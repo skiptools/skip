@@ -1,9 +1,9 @@
 import Foundation
 
-struct UnsupportedTypes {
+struct UnsupportedTypes1 {
 }
 
-func unsupportedFunction() {
+func unsupportedFunction1() {
 }
 
 #if DEBUG
