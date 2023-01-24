@@ -18,16 +18,16 @@ import SwiftSyntax
         try await action.perform(on: files)
     }
 
-    private static func processArguments(_ arguments: [String]) throws -> (Action, [String]) {
-        var files: [String] = []
+    private static func processArguments(_ arguments: [String]) throws -> (Action, [SourceFile]) {
+        var files: [SourceFile] = []
         var action: Action?
         for argument in arguments {
             if argument == "-printAST" {
                 action = PrintASTAction()
             } else if argument.hasPrefix("-") {
                 throw RunnerError(message: "Unrecognized option: \(argument)")
-            } else {
-                files.append(argument)
+            } else if let source = SourceFile(path: argument) {
+                files.append(source)
             }
         }
         return (action ?? TranspileAction(), files)
@@ -35,26 +35,25 @@ import SwiftSyntax
 }
 
 private protocol Action {
-    func perform(on files: [String]) async throws
+    func perform(on sourceFiles: [SourceFile]) async throws
 }
 
 private struct TranspileAction: Action {
-    func perform(on files: [String]) async throws {
-        let transpiler = Transpiler(inputFiles: files)
+    func perform(on sourceFiles: [SourceFile]) async throws {
+        let transpiler = Transpiler(sourceFiles: sourceFiles)
         try await transpiler.transpile { transpilation in
-            print(transpilation.outputFile)
-            print(String(repeating: "-", count: transpilation.outputFile.count))
-            print(transpilation.code)
+            print(transpilation.sourceFile.outputPath)
+            print(String(repeating: "-", count: transpilation.sourceFile.outputPath.count))
+            print(transpilation.outputContent)
             print()
         }
     }
 }
 
 private struct PrintASTAction: Action {
-    func perform(on files: [String]) async throws {
-        for file in files {
-            let source = try String(contentsOfFile: file)
-            let syntax = Parser.parse(source: source)
+    func perform(on sourceFiles: [SourceFile]) async throws {
+        for sourceFile in sourceFiles {
+            let syntax = try Parser.parse(source: sourceFile.content)
             print(syntax.root.prettyPrintTree)
         }
     }
