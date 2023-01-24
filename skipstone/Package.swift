@@ -11,6 +11,7 @@ let package = Package(
     ],
     products: [
         .library(name: "Skip", targets: ["Skip"]),
+        .plugin(name: "SkipTool", targets: ["SkipTool"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-syntax.git", branch: "main")
@@ -25,9 +26,11 @@ let package = Package(
             .product(name: "SwiftSyntax", package: "swift-syntax"),
             .product(name: "SwiftSyntaxParser", package: "swift-syntax"),
         ]),
+        .plugin(name: "SkipTool", capability: .buildTool(), dependencies: ["SkipRunner"]),
         .plugin(name: "SkipCommand",
                 capability: .command(intent: .custom(verb: "skip", description: "Run Skip transpiler")),
                 dependencies: ["SkipRunner"]),
         .testTarget(name: "SkipTests", dependencies: ["Skip"]),
+        .testTarget(name: "SkipRunnerTests", dependencies: [], plugins: ["SkipTool"]),
     ]
 )

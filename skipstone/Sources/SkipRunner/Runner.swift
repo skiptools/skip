@@ -18,15 +18,15 @@ import SwiftSyntax
         try await action.perform(on: files)
     }
 
-    private static func processArguments(_ arguments: [String]) throws -> (Action, [SourceFile]) {
-        var files: [SourceFile] = []
+    private static func processArguments(_ arguments: [String]) throws -> (Action, [Source.File]) {
+        var files: [Source.File] = []
         var action: Action?
         for argument in arguments {
             if argument == "-printAST" {
                 action = PrintASTAction()
             } else if argument.hasPrefix("-") {
                 throw RunnerError(message: "Unrecognized option: \(argument)")
-            } else if let source = SourceFile(path: argument) {
+            } else if let source = Source.File(path: argument) {
                 files.append(source)
             }
         }
@@ -35,13 +35,16 @@ import SwiftSyntax
 }
 
 private protocol Action {
-    func perform(on sourceFiles: [SourceFile]) async throws
+    func perform(on sourceFiles: [Source.File]) async throws
 }
 
 private struct TranspileAction: Action {
-    func perform(on sourceFiles: [SourceFile]) async throws {
+    func perform(on sourceFiles: [Source.File]) async throws {
         let transpiler = Transpiler(sourceFiles: sourceFiles)
         try await transpiler.transpile { transpilation in
+            for message in transpilation.messages {
+                print(message)
+            }
             print(transpilation.sourceFile.outputPath)
             print(String(repeating: "-", count: transpilation.sourceFile.outputPath.count))
             print(transpilation.outputContent)
@@ -51,9 +54,9 @@ private struct TranspileAction: Action {
 }
 
 private struct PrintASTAction: Action {
-    func perform(on sourceFiles: [SourceFile]) async throws {
+    func perform(on sourceFiles: [Source.File]) async throws {
         for sourceFile in sourceFiles {
-            let syntax = try Parser.parse(source: sourceFile.content)
+            let syntax = try Parser.parse(source: Source(file: sourceFile).content)
             print(syntax.root.prettyPrintTree)
         }
     }

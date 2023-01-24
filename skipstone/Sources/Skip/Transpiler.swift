@@ -4,10 +4,10 @@ import SwiftSyntax
 
 /// Manages the transpilation process.
 public struct Transpiler {
-    public let sourceFiles: [SourceFile]
+    public let sourceFiles: [Source.File]
 
     /// Supply files to transpile. Only `.swift` files will be processed.
-    public init(sourceFiles: [SourceFile]) {
+    public init(sourceFiles: [Source.File]) {
         self.sourceFiles = sourceFiles
     }
 
@@ -17,7 +17,7 @@ public struct Transpiler {
         try await withThrowingTaskGroup(of: Void.self) { group in
             for sourceFile in sourceFiles {
                 group.addTask {
-                    let syntaxTree = try SyntaxTree(sourceFile: sourceFile)
+                    let syntaxTree = try SyntaxTree(source: Source(file: sourceFile))
                     try codebaseInfo.gather(from: syntaxTree)
                 }
             }
@@ -28,7 +28,7 @@ public struct Transpiler {
             let translator = KotlinTranslator(codebaseInfo: codebaseInfo)
             for sourceFile in sourceFiles {
                 group.addTask {
-                    let syntaxTree = try SyntaxTree(sourceFile: sourceFile)
+                    let syntaxTree = try SyntaxTree(source: Source(file: sourceFile))
                     return try translator.translate(syntaxTree)
                 }
             }
