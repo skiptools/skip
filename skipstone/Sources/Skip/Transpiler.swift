@@ -13,27 +13,22 @@ public struct Transpiler {
 
     /// Perform transpilation, feeding results to the given handler.
     public func transpile(handler: (Transpilation) throws -> Void) async throws {
-        let syntaxTrees = try await withThrowingTaskGroup(of: SyntaxTree.self) { group in
+        let codebaseInfo = CodebaseInfo()
+        try await withThrowingTaskGroup(of: Void.self) { group in
             for sourceFile in sourceFiles {
                 group.addTask {
-                    return try SyntaxTree(sourceFile: sourceFile)
+                    let syntaxTree = try SyntaxTree(sourceFile: sourceFile)
+                    try codebaseInfo.gather(from: syntaxTree)
                 }
             }
-            var syntaxTrees: [SyntaxTree] = []
-            for try await syntaxTree in group {
-                syntaxTrees.append(syntaxTree)
-            }
-            return syntaxTrees
+            try await group.waitForAll()
         }
-
-        let codebaseInfo = try await Task {
-            return try CodebaseInfo(syntaxTrees: syntaxTrees)
-        }.value
 
         let transpilations = try await withThrowingTaskGroup(of: Transpilation.self) { group in
             let translator = KotlinTranslator(codebaseInfo: codebaseInfo)
-            for syntaxTree in syntaxTrees {
+            for sourceFile in sourceFiles {
                 group.addTask {
+                    let syntaxTree = try SyntaxTree(sourceFile: sourceFile)
                     return try translator.translate(syntaxTree)
                 }
             }
