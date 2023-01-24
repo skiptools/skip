@@ -49,7 +49,13 @@ private struct PrintASTAction: Action {
 }
 
 private struct TranspileAction: Action {
-    func perform(on files: [String]) {
-        // TODO: Implement transpile action
+    func perform(on files: [String]) throws {
+        let transpiler = Transpiler(inputFiles: files)
+        try transpiler.transpile { transpilation in
+            print(transpilation.outputFile)
+            print(String(repeating: "-", count: transpilation.outputFile.count))
+            print(transpilation.code)
+            print()
+        }
     }
 }
