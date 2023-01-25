@@ -1,7 +1,7 @@
 import Foundation
 import SwiftSyntax
 
-extension Syntax {
+extension SyntaxProtocol {
     /// Human-readable name of this syntax type.
     public var typeName: String {
         return String(describing: kind)
@@ -9,7 +9,19 @@ extension Syntax {
 
     /// Pretty-printable tree rooted on this syntax node.
     public var prettyPrintTree: PrettyPrintTree {
-        return PrettyPrintVisitor().visit(self)
+        return PrettyPrintVisitor().visit(Syntax(self))
+    }
+
+    /// The source code for this syntax as it appears in the source file.
+    public func sourceCode(in source: Source) -> String {
+        let startOffset = positionAfterSkippingLeadingTrivia.utf8Offset
+        let length = contentLength.utf8Length
+        let endOffset = startOffset + length
+
+        let utf8 = source.content.utf8
+        let startIndex = utf8.index(utf8.startIndex, offsetBy: startOffset)
+        let endIndex = utf8.index(utf8.startIndex, offsetBy: endOffset)
+        return String(utf8[startIndex..<endIndex]) ?? ""
     }
 }
 
