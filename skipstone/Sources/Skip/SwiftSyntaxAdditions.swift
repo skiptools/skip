@@ -7,21 +7,23 @@ extension SyntaxProtocol {
         return String(describing: kind)
     }
 
+    /// Xcode-compatible range of this syntax in the given source.
+    func range(in source: Source) -> Source.Range {
+        let offset = positionAfterSkippingLeadingTrivia.utf8Offset
+        let length = contentLength.utf8Length
+        return source.range(offset: offset, length: length)
+    }
+
+    /// Return the source code of this syntax.
+    func sourceCode(in source: Source) -> String {
+        let offset = positionAfterSkippingLeadingTrivia.utf8Offset
+        let length = contentLength.utf8Length
+        return source.content(offset: offset, length: length)
+    }
+
     /// Pretty-printable tree rooted on this syntax node.
     public var prettyPrintTree: PrettyPrintTree {
         return PrettyPrintVisitor().visit(Syntax(self))
-    }
-
-    /// The source code for this syntax as it appears in the source file.
-    public func sourceCode(in source: Source) -> String {
-        let startOffset = positionAfterSkippingLeadingTrivia.utf8Offset
-        let length = contentLength.utf8Length
-        let endOffset = startOffset + length
-
-        let utf8 = source.content.utf8
-        let startIndex = utf8.index(utf8.startIndex, offsetBy: startOffset)
-        let endIndex = utf8.index(utf8.startIndex, offsetBy: endOffset)
-        return String(utf8[startIndex..<endIndex]) ?? ""
     }
 }
 
@@ -44,3 +46,87 @@ private class PrettyPrintVisitor: SyntaxVisitor {
     }
 }
 
+// MARK: - Helper protocols
+
+/// An element in a list of syntaxes (e.g. a list of declarations or statements). These lists, like `MemberDeclListSyntax`
+/// and `CodeBlockItemListSyntax`, usually wrap their elements in these containers. This protocol allows us to use them generically.
+protocol SyntaxListElement: SyntaxProtocol {
+    var content: Syntax { get }
+}
+
+/// A syntax that represents a list of elements, e.g. a list of statements or declarations.
+protocol SyntaxList: Sequence where Element: SyntaxListElement {
+}
+
+/// A syntax that represents a code block. Contains a `SyntaxList` of statements and an end syntax (usually a closing brace) from which to get any final comment.
+protocol SyntaxListContainer {
+    associatedtype ElementList: SyntaxList
+    var syntaxList: ElementList { get }
+    var endSyntax: Syntax { get }
+}
+
+// MARK: - Conformances
+
+extension SourceFileSyntax: SyntaxListContainer {
+    var syntaxList: CodeBlockItemListSyntax {
+        return self.statements
+    }
+
+    var endSyntax: Syntax {
+        return Syntax(self.eofToken)
+    }
+}
+
+// Code blocks
+
+extension CodeBlockItemSyntax: SyntaxListElement {
+    var content: Syntax {
+        return Syntax(item)
+    }
+}
+
+extension CodeBlockItemListSyntax: SyntaxList {
+}
+
+extension CodeBlockSyntax: SyntaxListContainer {
+    var syntaxList: CodeBlockItemListSyntax {
+        return self.statements
+    }
+
+    var endSyntax: Syntax {
+        return Syntax(self.rightBrace)
+    }
+}
+
+// Member declarations
+
+extension MemberDeclListItemSyntax: SyntaxListElement {
+    var content: Syntax {
+        return Syntax(self.decl)
+    }
+}
+
+extension MemberDeclListSyntax: SyntaxList {
+}
+
+extension MemberDeclBlockSyntax: SyntaxListContainer {
+    var syntaxList: MemberDeclListSyntax {
+        return self.members
+    }
+
+    var endSyntax: Syntax {
+        return Syntax(self.rightBrace)
+    }
+}
+
+// Closure expressions
+
+extension ClosureExprSyntax: SyntaxListContainer {
+    var syntaxList: CodeBlockItemListSyntax {
+        return self.statements
+    }
+
+    var endSyntax: Syntax {
+        return Syntax(self.rightBrace)
+    }
+}

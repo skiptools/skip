@@ -29,7 +29,7 @@ public struct Transpiler {
             for sourceFile in sourceFiles {
                 group.addTask {
                     let syntaxTree = try SyntaxTree(source: Source(file: sourceFile))
-                    return try translator.translate(syntaxTree)
+                    return translator.translate(syntaxTree)
                 }
             }
             var transpilations: [Transpilation] = []

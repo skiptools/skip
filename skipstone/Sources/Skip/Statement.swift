@@ -5,12 +5,46 @@ protocol Statement {
     var type: StatementType { get }
     var syntax: Syntax? { get }
     var range: Source.Range? { get }
+    var children: [Statement] { get }
+
+    /// Attempt to construct this statement type from the given syntax.
+    init?(syntax: Syntax, source: Source)
 
     /// Pretty-printable tree rooted on this syntax statement.
     var prettyPrintTree: PrettyPrintTree { get }
 
-    /// Attempt to construct this statement type from the given syntax.
-    init?(syntax: Syntax, source: Source)
+    /// Messages about this statement and its children.
+    var messages: [Message] { get }
+}
+
+extension Statement {
+    var syntax: Syntax? {
+        return nil
+    }
+
+    var range: Source.Range? {
+        return nil
+    }
+
+    var children: [Statement] {
+        return []
+    }
+
+    var prettyPrintTree: PrettyPrintTree {
+        return PrettyPrintTree(root: String(describing: type), children: prettyPrintChildren)
+    }
+
+    var prettyPrintChildren: [PrettyPrintTree] {
+        return children.map { $0.prettyPrintTree }
+    }
+
+    var messages: [Message] {
+        return messagesChildren
+    }
+
+    var messagesChildren: [Message] {
+        return children.flatMap { $0.messages }
+    }
 }
 
 /// Supported Swift statement types.
@@ -42,9 +76,12 @@ enum StatementType: CaseIterable {
     case typealiasDeclaration
     case variableDeclaration
 
-    /// A statement that only exists in the target language.
-    case targetLanguage
+    /// A statement representing raw Swift code.
+    case raw
+    /// A statement that only exists to add a message to the syntax tree.
+    case message
 
+    /// The Swift data type that represents this statement type.
     var representingType: Statement.Type? {
         switch self {
         case .assignment:
@@ -97,27 +134,28 @@ enum StatementType: CaseIterable {
             return nil
         case .variableDeclaration:
             return nil
-        case .targetLanguage:
-            return nil
+
+        case .raw:
+            return RawStatement.self
+        case .message:
+            return MessageStatement.self
         }
     }
 }
 
+/// Create statements from syntax.
 struct StatementFactory {
-    func `for`(syntax: Syntax, in source: Source) -> Statement? {
+    static func `for`(syntax: Syntax, in source: Source) -> Statement {
         for statementType in StatementType.allCases {
             if let representingType = statementType.representingType, let statement = representingType.init(syntax: syntax, source: source) {
                 return statement
             }
         }
-        return nil
+        return RawStatement(syntax: syntax, source: source)!
     }
 }
 
 struct ImportDeclaration: Statement {
-    var type: StatementType { .importDeclaration }
-    let syntax: Syntax?
-    let range: Source.Range?
     let moduleName: String
 
     init(moduleName: String) {
@@ -126,18 +164,60 @@ struct ImportDeclaration: Statement {
         self.moduleName = moduleName
     }
 
+    var type: StatementType { .importDeclaration }
+    let syntax: Syntax?
+    let range: Source.Range?
+
     init?(syntax: Syntax, source: Source) {
         guard let importDecl = syntax.as(ImportDeclSyntax.self) else {
             return nil
         }
         self.syntax = syntax
-        self.range = source.range(of: syntax)
+        self.range = syntax.range(in: source)
         self.moduleName = importDecl.path.sourceCode(in: source)
     }
 
-    var prettyPrintTree: PrettyPrintTree {
-        return PrettyPrintTree(root: String(describing: self.type), children: [
-            PrettyPrintTree(root: moduleName)
-        ])
+    var prettyPrintChildren: [PrettyPrintTree] {
+        return [PrettyPrintTree(root: moduleName)]
+    }
+}
+
+struct RawStatement: Statement {
+    let sourceCode: String
+
+    init(sourceCode: String) {
+        self.syntax = nil
+        self.range = nil
+        self.sourceCode = sourceCode
+        self.messages = []
+    }
+
+    var type: StatementType { .raw }
+    let syntax: Syntax?
+    let range: Source.Range?
+    let messages: [Message]
+
+    init?(syntax: Syntax, source: Source) {
+        self.syntax = syntax
+        self.range = syntax.range(in: source)
+        self.sourceCode = syntax.sourceCode(in: source)
+        self.messages = [Message(severity: .warning, message: "Unsupported Swift syntax", source: source, range: range)]
+    }
+
+    var prettyPrintChildren: [PrettyPrintTree] {
+        return [PrettyPrintTree(root: sourceCode)]
+    }
+}
+
+struct MessageStatement: Statement {
+    var type: StatementType { .message }
+    let messages: [Message]
+
+    init(message: Message) {
+        self.messages = [message]
+    }
+
+    init?(syntax: Syntax, source: Source) {
+        return nil
     }
 }

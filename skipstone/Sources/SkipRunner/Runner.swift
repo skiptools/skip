@@ -26,8 +26,11 @@ import SwiftSyntax
                 action = PrintASTAction()
             } else if argument.hasPrefix("-") {
                 throw RunnerError(message: "Unrecognized option: \(argument)")
-            } else if let source = Source.File(path: argument) {
-                files.append(source)
+            } else {
+                let source = Source.File(path: argument)
+                if source.isSwift {
+                    files.append(source)
+                }
             }
         }
         return (action ?? TranspileAction(), files)
@@ -45,8 +48,6 @@ private struct TranspileAction: Action {
             for message in transpilation.messages {
                 print(message)
             }
-            print(transpilation.sourceFile.outputPath)
-            print(String(repeating: "-", count: transpilation.sourceFile.outputPath.count))
             print(transpilation.outputContent)
             print()
         }

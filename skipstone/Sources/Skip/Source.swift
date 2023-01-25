@@ -30,14 +30,19 @@ public struct Source {
         return String(lines[lineNumber - 1].line)
     }
 
-    /// Return the Xcode-compatible range for the given syntax.
-    func range(of syntax: SyntaxProtocol) -> Range {
-        let startOffset = syntax.positionAfterSkippingLeadingTrivia.utf8Offset
-        let length = syntax.contentLength.utf8Length
-
-        let startPosition = position(of: startOffset)
-        let endPosition = position(of: startOffset + length - 1) // End of range is inclusive
+    /// Return an Xcode-compatible range for the given UTF8 offsets.
+    func range(offset: Int, length: Int) -> Range {
+        let startPosition = position(of: offset)
+        let endPosition = position(of: offset + length - 1) // End of range is inclusive
         return Range(start: startPosition, end: endPosition)
+    }
+
+    /// Return the content for the given UTF8 offsets.
+    func content(offset: Int, length: Int) -> String {
+        let utf8 = content.utf8
+        let startIndex = utf8.index(utf8.startIndex, offsetBy: offset)
+        let endIndex = utf8.index(utf8.startIndex, offsetBy: offset + length)
+        return String(utf8[startIndex..<endIndex]) ?? ""
     }
 
     private func position(of offset: Int) -> Position {
@@ -59,15 +64,19 @@ public struct Source {
     public struct File {
         public let path: String
 
-        public init?(path: String) {
-            guard path.hasSuffix(".swift") && path.count > ".swift".count else {
-                return nil
-            }
+        public init(path: String) {
             self.path = path
         }
 
-        public var outputPath: String {
-            return path.dropLast(".swift".count) + ".kt"
+        public var isSwift: Bool {
+            return path.hasSuffix(".swift")
+        }
+
+        public func outputFile(withExtension: String) -> File {
+            guard let dotIndex = path.lastIndex(of: ".") else {
+                return File(path: "\(path).\(withExtension)")
+            }
+            return File(path: path[...dotIndex] + withExtension)
         }
     }
 
@@ -88,5 +97,3 @@ public struct Source {
         }
     }
 }
-
-
