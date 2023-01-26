@@ -8,13 +8,16 @@ protocol Statement {
     var children: [Statement] { get }
 
     /// Attempt to construct this statement type from the given syntax.
-    init?(syntax: Syntax, source: Source)
+    init?(syntax: Syntax, in syntaxTree: SyntaxTree)
 
     /// Pretty-printable tree rooted on this syntax statement.
     var prettyPrintTree: PrettyPrintTree { get }
 
-    /// Messages about this statement and its children.
-    var messages: [Message] { get }
+    /// Any message about this statement.
+    var message: Message? { get }
+
+    /// Recursive traversal of all messages from the tree rooted on this syntax statement.
+    var allMessages: [Message] { get }
 }
 
 extension Statement {
@@ -31,19 +34,23 @@ extension Statement {
     }
 
     var prettyPrintTree: PrettyPrintTree {
-        return PrettyPrintTree(root: String(describing: type), children: prettyPrintChildren)
+        return PrettyPrintTree(root: String(describing: type), children: prettyPrintChildren + children.map { $0.prettyPrintTree })
     }
 
     var prettyPrintChildren: [PrettyPrintTree] {
-        return children.map { $0.prettyPrintTree }
+        return []
     }
 
-    var messages: [Message] {
-        return messagesChildren
+    var message: Message? {
+        return nil
     }
 
-    var messagesChildren: [Message] {
-        return children.flatMap { $0.messages }
+    var allMessages: [Message] {
+        var messages: [Message] = []
+        if let message {
+            messages.append(message)
+        }
+        return messages + children.flatMap { $0.allMessages }
     }
 }
 
@@ -127,7 +134,7 @@ enum StatementType: CaseIterable {
         case .initDeclaration:
             return nil
         case .protocolDeclaration:
-            return nil
+            return ProtocolDeclaration.self
         case .structDeclaration:
             return nil
         case .typealiasDeclaration:
@@ -145,63 +152,115 @@ enum StatementType: CaseIterable {
 
 /// Create statements from syntax.
 struct StatementFactory {
-    static func `for`(syntax: Syntax, in source: Source) -> Statement {
+    static func `for`(syntax: Syntax, in syntaxTree: SyntaxTree) -> Statement {
         for statementType in StatementType.allCases {
-            if let representingType = statementType.representingType, let statement = representingType.init(syntax: syntax, source: source) {
+            if let representingType = statementType.representingType, let statement = representingType.init(syntax: syntax, in: syntaxTree) {
                 return statement
             }
         }
-        return RawStatement(syntax: syntax, source: source)!
+        return RawStatement(syntax: syntax, in: syntaxTree)!
     }
 }
 
 struct ImportDeclaration: Statement {
-    let moduleName: String
+    let modulePath: [String]
 
-    init(moduleName: String) {
+    init(modulePath: [String]) {
         self.syntax = nil
         self.range = nil
-        self.moduleName = moduleName
+        self.modulePath = modulePath
     }
 
     var type: StatementType { .importDeclaration }
     let syntax: Syntax?
     let range: Source.Range?
 
-    init?(syntax: Syntax, source: Source) {
+    init?(syntax: Syntax, in syntaxTree: SyntaxTree) {
         guard let importDecl = syntax.as(ImportDeclSyntax.self) else {
             return nil
         }
         self.syntax = syntax
-        self.range = syntax.range(in: source)
-        self.moduleName = importDecl.path.sourceCode(in: source)
+        self.range = syntax.range(in: syntaxTree.source)
+        self.modulePath = importDecl.path.map { $0.name.text }
     }
 
     var prettyPrintChildren: [PrettyPrintTree] {
-        return [PrettyPrintTree(root: moduleName)]
+        return [PrettyPrintTree(root: modulePath.joined(separator: "."))]
+    }
+}
+
+// TODO: Attributes, modifiers, generics, where clause
+struct ProtocolDeclaration: Statement {
+    let name: String
+    let inherits: [TypeSignature]
+    let members: [Statement]
+
+    init(name: String, inherits: [TypeSignature] = [], members: [Statement] = []) {
+        self.syntax = nil
+        self.range = nil
+        self.message = nil
+        self.name = name
+        self.inherits = inherits
+        self.members = members
+    }
+
+    var type: StatementType { .protocolDeclaration }
+    let syntax: Syntax?
+    let range: Source.Range?
+    let message: Message?
+
+    init?(syntax: Syntax, in syntaxTree: SyntaxTree) {
+        guard let protocolDecl = syntax.as(ProtocolDeclSyntax.self) else {
+            return nil
+        }
+        self.syntax = syntax
+        self.range = syntax.range(in: syntaxTree.source)
+        self.name = protocolDecl.identifier.text
+        var inherits: [TypeSignature] = []
+        var message: Message? = nil
+        if let inheritedTypeCollection = protocolDecl.inheritanceClause?.inheritedTypeCollection {
+            for typeSyntax in inheritedTypeCollection {
+                if let typeSignature = TypeSignature.for(syntax: typeSyntax.typeName) {
+                    inherits.append(typeSignature)
+                } else if message == nil {
+                    message = .unsupportedTypeSignature(source: syntaxTree.source, range: typeSyntax.range(in: syntaxTree.source))
+                }
+            }
+        }
+        self.inherits = inherits
+        self.message = message
+        self.members = syntaxTree.process(syntaxListContainer: protocolDecl.members)
+    }
+
+    var children: [Statement] {
+        return members
+    }
+
+    var prettyPrintChildren: [PrettyPrintTree] {
+        return [PrettyPrintTree(root: name)]
     }
 }
 
 struct RawStatement: Statement {
     let sourceCode: String
+    var message: Message?
 
-    init(sourceCode: String) {
+    init(sourceCode: String, message: Message? = nil) {
         self.syntax = nil
         self.range = nil
         self.sourceCode = sourceCode
-        self.messages = []
+        self.message = message
     }
 
     var type: StatementType { .raw }
     let syntax: Syntax?
     let range: Source.Range?
-    let messages: [Message]
 
-    init?(syntax: Syntax, source: Source) {
+    init?(syntax: Syntax, in syntaxTree: SyntaxTree) {
         self.syntax = syntax
-        self.range = syntax.range(in: source)
-        self.sourceCode = syntax.sourceCode(in: source)
-        self.messages = [Message(severity: .warning, message: "Unsupported Swift syntax", source: source, range: range)]
+        self.range = syntax.range(in: syntaxTree.source)
+        self.sourceCode = syntax.sourceCode(in: syntaxTree.source)
+        self.message = .unsupportedSyntax(source: syntaxTree.source, range: range)
     }
 
     var prettyPrintChildren: [PrettyPrintTree] {
@@ -211,13 +270,13 @@ struct RawStatement: Statement {
 
 struct MessageStatement: Statement {
     var type: StatementType { .message }
-    let messages: [Message]
+    let message: Message?
 
     init(message: Message) {
-        self.messages = [message]
+        self.message = message
     }
 
-    init?(syntax: Syntax, source: Source) {
+    init?(syntax: Syntax, in syntaxTree: SyntaxTree) {
         return nil
     }
 }

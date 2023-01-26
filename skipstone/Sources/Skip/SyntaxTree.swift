@@ -13,11 +13,11 @@ struct SyntaxTree {
         self.statements = process(syntaxListContainer: syntax)
     }
 
-    private func process<ListContainer: SyntaxListContainer>(syntaxListContainer: ListContainer) -> [Statement] {
+    func process<ListContainer: SyntaxListContainer>(syntaxListContainer: ListContainer) -> [Statement] {
         return process(syntaxList: syntaxListContainer.syntaxList)
     }
 
-    private func process<List: SyntaxList>(syntaxList: List) -> [Statement] {
-        return syntaxList.map { StatementFactory.for(syntax: $0.content, in: source) }
+    func process<List: SyntaxList>(syntaxList: List) -> [Statement] {
+        return syntaxList.map { StatementFactory.for(syntax: $0.content, in: self) }
     }
 }

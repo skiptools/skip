@@ -53,3 +53,17 @@ public struct Message: CustomStringConvertible {
         return "\(message)\n\(line)\n\(underline)"
     }
 }
+
+extension Message {
+    static func unsupportedSyntax(source: Source? = nil, range: Source.Range? = nil) -> Message {
+        return Message(severity: .warning, message: "Unsupported Swift syntax", source: source, range: range)
+    }
+
+    static func untranslatableSyntax(source: Source? = nil, range: Source.Range? = nil) -> Message {
+        return Message(severity: .warning, message: "Untranslatable Swift syntax", source: source, range: range)
+    }
+
+    static func unsupportedTypeSignature(source: Source? = nil, range: Source.Range? = nil) -> Message {
+        return Message(severity: .warning, message: "Unsupported type signature", source: source, range: range)
+    }
+}

@@ -25,11 +25,11 @@ public struct Transpiler {
         }
 
         let transpilations = try await withThrowingTaskGroup(of: Transpilation.self) { group in
-            let translator = KotlinTranslator(codebaseInfo: codebaseInfo)
             for sourceFile in sourceFiles {
                 group.addTask {
                     let syntaxTree = try SyntaxTree(source: Source(file: sourceFile))
-                    return translator.translate(syntaxTree)
+                    let translator = KotlinTranslator(syntaxTree: syntaxTree, codebaseInfo: codebaseInfo)
+                    return translator.translate()
                 }
             }
             var transpilations: [Transpilation] = []

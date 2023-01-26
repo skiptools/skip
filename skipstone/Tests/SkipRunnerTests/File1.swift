@@ -3,6 +3,9 @@ import Foundation
 struct UnsupportedTypes1 {
 }
 
+protocol UnsupportedProtocol {
+}
+
 func unsupportedFunction1() {
 }
 
