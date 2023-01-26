@@ -1,5 +1,7 @@
 /// Indentation helper.
 struct Indentation: ExpressibleByIntegerLiteral, CustomStringConvertible {
+    static let zero = Indentation(level: 0)
+    
     let level: Int
 
     init(level: Int) {

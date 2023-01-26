@@ -3,13 +3,13 @@ import SwiftSyntax
 /// A source code type signature.
 indirect enum TypeSignature: CustomStringConvertible {
     case array(TypeSignature)
-    case base(String, [TypeSignature]) // Generics
-    case classRestricted // class
-    case composition([TypeSignature]) // A & B & C
+    case base(String, [TypeSignature]) // A<B, C>
+    case classRestricted // 'class'
+    case composition([TypeSignature]) // (A & B & C)
     case dictionary(TypeSignature, TypeSignature)
     case function([TypeSignature], TypeSignature)
-    case member(TypeSignature, TypeSignature)
-    case metaType(TypeSignature)
+    case member(TypeSignature, TypeSignature) // A.B
+    case metaType(TypeSignature) // A.Type
     case optional(TypeSignature)
     case tuple([TypeSignature])
     case unwrappedOptional(TypeSignature)
@@ -20,6 +20,9 @@ indirect enum TypeSignature: CustomStringConvertible {
         case .array(let type):
             return "[\(type)]"
         case .base(let string, let generics):
+            guard !generics.isEmpty else {
+                return string
+            }
             return "\(string)<\(generics.map { $0.description }.joined(separator: ", "))>"
         case .classRestricted:
             return "class"
@@ -139,6 +142,7 @@ indirect enum TypeSignature: CustomStringConvertible {
             }
             return .unwrappedOptional(wrappedType)
 
+        // Unsupported
         case .missingType:
             fallthrough
         case .namedOpaqueReturnType:

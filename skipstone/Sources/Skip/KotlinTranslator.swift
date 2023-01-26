@@ -5,10 +5,11 @@ struct KotlinTranslator {
 
     func translate() -> Transpilation {
         let kotlinSyntaxTree = translateSyntaxTree()
-        let messages = codebaseInfo.messages(for: syntaxTree.source.file) + kotlinSyntaxTree.statements.flatMap { $0.allMessages }
-        let outputContent = kotlinSyntaxTree.statements.map { $0.code(indentation: 0) }.joined(separator: "\n")
+        let messages = codebaseInfo.messages(for: syntaxTree.source.file) + kotlinSyntaxTree.messages
         let outputFile = syntaxTree.source.file.outputFile(withExtension: "kt")
-        return Transpilation(sourceFile: syntaxTree.source.file, outputFile: outputFile, outputContent: outputContent, messages: messages)
+        let outputGenerator = OutputGenerator(roots: kotlinSyntaxTree.statements)
+        let (outputContent, outputMap) = outputGenerator.generateOutput()
+        return Transpilation(sourceFile: syntaxTree.source.file, outputFile: outputFile, outputContent: outputContent, outputMap: outputMap, messages: messages)
     }
 
     func translateSyntaxTree() -> KotlinSyntaxTree {
@@ -25,7 +26,7 @@ struct KotlinTranslator {
 
         // Fall back to a raw translation
         if let syntax = statement.syntax {
-            var rawStatement = RawStatement(syntax: syntax, in: syntaxTree)!
+            var rawStatement = RawStatement(syntax: syntax, extras: statement.extras, in: syntaxTree)!
             rawStatement.message = .untranslatableSyntax(source: syntaxTree.source, range: statement.range)
             return rawStatement.kotlinStatements(with: self)
         }

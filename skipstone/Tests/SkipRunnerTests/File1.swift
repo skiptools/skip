@@ -1,7 +1,14 @@
+// Header comment
+
 import Foundation
 
+// Standalone comment
+
+// Decl comment
 struct UnsupportedTypes1 {
 }
+
+// Protocol comment
 
 protocol UnsupportedProtocol {
 }
@@ -14,3 +21,5 @@ let unsupportedLet = 0
 #else
 let unsupportedLet = 1
 #endif
+
+// Footer comment

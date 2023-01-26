@@ -4,11 +4,13 @@ import SwiftSyntax
 protocol Statement {
     var type: StatementType { get }
     var syntax: Syntax? { get }
+    var file: Source.File? { get }
     var range: Source.Range? { get }
+    var extras: StatementExtras? { get }
     var children: [Statement] { get }
 
     /// Attempt to construct this statement type from the given syntax.
-    init?(syntax: Syntax, in syntaxTree: SyntaxTree)
+    init?(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree)
 
     /// Pretty-printable tree rooted on this syntax statement.
     var prettyPrintTree: PrettyPrintTree { get }
@@ -17,7 +19,7 @@ protocol Statement {
     var message: Message? { get }
 
     /// Recursive traversal of all messages from the tree rooted on this syntax statement.
-    var allMessages: [Message] { get }
+    var messages: [Message] { get }
 }
 
 extension Statement {
@@ -25,7 +27,15 @@ extension Statement {
         return nil
     }
 
+    var file: Source.File? {
+        return nil
+    }
+
     var range: Source.Range? {
+        return nil
+    }
+
+    var extras: StatementExtras? {
         return nil
     }
 
@@ -45,12 +55,12 @@ extension Statement {
         return nil
     }
 
-    var allMessages: [Message] {
+    var messages: [Message] {
         var messages: [Message] = []
-        if let message {
+        if let message, extras?.directives.contains(.nowarn) != true {
             messages.append(message)
         }
-        return messages + children.flatMap { $0.allMessages }
+        return messages + children.flatMap { $0.messages }
     }
 }
 
@@ -152,13 +162,25 @@ enum StatementType: CaseIterable {
 
 /// Create statements from syntax.
 struct StatementFactory {
-    static func `for`(syntax: Syntax, in syntaxTree: SyntaxTree) -> Statement {
+    static func `for`(syntax: Syntax, in syntaxTree: SyntaxTree) -> [Statement] {
+        let extras = StatementExtras.process(syntax: syntax)
+        var statements: [Statement] = []
+        if let extras {
+            let (extraStatements, replace) = extras.statements(syntax: syntax, in: syntaxTree)
+            guard !replace else {
+                return extraStatements
+            }
+            statements = extraStatements
+        }
+
         for statementType in StatementType.allCases {
-            if let representingType = statementType.representingType, let statement = representingType.init(syntax: syntax, in: syntaxTree) {
-                return statement
+            if let representingType = statementType.representingType, let statement = representingType.init(syntax: syntax, extras: extras, in: syntaxTree) {
+                statements.append(statement)
+                return statements
             }
         }
-        return RawStatement(syntax: syntax, in: syntaxTree)!
+        statements.append(RawStatement(syntax: syntax, extras: extras, in: syntaxTree)!)
+        return statements
     }
 }
 
@@ -167,20 +189,26 @@ struct ImportDeclaration: Statement {
 
     init(modulePath: [String]) {
         self.syntax = nil
+        self.file = nil
         self.range = nil
+        self.extras = nil
         self.modulePath = modulePath
     }
 
     var type: StatementType { .importDeclaration }
     let syntax: Syntax?
+    let file: Source.File?
     let range: Source.Range?
+    let extras: StatementExtras?
 
-    init?(syntax: Syntax, in syntaxTree: SyntaxTree) {
+    init?(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) {
         guard let importDecl = syntax.as(ImportDeclSyntax.self) else {
             return nil
         }
         self.syntax = syntax
+        self.file = syntaxTree.source.file
         self.range = syntax.range(in: syntaxTree.source)
+        self.extras = extras
         self.modulePath = importDecl.path.map { $0.name.text }
     }
 
@@ -197,7 +225,9 @@ struct ProtocolDeclaration: Statement {
 
     init(name: String, inherits: [TypeSignature] = [], members: [Statement] = []) {
         self.syntax = nil
+        self.file = nil
         self.range = nil
+        self.extras = nil
         self.message = nil
         self.name = name
         self.inherits = inherits
@@ -206,15 +236,19 @@ struct ProtocolDeclaration: Statement {
 
     var type: StatementType { .protocolDeclaration }
     let syntax: Syntax?
+    let file: Source.File?
     let range: Source.Range?
+    let extras: StatementExtras?
     let message: Message?
 
-    init?(syntax: Syntax, in syntaxTree: SyntaxTree) {
+    init?(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) {
         guard let protocolDecl = syntax.as(ProtocolDeclSyntax.self) else {
             return nil
         }
         self.syntax = syntax
+        self.file = syntaxTree.source.file
         self.range = syntax.range(in: syntaxTree.source)
+        self.extras = extras
         self.name = protocolDecl.identifier.text
         var inherits: [TypeSignature] = []
         var message: Message? = nil
@@ -245,20 +279,30 @@ struct RawStatement: Statement {
     let sourceCode: String
     var message: Message?
 
-    init(sourceCode: String, message: Message? = nil) {
-        self.syntax = nil
-        self.range = nil
+    init(sourceCode: String, message: Message? = nil, syntax: Syntax? = nil, extras: StatementExtras? = nil, in syntaxTree: SyntaxTree? = nil) {
+        self.syntax = syntax
+        self.file = syntaxTree?.source.file
+        if let syntaxTree {
+            range = syntax?.range(in: syntaxTree.source)
+        } else {
+            range = nil
+        }
+        self.extras = extras
         self.sourceCode = sourceCode
         self.message = message
     }
 
     var type: StatementType { .raw }
     let syntax: Syntax?
+    let file: Source.File?
     let range: Source.Range?
+    let extras: StatementExtras?
 
-    init?(syntax: Syntax, in syntaxTree: SyntaxTree) {
+    init?(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) {
         self.syntax = syntax
+        self.file = syntaxTree.source.file
         self.range = syntax.range(in: syntaxTree.source)
+        self.extras = extras
         self.sourceCode = syntax.sourceCode(in: syntaxTree.source)
         self.message = .unsupportedSyntax(source: syntaxTree.source, range: range)
     }
@@ -276,7 +320,7 @@ struct MessageStatement: Statement {
         self.message = message
     }
 
-    init?(syntax: Syntax, in syntaxTree: SyntaxTree) {
+    init?(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) {
         return nil
     }
 }

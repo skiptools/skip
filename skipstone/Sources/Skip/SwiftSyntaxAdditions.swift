@@ -7,6 +7,11 @@ extension SyntaxProtocol {
         return String(describing: kind)
     }
 
+    /// Pretty-printable tree rooted on this syntax node.
+    public var prettyPrintTree: PrettyPrintTree {
+        return PrettyPrintVisitor().visit(Syntax(self))
+    }
+
     /// Xcode-compatible range of this syntax in the given source.
     func range(in source: Source) -> Source.Range {
         let offset = positionAfterSkippingLeadingTrivia.utf8Offset
@@ -19,11 +24,6 @@ extension SyntaxProtocol {
         let offset = positionAfterSkippingLeadingTrivia.utf8Offset
         let length = contentLength.utf8Length
         return source.content(offset: offset, length: length)
-    }
-
-    /// Pretty-printable tree rooted on this syntax node.
-    public var prettyPrintTree: PrettyPrintTree {
-        return PrettyPrintVisitor().visit(Syntax(self))
     }
 }
 

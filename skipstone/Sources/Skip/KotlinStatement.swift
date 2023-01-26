@@ -1,12 +1,11 @@
 /// A node in the Kotlin syntax tree.
-protocol KotlinStatement {
+protocol KotlinStatement: OutputNode {
     /// A human-readable type name for this statement.
     var statementType: String { get }
+    var sourceFile: Source.File? { get }
     var sourceRange: Source.Range? { get }
+    var extras: StatementExtras? { get }
     var children: [KotlinStatement] { get }
-
-    /// Kotlin source code. May be empty.
-    func code(indentation: Indentation) -> String
 
     /// Pretty-printable tree rooted on this syntax statement.
     var prettyPrintTree: PrettyPrintTree { get }
@@ -15,11 +14,19 @@ protocol KotlinStatement {
     var message: Message? { get }
 
     /// Recursive traversal of all messages from the tree rooted on this syntax statement.
-    var allMessages: [Message] { get }
+    var messages: [Message] { get }
 }
 
 extension KotlinStatement {
+    var sourceFile: Source.File? {
+        return nil
+    }
+
     var sourceRange: Source.Range? {
+        return nil
+    }
+
+    var extras: StatementExtras? {
         return nil
     }
 
@@ -39,12 +46,16 @@ extension KotlinStatement {
         return nil
     }
 
-    var allMessages: [Message] {
+    var messages: [Message] {
         var messages: [Message] = []
-        if let message {
+        if let message, extras?.directives.contains(.nowarn) != true {
             messages.append(message)
         }
-        return messages + children.flatMap { $0.allMessages }
+        return messages + children.flatMap { $0.messages }
+    }
+
+    func leadingTrivia(indentation: Indentation) -> String {
+        return extras?.leadingTrivia(indentation: indentation) ?? ""
     }
 }
 
@@ -53,46 +64,55 @@ protocol KotlinTranslatable {
     func kotlinStatements(with translator: KotlinTranslator) -> [KotlinStatement]
 }
 
-/// Create a Kotlin statement with populated state, rather than creating a custom type.
+/// Create a Kotlin statement with populated state, rather than writing a custom type.
 struct PopulatedKotlinStatement: KotlinStatement {
     let statementType: String
+    var sourceFile: Source.File?
     var sourceRange: Source.Range?
+    var extras: StatementExtras?
     var children: [KotlinStatement]
     var message: Message?
     var prettyPrintChildrenCall: () -> [PrettyPrintTree]
-    var codeCall: (Indentation, [KotlinStatement]) -> String
+    var outputCall: (OutputGenerator, Indentation, [KotlinStatement]) -> Void
 
-    init(statementType: String, sourceRange: Source.Range? = nil, children: [KotlinStatement] = [], message: Message? = nil, prettyPrintChildrenCall: @escaping () -> [PrettyPrintTree] = { [] }, codeCall: @escaping (Indentation, [KotlinStatement]) -> String = { _, _ in "" }) {
+    init(statementType: String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil, children: [KotlinStatement] = [], message: Message? = nil, prettyPrintChildrenCall: @escaping () -> [PrettyPrintTree] = { [] }, outputCall: @escaping (OutputGenerator, Indentation, [KotlinStatement]) -> Void = { _, _, _ in }) {
         self.statementType = statementType
+        self.sourceFile = sourceFile
         self.sourceRange = sourceRange
+        self.extras = extras
         self.children = children
         self.message = message
         self.prettyPrintChildrenCall = prettyPrintChildrenCall
-        self.codeCall = codeCall
+        self.outputCall = outputCall
     }
 
-    init(statement: Statement, translator: KotlinTranslator, codeCall: @escaping (Indentation, [KotlinStatement]) -> String = { _, _ in "" }) {
+    init(statement: Statement, translator: KotlinTranslator, outputCall: @escaping (OutputGenerator, Indentation, [KotlinStatement]) -> Void = { _, _, _ in }) {
         self.statementType = String(describing: statement.type)
+        self.sourceFile = statement.file
         self.sourceRange = statement.range
+        self.extras = statement.extras
         self.children = statement.children.flatMap { translator.translateStatement($0) }
         self.message = statement.message
         self.prettyPrintChildrenCall = { statement.prettyPrintChildren }
-        self.codeCall = codeCall
+        self.outputCall = outputCall
     }
 
     var prettyPrintChildren: [PrettyPrintTree] {
         return prettyPrintChildrenCall()
     }
 
-    func code(indentation: Indentation) -> String {
-        return codeCall(indentation, children)
+    func append(to output: OutputGenerator, indentation: Indentation) {
+        outputCall(output, indentation, children)
     }
 }
 
 extension ImportDeclaration: KotlinTranslatable {
     func kotlinStatements(with translator: KotlinTranslator) -> [KotlinStatement] {
-        let statement = PopulatedKotlinStatement(statement: self, translator: translator) { indentation, _ in
-            return "\(indentation)import \(modulePath.joined(separator: "."))"
+        let statement = PopulatedKotlinStatement(statement: self, translator: translator) { output, indentation, _ in
+            output.append(indentation)
+            output.append("import ")
+            output.append(modulePath.joined(separator: "."))
+            output.append("\n")
         }
         return [statement]
     }
@@ -100,9 +120,19 @@ extension ImportDeclaration: KotlinTranslatable {
 
 extension ProtocolDeclaration: KotlinTranslatable {
     func kotlinStatements(with translator: KotlinTranslator) -> [KotlinStatement] {
-        let statement = PopulatedKotlinStatement(statement: self, translator: translator) { indentation, children in
-            // TODO: Children
-            return "\(indentation)interface \(name) {}"
+        let statement = PopulatedKotlinStatement(statement: self, translator: translator) { output, indentation, children in
+            output.append(indentation)
+            if let declaration = extras?.declaration {
+                output.append(declaration)
+            } else {
+                // TODO: Visibility, generics, inheritance, children
+                output.append("interface ")
+                output.append(name)
+                output.append(" {\n")
+            }
+            children.forEach { output.append($0, indentation: indentation.inc()) }
+            output.append(indentation)
+            output.append("}\n")
         }
         return [statement]
     }
@@ -110,8 +140,10 @@ extension ProtocolDeclaration: KotlinTranslatable {
 
 extension RawStatement: KotlinTranslatable {
     func kotlinStatements(with translator: KotlinTranslator) -> [KotlinStatement] {
-        let statement = PopulatedKotlinStatement(statement: self, translator: translator) { indentation, _ in
-            return "\(indentation)\(sourceCode)"
+        let statement = PopulatedKotlinStatement(statement: self, translator: translator) { output, indentation, _ in
+            output.append(indentation)
+            output.append(sourceCode)
+            output.append("\n")
         }
         return [statement]
     }
