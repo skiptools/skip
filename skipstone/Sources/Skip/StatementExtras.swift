@@ -1,7 +1,7 @@
 import SwiftSyntax
 
 /// Extra directives and trivia derived from the trivia surrounding a statement.
-struct StatementExtras {
+public struct StatementExtras { // Public because part of other public API
     enum Directive {
         /// Insert directly into the output.
         case insert(String, StatementExtras?)
@@ -72,7 +72,7 @@ struct StatementExtras {
                 continue
             }
 
-            var trimmedLine = String(line[startIndex...])
+            let trimmedLine = String(line[startIndex...])
             if trimmedLine.hasPrefix("// SKIP") {
                 endDirective()
                 if trimmedLine.hasPrefix(insertPrefix) {

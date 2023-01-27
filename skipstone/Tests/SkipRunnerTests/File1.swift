@@ -21,7 +21,7 @@ protocol UnsupportedProtocol {
 func unsupportedFunction1() {
 }
 
-#if DEBUG
+#if SKIP
 let unsupportedLet = 0
 #else
 let unsupportedLet = 1

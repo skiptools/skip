@@ -5,6 +5,7 @@ import SwiftSyntax
 /// Manages the transpilation process.
 public struct Transpiler {
     public let sourceFiles: [Source.File]
+    public var preprocessorSymbols: Set<String> = []
 
     /// Supply files to transpile. Only `.swift` files will be processed.
     public init(sourceFiles: [Source.File]) {
@@ -17,8 +18,8 @@ public struct Transpiler {
         try await withThrowingTaskGroup(of: Void.self) { group in
             for sourceFile in sourceFiles {
                 group.addTask {
-                    let syntaxTree = try SyntaxTree(source: Source(file: sourceFile))
-                    try codebaseInfo.gather(from: syntaxTree)
+                    let syntaxTree = try SyntaxTree(source: Source(file: sourceFile), preprocessorSymbols: preprocessorSymbols)
+                    codebaseInfo.gather(from: syntaxTree)
                 }
             }
             try await group.waitForAll()
@@ -27,7 +28,7 @@ public struct Transpiler {
         let transpilations = try await withThrowingTaskGroup(of: Transpilation.self) { group in
             for sourceFile in sourceFiles {
                 group.addTask {
-                    let syntaxTree = try SyntaxTree(source: Source(file: sourceFile))
+                    let syntaxTree = try SyntaxTree(source: Source(file: sourceFile), preprocessorSymbols: preprocessorSymbols)
                     let translator = KotlinTranslator(syntaxTree: syntaxTree, codebaseInfo: codebaseInfo)
                     return translator.translate()
                 }

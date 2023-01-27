@@ -72,6 +72,13 @@ public struct Source {
             self.path = path
         }
 
+        public var name: String {
+            guard path.last != "/", let lastDirIndex = path.lastIndex(of: "/") else {
+                return path
+            }
+            return String(path[path.index(after: lastDirIndex)...])
+        }
+
         public var isSwift: Bool {
             return path.hasSuffix(".swift")
         }

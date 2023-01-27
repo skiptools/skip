@@ -174,13 +174,31 @@ struct StatementFactory {
         }
 
         for statementType in StatementType.allCases {
-            if let representingType = statementType.representingType, let statement = representingType.init(syntax: syntax, extras: extras, in: syntaxTree) {
+            if statementType != .raw, let representingType = statementType.representingType, let statement = representingType.init(syntax: syntax, extras: extras, in: syntaxTree) {
                 statements.append(statement)
                 return statements
             }
         }
-        statements.append(RawStatement(syntax: syntax, extras: extras, in: syntaxTree)!)
+
+        if let preprocessorStatements = handleSKIPPreprocessor(syntax: syntax, in: syntaxTree) {
+            statements += preprocessorStatements
+        } else {
+            statements.append(RawStatement(syntax: syntax, extras: extras, in: syntaxTree)!)
+        }
         return statements
+    }
+
+    //~~~
+    static func handleSKIPPreprocessor(syntax: Syntax, in syntaxTree: SyntaxTree) -> [Statement]? {
+        print("CHECKING: \(syntax)")
+        guard let ifConfigDecl = syntax.as(IfConfigDeclSyntax.self) else {
+            return nil
+        }
+        print("FIRST CLAUSE DESC: \(ifConfigDecl.clauses.first?.condition?.description)")
+        guard let firstClause = ifConfigDecl.clauses.first, firstClause.condition?.description == "SKIP", case .statements(let codeBlockSyntax) = firstClause.elements else {
+            return nil
+        }
+        return syntaxTree.process(syntaxList: codeBlockSyntax)
     }
 }
 

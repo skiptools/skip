@@ -1,9 +1,12 @@
 /// Wholistic information about the codebase needed when transpiling Swift to Kotlin.
-class CodebaseInfo {
-    func gather(from syntaxTree: SyntaxTree) throws {
+public class CodebaseInfo {
+    public init() {
     }
 
-    func messages(for sourceFile: Source.File) -> [Message] {
+    public func gather(from syntaxTree: SyntaxTree) {
+    }
+
+    public func messages(for sourceFile: Source.File) -> [Message] {
         return []
     }
 }
