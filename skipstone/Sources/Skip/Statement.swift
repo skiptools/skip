@@ -10,8 +10,8 @@ protocol Statement {
     var children: [Statement] { get }
     var prettyPrintChildren: [PrettyPrintTree] { get }
 
-    /// Attempt to construct this statement type from the given syntax.
-    init?(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree)
+    /// Attempt to construct statements of this type from the given syntax.
+    static func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]?
 
     /// Pretty-printable tree rooted on this syntax statement.
     var prettyPrintTree: PrettyPrintTree { get }
@@ -154,7 +154,7 @@ enum StatementType: CaseIterable {
         case .typealiasDeclaration:
             return nil
         case .variableDeclaration:
-            return nil
+            return VariableDeclaration.self
 
         case .raw:
             return RawStatement.self
@@ -178,14 +178,14 @@ struct StatementFactory {
         }
 
         for statementType in StatementType.allCases {
-            if let representingType = statementType.representingType, let statement = representingType.init(syntax: syntax, extras: extras, in: syntaxTree) {
-                statements.append(statement)
+            if let representingType = statementType.representingType, let decodedStatements = representingType.decode(syntax: syntax, extras: extras, in: syntaxTree) {
+                statements += decodedStatements
                 return statements
             }
         }
 
         // Unsupported
-        statements.append(RawStatement(rawSyntax: syntax, extras: extras, in: syntaxTree))
+        statements.append(RawStatement(syntax: syntax, extras: extras, in: syntaxTree))
         return statements
     }
 }

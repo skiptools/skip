@@ -19,7 +19,14 @@ struct IfDefined: Statement {
     let range: Source.Range?
     let extras: StatementExtras?
 
-    init?(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) {
+    static func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
+        guard let statement = IfDefined(syntax: syntax, extras: extras, in: syntaxTree) else {
+            return nil
+        }
+        return [statement]
+    }
+
+    private init?(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) {
         guard let ifConfigDecl = syntax.as(IfConfigDeclSyntax.self) else {
             return nil
         }
@@ -52,13 +59,13 @@ struct IfDefined: Statement {
         case .statements(let syntax):
             return syntaxTree.process(syntaxList: syntax)
         case .switchCases(let syntax):
-            return [RawStatement(rawSyntax: Syntax(syntax), extras: nil, in: syntaxTree)]
+            return [RawStatement(syntax: Syntax(syntax), extras: nil, in: syntaxTree)]
         case .decls(let syntax):
             return syntaxTree.process(syntaxList: syntax)
         case .postfixExpression(let syntax):
-            return [RawStatement(rawSyntax: Syntax(syntax), extras: nil, in: syntaxTree)]
+            return [RawStatement(syntax: Syntax(syntax), extras: nil, in: syntaxTree)]
         case .attributes(let syntax):
-            return [RawStatement(rawSyntax: Syntax(syntax), extras: nil, in: syntaxTree)]
+            return [RawStatement(syntax: Syntax(syntax), extras: nil, in: syntaxTree)]
         }
     }
 
@@ -88,7 +95,14 @@ struct ImportDeclaration: Statement {
     let range: Source.Range?
     let extras: StatementExtras?
 
-    init?(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) {
+    static func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
+        guard let statement = ImportDeclaration(syntax: syntax, extras: extras, in: syntaxTree) else {
+            return nil
+        }
+        return [statement]
+    }
+
+    private init?(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) {
         guard let importDecl = syntax.as(ImportDeclSyntax.self) else {
             return nil
         }
@@ -112,7 +126,7 @@ struct MessageStatement: Statement {
         self.message = message
     }
 
-    init?(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) {
+    static func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
         return nil
     }
 }
@@ -141,7 +155,14 @@ struct ProtocolDeclaration: Statement {
     let extras: StatementExtras?
     let message: Message?
 
-    init?(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) {
+    static func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
+        guard let statement = ProtocolDeclaration(syntax: syntax, extras: extras, in: syntaxTree) else {
+            return nil
+        }
+        return [statement]
+    }
+
+    private init?(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) {
         guard let protocolDecl = syntax.as(ProtocolDeclSyntax.self) else {
             return nil
         }
@@ -192,12 +213,12 @@ struct RawStatement: Statement {
         self.message = message
     }
 
-    init(rawSyntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) {
-        self.syntax = rawSyntax
+    init(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) {
+        self.syntax = syntax
         self.file = syntaxTree.source.file
-        self.range = rawSyntax.range(in: syntaxTree.source)
+        self.range = syntax.range(in: syntaxTree.source)
         self.extras = extras
-        self.sourceCode = rawSyntax.sourceCode(in: syntaxTree.source)
+        self.sourceCode = syntax.sourceCode(in: syntaxTree.source)
         self.message = .unsupportedSyntax(source: syntaxTree.source, range: range)
     }
 
@@ -207,11 +228,23 @@ struct RawStatement: Statement {
     let range: Source.Range?
     let extras: StatementExtras?
 
-    init?(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) {
+    static func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
         return nil
     }
 
     var prettyPrintChildren: [PrettyPrintTree] {
         return [PrettyPrintTree(root: sourceCode)]
+    }
+}
+
+struct VariableDeclaration: Statement {
+    var type: StatementType { .variableDeclaration }
+    let syntax: Syntax?
+    let file: Source.File?
+    let range: Source.Range?
+    let extras: StatementExtras?
+
+    static func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
+        return nil
     }
 }

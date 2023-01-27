@@ -31,7 +31,7 @@ public struct KotlinTranslator {
 
         // Fall back to a raw translation
         if let syntax = statement.syntax {
-            var rawStatement = RawStatement(rawSyntax: syntax, extras: statement.extras, in: syntaxTree)
+            var rawStatement = RawStatement(syntax: syntax, extras: statement.extras, in: syntaxTree)
             rawStatement.message = .untranslatableSyntax(source: syntaxTree.source, range: statement.range)
             return rawStatement.kotlinStatements(with: self)
         }

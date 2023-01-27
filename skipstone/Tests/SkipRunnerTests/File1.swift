@@ -12,6 +12,7 @@ struct UnsupportedTypes1 {
 // Protocol comment
 // SKIP DECLARE: interface FooBar<X>
 protocol UnsupportedProtocol {
+    var x: Int { get set }
 }
 
 // SKIP INSERT: Hello from
@@ -26,5 +27,3 @@ protocol IfProtocol {}
 #else
 protocol ElseProtocol {}
 #endif
-
-// Footer comment
