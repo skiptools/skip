@@ -2,15 +2,17 @@ import SwiftSyntax
 
 /// Extra directives and trivia derived from the trivia surrounding a statement.
 struct StatementExtras {
-    enum Directive: Equatable {
+    enum Directive {
         /// Insert directly into the output.
-        case insert(String)
+        case insert(String, StatementExtras?)
         /// Replace the syntax with the given output.
-        case replace(String)
+        case replace(String, StatementExtras?)
         /// Replace the declaration line with the given output.
         case declaration(String)
         /// Mute warnings and errors for this syntax.
         case nowarn
+        /// Encountered an invalid directive.
+        case invalid(String)
     }
 
     let directives: [Directive]
@@ -25,6 +27,7 @@ struct StatementExtras {
         var directives: [Directive] = []
         var directive: Directive? = nil
         var directiveLines: [String] = []
+        var triviaLines: [String] = []
         let insertPrefix = "// SKIP INSERT:"
         let replacePrefix = "// SKIP REPLACE:"
         let declarationPrefix = "// SKIP DECLARE:"
@@ -35,10 +38,14 @@ struct StatementExtras {
             }
             let directiveString = directiveLines.joined().trimmingCharacters(in: .whitespacesAndNewlines)
             switch currentDirective {
-            case .insert(_):
-                directives.append(.insert(directiveString))
-            case .replace(_):
-                directives.append(.replace(directiveString))
+            case .insert(_, _):
+                let extras = StatementExtras(directives: [], leadingTrivia: triviaLines)
+                directives.append(.insert(directiveString, extras))
+                triviaLines.removeAll()
+            case .replace(_, _):
+                let extras = StatementExtras(directives: [], leadingTrivia: triviaLines)
+                directives.append(.replace(directiveString, extras))
+                triviaLines.removeAll()
             case .declaration(_):
                 directives.append(.declaration(directiveString))
             default:
@@ -48,60 +55,51 @@ struct StatementExtras {
             directiveLines = []
         }
 
-        let lines = trivia.description.split(separator: "\n", omittingEmptySubsequences: false)
-        var triviaLines: [String] = []
-        var isFirstLine = true
+        var triviaString = trivia.description
+        // Drop initial newline that is typically the trailing newline of the preceding statement
+        // Drop trailing newline because we add a newline to each line already
+        if triviaString.hasPrefix("\n") {
+            triviaString = String(triviaString.dropFirst())
+        }
+        if triviaString.hasSuffix("\n") {
+            triviaString = String(triviaString.dropLast())
+        }
+        let lines = triviaString.split(separator: "\n", omittingEmptySubsequences: false)
         for line in lines {
             guard let startIndex = line.firstIndex(where: { !$0.isWhitespace }) else {
-                if isFirstLine {
-                    // Ignore an initial blank line because it is the trailing newline from the previous syntax
-                    isFirstLine = false
-                } else {
-                    endDirective()
-                    triviaLines.append("\n")
-                }
+                endDirective()
+                triviaLines.append("\n")
                 continue
             }
 
             var trimmedLine = String(line[startIndex...])
-            if trimmedLine.hasPrefix(insertPrefix) {
+            if trimmedLine.hasPrefix("// SKIP") {
                 endDirective()
-                directive = .insert("")
-                directiveLines.append(String(trimmedLine.dropFirst(insertPrefix.count)).trimmingCharacters(in: .whitespaces) + "\n")
-                continue
-            } else if trimmedLine.hasPrefix(replacePrefix) {
-                endDirective()
-                directive = .replace("")
-                directiveLines.append(String(trimmedLine.dropFirst(insertPrefix.count)).trimmingCharacters(in: .whitespaces) + "\n")
-                continue
-            } else if trimmedLine.hasPrefix(declarationPrefix) {
-                endDirective()
-                directive = .declaration("")
-                directiveLines.append(String(trimmedLine.dropFirst(declarationPrefix.count)).trimmingCharacters(in: .whitespaces) + "\n")
-                continue
-            } else if trimmedLine.hasPrefix(noWarnPrefix) {
-                endDirective()
-                directives.append(.nowarn)
+                if trimmedLine.hasPrefix(insertPrefix) {
+                    directive = .insert("", nil)
+                    directiveLines.append(String(trimmedLine.dropFirst(insertPrefix.count)).trimmingCharacters(in: .whitespaces) + "\n")
+                } else if trimmedLine.hasPrefix(replacePrefix) {
+                    directive = .replace("", nil)
+                    directiveLines.append(String(trimmedLine.dropFirst(insertPrefix.count)).trimmingCharacters(in: .whitespaces) + "\n")
+                } else if trimmedLine.hasPrefix(declarationPrefix) {
+                    directive = .declaration("")
+                    directiveLines.append(String(trimmedLine.dropFirst(declarationPrefix.count)).trimmingCharacters(in: .whitespaces) + "\n")
+                } else if trimmedLine.hasPrefix(noWarnPrefix) {
+                    directives.append(.nowarn)
+                } else {
+                    directives.append(.invalid(trimmedLine))
+                }
                 continue
             }
-            if directive != nil {
-                if trimmedLine.hasPrefix("//") {
-                    trimmedLine = String(trimmedLine.dropFirst(2))
-                    directiveLines.append(trimmedLine + "\n")
-                } else {
-                    endDirective()
-                    triviaLines.append(trimmedLine + "\n")
-                }
+            if directive != nil && trimmedLine.hasPrefix("//") {
+                directiveLines.append(trimmedLine.dropFirst(2) + "\n")
             } else {
+                endDirective()
                 triviaLines.append(trimmedLine + "\n")
             }
         }
         endDirective()
-        
-        // Remove any trailing blank line, as it represents the last empty subsequence of our split
-        if triviaLines.last == "\n" {
-            //~~~triviaLines = Array(triviaLines.dropLast())
-        }
+
         guard !directives.isEmpty || !triviaLines.isEmpty else {
             return nil
         }
@@ -114,11 +112,14 @@ struct StatementExtras {
         var replace = false
         for directive in directives {
             switch directive {
-            case .insert(let string):
-                statements.append(RawStatement(sourceCode: string, syntax: syntax, extras: self, in: syntaxTree))
-            case .replace(let string):
+            case .insert(let string, let extras):
+                statements.append(RawStatement(sourceCode: string, syntax: syntax, extras: extras, in: syntaxTree))
+            case .replace(let string, let extras):
                 replace = true
-                statements.append(RawStatement(sourceCode: string, syntax: syntax, extras: self, in: syntaxTree))
+                statements.append(RawStatement(sourceCode: string, syntax: syntax, extras: extras, in: syntaxTree))
+            case .invalid(let string):
+                let message = Message(severity: .warning, message: "Unrecognized SKIP comment: \(string)", source: syntaxTree.source, range: syntax.range(in: syntaxTree.source))
+                statements.append(MessageStatement(message: message))
             default:
                 break
             }
@@ -134,6 +135,16 @@ struct StatementExtras {
             }
         }
         return nil
+    }
+
+    /// Whether to suppress the statement's message.
+    var suppressMessage: Bool {
+        for directive in directives {
+            if case .nowarn = directive {
+                return true
+            }
+        }
+        return false
     }
 
     /// Leading trivia string, allowing us to preserve original comments and blank lines.

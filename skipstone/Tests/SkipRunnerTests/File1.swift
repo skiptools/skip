@@ -5,7 +5,7 @@ import Foundation
 // Standalone comment
 
 // Decl comment
-
+// SKIP FOO
 struct UnsupportedTypes1 {
 }
 

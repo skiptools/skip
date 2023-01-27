@@ -57,7 +57,7 @@ extension Statement {
 
     var messages: [Message] {
         var messages: [Message] = []
-        if let message, extras?.directives.contains(.nowarn) != true {
+        if let message, extras?.suppressMessage != true {
             messages.append(message)
         }
         return messages + children.flatMap { $0.messages }
