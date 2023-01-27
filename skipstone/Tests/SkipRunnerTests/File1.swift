@@ -22,7 +22,7 @@ protocol UnsupportedProtocol {
 func unsupportedFunction1() {
 }
 
-#if FOO
+#if SKIP
 protocol IfProtocol {}
 #else
 protocol ElseProtocol {}

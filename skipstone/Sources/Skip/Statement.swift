@@ -135,14 +135,15 @@ enum StatementType: CaseIterable {
             return nil
         case .while:
             return nil
+
         case .classDeclaration:
-            return nil
+            return ClassDeclaration.self
         case .enumDeclaration:
             return nil
         case .extensionDeclaration:
-            return nil
+            return ExtensionDeclaration.self
         case .functionDeclaration:
-            return nil
+            return FunctionDeclaration.self
         case .importDeclaration:
             return ImportDeclaration.self
         case .initDeclaration:

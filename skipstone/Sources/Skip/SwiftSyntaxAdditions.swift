@@ -27,6 +27,23 @@ extension SyntaxProtocol {
     }
 }
 
+extension InheritedTypeListSyntax {
+    func typeSignatures(in syntaxTree: SyntaxTree) -> ([TypeSignature], Message?) {
+        var message: Message? = nil
+        let typeSignatures = compactMap { typeSyntax in
+            if let typeSignature = TypeSignature.for(syntax: typeSyntax.typeName) {
+                return typeSignature
+            } else {
+                if message == nil {
+                    message = .unsupportedTypeSignature(source: syntaxTree.source, range: typeSyntax.range(in: syntaxTree.source))
+                }
+                return nil
+            }
+        }
+        return (typeSignatures, message)
+    }
+}
+
 private class PrettyPrintVisitor: SyntaxVisitor {
     init() {
         super.init(viewMode: .sourceAccurate)
