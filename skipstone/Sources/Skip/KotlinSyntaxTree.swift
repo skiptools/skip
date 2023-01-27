@@ -9,7 +9,8 @@ public struct KotlinSyntaxTree {
     }
 
     public var prettyPrintTree: PrettyPrintTree {
-        return PrettyPrintTree(root: sourceFile.name, children: statements.map { $0.prettyPrintTree })
+        let root = sourceFile.outputFile(withExtension: "kt").name
+        return PrettyPrintTree(root: root, children: statements.map { $0.prettyPrintTree })
     }
 
     public var messages: [Message] {

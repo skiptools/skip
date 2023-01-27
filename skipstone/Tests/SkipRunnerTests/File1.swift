@@ -21,10 +21,10 @@ protocol UnsupportedProtocol {
 func unsupportedFunction1() {
 }
 
-#if SKIP
-let unsupportedLet = 0
+#if FOO
+protocol IfProtocol {}
 #else
-let unsupportedLet = 1
+protocol ElseProtocol {}
 #endif
 
 // Footer comment
