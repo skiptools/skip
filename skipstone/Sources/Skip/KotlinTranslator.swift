@@ -8,8 +8,8 @@ struct KotlinTranslator {
         let messages = codebaseInfo.messages(for: syntaxTree.source.file) + kotlinSyntaxTree.messages
         let outputFile = syntaxTree.source.file.outputFile(withExtension: "kt")
         let outputGenerator = OutputGenerator(roots: kotlinSyntaxTree.statements)
-        let (outputContent, outputMap) = outputGenerator.generateOutput()
-        return Transpilation(sourceFile: syntaxTree.source.file, outputFile: outputFile, outputContent: outputContent, outputMap: outputMap, messages: messages)
+        let (output, outputMap) = outputGenerator.generateOutput(file: outputFile)
+        return Transpilation(sourceFile: syntaxTree.source.file, output: output, outputMap: outputMap, messages: messages)
     }
 
     func translateSyntaxTree() -> KotlinSyntaxTree {

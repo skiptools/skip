@@ -5,13 +5,18 @@ import Foundation
 // Standalone comment
 
 // Decl comment
+
 struct UnsupportedTypes1 {
 }
 
 // Protocol comment
-
+// SKIP DECLARE: interface FooBar<X>
 protocol UnsupportedProtocol {
 }
+
+// SKIP INSERT: Hello from
+// Skip!
+// Another
 
 func unsupportedFunction1() {
 }

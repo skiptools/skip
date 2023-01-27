@@ -7,9 +7,13 @@ public struct Source {
     public let content: String
 
     public init(file: File) throws {
-        self.file = file
-        self.content = try String(contentsOfFile: file.path)
+        let content = try String(contentsOfFile: file.path)
+        self = Source(file: file, content: content)
+    }
 
+    public init(file: File, content: String) {
+        self.file = file
+        self.content = content
         let contentLines = content.split(separator: "\n", omittingEmptySubsequences: false)
         var currentPosition = 0
         var lines: [(Int, Substring)] = []

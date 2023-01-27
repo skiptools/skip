@@ -48,7 +48,7 @@ private struct TranspileAction: Action {
             for message in transpilation.messages {
                 print(message)
             }
-            print(transpilation.outputContent)
+            print(transpilation.output.content)
             print()
         }
     }

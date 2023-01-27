@@ -1,10 +1,15 @@
 /// Map output ranges to source ranges.
 public struct OutputMap {
-    private let entries: [(sourceFile: Source.File, sourceRange: Source.Range?, range: Source.Range)]
+    typealias Entry = (sourceFile: Source.File, sourceRange: Source.Range?, range: Source.Range)
+    private let entries: [Entry]
 
     /// Supply entries mapping source ranges to output ranges.
-    init(entries: [(sourceFile: Source.File, sourceRange: Source.Range?, range: Source.Range)]) {
-        self.entries = entries.sorted { $0.range.start < $1.range.start }
+    init(entries: [Entry]) {
+        // Sort by start and then from longest to shortest (i.e. reverse by end).
+        // Thus the last entry to contain a range will be the most specific
+        self.entries = entries.sorted {
+            $0.range.start < $1.range.start || ($0.range.start == $1.range.start && $0.range.end > $1.range.end)
+        }
     }
 
     /// Find the source information for the given output range.

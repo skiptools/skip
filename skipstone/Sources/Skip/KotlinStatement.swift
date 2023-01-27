@@ -128,8 +128,8 @@ extension ProtocolDeclaration: KotlinTranslatable {
                 // TODO: Visibility, generics, inheritance, children
                 output.append("interface ")
                 output.append(name)
-                output.append(" {\n")
             }
+            output.append(" {\n")
             children.forEach { output.append($0, indentation: indentation.inc()) }
             output.append(indentation)
             output.append("}\n")

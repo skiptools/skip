@@ -16,68 +16,94 @@ struct StatementExtras {
     let directives: [Directive]
     let leadingTrivia: [String]
 
+    /// Process the trivia on the given syntax to parse extras.
     static func process(syntax: Syntax) -> StatementExtras? {
         guard let trivia = syntax.leadingTrivia else {
             return nil
         }
 
         var directives: [Directive] = []
+        var directive: Directive? = nil
+        var directiveLines: [String] = []
         let insertPrefix = "// SKIP INSERT:"
         let replacePrefix = "// SKIP REPLACE:"
         let declarationPrefix = "// SKIP DECLARE:"
         let noWarnPrefix = "// SKIP NOWARN"
-        var isInserting = false
-        var isReplacing = false
-        var insertionLines: [String] = []
-        func endInsertion() {
-            if isInserting {
-                isInserting = false
-                directives.append(.insert(insertionLines.joined(separator: "\n")))
-            } else if isReplacing {
-                isReplacing = false
-                directives.append(.replace(insertionLines.joined(separator: "\n")))
+        func endDirective() {
+            guard let currentDirective = directive else {
+                return
             }
-            insertionLines = []
+            let directiveString = directiveLines.joined().trimmingCharacters(in: .whitespacesAndNewlines)
+            switch currentDirective {
+            case .insert(_):
+                directives.append(.insert(directiveString))
+            case .replace(_):
+                directives.append(.replace(directiveString))
+            case .declaration(_):
+                directives.append(.declaration(directiveString))
+            default:
+                break
+            }
+            directive = nil
+            directiveLines = []
         }
 
-        let lines = trivia.description.split(separator: "\n")
+        let lines = trivia.description.split(separator: "\n", omittingEmptySubsequences: false)
         var triviaLines: [String] = []
+        var isFirstLine = true
         for line in lines {
-            var trimmedLine: String
-            if let startIndex = line.firstIndex(where: { !$0.isWhitespace }) {
-                trimmedLine = String(line[startIndex...])
-            } else {
-                endInsertion()
-                triviaLines.append("")
+            guard let startIndex = line.firstIndex(where: { !$0.isWhitespace }) else {
+                if isFirstLine {
+                    // Ignore an initial blank line because it is the trailing newline from the previous syntax
+                    isFirstLine = false
+                } else {
+                    endDirective()
+                    triviaLines.append("\n")
+                }
                 continue
             }
 
+            var trimmedLine = String(line[startIndex...])
             if trimmedLine.hasPrefix(insertPrefix) {
-                endInsertion()
-                isInserting = true
-                trimmedLine = String(trimmedLine.dropFirst(insertPrefix.count))
+                endDirective()
+                directive = .insert("")
+                directiveLines.append(String(trimmedLine.dropFirst(insertPrefix.count)).trimmingCharacters(in: .whitespaces) + "\n")
+                continue
             } else if trimmedLine.hasPrefix(replacePrefix) {
-                endInsertion()
-                isReplacing = true
-                trimmedLine = String(trimmedLine.dropFirst(replacePrefix.count))
+                endDirective()
+                directive = .replace("")
+                directiveLines.append(String(trimmedLine.dropFirst(insertPrefix.count)).trimmingCharacters(in: .whitespaces) + "\n")
+                continue
             } else if trimmedLine.hasPrefix(declarationPrefix) {
-                endInsertion()
-                let declaration = String(trimmedLine.dropFirst(declarationPrefix.count)).trimmingCharacters(in: .whitespacesAndNewlines)
-                directives.append(.declaration(declaration))
+                endDirective()
+                directive = .declaration("")
+                directiveLines.append(String(trimmedLine.dropFirst(declarationPrefix.count)).trimmingCharacters(in: .whitespaces) + "\n")
                 continue
             } else if trimmedLine.hasPrefix(noWarnPrefix) {
-                endInsertion()
+                endDirective()
                 directives.append(.nowarn)
                 continue
             }
-            if isInserting || isReplacing {
+            if directive != nil {
                 if trimmedLine.hasPrefix("//") {
                     trimmedLine = String(trimmedLine.dropFirst(2))
+                    directiveLines.append(trimmedLine + "\n")
+                } else {
+                    endDirective()
+                    triviaLines.append(trimmedLine + "\n")
                 }
-                insertionLines.append(trimmedLine)
             } else {
-                triviaLines.append(trimmedLine)
+                triviaLines.append(trimmedLine + "\n")
             }
+        }
+        endDirective()
+        
+        // Remove any trailing blank line, as it represents the last empty subsequence of our split
+        if triviaLines.last == "\n" {
+            //~~~triviaLines = Array(triviaLines.dropLast())
+        }
+        guard !directives.isEmpty || !triviaLines.isEmpty else {
+            return nil
         }
         return StatementExtras(directives: directives, leadingTrivia: triviaLines)
     }
@@ -115,6 +141,7 @@ struct StatementExtras {
         guard !leadingTrivia.isEmpty else {
             return ""
         }
-        return indentation.description + leadingTrivia.joined(separator: "\n\(indentation)")
+        let indentationString = indentation.description
+        return indentationString + leadingTrivia.joined(separator: indentationString)
     }
 }
