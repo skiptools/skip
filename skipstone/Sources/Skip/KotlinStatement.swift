@@ -1,14 +1,5 @@
 /// A node in the Kotlin syntax tree.
 class KotlinStatement: OutputNode {
-    struct Context {
-        let translator: KotlinTranslator
-        var parent: KotlinStatement?
-
-        func reparented(_ parent: KotlinStatement?) -> Context {
-            return Context(translator: translator, parent: parent)
-        }
-    }
-
     /// A human-readable type name for this statement.
     let statementType: String
     let sourceFile: Source.File?
@@ -38,7 +29,7 @@ class KotlinStatement: OutputNode {
     }
 
     /// Pretty-printable tree rooted on this syntax statement.
-    var prettyPrintTree: PrettyPrintTree {
+    final var prettyPrintTree: PrettyPrintTree {
         return PrettyPrintTree(root: statementType, children: prettyPrintChildren + children.map { $0.prettyPrintTree })
     }
 
@@ -46,7 +37,7 @@ class KotlinStatement: OutputNode {
     var message: Message?
 
     /// Recursive traversal of all messages from the tree rooted on this syntax statement.
-    var messages: [Message] {
+    final var messages: [Message] {
         var messages: [Message] = []
         if let message, extras?.suppressMessage != true {
             messages.append(message)
@@ -54,7 +45,7 @@ class KotlinStatement: OutputNode {
         return messages + children.flatMap { $0.messages }
     }
 
-    func leadingTrivia(indentation: Indentation) -> String {
+    final func leadingTrivia(indentation: Indentation) -> String {
         return extras?.leadingTrivia(indentation: indentation) ?? ""
     }
 
@@ -64,7 +55,7 @@ class KotlinStatement: OutputNode {
 
 /// Implemented by many of our`Statement` types that translate themselves to Kotlin.
 protocol KotlinTranslatable {
-    func kotlinStatements(context: KotlinStatement.Context) -> [KotlinStatement]
+    func kotlinStatements(translator: KotlinTranslator) -> [KotlinStatement]
 }
 
 /// Create a Kotlin statement with populated state, rather than writing a custom type.
@@ -78,12 +69,11 @@ class PopulatedKotlinStatement: KotlinStatement {
         super.init(statementType: statementType, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
-    init(statement: Statement, context: Context, outputCall: @escaping (OutputGenerator, Indentation, [KotlinStatement]) -> Void = { _, _, _ in }) {
+    init(statement: Statement, translator: KotlinTranslator, outputCall: @escaping (OutputGenerator, Indentation, [KotlinStatement]) -> Void = { _, _, _ in }) {
         self.prettyPrintChildrenCall = { statement.prettyPrintChildren }
         self.outputCall = outputCall
         super.init(statementType: String(describing: statement.type), sourceFile: statement.file, sourceRange: statement.range, extras: statement.extras)
-        self.parent = context.parent
-        self.children = statement.children.flatMap { context.translator.translateStatement($0, context: context.reparented(self)) }
+        self.children = statement.children.flatMap { translator.translateStatement($0) }
         self.children.forEach { $0.parent = self }
         self.message = statement.message
     }

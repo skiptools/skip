@@ -2,15 +2,6 @@ import SwiftSyntax
 
 /// A node in the Swift syntax tree.
 class Statement {
-    struct Context {
-        let syntaxTree: SyntaxTree
-        var parent: Statement?
-
-        func reparented(_ parent: Statement?) -> Context {
-            return Context(syntaxTree: syntaxTree, parent: parent)
-        }
-    }
-
     let type: StatementType
     let syntax: Syntax?
     let file: Source.File?
@@ -26,7 +17,7 @@ class Statement {
     }
 
     /// Attempt to construct statements of this type from the given syntax.
-    class func decode(syntax: Syntax, extras: StatementExtras?, context: Context) -> [Statement]? {
+    class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
         return nil
     }
 
@@ -40,13 +31,22 @@ class Statement {
         }
     }
 
+    /// Resolve any information that relies on the tree being complete.
+    func resolveSelf() {
+    }
+
+    final func resolve() {
+        resolveSelf()
+        children.forEach { $0.resolve() }
+    }
+
     /// Any pretty print child trees aside from this node's child statements.
     var prettyPrintChildren: [PrettyPrintTree] {
         return []
     }
 
     /// Pretty-printable tree rooted on this syntax statement.
-    var prettyPrintTree: PrettyPrintTree {
+    final var prettyPrintTree: PrettyPrintTree {
         return PrettyPrintTree(root: String(describing: type), children: prettyPrintChildren + children.map { $0.prettyPrintTree })
     }
 
@@ -54,7 +54,7 @@ class Statement {
     var message: Message?
 
     /// Recursive traversal of all messages from the tree rooted on this syntax statement.
-    var messages: [Message] {
+    final var messages: [Message] {
         var messages: [Message] = []
         if let message, extras?.suppressMessage != true {
             messages.append(message)
@@ -165,11 +165,11 @@ enum StatementType: CaseIterable {
 
 /// Create statements from syntax.
 struct StatementFactory {
-    static func `for`(syntax: Syntax, context: Statement.Context) -> [Statement] {
+    static func `for`(syntax: Syntax, in syntaxTree: SyntaxTree) -> [Statement] {
         let extras = StatementExtras.process(syntax: syntax)
         var statements: [Statement] = []
         if let extras {
-            let (extraStatements, replace) = extras.statements(syntax: syntax, context: context)
+            let (extraStatements, replace) = extras.statements(syntax: syntax, in: syntaxTree)
             guard !replace else {
                 return extraStatements
             }
@@ -177,14 +177,14 @@ struct StatementFactory {
         }
 
         for statementType in StatementType.allCases {
-            if let representingType = statementType.representingType, let decodedStatements = representingType.decode(syntax: syntax, extras: extras, context: context) {
+            if let representingType = statementType.representingType, let decodedStatements = representingType.decode(syntax: syntax, extras: extras, in: syntaxTree) {
                 statements += decodedStatements
                 return statements
             }
         }
 
         // Unsupported
-        statements.append(RawStatement(syntax: syntax, extras: extras, context: context))
+        statements.append(RawStatement(syntax: syntax, extras: extras, in: syntaxTree))
         return statements
     }
 }
