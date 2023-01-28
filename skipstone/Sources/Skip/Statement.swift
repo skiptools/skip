@@ -2,6 +2,15 @@ import SwiftSyntax
 
 /// A node in the Swift syntax tree.
 class Statement {
+    struct Context {
+        let syntaxTree: SyntaxTree
+        var parent: Statement?
+
+        func reparented(_ parent: Statement?) -> Context {
+            return Context(syntaxTree: syntaxTree, parent: parent)
+        }
+    }
+
     let type: StatementType
     let syntax: Syntax?
     let file: Source.File?
@@ -17,7 +26,7 @@ class Statement {
     }
 
     /// Attempt to construct statements of this type from the given syntax.
-    class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree, parent: Statement?) -> [Statement]? {
+    class func decode(syntax: Syntax, extras: StatementExtras?, context: Context) -> [Statement]? {
         return nil
     }
 
@@ -156,11 +165,11 @@ enum StatementType: CaseIterable {
 
 /// Create statements from syntax.
 struct StatementFactory {
-    static func `for`(syntax: Syntax, in syntaxTree: SyntaxTree, parent: Statement?) -> [Statement] {
+    static func `for`(syntax: Syntax, context: Statement.Context) -> [Statement] {
         let extras = StatementExtras.process(syntax: syntax)
         var statements: [Statement] = []
         if let extras {
-            let (extraStatements, replace) = extras.statements(syntax: syntax, in: syntaxTree, parent: parent)
+            let (extraStatements, replace) = extras.statements(syntax: syntax, context: context)
             guard !replace else {
                 return extraStatements
             }
@@ -168,14 +177,14 @@ struct StatementFactory {
         }
 
         for statementType in StatementType.allCases {
-            if let representingType = statementType.representingType, let decodedStatements = representingType.decode(syntax: syntax, extras: extras, in: syntaxTree, parent: parent) {
+            if let representingType = statementType.representingType, let decodedStatements = representingType.decode(syntax: syntax, extras: extras, context: context) {
                 statements += decodedStatements
                 return statements
             }
         }
 
         // Unsupported
-        statements.append(RawStatement(syntax: syntax, extras: extras, in: syntaxTree))
+        statements.append(RawStatement(syntax: syntax, extras: extras, context: context))
         return statements
     }
 }

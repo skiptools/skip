@@ -3,27 +3,15 @@ import SwiftSyntax
 class IfDefined: Statement {
     let symbol: String
     var statements: [Statement] {
-        get {
-            return children
-        }
-        set {
-            children = newValue
-        }
+        return children
     }
 
-    init(symbol: String) {
+    init(symbol: String, syntax: Syntax? = nil, file: Source.File? = nil, range: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.symbol = symbol
-        super.init(type: .ifDefined)
+        super.init(type: .ifDefined, syntax: syntax, file: file, range: range, extras: extras)
     }
 
-    override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree, parent: Statement?) -> [Statement]? {
-        guard let statement = IfDefined(syntax: syntax, extras: extras, in: syntaxTree, parent: parent) else {
-            return nil
-        }
-        return [statement]
-    }
-
-    private init?(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree, parent: Statement?) {
+    override class func decode(syntax: Syntax, extras: StatementExtras?, context: Context) -> [Statement]? {
         guard let ifConfigDecl = syntax.as(IfConfigDeclSyntax.self) else {
             return nil
         }
@@ -33,7 +21,7 @@ class IfDefined: Statement {
         var clause: IfConfigClauseSyntax? = nil
         for ifConfigClause in ifConfigDecl.clauses {
             let clauseSymbol = ifConfigClause.condition?.description ?? ""
-            guard clauseSymbol == "SKIP" || syntaxTree.preprocessorSymbols.contains(clauseSymbol) || ifConfigClause.poundKeyword.text == "#else" else {
+            guard clauseSymbol == "SKIP" || context.syntaxTree.preprocessorSymbols.contains(clauseSymbol) || ifConfigClause.poundKeyword.text == "#else" else {
                 continue
             }
             symbol = clauseSymbol.isEmpty ? "#else" : clauseSymbol
@@ -41,93 +29,75 @@ class IfDefined: Statement {
             break
         }
 
-        self.symbol = symbol ?? ifConfigDecl.clauses.first?.condition?.description ?? ""
-        super.init(type: .ifDefined, syntax: syntax, file: syntaxTree.source.file, range: syntax.range(in: syntaxTree.source), extras: extras)
-        self.parent = parent
+        let resolvedSymbol = symbol ?? ifConfigDecl.clauses.first?.condition?.description ?? ""
+        let statement = IfDefined(symbol: resolvedSymbol, syntax: syntax, file: context.syntaxTree.source.file, range: syntax.range(in: context.syntaxTree.source), extras: extras)
         if let clause {
-            self.statements = Self.extractStatements(from: clause, in: syntaxTree, parent: parent)
-        } else {
-            self.statements = []
+            statement.children = statement.extractStatements(from: clause, context: context)
         }
+        return [statement]
     }
 
-    private static func extractStatements(from clause: IfConfigClauseSyntax, in syntaxTree: SyntaxTree, parent: Statement?) -> [Statement] {
+    private func extractStatements(from clause: IfConfigClauseSyntax, context: Context) -> [Statement] {
         guard let elements = clause.elements else {
             return []
         }
+        let context = context.reparented(self)
         switch elements {
         case .statements(let syntax):
-            return syntaxTree.process(syntaxList: syntax, parent: parent)
+            return context.syntaxTree.process(syntaxList: syntax, context: context)
         case .switchCases(let syntax):
-            return [RawStatement(syntax: Syntax(syntax), extras: nil, in: syntaxTree)]
+            return [RawStatement(syntax: Syntax(syntax), extras: nil, context: context)]
         case .decls(let syntax):
-            return syntaxTree.process(syntaxList: syntax, parent: parent)
+            return context.syntaxTree.process(syntaxList: syntax, context: context)
         case .postfixExpression(let syntax):
-            return [RawStatement(syntax: Syntax(syntax), extras: nil, in: syntaxTree)]
+            return [RawStatement(syntax: Syntax(syntax), extras: nil, context: context)]
         case .attributes(let syntax):
-            return [RawStatement(syntax: Syntax(syntax), extras: nil, in: syntaxTree)]
+            return [RawStatement(syntax: Syntax(syntax), extras: nil, context: context)]
         }
     }
 
-    var children: [Statement] {
-        return statements
-    }
-
-    var prettyPrintChildren: [PrettyPrintTree] {
+    override var prettyPrintChildren: [PrettyPrintTree] {
         return [PrettyPrintTree(root: symbol)]
     }
 }
 
-struct MessageStatement: Statement {
-    var type: StatementType { .message }
-    let message: Message?
-
+class MessageStatement: Statement {
     init(message: Message) {
+        super.init(type: .message)
         self.message = message
     }
 
-    static func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
+    override class func decode(syntax: Syntax, extras: StatementExtras?, context: Context) -> [Statement]? {
         return nil
     }
 }
 
-struct RawStatement: Statement {
+class RawStatement: Statement {
     let sourceCode: String
-    var message: Message?
 
-    init(sourceCode: String, message: Message? = nil, syntax: Syntax? = nil, extras: StatementExtras? = nil, in syntaxTree: SyntaxTree? = nil) {
-        self.syntax = syntax
-        self.file = syntaxTree?.source.file
-        if let syntaxTree {
-            range = syntax?.range(in: syntaxTree.source)
-        } else {
-            range = nil
-        }
-        self.extras = extras
+    init(sourceCode: String, message: Message? = nil, syntax: Syntax? = nil, extras: StatementExtras? = nil, context: Context? = nil) {
         self.sourceCode = sourceCode
+        var range: Source.Range? = nil
+        if let source = context?.syntaxTree.source {
+            range = syntax?.range(in: source)
+        }
+        super.init(type: .raw, syntax: syntax, file: context?.syntaxTree.source.file, range: range, extras: extras)
         self.message = message
     }
 
-    init(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) {
-        self.syntax = syntax
-        self.file = syntaxTree.source.file
-        self.range = syntax.range(in: syntaxTree.source)
-        self.extras = extras
-        self.sourceCode = syntax.sourceCode(in: syntaxTree.source)
-        self.message = .unsupportedSyntax(source: syntaxTree.source, range: range)
+    init(syntax: Syntax, extras: StatementExtras?, context: Context) {
+        self.sourceCode = syntax.sourceCode(in: context.syntaxTree.source)
+        let source = context.syntaxTree.source
+        let range = syntax.range(in: source)
+        super.init(type: .raw, syntax: syntax, file: source.file, range: range, extras: extras)
+        self.message = .unsupportedSyntax(source: source, range: range)
     }
 
-    var type: StatementType { .raw }
-    let syntax: Syntax?
-    let file: Source.File?
-    let range: Source.Range?
-    let extras: StatementExtras?
-
-    static func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
+    override class func decode(syntax: Syntax, extras: StatementExtras?, context: Context) -> [Statement]? {
         return nil
     }
 
-    var prettyPrintChildren: [PrettyPrintTree] {
+    override var prettyPrintChildren: [PrettyPrintTree] {
         return [PrettyPrintTree(root: sourceCode)]
     }
 }
@@ -135,56 +105,44 @@ struct RawStatement: Statement {
 // MARK: - Declarations
 
 // TODO: Attributes, modifiers, generics, where clause
-struct ClassDeclaration: Statement {
+class ClassDeclaration: Statement {
     let name: String
     let inherits: [TypeSignature]
-    let members: [Statement]
-
-    init(name: String, inherits: [TypeSignature] = [], members: [Statement] = []) {
-        self.syntax = nil
-        self.file = nil
-        self.range = nil
-        self.extras = nil
-        self.message = nil
-        self.name = name
-        self.inherits = inherits
-        self.members = members
+    var members: [Statement] {
+        return children
     }
 
-    var type: StatementType { .classDeclaration }
-    let syntax: Syntax?
-    let file: Source.File?
-    let range: Source.Range?
-    let extras: StatementExtras?
-    let message: Message?
+    init(name: String, inherits: [TypeSignature] = [], members: [Statement] = []) {
+        self.name = name
+        self.inherits = inherits
+        super.init(type: .classDeclaration)
+        self.children = members
+        self.children.forEach { $0.parent = self }
+    }
 
-    static func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
-        guard let statement = ClassDeclaration(syntax: syntax, extras: extras, in: syntaxTree) else {
+    override class func decode(syntax: Syntax, extras: StatementExtras?, context: Context) -> [Statement]? {
+        guard let statement = ClassDeclaration(syntax: syntax, extras: extras, context: context) else {
             return nil
         }
         return [statement]
     }
 
-    private init?(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) {
+    private init?(syntax: Syntax, extras: StatementExtras?, context: Context) {
         guard let classDecl = syntax.as(ClassDeclSyntax.self) else {
             return nil
         }
-        self.syntax = syntax
-        self.file = syntaxTree.source.file
-        self.range = syntax.range(in: syntaxTree.source)
-        self.extras = extras
         self.name = classDecl.identifier.text
-        let (inherits, message) = classDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], nil)
+        let (inherits, message) = classDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: context.syntaxTree) ?? ([], nil)
+        self.inherits = inherits
+        super.init(type: .classDeclaration, syntax: syntax, file: context.syntaxTree.source.file, range: syntax.range(in: context.syntaxTree.source), extras: extras)
+
         self.inherits = inherits
         self.message = message
-        self.members = syntaxTree.process(syntaxListContainer: classDecl.members)
+        self.members = context.syntaxTree.process(syntaxListContainer: classDecl.members, context: context.reparented(self))
+        self.children.forEach { $0.parent = self }
     }
 
-    var children: [Statement] {
-        return members
-    }
-
-    var prettyPrintChildren: [PrettyPrintTree] {
+    override var prettyPrintChildren: [PrettyPrintTree] {
         var children = [PrettyPrintTree(root: name)]
         if !inherits.isEmpty {
             children.append(PrettyPrintTree(root: "inherits", children: inherits.map { PrettyPrintTree(root: $0.description) }))
@@ -197,7 +155,14 @@ struct ClassDeclaration: Statement {
 struct ExtensionDeclaration: Statement {
     let extends: TypeSignature
     let inherits: [TypeSignature]
-    let members: [Statement]
+    var members: [Statement] {
+        get {
+            return children
+        }
+        set {
+            children = newValue
+        }
+    }
 
     init(extends: TypeSignature, inherits: [TypeSignature] = [], members: [Statement] = []) {
         self.syntax = nil

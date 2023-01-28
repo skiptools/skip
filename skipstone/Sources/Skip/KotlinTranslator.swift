@@ -20,21 +20,22 @@ public struct KotlinTranslator {
 
     /// Translate syntax trees only.
     public func translateSyntaxTree() -> KotlinSyntaxTree {
-        let statements = syntaxTree.statements.flatMap { translateStatement($0, parent: nil) }
+        let context = KotlinStatement.Context(translator: self)
+        let statements = syntaxTree.statements.flatMap { translateStatement($0, context: context) }
         return KotlinSyntaxTree(sourceFile: syntaxTree.source.file, statements: statements)
     }
 
-    func translateStatement(_ statement: Statement, parent: KotlinStatement?) -> [KotlinStatement] {
+    func translateStatement(_ statement: Statement, context: KotlinStatement.Context) -> [KotlinStatement] {
         if let translatable = statement as? KotlinTranslatable {
-            return translatable.kotlinStatements(with: self, parent: parent)
+            return translatable.kotlinStatements(context: context)
         }
 
         // Fall back to a raw translation
         if let syntax = statement.syntax {
-            var rawStatement = RawStatement(syntax: syntax, extras: statement.extras, in: syntaxTree)
+            var rawStatement = RawStatement(syntax: syntax, extras: statement.extras, context: Statement.Context(syntaxTree: syntaxTree, parent: statement.parent))
             rawStatement.message = .untranslatableSyntax(source: syntaxTree.source, range: statement.range)
-            return rawStatement.kotlinStatements(with: self, parent: parent)
+            return rawStatement.kotlinStatements(context: context)
         }
-        return MessageStatement(message: .untranslatableSyntax()).kotlinStatements(with: self, parent: parent)
+        return MessageStatement(message: .untranslatableSyntax()).kotlinStatements(context: context)
     }
 }

@@ -1,5 +1,14 @@
 /// A node in the Kotlin syntax tree.
 class KotlinStatement: OutputNode {
+    struct Context {
+        let translator: KotlinTranslator
+        var parent: KotlinStatement?
+
+        func reparented(_ parent: KotlinStatement?) -> Context {
+            return Context(translator: translator, parent: parent)
+        }
+    }
+
     /// A human-readable type name for this statement.
     let statementType: String
     let sourceFile: Source.File?
@@ -55,7 +64,7 @@ class KotlinStatement: OutputNode {
 
 /// Implemented by many of our`Statement` types that translate themselves to Kotlin.
 protocol KotlinTranslatable {
-    func kotlinStatements(with translator: KotlinTranslator, parent: KotlinStatement?) -> [KotlinStatement]
+    func kotlinStatements(context: KotlinStatement.Context) -> [KotlinStatement]
 }
 
 /// Create a Kotlin statement with populated state, rather than writing a custom type.
@@ -69,12 +78,12 @@ class PopulatedKotlinStatement: KotlinStatement {
         super.init(statementType: statementType, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
-    init(statement: Statement, translator: KotlinTranslator, parent: KotlinStatement? = nil, outputCall: @escaping (OutputGenerator, Indentation, [KotlinStatement]) -> Void = { _, _, _ in }) {
+    init(statement: Statement, context: Context, outputCall: @escaping (OutputGenerator, Indentation, [KotlinStatement]) -> Void = { _, _, _ in }) {
         self.prettyPrintChildrenCall = { statement.prettyPrintChildren }
         self.outputCall = outputCall
         super.init(statementType: String(describing: statement.type), sourceFile: statement.file, sourceRange: statement.range, extras: statement.extras)
-        self.parent = parent
-        self.children = statement.children.flatMap { translator.translateStatement($0, parent: self) }
+        self.parent = context.parent
+        self.children = statement.children.flatMap { context.translator.translateStatement($0, context: context.reparented(self)) }
         self.children.forEach { $0.parent = self }
         self.message = statement.message
     }

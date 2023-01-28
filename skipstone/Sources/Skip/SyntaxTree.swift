@@ -12,7 +12,7 @@ public class SyntaxTree {
         self.source = source
         self.preprocessorSymbols = preprocessorSymbols
         self.syntax = Parser.parse(source: source.content)
-        self.statements = process(syntaxListContainer: syntax, parent: nil)
+        self.statements = process(syntaxListContainer: syntax, context: Statement.Context(syntaxTree: self))
     }
 
     public var prettyPrintTree: PrettyPrintTree {
@@ -23,11 +23,11 @@ public class SyntaxTree {
         return statements.flatMap { $0.messages }
     }
 
-    func process<ListContainer: SyntaxListContainer>(syntaxListContainer: ListContainer, parent: Statement?) -> [Statement] {
-        return process(syntaxList: syntaxListContainer.syntaxList, parent: parent)
+    func process<ListContainer: SyntaxListContainer>(syntaxListContainer: ListContainer, context: Statement.Context) -> [Statement] {
+        return process(syntaxList: syntaxListContainer.syntaxList, context: context)
     }
 
-    func process<List: SyntaxList>(syntaxList: List, parent: Statement?) -> [Statement] {
-        return syntaxList.flatMap { StatementFactory.for(syntax: $0.content, in: self, parent: parent) }
+    func process<List: SyntaxList>(syntaxList: List, context: Statement.Context) -> [Statement] {
+        return syntaxList.flatMap { StatementFactory.for(syntax: $0.content, context: context) }
     }
 }
