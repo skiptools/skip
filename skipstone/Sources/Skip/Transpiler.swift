@@ -30,7 +30,7 @@ public struct Transpiler {
                 group.addTask {
                     let syntaxTree = try SyntaxTree(source: Source(file: sourceFile), preprocessorSymbols: preprocessorSymbols)
                     let translator = KotlinTranslator(syntaxTree: syntaxTree, codebaseInfo: codebaseInfo)
-                    return translator.translate()
+                    return translator.transpile()
                 }
             }
             var transpilations: [Transpilation] = []

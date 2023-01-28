@@ -1,52 +1,42 @@
 /// A node in the Kotlin syntax tree.
-protocol KotlinStatement: OutputNode {
+class KotlinStatement: OutputNode {
     /// A human-readable type name for this statement.
-    var statementType: String { get }
-    var sourceFile: Source.File? { get }
-    var sourceRange: Source.Range? { get }
-    var extras: StatementExtras? { get }
-    var children: [KotlinStatement] { get }
-    var prettyPrintChildren: [PrettyPrintTree] { get }
+    let statementType: String
+    let sourceFile: Source.File?
+    let sourceRange: Source.Range?
+    let extras: StatementExtras?
 
-    /// Pretty-printable tree rooted on this syntax statement.
-    var prettyPrintTree: PrettyPrintTree { get }
-
-    /// Any message about this statement.
-    var message: Message? { get }
-
-    /// Recursive traversal of all messages from the tree rooted on this syntax statement.
-    var messages: [Message] { get }
-}
-
-extension KotlinStatement {
-    var sourceFile: Source.File? {
-        return nil
+    init(statementType: String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.statementType = statementType
+        self.sourceFile = sourceFile
+        self.sourceRange = sourceRange
+        self.extras = extras
     }
 
-    var sourceRange: Source.Range? {
-        return nil
+    weak var parent: KotlinStatement?
+    var children: [KotlinStatement] = [] {
+        willSet {
+            children.forEach { $0.parent = nil }
+        }
+        didSet {
+            children.forEach { $0.parent = self }
+        }
     }
 
-    var extras: StatementExtras? {
-        return nil
-    }
-
-    var children: [KotlinStatement] {
-        return []
-    }
-
-    var prettyPrintTree: PrettyPrintTree {
-        return PrettyPrintTree(root: statementType, children: prettyPrintChildren + children.map { $0.prettyPrintTree })
-    }
-
+    /// Any pretty print child trees aside from this node's child statements.
     var prettyPrintChildren: [PrettyPrintTree] {
         return []
     }
 
-    var message: Message? {
-        return nil
+    /// Pretty-printable tree rooted on this syntax statement.
+    var prettyPrintTree: PrettyPrintTree {
+        return PrettyPrintTree(root: statementType, children: prettyPrintChildren + children.map { $0.prettyPrintTree })
     }
 
+    /// Any message about this statement.
+    var message: Message?
+
+    /// Recursive traversal of all messages from the tree rooted on this syntax statement.
     var messages: [Message] {
         var messages: [Message] = []
         if let message, extras?.suppressMessage != true {
@@ -58,51 +48,42 @@ extension KotlinStatement {
     func leadingTrivia(indentation: Indentation) -> String {
         return extras?.leadingTrivia(indentation: indentation) ?? ""
     }
+
+    func append(to output: OutputGenerator, indentation: Indentation) {
+    }
 }
 
-/// Implemented by many of our`Statement` types below that translate themselves to Kotlin.
+/// Implemented by many of our`Statement` types that translate themselves to Kotlin.
 protocol KotlinTranslatable {
-    func kotlinStatements(with translator: KotlinTranslator) -> [KotlinStatement]
+    func kotlinStatements(with translator: KotlinTranslator, parent: KotlinStatement?) -> [KotlinStatement]
 }
 
 /// Create a Kotlin statement with populated state, rather than writing a custom type.
-struct PopulatedKotlinStatement: KotlinStatement {
-    let statementType: String
-    var sourceFile: Source.File?
-    var sourceRange: Source.Range?
-    var extras: StatementExtras?
-    var children: [KotlinStatement]
-    var message: Message?
-    var prettyPrintChildrenCall: () -> [PrettyPrintTree]
-    var outputCall: (OutputGenerator, Indentation, [KotlinStatement]) -> Void
+class PopulatedKotlinStatement: KotlinStatement {
+    let prettyPrintChildrenCall: () -> [PrettyPrintTree]
+    let outputCall: (OutputGenerator, Indentation, [KotlinStatement]) -> Void
 
-    init(statementType: String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil, children: [KotlinStatement] = [], message: Message? = nil, prettyPrintChildrenCall: @escaping () -> [PrettyPrintTree] = { [] }, outputCall: @escaping (OutputGenerator, Indentation, [KotlinStatement]) -> Void = { _, _, _ in }) {
-        self.statementType = statementType
-        self.sourceFile = sourceFile
-        self.sourceRange = sourceRange
-        self.extras = extras
-        self.children = children
-        self.message = message
+    init(statementType: String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil, prettyPrintChildrenCall: @escaping () -> [PrettyPrintTree] = { [] }, outputCall: @escaping (OutputGenerator, Indentation, [KotlinStatement]) -> Void = { _, _, _ in }) {
         self.prettyPrintChildrenCall = prettyPrintChildrenCall
         self.outputCall = outputCall
+        super.init(statementType: statementType, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
-    init(statement: Statement, translator: KotlinTranslator, outputCall: @escaping (OutputGenerator, Indentation, [KotlinStatement]) -> Void = { _, _, _ in }) {
-        self.statementType = String(describing: statement.type)
-        self.sourceFile = statement.file
-        self.sourceRange = statement.range
-        self.extras = statement.extras
-        self.children = statement.children.flatMap { translator.translateStatement($0) }
-        self.message = statement.message
+    init(statement: Statement, translator: KotlinTranslator, parent: KotlinStatement? = nil, outputCall: @escaping (OutputGenerator, Indentation, [KotlinStatement]) -> Void = { _, _, _ in }) {
         self.prettyPrintChildrenCall = { statement.prettyPrintChildren }
         self.outputCall = outputCall
+        super.init(statementType: String(describing: statement.type), sourceFile: statement.file, sourceRange: statement.range, extras: statement.extras)
+        self.parent = parent
+        self.children = statement.children.flatMap { translator.translateStatement($0, parent: self) }
+        self.children.forEach { $0.parent = self }
+        self.message = statement.message
     }
 
-    var prettyPrintChildren: [PrettyPrintTree] {
+    override var prettyPrintChildren: [PrettyPrintTree] {
         return prettyPrintChildrenCall()
     }
 
-    func append(to output: OutputGenerator, indentation: Indentation) {
+    override func append(to output: OutputGenerator, indentation: Indentation) {
         outputCall(output, indentation, children)
     }
 }

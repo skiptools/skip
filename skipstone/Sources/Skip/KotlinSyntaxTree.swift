@@ -1,5 +1,5 @@
 /// Representation of the Kotlin syntax tree.
-public struct KotlinSyntaxTree {
+public class KotlinSyntaxTree {
     public let sourceFile: Source.File
     let statements: [KotlinStatement]
 

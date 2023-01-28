@@ -1,12 +1,12 @@
 extension IfDefined: KotlinTranslatable {
-    func kotlinStatements(with translator: KotlinTranslator) -> [KotlinStatement] {
-        return statements.flatMap { translator.translateStatement($0) }
+    func kotlinStatements(with translator: KotlinTranslator, parent: KotlinStatement?) -> [KotlinStatement] {
+        return statements.flatMap { translator.translateStatement($0, parent: parent) }
     }
 }
 
 extension ImportDeclaration: KotlinTranslatable {
-    func kotlinStatements(with translator: KotlinTranslator) -> [KotlinStatement] {
-        let statement = PopulatedKotlinStatement(statement: self, translator: translator) { output, indentation, _ in
+    func kotlinStatements(with translator: KotlinTranslator, parent: KotlinStatement?) -> [KotlinStatement] {
+        let statement = PopulatedKotlinStatement(statement: self, translator: translator, parent: parent) { output, indentation, _ in
             output.append(indentation)
             output.append("import ")
             output.append(modulePath.joined(separator: "."))
@@ -17,15 +17,15 @@ extension ImportDeclaration: KotlinTranslatable {
 }
 
 extension MessageStatement: KotlinTranslatable {
-    func kotlinStatements(with translator: KotlinTranslator) -> [KotlinStatement] {
-        let statement = PopulatedKotlinStatement(statement: self, translator: translator)
+    func kotlinStatements(with translator: KotlinTranslator, parent: KotlinStatement?) -> [KotlinStatement] {
+        let statement = PopulatedKotlinStatement(statement: self, translator: translator, parent: parent)
         return [statement]
     }
 }
 
 extension ProtocolDeclaration: KotlinTranslatable {
-    func kotlinStatements(with translator: KotlinTranslator) -> [KotlinStatement] {
-        let statement = PopulatedKotlinStatement(statement: self, translator: translator) { output, indentation, children in
+    func kotlinStatements(with translator: KotlinTranslator, parent: KotlinStatement?) -> [KotlinStatement] {
+        let statement = PopulatedKotlinStatement(statement: self, translator: translator, parent: parent) { output, indentation, children in
             output.append(indentation)
             if let declaration = extras?.declaration {
                 output.append(declaration)
@@ -44,8 +44,8 @@ extension ProtocolDeclaration: KotlinTranslatable {
 }
 
 extension RawStatement: KotlinTranslatable {
-    func kotlinStatements(with translator: KotlinTranslator) -> [KotlinStatement] {
-        let statement = PopulatedKotlinStatement(statement: self, translator: translator) { output, indentation, _ in
+    func kotlinStatements(with translator: KotlinTranslator, parent: KotlinStatement?) -> [KotlinStatement] {
+        let statement = PopulatedKotlinStatement(statement: self, translator: translator, parent: parent) { output, indentation, _ in
             output.append(indentation)
             output.append(sourceCode)
             output.append("\n")

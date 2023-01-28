@@ -1,67 +1,67 @@
 import SwiftSyntax
 
-struct IfDefined: Statement {
+class IfDefined: Statement {
     let symbol: String
-    let statements: [Statement]
-
-    init(symbol: String, statements: [Statement]) {
-        self.syntax = nil
-        self.file = nil
-        self.range = nil
-        self.extras = nil
-        self.symbol = symbol
-        self.statements = statements
+    var statements: [Statement] {
+        get {
+            return children
+        }
+        set {
+            children = newValue
+        }
     }
 
-    var type: StatementType { .ifDefined }
-    let syntax: Syntax?
-    let file: Source.File?
-    let range: Source.Range?
-    let extras: StatementExtras?
+    init(symbol: String) {
+        self.symbol = symbol
+        super.init(type: .ifDefined)
+    }
 
-    static func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
-        guard let statement = IfDefined(syntax: syntax, extras: extras, in: syntaxTree) else {
+    override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree, parent: Statement?) -> [Statement]? {
+        guard let statement = IfDefined(syntax: syntax, extras: extras, in: syntaxTree, parent: parent) else {
             return nil
         }
         return [statement]
     }
 
-    private init?(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) {
+    private init?(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree, parent: Statement?) {
         guard let ifConfigDecl = syntax.as(IfConfigDeclSyntax.self) else {
             return nil
         }
 
-        self.syntax = syntax
-        self.file = syntaxTree.source.file
-        self.range = syntax.range(in: syntaxTree.source)
-        self.extras = extras
-
         // Look for a clause that matches a defined symbol, or an 'else'
-        for clause in ifConfigDecl.clauses {
-            let symbol = clause.condition?.description ?? ""
-            guard symbol == "SKIP" || syntaxTree.preprocessorSymbols.contains(symbol) || clause.poundKeyword.text == "#else" else {
+        var symbol: String? = nil
+        var clause: IfConfigClauseSyntax? = nil
+        for ifConfigClause in ifConfigDecl.clauses {
+            let clauseSymbol = ifConfigClause.condition?.description ?? ""
+            guard clauseSymbol == "SKIP" || syntaxTree.preprocessorSymbols.contains(clauseSymbol) || ifConfigClause.poundKeyword.text == "#else" else {
                 continue
             }
-            self.symbol = symbol.isEmpty ? "#else" : symbol
-            self.statements = Self.extractStatements(from: clause, in: syntaxTree)
-            return
+            symbol = clauseSymbol.isEmpty ? "#else" : clauseSymbol
+            clause = ifConfigClause
+            break
         }
-        // Didn't find a match
-        self.symbol = ifConfigDecl.clauses.first?.condition?.description ?? ""
-        self.statements = []
+
+        self.symbol = symbol ?? ifConfigDecl.clauses.first?.condition?.description ?? ""
+        super.init(type: .ifDefined, syntax: syntax, file: syntaxTree.source.file, range: syntax.range(in: syntaxTree.source), extras: extras)
+        self.parent = parent
+        if let clause {
+            self.statements = Self.extractStatements(from: clause, in: syntaxTree, parent: parent)
+        } else {
+            self.statements = []
+        }
     }
 
-    private static func extractStatements(from clause: IfConfigClauseSyntax, in syntaxTree: SyntaxTree) -> [Statement] {
+    private static func extractStatements(from clause: IfConfigClauseSyntax, in syntaxTree: SyntaxTree, parent: Statement?) -> [Statement] {
         guard let elements = clause.elements else {
             return []
         }
         switch elements {
         case .statements(let syntax):
-            return syntaxTree.process(syntaxList: syntax)
+            return syntaxTree.process(syntaxList: syntax, parent: parent)
         case .switchCases(let syntax):
             return [RawStatement(syntax: Syntax(syntax), extras: nil, in: syntaxTree)]
         case .decls(let syntax):
-            return syntaxTree.process(syntaxList: syntax)
+            return syntaxTree.process(syntaxList: syntax, parent: parent)
         case .postfixExpression(let syntax):
             return [RawStatement(syntax: Syntax(syntax), extras: nil, in: syntaxTree)]
         case .attributes(let syntax):

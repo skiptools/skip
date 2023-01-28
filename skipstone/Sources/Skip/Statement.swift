@@ -1,61 +1,50 @@
 import SwiftSyntax
 
 /// A node in the Swift syntax tree.
-protocol Statement {
-    var type: StatementType { get }
-    var syntax: Syntax? { get }
-    var file: Source.File? { get }
-    var range: Source.Range? { get }
-    var extras: StatementExtras? { get }
-    var children: [Statement] { get }
-    var prettyPrintChildren: [PrettyPrintTree] { get }
+class Statement {
+    let type: StatementType
+    let syntax: Syntax?
+    let file: Source.File?
+    let range: Source.Range?
+    let extras: StatementExtras?
+
+    init(type: StatementType, syntax: Syntax? = nil, file: Source.File? = nil, range: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.type = type
+        self.syntax = syntax
+        self.file = file
+        self.range = range
+        self.extras = extras
+    }
 
     /// Attempt to construct statements of this type from the given syntax.
-    static func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]?
-
-    /// Pretty-printable tree rooted on this syntax statement.
-    var prettyPrintTree: PrettyPrintTree { get }
-
-    /// Any message about this statement.
-    var message: Message? { get }
-
-    /// Recursive traversal of all messages from the tree rooted on this syntax statement.
-    var messages: [Message] { get }
-}
-
-extension Statement {
-    var syntax: Syntax? {
+    class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree, parent: Statement?) -> [Statement]? {
         return nil
     }
 
-    var file: Source.File? {
-        return nil
+    weak var parent: Statement?
+    var children: [Statement] = [] {
+        willSet {
+            children.forEach { $0.parent = nil }
+        }
+        didSet {
+            children.forEach { $0.parent = self }
+        }
     }
 
-    var range: Source.Range? {
-        return nil
-    }
-
-    var extras: StatementExtras? {
-        return nil
-    }
-
-    var children: [Statement] {
-        return []
-    }
-
-    var prettyPrintTree: PrettyPrintTree {
-        return PrettyPrintTree(root: String(describing: type), children: prettyPrintChildren + children.map { $0.prettyPrintTree })
-    }
-
+    /// Any pretty print child trees aside from this node's child statements.
     var prettyPrintChildren: [PrettyPrintTree] {
         return []
     }
 
-    var message: Message? {
-        return nil
+    /// Pretty-printable tree rooted on this syntax statement.
+    var prettyPrintTree: PrettyPrintTree {
+        return PrettyPrintTree(root: String(describing: type), children: prettyPrintChildren + children.map { $0.prettyPrintTree })
     }
 
+    /// Any message about this statement.
+    var message: Message?
+
+    /// Recursive traversal of all messages from the tree rooted on this syntax statement.
     var messages: [Message] {
         var messages: [Message] = []
         if let message, extras?.suppressMessage != true {
@@ -167,11 +156,11 @@ enum StatementType: CaseIterable {
 
 /// Create statements from syntax.
 struct StatementFactory {
-    static func `for`(syntax: Syntax, in syntaxTree: SyntaxTree) -> [Statement] {
+    static func `for`(syntax: Syntax, in syntaxTree: SyntaxTree, parent: Statement?) -> [Statement] {
         let extras = StatementExtras.process(syntax: syntax)
         var statements: [Statement] = []
         if let extras {
-            let (extraStatements, replace) = extras.statements(syntax: syntax, in: syntaxTree)
+            let (extraStatements, replace) = extras.statements(syntax: syntax, in: syntaxTree, parent: parent)
             guard !replace else {
                 return extraStatements
             }
@@ -179,7 +168,7 @@ struct StatementFactory {
         }
 
         for statementType in StatementType.allCases {
-            if let representingType = statementType.representingType, let decodedStatements = representingType.decode(syntax: syntax, extras: extras, in: syntaxTree) {
+            if let representingType = statementType.representingType, let decodedStatements = representingType.decode(syntax: syntax, extras: extras, in: syntaxTree, parent: parent) {
                 statements += decodedStatements
                 return statements
             }

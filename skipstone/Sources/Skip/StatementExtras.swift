@@ -107,19 +107,19 @@ public struct StatementExtras { // Public because part of other public API
     }
 
     /// All statements contained in our directives.
-    func statements(syntax: Syntax, in syntaxTree: SyntaxTree) -> (statements: [Statement], replace: Bool) {
+    func statements(syntax: Syntax, in syntaxTree: SyntaxTree, parent: Statement?) -> (statements: [Statement], replace: Bool) {
         var statements: [Statement] = []
         var replace = false
         for directive in directives {
             switch directive {
             case .insert(let string, let extras):
-                statements.append(RawStatement(sourceCode: string, syntax: syntax, extras: extras, in: syntaxTree))
+                statements.append(RawStatement(sourceCode: string, syntax: syntax, extras: extras, in: syntaxTree, parent: parent))
             case .replace(let string, let extras):
                 replace = true
-                statements.append(RawStatement(sourceCode: string, syntax: syntax, extras: extras, in: syntaxTree))
+                statements.append(RawStatement(sourceCode: string, syntax: syntax, extras: extras, in: syntaxTree, parent: parent))
             case .invalid(let string):
                 let message = Message(severity: .warning, message: "Unrecognized SKIP comment: \(string)", source: syntaxTree.source, range: syntax.range(in: syntaxTree.source))
-                statements.append(MessageStatement(message: message))
+                statements.append(MessageStatement(message: message, parent: parent))
             default:
                 break
             }
