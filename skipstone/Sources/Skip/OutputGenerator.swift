@@ -23,9 +23,21 @@ class OutputGenerator {
         append(node.leadingTrivia(indentation: indentation))
         let startOffset = content.utf8.count
         node.append(to: self, indentation: indentation)
+        let trailingTrivia = node.trailingTrivia(indentation: indentation)
+        var trailingNewline = false
+        if !trailingTrivia.isEmpty && content.last == "\n" {
+            content = String(content.dropLast())
+            trailingNewline = true
+        }
         let length = content.utf8.count - startOffset
         if length > 0, let sourceFile = node.sourceFile {
             mapEntryOffsets.append((sourceFile, node.sourceRange, startOffset, length))
+        }
+        if !trailingTrivia.isEmpty {
+            content += " \(trailingTrivia)"
+            if trailingNewline {
+                content += "\n"
+            }
         }
     }
 
@@ -53,4 +65,7 @@ protocol OutputNode {
 
     /// Append the content of this node to the given generator.
     func append(to output: OutputGenerator, indentation: Indentation)
+
+    /// Any trailing trivia after the output. Trivia is not part of the ranges.
+    func trailingTrivia(indentation: Indentation) -> String
 }

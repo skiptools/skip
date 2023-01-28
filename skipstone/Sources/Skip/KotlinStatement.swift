@@ -49,6 +49,10 @@ class KotlinStatement: OutputNode {
         return extras?.leadingTrivia(indentation: indentation) ?? ""
     }
 
+    final func trailingTrivia(indentation: Indentation) -> String {
+        return extras?.trailingTrivia(indentation: indentation) ?? ""
+    }
+
     func append(to output: OutputGenerator, indentation: Indentation) {
     }
 }

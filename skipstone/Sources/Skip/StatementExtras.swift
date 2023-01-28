@@ -17,11 +17,16 @@ public struct StatementExtras { // Public because part of other public API
 
     let directives: [Directive]
     let leadingTrivia: [String]
+    let trailingTrivia: [String]
 
     /// Process the trivia on the given syntax to parse extras.
     static func process(syntax: Syntax) -> StatementExtras? {
+        let trailingTriviaString = processTrailingTrivia(syntax: syntax)
         guard let trivia = syntax.leadingTrivia else {
-            return nil
+            guard !trailingTriviaString.isEmpty else {
+                return nil
+            }
+            return StatementExtras(directives: [], leadingTrivia: [], trailingTrivia: [trailingTriviaString])
         }
 
         var directives: [Directive] = []
@@ -39,11 +44,11 @@ public struct StatementExtras { // Public because part of other public API
             let directiveString = directiveLines.joined().trimmingCharacters(in: .whitespacesAndNewlines)
             switch currentDirective {
             case .insert(_, _):
-                let extras = StatementExtras(directives: [], leadingTrivia: triviaLines)
+                let extras = StatementExtras(directives: [], leadingTrivia: triviaLines, trailingTrivia: [])
                 directives.append(.insert(directiveString, extras))
                 triviaLines.removeAll()
             case .replace(_, _):
-                let extras = StatementExtras(directives: [], leadingTrivia: triviaLines)
+                let extras = StatementExtras(directives: [], leadingTrivia: triviaLines, trailingTrivia: [])
                 directives.append(.replace(directiveString, extras))
                 triviaLines.removeAll()
             case .declaration(_):
@@ -100,10 +105,17 @@ public struct StatementExtras { // Public because part of other public API
         }
         endDirective()
 
-        guard !directives.isEmpty || !triviaLines.isEmpty else {
+        guard !directives.isEmpty || !triviaLines.isEmpty || !trailingTriviaString.isEmpty else {
             return nil
         }
-        return StatementExtras(directives: directives, leadingTrivia: triviaLines)
+        return StatementExtras(directives: directives, leadingTrivia: triviaLines, trailingTrivia: [trailingTriviaString])
+    }
+
+    private static func processTrailingTrivia(syntax: Syntax) -> String {
+        guard let trailingTrivia = syntax.trailingTrivia else {
+            return ""
+        }
+        return trailingTrivia.description.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// All statements contained in our directives.
@@ -154,5 +166,10 @@ public struct StatementExtras { // Public because part of other public API
         }
         let indentationString = indentation.description
         return indentationString + leadingTrivia.joined(separator: indentationString)
+    }
+
+    /// Trailing trivia string, allowing us to preserve trailing comments.
+    func trailingTrivia(indentation: Indentation) -> String {
+        return trailingTrivia.joined(separator: indentation.description)
     }
 }

@@ -1,12 +1,12 @@
 // Header comment
 
-import Foundation
+import /* Middle comment */ Foundation // Trailing import comment
+// That continues here
 
 // Standalone comment
 
 // Decl comment
-// SKIP FOO
-struct UnsupportedTypes1 {
+struct UnsupportedTypes1 { // Trailing comment
 }
 
 // Protocol comment
