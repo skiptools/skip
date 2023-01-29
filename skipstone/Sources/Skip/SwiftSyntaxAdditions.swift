@@ -45,7 +45,7 @@ extension InheritedTypeListSyntax {
 }
 
 extension FunctionSignatureSyntax {
-    func typeSignatures(in syntaxTree: SyntaxTree) -> (TypeSignature?, [Parameter], Message?) {
+    func typeSignatures(in syntaxTree: SyntaxTree) -> (TypeSignature?, [Parameter<Statement>], Message?) {
         var returnType: TypeSignature? = nil
         var message: Message? = nil
         if let output = output {
@@ -65,7 +65,8 @@ extension FunctionSignatureSyntax {
                     }
                 }
             }
-            return Parameter(externalName: parameterSyntax.firstName?.text ?? "", internalName: parameterSyntax.secondName?.text, type: type)
+            // TODO: Default value, variadic
+            return Parameter<Statement>(externalName: parameterSyntax.firstName?.text ?? "", internalName: parameterSyntax.secondName?.text, type: type)
         }
         return (returnType, parameters, message)
     }

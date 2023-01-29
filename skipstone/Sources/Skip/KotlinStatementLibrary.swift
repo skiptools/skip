@@ -74,13 +74,17 @@ class KotlinClassDeclaration: KotlinStatement {
 class KotlinFunctionDeclaration: KotlinStatement {
     let name: String
     let returnType: TypeSignature?
-    let parameters: [Parameter]
+    let parameters: [Parameter<KotlinStatement>]
 
     init(statement: FunctionDeclaration) {
         self.name = statement.name
         self.returnType = statement.returnType
         self.parameters = statement.parameters
         super.init(type: .functionDeclaration, statement: statement)
+    }
+
+    override var children: [KotlinStatement] {
+        return parameters.compactMap { $0.defaultValue }
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {

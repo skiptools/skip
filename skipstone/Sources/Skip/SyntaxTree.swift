@@ -2,7 +2,7 @@ import SwiftParser
 import SwiftSyntax
 
 /// Representation of the Swift syntax tree.
-public class SyntaxTree {
+public class SyntaxTree: PrettyPrintable {
     let source: Source
     let syntax: SourceFileSyntax
     let preprocessorSymbols: Set<String>
@@ -23,4 +23,11 @@ public class SyntaxTree {
     public var messages: [Message] {
         return statements.flatMap { $0.messages }
     }
+}
+
+/// A node in a syntax tree.
+protocol SyntaxTreeNode: AnyObject {
+    associatedtype S
+    var parent: S? { get set }
+    var children: [S] { get }
 }

@@ -1,30 +1,33 @@
 import SwiftSyntax
 
 /// A block of code.
-struct CodeBlock {
-    let parent: Statement
+struct CodeBlock<S: SyntaxTreeNode> {
+    let parent: S?
 
-    var statements: [Statement] = [] {
+    var statements: [S] = [] {
         didSet {
-            statements.forEach { $0.parent = parent }
+            statements.forEach { $0.parent = parent as? S.S }
         }
     }
 }
 
-// TODO: Attributes, variadic, default value
 /// A function parameter.
-struct Parameter {
+struct Parameter<S> {
     let externalName: String
     var internalName: String {
         return _internalName ?? externalName
     }
     private let _internalName: String?
     let type: TypeSignature?
+    let isVariadic: Bool
+    let defaultValue: S?
 
-    init(externalName: String, internalName: String? = nil, type: TypeSignature?) {
+    init(externalName: String, internalName: String? = nil, type: TypeSignature?, isVariadic: Bool = false, defaultValue: S? = nil) {
         self.externalName = externalName
         _internalName = internalName
         self.type = type
+        self.isVariadic = isVariadic
+        self.defaultValue = defaultValue
     }
 
     var prettyPrintTree: PrettyPrintTree {
@@ -33,7 +36,14 @@ struct Parameter {
             children.append(PrettyPrintTree(root: internalName))
         }
         if let type {
-            children.append(PrettyPrintTree(root: type.description))
+            var typeDescription = type.description
+            if isVariadic {
+                typeDescription += "..."
+            }
+            children.append(PrettyPrintTree(root: typeDescription))
+        }
+        if let defaultValue = defaultValue as? PrettyPrintable {
+            children.append(defaultValue.prettyPrintTree)
         }
         return PrettyPrintTree(root: externalName.isEmpty ? "_" : externalName, children: children)
     }

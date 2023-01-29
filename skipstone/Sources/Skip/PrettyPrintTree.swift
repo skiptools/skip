@@ -38,3 +38,8 @@ extension PrettyPrintTree: CustomStringConvertible {
         return rootLine + childLines
     }
 }
+
+/// Entity that can generate a pretty print tree.
+public protocol PrettyPrintable {
+    var prettyPrintTree: PrettyPrintTree { get }
+}

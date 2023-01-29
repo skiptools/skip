@@ -194,14 +194,15 @@ class ExtensionDeclaration: Statement {
 class FunctionDeclaration: Statement {
     let name: String
     let returnType: TypeSignature?
-    let parameters: [Parameter]
-    var body: CodeBlock?
+    let parameters: [Parameter<Statement>]
+    var body: CodeBlock<Statement>?
 
-    init(name: String, returnType: TypeSignature?, parameters: [Parameter], syntax: Syntax? = nil, file: Source.File? = nil, range: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(name: String, returnType: TypeSignature?, parameters: [Parameter<Statement>], syntax: Syntax? = nil, file: Source.File? = nil, range: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.name = name
         self.returnType = returnType
         self.parameters = parameters
         super.init(type: .functionDeclaration, syntax: syntax, file: file, range: range, extras: extras)
+        
     }
 
     override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
@@ -220,7 +221,7 @@ class FunctionDeclaration: Statement {
     }
 
     override var children: [Statement] {
-        return body?.statements ?? []
+        return parameters.compactMap { $0.defaultValue } + (body?.statements ?? [])
     }
 
     override var prettyPrintChildren: [PrettyPrintTree] {

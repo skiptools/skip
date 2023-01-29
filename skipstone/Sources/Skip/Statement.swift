@@ -1,8 +1,7 @@
 import SwiftSyntax
 
-// TODO: Make children dynamic and up to each statement type, becuase it's often going to be a combo of things
-/// A node in the Swift syntax tree.
-class Statement {
+/// A statement in the Swift syntax tree.
+class Statement: SyntaxTreeNode, PrettyPrintable {
     let type: StatementType
     let syntax: Syntax?
     let file: Source.File?
@@ -15,6 +14,7 @@ class Statement {
         self.file = file
         self.range = range
         self.extras = extras
+        //~~~ set parent of children here... or do it all in resolve()?
     }
 
     /// Attempt to construct statements of this type from the given syntax.

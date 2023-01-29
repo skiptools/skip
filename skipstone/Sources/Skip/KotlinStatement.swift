@@ -1,5 +1,5 @@
 /// A node in the Kotlin syntax tree.
-class KotlinStatement: OutputNode {
+class KotlinStatement: SyntaxTreeNode, OutputNode {
     let type: KotlinStatementType
     let sourceFile: Source.File?
     let sourceRange: Source.Range?
