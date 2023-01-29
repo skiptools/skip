@@ -8,11 +8,6 @@ public class KotlinSyntaxTree {
         self.statements = statements
     }
 
-    public var prettyPrintTree: PrettyPrintTree {
-        let root = sourceFile.outputFile(withExtension: "kt").name
-        return PrettyPrintTree(root: root, children: statements.map { $0.prettyPrintTree })
-    }
-
     public var messages: [Message] {
         return statements.flatMap { $0.messages }
     }

@@ -1,20 +1,22 @@
 /// A node in the Kotlin syntax tree.
 class KotlinStatement: OutputNode {
-    /// A human-readable type name for this statement.
-    let statementType: String
+    let type: KotlinStatementType
     let sourceFile: Source.File?
     let sourceRange: Source.Range?
     let extras: StatementExtras?
 
-    init(statementType: String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
-        self.statementType = statementType
+    init(type: KotlinStatementType, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.type = type
         self.sourceFile = sourceFile
         self.sourceRange = sourceRange
         self.extras = extras
     }
 
-    convenience init(statementType: String, statement: Statement) {
-        self.init(statementType: statementType, sourceFile: statement.file, sourceRange: statement.range, extras: statement.extras)
+    init(type: KotlinStatementType, statement: Statement) {
+        self.type = type
+        self.sourceFile = statement.file
+        self.sourceRange = statement.range
+        self.extras = statement.extras
         if self.message == nil {
             self.message = statement.message
         }
@@ -47,4 +49,18 @@ class KotlinStatement: OutputNode {
 
     func append(to output: OutputGenerator, indentation: Indentation) {
     }
+}
+
+enum KotlinStatementType {
+    case classDeclaration
+    case extensionDeclaration
+    case functionDeclaration
+    case importDeclaration
+    case protocolDeclaration
+    case variableDeclaration
+
+    /// A statement representing raw Kotlin code.
+    case raw
+    /// A statement that only exists to add a message to the syntax tree.
+    case message
 }

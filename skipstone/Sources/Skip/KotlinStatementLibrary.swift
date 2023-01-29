@@ -1,109 +1,121 @@
+class KotlinMessageStatement: KotlinStatement {
+    init(message: Message) {
+        super.init(type: .message)
+        self.message = message
+    }
 
-extension IfDefined: KotlinTranslatable {
-    func kotlinStatements(translator: KotlinTranslator) -> [KotlinStatement] {
-        return statements.flatMap { translator.translateStatement($0) }
+    init(statement: Statement) {
+        super.init(type: .message, statement: statement)
     }
 }
 
-extension MessageStatement: KotlinTranslatable {
-    func kotlinStatements(translator: KotlinTranslator) -> [KotlinStatement] {
-        let statement = PopulatedKotlinStatement(statement: self, translator: translator)
-        return [statement]
-    }
-}
+class KotlinRawStatement: KotlinStatement {
+    let sourceCode: String
 
-extension RawStatement: KotlinTranslatable {
-    func kotlinStatements(translator: KotlinTranslator) -> [KotlinStatement] {
-        let sourceCode = self.sourceCode
-        let statement = PopulatedKotlinStatement(statement: self, translator: translator) { output, indentation, _ in
-            output.append(indentation)
-            output.append(sourceCode)
-            output.append("\n")
-        }
-        return [statement]
+    init(statement: RawStatement) {
+        self.sourceCode = statement.sourceCode
+        super.init(type: .raw, statement: statement)
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        output.append(indentation)
+        output.append(sourceCode)
+        output.append("\n")
     }
 }
 
 // MARK: - Declarations
 
-extension ClassDeclaration: KotlinTranslatable {
-    func kotlinStatements(translator: KotlinTranslator) -> [KotlinStatement] {
-        let name = self.name
-        let extras = self.extras
-        let statement = PopulatedKotlinStatement(statement: self, translator: translator) { output, indentation, children in
-            output.append(indentation)
-            if let declaration = extras?.declaration {
-                output.append(declaration)
-            } else {
-                // TODO: Visibility, generics, inheritance, children
-                output.append("class ")
-                output.append(name)
-            }
-            output.append(" {\n")
-            children.forEach { output.append($0, indentation: indentation.inc()) }
-            output.append(indentation)
-            output.append("}\n")
+class KotlinClassDeclaration: KotlinStatement {
+    let name: String
+    var members: [KotlinStatement] = [] {
+        didSet {
+            members.forEach { $0.parent = self }
         }
-        return [statement]
+    }
+
+    static func translate(statement: ClassDeclaration, translator: KotlinTranslator) -> KotlinClassDeclaration {
+        let kstatement = KotlinClassDeclaration(statement: statement)
+        kstatement.members = statement.members.flatMap { translator.translateStatement($0) }
+        return kstatement
+    }
+
+    private init(statement: ClassDeclaration) {
+        self.name = statement.name
+        super.init(type: .classDeclaration, statement: statement)
+    }
+
+    override var children: [KotlinStatement] {
+        return members
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        output.append(indentation)
+        if let declaration = extras?.declaration {
+            output.append(declaration)
+        } else {
+            // TODO: Visibility, generics, inheritance, children
+            output.append("class ")
+            output.append(name)
+        }
+        output.append(" {\n")
+        children.forEach { output.append($0, indentation: indentation.inc()) }
+        output.append(indentation)
+        output.append("}\n")
     }
 }
 
-extension ExtensionDeclaration: KotlinTranslatable {
-    func kotlinStatements(translator: KotlinTranslator) -> [KotlinStatement] {
-        let extends = self.extends.description
-        let statement = PopulatedKotlinStatement(statement: self, translator: translator) { output, indentation, children in
-            output.append(indentation)
-            if let declaration = extras?.declaration {
-                output.append(declaration)
-            } else {
-                // TODO: Visibility, generics, inheritance, children
-                output.append(" ")
-                output.append(name)
-            }
-            output.append(" {\n")
-            children.forEach { output.append($0, indentation: indentation.inc()) }
-            output.append(indentation)
-            output.append("}\n")
-        }
-        return [statement]
+class KotlinImportDeclaration: KotlinStatement {
+    let modulePath: [String]
+
+    init(statement: ImportDeclaration) {
+        self.modulePath = statement.modulePath
+        super.init(type: .importDeclaration, statement: statement)
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        output.append(indentation)
+        output.append("import ")
+        output.append(modulePath.joined(separator: "."))
+        output.append("\n")
     }
 }
 
-extension FunctionDeclaration: KotlinTranslatable {
-    
-}
-
-extension ImportDeclaration: KotlinTranslatable {
-    func kotlinStatements(translator: KotlinTranslator) -> [KotlinStatement] {
-        let modulePath = self.modulePath
-        let statement = PopulatedKotlinStatement(statement: self, translator: translator) { output, indentation, _ in
-            output.append(indentation)
-            output.append("import ")
-            output.append(modulePath.joined(separator: "."))
-            output.append("\n")
+class KotlinProtocolDeclaration: KotlinStatement {
+    let name: String
+    var members: [KotlinStatement] = [] {
+        didSet {
+            members.forEach { $0.parent = self }
         }
-        return [statement]
     }
-}
 
-extension ProtocolDeclaration: KotlinTranslatable {
-    func kotlinStatements(translator: KotlinTranslator) -> [KotlinStatement] {
-        let name = self.name
-        let extras = self.extras
-        let statement = PopulatedKotlinStatement(statement: self, translator: translator) { output, indentation, children in
-            output.append(indentation)
-            if let declaration = extras?.declaration {
-                output.append(declaration)
-            } else {
-                // TODO: Visibility, generics, inheritance, children
-                output.append("interface ")
-                output.append(name)
-            }
-            output.append(" {\n")
-            children.forEach { output.append($0, indentation: indentation.inc()) }
-            output.append(indentation)
-            output.append("}\n")
+    static func translate(statement: ProtocolDeclaration, translator: KotlinTranslator) -> KotlinProtocolDeclaration {
+        let kstatement = KotlinProtocolDeclaration(statement: statement)
+        kstatement.members = statement.members.flatMap { translator.translateStatement($0) }
+        return kstatement
+    }
+
+    private init(statement: ProtocolDeclaration) {
+        self.name = statement.name
+        super.init(type: .protocolDeclaration, statement: statement)
+    }
+
+    override var children: [KotlinStatement] {
+        return members
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        output.append(indentation)
+        if let declaration = extras?.declaration {
+            output.append(declaration)
+        } else {
+            // TODO: Visibility, generics, inheritance, children
+            output.append("interface ")
+            output.append(name)
         }
-        return [statement]
+        output.append(" {\n")
+        children.forEach { output.append($0, indentation: indentation.inc()) }
+        output.append(indentation)
+        output.append("}\n")
     }
 }

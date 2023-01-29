@@ -12,7 +12,7 @@ public class SyntaxTree {
         self.source = source
         self.preprocessorSymbols = preprocessorSymbols
         self.syntax = Parser.parse(source: source.content)
-        self.statements = process(syntaxListContainer: syntax)
+        self.statements = StatementDecoder.decode(syntaxListContainer: syntax, in: self)
         self.statements.forEach { $0.resolve() }
     }
 

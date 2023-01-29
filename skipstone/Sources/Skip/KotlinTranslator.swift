@@ -25,18 +25,73 @@ public struct KotlinTranslator {
     }
 
     func translateStatement(_ statement: Statement) -> [KotlinStatement] {
-        
-
-        if let translatable = statement as? KotlinTranslatable {
-            return translatable.kotlinStatements(translator: self)
+        switch statement.type {
+        case .assignment:
+            break
+        case .break:
+            break
+        case .catch:
+            break
+        case .comment:
+            break
+        case .continue:
+            break
+        case .defer:
+            break
+        case .do:
+            break
+        case .error:
+            break
+        case .expression:
+            break
+        case .for:
+            break
+        case .if:
+            break
+        case .ifDefined:
+            // Inline the #if content
+            return statement.children.flatMap { translateStatement($0) }
+        case .return:
+            break
+        case .switch:
+            break
+        case .throw:
+            break
+        case .while:
+            break
+        case .classDeclaration:
+            return [KotlinClassDeclaration.translate(statement: statement as! ClassDeclaration, translator: self)]
+        case .enumDeclaration:
+            break
+        case .extensionDeclaration:
+            break
+        case .functionDeclaration:
+            break
+        case .importDeclaration:
+            return [KotlinImportDeclaration(statement: statement as! ImportDeclaration)]
+        case .initDeclaration:
+            break
+        case .protocolDeclaration:
+            return [KotlinProtocolDeclaration.translate(statement: statement as! ProtocolDeclaration, translator: self)]
+        case .structDeclaration:
+            break
+        case .typealiasDeclaration:
+            break
+        case .variableDeclaration:
+            break
+        case .raw:
+            return [KotlinRawStatement(statement: statement as! RawStatement)]
+        case .message:
+            return [KotlinMessageStatement(statement: statement)]
         }
 
         // Fall back to a raw translation
         if let syntax = statement.syntax {
             let rawStatement = RawStatement(syntax: syntax, extras: statement.extras, in: syntaxTree)
-            rawStatement.message = .untranslatableSyntax(source: syntaxTree.source, range: statement.range)
-            return rawStatement.kotlinStatements(translator: self)
+            let krawStatement = KotlinRawStatement(statement: rawStatement)
+            krawStatement.message = .untranslatableSyntax(source: syntaxTree.source, range: statement.range)
+            return [krawStatement]
         }
-        return MessageStatement(message: .untranslatableSyntax()).kotlinStatements(translator: self)
+        return [KotlinMessageStatement(message: .untranslatableSyntax())]
     }
 }
