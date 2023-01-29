@@ -1,5 +1,7 @@
 /// A node in the Kotlin syntax tree.
-class KotlinStatement: SyntaxTreeNode, OutputNode {
+///
+/// Kotlin statements are generally mutable, as we may modify the tree in order to generate the desired Kotlin output.
+class KotlinStatement: OutputNode {
     let type: KotlinStatementType
     let sourceFile: Source.File?
     let sourceRange: Source.Range?
@@ -22,7 +24,6 @@ class KotlinStatement: SyntaxTreeNode, OutputNode {
         }
     }
 
-    weak var parent: KotlinStatement?
     var children: [KotlinStatement] {
         return []
     }

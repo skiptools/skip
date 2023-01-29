@@ -1,7 +1,10 @@
 import SwiftSyntax
 
 /// A statement in the Swift syntax tree.
-class Statement: SyntaxTreeNode, PrettyPrintable {
+///
+/// Statements are generally immutable after `resolve` is called with the parent statement, allowing each statement to finalize
+/// itself with any contextual information.
+class Statement: PrettyPrintable {
     let type: StatementType
     let syntax: Syntax?
     let file: Source.File?
@@ -14,7 +17,6 @@ class Statement: SyntaxTreeNode, PrettyPrintable {
         self.file = file
         self.range = range
         self.extras = extras
-        //~~~ set parent of children here... or do it all in resolve()?
     }
 
     /// Attempt to construct statements of this type from the given syntax.
@@ -22,28 +24,27 @@ class Statement: SyntaxTreeNode, PrettyPrintable {
         return nil
     }
 
-    weak var parent: Statement?
     var children: [Statement] {
         return []
     }
 
     /// Resolve any information that relies on the tree being complete.
-    func resolveSelf() {
+    func resolveSelf(parent: Statement?) {
     }
 
-    final func resolve() {
-        resolveSelf()
-        children.forEach { $0.resolve() }
+    final func resolve(parent: Statement?) {
+        resolveSelf(parent: parent)
+        children.forEach { $0.resolve(parent: self) }
     }
 
-    /// Any pretty print child trees aside from this node's child statements.
-    var prettyPrintChildren: [PrettyPrintTree] {
+    /// Pretty print child trees for this statement's attributes, excluding `children`.
+    var prettyPrintAttributes: [PrettyPrintTree] {
         return []
     }
 
     /// Pretty-printable tree rooted on this syntax statement.
     final var prettyPrintTree: PrettyPrintTree {
-        return PrettyPrintTree(root: String(describing: type), children: prettyPrintChildren + children.map { $0.prettyPrintTree })
+        return PrettyPrintTree(root: String(describing: type), children: prettyPrintAttributes + children.map { $0.prettyPrintTree })
     }
 
     /// Any message about this statement.

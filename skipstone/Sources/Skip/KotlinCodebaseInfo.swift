@@ -11,6 +11,7 @@ class KotlinCodebaseInfo {
         return []
     }
 
+    // TODO
     private var concreteTypeNames: Set<String> = []
     private var extensionDeclarations: [String: [ExtensionDeclaration]] = [:]
 

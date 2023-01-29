@@ -1,14 +1,8 @@
 import SwiftSyntax
 
 /// A block of code.
-struct CodeBlock<S: SyntaxTreeNode> {
-    let parent: S?
-
-    var statements: [S] = [] {
-        didSet {
-            statements.forEach { $0.parent = parent as? S.S }
-        }
-    }
+struct CodeBlock<S> {
+    let statements: [S]
 }
 
 /// A function parameter.

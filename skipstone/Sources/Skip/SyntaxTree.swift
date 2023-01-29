@@ -13,7 +13,7 @@ public class SyntaxTree: PrettyPrintable {
         self.preprocessorSymbols = preprocessorSymbols
         self.syntax = Parser.parse(source: source.content)
         self.statements = StatementDecoder.decode(syntaxListContainer: syntax, in: self)
-        self.statements.forEach { $0.resolve() }
+        self.statements.forEach { $0.resolve(parent: nil) }
     }
 
     public var prettyPrintTree: PrettyPrintTree {
@@ -23,11 +23,4 @@ public class SyntaxTree: PrettyPrintable {
     public var messages: [Message] {
         return statements.flatMap { $0.messages }
     }
-}
-
-/// A node in a syntax tree.
-protocol SyntaxTreeNode: AnyObject {
-    associatedtype S
-    var parent: S? { get set }
-    var children: [S] { get }
 }

@@ -67,13 +67,13 @@ struct KotlinTranslator {
             // TODO: Use extension functions for extensions of unknown types and of protocols
             return []
         case .functionDeclaration:
-            return [KotlinFunctionDeclaration(statement: statement as! FunctionDeclaration)]
+            return [KotlinFunctionDeclaration.translate(statement: statement as! FunctionDeclaration, translator: self)]
         case .importDeclaration:
             return [KotlinImportDeclaration(statement: statement as! ImportDeclaration)]
         case .initDeclaration:
             break
         case .protocolDeclaration:
-            return [KotlinProtocolDeclaration.translate(statement: statement as! ProtocolDeclaration, translator: self)]
+            return [KotlinInterfaceDeclaration.translate(statement: statement as! ProtocolDeclaration, translator: self)]
         case .structDeclaration:
             break
         case .typealiasDeclaration:

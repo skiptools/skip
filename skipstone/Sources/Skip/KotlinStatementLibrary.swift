@@ -27,12 +27,8 @@ class KotlinRawStatement: KotlinStatement {
 // MARK: - Declarations
 
 class KotlinClassDeclaration: KotlinStatement {
-    let name: String
-    var members: [KotlinStatement] = [] {
-        didSet {
-            members.forEach { $0.parent = self }
-        }
-    }
+    var name: String
+    var members: [KotlinStatement] = []
 
     static func translate(statement: ClassDeclaration, translator: KotlinTranslator) -> KotlinClassDeclaration {
         let kstatement = KotlinClassDeclaration(statement: statement)
@@ -72,14 +68,25 @@ class KotlinClassDeclaration: KotlinStatement {
 }
 
 class KotlinFunctionDeclaration: KotlinStatement {
-    let name: String
-    let returnType: TypeSignature?
-    let parameters: [Parameter<KotlinStatement>]
+    var name: String
+    var returnType: TypeSignature?
+    var parameters: [Parameter<KotlinStatement>] = []
 
-    init(statement: FunctionDeclaration) {
+    static func translate(statement: FunctionDeclaration, translator: KotlinTranslator) -> KotlinFunctionDeclaration {
+        let kstatement = KotlinFunctionDeclaration(statement: statement)
+        kstatement.returnType = statement.returnType
+        kstatement.parameters = statement.parameters.map { parameter in
+            var kdefaultValue: KotlinStatement? = nil
+            if let defaultValue = parameter.defaultValue {
+                kdefaultValue = translator.translateStatement(defaultValue).first
+            }
+            return Parameter(externalName: parameter.externalName, internalName: parameter.internalName, type: parameter.type, isVariadic: parameter.isVariadic, defaultValue: kdefaultValue)
+        }
+        return kstatement
+    }
+
+    private init(statement: FunctionDeclaration) {
         self.name = statement.name
-        self.returnType = statement.returnType
-        self.parameters = statement.parameters
         super.init(type: .functionDeclaration, statement: statement)
     }
 
@@ -134,16 +141,12 @@ class KotlinImportDeclaration: KotlinStatement {
     }
 }
 
-class KotlinProtocolDeclaration: KotlinStatement {
+class KotlinInterfaceDeclaration: KotlinStatement {
     let name: String
-    var members: [KotlinStatement] = [] {
-        didSet {
-            members.forEach { $0.parent = self }
-        }
-    }
+    var members: [KotlinStatement] = []
 
-    static func translate(statement: ProtocolDeclaration, translator: KotlinTranslator) -> KotlinProtocolDeclaration {
-        let kstatement = KotlinProtocolDeclaration(statement: statement)
+    static func translate(statement: ProtocolDeclaration, translator: KotlinTranslator) -> KotlinInterfaceDeclaration {
+        let kstatement = KotlinInterfaceDeclaration(statement: statement)
         kstatement.members = statement.members.flatMap { translator.translateStatement($0) }
         return kstatement
     }
