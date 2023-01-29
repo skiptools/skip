@@ -1,5 +1,6 @@
 import SwiftSyntax
 
+// TODO: Make children dynamic and up to each statement type, becuase it's often going to be a combo of things
 /// A node in the Swift syntax tree.
 class Statement {
     let type: StatementType
@@ -23,9 +24,6 @@ class Statement {
 
     weak var parent: Statement?
     var children: [Statement] = [] {
-        willSet {
-            children.forEach { $0.parent = nil }
-        }
         didSet {
             children.forEach { $0.parent = self }
         }

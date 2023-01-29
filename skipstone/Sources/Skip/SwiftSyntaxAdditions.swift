@@ -44,6 +44,33 @@ extension InheritedTypeListSyntax {
     }
 }
 
+extension FunctionSignatureSyntax {
+    func typeSignatures(in syntaxTree: SyntaxTree) -> (TypeSignature?, [Parameter], Message?) {
+        var returnType: TypeSignature? = nil
+        var message: Message? = nil
+        if let output = output {
+            returnType = TypeSignature.for(syntax: output.returnType)
+            if returnType == nil {
+                message = .unsupportedTypeSignature(source: syntaxTree.source, range: output.range(in: syntaxTree.source))
+            }
+        }
+        let parameters = input.parameterList.map { parameterSyntax in
+            var type: TypeSignature? = nil
+            if let typeSyntax = parameterSyntax.type {
+                type = TypeSignature.for(syntax: typeSyntax)
+                if type == nil {
+                    type = .base("Any", [])
+                    if message == nil {
+                        message = .unsupportedTypeSignature(source: syntaxTree.source, range: typeSyntax.range(in: syntaxTree.source))
+                    }
+                }
+            }
+            return Parameter(externalName: parameterSyntax.firstName?.text ?? "", internalName: parameterSyntax.secondName?.text, type: type)
+        }
+        return (returnType, parameters, message)
+    }
+}
+
 private class PrettyPrintVisitor: SyntaxVisitor {
     init() {
         super.init(viewMode: .sourceAccurate)
@@ -94,8 +121,6 @@ extension SourceFileSyntax: SyntaxListContainer {
     }
 }
 
-// Code blocks
-
 extension CodeBlockItemSyntax: SyntaxListElement {
     var content: Syntax {
         return Syntax(item)
@@ -115,8 +140,6 @@ extension CodeBlockSyntax: SyntaxListContainer {
     }
 }
 
-// Member declarations
-
 extension MemberDeclListItemSyntax: SyntaxListElement {
     var content: Syntax {
         return Syntax(self.decl)
@@ -135,8 +158,6 @@ extension MemberDeclBlockSyntax: SyntaxListContainer {
         return Syntax(self.rightBrace)
     }
 }
-
-// Closure expressions
 
 extension ClosureExprSyntax: SyntaxListContainer {
     var syntaxList: CodeBlockItemListSyntax {

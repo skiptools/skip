@@ -187,122 +187,46 @@ class ExtensionDeclaration: Statement {
     }
 }
 
+// TODO: Body, attributes, modifiers, async, throws, generics, where
 class FunctionDeclaration: Statement {
-//    let symbol: String
-//    let statements: [Statement]
-//
-//    init(symbol: String, statements: [Statement]) {
-//        self.syntax = nil
-//        self.file = nil
-//        self.range = nil
-//        self.extras = nil
-//        self.symbol = symbol
-//        self.statements = statements
-//    }
+    let name: String
+    let returnType: TypeSignature?
+    let parameters: [Parameter]
+    var body: CodeBlock?
+
+    init(name: String, returnType: TypeSignature?, parameters: [Parameter], syntax: Syntax? = nil, file: Source.File? = nil, range: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.name = name
+        self.returnType = returnType
+        self.parameters = parameters
+        super.init(type: .functionDeclaration, syntax: syntax, file: file, range: range, extras: extras)
+    }
 
     override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
-        return nil
+        guard let functionDecl = syntax.as(FunctionDeclSyntax.self) else {
+            return nil
+        }
+        let name = functionDecl.identifier.text
+        let (returnType, parameters, message) = functionDecl.signature.typeSignatures(in: syntaxTree)
+        let statement = FunctionDeclaration(name: name, returnType: returnType, parameters: parameters, syntax: syntax, file: syntaxTree.source.file, range: syntax.range(in: syntaxTree.source), extras: extras)
+        statement.message = message
+        if let body = functionDecl.body {
+            statement.body = CodeBlock(parent: statement)
+            statement.body?.statements = syntaxTree.process(syntaxListContainer: body)
+        }
+        return [statement]
     }
 
-//        guard let functionDecl = syntax.as(FunctionDeclSyntax.self) else {
-//            return nil
-//        }
-//        self.syntax = syntax
-//        self.file = syntaxTree.source.file
-//        self.range = syntax.range(in: syntaxTree.source)
-//        self.extras = extras
-//
-//        // Look for a clause that matches a defined symbol, or an 'else'
-//        for clause in ifConfigDecl.clauses {
-//            let symbol = clause.condition?.description ?? ""
-//            guard symbol == "SKIP" || syntaxTree.preprocessorSymbols.contains(symbol) || clause.poundKeyword.text == "#else" else {
-//                continue
-//            }
-//            self.symbol = symbol.isEmpty ? "#else" : symbol
-//            self.statements = Self.extractStatements(from: clause, in: syntaxTree)
-//            return
-//        }
-//        // Didn't find a match
-//        self.symbol = ifConfigDecl.clauses.first?.condition?.description ?? ""
-//        self.statements = []
+    override var prettyPrintChildren: [PrettyPrintTree] {
+        var children = [PrettyPrintTree(root: name)]
+        if let returnType {
+            children.append(PrettyPrintTree(root: returnType.description))
+        }
+        if !parameters.isEmpty {
+            children.append(PrettyPrintTree(root: "parameters", children: parameters.map { $0.prettyPrintTree }))
+        }
+        return children
     }
-
-//    let prefix = functionLikeDeclaration.prefix
-//
-//    let parameters: MutableList<FunctionParameter> =
-//    try convertParameters(functionLikeDeclaration.parameterList)
-//
-//    let inputType = "(" + parameters
-//        .map { $0.typeName + ($0.isVariadic ? "..." : "") }
-//        .joined(separator: ", ") +
-//    ")"
-//
-//    let returnType: String
-//    if let returnTypeSyntax = functionLikeDeclaration.returnType {
-//        returnType = try convertType(returnTypeSyntax)
-//    }
-//    else {
-//        returnType = "Void"
-//    }
-//
-//    let functionType = inputType + " -> " + returnType
-//
-//    let statements: MutableList<Statement>
-//    if let statementsSyntax = functionLikeDeclaration.statements {
-//        statements = try convertBlock(statementsSyntax)
-//    }
-//    else {
-//        statements = []
-//    }
-//
-//    let accessAndAnnotations =
-//    getAccessAndAnnotations(fromModifiers: functionLikeDeclaration.modifierList)
-//
-//    // Get annotations from `gryphon annotation` comments
-//    let annotationComments = getLeadingComments(
-//        forSyntax: functionLikeDeclaration.asSyntax,
-//        withKey: .annotation)
-//    let manualAnnotations = annotationComments.compactMap { $0.value }
-//    let annotations = accessAndAnnotations.annotations
-//    annotations.append(contentsOf: manualAnnotations)
-//
-//    let isOpen: Bool
-//    if annotations.remove("final") {
-//        isOpen = false
-//    }
-//    else if let access = accessAndAnnotations.access, access == "open" {
-//        isOpen = true
-//    }
-//    else {
-//        isOpen = !context.defaultsToFinal
-//    }
-//
-//    let generics: MutableList<String>
-//    if let genericsSyntax = functionLikeDeclaration.generics {
-//        generics = MutableList(genericsSyntax.map { $0.name.text })
-//    }
-//    else {
-//        generics = []
-//    }
-//
-//    let isMutating = annotations.remove("mutating")
-//
-//    let isPure = !getLeadingComments(
-//        forSyntax: functionLikeDeclaration.asSyntax,
-//        withKey: .pure).isEmpty
-//    if let range = functionLikeDeclaration.getRange(inFile: self.sourceFile),
-//       let translationComment = self.sourceFile.getTranslationCommentFromLine(range.start.line),
-//       translationComment.key == .pure
-//    {
-//        Compiler.handleWarning(
-//            message: "Deprecated: the \"gryphon pure\" comment should be before " +
-//            "this function. " +
-//            "Fix it: move \"// gryphon pure\" to the line above this one.",
-//            syntax: functionLikeDeclaration.asSyntax,
-//            ast: functionLikeDeclaration.toPrintableTree(),
-//            sourceFile: self.sourceFile,
-//            sourceFileRange: range)
-//    }
+}
 
 class ImportDeclaration: Statement {
     let modulePath: [String]

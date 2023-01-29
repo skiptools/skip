@@ -1,5 +1,47 @@
 import SwiftSyntax
 
+/// A block of code.
+struct CodeBlock {
+    let parent: Statement
+
+    var statements: [Statement] {
+        get {
+            return parent.children
+        }
+        set {
+            parent.children = newValue
+        }
+    }
+}
+
+// TODO: Attributes, variadic, default value
+/// A function parameter.
+struct Parameter {
+    let externalName: String
+    var internalName: String {
+        return _internalName ?? externalName
+    }
+    private let _internalName: String?
+    let type: TypeSignature?
+
+    init(externalName: String, internalName: String? = nil, type: TypeSignature?) {
+        self.externalName = externalName
+        _internalName = internalName
+        self.type = type
+    }
+
+    var prettyPrintTree: PrettyPrintTree {
+        var children: [PrettyPrintTree] = []
+        if let internalName = _internalName {
+            children.append(PrettyPrintTree(root: internalName))
+        }
+        if let type {
+            children.append(PrettyPrintTree(root: type.description))
+        }
+        return PrettyPrintTree(root: externalName.isEmpty ? "_" : externalName, children: children)
+    }
+}
+
 /// A source code type signature.
 indirect enum TypeSignature: CustomStringConvertible {
     case array(TypeSignature)

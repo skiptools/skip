@@ -15,9 +15,6 @@ class KotlinStatement: OutputNode {
 
     weak var parent: KotlinStatement?
     var children: [KotlinStatement] = [] {
-        willSet {
-            children.forEach { $0.parent = nil }
-        }
         didSet {
             children.forEach { $0.parent = self }
         }
