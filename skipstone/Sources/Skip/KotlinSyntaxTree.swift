@@ -1,6 +1,6 @@
 /// Representation of the Kotlin syntax tree.
-public class KotlinSyntaxTree {
-    public let sourceFile: Source.File
+class KotlinSyntaxTree {
+    let sourceFile: Source.File
     let statements: [KotlinStatement]
 
     init(sourceFile: Source.File, statements: [KotlinStatement]) {
@@ -8,7 +8,7 @@ public class KotlinSyntaxTree {
         self.statements = statements
     }
 
-    public var messages: [Message] {
+    var messages: [Message] {
         return statements.flatMap { $0.messages }
     }
 }

@@ -14,7 +14,7 @@ public struct Transpiler {
 
     /// Perform transpilation, feeding results to the given handler.
     public func transpile(handler: (Transpilation) throws -> Void) async throws {
-        let codebaseInfo = CodebaseInfo()
+        let codebaseInfo = KotlinCodebaseInfo()
         try await withThrowingTaskGroup(of: Void.self) { group in
             for sourceFile in sourceFiles {
                 group.addTask {

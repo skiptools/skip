@@ -1,7 +1,7 @@
 import SwiftSyntax
 
 /// Extra directives and trivia derived from the trivia surrounding a statement.
-public struct StatementExtras { // Public because part of other public API
+struct StatementExtras {
     enum Directive {
         /// Insert directly into the output.
         case insert(String, StatementExtras?)
