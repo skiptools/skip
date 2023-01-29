@@ -19,8 +19,8 @@ public struct StatementExtras { // Public because part of other public API
     let leadingTrivia: [String]
     let trailingTrivia: [String]
 
-    /// Process the trivia on the given syntax to parse extras.
-    static func process(syntax: Syntax) -> StatementExtras? {
+    /// Decode the trivia on the given syntax to parse extras.
+    static func decode(syntax: Syntax) -> StatementExtras? {
         let trailingTriviaString = processTrailingTrivia(syntax: syntax)
         guard let trivia = syntax.leadingTrivia else {
             guard !trailingTriviaString.isEmpty else {

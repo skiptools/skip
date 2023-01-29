@@ -25,6 +25,8 @@ public struct KotlinTranslator {
     }
 
     func translateStatement(_ statement: Statement) -> [KotlinStatement] {
+        
+
         if let translatable = statement as? KotlinTranslatable {
             return translatable.kotlinStatements(translator: self)
         }

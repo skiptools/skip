@@ -23,12 +23,4 @@ public class SyntaxTree {
     public var messages: [Message] {
         return statements.flatMap { $0.messages }
     }
-
-    func process<ListContainer: SyntaxListContainer>(syntaxListContainer: ListContainer) -> [Statement] {
-        return process(syntaxList: syntaxListContainer.syntaxList)
-    }
-
-    func process<List: SyntaxList>(syntaxList: List) -> [Statement] {
-        return syntaxList.flatMap { StatementFactory.for(syntax: $0.content, in: self) }
-    }
 }

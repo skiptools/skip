@@ -2,12 +2,9 @@ import SwiftSyntax
 
 class IfDefined: Statement {
     let symbol: String
-    var statements: [Statement] {
-        get {
-            return children
-        }
-        set {
-            children = newValue
+    var statements: [Statement] = [] {
+        didSet {
+            statements.forEach { $0.parent = self }
         }
     }
 
@@ -17,7 +14,7 @@ class IfDefined: Statement {
     }
 
     override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
-        guard let ifConfigDecl = syntax.as(IfConfigDeclSyntax.self) else {
+        guard syntax.kind == .ifConfigDecl, let ifConfigDecl = syntax.as(IfConfigDeclSyntax.self) else {
             return nil
         }
 
@@ -37,7 +34,7 @@ class IfDefined: Statement {
         let resolvedSymbol = symbol ?? ifConfigDecl.clauses.first?.condition?.description ?? ""
         let statement = IfDefined(symbol: resolvedSymbol, syntax: syntax, file: syntaxTree.source.file, range: syntax.range(in: syntaxTree.source), extras: extras)
         if let clause {
-            statement.children = statement.extractStatements(from: clause, in: syntaxTree)
+            statement.statements = statement.extractStatements(from: clause, in: syntaxTree)
         }
         return [statement]
     }
@@ -48,16 +45,20 @@ class IfDefined: Statement {
         }
         switch elements {
         case .statements(let syntax):
-            return syntaxTree.process(syntaxList: syntax)
+            return StatementDecoder.decode(syntaxList: syntax, in: syntaxTree)
         case .switchCases(let syntax):
             return [RawStatement(syntax: Syntax(syntax), in: syntaxTree)]
         case .decls(let syntax):
-            return syntaxTree.process(syntaxList: syntax)
+            return StatementDecoder.decode(syntaxList: syntax, in: syntaxTree)
         case .postfixExpression(let syntax):
             return [RawStatement(syntax: Syntax(syntax), in: syntaxTree)]
         case .attributes(let syntax):
             return [RawStatement(syntax: Syntax(syntax), in: syntaxTree)]
         }
+    }
+
+    override var children: [Statement] {
+        return statements
     }
 
     override var prettyPrintChildren: [PrettyPrintTree] {
@@ -112,12 +113,9 @@ class RawStatement: Statement {
 class ClassDeclaration: Statement {
     let name: String
     let inherits: [TypeSignature]
-    var members: [Statement] {
-        get {
-            return children
-        }
-        set {
-            children = newValue
+    var members: [Statement] = [] {
+        didSet {
+            members.forEach { $0.parent = self }
         }
     }
 
@@ -128,15 +126,19 @@ class ClassDeclaration: Statement {
     }
 
     override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
-        guard let classDecl = syntax.as(ClassDeclSyntax.self) else {
+        guard syntax.kind == .classDecl, let classDecl = syntax.as(ClassDeclSyntax.self) else {
             return nil
         }
         let name = classDecl.identifier.text
         let (inherits, message) = classDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], nil)
         let statement = ClassDeclaration(name: name, inherits: inherits, syntax: syntax, file: syntaxTree.source.file, range: syntax.range(in: syntaxTree.source), extras: extras)
         statement.message = message
-        statement.members = syntaxTree.process(syntaxListContainer: classDecl.members)
+        statement.members = StatementDecoder.decode(syntaxListContainer: classDecl.members, in: syntaxTree)
         return [statement]
+    }
+
+    override var children: [Statement] {
+        return members
     }
 
     override var prettyPrintChildren: [PrettyPrintTree] {
@@ -152,12 +154,9 @@ class ClassDeclaration: Statement {
 class ExtensionDeclaration: Statement {
     let extends: TypeSignature
     let inherits: [TypeSignature]
-    var members: [Statement] {
-        get {
-            return children
-        }
-        set {
-            children = newValue
+    var members: [Statement] = [] {
+        didSet {
+            members.forEach { $0.parent = self }
         }
     }
 
@@ -168,14 +167,18 @@ class ExtensionDeclaration: Statement {
     }
 
     override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
-        guard let extensionDecl = syntax.as(ExtensionDeclSyntax.self), let extends = TypeSignature.for(syntax: extensionDecl.extendedType) else {
+        guard syntax.kind == .extensionDecl, let extensionDecl = syntax.as(ExtensionDeclSyntax.self), let extends = TypeSignature.for(syntax: extensionDecl.extendedType) else {
             return nil
         }
         let (inherits, message) = extensionDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], nil)
         let statement = ExtensionDeclaration(extends: extends, inherits: inherits, syntax: syntax, file: syntaxTree.source.file, range: syntax.range(in: syntaxTree.source), extras: extras)
         statement.message = message
-        statement.members = syntaxTree.process(syntaxListContainer: extensionDecl.members)
+        statement.members = StatementDecoder.decode(syntaxListContainer: extensionDecl.members, in: syntaxTree)
         return [statement]
+    }
+
+    override var children: [Statement] {
+        return members
     }
 
     override var prettyPrintChildren: [PrettyPrintTree] {
@@ -202,7 +205,7 @@ class FunctionDeclaration: Statement {
     }
 
     override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
-        guard let functionDecl = syntax.as(FunctionDeclSyntax.self) else {
+        guard syntax.kind == .functionDecl, let functionDecl = syntax.as(FunctionDeclSyntax.self) else {
             return nil
         }
         let name = functionDecl.identifier.text
@@ -211,9 +214,13 @@ class FunctionDeclaration: Statement {
         statement.message = message
         if let body = functionDecl.body {
             statement.body = CodeBlock(parent: statement)
-            statement.body?.statements = syntaxTree.process(syntaxListContainer: body)
+            statement.body?.statements = StatementDecoder.decode(syntaxListContainer: body, in: syntaxTree)
         }
         return [statement]
+    }
+
+    override var children: [Statement] {
+        return body?.statements ?? []
     }
 
     override var prettyPrintChildren: [PrettyPrintTree] {
@@ -237,7 +244,7 @@ class ImportDeclaration: Statement {
     }
 
     override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
-        guard let importDecl = syntax.as(ImportDeclSyntax.self) else {
+        guard syntax.kind == .importDecl, let importDecl = syntax.as(ImportDeclSyntax.self) else {
             return nil
         }
         let modulePath = importDecl.path.map { $0.name.text }
@@ -254,12 +261,9 @@ class ImportDeclaration: Statement {
 class ProtocolDeclaration: Statement {
     let name: String
     let inherits: [TypeSignature]
-    var members: [Statement] {
-        get {
-            return children
-        }
-        set {
-            children = newValue
+    var members: [Statement] = [] {
+        didSet {
+            members.forEach { $0.parent = self }
         }
     }
 
@@ -270,15 +274,19 @@ class ProtocolDeclaration: Statement {
     }
 
     override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
-        guard let protocolDecl = syntax.as(ProtocolDeclSyntax.self) else {
+        guard syntax.kind == .protocolDecl, let protocolDecl = syntax.as(ProtocolDeclSyntax.self) else {
             return nil
         }
         let name = protocolDecl.identifier.text
         let (inherits, message) = protocolDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], nil)
         let statement = ProtocolDeclaration(name: name, inherits: inherits, syntax: syntax, file: syntaxTree.source.file, range: syntax.range(in: syntaxTree.source), extras: extras)
         statement.message = message
-        statement.members = syntaxTree.process(syntaxListContainer: protocolDecl.members)
+        statement.members = StatementDecoder.decode(syntaxListContainer: protocolDecl.members, in: syntaxTree)
         return [statement]
+    }
+
+    override var children: [Statement] {
+        return members
     }
 
     override var prettyPrintChildren: [PrettyPrintTree] {

@@ -27,8 +27,6 @@ import SwiftSyntax
                 action = PrintSwiftASTAction()
             } else if argument == "-skipAST" {
                 action = PrintSkipASTAction()
-            } else if argument == "-kotlinAST" {
-                action = PrintKotlinASTAction()
             } else if argument.hasPrefix("-D") && argument.count > 2 {
                 options.preprocessorSymbols.append(String(argument.dropFirst(2)))
             } else if argument.hasPrefix("-") {
@@ -81,24 +79,6 @@ private struct PrintSkipASTAction: Action {
             let source = try Source(file: sourceFile)
             let syntaxTree = SyntaxTree(source: source, preprocessorSymbols: Set(options.preprocessorSymbols))
             print(syntaxTree.prettyPrintTree)
-        }
-    }
-}
-
-private struct PrintKotlinASTAction: Action {
-    func perform(on sourceFiles: [Source.File], options: Options) async throws {
-        let codebaseInfo = CodebaseInfo()
-        var syntaxTrees: [SyntaxTree] = []
-        for sourceFile in sourceFiles {
-            let source = try Source(file: sourceFile)
-            let syntaxTree = SyntaxTree(source: source, preprocessorSymbols: Set(options.preprocessorSymbols))
-            codebaseInfo.gather(from: syntaxTree)
-            syntaxTrees.append(syntaxTree)
-        }
-        for syntaxTree in syntaxTrees {
-            let translator = KotlinTranslator(syntaxTree: syntaxTree, codebaseInfo: codebaseInfo)
-            let kotlinAST = translator.translateSyntaxTree()
-            print(kotlinAST.prettyPrintTree)
         }
     }
 }

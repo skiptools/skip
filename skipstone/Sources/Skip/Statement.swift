@@ -23,10 +23,8 @@ class Statement {
     }
 
     weak var parent: Statement?
-    var children: [Statement] = [] {
-        didSet {
-            children.forEach { $0.parent = self }
-        }
+    var children: [Statement] {
+        return []
     }
 
     /// Resolve any information that relies on the tree being complete.
@@ -161,10 +159,10 @@ enum StatementType: CaseIterable {
     }
 }
 
-/// Create statements from syntax.
-struct StatementFactory {
-    static func `for`(syntax: Syntax, in syntaxTree: SyntaxTree) -> [Statement] {
-        let extras = StatementExtras.process(syntax: syntax)
+/// Decode statements from syntax.
+struct StatementDecoder {
+    static func decode(syntax: Syntax, in syntaxTree: SyntaxTree) -> [Statement] {
+        let extras = StatementExtras.decode(syntax: syntax)
         var statements: [Statement] = []
         if let extras {
             let (extraStatements, replace) = extras.statements(syntax: syntax, in: syntaxTree)
@@ -184,5 +182,13 @@ struct StatementFactory {
         // Unsupported
         statements.append(RawStatement(syntax: syntax, extras: extras, in: syntaxTree))
         return statements
+    }
+
+    static func decode<ListContainer: SyntaxListContainer>(syntaxListContainer: ListContainer, in syntaxTree: SyntaxTree) -> [Statement] {
+        return decode(syntaxList: syntaxListContainer.syntaxList, in: syntaxTree)
+    }
+
+    static func decode<List: SyntaxList>(syntaxList: List, in syntaxTree: SyntaxTree) -> [Statement] {
+        return syntaxList.flatMap { decode(syntax: $0.content, in: syntaxTree) }
     }
 }

@@ -1,3 +1,4 @@
+
 extension IfDefined: KotlinTranslatable {
     func kotlinStatements(translator: KotlinTranslator) -> [KotlinStatement] {
         return statements.flatMap { translator.translateStatement($0) }

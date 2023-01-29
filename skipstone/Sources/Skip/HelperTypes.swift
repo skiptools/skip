@@ -4,12 +4,9 @@ import SwiftSyntax
 struct CodeBlock {
     let parent: Statement
 
-    var statements: [Statement] {
-        get {
-            return parent.children
-        }
-        set {
-            parent.children = newValue
+    var statements: [Statement] = [] {
+        didSet {
+            statements.forEach { $0.parent = parent }
         }
     }
 }
