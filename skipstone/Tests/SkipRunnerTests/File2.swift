@@ -1,5 +1,5 @@
-struct UnsupportedTypes2 {
-}
-
-func unsupportedFunction2() {
+extension ExtendedClass {
+    func f2(param: String) -> String {
+        return ""
+    }
 }

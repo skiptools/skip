@@ -36,7 +36,13 @@ class KotlinClassDeclaration: KotlinStatement {
 
     static func translate(statement: ClassDeclaration, translator: KotlinTranslator) -> KotlinClassDeclaration {
         let kstatement = KotlinClassDeclaration(statement: statement)
-        kstatement.members = statement.members.flatMap { translator.translateStatement($0) }
+        var members = statement.members.flatMap { translator.translateStatement($0) }
+        // Move extensions of this type into the type itself rather than use Kotlin extension functions.
+        // Kotlin extension functions act like static functions, which can lead to different behavior
+        for ext in translator.codebaseInfo.extensions(ofConcreteType: statement.name) {
+            members += ext.members.flatMap { translator.translateStatement($0) }
+        }
+        kstatement.members = members
         return kstatement
     }
 
@@ -62,6 +68,49 @@ class KotlinClassDeclaration: KotlinStatement {
         children.forEach { output.append($0, indentation: indentation.inc()) }
         output.append(indentation)
         output.append("}\n")
+    }
+}
+
+class KotlinFunctionDeclaration: KotlinStatement {
+    let name: String
+    let returnType: TypeSignature?
+    let parameters: [Parameter]
+
+    init(statement: FunctionDeclaration) {
+        self.name = statement.name
+        self.returnType = statement.returnType
+        self.parameters = statement.parameters
+        super.init(type: .functionDeclaration, statement: statement)
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        output.append(indentation)
+        if let declaration = extras?.declaration {
+            output.append(declaration)
+        } else {
+            // TODO: Visibility, generics, inheritance, children
+            output.append("fun ")
+            output.append(name)
+            output.append("(")
+            for entry in parameters.enumerated() {
+                let parameter = entry.element
+                let name = parameter.externalName.isEmpty ? parameter.internalName : parameter.externalName
+                output.append(name)
+                output.append(": ")
+                output.append(parameter.type?.description ?? "Any")
+                if entry.offset != parameters.count - 1 {
+                    output.append(", ")
+                }
+            }
+            output.append(")")
+            if let returnType {
+                output.append(": ")
+                output.append(returnType.description)
+            } else {
+                output.append(": Unit")
+            }
+        }
+        output.append(" {}\n")
     }
 }
 

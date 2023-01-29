@@ -64,9 +64,10 @@ struct KotlinTranslator {
         case .enumDeclaration:
             break
         case .extensionDeclaration:
-            break
+            // TODO: Use extension functions for extensions of unknown types and of protocols
+            return []
         case .functionDeclaration:
-            break
+            return [KotlinFunctionDeclaration(statement: statement as! FunctionDeclaration)]
         case .importDeclaration:
             return [KotlinImportDeclaration(statement: statement as! ImportDeclaration)]
         case .initDeclaration:

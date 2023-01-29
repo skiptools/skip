@@ -6,12 +6,12 @@ import /* Middle comment */ Foundation // Trailing import comment
 // Standalone comment
 
 // Decl comment
-struct UnsupportedTypes1 { // Trailing comment
+struct UnsupportedStruct { // Trailing comment
 }
 
 // Protocol comment
 // SKIP DECLARE: interface FooBar<X>
-protocol UnsupportedProtocol {
+protocol ReplacedProtocolDeclaration {
     var x: Int { get set }
 }
 
@@ -27,3 +27,8 @@ protocol IfProtocol {}
 #else
 protocol ElseProtocol {}
 #endif
+
+class ExtendedClass {
+    func f1() {
+    }
+}
