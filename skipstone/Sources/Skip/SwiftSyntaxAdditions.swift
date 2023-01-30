@@ -59,7 +59,7 @@ extension FunctionSignatureSyntax {
             if let typeSyntax = parameterSyntax.type {
                 type = TypeSignature.for(syntax: typeSyntax)
                 if type == nil {
-                    type = .base("Any", [])
+                    type = .base("Any", nil, [])
                     if message == nil {
                         message = .unsupportedTypeSignature(source: syntaxTree.source, range: typeSyntax.range(in: syntaxTree.source))
                     }

@@ -30,7 +30,7 @@ class KotlinClassDeclaration: KotlinStatement {
     var name: String
     var members: [KotlinStatement] = []
 
-    static func translate(statement: ClassDeclaration, translator: KotlinTranslator) -> KotlinClassDeclaration {
+    static func translate(statement: TypeDeclaration, translator: KotlinTranslator) -> KotlinClassDeclaration {
         let kstatement = KotlinClassDeclaration(statement: statement)
         var members = statement.members.flatMap { translator.translateStatement($0) }
         // Move extensions of this type into the type itself rather than use Kotlin extension functions.
@@ -42,7 +42,7 @@ class KotlinClassDeclaration: KotlinStatement {
         return kstatement
     }
 
-    private init(statement: ClassDeclaration) {
+    private init(statement: TypeDeclaration) {
         self.name = statement.name
         super.init(type: .classDeclaration, statement: statement)
     }
@@ -145,15 +145,15 @@ class KotlinInterfaceDeclaration: KotlinStatement {
     let name: String
     var members: [KotlinStatement] = []
 
-    static func translate(statement: ProtocolDeclaration, translator: KotlinTranslator) -> KotlinInterfaceDeclaration {
+    static func translate(statement: TypeDeclaration, translator: KotlinTranslator) -> KotlinInterfaceDeclaration {
         let kstatement = KotlinInterfaceDeclaration(statement: statement)
         kstatement.members = statement.members.flatMap { translator.translateStatement($0) }
         return kstatement
     }
 
-    private init(statement: ProtocolDeclaration) {
+    private init(statement: TypeDeclaration) {
         self.name = statement.name
-        super.init(type: .protocolDeclaration, statement: statement)
+        super.init(type: .interfaceDeclaration, statement: statement)
     }
 
     override var children: [KotlinStatement] {

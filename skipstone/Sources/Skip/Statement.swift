@@ -24,17 +24,21 @@ class Statement: PrettyPrintable {
         return nil
     }
 
+    weak var parent: Statement? = nil
     var children: [Statement] {
         return []
     }
 
-    /// Resolve any information that relies on the tree being complete.
-    func resolveSelf(parent: Statement?) {
+    /// Resolve any information that relies on our parent statement being set.
+    func resolveSelf() {
     }
 
-    final func resolve(parent: Statement?) {
-        resolveSelf(parent: parent)
-        children.forEach { $0.resolve(parent: self) }
+    final func resolve() {
+        resolveSelf()
+        children.forEach {
+            $0.parent = self
+            $0.resolve()
+        }
     }
 
     /// Pretty print child trees for this statement's attributes, excluding `children`.
@@ -57,6 +61,18 @@ class Statement: PrettyPrintable {
             messages.append(message)
         }
         return messages + children.flatMap { $0.messages }
+    }
+
+    /// Find the nearest type declaration by traversing pu the statement tree.
+    final var owningTypeDeclaration: TypeDeclaration? {
+        var current: Statement? = self
+        while current != nil {
+            if let typeDeclaration = current as? TypeDeclaration {
+                return typeDeclaration
+            }
+            current = current?.parent
+        }
+        return nil
     }
 }
 
@@ -132,9 +148,9 @@ enum StatementType: CaseIterable {
             return nil
 
         case .classDeclaration:
-            return ClassDeclaration.self
+            return TypeDeclaration.self
         case .enumDeclaration:
-            return nil
+            return TypeDeclaration.self
         case .extensionDeclaration:
             return ExtensionDeclaration.self
         case .functionDeclaration:
@@ -144,13 +160,13 @@ enum StatementType: CaseIterable {
         case .initDeclaration:
             return nil
         case .protocolDeclaration:
-            return ProtocolDeclaration.self
+            return TypeDeclaration.self
         case .structDeclaration:
-            return nil
+            return TypeDeclaration.self
         case .typealiasDeclaration:
             return nil
         case .variableDeclaration:
-            return VariableDeclaration.self
+            return nil
 
         case .raw:
             return RawStatement.self
@@ -191,5 +207,33 @@ struct StatementDecoder {
 
     static func decode<List: SyntaxList>(syntaxList: List, in syntaxTree: SyntaxTree) -> [Statement] {
         return syntaxList.flatMap { decode(syntax: $0.content, in: syntaxTree) }
+    }
+
+    /// Traverse up the statement tree to fully qualify a type name used in a statement.
+    static func qualifyReferencedTypeName(_ typeName: String, in statement: Statement?) -> String {
+        // Look for a qualified name whose last token(s) are the given type name
+        let suffix = ".\(typeName)"
+        var current = statement
+        while current != nil {
+            // Find the next declared type up the statement chain
+            guard let owningType = current?.owningTypeDeclaration else {
+                break
+            }
+            // Look for any direct child of that type with a matching qualified name
+            if let referencedType = owningType.children.first(where: { ($0 as? TypeDeclaration)?.qualifiedName.hasSuffix(suffix) == true }) {
+                return (referencedType as! TypeDeclaration).qualifiedName
+            }
+            // Move up to the next owning type and repeat
+            current = owningType.parent
+        }
+        return typeName
+    }
+
+    /// Traverse up the statement tree to fully qualify a type name declared by a class, struct, etc.
+    static func qualifyDeclaredTypeName(_ typeName: String, declaration: Statement) -> String {
+        if let typeDeclaration = declaration.parent?.owningTypeDeclaration {
+            return "\(typeDeclaration.qualifiedName).\(typeName)"
+        }
+        return typeName
     }
 }

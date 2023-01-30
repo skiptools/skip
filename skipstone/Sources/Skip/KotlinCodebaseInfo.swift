@@ -11,14 +11,14 @@ class KotlinCodebaseInfo {
         return []
     }
 
-    // TODO
+    // TODO: this is just a prototype
     private var concreteTypeNames: Set<String> = []
     private var extensionDeclarations: [String: [ExtensionDeclaration]] = [:]
 
     private func gather(from statement: Statement) {
         switch statement.type {
         case .classDeclaration:
-            concreteTypeNames.insert((statement as! ClassDeclaration).name)
+            concreteTypeNames.insert((statement as! TypeDeclaration).name)
         case .extensionDeclaration:
             let declaration = statement as! ExtensionDeclaration
             let key = declaration.extends.description

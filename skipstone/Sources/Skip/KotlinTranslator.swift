@@ -60,7 +60,7 @@ struct KotlinTranslator {
         case .while:
             break
         case .classDeclaration:
-            return [KotlinClassDeclaration.translate(statement: statement as! ClassDeclaration, translator: self)]
+            return [KotlinClassDeclaration.translate(statement: statement as! TypeDeclaration, translator: self)]
         case .enumDeclaration:
             break
         case .extensionDeclaration:
@@ -73,9 +73,9 @@ struct KotlinTranslator {
         case .initDeclaration:
             break
         case .protocolDeclaration:
-            return [KotlinInterfaceDeclaration.translate(statement: statement as! ProtocolDeclaration, translator: self)]
+            return [KotlinInterfaceDeclaration.translate(statement: statement as! TypeDeclaration, translator: self)]
         case .structDeclaration:
-            break
+            return [KotlinClassDeclaration.translate(statement: statement as! TypeDeclaration, translator: self)]
         case .typealiasDeclaration:
             break
         case .variableDeclaration:

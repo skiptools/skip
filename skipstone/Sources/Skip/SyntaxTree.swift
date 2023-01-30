@@ -13,7 +13,7 @@ public class SyntaxTree: PrettyPrintable {
         self.preprocessorSymbols = preprocessorSymbols
         self.syntax = Parser.parse(source: source.content)
         self.statements = StatementDecoder.decode(syntaxListContainer: syntax, in: self)
-        self.statements.forEach { $0.resolve(parent: nil) }
+        self.statements.forEach { $0.resolve() }
     }
 
     public var prettyPrintTree: PrettyPrintTree {

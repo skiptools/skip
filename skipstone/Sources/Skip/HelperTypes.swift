@@ -12,7 +12,7 @@ struct Parameter<S> {
         return _internalName ?? externalName
     }
     private let _internalName: String?
-    let type: TypeSignature?
+    private(set) var type: TypeSignature?
     let isVariadic: Bool
     let defaultValue: S?
 
@@ -41,12 +41,18 @@ struct Parameter<S> {
         }
         return PrettyPrintTree(root: externalName.isEmpty ? "_" : externalName, children: children)
     }
+
+    func qualifiedType(in statement: Statement) -> Parameter<S> {
+        var parameter = self
+        parameter.type = type?.qualified(in: statement)
+        return parameter
+    }
 }
 
 /// A source code type signature.
 indirect enum TypeSignature: CustomStringConvertible {
     case array(TypeSignature)
-    case base(String, [TypeSignature]) // A<B, C>
+    case base(String, String?, [TypeSignature]) // A<B, C> (Second string is qualified name if resolved)
     case classRestricted // 'class'
     case composition([TypeSignature]) // (A & B & C)
     case dictionary(TypeSignature, TypeSignature)
@@ -57,16 +63,15 @@ indirect enum TypeSignature: CustomStringConvertible {
     case tuple([TypeSignature])
     case unwrappedOptional(TypeSignature)
 
-
     var description: String {
         switch self {
         case .array(let type):
             return "[\(type)]"
-        case .base(let string, let generics):
+        case .base(let name, _, let generics):
             guard !generics.isEmpty else {
-                return string
+                return name
             }
-            return "\(string)<\(generics.map { $0.description }.joined(separator: ", "))>"
+            return "\(name)<\(generics.map { $0.description }.joined(separator: ", "))>"
         case .classRestricted:
             return "class"
         case .composition(let types):
@@ -114,7 +119,7 @@ indirect enum TypeSignature: CustomStringConvertible {
                     return nil
                 }
             }
-            return .base(name, genericTypes)
+            return .base(name, nil, genericTypes)
         case .compositionType:
             guard let compositionType = syntax.as(CompositionTypeSyntax.self) else {
                 return nil
@@ -159,7 +164,7 @@ indirect enum TypeSignature: CustomStringConvertible {
                     return nil
                 }
             }
-            return .member(baseType, .base(name, genericTypes))
+            return .member(baseType, .base(name, nil, genericTypes))
         case .metatypeType:
             guard let metaType = syntax.as(MetatypeTypeSyntax.self), let baseType = self.for(syntax: metaType.baseType) else {
                 return nil
@@ -197,5 +202,118 @@ indirect enum TypeSignature: CustomStringConvertible {
         default:
             return nil
         }
+    }
+
+    func qualified(in statement: Statement) -> TypeSignature {
+        switch self {
+        case .array(let elementType):
+            return .array(elementType.qualified(in: statement))
+        case .base(let name, let qualifiedName, let generics):
+            if qualifiedName != nil {
+                return self
+            }
+            return .base(name, StatementDecoder.qualifyReferencedTypeName(name, in: statement), generics.map { $0.qualified(in: statement) })
+        case .classRestricted:
+            return self
+        case .composition(let types):
+            return .composition(types.map { $0.qualified(in: statement) })
+        case .dictionary(let keyType, let valueType):
+            return .dictionary(keyType.qualified(in: statement), valueType.qualified(in: statement))
+        case .function(let parameterTypes, let returnType):
+            return .function(parameterTypes.map { $0.qualified(in: statement) }, returnType.qualified(in: statement))
+        case .member(let baseType, let type):
+            return .member(baseType.qualified(in: statement), type)
+        case .metaType(let baseType):
+            return .metaType(baseType.qualified(in: statement))
+        case .optional(let wrappedType):
+            return .optional(wrappedType.qualified(in: statement))
+        case .tuple(let elementTypes):
+            return .tuple(elementTypes.map { $0.qualified(in: statement) })
+        case .unwrappedOptional(let wrappedType):
+            return .unwrappedOptional(wrappedType.qualified(in: statement))
+        }
+    }
+}
+
+/// Member and type modifiers.
+struct Modifiers: PrettyPrintable {
+    /// Visibility modifier.
+    enum Visibility {
+        case `default`
+        case `open`
+        case `public`
+        case `internal`
+        case `private`
+    }
+
+    let visibility: Visibility
+    let isStatic: Bool
+    let isFinal: Bool
+    let isOverride: Bool
+
+    init(visibility: Visibility = .default, isStatic: Bool = false, isFinal: Bool = false, isOverride: Bool = false) {
+        self.visibility = visibility
+        self.isStatic = isStatic
+        self.isFinal = isFinal
+        self.isOverride = isOverride
+    }
+
+    /// Decode the modifier information in the given syntax.
+    static func `for`(syntax: ModifierListSyntax?) -> Modifiers {
+        guard let syntax else {
+            return Modifiers()
+        }
+        var visibility: Visibility = .default
+        var isStatic = false
+        var isFinal = false
+        var isOverride = false
+        for modifier in syntax {
+            guard modifier.detail == nil else {
+                // Ignore e.g. 'private(set)' for now
+                continue
+            }
+            switch modifier.name.text {
+            case "open":
+                visibility = .open
+            case "public":
+                visibility = .public
+            case "internal":
+                visibility = .internal
+            case "private":
+                visibility = .private
+            case "static":
+                isStatic = true
+            case "class":
+                isStatic = true
+            case "final":
+                isFinal = true
+            case "override":
+                isOverride = true
+            default:
+                break
+            }
+        }
+        return Modifiers(visibility: visibility, isStatic: isStatic, isFinal: isFinal, isOverride: isOverride)
+    }
+
+    var isEmpty: Bool {
+        return visibility == .default && !isStatic && !isFinal && !isOverride
+    }
+
+    var prettyPrintTree: PrettyPrintTree {
+        var children: [PrettyPrintTree] = []
+        if visibility != .default {
+            children.append(PrettyPrintTree(root: String(describing: visibility)))
+        }
+        if isStatic {
+            children.append(PrettyPrintTree(root: "static"))
+        }
+        if isFinal {
+            children.append(PrettyPrintTree(root: "final"))
+        }
+        if isOverride {
+            children.append(PrettyPrintTree(root: "override"))
+        }
+        return PrettyPrintTree(root: "modifiers", children: children)
     }
 }
