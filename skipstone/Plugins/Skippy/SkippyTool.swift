@@ -8,7 +8,7 @@ import PackagePlugin
             return []
         }
         let runner = try context.tool(named: "SkipRunner").path
-        let inputPaths = sourceModuleTarget.sourceFiles(withSuffix: "swift").map { $0.path }
+        let inputPaths = sourceModuleTarget.sourceFiles(withSuffix: ".swift").map { $0.path }
         let outputDir = context.pluginWorkDirectory
         return inputPaths.map { Command.buildCommand(displayName: "skippy", executable: runner, arguments: ["-skippy", "-O\(outputDir.string)", $0.string], inputFiles: [$0], outputFiles: [$0.skipPath(in: outputDir)]) }
     }
@@ -32,10 +32,8 @@ extension SkippyTool: XcodeBuildToolPlugin {
 extension Path {
     func skipPath(in outputDir: Path) -> Path {
         let lastComponent = self.lastComponent
-        var extensionLength = 0
-        if let ext = self.extension {
-            extensionLength = ext.count + 1
-        }
-        return outputDir.appending(subpath: lastComponent.dropLast(extensionLength) + ".skip")
+        assert(lastComponent.hasSuffix(".swift"))
+        let fileName = String(lastComponent.dropLast(".swift".count) + "_skip.swift")
+        return outputDir.appending(subpath: fileName)
     }
 }
