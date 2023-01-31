@@ -1,7 +1,7 @@
 import Foundation
 import PackagePlugin
 
-/// Built plugin to invoke our `Skip` tool with source files.
+/// Build plugin to invoke our `Skip` tool with source files.
 @main struct SkipTool: BuildToolPlugin {
     func createBuildCommands(context: PluginContext, target: Target) async throws -> [Command] {
         let runner = try context.tool(named: "SkipRunner").path

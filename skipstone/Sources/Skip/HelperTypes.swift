@@ -48,7 +48,7 @@ struct Parameter<S>: Hashable {
         return parameter
     }
 
-    static func == (lhs: Parameter<S>, rhs: Parameter<S>) -> Bool {
+    static func ==(lhs: Parameter<S>, rhs: Parameter<S>) -> Bool {
         return lhs.externalName == rhs.externalName && lhs.type == rhs.type && lhs.isVariadic == rhs.isVariadic
     }
 

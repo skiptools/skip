@@ -1,7 +1,7 @@
 class KotlinMessageStatement: KotlinStatement {
     init(message: Message) {
         super.init(type: .message)
-        self.message = message
+        self.statementMessages = [message]
     }
 
     init(statement: Statement) {
@@ -147,11 +147,17 @@ struct KotlinExtensionDeclaration {
 
         var kotlinStatements: [KotlinStatement] = []
         if !statement.inherits.isEmpty {
-            kotlinStatements.append(KotlinMessageStatement(message: Message(severity: .warning, message: "Cannot add protocol conformances via extensions to Kotlin interfaces or to types defined outside this module", file: statement.file, range: statement.range)))
+            let messageString: String
+            if declarationType == .protocolDeclaration {
+                messageString = "Cannot use an extension to add additional protocols to a Kotlin interface"
+            } else {
+                messageString = "Cannot use an extension to add additional protocols to a Kotlin type defined outside of this module"
+            }
+            kotlinStatements.append(KotlinMessageStatement(message: Message(severity: .error, message: messageString, file: statement.file, range: statement.range)))
         }
         for member in statement.members.flatMap({ translator.translateStatement($0) }) {
             guard let memberDeclaration = member as? KotlinMemberDeclaration else {
-                kotlinStatements.append(KotlinMessageStatement(message: Message(severity: .warning, message: "This declaration is not supported in Kotlin extensions", file: member.sourceFile, range: member.sourceRange)))
+                kotlinStatements.append(KotlinMessageStatement(message: Message(severity: .error, message: "This declaration is not supported in a Kotlin extension", file: member.sourceFile, range: member.sourceRange)))
                 continue
             }
             memberDeclaration.extends = statement.extends

@@ -89,7 +89,7 @@ struct KotlinTranslator {
         if let syntax = statement.syntax {
             let rawStatement = RawStatement(syntax: syntax, extras: statement.extras, in: syntaxTree)
             let krawStatement = KotlinRawStatement(statement: rawStatement)
-            krawStatement.message = .untranslatableSyntax(source: syntaxTree.source, range: statement.range)
+            krawStatement.statementMessages = [.untranslatableSyntax(source: syntaxTree.source, range: statement.range)]
             return [krawStatement]
         }
         return [KotlinMessageStatement(message: .untranslatableSyntax())]

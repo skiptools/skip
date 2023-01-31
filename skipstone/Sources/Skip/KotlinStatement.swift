@@ -19,24 +19,19 @@ class KotlinStatement: OutputNode {
         self.sourceFile = statement.file
         self.sourceRange = statement.range
         self.extras = statement.extras
-        if self.message == nil {
-            self.message = statement.message
-        }
+        self.statementMessages = statement.statementMessages
     }
 
     var children: [KotlinStatement] {
         return []
     }
 
-    /// Any message about this statement.
-    var message: Message?
+    /// Any messages about this statement.
+    var statementMessages: [Message] = []
 
     /// Recursive traversal of all messages from the tree rooted on this syntax statement.
     final var messages: [Message] {
-        var messages: [Message] = []
-        if let message, extras?.suppressMessage != true {
-            messages.append(message)
-        }
+        let messages: [Message] = extras?.suppressMessages == true ? [] : statementMessages
         return messages + children.flatMap { $0.messages }
     }
 

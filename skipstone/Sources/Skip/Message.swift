@@ -63,14 +63,14 @@ public struct Message: CustomStringConvertible {
 
 extension Message {
     static func unsupportedSyntax(source: Source? = nil, range: Source.Range? = nil) -> Message {
-        return Message(severity: .warning, message: "Unsupported Swift syntax", source: source, range: range)
+        return Message(severity: .error, message: "Skip does not support this Swift syntax", source: source, range: range)
     }
 
     static func untranslatableSyntax(source: Source? = nil, range: Source.Range? = nil) -> Message {
-        return Message(severity: .warning, message: "Untranslatable Swift syntax", source: source, range: range)
+        return Message(severity: .error, message: "Cannot translate this Swift to Kotlin", source: source, range: range)
     }
 
     static func unsupportedTypeSignature(source: Source? = nil, range: Source.Range? = nil) -> Message {
-        return Message(severity: .warning, message: "Unsupported type signature", source: source, range: range)
+        return Message(severity: .error, message: "Cannot translate this type signature to Kotlin", source: source, range: range)
     }
 }

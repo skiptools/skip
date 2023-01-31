@@ -66,7 +66,7 @@ class IfDefined: Statement {
 class MessageStatement: Statement {
     init(message: Message) {
         super.init(type: .message)
-        self.message = message
+        self.statementMessages = [message]
     }
 
     override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
@@ -85,7 +85,9 @@ class RawStatement: Statement {
             range = syntax?.range(in: source)
         }
         super.init(type: .raw, syntax: syntax, file: syntaxTree?.source.file, range: range, extras: extras)
-        self.message = message
+        if let message {
+            self.statementMessages = [message]
+        }
     }
 
     init(syntax: Syntax, extras: StatementExtras? = nil, in syntaxTree: SyntaxTree) {
@@ -93,7 +95,7 @@ class RawStatement: Statement {
         let source = syntaxTree.source
         let range = syntax.range(in: source)
         super.init(type: .raw, syntax: syntax, file: source.file, range: range, extras: extras)
-        self.message = .unsupportedSyntax(source: source, range: range)
+        self.statementMessages = [.unsupportedSyntax(source: source, range: range)]
     }
 
     override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
@@ -121,11 +123,11 @@ class ExtensionDeclaration: TypeDeclaration {
         guard syntax.kind == .extensionDecl, let extensionDecl = syntax.as(ExtensionDeclSyntax.self), let extends = TypeSignature.for(syntax: extensionDecl.extendedType) else {
             return nil
         }
-        let (inherits, message) = extensionDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], nil)
+        let (inherits, messages) = extensionDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], nil)
         let modifiers = Modifiers.for(syntax: extensionDecl.modifiers)
         let members = StatementDecoder.decode(syntaxListContainer: extensionDecl.members, in: syntaxTree)
         let statement = ExtensionDeclaration(extends: extends, inherits: inherits, modifiers: modifiers, members: members, syntax: syntax, file: syntaxTree.source.file, range: syntax.range(in: syntaxTree.source), extras: extras)
-        statement.message = message
+        statement.statementMessages = messages ?? []
         return [statement]
     }
 }
@@ -157,7 +159,7 @@ class FunctionDeclaration: Statement {
             return nil
         }
         let name = functionDecl.identifier.text
-        let (returnType, parameters, message) = functionDecl.signature.typeSignatures(in: syntaxTree)
+        let (returnType, parameters, messages) = functionDecl.signature.typeSignatures(in: syntaxTree)
         let isAsync = functionDecl.signature.asyncOrReasyncKeyword?.text == "async" || functionDecl.signature.throwsOrRethrowsKeyword?.text == "async"
         let isThrows = functionDecl.signature.asyncOrReasyncKeyword?.text == "throws" || functionDecl.signature.throwsOrRethrowsKeyword?.text == "throws"
         let modifiers = Modifiers.for(syntax: functionDecl.modifiers)
@@ -166,7 +168,7 @@ class FunctionDeclaration: Statement {
             body = CodeBlock(statements: StatementDecoder.decode(syntaxListContainer: bodySyntax, in: syntaxTree))
         }
         let statement = FunctionDeclaration(name: name, returnType: returnType, parameters: parameters, isAsync: isAsync, isThrows: isThrows, modifiers: modifiers, body: body, syntax: syntax, file: syntaxTree.source.file, range: syntax.range(in: syntaxTree.source), extras: extras)
-        statement.message = message
+        statement.statementMessages = messages
         return [statement]
     }
 
@@ -259,41 +261,41 @@ class TypeDeclaration: Statement {
 
     private static func decodeClassDeclaration(_ classDecl: ClassDeclSyntax, syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration {
         let name = classDecl.identifier.text
-        let (inherits, message) = classDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], nil)
+        let (inherits, messages) = classDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], nil)
         let modifiers = Modifiers.for(syntax: classDecl.modifiers)
         let members = StatementDecoder.decode(syntaxListContainer: classDecl.members, in: syntaxTree)
         let statement = TypeDeclaration(type: .classDeclaration, name: name, inherits: inherits, modifiers: modifiers, members: members, syntax: syntax, file: syntaxTree.source.file, range: syntax.range(in: syntaxTree.source), extras: extras)
-        statement.message = message
+        statement.statementMessages = messages ?? []
         return statement
     }
 
     private static func decodeStructDeclaration(_ structDecl: StructDeclSyntax, syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration {
         let name = structDecl.identifier.text
-        let (inherits, message) = structDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], nil)
+        let (inherits, messages) = structDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], nil)
         let modifiers = Modifiers.for(syntax: structDecl.modifiers)
         let members = StatementDecoder.decode(syntaxListContainer: structDecl.members, in: syntaxTree)
         let statement = TypeDeclaration(type: .structDeclaration, name: name, inherits: inherits, modifiers: modifiers, members: members, syntax: syntax, file: syntaxTree.source.file, range: syntax.range(in: syntaxTree.source), extras: extras)
-        statement.message = message
+        statement.statementMessages = messages ?? []
         return statement
     }
 
     private static func decodeProtocolDeclaration(_ protocolDecl: ProtocolDeclSyntax, syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration {
         let name = protocolDecl.identifier.text
-        let (inherits, message) = protocolDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], nil)
+        let (inherits, messages) = protocolDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], nil)
         let modifiers = Modifiers.for(syntax: protocolDecl.modifiers)
         let members = StatementDecoder.decode(syntaxListContainer: protocolDecl.members, in: syntaxTree)
         let statement = TypeDeclaration(type: .protocolDeclaration, name: name, inherits: inherits, modifiers: modifiers, members: members, syntax: syntax, file: syntaxTree.source.file, range: syntax.range(in: syntaxTree.source), extras: extras)
-        statement.message = message
+        statement.statementMessages = messages ?? []
         return statement
     }
 
     private static func decodeEnumDeclaration(_ enumDecl: EnumDeclSyntax, syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration {
         let name = enumDecl.identifier.text
-        let (inherits, message) = enumDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], nil)
+        let (inherits, messages) = enumDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], nil)
         let modifiers = Modifiers.for(syntax: enumDecl.modifiers)
         let members = StatementDecoder.decode(syntaxListContainer: enumDecl.members, in: syntaxTree)
         let statement = TypeDeclaration(type: .enumDeclaration, name: name, inherits: inherits, modifiers: modifiers, members: members, syntax: syntax, file: syntaxTree.source.file, range: syntax.range(in: syntaxTree.source), extras: extras)
-        statement.message = message
+        statement.statementMessages = messages ?? []
         return statement
     }
 

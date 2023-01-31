@@ -149,8 +149,8 @@ struct StatementExtras {
         return nil
     }
 
-    /// Whether to suppress the statement's message.
-    var suppressMessage: Bool {
+    /// Whether to suppress the statement's messages.
+    var suppressMessages: Bool {
         for directive in directives {
             if case .nowarn = directive {
                 return true
