@@ -10,7 +10,7 @@ import PackagePlugin
         let runner = try context.tool(named: "SkipRunner").path
         let inputPaths = sourceModuleTarget.sourceFiles(withSuffix: ".swift").map { $0.path }
         let outputDir = context.pluginWorkDirectory
-        return inputPaths.map { Command.buildCommand(displayName: "skippy", executable: runner, arguments: ["-skippy", "-O\(outputDir.string)", $0.string], inputFiles: [$0], outputFiles: [$0.skipPath(in: outputDir)]) }
+        return inputPaths.map { Command.buildCommand(displayName: "skippy", executable: runner, arguments: ["-skippy", "-O\(outputDir.string)", $0.string], inputFiles: [$0], outputFiles: [$0.outputPath(in: outputDir)]) }
     }
 }
 
@@ -24,16 +24,21 @@ extension SkippyTool: XcodeBuildToolPlugin {
             .filter { $0.type == .source && $0.path.extension == "swift" }
             .map { $0.path }
         let outputDir = context.pluginWorkDirectory
-        return inputPaths.map { Command.buildCommand(displayName: "skippy", executable: runner, arguments: ["-skippy", "-O\(outputDir.string)", $0.string], inputFiles: [$0], outputFiles: [$0.skipPath(in: outputDir)]) }
+        return inputPaths.map { Command.buildCommand(displayName: "skippy", executable: runner, arguments: ["-skippy", "-O\(outputDir.string)", $0.string], inputFiles: [$0], outputFiles: [$0.outputPath(in: outputDir)]) }
     }
 }
 #endif
 
 extension Path {
-    func skipPath(in outputDir: Path) -> Path {
-        let lastComponent = self.lastComponent
-        assert(lastComponent.hasSuffix(".swift"))
-        let fileName = String(lastComponent.dropLast(".swift".count) + "_skip.swift")
-        return outputDir.appending(subpath: fileName)
+    /// Xcode requires that we create an output file in order for incremental build tools to work.
+    ///
+    /// - Warning: This is duplicated in Runner.
+    func outputPath(in outputDir: Path) -> Path {
+        var outputFileName = self.lastComponent
+        if outputFileName.hasSuffix(".swift") {
+            outputFileName = String(lastComponent.dropLast(".swift".count))
+        }
+        outputFileName += "_skip.swift"
+        return outputDir.appending(subpath: outputFileName)
     }
 }

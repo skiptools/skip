@@ -72,25 +72,29 @@ private struct TranspileAction: Action {
 private struct SkippyAction: Action {
     func perform(on sourceFiles: [Source.File], options: Options) async throws {
         for sourceFile in sourceFiles {
-            print("RUNNING ON: \(sourceFile.path)") //~~~
             let source = try Source(file: sourceFile)
             let syntaxTree = SyntaxTree(source: source, preprocessorSymbols: Set(options.preprocessorSymbols))
             let translator = KotlinTranslator(syntaxTree: syntaxTree)
             let kotlinTree = translator.translateSyntaxTree()
             kotlinTree.messages.forEach { print($0) }
 
-            // Xcode requires that we create an output file in order for incremental build tools to work
             if let outputDir = options.outputDirectory {
-                let outputDirURL = URL(fileURLWithPath: outputDir)
-                var outputFileName = sourceFile.name
-                if outputFileName.hasSuffix(".swift") {
-                    outputFileName = String(outputFileName.dropLast(".swift".count))
-                }
-                outputFileName += "_skip.swift"
-                let outputFileURL = outputDirURL.appendingPathComponent(outputFileName)
+                let outputFileURL = outputFileURL(for: sourceFile, in: URL(fileURLWithPath: outputDir))
                 try "".write(to: outputFileURL, atomically: false, encoding: .utf8)
             }
         }
+    }
+
+    /// Xcode requires that we create an output file in order for incremental build tools to work.
+    ///
+    /// - Warning: This is duplicated in SkippyTool.
+    func outputFileURL(for sourceFile: Source.File, in outputDir: URL) -> URL {
+        var outputFileName = sourceFile.name
+        if outputFileName.hasSuffix(".swift") {
+            outputFileName = String(outputFileName.dropLast(".swift".count))
+        }
+        outputFileName += "_skippy.swift"
+        return outputDir.appendingPathComponent(outputFileName)
     }
 }
 
