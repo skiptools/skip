@@ -236,6 +236,9 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             output.append("fun ")
             if let extends {
                 output.append(extends.qualifiedDescription).append(".")
+                if isStatic {
+                    output.append("Companion.")
+                }
             }
             output.append(name).append("(")
             for entry in parameters.enumerated() {
