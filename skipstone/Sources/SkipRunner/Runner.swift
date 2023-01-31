@@ -23,12 +23,16 @@ import SwiftSyntax
         var action: Action?
         var options = Options()
         for argument in arguments {
-            if argument == "-swiftAST" {
+            if argument == "-skippy" {
+                action = SkippyAction()
+            } else if argument == "-swiftAST" {
                 action = PrintSwiftASTAction()
             } else if argument == "-skipAST" {
                 action = PrintSkipASTAction()
             } else if argument.hasPrefix("-D") && argument.count > 2 {
                 options.preprocessorSymbols.append(String(argument.dropFirst(2)))
+            } else if argument.hasPrefix("-O") && argument.count > 2 {
+                options.outputDirectory = String(argument.dropFirst(2))
             } else if argument.hasPrefix("-") {
                 throw RunnerError(message: "Unrecognized option: \(argument)")
             } else {
@@ -48,6 +52,7 @@ private protocol Action {
 
 private struct Options {
     var preprocessorSymbols: [String] = []
+    var outputDirectory: String?
 }
 
 private struct TranspileAction: Action {
@@ -60,6 +65,25 @@ private struct TranspileAction: Action {
             }
             print(transpilation.output.content)
             print()
+        }
+    }
+}
+
+private struct SkippyAction: Action {
+    func perform(on sourceFiles: [Source.File], options: Options) async throws {
+        for sourceFile in sourceFiles {
+            print("RUNNING ON: \(sourceFile.path)") //~~~
+            let source = try Source(file: sourceFile)
+            let syntaxTree = SyntaxTree(source: source, preprocessorSymbols: Set(options.preprocessorSymbols))
+            let translator = KotlinTranslator(syntaxTree: syntaxTree)
+            let kotlinTree = translator.translateSyntaxTree()
+            kotlinTree.messages.forEach { print($0) }
+
+            // Xcode requires that we create an output file in order for incremental build tools to work
+            if let outputDir = options.outputDirectory {
+                let outputFileURL = URL(fileURLWithPath: outputDir).appendingPathComponent(source.file.outputFile(withExtension: "skip").name)
+                try Date().description.write(to: outputFileURL, atomically: false, encoding: .utf8)
+            }
         }
     }
 }

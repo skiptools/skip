@@ -1,15 +1,16 @@
 /// Translates a Swift syntax tree to Kotlin code.
-struct KotlinTranslator {
+public class KotlinTranslator {
     let syntaxTree: SyntaxTree
-    let codebaseInfo: KotlinCodebaseInfo
+    var codebaseInfo: KotlinCodebaseInfo?
 
-    init(syntaxTree: SyntaxTree, codebaseInfo: KotlinCodebaseInfo) {
+    public init(syntaxTree: SyntaxTree) {
         self.syntaxTree = syntaxTree
-        self.codebaseInfo = codebaseInfo
     }
 
     /// Translate and transpile to source code.
-    func transpile() -> Transpilation {
+    public func transpile(codebaseInfo: KotlinCodebaseInfo) -> Transpilation {
+        self.codebaseInfo = codebaseInfo
+        
         let kotlinSyntaxTree = translateSyntaxTree()
         let messages = codebaseInfo.messages(for: syntaxTree.source.file) + kotlinSyntaxTree.messages
         let outputFile = syntaxTree.source.file.outputFile(withExtension: "kt")
@@ -19,7 +20,7 @@ struct KotlinTranslator {
     }
 
     /// Translate syntax trees only.
-    func translateSyntaxTree() -> KotlinSyntaxTree {
+    public func translateSyntaxTree() -> KotlinSyntaxTree {
         let statements = syntaxTree.statements.flatMap { translateStatement($0) }
         return KotlinSyntaxTree(sourceFile: syntaxTree.source.file, statements: statements)
     }

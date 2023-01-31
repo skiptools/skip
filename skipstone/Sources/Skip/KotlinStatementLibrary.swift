@@ -38,9 +38,11 @@ class KotlinClassDeclaration: KotlinStatement {
         var members = statement.members.flatMap { translator.translateStatement($0) }
         // Move extensions of this type into the type itself rather than use Kotlin extension functions.
         // Kotlin extension functions act like static functions, which can lead to different behavior
-        for ext in translator.codebaseInfo.extensions(of: statement) {
-            kstatement.inherits += ext.inherits
-            members += ext.members.flatMap { translator.translateStatement($0) }
+        if let codebaseInfo = translator.codebaseInfo {
+            for ext in codebaseInfo.extensions(of: statement) {
+                kstatement.inherits += ext.inherits
+                members += ext.members.flatMap { translator.translateStatement($0) }
+            }
         }
         kstatement.members = members
         return kstatement
@@ -127,7 +129,7 @@ class KotlinClassDeclaration: KotlinStatement {
     }
 
     private func buildSuperclassCall(translator: KotlinTranslator) {
-        guard let superclass = inherits.first, translator.codebaseInfo.declarationType(of: superclass.qualifiedDescription) == .classDeclaration else {
+        guard let superclass = inherits.first, translator.codebaseInfo?.declarationType(of: superclass.qualifiedDescription) == .classDeclaration else {
             return
         }
         // TODO: Call superclass default constructor with our default constructor params
@@ -140,13 +142,13 @@ struct KotlinExtensionDeclaration {
         // If the extension is on a type outside this module or is on a protocol, use Kotlin extension
         // functions. Otherwise do not translate the extension - instead we'll move its members into
         // our declaration of its extended type
-        let declarationType = translator.codebaseInfo.declarationType(of: statement.extends.qualifiedDescription)
+        let declarationType = translator.codebaseInfo?.declarationType(of: statement.extends.qualifiedDescription)
         guard declarationType == nil || declarationType == .protocolDeclaration else {
             return []
         }
 
         var kotlinStatements: [KotlinStatement] = []
-        if !statement.inherits.isEmpty {
+        if !statement.inherits.isEmpty && translator.codebaseInfo != nil {
             let messageString: String
             if declarationType == .protocolDeclaration {
                 messageString = "Cannot use an extension to add additional protocols to a Kotlin interface"
@@ -195,7 +197,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         }
         if let owningTypeDeclaration = statement.owningTypeDeclaration {
             kstatement.isOpen = !statement.modifiers.isFinal && statement.modifiers.visibility != .private && owningTypeDeclaration.type == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
-            kstatement.isProtocolFunction = translator.codebaseInfo.isProtocolFunction(declaration: statement, in: owningTypeDeclaration)
+            kstatement.isProtocolFunction = translator.codebaseInfo?.isProtocolFunction(declaration: statement, in: owningTypeDeclaration) == true
         }
         if let body = statement.body {
             let bodyStatements = body.statements.flatMap { translator.translateStatement($0) }

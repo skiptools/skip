@@ -1,5 +1,5 @@
 /// Wholistic information about the codebase needed when transpiling Swift to Kotlin.
-class KotlinCodebaseInfo {
+public class KotlinCodebaseInfo {
     init() {
     }
 

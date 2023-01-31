@@ -29,8 +29,8 @@ public struct Transpiler {
             for sourceFile in sourceFiles {
                 group.addTask {
                     let syntaxTree = try SyntaxTree(source: Source(file: sourceFile), preprocessorSymbols: preprocessorSymbols)
-                    let translator = KotlinTranslator(syntaxTree: syntaxTree, codebaseInfo: codebaseInfo)
-                    return translator.transpile()
+                    let translator = KotlinTranslator(syntaxTree: syntaxTree)
+                    return translator.transpile(codebaseInfo: codebaseInfo)
                 }
             }
             var transpilations: [Transpilation] = []
