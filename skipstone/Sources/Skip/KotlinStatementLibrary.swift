@@ -105,7 +105,16 @@ class KotlinClassDeclaration: KotlinStatement {
             }
         }
         output.append(" {\n")
-        children.forEach { output.append($0, indentation: indentation.inc()) }
+
+        let memberIndentation = indentation.inc()
+        let staticMembers = members.filter { ($0 as? KotlinMemberDeclaration)?.isStatic == true }
+        let nonstaticMembers = members.filter { ($0 as? KotlinMemberDeclaration)?.isStatic != true }
+        nonstaticMembers.forEach { output.append($0, indentation: memberIndentation) }
+
+        output.append("\n").append(memberIndentation).append("companion object {\n")
+        staticMembers.forEach { output.append($0, indentation: memberIndentation.inc()) }
+        output.append(memberIndentation).append("}\n")
+
         output.append(indentation).append("}\n")
     }
 
@@ -140,16 +149,19 @@ struct KotlinExtensionDeclaration {
         if !statement.inherits.isEmpty {
             kotlinStatements.append(KotlinMessageStatement(message: Message(severity: .warning, message: "Cannot add protocol conformances via extensions to Kotlin interfaces or to types defined outside this module", file: statement.file, range: statement.range)))
         }
-        for functionDeclaration in statement.members.compactMap({ $0 as? FunctionDeclaration }) {
-            let kotlinFunctionDeclaration = KotlinFunctionDeclaration.translate(statement: functionDeclaration, translator: translator)
-            kotlinFunctionDeclaration.extends = statement.extends
-            kotlinStatements.append(kotlinFunctionDeclaration)
+        for member in statement.members.flatMap({ translator.translateStatement($0) }) {
+            guard let memberDeclaration = member as? KotlinMemberDeclaration else {
+                kotlinStatements.append(KotlinMessageStatement(message: Message(severity: .warning, message: "This declaration is not supported in Kotlin extensions", file: member.sourceFile, range: member.sourceRange)))
+                continue
+            }
+            memberDeclaration.extends = statement.extends
+            kotlinStatements.append(member)
         }
         return kotlinStatements
     }
 }
 
-class KotlinFunctionDeclaration: KotlinStatement {
+class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     let name: String
     var returnType: TypeSignature?
     var parameters: [Parameter<KotlinStatement>] = []
@@ -158,7 +170,12 @@ class KotlinFunctionDeclaration: KotlinStatement {
     var isOpen = false
     var isProtocolFunction = false
     var body: CodeBlock<KotlinStatement>?
+
+    // KotlinMemberDeclaration
     var extends: TypeSignature?
+    var isStatic: Bool {
+        return modifiers.isStatic
+    }
 
     static func translate(statement: FunctionDeclaration, translator: KotlinTranslator) -> KotlinFunctionDeclaration {
         let kstatement = KotlinFunctionDeclaration(statement: statement)
