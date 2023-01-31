@@ -7,25 +7,32 @@ public struct Message: CustomStringConvertible {
 
     public let severity: Severity
     public let message: String
-    public let sourceFile: Source.File?
+    public let file: Source.File?
     public let range: Source.Range?
 
     init(severity: Severity, message: String, source: Source? = nil, range: Source.Range? = nil) {
         self.severity = severity
         self.message = Self.messageWithSource(for: message, in: source, range: range)
-        self.sourceFile = source?.file
+        self.file = source?.file
+        self.range = range
+    }
+
+    init(severity: Severity, message: String, file: Source.File? = nil, range: Source.Range? = nil) {
+        self.severity = severity
+        self.message = Self.messageWithSource(for: message, in: nil, range: range)
+        self.file = file
         self.range = range
     }
 
     public var description: String {
         let message = "\(severity == .error ? "error" : "warning"): \(message)"
-        guard let sourceFile else {
+        guard let file else {
             return message
         }
         guard let range else {
-            return "\(sourceFile.path): \(message)"
+            return "\(file.path): \(message)"
         }
-        return "\(sourceFile.path):\(range.start.line):\(range.start.column): \(message)"
+        return "\(file.path):\(range.start.line):\(range.start.column): \(message)"
     }
 
     private static func messageWithSource(for message: String, in source: Source?, range: Source.Range?) -> String {

@@ -19,7 +19,7 @@ class OutputGenerator {
         return ret
     }
 
-    func append(_ node: OutputNode, indentation: Indentation) {
+    @discardableResult func append(_ node: OutputNode, indentation: Indentation) -> OutputGenerator {
         append(node.leadingTrivia(indentation: indentation))
         let startOffset = content.utf8.count
         node.append(to: self, indentation: indentation)
@@ -39,14 +39,22 @@ class OutputGenerator {
                 content += "\n"
             }
         }
+        return self
     }
 
-    func append(_ string: String) {
+    @discardableResult func append(_ nodes: [OutputNode], indentation: Indentation) -> OutputGenerator {
+        nodes.forEach { append($0, indentation: indentation) }
+        return self
+    }
+
+    @discardableResult func append(_ string: String) -> OutputGenerator {
         content += string
+        return self
     }
 
-    func append(_ convertible: CustomStringConvertible) {
+    @discardableResult func append(_ convertible: CustomStringConvertible) -> OutputGenerator {
         append(convertible.description)
+        return self
     }
 
     private func outputMapEntry(for offsets: MapEntryOffsets, in output: Source) -> OutputMap.Entry {

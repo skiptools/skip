@@ -30,15 +30,7 @@ class Statement: PrettyPrintable {
     }
 
     /// Resolve any information that relies on our parent statement being set.
-    func resolveSelf() {
-    }
-
-    final func resolve() {
-        resolveSelf()
-        children.forEach {
-            $0.parent = self
-            $0.resolve()
-        }
+    func resolve() {
     }
 
     /// Pretty print child trees for this statement's attributes, excluding `children`.

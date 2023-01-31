@@ -64,8 +64,7 @@ struct KotlinTranslator {
         case .enumDeclaration:
             break
         case .extensionDeclaration:
-            // TODO: Use extension functions for extensions of unknown types and of protocols
-            return []
+            return KotlinExtensionDeclaration.translate(statement: statement as! ExtensionDeclaration, translator: self)
         case .functionDeclaration:
             return [KotlinFunctionDeclaration.translate(statement: statement as! FunctionDeclaration, translator: self)]
         case .importDeclaration:
@@ -86,7 +85,7 @@ struct KotlinTranslator {
             return [KotlinMessageStatement(statement: statement)]
         }
 
-        // Fall back to a raw translation
+        // Fall back to a raw translation and associated warning
         if let syntax = statement.syntax {
             let rawStatement = RawStatement(syntax: syntax, extras: statement.extras, in: syntaxTree)
             let krawStatement = KotlinRawStatement(statement: rawStatement)

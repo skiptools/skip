@@ -28,6 +28,7 @@ extension SyntaxProtocol {
 }
 
 extension InheritedTypeListSyntax {
+    /// The list of types in this list, and an optional message warning of any issues.
     func typeSignatures(in syntaxTree: SyntaxTree) -> ([TypeSignature], Message?) {
         var message: Message? = nil
         let typeSignatures = compactMap { typeSyntax in
@@ -45,6 +46,7 @@ extension InheritedTypeListSyntax {
 }
 
 extension FunctionSignatureSyntax {
+    /// The return type and parameters in this signature, and an optional message warning of any issues.
     func typeSignatures(in syntaxTree: SyntaxTree) -> (TypeSignature?, [Parameter<Statement>], Message?) {
         var returnType: TypeSignature? = nil
         var message: Message? = nil
@@ -65,8 +67,12 @@ extension FunctionSignatureSyntax {
                     }
                 }
             }
-            // TODO: Default value, variadic
-            return Parameter<Statement>(externalName: parameterSyntax.firstName?.text ?? "", internalName: parameterSyntax.secondName?.text, type: type)
+            let isVariadic = parameterSyntax.ellipsis?.text == "..."
+            var defaultValue: Statement? = nil
+            if let defaultArgument = parameterSyntax.defaultArgument {
+                defaultValue = StatementDecoder.decode(syntax: Syntax(defaultArgument), in: syntaxTree).first
+            }
+            return Parameter<Statement>(externalName: parameterSyntax.firstName?.text ?? "", internalName: parameterSyntax.secondName?.text, type: type, isVariadic: isVariadic, defaultValue: defaultValue)
         }
         return (returnType, parameters, message)
     }

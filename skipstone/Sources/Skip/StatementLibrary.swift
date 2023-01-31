@@ -1,5 +1,6 @@
 import SwiftSyntax
 
+/// `#if SYMBOL ... #endif`
 class IfDefined: Statement {
     let symbol: String
     let statements: [Statement]
@@ -61,6 +62,7 @@ class IfDefined: Statement {
     }
 }
 
+/// Attach a warning or error to the tree.
 class MessageStatement: Statement {
     init(message: Message) {
         super.init(type: .message)
@@ -72,6 +74,7 @@ class MessageStatement: Statement {
     }
 }
 
+/// Raw source code.
 class RawStatement: Statement {
     let sourceCode: String
 
@@ -105,18 +108,13 @@ class RawStatement: Statement {
 // MARK: - Declarations
 
 // TODO: Generics
-class ExtensionDeclaration: Statement {
+/// `extension Type { ... }`
+class ExtensionDeclaration: TypeDeclaration {
     let extends: TypeSignature
-    let inherits: [TypeSignature]
-    let modifiers: Modifiers
-    let members: [Statement]
 
     init(extends: TypeSignature, inherits: [TypeSignature] = [], modifiers: Modifiers? = nil, members: [Statement] = [], syntax: Syntax? = nil, file: Source.File? = nil, range: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.extends = extends
-        self.inherits = inherits
-        self.modifiers = modifiers ?? Modifiers()
-        self.members = members
-        super.init(type: .extensionDeclaration, syntax: syntax, file: file, range: range, extras: extras)
+        super.init(type: .extensionDeclaration, name: extends.description, qualifiedName: extends.description, inherits: inherits, modifiers: modifiers, members: members, syntax: syntax, file: file, range: range, extras: extras)
     }
 
     override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
@@ -130,31 +128,17 @@ class ExtensionDeclaration: Statement {
         statement.message = message
         return [statement]
     }
-
-    override var children: [Statement] {
-        return members
-    }
-
-    override var prettyPrintAttributes: [PrettyPrintTree] {
-        var attrs = [PrettyPrintTree(root: extends.description)]
-        if !inherits.isEmpty {
-            attrs.append(PrettyPrintTree(root: "inherits", children: inherits.map { PrettyPrintTree(root: $0.description) }))
-        }
-        if !modifiers.isEmpty {
-            attrs.append(modifiers.prettyPrintTree)
-        }
-        return attrs
-    }
 }
 
 // TODO: Generics
+/// `func f() { ... }`
 class FunctionDeclaration: Statement {
     let name: String
     private(set) var returnType: TypeSignature?
     private(set) var parameters: [Parameter<Statement>]
     let isAsync: Bool
     let isThrows: Bool
-    let modifiers: Modifiers
+    private(set) var modifiers: Modifiers
     let body: CodeBlock<Statement>?
 
     init(name: String, returnType: TypeSignature?, parameters: [Parameter<Statement>], isAsync: Bool = false, isThrows: Bool = false, modifiers: Modifiers? = nil, body: CodeBlock<Statement>? = nil, syntax: Syntax? = nil, file: Source.File? = nil, range: Source.Range? = nil, extras: StatementExtras? = nil) {
@@ -186,11 +170,15 @@ class FunctionDeclaration: Statement {
         return [statement]
     }
 
-    override func resolveSelf() {
+    override func resolve() {
         if let returnType {
             self.returnType = returnType.qualified(in: self)
         }
         parameters = parameters.map { $0.qualifiedType(in: self) }
+        // Functions in protocols or extensions inherit the visibility of the protocol or extension
+        if modifiers.visibility == .default, let owningTypeDeclaration, (owningTypeDeclaration.type == .protocolDeclaration || owningTypeDeclaration.type == .extensionDeclaration) {
+            modifiers.visibility = owningTypeDeclaration.modifiers.visibility
+        }
     }
 
     override var children: [Statement] {
@@ -212,6 +200,7 @@ class FunctionDeclaration: Statement {
     }
 }
 
+/// `import Module`
 class ImportDeclaration: Statement {
     let modulePath: [String]
 
@@ -235,19 +224,14 @@ class ImportDeclaration: Statement {
 }
 
 // TODO: Generics
+/// `class/struct/enum Type { ... }`
 class TypeDeclaration: Statement {
     let name: String
     private(set) var inherits: [TypeSignature]
     let modifiers: Modifiers
     let members: [Statement]
-
     var qualifiedName: String {
-        get {
-            return _qualifiedName ?? name
-        }
-        set {
-            _qualifiedName = newValue
-        }
+        return _qualifiedName ?? name
     }
     private var _qualifiedName: String?
 
@@ -313,7 +297,7 @@ class TypeDeclaration: Statement {
         return statement
     }
 
-    override func resolveSelf() {
+    override func resolve() {
         if _qualifiedName == nil {
             _qualifiedName = StatementDecoder.qualifyDeclaredTypeName(name, declaration: self)
         }

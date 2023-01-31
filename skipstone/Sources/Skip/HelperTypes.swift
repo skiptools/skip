@@ -6,7 +6,7 @@ struct CodeBlock<S> {
 }
 
 /// A function parameter.
-struct Parameter<S> {
+struct Parameter<S>: Hashable {
     let externalName: String
     var internalName: String {
         return _internalName ?? externalName
@@ -47,10 +47,20 @@ struct Parameter<S> {
         parameter.type = type?.qualified(in: statement)
         return parameter
     }
+
+    static func == (lhs: Parameter<S>, rhs: Parameter<S>) -> Bool {
+        return lhs.externalName == rhs.externalName && lhs.type == rhs.type && lhs.isVariadic == rhs.isVariadic
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(externalName)
+        hasher.combine(type)
+        hasher.combine(isVariadic)
+    }
 }
 
 /// A source code type signature.
-indirect enum TypeSignature: CustomStringConvertible {
+indirect enum TypeSignature: CustomStringConvertible, Hashable {
     case array(TypeSignature)
     case base(String, String?, [TypeSignature]) // A<B, C> (Second string is qualified name if resolved)
     case classRestricted // 'class'
@@ -64,32 +74,41 @@ indirect enum TypeSignature: CustomStringConvertible {
     case unwrappedOptional(TypeSignature)
 
     var description: String {
+        return description(isQualified: false)
+    }
+
+    var qualifiedDescription: String {
+        return description(isQualified: true)
+    }
+
+    private func description(isQualified: Bool) -> String {
         switch self {
-        case .array(let type):
-            return "[\(type)]"
-        case .base(let name, _, let generics):
+        case .array(let elementType):
+            return "[\(elementType.description(isQualified: isQualified))]"
+        case .base(let name, let qualifiedName, let generics):
+            let name = (isQualified ? qualifiedName : name) ?? name
             guard !generics.isEmpty else {
                 return name
             }
-            return "\(name)<\(generics.map { $0.description }.joined(separator: ", "))>"
+            return "\(name)<\(generics.map { $0.description(isQualified: isQualified) }.joined(separator: ", "))>"
         case .classRestricted:
             return "class"
         case .composition(let types):
-            return "(\(types.map { $0.description }.joined(separator: " & ")))"
+            return "(\(types.map { $0.description(isQualified: isQualified) }.joined(separator: " & ")))"
         case .dictionary(let keyType, let valueType):
-            return "[\(keyType): \(valueType)]"
+            return "[\(keyType.description(isQualified: isQualified)): \(valueType.description(isQualified: isQualified))]"
         case .function(let paramTypes, let returnType):
-            return "(\(paramTypes.map { $0.description }.joined(separator: ", ")) -> \(returnType)"
+            return "(\(paramTypes.map { $0.description(isQualified: isQualified) }.joined(separator: ", ")) -> \(returnType.description(isQualified: isQualified))"
         case .optional(let type):
-            return "\(type)?"
+            return "\(type.description(isQualified: isQualified))?"
         case .member(let baseType, let type):
-            return "\(baseType).\(type)"
+            return "\(baseType.description(isQualified: isQualified)).\(type)"
         case .metaType(let baseType):
-            return "\(baseType).Type"
+            return "\(baseType.description(isQualified: isQualified)).Type"
         case .tuple(let types):
-            return "(\(types.map { $0.description }.joined(separator: ", "))"
+            return "(\(types.map { $0.description(isQualified: isQualified) }.joined(separator: ", "))"
         case .unwrappedOptional(let type):
-            return "\(type)!"
+            return "\(type.description(isQualified: isQualified))!"
         }
     }
 
@@ -105,7 +124,6 @@ indirect enum TypeSignature: CustomStringConvertible {
             guard let attributedType = syntax.as(AttributedTypeSyntax.self) else {
                 return nil
             }
-            // TODO: Attributes
             return self.for(syntax: attributedType.baseType)
         case .simpleTypeIdentifier:
             guard let simpleType = syntax.as(SimpleTypeIdentifierSyntax.self) else {
@@ -138,7 +156,6 @@ indirect enum TypeSignature: CustomStringConvertible {
             guard let constrainedSugarType = syntax.as(ConstrainedSugarTypeSyntax.self) else {
                 return nil
             }
-            // TODO: any / some
             return self.for(syntax: constrainedSugarType.baseType)
         case .functionType:
             guard let functionType = syntax.as(FunctionTypeSyntax.self) else {
@@ -246,7 +263,7 @@ struct Modifiers: PrettyPrintable {
         case `private`
     }
 
-    let visibility: Visibility
+    var visibility: Visibility
     let isStatic: Bool
     let isFinal: Bool
     let isOverride: Bool
