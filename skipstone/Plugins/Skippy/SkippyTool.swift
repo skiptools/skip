@@ -38,7 +38,7 @@ extension Path {
         if outputFileName.hasSuffix(".swift") {
             outputFileName = String(lastComponent.dropLast(".swift".count))
         }
-        outputFileName += "_skip.swift"
+        outputFileName += "_skippy.swift"
         return outputDir.appending(subpath: outputFileName)
     }
 }

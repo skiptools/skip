@@ -211,7 +211,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
 
     override var children: [KotlinStatement] {
-        return parameters.compactMap { $0.defaultValue }
+        return parameters.compactMap { $0.defaultValue } + (body?.statements ?? [])
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
