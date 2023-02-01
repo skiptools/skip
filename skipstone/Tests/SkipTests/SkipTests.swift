@@ -17,38 +17,67 @@ final class SkipTests: XCTestCase {
             }
 
             public struct SubStruct: Hashable, Codable, Sendable {
+                /// This is a doc comment
                 internal var otherField: Set<Int>
             }
         }
         """
 
-        let symbols = try await Process.buildSymbols(swift: tmpFile(named: "Source.swift", contents: swift))
-        dump(symbols)
+        let graph = try await Process.buildSymbols(swift: tmpFile(named: "Source.swift", contents: swift))
+        dump(graph)
 
         // symbols mapped by "precise identifier" (like "s:6Source9TopStructV3strSSSgvp")
-        let symbolNameMap = symbols.symbols
+        let symbolNameMap = graph.symbols
 
-        XCTAssertEqual("str", symbolNameMap["s:6Source9TopStructV3strSSSgvp"]?.names.title)
 
-        // here is how we might index by position…
-        let locations = Dictionary(symbolNameMap.values.map({ (($0.mixins["location"] as? SymbolKit.SymbolGraph.Symbol.Location)?.position, $0) }), uniquingKeysWith: { $1 })
+        // here is how we might index by position, noting that there may be more than one Symbol at a given position…
+        let locations: [SymbolGraph.LineList.SourceRange.Position?: [SymbolGraph.Symbol]] = Dictionary(grouping: symbolNameMap.values.map({ (($0.mixins["location"] as? SymbolKit.SymbolGraph.Symbol.Location)?.position, $0) }), by: \.0).mapValues({ $0.compactMap({ $0.1 }) })
 
-        let int = locations[.init(line: 1, character: 15)]
-        XCTAssertEqual("int", int?.names.title)
-        XCTAssertEqual("s:6Source9TopStructV3intSivp", int?.identifier.precise)
-        XCTAssertEqual(["let", " ", "int", ": ", "Int"], int?.names.subHeading?.map(\.spelling))
+        // check structs
 
-        let str = locations[.init(line: 2, character: 15)]
-        XCTAssertEqual("str", str?.names.title)
-        XCTAssertEqual("s:6Source9TopStructV3strSSSgvp", str?.identifier.precise)
-        XCTAssertEqual("?", str?.names.subHeading?.last?.spelling)
-        XCTAssertEqual("String", str?.names.subHeading?.dropLast(1).last?.spelling)
-        XCTAssertEqual(["let", " ", "str", ": ", "String", "?"], str?.names.subHeading?.map(\.spelling))
+        let topStruct = try XCTUnwrap(locations[.init(line: 0, character: 14)]?.first(where: { $0.kind.identifier == .struct } ))
+        XCTAssertEqual("TopStruct", topStruct.names.title)
+        XCTAssertEqual(.struct, topStruct.kind.identifier)
+        XCTAssertEqual("public", topStruct.accessLevel.rawValue)
+        XCTAssertEqual("s:6Source9TopStructV", topStruct.identifier.precise)
+        XCTAssertEqual(["struct", " ", "TopStruct"], topStruct.names.subHeading?.map(\.spelling))
 
-        let array = locations[.init(line: 5, character: 20)]
-        XCTAssertEqual("array", array?.names.title)
-        XCTAssertEqual("s:6Source9TopStructV5array33_A585AEAB28D15CB704B838A9B0AB5A10LLSaySSSgGvp", array?.identifier.precise)
-        XCTAssertEqual(["let", " ", "array", ": [", "Optional", "<", "String", ">]"], array?.names.subHeading?.map(\.spelling))
+        // check relationships
+
+        let relations = graph.relationships.filter({ $0.source == topStruct.identifier.precise })
+
+        // check possible relations: memberOf, conformsTo, inheritsFrom, defaultImplementationOf, overrides, requirementOf, optionalRequirementOf, extensionTo
+        let conformsTo = relations.filter({ $0.kind == .conformsTo })
+        XCTAssertEqual(["s:SE", "s:SQ", "s:s8SendableP"], conformsTo.map(\.target).sorted())
+        XCTAssertEqual(["Swift.Encodable", "Swift.Equatable", "Swift.Sendable"], conformsTo.compactMap(\.targetFallback).sorted())
+
+
+        // check properties
+
+        let int = try XCTUnwrap(locations[.init(line: 1, character: 15)]?.first)
+        XCTAssertEqual("int", int.names.title)
+        XCTAssertEqual(.property, int.kind.identifier)
+        XCTAssertEqual("public", int.accessLevel.rawValue)
+        XCTAssertEqual("s:6Source9TopStructV3intSivp", int.identifier.precise)
+        XCTAssertEqual(["let", " ", "int", ": ", "Int"], int.names.subHeading?.map(\.spelling))
+
+        let str = try XCTUnwrap(locations[.init(line: 2, character: 15)]?.first)
+        XCTAssertEqual("str", str.names.title)
+        XCTAssertEqual(.property, str.kind.identifier)
+        XCTAssertEqual("public", str.accessLevel.rawValue)
+        XCTAssertEqual("s:6Source9TopStructV3strSSSgvp", str.identifier.precise)
+        XCTAssertEqual("?", str.names.subHeading?.last?.spelling)
+        XCTAssertEqual("String", str.names.subHeading?.dropLast(1).last?.spelling)
+        XCTAssertEqual(["let", " ", "str", ": ", "String", "?"], str.names.subHeading?.map(\.spelling))
+
+        let array = try XCTUnwrap(locations[.init(line: 5, character: 20)]?.first)
+        XCTAssertEqual(nil, array.docComment)
+        XCTAssertEqual(["TopStruct", "array"], array.pathComponents)
+        XCTAssertEqual("array", array.names.title)
+        XCTAssertEqual("fileprivate", array.accessLevel.rawValue)
+        XCTAssertEqual(.property, array.kind.identifier)
+        XCTAssertEqual("s:6Source9TopStructV5array33_A585AEAB28D15CB704B838A9B0AB5A10LLSaySSSgGvp", array.identifier.precise)
+        XCTAssertEqual(["let", " ", "array", ": [", "Optional", "<", "String", ">]"], array.names.subHeading?.map(\.spelling))
 
         // ambiguous! There is also the `init(otherField:)` function at that position…
 //        let subStruct = locations[.init(line: 11, character: 18)]
@@ -56,10 +85,13 @@ final class SkipTests: XCTestCase {
 //        XCTAssertEqual("s:6Source9TopStructV03SubC0V", subStruct?.identifier.precise)
 //        XCTAssertEqual(["struct", " ", "SubStruct"], subStruct?.names.subHeading?.map(\.spelling))
 
-        let set = locations[.init(line: 12, character: 21)]
-        XCTAssertEqual("otherField", set?.names.title)
-        XCTAssertEqual("s:6Source9TopStructV03SubC0V10otherFieldShySiGvp", set?.identifier.precise)
-        XCTAssertEqual(["var", " ", "otherField", ": ", "Set", "<", "Int", ">"], set?.names.subHeading?.map(\.spelling))
+        let set = try XCTUnwrap(locations[.init(line: 13, character: 21)]?.first)
+        XCTAssertEqual("This is a doc comment", set.docComment?.lines.first?.text)
+        XCTAssertEqual(["TopStruct", "SubStruct", "otherField"], set.pathComponents)
+        XCTAssertEqual("internal", set.accessLevel.rawValue)
+        XCTAssertEqual("otherField", set.names.title)
+        XCTAssertEqual("s:6Source9TopStructV03SubC0V10otherFieldShySiGvp", set.identifier.precise)
+        XCTAssertEqual(["var", " ", "otherField", ": ", "Set", "<", "Int", ">"], set.names.subHeading?.map(\.spelling))
 
     }
 
@@ -88,8 +120,6 @@ extension SymbolGraph.LineList.SourceRange.Position : Hashable {
 extension XCTestCase {
     /// Checks that the given Swift compiles to the specified Kotlin.
     func check(swift: String, kotlin: String? = nil, file: StaticString = #file, line: UInt = #line) async throws {
-        let tmpdir = URL(fileURLWithPath: UUID().uuidString, isDirectory: true, relativeTo: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true))
-        try FileManager.default.createDirectory(at: tmpdir, withIntermediateDirectories: true)
         let srcFile = try tmpFile(named: "Source.swift", contents: swift)
         if let kotlin = kotlin {
             let tp = Transpiler(sourceFiles: [Source.File(path: srcFile.path)])
