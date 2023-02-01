@@ -21,7 +21,11 @@ public class KotlinTranslator {
 
     /// Translate syntax trees only.
     public func translateSyntaxTree() -> KotlinSyntaxTree {
-        let statements = syntaxTree.statements.flatMap { translateStatement($0) }
+        var statements: [KotlinStatement] = []
+        if let packageName = codebaseInfo?.packageName {
+            statements.append(KotlinPackageDeclaration(name: packageName))
+        }
+        statements += syntaxTree.statements.flatMap { translateStatement($0) }
         return KotlinSyntaxTree(sourceFile: syntaxTree.source.file, statements: statements)
     }
 

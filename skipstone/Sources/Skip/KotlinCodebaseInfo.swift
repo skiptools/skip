@@ -1,5 +1,8 @@
 /// Wholistic information about the codebase needed when transpiling Swift to Kotlin.
 public class KotlinCodebaseInfo {
+    /// The package being generated.
+    public var packageName: String?
+
     init() {
     }
 

@@ -266,7 +266,13 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         }
         if let body {
             output.append(" {\n")
-            output.append(body.statements, indentation: indentation.inc())
+            let bodyIndentation = indentation.inc()
+            for parameter in parameters {
+                if parameter.internalName != parameter.externalName {
+                    output.append(bodyIndentation).append("val \(parameter.internalName) = \(parameter.externalName)\n")
+                }
+            }
+            output.append(body.statements, indentation: bodyIndentation)
             output.append(indentation).append("}\n")
         }
     }
@@ -340,5 +346,18 @@ class KotlinInterfaceDeclaration: KotlinStatement {
         output.append(" {\n")
         children.forEach { output.append($0, indentation: indentation.inc()) }
         output.append(indentation).append("}\n")
+    }
+}
+
+class KotlinPackageDeclaration: KotlinStatement {
+    let name: String
+
+    init(name: String) {
+        self.name = name
+        super.init(type: .packageDeclaration)
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        output.append(indentation).append("package \(name)\n\n")
     }
 }

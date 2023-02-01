@@ -33,6 +33,8 @@ import SwiftSyntax
                 options.preprocessorSymbols.append(String(argument.dropFirst(2)))
             } else if argument.hasPrefix("-O") && argument.count > 2 {
                 options.outputDirectory = String(argument.dropFirst(2))
+            } else if argument.hasPrefix("-P") && argument.count > 2 {
+                options.packageName = String(argument.dropFirst(2))
             } else if argument.hasPrefix("-") {
                 throw RunnerError(message: "Unrecognized option: \(argument)")
             } else {
@@ -53,12 +55,14 @@ private protocol Action {
 private struct Options {
     var preprocessorSymbols: [String] = []
     var outputDirectory: String?
+    var packageName: String?
 }
 
 private struct TranspileAction: Action {
     func perform(on sourceFiles: [Source.File], options: Options) async throws {
         var transpiler = Transpiler(sourceFiles: sourceFiles)
         transpiler.preprocessorSymbols = Set(options.preprocessorSymbols)
+        transpiler.packageName = options.packageName
         try await transpiler.transpile { transpilation in
             for message in transpilation.messages {
                 print(message)

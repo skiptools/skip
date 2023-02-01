@@ -54,6 +54,7 @@ enum KotlinStatementType {
     case functionDeclaration
     case importDeclaration
     case interfaceDeclaration
+    case packageDeclaration
     case variableDeclaration
 
     /// A statement representing raw Kotlin code.
