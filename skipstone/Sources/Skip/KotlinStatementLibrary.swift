@@ -103,7 +103,7 @@ class KotlinClassDeclaration: KotlinStatement {
                         output.append(", ")
                     }
                 }
-                output.append(inherits.map({ $0.qualifiedDescription }).joined(separator: ", "))
+                output.append(inherits.map({ $0.kotlin.qualifiedDescription }).joined(separator: ", "))
             }
         }
         output.append(" {\n")
@@ -133,7 +133,7 @@ class KotlinClassDeclaration: KotlinStatement {
             return
         }
         // TODO: Call superclass default constructor with our default constructor params
-        superclassCall = "\(superclass.qualifiedDescription)()"
+        superclassCall = "\(superclass.kotlin.qualifiedDescription)()"
     }
 }
 
@@ -226,7 +226,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
 
             output.append("fun ")
             if let extends {
-                output.append(extends.qualifiedDescription).append(".")
+                output.append(extends.kotlin.qualifiedDescription).append(".")
                 if isStatic {
                     output.append("Companion.")
                 }
@@ -237,7 +237,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 let name = parameter.externalName.isEmpty ? parameter.internalName : parameter.externalName
                 output.append(name)
                 output.append(": ")
-                output.append(parameter.type?.qualifiedDescription ?? "Any")
+                output.append(parameter.type?.kotlin.qualifiedDescription ?? "Any")
                 if let defaultValue = parameter.defaultValue {
                     output.append(" = ").append(defaultValue, indentation: 0)
                 }
@@ -245,7 +245,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                     output.append(", ")
                 }
             }
-            output.append("): \(returnType?.qualifiedDescription ?? "Unit")")
+            output.append("): \(returnType?.kotlin.qualifiedDescription ?? "Unit")")
         }
         if let body {
             output.append(" {\n")
@@ -323,7 +323,7 @@ class KotlinInterfaceDeclaration: KotlinStatement {
             output.append("interface ").append(name)
             if !inherits.isEmpty {
                 output.append(": ")
-                output.append(inherits.map({ $0.qualifiedDescription }).joined(separator: ", "))
+                output.append(inherits.map({ $0.kotlin.qualifiedDescription }).joined(separator: ", "))
             }
         }
         output.append(" {\n")
@@ -426,7 +426,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 output.append("var ")
             }
             if let extends {
-                output.append(extends.qualifiedDescription).append(".")
+                output.append(extends.kotlin.qualifiedDescription).append(".")
                 if isStatic {
                     output.append("Companion.")
                 }
@@ -434,7 +434,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             output.append(name)
 
             if let declaredType {
-                output.append(": ").append(declaredType.qualifiedDescription)
+                output.append(": ").append(declaredType.kotlin.qualifiedDescription)
             }
             if let value {
                 output.append(" = ").append(value, indentation: 0)
