@@ -44,13 +44,16 @@ final class SkipTests: XCTestCase {
 
         // check relationships
 
+        let memberOf = graph.relationships.filter({ $0.target == topStruct.identifier.precise && $0.kind == .memberOf })
+        XCTAssertEqual(9, memberOf.count)
+        XCTAssertEqual(["s:6Source9TopStructV03SubC0V", "s:6Source9TopStructV3bol33_A585AEAB28D15CB704B838A9B0AB5A10LLSbvp", "s:6Source9TopStructV3int3num3bolACSi_SdSbtc33_A585AEAB28D15CB704B838A9B0AB5A10Llfc", "s:6Source9TopStructV3intSivp", "s:6Source9TopStructV3numSdvp", "s:6Source9TopStructV3strSSSgvp", "s:6Source9TopStructV5array33_A585AEAB28D15CB704B838A9B0AB5A10LLSaySSSgGvp", "s:6Source9TopStructV7doStuff4with3andAC03SubC0VSS_SiSgtYaKF", "s:SQsE2neoiySbx_xtFZ::SYNTHESIZED::s:6Source9TopStructV"], memberOf.map(\.source).sorted())
+
         let relations = graph.relationships.filter({ $0.source == topStruct.identifier.precise })
 
         // check possible relations: memberOf, conformsTo, inheritsFrom, defaultImplementationOf, overrides, requirementOf, optionalRequirementOf, extensionTo
         let conformsTo = relations.filter({ $0.kind == .conformsTo })
         XCTAssertEqual(["s:SE", "s:SQ", "s:s8SendableP"], conformsTo.map(\.target).sorted())
         XCTAssertEqual(["Swift.Encodable", "Swift.Equatable", "Swift.Sendable"], conformsTo.compactMap(\.targetFallback).sorted())
-
 
         // check properties
 
