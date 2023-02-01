@@ -155,7 +155,7 @@ enum StatementType: CaseIterable {
         case .typealiasDeclaration:
             return nil
         case .variableDeclaration:
-            return nil
+            return VariableDeclaration.self
 
         case .raw:
             return RawStatement.self

@@ -83,7 +83,7 @@ public class KotlinTranslator {
         case .typealiasDeclaration:
             break
         case .variableDeclaration:
-            break
+            return [KotlinVariableDeclaration.translate(statement: statement as! VariableDeclaration, translator: self)]
         case .raw:
             return [KotlinRawStatement(statement: statement as! RawStatement)]
         case .message:

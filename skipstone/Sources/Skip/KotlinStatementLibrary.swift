@@ -139,6 +139,8 @@ class KotlinClassDeclaration: KotlinStatement {
 
 struct KotlinExtensionDeclaration {
     static func translate(statement: ExtensionDeclaration, translator: KotlinTranslator) -> [KotlinStatement] {
+        // TODO: Move protocol extension functions into the Kotlin protocol, overriding any function declaration. Kotlin protocols can contain default implementations
+
         // If the extension is on a type outside this module or is on a protocol, use Kotlin extension
         // functions. Otherwise do not translate the extension - instead we'll move its members into
         // our declaration of its extended type
@@ -173,10 +175,9 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     let name: String
     var returnType: TypeSignature?
     var parameters: [Parameter<KotlinStatement>] = []
-    var modifiers: Modifiers
     var isAsync: Bool
     var isOpen = false
-    var isProtocolFunction = false
+    var modifiers: Modifiers
     var body: CodeBlock<KotlinStatement>?
 
     // KotlinMemberDeclaration
@@ -188,16 +189,12 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     static func translate(statement: FunctionDeclaration, translator: KotlinTranslator) -> KotlinFunctionDeclaration {
         let kstatement = KotlinFunctionDeclaration(statement: statement)
         kstatement.returnType = statement.returnType
-        kstatement.parameters = statement.parameters.map { parameter in
-            var kdefaultValue: KotlinStatement? = nil
-            if let defaultValue = parameter.defaultValue {
-                kdefaultValue = translator.translateStatement(defaultValue).first
-            }
-            return Parameter(externalName: parameter.externalName, internalName: parameter.internalName, type: parameter.type, isVariadic: parameter.isVariadic, defaultValue: kdefaultValue)
-        }
+        kstatement.parameters = statement.parameters.map { $0.translate(translator: translator) }
         if let owningTypeDeclaration = statement.owningTypeDeclaration {
             kstatement.isOpen = !statement.modifiers.isFinal && statement.modifiers.visibility != .private && owningTypeDeclaration.type == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
-            kstatement.isProtocolFunction = translator.codebaseInfo?.isProtocolFunction(declaration: statement, in: owningTypeDeclaration) == true
+            if (translator.codebaseInfo?.isProtocolMember(declaration: statement, in: owningTypeDeclaration) == true) {
+                kstatement.modifiers.isOverride = true
+            }
         }
         if let body = statement.body {
             let bodyStatements = body.statements.flatMap { translator.translateStatement($0) }
@@ -208,8 +205,8 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
 
     private init(statement: FunctionDeclaration) {
         self.name = statement.name
-        self.modifiers = statement.modifiers
         self.isAsync = statement.isAsync
+        self.modifiers = statement.modifiers
         super.init(type: .functionDeclaration, statement: statement)
     }
 
@@ -222,21 +219,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if let declaration = extras?.declaration {
             output.append(declaration)
         } else {
-            switch modifiers.visibility {
-            case .default:
-                fallthrough
-            case .internal:
-                output.append("internal ")
-            case .open:
-                output.append("public ")
-            case .public:
-                output.append("public ")
-            case .private:
-                output.append("private ")
-            }
-            if isOpen {
-                output.append("open ")
-            }
+            output.append(modifiers.kotlinMemberString(isOpen: isOpen)).append(" ")
             if isAsync {
                 output.append("suspend ")
             }
@@ -359,5 +342,131 @@ class KotlinPackageDeclaration: KotlinStatement {
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
         output.append(indentation).append("package \(name)\n\n")
+    }
+}
+
+class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
+    let name: String
+    var declaredType: TypeSignature?
+    var isLet: Bool
+    var isAsync: Bool
+    var isOpen = false
+    var modifiers: Modifiers
+    var value: KotlinStatement?
+    var getter: Accessor<KotlinStatement>?
+    var setter: Accessor<KotlinStatement>?
+    var willSet: Accessor<KotlinStatement>?
+    var didSet: Accessor<KotlinStatement>?
+
+    // KotlinMemberDeclaration
+    var extends: TypeSignature?
+    var isStatic: Bool {
+        return modifiers.isStatic
+    }
+
+    static func translate(statement: VariableDeclaration, translator: KotlinTranslator) -> KotlinVariableDeclaration {
+        let kstatement = KotlinVariableDeclaration(statement: statement)
+        kstatement.declaredType = statement.declaredType
+        if let owningTypeDeclaration = statement.owningTypeDeclaration {
+            kstatement.isOpen = !statement.modifiers.isFinal && statement.modifiers.visibility != .private && owningTypeDeclaration.type == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
+            if (translator.codebaseInfo?.isProtocolMember(declaration: statement, in: owningTypeDeclaration) == true) {
+                kstatement.modifiers.isOverride = true
+            }
+        }
+        if let value = statement.value {
+            kstatement.value = translator.translateStatement(value).first
+        }
+        kstatement.getter = statement.getter?.translate(translator: translator)
+        kstatement.setter = statement.setter?.translate(translator: translator)
+        kstatement.willSet = statement.willSet?.translate(translator: translator)
+        kstatement.didSet = statement.didSet?.translate(translator: translator)
+        if statement.isAsync {
+            kstatement.statementMessages.append(Message(severity: .error, message: "Kotlin does not support async properties", file: statement.file, range: statement.range))
+        }
+        return kstatement
+    }
+
+    private init(statement: VariableDeclaration) {
+        self.name = statement.name
+        self.isLet = statement.isLet
+        self.isAsync = statement.isAsync
+        self.modifiers = statement.modifiers
+        super.init(type: .variableDeclaration, statement: statement)
+    }
+
+    override var children: [KotlinStatement] {
+        var children: [KotlinStatement] = []
+        if let value {
+            children.append(value)
+        }
+        if let statements = getter?.statements {
+            children += statements
+        }
+        if let statements = setter?.statements {
+            children += statements
+        }
+        if let statements = willSet?.statements {
+            children += statements
+        }
+        if let statements = didSet?.statements {
+            children += statements
+        }
+        return children
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        output.append(indentation)
+        if let declaration = extras?.declaration {
+            output.append(declaration)
+        } else {
+            output.append(modifiers.kotlinMemberString(isOpen: isOpen)).append(" ")
+            if isLet || (getter != nil && setter == nil) {
+                output.append("val ")
+            } else {
+                output.append("var ")
+            }
+            if let extends {
+                output.append(extends.qualifiedDescription).append(".")
+                if isStatic {
+                    output.append("Companion.")
+                }
+            }
+            output.append(name)
+
+            if let declaredType {
+                output.append(": ").append(declaredType.qualifiedDescription)
+            }
+            if let value {
+                output.append(" = ").append(value, indentation: 0)
+            }
+            output.append("\n")
+        }
+        if let getterStatements = getter?.statements {
+            let getterIndentation = indentation.inc()
+            output.append(getterIndentation).append("get() {\n")
+            output.append(getterStatements, indentation: getterIndentation.inc())
+            output.append(getterIndentation).append("}\n")
+        }
+        if setter?.statements != nil || willSet?.statements != nil || didSet?.statements != nil {
+            let setterIndentation = indentation.inc()
+            output.append(setterIndentation).append("set(newValue) {\n")
+            let setterBodyIndentation = setterIndentation.inc()
+            if let willSetStatements = willSet?.statements {
+                if let parameterName = willSet?.parameterName, parameterName != "newValue" {
+                    output.append(setterBodyIndentation).append("val \(parameterName) = newValue\n")
+                }
+                output.append(willSetStatements, indentation: setterBodyIndentation)
+            }
+            if let setterStatements = setter?.statements {
+                if let parameterName = setter?.parameterName, parameterName != "newValue" && parameterName != willSet?.parameterName {
+                    output.append(setterBodyIndentation).append("val \(parameterName) = newValue\n")
+                }
+                output.append(setterStatements, indentation: setterBodyIndentation)
+            }
+            if let didSetStatements = didSet?.statements {
+                output.append(didSetStatements, indentation: setterBodyIndentation)
+            }
+            output.append(setterIndentation).append("}\n")
+        }
     }
 }

@@ -54,22 +54,14 @@ public class KotlinCodebaseInfo {
     }
 
     /// Whether a function with the given signature is implementing an inherited protocol function of the given type.
-    func isProtocolFunction(declaration: FunctionDeclaration, in typeDeclaration: TypeDeclaration) -> Bool {
+    func isProtocolMember(declaration: FunctionDeclaration, in typeDeclaration: TypeDeclaration) -> Bool {
+        // TODO: Needs to check all protocol conformances of the given type, including protocols of protocols, etc
+        return false
+    }
+
+    /// Whether a property with the given signature is implementing an inherited protocol property of the given type.
+    func isProtocolMember(declaration: VariableDeclaration, in typeDeclaration: TypeDeclaration) -> Bool {
         // TODO: Needs to check all protocol conformances of the given type, including protocols of protocols, etc
         return false
     }
 }
-
-//private struct FunctionInfo: Hashable {
-//    let name: String
-//    let returnType: TypeSignature
-//    let parameters: [Parameter<Statement>]
-//
-//    init(declaration: FunctionDeclaration) {
-//        self.name = declaration.name
-//        self.returnType = declaration.returnType ?? .base("Void", nil, [])
-//        self.parameters = declaration.parameters.map {
-//            Parameter(externalName: $0.externalName, type: $0.type, isVariadic: $0.isVariadic)
-//        }
-//    }
-//}

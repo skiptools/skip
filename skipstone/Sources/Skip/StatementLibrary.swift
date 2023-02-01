@@ -195,6 +195,12 @@ class FunctionDeclaration: Statement {
         if !parameters.isEmpty {
             attrs.append(PrettyPrintTree(root: "parameters", children: parameters.map { $0.prettyPrintTree }))
         }
+        if isAsync {
+            attrs.append(PrettyPrintTree(root: "async"))
+        }
+        if isThrows {
+            attrs.append(PrettyPrintTree(root: "throws"))
+        }
         if !modifiers.isEmpty {
             attrs.append(modifiers.prettyPrintTree)
         }
@@ -314,6 +320,175 @@ class TypeDeclaration: Statement {
         var attrs = [PrettyPrintTree(root: name)]
         if !inherits.isEmpty {
             attrs.append(PrettyPrintTree(root: "inherits", children: inherits.map { PrettyPrintTree(root: $0.description) }))
+        }
+        if !modifiers.isEmpty {
+            attrs.append(modifiers.prettyPrintTree)
+        }
+        return attrs
+    }
+}
+
+// TODO: Property wrappers?, generics, patterns (tuple deconstruction, etc)
+/// `let/var v ...`
+class VariableDeclaration: Statement {
+    let name: String
+    private(set) var declaredType: TypeSignature?
+    let isLet: Bool
+    let isAsync: Bool
+    let isThrows: Bool
+    private(set) var modifiers: Modifiers
+    let value: Statement?
+    let getter: Accessor<Statement>?
+    let setter: Accessor<Statement>?
+    let willSet: Accessor<Statement>?
+    let didSet: Accessor<Statement>?
+
+    init(name: String, declaredType: TypeSignature?, isLet: Bool = false, isAsync: Bool = false, isThrows: Bool = false, modifiers: Modifiers? = nil, value: Statement?, getter: Accessor<Statement>? = nil, setter: Accessor<Statement>? = nil, willSet: Accessor<Statement>? = nil, didSet: Accessor<Statement>? = nil, syntax: Syntax? = nil, file: Source.File? = nil, range: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.name = name
+        self.declaredType = declaredType
+        self.isLet = isLet
+        self.isAsync = isAsync
+        self.isThrows = isThrows
+        self.modifiers = modifiers ?? Modifiers()
+        self.value = value
+        self.getter = getter
+        self.setter = setter
+        self.willSet = willSet
+        self.didSet = didSet
+        super.init(type: .variableDeclaration, syntax: syntax, file: file, range: range, extras: extras)
+    }
+
+    override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
+        guard syntax.kind == .variableDecl, let variableDecl = syntax.as(VariableDeclSyntax.self) else {
+            return nil
+        }
+
+        let isLet = variableDecl.letOrVarKeyword.text == "let"
+        let modifiers = Modifiers.for(syntax: variableDecl.modifiers)
+        var statements: [Statement] = []
+        for entry in variableDecl.bindings.enumerated() {
+            let bindingExtras = entry.offset == 0 ? extras : nil
+            let statement = decode(syntax: entry.element, isLet: isLet, modifiers: modifiers, extras: bindingExtras, in: syntaxTree)
+            statements.append(statement)
+        }
+        return statements
+    }
+
+    private static func decode(syntax: PatternBindingSyntax, isLet: Bool, modifiers: Modifiers?, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> Statement {
+        var declaredType: TypeSignature? = nil
+        if let typeSyntax = syntax.typeAnnotation?.type {
+            declaredType = TypeSignature.for(syntax: typeSyntax)
+        }
+        var value: Statement? = nil
+        if let valueSyntax = syntax.initializer?.value {
+            value = StatementDecoder.decode(syntax: Syntax(valueSyntax), in: syntaxTree).first
+        }
+
+        var getter: Accessor<Statement>? = nil
+        var setter: Accessor<Statement>? = nil
+        var willSet: Accessor<Statement>? = nil
+        var didSet: Accessor<Statement>? = nil
+        var isAsync = false
+        var isThrows = false
+        var messages: [Message] = []
+        if let accessor = syntax.accessor {
+            switch accessor {
+            case .accessors(let accessorListSyntax):
+                for accessorSyntax in accessorListSyntax.accessors {
+                    if accessorSyntax.throwsKeyword?.text == "throws" || accessorSyntax.asyncKeyword?.text == "throws" {
+                        isThrows = true
+                    }
+                    if accessorSyntax.throwsKeyword?.text == "async" || accessorSyntax.asyncKeyword?.text == "async" {
+                        isAsync = true
+                    }
+                    var statements: [Statement]? = nil
+                    if let body = accessorSyntax.body {
+                        statements = StatementDecoder.decode(syntaxListContainer: body, in: syntaxTree)
+                    }
+
+                    switch accessorSyntax.accessorKind.text {
+                    case "get":
+                        getter = Accessor(statements: statements)
+                    case "set":
+                        let parameterName = accessorSyntax.parameter?.name.text
+                        setter = Accessor(parameterName: parameterName, statements: statements)
+                    case "willSet":
+                        willSet = Accessor(statements: statements)
+                    case "didSet":
+                        didSet = Accessor(statements: statements)
+                    default:
+                        messages.append(.unsupportedSyntax(source: syntaxTree.source, range: syntax.range(in: syntaxTree.source)))
+                    }
+                }
+            case .getter(let codeBlockSyntax):
+                getter = Accessor(statements: StatementDecoder.decode(syntaxListContainer: codeBlockSyntax, in: syntaxTree))
+            }
+        }
+
+        // TODO: Support patterns other than a simple identifier
+        switch syntax.pattern.kind {
+        case .expressionPattern:
+            return RawStatement(syntax: Syntax(syntax), in: syntaxTree)
+        case .identifierPattern:
+            let name = syntax.pattern.as(IdentifierPatternSyntax.self)!.identifier.text
+            let declaration = VariableDeclaration(name: name, declaredType: declaredType, isLet: isLet, isAsync: isAsync, isThrows: isThrows, modifiers: modifiers, value: value, getter: getter, setter: setter, willSet: willSet, didSet: didSet, syntax: Syntax(syntax), file: syntaxTree.source.file, range: syntax.range(in: syntaxTree.source), extras: extras)
+            declaration.statementMessages = messages
+            return declaration
+        case .isTypePattern:
+            return RawStatement(syntax: Syntax(syntax), in: syntaxTree)
+        case .missingPattern:
+            return RawStatement(syntax: Syntax(syntax), in: syntaxTree)
+        case .tuplePattern:
+            return RawStatement(syntax: Syntax(syntax), in: syntaxTree)
+        case .valueBindingPattern:
+            return RawStatement(syntax: Syntax(syntax), in: syntaxTree)
+        case .wildcardPattern:
+            return RawStatement(syntax: Syntax(syntax), in: syntaxTree)
+        default:
+            return RawStatement(syntax: Syntax(syntax), in: syntaxTree)
+        }
+    }
+
+    override func resolve() {
+        if let declaredType {
+            self.declaredType = declaredType.qualified(in: self)
+        }
+        // Variables in protocols or extensions inherit the visibility of the protocol or extension
+        if modifiers.visibility == .default, let owningTypeDeclaration, (owningTypeDeclaration.type == .protocolDeclaration || owningTypeDeclaration.type == .extensionDeclaration) {
+            modifiers.visibility = owningTypeDeclaration.modifiers.visibility
+        }
+    }
+
+    override var children: [Statement] {
+        var children: [Statement] = []
+        if let value {
+            children.append(value)
+        }
+        if let statements = getter?.statements {
+            children += statements
+        }
+        if let statements = setter?.statements {
+            children += statements
+        }
+        if let statements = willSet?.statements {
+            children += statements
+        }
+        if let statements = didSet?.statements {
+            children += statements
+        }
+        return children
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        var attrs = [PrettyPrintTree(root: name)]
+        if let declaredType {
+            attrs.append(PrettyPrintTree(root: declaredType.description))
+        }
+        if isAsync {
+            attrs.append(PrettyPrintTree(root: "async"))
+        }
+        if isThrows {
+            attrs.append(PrettyPrintTree(root: "throws"))
         }
         if !modifiers.isEmpty {
             attrs.append(modifiers.prettyPrintTree)

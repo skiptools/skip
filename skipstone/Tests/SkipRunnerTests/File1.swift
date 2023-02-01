@@ -12,7 +12,7 @@ struct UnsupportedStruct { // Trailing comment
 // Protocol comment
 // SKIP DECLARE: interface FooBar<X>
 protocol ReplacedProtocolDeclaration {
-    //var x: Int { get set }
+    var x: Int { get set }
 }
 
 // SKIP INSERT: Hello from

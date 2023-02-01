@@ -5,6 +5,12 @@ struct CodeBlock<S> {
     let statements: [S]
 }
 
+/// A variable accessor.
+struct Accessor<S> {
+    var parameterName: String?
+    var statements: [S]? // Nil if the accessor has no body, as in a protocol { get set }
+}
+
 /// A function parameter.
 struct Parameter<S>: Hashable {
     let externalName: String
@@ -266,7 +272,7 @@ struct Modifiers: PrettyPrintable {
     var visibility: Visibility
     let isStatic: Bool
     let isFinal: Bool
-    let isOverride: Bool
+    var isOverride: Bool
 
     init(visibility: Visibility = .default, isStatic: Bool = false, isFinal: Bool = false, isOverride: Bool = false) {
         self.visibility = visibility
