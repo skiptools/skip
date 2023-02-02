@@ -17,6 +17,7 @@ extension Message {
         Message(severity: .error, message: "Kotlin does not support composed types. Consider creating a single type that conforms to these types", file: statement.sourceFile, range: statement.sourceRange)
     }
 
+    // TODO: Kotlin interfaces can have default implementations inline. Move inheritance and implementations into generated interface
     static func kotlinExtensionAddProtocolsToInterface(statement: Statement) -> Message {
         return Message(severity: .error, message: "Cannot use an extension to add additional protocols to a Kotlin interface", file: statement.file, range: statement.range)
     }
@@ -29,7 +30,12 @@ extension Message {
         return Message(severity: .error, message: "This declaration is not supported in a Kotlin extension [\(statement.type)]", file: statement.sourceFile, range: statement.sourceRange)
     }
 
+    // TODO: Consider generating custom Kotlin data classes to work around these limitations of tuples
     static func kotlinTupleArity(statement: KotlinStatement) -> Message {
         return Message(severity: .error, message: "Kotlin uses Pair for 2-tuples and Triple for 3-tuples. It does not support tuples of arity > 3. Consider creating a struct instead", file: statement.sourceFile, range: statement.sourceRange)
+    }
+
+    static func kotlinTupleLabels(statement: KotlinStatement) -> Message {
+        return Message(severity: .error, message: "Kotlin uses Pair for 2-tuples and Triple for 3-tuples. It does not support custom tuple element labels. Consider creating a struct instead", file: statement.sourceFile, range: statement.sourceRange)
     }
 }

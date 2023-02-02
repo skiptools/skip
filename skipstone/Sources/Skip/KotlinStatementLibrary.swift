@@ -140,8 +140,6 @@ class KotlinClassDeclaration: KotlinStatement {
 
 struct KotlinExtensionDeclaration {
     static func translate(statement: ExtensionDeclaration, translator: KotlinTranslator) -> [KotlinStatement] {
-        // TODO: Move protocol extension functions into the Kotlin protocol, overriding any function declaration. Kotlin protocols can contain default implementations
-
         // If the extension is on a type outside this module or is on a protocol, use Kotlin extension
         // functions. Otherwise do not translate the extension - instead we'll move its members into
         // our declaration of its extended type

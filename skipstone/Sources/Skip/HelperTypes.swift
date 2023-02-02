@@ -76,7 +76,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
     case member(TypeSignature, TypeSignature) // A.B
     case metaType(TypeSignature) // A.Type
     case optional(TypeSignature)
-    case tuple([TypeSignature])
+    case tuple([String?], [TypeSignature])
     case unwrappedOptional(TypeSignature)
 
     var description: String {
@@ -111,8 +111,15 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
             return "\(baseType.description(isQualified: isQualified)).\(type)"
         case .metaType(let baseType):
             return "\(baseType.description(isQualified: isQualified)).Type"
-        case .tuple(let types):
-            return "(\(types.map { $0.description(isQualified: isQualified) }.joined(separator: ", "))"
+        case .tuple(let labels, let types):
+            let descriptions = zip(labels, types).map {
+                let typeDescription = $0.1.description(isQualified: isQualified)
+                guard let label = $0.0 else {
+                    return typeDescription
+                }
+                return "\(label): \(typeDescription)"
+            }
+            return "(\(descriptions.joined(separator: ", ")))"
         case .unwrappedOptional(let type):
             return "\(type.description(isQualified: isQualified))!"
         }
@@ -202,11 +209,17 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
             guard let tupleType = syntax.as(TupleTypeSyntax.self) else {
                 return nil
             }
-            let elementTypes = tupleType.elements.compactMap { self.for(syntax: $0.type) }
-            guard elementTypes.count == tupleType.elements.count else {
+            let elementsSyntax = tupleType.elements
+            let elements = elementsSyntax.compactMap { (syntax: TupleTypeElementSyntax) -> (String?, TypeSignature)? in
+                guard let type = self.for(syntax: syntax.type) else {
+                    return nil
+                }
+                return (syntax.name?.text, type)
+            }
+            guard elements.count == tupleType.elements.count else {
                 return nil
             }
-            return .tuple(elementTypes)
+            return .tuple(elements.map(\.0), elements.map(\.1))
         case .implicitlyUnwrappedOptionalType:
             guard let unwrappedOptionalType = syntax.as(ImplicitlyUnwrappedOptionalTypeSyntax.self), let wrappedType = self.for(syntax: unwrappedOptionalType.wrappedType) else {
                 return nil
@@ -246,14 +259,14 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
             return .function(parameterTypes.map { $0.qualified(in: statement) }, returnType.qualified(in: statement))
         case .member(let baseType, let type):
             return .member(baseType.qualified(in: statement), type)
-        case .metaType(let baseType):
-            return .metaType(baseType.qualified(in: statement))
-        case .optional(let wrappedType):
-            return .optional(wrappedType.qualified(in: statement))
-        case .tuple(let elementTypes):
-            return .tuple(elementTypes.map { $0.qualified(in: statement) })
-        case .unwrappedOptional(let wrappedType):
-            return .unwrappedOptional(wrappedType.qualified(in: statement))
+        case .metaType(let type):
+            return .metaType(type.qualified(in: statement))
+        case .optional(let type):
+            return .optional(type.qualified(in: statement))
+        case .tuple(let labels, let types):
+            return .tuple(labels, types.map { $0.qualified(in: statement) })
+        case .unwrappedOptional(let type):
+            return .unwrappedOptional(type.qualified(in: statement))
         }
     }
 }

@@ -62,8 +62,8 @@ extension TypeSignature {
         switch self {
         case .array(let elementType):
             elementType.appendKotlinMessages(to: statement)
-        case .base(_, _, let genericTypes):
-            genericTypes.forEach { $0.appendKotlinMessages(to: statement) }
+        case .base(_, _, let generics):
+            generics.forEach { $0.appendKotlinMessages(to: statement) }
         case .classRestricted:
             break
         case .composition:
@@ -76,18 +76,20 @@ extension TypeSignature {
             returnType.appendKotlinMessages(to: statement)
         case .member(_, let type):
             type.appendKotlinMessages(to: statement)
-        case .metaType(let baseType):
-            baseType.appendKotlinMessages(to: statement)
-        case .optional(let wrappedType):
-            wrappedType.appendKotlinMessages(to: statement)
-        case .tuple(let elementTypes):
-            // TODO: We could create larger arity classes
-            if elementTypes.count > 3 {
+        case .metaType(let type):
+            type.appendKotlinMessages(to: statement)
+        case .optional(let type):
+            type.appendKotlinMessages(to: statement)
+        case .tuple(let labels, let types):
+            if labels.contains(where: { $0 != nil }) {
+                statement.statementMessages.append(.kotlinTupleLabels(statement: statement))
+            }
+            if types.count > 3 {
                 statement.statementMessages.append(.kotlinTupleArity(statement: statement))
             }
-            elementTypes.forEach { $0.appendKotlinMessages(to: statement) }
-        case .unwrappedOptional(let wrappedType):
-            wrappedType.appendKotlinMessages(to: statement)
+            types.forEach { $0.appendKotlinMessages(to: statement) }
+        case .unwrappedOptional(let type):
+            type.appendKotlinMessages(to: statement)
         }
     }
 
@@ -115,7 +117,7 @@ extension TypeSignature {
             return "\(baseType.kotlin(isQualified: isQualified)).\(type.kotlin(isQualified: false))"
         case .metaType(let baseType):
             return "\(baseType.kotlin(isQualified: isQualified))::"
-        case .tuple(let types):
+        case .tuple(_, let types):
             if types.isEmpty {
                 return "Unit"
             }
