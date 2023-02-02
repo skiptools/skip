@@ -1,5 +1,48 @@
 import SwiftSyntax
 
+// MARK: - Statements
+
+/// A general statement hosting an `Expression`.
+class ExpressionStatement: Statement {
+    let expression: Expression?
+
+    init(type: StatementType = .expression, expression: Expression? = nil, syntax: Syntax? = nil, file: Source.File? = nil, range: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.expression = expression
+        super.init(type: type, syntax: syntax, file: file, range: range, extras: extras)
+    }
+
+    override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
+        guard let expression = ExpressionDecoder.decode(syntax: syntax, in: syntaxTree) else {
+            return nil
+        }
+        return [ExpressionStatement(expression: expression, syntax: syntax, file: syntaxTree.source.file, range: syntax.range(in: syntaxTree.source), extras: extras)]
+    }
+
+    override func resolve() {
+        guard let expression else {
+            return
+        }
+
+        // Resolve expressions breadth first so that a child can use information from its parent's siblings
+        var resolveQueue = [expression]
+        while !resolveQueue.isEmpty {
+            let expression = resolveQueue.removeFirst()
+            expression.statement = self
+            expression.resolve()
+            expression.children.forEach { $0.parent = expression }
+            resolveQueue += expression.children
+        }
+        statementMessages += expression.messages
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        guard let expression else {
+            return []
+        }
+        return [expression.prettyPrintTree]
+    }
+}
+
 /// `#if SYMBOL ... #endif`
 class IfDefined: Statement {
     let symbol: String
@@ -61,6 +104,31 @@ class IfDefined: Statement {
         return [PrettyPrintTree(root: symbol)]
     }
 }
+
+class Return: ExpressionStatement {
+    init(expression: Expression? = nil, syntax: Syntax? = nil, file: Source.File? = nil, range: Source.Range? = nil, extras: StatementExtras? = nil) {
+        super.init(type: .return, expression: expression, syntax: syntax, file: file, range: range, extras: extras)
+    }
+
+    override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
+        guard syntax.kind == .returnStmt, let returnStmnt = syntax.as(ReturnStmtSyntax.self) else {
+            return nil
+        }
+
+        var expression: Expression? = nil
+        if let expressionSyntax = returnStmnt.expression {
+            expression = ExpressionDecoder.decode(syntax: Syntax(expressionSyntax), in: syntaxTree)
+        }
+        let statement = Return(expression: expression, syntax: syntax, file: syntaxTree.source.file, range: syntax.range(in: syntaxTree.source), extras: extras)
+        return [statement]
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        return [PrettyPrintTree(root: "return")] + super.prettyPrintAttributes
+    }
+}
+
+// MARK: - Special statements
 
 /// Attach a warning or error to the tree.
 class MessageStatement: Statement {

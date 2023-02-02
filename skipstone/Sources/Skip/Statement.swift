@@ -2,7 +2,7 @@ import SwiftSyntax
 
 /// A statement in the Swift syntax tree.
 ///
-/// Statements are generally immutable after `resolve` is called with the parent statement, allowing each statement to finalize
+/// Statements are generally immutable after `resolve` is called with the parent statement set, allowing each statement to finalize
 /// itself with any contextual information.
 class Statement: PrettyPrintable {
     let type: StatementType
@@ -52,7 +52,7 @@ class Statement: PrettyPrintable {
         return messages + children.flatMap { $0.messages }
     }
 
-    /// Find the nearest type declaration by traversing pu the statement tree.
+    /// Find the nearest type declaration by traversing up the statement tree.
     final var owningTypeDeclaration: TypeDeclaration? {
         var current: Statement? = self
         while current != nil {
@@ -120,7 +120,7 @@ enum StatementType: CaseIterable {
         case .error:
             return nil
         case .expression:
-            return nil
+            return ExpressionStatement.self
         case .for:
             return nil
         case .if:
@@ -128,7 +128,7 @@ enum StatementType: CaseIterable {
         case .ifDefined:
             return IfDefined.self
         case .return:
-            return nil
+            return Return.self
         case .switch:
             return nil
         case .throw:
