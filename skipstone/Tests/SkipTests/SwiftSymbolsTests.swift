@@ -1,4 +1,4 @@
-@testable import Skip
+import Skip
 import SymbolKit
 import XCTest
 
@@ -156,24 +156,59 @@ extension Process {
     ///   - url: the URL of the Swift file to compile. If this is a `Package.swift` file, then the build will be run with `swift build`, otherwise it will use `swiftc` for a single file.
     ///   - accessLevel: the default access level for the generated symbols
     /// - Returns: the parsed SymbolGraph that resulted from the compilation
-    static func buildSymbols(swift url: URL, singlePass: Bool = false, sdk: String = "macosx", moduleName: String? = nil, accessLevel: String = "private") async throws -> SymbolGraph {
+    static func buildSymbols(swift swiftFileURL: URL, singlePass: Bool = false, sdk: String = "macosx", moduleName: String? = nil, accessLevel: String = "private") async throws -> SymbolGraph {
         // another alternative could be to fork `swift build` against a Package.swift
         // https://www.swift.org/documentation/docc/documenting-a-swift-framework-or-package#Create-Documentation-for-a-Swift-Package
         // swift build --target DeckOfPlayingCards -Xswiftc -emit-symbol-graph -Xswiftc -emit-symbol-graph-dir -Xswiftc .build
         // this is based on how docc gathers symbols: https://github.com/apple/swift-docc/blob/main/Sources/generate-symbol-graph/main.swift#L157
         // e.g.: swift build -Xswiftc -emit-symbol-graph -Xswiftc -emit-symbol-graph-dir -Xswiftc ./.build/ -Xswiftc -symbol-graph-minimum-access-level -Xswiftc private
 
-        let urlBase = url.deletingPathExtension()
+        let urlBase = swiftFileURL.deletingPathExtension()
         let moduleName = moduleName ?? urlBase.lastPathComponent // if the module name is not set, default to the last part of the URL
         let dir = urlBase.deletingLastPathComponent()
 
+        // get the correct sdk and target info, a la: swiftc -module-name Source -emit-module-path . Source.swift && swift symbolgraph-extract -output-dir . -target $(swiftc -print-target-info | jq -r .target.triple) -sdk $(xcrun --show-sdk-path --sdk macosx) -minimum-access-level internal -I . -module-name Source
+
+        let targetInfoData = try await xcrun("swiftc", "-print-target-info").stdout.readData() ?? Data()
+        let targetInfo = try JSONDecoder().decode(SwiftTarget.self, from: targetInfoData)
+        let sdKPath = try await xcrun("--show-sdk-path", "--sdk", sdk).stdout.readString()
+
+        // xcrun swift -frontend -target $(swiftc -print-target-info | jq -r .target.triple) -sdk $(xcrun --show-sdk-path --sdk macosx) -D DEBUG  -module-name Source -emit-module-path Source.swiftmodule Source.swift
+
+        let modulePath = urlBase.appendingPathExtension("swiftmodule").path
+
         if singlePass {
-            try await xcrun("swiftc", "-emit-symbol-graph", "-emit-module-path", url.deletingLastPathComponent().path, "-emit-symbol-graph-dir", url.deletingLastPathComponent().path, "-symbol-graph-minimum-access-level", accessLevel, url.path)
+            try await xcrun("swiftc",
+                            "-target", targetInfo.target.triple,
+                            "-sdk", sdKPath,
+                            "-module-name", moduleName,
+                            "-emit-module-path", modulePath,
+                            "-emit-symbol-graph",
+                            "-emit-symbol-graph-dir", dir.path,
+                            "-symbol-graph-minimum-access-level", accessLevel,
+                            swiftFileURL.path)
         } else {
-            let targetInfo = try await JSONDecoder().decode(SwiftTarget.self, from: xcrun("swiftc", "-print-target-info").stdout.readData() ?? Data())
-            try await xcrun("swiftc", "-target", targetInfo.target.triple, "-module-name", moduleName, "-emit-module-path", dir.path, url.path)
-            let sdKPath = try await xcrun("--show-sdk-path", "--sdk", sdk).stdout.readString()
-            try await xcrun("swift", "symbolgraph-extract", "-output-dir", dir.path, "-target", targetInfo.target.triple, "-sdk", sdKPath, "-minimum-access-level", accessLevel, "-I", dir.path, "-module-name", moduleName)
+            try await xcrun("swift",
+                            "-frontend",
+                            "-module-name", moduleName,
+                            "-target", targetInfo.target.triple,
+                            "-sdk", sdKPath,
+                            //"-emit-module-path", dir.path, // different between `swiftc` and `swift -frontend`
+                            "-emit-module-path", modulePath,
+                            swiftFileURL.path)
+            try await xcrun("swift",
+                            "symbolgraph-extract",
+                            "-module-name", moduleName,
+                            "-include-spi-symbols",
+                            "-skip-inherited-docs",
+                            //"-v", // verbose
+                            //"-pretty-print",
+                            //"-skip-synthesized-members",
+                            "-output-dir", dir.path,
+                            "-target", targetInfo.target.triple,
+                            "-sdk", sdKPath,
+                            "-minimum-access-level", accessLevel,
+                            "-I", dir.path)
         }
 
         let symbolFile = urlBase.appendingPathExtension("symbols.json")
