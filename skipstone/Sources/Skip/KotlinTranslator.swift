@@ -97,6 +97,6 @@ public class KotlinTranslator {
             krawStatement.statementMessages = [.untranslatableSyntax(source: syntaxTree.source, range: statement.range)]
             return [krawStatement]
         }
-        return [KotlinMessageStatement(message: .untranslatableSyntax())]
+        return [KotlinMessageStatement(message: .untranslatableSyntax(file: statement.file, range: statement.range))]
     }
 }

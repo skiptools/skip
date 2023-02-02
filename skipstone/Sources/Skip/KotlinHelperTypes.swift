@@ -47,43 +47,118 @@ extension Parameter where S: Statement {
 }
 
 extension TypeSignature {
-    /// Convert this type signature into the equivalent Kotlin type signature.
-    var kotlin: TypeSignature {
+    /// Whether this type can be represented in Kotlin.
+    var isKotlinCompatible: Bool {
         switch self {
         case .array(let elementType):
-            return .array(elementType.kotlin)
-        case .base(let typeName, let qualifiedTypeName, let genericTypes):
-            let kotlinQualifiedTypeName = translateQualifiedTypeName(qualifiedTypeName)
-            return .base(translateTypeName(typeName), kotlinQualifiedTypeName, genericTypes.map { $0.kotlin })
+            return elementType.isKotlinCompatible
+        case .base(_, _, let genericTypes):
+            return genericTypes.allSatisfy { $0.isKotlinCompatible }
         case .classRestricted:
-            return .base("Any", "Any", [])
-        case .composition(let types):
-            return .composition(types.map { $0.kotlin })
+            return true
+        case .composition:
+            return false
         case .dictionary(let keyType, let valueType):
-            return .dictionary(keyType.kotlin, valueType.kotlin)
+            return keyType.isKotlinCompatible && valueType.isKotlinCompatible
         case .function(let parameterTypes, let returnType):
-            return .function(parameterTypes.map { $0.kotlin }, returnType.kotlin)
-        case .member(let baseType, let type):
-            return .member(baseType, type.kotlin)
+            return parameterTypes.allSatisfy { $0.isKotlinCompatible } && returnType.isKotlinCompatible
+        case .member(_, let type):
+            return type.isKotlinCompatible
         case .metaType(let baseType):
-            return .metaType(baseType.kotlin)
+            return baseType.isKotlinCompatible
         case .optional(let wrappedType):
-            return .optional(wrappedType.kotlin)
+            return wrappedType.isKotlinCompatible
         case .tuple(let elementTypes):
-            return .tuple(elementTypes.map { $0.kotlin })
+            // TODO: We could create larger arity classes
+            return elementTypes.count <= 3 && elementTypes.allSatisfy { $0.isKotlinCompatible }
         case .unwrappedOptional(let wrappedType):
-            return .unwrappedOptional(wrappedType.kotlin)
+            return wrappedType.isKotlinCompatible
+        }
+    }
+
+    /// Kotlin description of this type.
+    var kotlin: String {
+        return kotlin(isQualified: false)
+    }
+
+    /// Kotlin description of the qualified form of this type.
+    var qualifiedKotlin: String {
+        return kotlin(isQualified: true)
+    }
+
+    /// An appropriate message if this type is not supported.
+    func kotlinMessage(for statement: Statement) -> Message? {
+        guard !isKotlinCompatible else {
+            return nil
+        }
+        return .unsupportedTypeSignature(file: statement.file, range: statement.range)
+    }
+
+    private func kotlin(isQualified: Bool) -> String {
+        switch self {
+        case .array(let elementType):
+            return "MutableList<\(elementType.kotlin(isQualified: isQualified))>"
+        case .base(let name, let qualifiedName, let generics):
+            let name = translateTypeName((isQualified ? qualifiedName : name) ?? name)
+            guard !generics.isEmpty else {
+                return name
+            }
+            return "\(name)<\(generics.map { $0.kotlin(isQualified: isQualified) }.joined(separator: ", "))>"
+        case .classRestricted:
+            return "Any"
+        case .composition:
+            return "Any"
+        case .dictionary(let keyType, let valueType):
+            return "MutableMap<\(keyType.kotlin(isQualified: isQualified)), \(valueType.kotlin(isQualified: isQualified))>"
+        case .function(let paramTypes, let returnType):
+            return "(\(paramTypes.map { $0.kotlin(isQualified: isQualified) }.joined(separator: ", "))) -> \(returnType.kotlin(isQualified: isQualified))"
+        case .optional(let type):
+            return "\(type.kotlin(isQualified: isQualified))?"
+        case .member(let baseType, let type):
+            return "\(baseType.kotlin(isQualified: isQualified)).\(type.kotlin(isQualified: false))"
+        case .metaType(let baseType):
+            return "\(baseType.kotlin(isQualified: isQualified))::"
+        case .tuple(let types):
+            if types.isEmpty {
+                return "Unit"
+            }
+            let generics = types.map { $0.kotlin(isQualified: isQualified) }.joined(separator: ", ")
+            if types.count == 2 {
+                return "Pair<\(generics)>"
+            } else if types.count == 3 {
+                return "Triple<\(generics)>"
+            } else {
+                return "Any"
+            }
+        case .unwrappedOptional(let type):
+            return type.kotlin(isQualified: isQualified)
         }
     }
 
     private func translateTypeName(_ typeName: String) -> String {
+        guard let lastSeparator = typeName.lastIndex(of: ".") else {
+            return translateUnqualifiedTypeName(typeName)
+        }
+        let lastTypeName = String(typeName[typeName.index(after: lastSeparator)...])
+        let translatedLastTypeName = translateUnqualifiedTypeName(lastTypeName)
+        guard translatedLastTypeName != lastTypeName else {
+            return typeName
+        }
+        return typeName[...lastSeparator] + translatedLastTypeName
+    }
+
+    private func translateUnqualifiedTypeName(_ typeName: String) -> String {
         switch typeName {
         case "AnyObject":
             return "Any"
+        case "Array":
+            return "MutableList"
         case "Bool":
             return "Boolean"
         case "Character":
             return "Char"
+        case "Dictionary":
+            return "MutableMap"
         case "Int":
             return "Long"
         case "Int8":
@@ -94,6 +169,8 @@ extension TypeSignature {
             return "Int"
         case "Int64":
             return "Long"
+        case "Set":
+            return "MutableSet"
         case "UInt":
             return "ULong"
         case "UInt8":
@@ -107,20 +184,5 @@ extension TypeSignature {
         default:
             return typeName
         }
-    }
-
-    private func translateQualifiedTypeName(_ qualifiedTypeName: String?) -> String? {
-        guard let qualifiedTypeName else {
-            return nil
-        }
-
-        var components = qualifiedTypeName.split(separator: ".")
-        let lastTypeName = String(components.removeLast())
-        let kotlinTypeName = translateTypeName(lastTypeName)
-        if kotlinTypeName == lastTypeName {
-            return qualifiedTypeName
-        }
-        let kotlinComponents = components.map { String($0) } + [kotlinTypeName]
-        return kotlinComponents.joined(separator: ".")
     }
 }

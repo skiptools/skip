@@ -8,6 +8,8 @@ final class BaseTypeTests: XCTestCase {
         var ao: AnyObject
         var b: Bool
         var c: Character
+        var d: Double
+        var f: Float
         var i: Int
         var i8: Int8
         var i16: Int16
@@ -24,6 +26,8 @@ final class BaseTypeTests: XCTestCase {
         internal var ao: Any
         internal var b: Boolean
         internal var c: Char
+        internal var d: Double
+        internal var f: Float
         internal var i: Long
         internal var i8: Byte
         internal var i16: Short
@@ -35,6 +39,46 @@ final class BaseTypeTests: XCTestCase {
         internal var ui16: UShort
         internal var ui32: UInt
         internal var ui64: ULong
+        """)
+    }
+
+    func testContainerTypeConversions() async throws {
+        try await check(swift: """
+        var a: [Any]
+        var ai: [Int]
+        var ai2: Array<Int>
+        var m: [Any: Any]
+        var mis: [Int: String]
+        var mis2: Dictionary<Int, String>
+        var tis: (Int, String)
+        var tis2: (Int, String, Double)
+        """, kotlin: """
+        internal var a: MutableList<Any>
+        internal var ai: MutableList<Long>
+        internal var ai2: MutableList<Long>
+        internal var m: MutableMap<Any, Any>
+        internal var mis: MutableMap<Long, String>
+        internal var mis2: MutableMap<Long, String>
+        internal var tis: Pair<Long, String>
+        internal var tis2: Triple<Long, String, Double>
+        """)
+    }
+
+    func testCustomTypeConversions() async throws {
+        try await check(swift: """
+        var c: CustomType
+        """, kotlin: """
+        internal var c: CustomType
+        """)
+    }
+
+    func testOptionalTypeConversions() async throws {
+        try await check(swift: """
+        var i: Int?
+        var c: CustomType?
+        """, kotlin: """
+        internal var i: Long?
+        internal var c: CustomType?
         """)
     }
 }

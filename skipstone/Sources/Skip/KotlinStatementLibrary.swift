@@ -45,6 +45,7 @@ class KotlinClassDeclaration: KotlinStatement {
             }
         }
         kstatement.members = members
+        kstatement.statementMessages += kstatement.inherits.compactMap { $0.kotlinMessage(for: statement) }
         return kstatement
     }
 
@@ -103,7 +104,7 @@ class KotlinClassDeclaration: KotlinStatement {
                         output.append(", ")
                     }
                 }
-                output.append(inherits.map({ $0.kotlin.qualifiedDescription }).joined(separator: ", "))
+                output.append(inherits.map({ $0.qualifiedKotlin }).joined(separator: ", "))
             }
         }
         output.append(" {\n")
@@ -133,7 +134,7 @@ class KotlinClassDeclaration: KotlinStatement {
             return
         }
         // TODO: Call superclass default constructor with our default constructor params
-        superclassCall = "\(superclass.kotlin.qualifiedDescription)()"
+        superclassCall = "\(superclass.qualifiedKotlin)()"
     }
 }
 
@@ -200,6 +201,10 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             let bodyStatements = body.statements.flatMap { translator.translateStatement($0) }
             kstatement.body = CodeBlock(statements: bodyStatements)
         }
+        if let returnTypeMssage = kstatement.returnType?.kotlinMessage(for: statement) {
+            kstatement.statementMessages.append(returnTypeMssage)
+        }
+        kstatement.statementMessages += kstatement.parameters.compactMap { $0.type?.kotlinMessage(for: statement) }
         return kstatement
     }
 
@@ -226,7 +231,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
 
             output.append("fun ")
             if let extends {
-                output.append(extends.kotlin.qualifiedDescription).append(".")
+                output.append(extends.qualifiedKotlin).append(".")
                 if isStatic {
                     output.append("Companion.")
                 }
@@ -237,7 +242,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 let name = parameter.externalName.isEmpty ? parameter.internalName : parameter.externalName
                 output.append(name)
                 output.append(": ")
-                output.append(parameter.type?.kotlin.qualifiedDescription ?? "Any")
+                output.append(parameter.type?.qualifiedKotlin ?? "Any")
                 if let defaultValue = parameter.defaultValue {
                     output.append(" = ").append(defaultValue, indentation: 0)
                 }
@@ -245,7 +250,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                     output.append(", ")
                 }
             }
-            output.append("): \(returnType?.kotlin.qualifiedDescription ?? "Unit")")
+            output.append("): \(returnType?.qualifiedKotlin ?? "Unit")")
         }
         if let body {
             output.append(" {\n")
@@ -291,6 +296,7 @@ class KotlinInterfaceDeclaration: KotlinStatement {
     static func translate(statement: TypeDeclaration, translator: KotlinTranslator) -> KotlinInterfaceDeclaration {
         let kstatement = KotlinInterfaceDeclaration(statement: statement)
         kstatement.members = statement.members.flatMap { translator.translateStatement($0) }
+        kstatement.statementMessages += kstatement.inherits.compactMap { $0.kotlinMessage(for: statement) }
         return kstatement
     }
 
@@ -325,7 +331,7 @@ class KotlinInterfaceDeclaration: KotlinStatement {
             output.append("interface ").append(name)
             if !inherits.isEmpty {
                 output.append(": ")
-                output.append(inherits.map({ $0.kotlin.qualifiedDescription }).joined(separator: ", "))
+                output.append(inherits.map({ $0.qualifiedKotlin }).joined(separator: ", "))
             }
         }
         output.append(" {\n")
@@ -382,6 +388,9 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         kstatement.setter = statement.setter?.translate(translator: translator)
         kstatement.willSet = statement.willSet?.translate(translator: translator)
         kstatement.didSet = statement.didSet?.translate(translator: translator)
+        if let declaredTypeMessage = kstatement.declaredType?.kotlinMessage(for: statement) {
+            kstatement.statementMessages.append(declaredTypeMessage)
+        }
         if statement.isAsync {
             kstatement.statementMessages.append(Message(severity: .error, message: "Kotlin does not support async properties", file: statement.file, range: statement.range))
         }
@@ -422,13 +431,16 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             output.append(declaration)
         } else {
             output.append(modifiers.kotlinMemberString(isOpen: isOpen)).append(" ")
+            if case .unwrappedOptional = declaredType {
+                output.append("lateinit ")
+            }
             if isLet || (getter != nil && setter == nil) {
                 output.append("val ")
             } else {
                 output.append("var ")
             }
             if let extends {
-                output.append(extends.kotlin.qualifiedDescription).append(".")
+                output.append(extends.qualifiedKotlin).append(".")
                 if isStatic {
                     output.append("Companion.")
                 }
@@ -436,7 +448,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             output.append(name)
 
             if let declaredType {
-                output.append(": ").append(declaredType.kotlin.qualifiedDescription)
+                output.append(": ").append(declaredType.qualifiedKotlin)
             }
             if let value {
                 output.append(" = ").append(value, indentation: 0)
