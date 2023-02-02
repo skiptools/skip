@@ -95,7 +95,7 @@ class RawStatement: Statement {
         let source = syntaxTree.source
         let range = syntax.range(in: source)
         super.init(type: .raw, syntax: syntax, file: source.file, range: range, extras: extras)
-        self.statementMessages = [.unsupportedSyntax(source: source, range: range)]
+        self.statementMessages = [.unsupportedSyntax(syntax: syntax, source: source, range: range)]
     }
 
     override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
@@ -417,7 +417,7 @@ class VariableDeclaration: Statement {
                     case "didSet":
                         didSet = Accessor(statements: statements)
                     default:
-                        messages.append(.unsupportedSyntax(source: syntaxTree.source, range: syntax.range(in: syntaxTree.source)))
+                        messages.append(.unsupportedSyntax(syntax: Syntax(syntax), source: syntaxTree.source, range: syntax.range(in: syntaxTree.source)))
                     }
                 }
             case .getter(let codeBlockSyntax):

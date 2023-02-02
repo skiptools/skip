@@ -1,3 +1,5 @@
+import SwiftSyntax
+
 /// An Xcode-formatted message for the user.
 public struct Message: CustomStringConvertible {
     public enum Severity {
@@ -62,23 +64,11 @@ public struct Message: CustomStringConvertible {
 }
 
 extension Message {
-    static func unsupportedSyntax(source: Source? = nil, range: Source.Range? = nil) -> Message {
-        return Message(severity: .error, message: "Skip does not support this Swift syntax", source: source, range: range)
+    static func unsupportedSyntax(syntax: Syntax, source: Source? = nil, range: Source.Range? = nil) -> Message {
+        return Message(severity: .error, message: "Skip does not support this Swift syntax [\(syntax.kind)]", source: source, range: range)
     }
 
-    static func untranslatableSyntax(source: Source? = nil, range: Source.Range? = nil) -> Message {
-        return Message(severity: .error, message: "Cannot translate this Swift to Kotlin", source: source, range: range)
-    }
-
-    static func untranslatableSyntax(file: Source.File? = nil, range: Source.Range? = nil) -> Message {
-        return Message(severity: .error, message: "Cannot translate this Swift to Kotlin", file: file, range: range)
-    }
-
-    static func unsupportedTypeSignature(source: Source? = nil, range: Source.Range? = nil) -> Message {
-        return Message(severity: .error, message: "Skip does not support this Swift type", source: source, range: range)
-    }
-
-    static func unsupportedTypeSignature(file: Source.File? = nil, range: Source.Range? = nil) -> Message {
-        return Message(severity: .error, message: "Skip does not support this Swift type", file: file, range: range)
+    static func unsupportedTypeSignature(_ typeSyntax: TypeSyntax, source: Source? = nil, range: Source.Range? = nil) -> Message {
+        return Message(severity: .error, message: "Skip does not support this Swift type syntax [\(typeSyntax)]", source: source, range: range)
     }
 }

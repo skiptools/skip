@@ -45,7 +45,7 @@ class KotlinClassDeclaration: KotlinStatement {
             }
         }
         kstatement.members = members
-        kstatement.statementMessages += kstatement.inherits.compactMap { $0.kotlinMessage(for: statement) }
+        kstatement.inherits.forEach { $0.appendKotlinMessages(to: kstatement) }
         return kstatement
     }
 
@@ -152,17 +152,17 @@ struct KotlinExtensionDeclaration {
 
         var kotlinStatements: [KotlinStatement] = []
         if !statement.inherits.isEmpty && translator.codebaseInfo != nil {
-            let messageString: String
+            let message: Message
             if declarationType == .protocolDeclaration {
-                messageString = "Cannot use an extension to add additional protocols to a Kotlin interface"
+                message = .kotlinExtensionAddProtocolsToInterface(statement: statement)
             } else {
-                messageString = "Cannot use an extension to add additional protocols to a Kotlin type defined outside of this module"
+                message = .kotlinExtensionAddProtocolsToOutsideType(statement: statement)
             }
-            kotlinStatements.append(KotlinMessageStatement(message: Message(severity: .error, message: messageString, file: statement.file, range: statement.range)))
+            kotlinStatements.append(KotlinMessageStatement(message: message))
         }
         for member in statement.members.flatMap({ translator.translateStatement($0) }) {
             guard let memberDeclaration = member as? KotlinMemberDeclaration else {
-                kotlinStatements.append(KotlinMessageStatement(message: Message(severity: .error, message: "This declaration is not supported in a Kotlin extension", file: member.sourceFile, range: member.sourceRange)))
+                kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionUnsupportedMember(statement: member)))
                 continue
             }
             memberDeclaration.extends = statement.extends
@@ -201,10 +201,8 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             let bodyStatements = body.statements.flatMap { translator.translateStatement($0) }
             kstatement.body = CodeBlock(statements: bodyStatements)
         }
-        if let returnTypeMssage = kstatement.returnType?.kotlinMessage(for: statement) {
-            kstatement.statementMessages.append(returnTypeMssage)
-        }
-        kstatement.statementMessages += kstatement.parameters.compactMap { $0.type?.kotlinMessage(for: statement) }
+        kstatement.returnType?.appendKotlinMessages(to: kstatement)
+        kstatement.parameters.forEach { $0.type?.appendKotlinMessages(to: kstatement) }
         return kstatement
     }
 
@@ -296,7 +294,7 @@ class KotlinInterfaceDeclaration: KotlinStatement {
     static func translate(statement: TypeDeclaration, translator: KotlinTranslator) -> KotlinInterfaceDeclaration {
         let kstatement = KotlinInterfaceDeclaration(statement: statement)
         kstatement.members = statement.members.flatMap { translator.translateStatement($0) }
-        kstatement.statementMessages += kstatement.inherits.compactMap { $0.kotlinMessage(for: statement) }
+        kstatement.inherits.forEach { $0.appendKotlinMessages(to: kstatement) }
         return kstatement
     }
 
@@ -388,11 +386,9 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         kstatement.setter = statement.setter?.translate(translator: translator)
         kstatement.willSet = statement.willSet?.translate(translator: translator)
         kstatement.didSet = statement.didSet?.translate(translator: translator)
-        if let declaredTypeMessage = kstatement.declaredType?.kotlinMessage(for: statement) {
-            kstatement.statementMessages.append(declaredTypeMessage)
-        }
+        kstatement.declaredType?.appendKotlinMessages(to: kstatement)
         if statement.isAsync {
-            kstatement.statementMessages.append(Message(severity: .error, message: "Kotlin does not support async properties", file: statement.file, range: statement.range))
+            kstatement.statementMessages.append(.kotlinAsyncProperties(statement: kstatement))
         }
         return kstatement
     }

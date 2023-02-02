@@ -35,7 +35,7 @@ extension InheritedTypeListSyntax {
             if let typeSignature = TypeSignature.for(syntax: typeSyntax.typeName) {
                 return typeSignature
             } else {
-                messages.append(.unsupportedTypeSignature(source: syntaxTree.source, range: typeSyntax.range(in: syntaxTree.source)))
+                messages.append(.unsupportedTypeSignature(typeSyntax.typeName, source: syntaxTree.source, range: typeSyntax.range(in: syntaxTree.source)))
                 return nil
             }
         }
@@ -51,7 +51,7 @@ extension FunctionSignatureSyntax {
         if let output = output {
             returnType = TypeSignature.for(syntax: output.returnType)
             if returnType == nil {
-                messages.append(.unsupportedTypeSignature(source: syntaxTree.source, range: output.range(in: syntaxTree.source)))
+                messages.append(.unsupportedTypeSignature(output.returnType, source: syntaxTree.source, range: output.range(in: syntaxTree.source)))
             }
         }
         let parameters = input.parameterList.map { parameterSyntax in
@@ -60,7 +60,7 @@ extension FunctionSignatureSyntax {
                 type = TypeSignature.for(syntax: typeSyntax)
                 if type == nil {
                     type = .base("Any", nil, [])
-                    messages.append(.unsupportedTypeSignature(source: syntaxTree.source, range: typeSyntax.range(in: syntaxTree.source)))
+                    messages.append(.unsupportedTypeSignature(typeSyntax, source: syntaxTree.source, range: typeSyntax.range(in: syntaxTree.source)))
                 }
             }
             let isVariadic = parameterSyntax.ellipsis?.text == "..."

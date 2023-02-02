@@ -47,35 +47,6 @@ extension Parameter where S: Statement {
 }
 
 extension TypeSignature {
-    /// Whether this type can be represented in Kotlin.
-    var isKotlinCompatible: Bool {
-        switch self {
-        case .array(let elementType):
-            return elementType.isKotlinCompatible
-        case .base(_, _, let genericTypes):
-            return genericTypes.allSatisfy { $0.isKotlinCompatible }
-        case .classRestricted:
-            return true
-        case .composition:
-            return false
-        case .dictionary(let keyType, let valueType):
-            return keyType.isKotlinCompatible && valueType.isKotlinCompatible
-        case .function(let parameterTypes, let returnType):
-            return parameterTypes.allSatisfy { $0.isKotlinCompatible } && returnType.isKotlinCompatible
-        case .member(_, let type):
-            return type.isKotlinCompatible
-        case .metaType(let baseType):
-            return baseType.isKotlinCompatible
-        case .optional(let wrappedType):
-            return wrappedType.isKotlinCompatible
-        case .tuple(let elementTypes):
-            // TODO: We could create larger arity classes
-            return elementTypes.count <= 3 && elementTypes.allSatisfy { $0.isKotlinCompatible }
-        case .unwrappedOptional(let wrappedType):
-            return wrappedType.isKotlinCompatible
-        }
-    }
-
     /// Kotlin description of this type.
     var kotlin: String {
         return kotlin(isQualified: false)
@@ -86,12 +57,38 @@ extension TypeSignature {
         return kotlin(isQualified: true)
     }
 
-    /// An appropriate message if this type is not supported.
-    func kotlinMessage(for statement: Statement) -> Message? {
-        guard !isKotlinCompatible else {
-            return nil
+    /// Add appropriate messages if this type is not supported.
+    func appendKotlinMessages(to statement: KotlinStatement) {
+        switch self {
+        case .array(let elementType):
+            elementType.appendKotlinMessages(to: statement)
+        case .base(_, _, let genericTypes):
+            genericTypes.forEach { $0.appendKotlinMessages(to: statement) }
+        case .classRestricted:
+            break
+        case .composition:
+            statement.statementMessages.append(.kotlinComposedTypes(statement: statement))
+        case .dictionary(let keyType, let valueType):
+            keyType.appendKotlinMessages(to: statement)
+            valueType.appendKotlinMessages(to: statement)
+        case .function(let parameterTypes, let returnType):
+            parameterTypes.forEach { $0.appendKotlinMessages(to: statement) }
+            returnType.appendKotlinMessages(to: statement)
+        case .member(_, let type):
+            type.appendKotlinMessages(to: statement)
+        case .metaType(let baseType):
+            baseType.appendKotlinMessages(to: statement)
+        case .optional(let wrappedType):
+            wrappedType.appendKotlinMessages(to: statement)
+        case .tuple(let elementTypes):
+            // TODO: We could create larger arity classes
+            if elementTypes.count > 3 {
+                statement.statementMessages.append(.kotlinTupleArity(statement: statement))
+            }
+            elementTypes.forEach { $0.appendKotlinMessages(to: statement) }
+        case .unwrappedOptional(let wrappedType):
+            wrappedType.appendKotlinMessages(to: statement)
         }
-        return .unsupportedTypeSignature(file: statement.file, range: statement.range)
     }
 
     private func kotlin(isQualified: Bool) -> String {

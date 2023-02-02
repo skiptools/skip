@@ -94,9 +94,9 @@ public class KotlinTranslator {
         if let syntax = statement.syntax {
             let rawStatement = RawStatement(syntax: syntax, extras: statement.extras, in: syntaxTree)
             let krawStatement = KotlinRawStatement(statement: rawStatement)
-            krawStatement.statementMessages = [.untranslatableSyntax(source: syntaxTree.source, range: statement.range)]
+            krawStatement.statementMessages = [.kotlinUntranslatable(statement: statement, source: syntaxTree.source, range: statement.range)]
             return [krawStatement]
         }
-        return [KotlinMessageStatement(message: .untranslatableSyntax(file: statement.file, range: statement.range))]
+        return [KotlinMessageStatement(message: .kotlinUntranslatable(statement: statement))]
     }
 }
