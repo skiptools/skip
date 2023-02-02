@@ -62,22 +62,32 @@ struct StatementExtras {
 
         var triviaString = trivia.description
         // Drop initial newline that is typically the trailing newline of the preceding statement
-        // Drop trailing newline because we add a newline to each line already
         if triviaString.hasPrefix("\n") {
             triviaString = String(triviaString.dropFirst())
         }
-        if triviaString.hasSuffix("\n") {
-            triviaString = String(triviaString.dropLast())
-        }
-        let lines = triviaString.split(separator: "\n", omittingEmptySubsequences: false)
-        for line in lines {
-            guard let startIndex = line.firstIndex(where: { !$0.isWhitespace }) else {
+        while !triviaString.isEmpty {
+            // Do out own line splits so that we can differentiate whether the last line had a trailing newline.
+            // We don't want to treat indentation before the statement as a trivia line
+            let line: String
+            let hasNewline: Bool
+            if let nextNewline = triviaString.firstIndex(of: "\n") {
+                line = String(triviaString[..<nextNewline])
+                hasNewline = true
+                triviaString = String(triviaString.dropFirst(line.count + 1))
+            } else {
+                line = triviaString
+                hasNewline = false
+                triviaString = ""
+            }
+            let trimmedLine = line.trimmingCharacters(in: .whitespaces)
+            guard !trimmedLine.isEmpty else {
                 endDirective()
-                triviaLines.append("\n")
+                if hasNewline {
+                    triviaLines.append("\n")
+                }
                 continue
             }
 
-            let trimmedLine = String(line[startIndex...])
             if trimmedLine.hasPrefix("// SKIP") {
                 endDirective()
                 if trimmedLine.hasPrefix(insertPrefix) {
@@ -161,15 +171,28 @@ struct StatementExtras {
 
     /// Leading trivia string, allowing us to preserve original comments and blank lines.
     func leadingTrivia(indentation: Indentation) -> String {
-        guard !leadingTrivia.isEmpty else {
-            return ""
-        }
-        let indentationString = indentation.description
-        return indentationString + leadingTrivia.joined(separator: indentationString)
+        return join(lines: leadingTrivia, indentation: indentation)
     }
 
     /// Trailing trivia string, allowing us to preserve trailing comments.
     func trailingTrivia(indentation: Indentation) -> String {
-        return trailingTrivia.joined(separator: indentation.description)
+        return join(lines: trailingTrivia, indentation: indentation)
+    }
+
+    private func join(lines: [String], indentation: Indentation) -> String {
+        guard !lines.isEmpty else {
+            return ""
+        }
+        var joined = ""
+        let indentationString = indentation.description
+        for entry in lines.enumerated() {
+            if entry.element == "\n" || entry.offset == 0 {
+                joined.append(entry.element)
+            } else {
+                joined.append(indentationString)
+                joined.append(entry.element)
+            }
+        }
+        return joined
     }
 }

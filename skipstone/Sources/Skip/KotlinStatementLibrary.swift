@@ -257,6 +257,8 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             }
             output.append(body.statements, indentation: bodyIndentation)
             output.append(indentation).append("}\n")
+        } else {
+            output.append("\n")
         }
     }
 }
