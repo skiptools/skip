@@ -54,7 +54,7 @@ class IfDefined: Statement {
         super.init(type: .ifDefined, syntax: syntax, file: file, range: range, extras: extras)
     }
 
-    override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
+    override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
         guard syntax.kind == .ifConfigDecl, let ifConfigDecl = syntax.as(IfConfigDeclSyntax.self) else {
             return nil
         }
@@ -73,12 +73,12 @@ class IfDefined: Statement {
         }
 
         let resolvedSymbol = symbol ?? ifConfigDecl.clauses.first?.condition?.description ?? ""
-        let statements = extractStatements(from: clause, in: syntaxTree)
+        let statements = try extractStatements(from: clause, in: syntaxTree)
         let statement = IfDefined(symbol: resolvedSymbol, statements: statements, syntax: syntax, file: syntaxTree.source.file, range: syntax.range(in: syntaxTree.source), extras: extras)
         return [statement]
     }
 
-    private static func extractStatements(from clause: IfConfigClauseSyntax?, in syntaxTree: SyntaxTree) -> [Statement] {
+    private static func extractStatements(from clause: IfConfigClauseSyntax?, in syntaxTree: SyntaxTree) throws -> [Statement] {
         guard let elements = clause?.elements else {
             return []
         }
@@ -90,9 +90,9 @@ class IfDefined: Statement {
         case .decls(let syntax):
             return StatementDecoder.decode(syntaxList: syntax, in: syntaxTree)
         case .postfixExpression(let syntax):
-            return [RawStatement(syntax: Syntax(syntax), in: syntaxTree)]
+            throw Message.unsupportedSyntax(syntax: Syntax(syntax), source: syntaxTree.source)
         case .attributes(let syntax):
-            return [RawStatement(syntax: Syntax(syntax), in: syntaxTree)]
+            throw Message.unsupportedSyntax(syntax: Syntax(syntax), source: syntaxTree.source)
         }
     }
 
@@ -125,53 +125,6 @@ class Return: ExpressionStatement {
 
     override var prettyPrintAttributes: [PrettyPrintTree] {
         return [PrettyPrintTree(root: "return")] + super.prettyPrintAttributes
-    }
-}
-
-// MARK: - Special statements
-
-/// Attach a warning or error to the tree.
-class MessageStatement: Statement {
-    init(message: Message) {
-        super.init(type: .message)
-        self.statementMessages = [message]
-    }
-
-    override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
-        return nil
-    }
-}
-
-/// Raw source code.
-class RawStatement: Statement {
-    let sourceCode: String
-
-    init(sourceCode: String, message: Message? = nil, syntax: Syntax? = nil, extras: StatementExtras? = nil, in syntaxTree: SyntaxTree? = nil) {
-        self.sourceCode = sourceCode
-        var range: Source.Range? = nil
-        if let source = syntaxTree?.source {
-            range = syntax?.range(in: source)
-        }
-        super.init(type: .raw, syntax: syntax, file: syntaxTree?.source.file, range: range, extras: extras)
-        if let message {
-            self.statementMessages = [message]
-        }
-    }
-
-    init(syntax: Syntax, extras: StatementExtras? = nil, in syntaxTree: SyntaxTree) {
-        self.sourceCode = syntax.sourceCode(in: syntaxTree.source)
-        let source = syntaxTree.source
-        let range = syntax.range(in: source)
-        super.init(type: .raw, syntax: syntax, file: source.file, range: range, extras: extras)
-        self.statementMessages = [.unsupportedSyntax(syntax: syntax, source: source, range: range)]
-    }
-
-    override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
-        return nil
-    }
-
-    override var prettyPrintAttributes: [PrettyPrintTree] {
-        return [PrettyPrintTree(root: sourceCode)]
     }
 }
 
@@ -426,7 +379,7 @@ class VariableDeclaration: Statement {
         super.init(type: .variableDeclaration, syntax: syntax, file: file, range: range, extras: extras)
     }
 
-    override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
+    override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
         guard syntax.kind == .variableDecl, let variableDecl = syntax.as(VariableDeclSyntax.self) else {
             return nil
         }
@@ -436,13 +389,13 @@ class VariableDeclaration: Statement {
         var statements: [Statement] = []
         for entry in variableDecl.bindings.enumerated() {
             let bindingExtras = entry.offset == 0 ? extras : nil
-            let statement = decode(syntax: entry.element, isLet: isLet, modifiers: modifiers, extras: bindingExtras, in: syntaxTree)
+            let statement = try decode(syntax: entry.element, isLet: isLet, modifiers: modifiers, extras: bindingExtras, in: syntaxTree)
             statements.append(statement)
         }
         return statements
     }
 
-    private static func decode(syntax: PatternBindingSyntax, isLet: Bool, modifiers: Modifiers?, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> Statement {
+    private static func decode(syntax: PatternBindingSyntax, isLet: Bool, modifiers: Modifiers?, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> Statement {
         var declaredType: TypeSignature? = nil
         if let typeSyntax = syntax.typeAnnotation?.type {
             declaredType = TypeSignature.for(syntax: typeSyntax)
@@ -485,7 +438,7 @@ class VariableDeclaration: Statement {
                     case "didSet":
                         didSet = Accessor(statements: statements)
                     default:
-                        messages.append(.unsupportedSyntax(syntax: Syntax(syntax), source: syntaxTree.source, range: syntax.range(in: syntaxTree.source)))
+                        messages.append(.unsupportedSyntax(syntax: Syntax(accessor), source: syntaxTree.source, range: syntax.range(in: syntaxTree.source)))
                     }
                 }
             case .getter(let codeBlockSyntax):
@@ -494,26 +447,27 @@ class VariableDeclaration: Statement {
         }
 
         // TODO: Support patterns other than a simple identifier
-        switch syntax.pattern.kind {
+        let patternSyntax = syntax.pattern
+        switch patternSyntax.kind {
         case .expressionPattern:
-            return RawStatement(syntax: Syntax(syntax), in: syntaxTree)
+            throw Message.unsupportedSyntax(syntax: Syntax(patternSyntax), source: syntaxTree.source)
         case .identifierPattern:
-            let name = syntax.pattern.as(IdentifierPatternSyntax.self)!.identifier.text
+            let name = patternSyntax.as(IdentifierPatternSyntax.self)!.identifier.text
             let declaration = VariableDeclaration(name: name, declaredType: declaredType, isLet: isLet, isAsync: isAsync, isThrows: isThrows, modifiers: modifiers, value: value, getter: getter, setter: setter, willSet: willSet, didSet: didSet, syntax: Syntax(syntax), file: syntaxTree.source.file, range: syntax.range(in: syntaxTree.source), extras: extras)
             declaration.statementMessages = messages
             return declaration
         case .isTypePattern:
-            return RawStatement(syntax: Syntax(syntax), in: syntaxTree)
+            throw Message.unsupportedSyntax(syntax: Syntax(patternSyntax), source: syntaxTree.source)
         case .missingPattern:
-            return RawStatement(syntax: Syntax(syntax), in: syntaxTree)
+            throw Message.unsupportedSyntax(syntax: Syntax(patternSyntax), source: syntaxTree.source)
         case .tuplePattern:
-            return RawStatement(syntax: Syntax(syntax), in: syntaxTree)
+            throw Message.unsupportedSyntax(syntax: Syntax(patternSyntax), source: syntaxTree.source)
         case .valueBindingPattern:
-            return RawStatement(syntax: Syntax(syntax), in: syntaxTree)
+            throw Message.unsupportedSyntax(syntax: Syntax(patternSyntax), source: syntaxTree.source)
         case .wildcardPattern:
-            return RawStatement(syntax: Syntax(syntax), in: syntaxTree)
+            throw Message.unsupportedSyntax(syntax: Syntax(patternSyntax), source: syntaxTree.source)
         default:
-            return RawStatement(syntax: Syntax(syntax), in: syntaxTree)
+            throw Message.unsupportedSyntax(syntax: Syntax(patternSyntax), source: syntaxTree.source)
         }
     }
 

@@ -19,7 +19,7 @@ class OutputGenerator {
         return ret
     }
 
-    @discardableResult func append(_ node: OutputNode, indentation: Indentation) -> OutputGenerator {
+    @discardableResult func append(_ node: OutputNode, indentation: Indentation = 0) -> OutputGenerator {
         append(node.leadingTrivia(indentation: indentation))
         let startOffset = content.utf8.count
         node.append(to: self, indentation: indentation)
@@ -42,7 +42,7 @@ class OutputGenerator {
         return self
     }
 
-    @discardableResult func append(_ nodes: [OutputNode], indentation: Indentation) -> OutputGenerator {
+    @discardableResult func append(_ nodes: [OutputNode], indentation: Indentation = 0) -> OutputGenerator {
         nodes.forEach { append($0, indentation: indentation) }
         return self
     }

@@ -1,7 +1,7 @@
 import SwiftSyntax
 
 /// An Xcode-formatted message for the user.
-public struct Message: CustomStringConvertible {
+public struct Message: Error, CustomStringConvertible {
     public enum Severity {
         case warning
         case error
@@ -65,10 +65,18 @@ public struct Message: CustomStringConvertible {
 
 extension Message {
     static func unsupportedSyntax(syntax: Syntax, source: Source? = nil, range: Source.Range? = nil) -> Message {
+        var range = range
+        if range == nil, let source {
+            range = syntax.range(in: source)
+        }
         return Message(severity: .error, message: "Skip does not support this Swift syntax [\(syntax.kind)]", source: source, range: range)
     }
 
     static func unsupportedTypeSignature(_ typeSyntax: TypeSyntax, source: Source? = nil, range: Source.Range? = nil) -> Message {
+        var range = range
+        if range == nil, let source {
+            range = typeSyntax.range(in: source)
+        }
         return Message(severity: .error, message: "Skip does not support this Swift type syntax [\(typeSyntax)]", source: source, range: range)
     }
 }

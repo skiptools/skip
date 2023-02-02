@@ -1,27 +1,3 @@
-class KotlinMessageStatement: KotlinStatement {
-    init(message: Message) {
-        super.init(type: .message)
-        self.statementMessages = [message]
-    }
-
-    init(statement: Statement) {
-        super.init(type: .message, statement: statement)
-    }
-}
-
-class KotlinRawStatement: KotlinStatement {
-    let sourceCode: String
-
-    init(statement: RawStatement) {
-        self.sourceCode = statement.sourceCode
-        super.init(type: .raw, statement: statement)
-    }
-
-    override func append(to output: OutputGenerator, indentation: Indentation) {
-        output.append(indentation).append(sourceCode).append("\n")
-    }
-}
-
 // MARK: - Declarations
 
 class KotlinClassDeclaration: KotlinStatement {

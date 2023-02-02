@@ -20,7 +20,9 @@ class Statement: PrettyPrintable {
     }
 
     /// Attempt to construct statements of this type from the given syntax.
-    class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
+    ///
+    /// - Throws: `Message` when unable to decode a compatible syntax.
+    class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
         return nil
     }
 
@@ -178,15 +180,20 @@ struct StatementDecoder {
             statements = extraStatements
         }
 
-        for statementType in StatementType.allCases {
-            if let representingType = statementType.representingType, let decodedStatements = representingType.decode(syntax: syntax, extras: extras, in: syntaxTree) {
-                statements += decodedStatements
-                return statements
+        var message: Message? = nil
+        do {
+            for statementType in StatementType.allCases {
+                if let representingType = statementType.representingType, let decodedStatements = try representingType.decode(syntax: syntax, extras: extras, in: syntaxTree) {
+                    statements += decodedStatements
+                    return statements
+                }
             }
+        } catch {
+            message = error as? Message
         }
 
         // Unsupported
-        statements.append(RawStatement(syntax: syntax, extras: extras, in: syntaxTree))
+        statements.append(RawStatement(syntax: syntax, message: message, extras: extras, in: syntaxTree))
         return statements
     }
 
@@ -224,5 +231,54 @@ struct StatementDecoder {
             return "\(typeDeclaration.qualifiedName).\(typeName)"
         }
         return typeName
+    }
+}
+
+/// Attach a warning or error to the tree.
+class MessageStatement: Statement {
+    init(message: Message) {
+        super.init(type: .message)
+        self.statementMessages = [message]
+    }
+
+    override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
+        return nil
+    }
+}
+
+/// Raw source code.
+class RawStatement: Statement {
+    let sourceCode: String
+
+    init(sourceCode: String, message: Message? = nil, syntax: Syntax? = nil, extras: StatementExtras? = nil, in syntaxTree: SyntaxTree? = nil) {
+        self.sourceCode = sourceCode
+        var range: Source.Range? = nil
+        if let source = syntaxTree?.source {
+            range = syntax?.range(in: source)
+        }
+        super.init(type: .raw, syntax: syntax, file: syntaxTree?.source.file, range: range, extras: extras)
+        if let message {
+            self.statementMessages = [message]
+        }
+    }
+
+    init(syntax: Syntax, message: Message? = nil, extras: StatementExtras? = nil, in syntaxTree: SyntaxTree) {
+        self.sourceCode = syntax.sourceCode(in: syntaxTree.source)
+        let source = syntaxTree.source
+        let range = syntax.range(in: source)
+        super.init(type: .raw, syntax: syntax, file: source.file, range: range, extras: extras)
+        if let message {
+            self.statementMessages = [message]
+        } else {
+            self.statementMessages = [.unsupportedSyntax(syntax: syntax, source: source, range: range)]
+        }
+    }
+
+    override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
+        return nil
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        return [PrettyPrintTree(root: sourceCode)]
     }
 }
