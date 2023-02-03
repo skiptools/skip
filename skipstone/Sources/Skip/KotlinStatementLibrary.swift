@@ -1,3 +1,25 @@
+class KotlinReturn: KotlinExpressionStatement {
+    static func translate(statement: Return, translator: KotlinTranslator) -> KotlinExpressionStatement {
+        let kstatement = KotlinExpressionStatement(statement: statement)
+        if let expression = statement.expression {
+            kstatement.expression = translator.translateExpression(expression)
+        }
+        return kstatement
+    }
+
+    init(statement: Return) {
+        super.init(type: .return, statement: statement)
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        if let expression {
+            output.append(indentation).append("return ").append(expression).append("\n")
+        } else {
+            output.append(indentation).append("return")
+        }
+    }
+}
+
 // MARK: - Declarations
 
 class KotlinClassDeclaration: KotlinStatement {

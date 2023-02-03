@@ -56,8 +56,7 @@ class Expression: PrettyPrintable {
 /// Supported Swift expression types.
 enum ExpressionType: CaseIterable {
     case booleanLiteral
-    case floatingPointLiteral
-    case integerLiteral
+    case numericLiteral
     case stringLiteral
 
     /// An expression representing raw Swift code.
@@ -68,9 +67,7 @@ enum ExpressionType: CaseIterable {
         switch self {
         case .booleanLiteral:
             return BooleanLiteral.self
-        case .floatingPointLiteral:
-            return NumericLiteral.self
-        case .integerLiteral:
+        case .numericLiteral:
             return NumericLiteral.self
         case .stringLiteral:
             return StringLiteral.self
@@ -101,7 +98,7 @@ struct ExpressionDecoder {
 class RawExpression: Expression {
     let sourceCode: String
 
-    init(sourceCode: String, message: Message? = nil, syntax: Syntax? = nil, in syntaxTree: SyntaxTree? = nil) {
+    init(sourceCode: String, message: Message? = nil, syntax: Syntax? = nil, range: Source.Range?, in syntaxTree: SyntaxTree? = nil) {
         self.sourceCode = sourceCode
         var range: Source.Range? = nil
         if let source = syntaxTree?.source {

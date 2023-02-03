@@ -180,6 +180,8 @@ extension TypeSignature {
             return "UInt"
         case "UInt64":
             return "ULong"
+        case "Void":
+            return "Unit"
         default:
             return typeName
         }

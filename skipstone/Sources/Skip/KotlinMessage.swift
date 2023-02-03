@@ -7,6 +7,10 @@ extension Message {
         return Message(severity: .error, message: "Skip cannot translate this statement to Kotlin [\(statement.type)]", file: statement.file, range: statement.range)
     }
 
+    static func kotlinUntranslatable(expression: Expression) -> Message {
+        return Message(severity: .error, message: "Skip cannot translate this expression to Kotlin [\(expression.type)]", file: expression.file, range: expression.range)
+    }
+
     // List of specific untranslatable errors. This will be helpful in maintaining documentation
 
     static func kotlinAsyncProperties(statement: KotlinStatement) -> Message {

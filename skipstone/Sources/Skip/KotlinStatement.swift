@@ -49,6 +49,9 @@ class KotlinStatement: OutputNode {
 
 /// Types of Kotlin statements.
 enum KotlinStatementType {
+    case expression
+    case `return`
+
     case classDeclaration
     case extensionDeclaration
     case functionDeclaration
@@ -90,5 +93,27 @@ class KotlinRawStatement: KotlinStatement {
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
         output.append(indentation).append(sourceCode).append("\n")
+    }
+}
+
+class KotlinExpressionStatement: KotlinStatement {
+    var expression: KotlinExpression?
+
+    static func translate(statement: ExpressionStatement, translator: KotlinTranslator) -> KotlinExpressionStatement {
+        let kstatement = KotlinExpressionStatement(statement: statement)
+        if let expression = statement.expression {
+            kstatement.expression = translator.translateExpression(expression)
+        }
+        return kstatement
+    }
+
+    init(type: KotlinStatementType = .expression, statement: ExpressionStatement) {
+        super.init(type: type, statement: statement)
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        if let expression {
+            output.append(indentation).append(expression).append("\n")
+        }
     }
 }

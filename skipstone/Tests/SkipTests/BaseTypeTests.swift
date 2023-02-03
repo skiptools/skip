@@ -21,6 +21,7 @@ final class BaseTypeTests: XCTestCase {
         var ui16: UInt16
         var ui32: UInt32
         var ui64: UInt64
+        var v: Void
         """, kotlin: """
         internal var a: Any
         internal var ao: Any
@@ -39,6 +40,7 @@ final class BaseTypeTests: XCTestCase {
         internal var ui16: UShort
         internal var ui32: UInt
         internal var ui64: ULong
+        internal var v: Unit
         """)
     }
 
@@ -76,9 +78,11 @@ final class BaseTypeTests: XCTestCase {
         try await check(swift: """
         var i: Int?
         var c: CustomType?
+        var u: CustomType!
         """, kotlin: """
         internal var i: Long?
         internal var c: CustomType?
+        internal lateinit var u: CustomType
         """)
     }
 }

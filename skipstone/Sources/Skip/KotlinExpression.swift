@@ -32,6 +32,7 @@ class KotlinExpression: OutputNode {
     }
 
     final func append(to output: OutputGenerator, indentation: Indentation) {
+        output.append(indentation)
         append(to: output)
     }
 

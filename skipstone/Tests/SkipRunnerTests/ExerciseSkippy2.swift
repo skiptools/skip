@@ -1,5 +1,5 @@
 /// A second file to exercise Skippy on multi-file modules.
 
-func f2() -> String {
-    return "We don't yet support this line"
+func f2(param: Int) -> Int {
+    return param + 1
 }

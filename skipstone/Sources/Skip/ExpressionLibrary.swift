@@ -25,25 +25,27 @@ class BooleanLiteral: Expression {
 /// `1, 1.0`
 class NumericLiteral: Expression {
     let literal: String
+    let isFloatingPoint: Bool
 
-    init(type: ExpressionType, literal: String, syntax: Syntax? = nil, file: Source.File? = nil, range: Source.Range? = nil) {
+    init(literal: String, isFloatingPoint: Bool, syntax: Syntax? = nil, file: Source.File? = nil, range: Source.Range? = nil) {
         self.literal = literal
-        super.init(type: type, syntax: syntax, file: file, range: range)
+        self.isFloatingPoint = isFloatingPoint
+        super.init(type: .numericLiteral, syntax: syntax, file: file, range: range)
     }
 
     override class func decode(syntax: Syntax, in syntaxTree: SyntaxTree) -> Expression? {
-        let type: ExpressionType
         let literal: String
+        let isFloatingPoint: Bool
         if syntax.kind == .floatLiteralExpr, let floatLiteralExpr = syntax.as(FloatLiteralExprSyntax.self) {
-            type = .floatingPointLiteral
             literal = floatLiteralExpr.floatingDigits.text
+            isFloatingPoint = true
         } else if syntax.kind == .integerLiteralExpr, let integerLiteralExpr = syntax.as(IntegerLiteralExprSyntax.self) {
-            type = .integerLiteral
             literal = integerLiteralExpr.digits.text
+            isFloatingPoint = false
         } else {
             return nil
         }
-        return NumericLiteral(type: type, literal: literal, syntax: syntax, file: syntaxTree.source.file, range: syntax.range(in: syntaxTree.source))
+        return NumericLiteral(literal: literal, isFloatingPoint: isFloatingPoint, syntax: syntax, file: syntaxTree.source.file, range: syntax.range(in: syntaxTree.source))
     }
 
     override var prettyPrintAttributes: [PrettyPrintTree] {
@@ -53,14 +55,10 @@ class NumericLiteral: Expression {
 
 /// `"..."`
 class StringLiteral: Expression {
-    enum Segment {
-        case string(String)
-        case expression(Expression)
-    }
-    let segments: [Segment]
+    let segments: [StringLiteralSegment<Expression>]
     let isMultiline: Bool
 
-    init(segments: [Segment], isMultiline: Bool = false, syntax: Syntax? = nil, file: Source.File? = nil, range: Source.Range? = nil) {
+    init(segments: [StringLiteralSegment<Expression>], isMultiline: Bool = false, syntax: Syntax? = nil, file: Source.File? = nil, range: Source.Range? = nil) {
         self.segments = segments
         self.isMultiline = isMultiline
         super.init(type: .stringLiteral, syntax: syntax, file: file, range: range)
@@ -71,7 +69,7 @@ class StringLiteral: Expression {
             return nil
         }
         let isMultiline = stringLiteralExpr.openQuote.tokenKind == .multilineStringQuote
-        var segments: [Segment] = []
+        var segments: [StringLiteralSegment<Expression>] = []
         for segmentSyntax in stringLiteralExpr.segments {
             switch segmentSyntax {
             case .stringSegment(let stringSyntax):

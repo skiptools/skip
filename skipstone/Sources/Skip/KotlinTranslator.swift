@@ -48,7 +48,7 @@ public class KotlinTranslator {
         case .error:
             break
         case .expression:
-            break
+            return [KotlinExpressionStatement.translate(statement: statement as! ExpressionStatement, translator: self)]
         case .for:
             break
         case .if:
@@ -57,7 +57,7 @@ public class KotlinTranslator {
             // Inline the #if content
             return statement.children.flatMap { translateStatement($0) }
         case .return:
-            break
+            return [KotlinReturn.translate(statement: statement as! Return, translator: self)]
         case .switch:
             break
         case .throw:
@@ -92,11 +92,34 @@ public class KotlinTranslator {
 
         // Fall back to a raw translation and associated warning
         if let syntax = statement.syntax {
-            let rawStatement = RawStatement(syntax: syntax, extras: statement.extras, in: syntaxTree)
+            let message = Message.kotlinUntranslatable(statement: statement)
+            let rawStatement = RawStatement(syntax: syntax, message: message, extras: statement.extras, in: syntaxTree)
             let krawStatement = KotlinRawStatement(statement: rawStatement)
-            krawStatement.statementMessages = [.kotlinUntranslatable(statement: statement, source: syntaxTree.source, range: statement.range)]
             return [krawStatement]
         }
         return [KotlinMessageStatement(message: .kotlinUntranslatable(statement: statement))]
+    }
+
+    func translateExpression(_ expression: Expression) -> KotlinExpression {
+        switch expression.type {
+        case .booleanLiteral:
+            return KotlinBooleanLiteral(expression: expression as! BooleanLiteral)
+        case .numericLiteral:
+            return KotlinNumericLiteral(expression: expression as! NumericLiteral)
+        case .stringLiteral:
+            return KotlinStringLiteral.translate(expression: expression as! StringLiteral, translator: self)
+        case .raw:
+            return KotlinRawExpression(expression: expression as! RawExpression)
+        }
+
+        // Fall back to a raw translation and associated warning
+//        let message = Message.kotlinUntranslatable(expression: expression)
+//        let rawExpression: RawExpression
+//        if let syntax = expression.syntax {
+//            rawExpression = RawExpression(syntax: syntax, message: message, in: syntaxTree)
+//        } else {
+//            rawExpression = RawExpression(sourceCode: "?", message: message, range: expression.range, in: syntaxTree)
+//        }
+//        return KotlinRawExpression(expression: rawExpression)
     }
 }

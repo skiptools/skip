@@ -65,6 +65,12 @@ struct Parameter<S>: Hashable {
     }
 }
 
+/// A segment in a string literal.
+enum StringLiteralSegment<E> {
+    case string(String)
+    case expression(E)
+}
+
 /// A source code type signature.
 indirect enum TypeSignature: CustomStringConvertible, Hashable {
     case array(TypeSignature)
