@@ -16,11 +16,11 @@ class KotlinSyntaxNode: SourceDerived, OutputNode {
         return []
     }
 
-    var derivationMessages: [Message] = []
+    var messages: [Message] = []
 
     /// All messages rooted in this subtree.
-    var messages: [Message] {
-        return derivationMessages + children.flatMap { $0.messages }
+    var subtreeMessages: [Message] {
+        return messages + children.flatMap { $0.subtreeMessages }
     }
 
     func leadingTrivia(indentation: Indentation) -> String {

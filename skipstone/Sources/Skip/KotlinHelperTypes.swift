@@ -67,7 +67,7 @@ extension TypeSignature {
         case .classRestricted:
             break
         case .composition:
-            statement.derivationMessages.append(.kotlinComposedTypes(statement))
+            statement.messages.append(.kotlinComposedTypes(statement))
         case .dictionary(let keyType, let valueType):
             keyType.appendKotlinMessages(to: statement)
             valueType.appendKotlinMessages(to: statement)
@@ -82,10 +82,10 @@ extension TypeSignature {
             type.appendKotlinMessages(to: statement)
         case .tuple(let labels, let types):
             if labels.contains(where: { $0 != nil }) {
-                statement.derivationMessages.append(.kotlinTupleLabels(statement))
+                statement.messages.append(.kotlinTupleLabels(statement))
             }
             if types.count > 3 {
-                statement.derivationMessages.append(.kotlinTupleArity(statement))
+                statement.messages.append(.kotlinTupleArity(statement))
             }
             types.forEach { $0.appendKotlinMessages(to: statement) }
         case .unwrappedOptional(let type):

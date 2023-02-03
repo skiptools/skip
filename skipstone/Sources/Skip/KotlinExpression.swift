@@ -10,7 +10,7 @@ class KotlinExpression: KotlinSyntaxNode {
     init(type: KotlinExpressionType, expression: Expression) {
         self.type = type
         super.init(nodeName: String(describing: type), sourceFile: expression.sourceFile, sourceRange: expression.sourceRange)
-        self.derivationMessages = expression.derivationMessages
+        self.messages = expression.messages
     }
 
     final override func append(to output: OutputGenerator, indentation: Indentation) {

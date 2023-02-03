@@ -4,6 +4,6 @@ protocol SourceDerived {
     var sourceRange: Source.Range? { get }
 
     /// Messages for this derivation.
-    var derivationMessages: [Message] { get set }
+    var messages: [Message] { get set }
 }
 

@@ -34,11 +34,11 @@ class SyntaxNode: SourceDerived, PrettyPrintable {
         return PrettyPrintTree(root: nodeName, children: prettyPrintAttributes + children.map { $0.prettyPrintTree })
     }
 
-    var derivationMessages: [Message] = []
+    var messages: [Message] = []
 
     /// All messages rooted in this subtree.
-    var messages: [Message] {
-        return derivationMessages + children.flatMap { $0.messages }
+    var subtreeMessages: [Message] {
+        return messages + children.flatMap { $0.subtreeMessages }
     }
 
     /// Find the nearest type declaration by traversing up the syntax tree.

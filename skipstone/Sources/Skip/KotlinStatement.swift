@@ -13,7 +13,7 @@ class KotlinStatement: KotlinSyntaxNode {
         self.type = type
         self.extras = statement.extras
         super.init(nodeName: String(describing: type), sourceFile: statement.sourceFile, sourceRange: statement.sourceRange)
-        self.derivationMessages = statement.derivationMessages
+        self.messages = statement.messages
     }
 
     final override func leadingTrivia(indentation: Indentation) -> String {
@@ -79,7 +79,7 @@ class KotlinExpressionStatement: KotlinStatement {
 class KotlinMessageStatement: KotlinStatement {
     init(message: Message) {
         super.init(type: .message)
-        self.derivationMessages = [message]
+        self.messages = [message]
     }
 
     init(statement: Statement) {

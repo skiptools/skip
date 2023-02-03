@@ -384,7 +384,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         kstatement.didSet = statement.didSet?.translate(translator: translator)
         kstatement.declaredType?.appendKotlinMessages(to: kstatement)
         if statement.isAsync {
-            kstatement.derivationMessages.append(.kotlinAsyncProperties(kstatement))
+            kstatement.messages.append(.kotlinAsyncProperties(kstatement))
         }
         return kstatement
     }

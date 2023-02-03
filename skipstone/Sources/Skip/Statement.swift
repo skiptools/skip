@@ -18,9 +18,9 @@ class Statement: SyntaxNode {
         return nil
     }
 
-    final override var messages: [Message] {
-        let messages: [Message] = extras?.suppressMessages == true ? [] : derivationMessages
-        return messages + children.flatMap { $0.messages }
+    final override var subtreeMessages: [Message] {
+        let messages: [Message] = extras?.suppressMessages == true ? [] : messages
+        return messages + children.flatMap { $0.subtreeMessages }
     }
 }
 
@@ -191,7 +191,7 @@ class ExpressionStatement: Statement {
 class MessageStatement: Statement {
     init(message: Message) {
         super.init(type: .message)
-        self.derivationMessages = [message]
+        self.messages = [message]
     }
 
     override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
@@ -211,7 +211,7 @@ class RawStatement: Statement {
         }
         super.init(type: .raw, syntax: syntax, sourceFile: syntaxTree?.source.file, sourceRange: range, extras: extras)
         if let message {
-            self.derivationMessages = [message]
+            self.messages = [message]
         }
     }
 
@@ -221,9 +221,9 @@ class RawStatement: Statement {
         let range = syntax.range(in: source)
         super.init(type: .raw, syntax: syntax, sourceFile: source.file, sourceRange: range, extras: extras)
         if let message {
-            self.derivationMessages = [message]
+            self.messages = [message]
         } else {
-            self.derivationMessages = [.unsupportedSyntax(syntax, source: source, sourceRange: range)]
+            self.messages = [.unsupportedSyntax(syntax, source: source, sourceRange: range)]
         }
     }
 

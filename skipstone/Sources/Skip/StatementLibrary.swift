@@ -108,7 +108,7 @@ class ExtensionDeclaration: TypeDeclaration {
         let modifiers = Modifiers.for(syntax: extensionDecl.modifiers)
         let members = StatementDecoder.decode(syntaxListContainer: extensionDecl.members, in: syntaxTree)
         let statement = ExtensionDeclaration(extends: extends, inherits: inherits, modifiers: modifiers, members: members, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
-        statement.derivationMessages = messages ?? []
+        statement.messages = messages ?? []
         return [statement]
     }
 }
@@ -149,7 +149,7 @@ class FunctionDeclaration: Statement {
             body = CodeBlock(statements: StatementDecoder.decode(syntaxListContainer: bodySyntax, in: syntaxTree))
         }
         let statement = FunctionDeclaration(name: name, returnType: returnType, parameters: parameters, isAsync: isAsync, isThrows: isThrows, modifiers: modifiers, body: body, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
-        statement.derivationMessages = messages
+        statement.messages = messages
         return [statement]
     }
 
@@ -252,7 +252,7 @@ class TypeDeclaration: Statement {
         let modifiers = Modifiers.for(syntax: classDecl.modifiers)
         let members = StatementDecoder.decode(syntaxListContainer: classDecl.members, in: syntaxTree)
         let statement = TypeDeclaration(type: .classDeclaration, name: name, inherits: inherits, modifiers: modifiers, members: members, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
-        statement.derivationMessages = messages ?? []
+        statement.messages = messages ?? []
         return statement
     }
 
@@ -262,7 +262,7 @@ class TypeDeclaration: Statement {
         let modifiers = Modifiers.for(syntax: structDecl.modifiers)
         let members = StatementDecoder.decode(syntaxListContainer: structDecl.members, in: syntaxTree)
         let statement = TypeDeclaration(type: .structDeclaration, name: name, inherits: inherits, modifiers: modifiers, members: members, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
-        statement.derivationMessages = messages ?? []
+        statement.messages = messages ?? []
         return statement
     }
 
@@ -272,7 +272,7 @@ class TypeDeclaration: Statement {
         let modifiers = Modifiers.for(syntax: protocolDecl.modifiers)
         let members = StatementDecoder.decode(syntaxListContainer: protocolDecl.members, in: syntaxTree)
         let statement = TypeDeclaration(type: .protocolDeclaration, name: name, inherits: inherits, modifiers: modifiers, members: members, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
-        statement.derivationMessages = messages ?? []
+        statement.messages = messages ?? []
         return statement
     }
 
@@ -282,7 +282,7 @@ class TypeDeclaration: Statement {
         let modifiers = Modifiers.for(syntax: enumDecl.modifiers)
         let members = StatementDecoder.decode(syntaxListContainer: enumDecl.members, in: syntaxTree)
         let statement = TypeDeclaration(type: .enumDeclaration, name: name, inherits: inherits, modifiers: modifiers, members: members, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
-        statement.derivationMessages = messages ?? []
+        statement.messages = messages ?? []
         return statement
     }
 
@@ -414,7 +414,7 @@ class VariableDeclaration: Statement {
         case .identifierPattern:
             let name = patternSyntax.as(IdentifierPatternSyntax.self)!.identifier.text
             let declaration = VariableDeclaration(name: name, declaredType: declaredType, isLet: isLet, isAsync: isAsync, isThrows: isThrows, modifiers: modifiers, value: value, getter: getter, setter: setter, willSet: willSet, didSet: didSet, syntax: Syntax(syntax), sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
-            declaration.derivationMessages = messages
+            declaration.messages = messages
             return declaration
         case .isTypePattern:
             throw Message.unsupportedSyntax(Syntax(patternSyntax), source: syntaxTree.source)

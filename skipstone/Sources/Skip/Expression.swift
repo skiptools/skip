@@ -70,7 +70,7 @@ class RawExpression: Expression {
         }
         super.init(type: .raw, syntax: syntax, sourceFile: syntaxTree?.source.file, sourceRange: range)
         if let message {
-            self.derivationMessages = [message]
+            self.messages = [message]
         }
     }
 
@@ -80,9 +80,9 @@ class RawExpression: Expression {
         let range = syntax.range(in: source)
         super.init(type: .raw, syntax: syntax, sourceFile: source.file, sourceRange: range)
         if let message {
-            self.derivationMessages = [message]
+            self.messages = [message]
         } else {
-            self.derivationMessages = [.unsupportedSyntax(syntax, source: source, sourceRange: range)]
+            self.messages = [.unsupportedSyntax(syntax, source: source, sourceRange: range)]
         }
     }
 

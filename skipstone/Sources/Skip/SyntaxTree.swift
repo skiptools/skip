@@ -29,7 +29,7 @@ public class SyntaxTree: PrettyPrintable {
     }
 
     public var messages: [Message] {
-        return statements.flatMap { $0.messages }
+        return statements.flatMap { $0.subtreeMessages }
     }
 }
 
