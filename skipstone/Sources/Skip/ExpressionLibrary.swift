@@ -4,9 +4,9 @@ import SwiftSyntax
 class BooleanLiteral: Expression {
     let literal: Bool
 
-    init(literal: Bool, syntax: Syntax? = nil, file: Source.File? = nil, range: Source.Range? = nil) {
+    init(literal: Bool, syntax: Syntax? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
         self.literal = literal
-        super.init(type: .booleanLiteral, syntax: syntax, file: file, range: range)
+        super.init(type: .booleanLiteral, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
     override class func decode(syntax: Syntax, in syntaxTree: SyntaxTree) -> Expression? {
@@ -14,7 +14,7 @@ class BooleanLiteral: Expression {
             return nil
         }
         let literal = booleanLiteralExpr.booleanLiteral.text == "true"
-        return BooleanLiteral(literal: literal, syntax: syntax, file: syntaxTree.source.file, range: syntax.range(in: syntaxTree.source))
+        return BooleanLiteral(literal: literal, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
     override var prettyPrintAttributes: [PrettyPrintTree] {
@@ -27,10 +27,10 @@ class NumericLiteral: Expression {
     let literal: String
     let isFloatingPoint: Bool
 
-    init(literal: String, isFloatingPoint: Bool, syntax: Syntax? = nil, file: Source.File? = nil, range: Source.Range? = nil) {
+    init(literal: String, isFloatingPoint: Bool, syntax: Syntax? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
         self.literal = literal
         self.isFloatingPoint = isFloatingPoint
-        super.init(type: .numericLiteral, syntax: syntax, file: file, range: range)
+        super.init(type: .numericLiteral, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
     override class func decode(syntax: Syntax, in syntaxTree: SyntaxTree) -> Expression? {
@@ -45,7 +45,7 @@ class NumericLiteral: Expression {
         } else {
             return nil
         }
-        return NumericLiteral(literal: literal, isFloatingPoint: isFloatingPoint, syntax: syntax, file: syntaxTree.source.file, range: syntax.range(in: syntaxTree.source))
+        return NumericLiteral(literal: literal, isFloatingPoint: isFloatingPoint, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
     override var prettyPrintAttributes: [PrettyPrintTree] {
@@ -58,10 +58,10 @@ class StringLiteral: Expression {
     let segments: [StringLiteralSegment<Expression>]
     let isMultiline: Bool
 
-    init(segments: [StringLiteralSegment<Expression>], isMultiline: Bool = false, syntax: Syntax? = nil, file: Source.File? = nil, range: Source.Range? = nil) {
+    init(segments: [StringLiteralSegment<Expression>], isMultiline: Bool = false, syntax: Syntax? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
         self.segments = segments
         self.isMultiline = isMultiline
-        super.init(type: .stringLiteral, syntax: syntax, file: file, range: range)
+        super.init(type: .stringLiteral, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
     override class func decode(syntax: Syntax, in syntaxTree: SyntaxTree) -> Expression? {
@@ -84,6 +84,6 @@ class StringLiteral: Expression {
                 segments.append(.expression(expression))
             }
         }
-        return StringLiteral(segments: segments, isMultiline: isMultiline, syntax: syntax, file: syntaxTree.source.file, range: syntax.range(in: syntaxTree.source))
+        return StringLiteral(segments: segments, isMultiline: isMultiline, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 }

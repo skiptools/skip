@@ -9,32 +9,36 @@ public struct Message: Error, CustomStringConvertible {
 
     public let severity: Severity
     public let message: String
-    public let file: Source.File?
-    public let range: Source.Range?
+    public let sourceFile: Source.File?
+    public let sourceRange: Source.Range?
 
-    init(severity: Severity, message: String, source: Source? = nil, range: Source.Range? = nil) {
+    init(severity: Severity, message: String, source: Source? = nil, sourceRange: Source.Range? = nil) {
         self.severity = severity
-        self.message = Self.messageWithSource(for: message, in: source, range: range)
-        self.file = source?.file
-        self.range = range
+        self.message = Self.messageWithSource(for: message, in: source, range: sourceRange)
+        self.sourceFile = source?.file
+        self.sourceRange = sourceRange
     }
 
-    init(severity: Severity, message: String, file: Source.File? = nil, range: Source.Range? = nil) {
+    init(severity: Severity, message: String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
         self.severity = severity
-        self.message = Self.messageWithSource(for: message, in: nil, range: range)
-        self.file = file
-        self.range = range
+        self.message = Self.messageWithSource(for: message, in: nil, range: sourceRange)
+        self.sourceFile = sourceFile
+        self.sourceRange = sourceRange
+    }
+
+    init(severity: Severity, message: String, sourceDerived: SourceDerived) {
+        self = Message(severity: severity, message: message, sourceFile: sourceDerived.sourceFile, sourceRange: sourceDerived.sourceRange)
     }
 
     public var description: String {
         let message = "\(severity == .error ? "error" : "warning"): \(message)"
-        guard let file else {
+        guard let sourceFile else {
             return message
         }
-        guard let range else {
-            return "\(file.path): \(message)"
+        guard let sourceRange else {
+            return "\(sourceFile.path): \(message)"
         }
-        return "\(file.path):\(range.start.line):\(range.start.column): \(message)"
+        return "\(sourceFile.path):\(sourceRange.start.line):\(sourceRange.start.column): \(message)"
     }
 
     private static func messageWithSource(for message: String, in source: Source?, range: Source.Range?) -> String {
@@ -64,19 +68,19 @@ public struct Message: Error, CustomStringConvertible {
 }
 
 extension Message {
-    static func unsupportedSyntax(syntax: Syntax, source: Source? = nil, range: Source.Range? = nil) -> Message {
-        var range = range
+    static func unsupportedSyntax(_ syntax: Syntax, source: Source? = nil, sourceRange: Source.Range? = nil) -> Message {
+        var range = sourceRange
         if range == nil, let source {
             range = syntax.range(in: source)
         }
-        return Message(severity: .error, message: "Skip does not support this Swift syntax [\(syntax.kind)]", source: source, range: range)
+        return Message(severity: .error, message: "Skip does not support this Swift syntax [\(syntax.kind)]", source: source, sourceRange: range)
     }
 
-    static func unsupportedTypeSignature(_ typeSyntax: TypeSyntax, source: Source? = nil, range: Source.Range? = nil) -> Message {
-        var range = range
+    static func unsupportedTypeSignature(_ typeSyntax: TypeSyntax, source: Source? = nil, sourceRange: Source.Range? = nil) -> Message {
+        var range = sourceRange
         if range == nil, let source {
             range = typeSyntax.range(in: source)
         }
-        return Message(severity: .error, message: "Skip does not support this Swift type syntax [\(typeSyntax)]", source: source, range: range)
+        return Message(severity: .error, message: "Skip does not support this Swift type syntax [\(typeSyntax.kind)]", source: source, sourceRange: range)
     }
 }

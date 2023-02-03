@@ -55,7 +55,7 @@ class KotlinClassDeclaration: KotlinStatement {
         super.init(type: .classDeclaration, statement: statement)
     }
 
-    override var children: [KotlinStatement] {
+    override var children: [KotlinSyntaxNode] {
         return members
     }
 
@@ -150,15 +150,15 @@ struct KotlinExtensionDeclaration {
         if !statement.inherits.isEmpty && translator.codebaseInfo != nil {
             let message: Message
             if declarationType == .protocolDeclaration {
-                message = .kotlinExtensionAddProtocolsToInterface(statement: statement)
+                message = .kotlinExtensionAddProtocolsToInterface(statement)
             } else {
-                message = .kotlinExtensionAddProtocolsToOutsideType(statement: statement)
+                message = .kotlinExtensionAddProtocolsToOutsideType(statement)
             }
             kotlinStatements.append(KotlinMessageStatement(message: message))
         }
         for member in statement.members.flatMap({ translator.translateStatement($0) }) {
             guard let memberDeclaration = member as? KotlinMemberDeclaration else {
-                kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionUnsupportedMember(statement: member)))
+                kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionUnsupportedMember(member)))
                 continue
             }
             memberDeclaration.extends = statement.extends
@@ -209,7 +209,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         super.init(type: .functionDeclaration, statement: statement)
     }
 
-    override var children: [KotlinStatement] {
+    override var children: [KotlinSyntaxNode] {
         return parameters.compactMap { $0.defaultValue } + (body?.statements ?? [])
     }
 
@@ -301,7 +301,7 @@ class KotlinInterfaceDeclaration: KotlinStatement {
         super.init(type: .interfaceDeclaration, statement: statement)
     }
 
-    override var children: [KotlinStatement] {
+    override var children: [KotlinSyntaxNode] {
         return members
     }
 
@@ -384,7 +384,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         kstatement.didSet = statement.didSet?.translate(translator: translator)
         kstatement.declaredType?.appendKotlinMessages(to: kstatement)
         if statement.isAsync {
-            kstatement.statementMessages.append(.kotlinAsyncProperties(statement: kstatement))
+            kstatement.derivationMessages.append(.kotlinAsyncProperties(kstatement))
         }
         return kstatement
     }
@@ -397,7 +397,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         super.init(type: .variableDeclaration, statement: statement)
     }
 
-    override var children: [KotlinStatement] {
+    override var children: [KotlinSyntaxNode] {
         var children: [KotlinStatement] = []
         if let value {
             children.append(value)

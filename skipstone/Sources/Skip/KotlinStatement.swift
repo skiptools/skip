@@ -1,49 +1,27 @@
 /// A node in the Kotlin syntax tree.
-///
-/// Kotlin statements are generally mutable, as we may modify the tree in order to generate the desired Kotlin output.
-class KotlinStatement: OutputNode {
+class KotlinStatement: KotlinSyntaxNode {
     let type: KotlinStatementType
-    let sourceFile: Source.File?
-    let sourceRange: Source.Range?
     let extras: StatementExtras?
 
     init(type: KotlinStatementType, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.type = type
-        self.sourceFile = sourceFile
-        self.sourceRange = sourceRange
         self.extras = extras
+        super.init(nodeName: String(describing: type), sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
     init(type: KotlinStatementType, statement: Statement) {
         self.type = type
-        self.sourceFile = statement.file
-        self.sourceRange = statement.range
         self.extras = statement.extras
-        self.statementMessages = statement.statementMessages
+        super.init(nodeName: String(describing: type), sourceFile: statement.sourceFile, sourceRange: statement.sourceRange)
+        self.derivationMessages = statement.derivationMessages
     }
 
-    var children: [KotlinStatement] {
-        return []
-    }
-
-    /// Any messages about this statement.
-    var statementMessages: [Message] = []
-
-    /// Recursive traversal of all messages from the tree rooted on this syntax statement.
-    final var messages: [Message] {
-        let messages: [Message] = extras?.suppressMessages == true ? [] : statementMessages
-        return messages + children.flatMap { $0.messages }
-    }
-
-    final func leadingTrivia(indentation: Indentation) -> String {
+    final override func leadingTrivia(indentation: Indentation) -> String {
         return extras?.leadingTrivia(indentation: indentation) ?? ""
     }
 
-    final func trailingTrivia(indentation: Indentation) -> String {
+    final override func trailingTrivia(indentation: Indentation) -> String {
         return extras?.trailingTrivia(indentation: indentation) ?? ""
-    }
-
-    func append(to output: OutputGenerator, indentation: Indentation) {
     }
 }
 
@@ -72,10 +50,36 @@ protocol KotlinMemberDeclaration: AnyObject {
     var isStatic: Bool { get }
 }
 
+class KotlinExpressionStatement: KotlinStatement {
+    var expression: KotlinExpression?
+
+    static func translate(statement: ExpressionStatement, translator: KotlinTranslator) -> KotlinExpressionStatement {
+        let kstatement = KotlinExpressionStatement(statement: statement)
+        if let expression = statement.expression {
+            kstatement.expression = translator.translateExpression(expression)
+        }
+        return kstatement
+    }
+
+    init(type: KotlinStatementType = .expression, statement: ExpressionStatement) {
+        super.init(type: type, statement: statement)
+    }
+
+    override var children: [KotlinSyntaxNode] {
+        return expression == nil ? [] : [expression!]
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        if let expression {
+            output.append(indentation).append(expression).append("\n")
+        }
+    }
+}
+
 class KotlinMessageStatement: KotlinStatement {
     init(message: Message) {
         super.init(type: .message)
-        self.statementMessages = [message]
+        self.derivationMessages = [message]
     }
 
     init(statement: Statement) {
@@ -93,27 +97,5 @@ class KotlinRawStatement: KotlinStatement {
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
         output.append(indentation).append(sourceCode).append("\n")
-    }
-}
-
-class KotlinExpressionStatement: KotlinStatement {
-    var expression: KotlinExpression?
-
-    static func translate(statement: ExpressionStatement, translator: KotlinTranslator) -> KotlinExpressionStatement {
-        let kstatement = KotlinExpressionStatement(statement: statement)
-        if let expression = statement.expression {
-            kstatement.expression = translator.translateExpression(expression)
-        }
-        return kstatement
-    }
-
-    init(type: KotlinStatementType = .expression, statement: ExpressionStatement) {
-        super.init(type: type, statement: statement)
-    }
-
-    override func append(to output: OutputGenerator, indentation: Indentation) {
-        if let expression {
-            output.append(indentation).append(expression).append("\n")
-        }
     }
 }

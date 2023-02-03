@@ -15,7 +15,7 @@ public class SyntaxTree: PrettyPrintable {
         self.statements = StatementDecoder.decode(syntaxListContainer: syntax, in: self)
 
         // Resolve statements breadth first so that a child can use information from its parent's siblings
-        var resolveQueue = statements
+        var resolveQueue: [SyntaxNode] = statements
         while !resolveQueue.isEmpty {
             let statement = resolveQueue.removeFirst()
             statement.resolve()
@@ -32,3 +32,4 @@ public class SyntaxTree: PrettyPrintable {
         return statements.flatMap { $0.messages }
     }
 }
+

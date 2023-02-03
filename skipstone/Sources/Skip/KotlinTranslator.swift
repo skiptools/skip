@@ -55,7 +55,7 @@ public class KotlinTranslator {
             break
         case .ifDefined:
             // Inline the #if content
-            return statement.children.flatMap { translateStatement($0) }
+            return (statement as! IfDefined).statements.flatMap { translateStatement($0) }
         case .return:
             return [KotlinReturn.translate(statement: statement as! Return, translator: self)]
         case .switch:
@@ -92,12 +92,12 @@ public class KotlinTranslator {
 
         // Fall back to a raw translation and associated warning
         if let syntax = statement.syntax {
-            let message = Message.kotlinUntranslatable(statement: statement)
+            let message = Message.kotlinUntranslatable(statement)
             let rawStatement = RawStatement(syntax: syntax, message: message, extras: statement.extras, in: syntaxTree)
             let krawStatement = KotlinRawStatement(statement: rawStatement)
             return [krawStatement]
         }
-        return [KotlinMessageStatement(message: .kotlinUntranslatable(statement: statement))]
+        return [KotlinMessageStatement(message: .kotlinUntranslatable(statement))]
     }
 
     func translateExpression(_ expression: Expression) -> KotlinExpression {

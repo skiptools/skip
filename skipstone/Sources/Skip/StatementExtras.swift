@@ -140,7 +140,7 @@ struct StatementExtras {
                 replace = true
                 statements.append(RawStatement(sourceCode: string, syntax: syntax, extras: extras, in: syntaxTree))
             case .invalid(let string):
-                let message = Message(severity: .warning, message: "Unrecognized SKIP comment: \(string)", source: syntaxTree.source, range: syntax.range(in: syntaxTree.source))
+                let message = Message(severity: .warning, message: "Unrecognized SKIP comment: \(string)", source: syntaxTree.source, sourceRange: syntax.range(in: syntaxTree.source))
                 statements.append(MessageStatement(message: message))
             default:
                 break

@@ -254,7 +254,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
             if qualifiedName != nil {
                 return self
             }
-            return .base(name, StatementDecoder.qualifyReferencedTypeName(name, in: statement), generics.map { $0.qualified(in: statement) })
+            return .base(name, statement.qualifyReferencedTypeName(name), generics.map { $0.qualified(in: statement) })
         case .classRestricted:
             return self
         case .composition(let types):

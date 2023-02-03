@@ -1,22 +1,14 @@
 import SwiftSyntax
 
 /// A statement in the Swift syntax tree.
-///
-/// Statements are generally immutable after `resolve` is called with the parent statement set, allowing each statement to finalize
-/// itself with any contextual information.
-class Statement: PrettyPrintable {
+class Statement: SyntaxNode {
     let type: StatementType
-    let syntax: Syntax?
-    let file: Source.File?
-    let range: Source.Range?
     let extras: StatementExtras?
 
-    init(type: StatementType, syntax: Syntax? = nil, file: Source.File? = nil, range: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(type: StatementType, syntax: Syntax? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.type = type
-        self.syntax = syntax
-        self.file = file
-        self.range = range
         self.extras = extras
+        super.init(nodeName: String(describing: type), syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
     /// Attempt to construct statements of this type from the given syntax.
@@ -26,44 +18,9 @@ class Statement: PrettyPrintable {
         return nil
     }
 
-    weak var parent: Statement? = nil
-    var children: [Statement] {
-        return []
-    }
-
-    /// Resolve any information that relies on our parent statement being set.
-    func resolve() {
-    }
-
-    /// Pretty print child trees for this statement's attributes, excluding `children`.
-    var prettyPrintAttributes: [PrettyPrintTree] {
-        return []
-    }
-
-    /// Pretty-printable tree rooted on this syntax statement.
-    final var prettyPrintTree: PrettyPrintTree {
-        return PrettyPrintTree(root: String(describing: type), children: prettyPrintAttributes + children.map { $0.prettyPrintTree })
-    }
-
-    /// Any message about this statement.
-    var statementMessages: [Message] = []
-
-    /// Recursive traversal of all messages from the tree rooted on this syntax statement.
-    final var messages: [Message] {
-        let messages: [Message] = extras?.suppressMessages == true ? [] : statementMessages
+    final override var messages: [Message] {
+        let messages: [Message] = extras?.suppressMessages == true ? [] : derivationMessages
         return messages + children.flatMap { $0.messages }
-    }
-
-    /// Find the nearest type declaration by traversing up the statement tree.
-    final var owningTypeDeclaration: TypeDeclaration? {
-        var current: Statement? = self
-        while current != nil {
-            if let typeDeclaration = current as? TypeDeclaration {
-                return typeDeclaration
-            }
-            current = current?.parent
-        }
-        return nil
     }
 }
 
@@ -77,7 +34,6 @@ enum StatementType: CaseIterable {
     case `defer`
     case `do`
     case error
-    case expression
     case `for`
     case `if`
     case ifDefined
@@ -97,6 +53,8 @@ enum StatementType: CaseIterable {
     case typealiasDeclaration
     case variableDeclaration
 
+    /// A statement hosting an `Expression`.
+    case expression
     /// A statement representing raw Swift code.
     case raw
     /// A statement that only exists to add a message to the syntax tree.
@@ -121,8 +79,6 @@ enum StatementType: CaseIterable {
             return nil
         case .error:
             return nil
-        case .expression:
-            return ExpressionStatement.self
         case .for:
             return nil
         case .if:
@@ -159,10 +115,12 @@ enum StatementType: CaseIterable {
         case .variableDeclaration:
             return VariableDeclaration.self
 
-        case .raw:
-            return RawStatement.self
+        case .expression:
+            return ExpressionStatement.self
         case .message:
             return MessageStatement.self
+        case .raw:
+            return RawStatement.self
         }
     }
 }
@@ -204,33 +162,28 @@ struct StatementDecoder {
     static func decode<List: SyntaxList>(syntaxList: List, in syntaxTree: SyntaxTree) -> [Statement] {
         return syntaxList.flatMap { decode(syntax: $0.content, in: syntaxTree) }
     }
+}
 
-    /// Traverse up the statement tree to fully qualify a type name used in a statement.
-    static func qualifyReferencedTypeName(_ typeName: String, in statement: Statement?) -> String {
-        // Look for a qualified name whose last token(s) are the given type name
-        let suffix = ".\(typeName)"
-        var current = statement
-        while current != nil {
-            // Find the next declared type up the statement chain
-            guard let owningType = current?.owningTypeDeclaration else {
-                break
-            }
-            // Look for any direct child of that type with a matching qualified name
-            if let referencedType = owningType.children.first(where: { ($0 as? TypeDeclaration)?.qualifiedName.hasSuffix(suffix) == true }) {
-                return (referencedType as! TypeDeclaration).qualifiedName
-            }
-            // Move up to the next owning type and repeat
-            current = owningType.parent
-        }
-        return typeName
+/// A general statement hosting an `Expression`.
+///
+/// - Seealso: ``Expression``
+class ExpressionStatement: Statement {
+    let expression: Expression?
+
+    init(type: StatementType = .expression, expression: Expression? = nil, syntax: Syntax? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.expression = expression
+        super.init(type: type, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
-    /// Traverse up the statement tree to fully qualify a type name declared by a class, struct, etc.
-    static func qualifyDeclaredTypeName(_ typeName: String, declaration: Statement) -> String {
-        if let typeDeclaration = declaration.parent?.owningTypeDeclaration {
-            return "\(typeDeclaration.qualifiedName).\(typeName)"
+    override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+        guard let expression = ExpressionDecoder.decode(syntax: syntax, in: syntaxTree) else {
+            return nil
         }
-        return typeName
+        return [ExpressionStatement(expression: expression, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
+    }
+
+    override var children: [SyntaxNode] {
+        return expression == nil ? [] : [expression!]
     }
 }
 
@@ -238,7 +191,7 @@ struct StatementDecoder {
 class MessageStatement: Statement {
     init(message: Message) {
         super.init(type: .message)
-        self.statementMessages = [message]
+        self.derivationMessages = [message]
     }
 
     override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
@@ -250,15 +203,15 @@ class MessageStatement: Statement {
 class RawStatement: Statement {
     let sourceCode: String
 
-    init(sourceCode: String, message: Message? = nil, syntax: Syntax? = nil, extras: StatementExtras? = nil, in syntaxTree: SyntaxTree? = nil) {
+    init(sourceCode: String, syntax: Syntax? = nil, message: Message? = nil, extras: StatementExtras? = nil, in syntaxTree: SyntaxTree? = nil) {
         self.sourceCode = sourceCode
         var range: Source.Range? = nil
         if let source = syntaxTree?.source {
             range = syntax?.range(in: source)
         }
-        super.init(type: .raw, syntax: syntax, file: syntaxTree?.source.file, range: range, extras: extras)
+        super.init(type: .raw, syntax: syntax, sourceFile: syntaxTree?.source.file, sourceRange: range, extras: extras)
         if let message {
-            self.statementMessages = [message]
+            self.derivationMessages = [message]
         }
     }
 
@@ -266,11 +219,11 @@ class RawStatement: Statement {
         self.sourceCode = syntax.sourceCode(in: syntaxTree.source)
         let source = syntaxTree.source
         let range = syntax.range(in: source)
-        super.init(type: .raw, syntax: syntax, file: source.file, range: range, extras: extras)
+        super.init(type: .raw, syntax: syntax, sourceFile: source.file, sourceRange: range, extras: extras)
         if let message {
-            self.statementMessages = [message]
+            self.derivationMessages = [message]
         } else {
-            self.statementMessages = [.unsupportedSyntax(syntax: syntax, source: source, range: range)]
+            self.derivationMessages = [.unsupportedSyntax(syntax, source: source, sourceRange: range)]
         }
     }
 
@@ -280,48 +233,5 @@ class RawStatement: Statement {
 
     override var prettyPrintAttributes: [PrettyPrintTree] {
         return [PrettyPrintTree(root: sourceCode)]
-    }
-}
-
-/// A general statement hosting an `Expression`.
-///
-/// - Seealso: ``Expression``
-class ExpressionStatement: Statement {
-    let expression: Expression?
-
-    init(type: StatementType = .expression, expression: Expression? = nil, syntax: Syntax? = nil, file: Source.File? = nil, range: Source.Range? = nil, extras: StatementExtras? = nil) {
-        self.expression = expression
-        super.init(type: type, syntax: syntax, file: file, range: range, extras: extras)
-    }
-
-    override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
-        guard let expression = ExpressionDecoder.decode(syntax: syntax, in: syntaxTree) else {
-            return nil
-        }
-        return [ExpressionStatement(expression: expression, syntax: syntax, file: syntaxTree.source.file, range: syntax.range(in: syntaxTree.source), extras: extras)]
-    }
-
-    override func resolve() {
-        guard let expression else {
-            return
-        }
-
-        // Resolve expressions breadth first so that a child can use information from its parent's siblings
-        var resolveQueue = [expression]
-        while !resolveQueue.isEmpty {
-            let expression = resolveQueue.removeFirst()
-            expression.statement = self
-            expression.resolve()
-            expression.children.forEach { $0.parent = expression }
-            resolveQueue += expression.children
-        }
-        statementMessages += expression.messages
-    }
-
-    override var prettyPrintAttributes: [PrettyPrintTree] {
-        guard let expression else {
-            return []
-        }
-        return [expression.prettyPrintTree]
     }
 }

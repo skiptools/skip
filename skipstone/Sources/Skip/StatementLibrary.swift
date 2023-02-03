@@ -5,10 +5,10 @@ class IfDefined: Statement {
     let symbol: String
     let statements: [Statement]
 
-    init(symbol: String, statements: [Statement] = [], syntax: Syntax? = nil, file: Source.File? = nil, range: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(symbol: String, statements: [Statement] = [], syntax: Syntax? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.symbol = symbol
         self.statements = statements
-        super.init(type: .ifDefined, syntax: syntax, file: file, range: range, extras: extras)
+        super.init(type: .ifDefined, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
     override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
@@ -31,7 +31,7 @@ class IfDefined: Statement {
 
         let resolvedSymbol = symbol ?? ifConfigDecl.clauses.first?.condition?.description ?? ""
         let statements = try extractStatements(from: clause, in: syntaxTree)
-        let statement = IfDefined(symbol: resolvedSymbol, statements: statements, syntax: syntax, file: syntaxTree.source.file, range: syntax.range(in: syntaxTree.source), extras: extras)
+        let statement = IfDefined(symbol: resolvedSymbol, statements: statements, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
         return [statement]
     }
 
@@ -47,13 +47,13 @@ class IfDefined: Statement {
         case .decls(let syntax):
             return StatementDecoder.decode(syntaxList: syntax, in: syntaxTree)
         case .postfixExpression(let syntax):
-            throw Message.unsupportedSyntax(syntax: Syntax(syntax), source: syntaxTree.source)
+            throw Message.unsupportedSyntax(Syntax(syntax), source: syntaxTree.source)
         case .attributes(let syntax):
-            throw Message.unsupportedSyntax(syntax: Syntax(syntax), source: syntaxTree.source)
+            throw Message.unsupportedSyntax(Syntax(syntax), source: syntaxTree.source)
         }
     }
 
-    override var children: [Statement] {
+    override var children: [SyntaxNode] {
         return statements
     }
 
@@ -63,8 +63,8 @@ class IfDefined: Statement {
 }
 
 class Return: ExpressionStatement {
-    init(expression: Expression? = nil, syntax: Syntax? = nil, file: Source.File? = nil, range: Source.Range? = nil, extras: StatementExtras? = nil) {
-        super.init(type: .return, expression: expression, syntax: syntax, file: file, range: range, extras: extras)
+    init(expression: Expression? = nil, syntax: Syntax? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        super.init(type: .return, expression: expression, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
     override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
@@ -76,10 +76,10 @@ class Return: ExpressionStatement {
         if let expressionSyntax = returnStmnt.expression {
             expression = ExpressionDecoder.decode(syntax: Syntax(expressionSyntax), in: syntaxTree)
             if expression == nil {
-                throw Message.unsupportedSyntax(syntax: Syntax(expressionSyntax), source: syntaxTree.source)
+                throw Message.unsupportedSyntax(Syntax(expressionSyntax), source: syntaxTree.source)
             }
         }
-        let statement = Return(expression: expression, syntax: syntax, file: syntaxTree.source.file, range: syntax.range(in: syntaxTree.source), extras: extras)
+        let statement = Return(expression: expression, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
         return [statement]
     }
 
@@ -95,9 +95,9 @@ class Return: ExpressionStatement {
 class ExtensionDeclaration: TypeDeclaration {
     let extends: TypeSignature
 
-    init(extends: TypeSignature, inherits: [TypeSignature] = [], modifiers: Modifiers? = nil, members: [Statement] = [], syntax: Syntax? = nil, file: Source.File? = nil, range: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(extends: TypeSignature, inherits: [TypeSignature] = [], modifiers: Modifiers? = nil, members: [Statement] = [], syntax: Syntax? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.extends = extends
-        super.init(type: .extensionDeclaration, name: extends.description, qualifiedName: extends.description, inherits: inherits, modifiers: modifiers, members: members, syntax: syntax, file: file, range: range, extras: extras)
+        super.init(type: .extensionDeclaration, name: extends.description, qualifiedName: extends.description, inherits: inherits, modifiers: modifiers, members: members, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
     override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
@@ -107,8 +107,8 @@ class ExtensionDeclaration: TypeDeclaration {
         let (inherits, messages) = extensionDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], nil)
         let modifiers = Modifiers.for(syntax: extensionDecl.modifiers)
         let members = StatementDecoder.decode(syntaxListContainer: extensionDecl.members, in: syntaxTree)
-        let statement = ExtensionDeclaration(extends: extends, inherits: inherits, modifiers: modifiers, members: members, syntax: syntax, file: syntaxTree.source.file, range: syntax.range(in: syntaxTree.source), extras: extras)
-        statement.statementMessages = messages ?? []
+        let statement = ExtensionDeclaration(extends: extends, inherits: inherits, modifiers: modifiers, members: members, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
+        statement.derivationMessages = messages ?? []
         return [statement]
     }
 }
@@ -124,7 +124,7 @@ class FunctionDeclaration: Statement {
     private(set) var modifiers: Modifiers
     let body: CodeBlock<Statement>?
 
-    init(name: String, returnType: TypeSignature?, parameters: [Parameter<Statement>], isAsync: Bool = false, isThrows: Bool = false, modifiers: Modifiers? = nil, body: CodeBlock<Statement>? = nil, syntax: Syntax? = nil, file: Source.File? = nil, range: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(name: String, returnType: TypeSignature?, parameters: [Parameter<Statement>], isAsync: Bool = false, isThrows: Bool = false, modifiers: Modifiers? = nil, body: CodeBlock<Statement>? = nil, syntax: Syntax? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.name = name
         self.returnType = returnType
         self.parameters = parameters
@@ -132,7 +132,7 @@ class FunctionDeclaration: Statement {
         self.isThrows = isThrows
         self.modifiers = modifiers ?? Modifiers()
         self.body = body
-        super.init(type: .functionDeclaration, syntax: syntax, file: file, range: range, extras: extras)
+        super.init(type: .functionDeclaration, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
     override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
@@ -148,8 +148,8 @@ class FunctionDeclaration: Statement {
         if let bodySyntax = functionDecl.body {
             body = CodeBlock(statements: StatementDecoder.decode(syntaxListContainer: bodySyntax, in: syntaxTree))
         }
-        let statement = FunctionDeclaration(name: name, returnType: returnType, parameters: parameters, isAsync: isAsync, isThrows: isThrows, modifiers: modifiers, body: body, syntax: syntax, file: syntaxTree.source.file, range: syntax.range(in: syntaxTree.source), extras: extras)
-        statement.statementMessages = messages
+        let statement = FunctionDeclaration(name: name, returnType: returnType, parameters: parameters, isAsync: isAsync, isThrows: isThrows, modifiers: modifiers, body: body, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
+        statement.derivationMessages = messages
         return [statement]
     }
 
@@ -164,7 +164,7 @@ class FunctionDeclaration: Statement {
         }
     }
 
-    override var children: [Statement] {
+    override var children: [SyntaxNode] {
         return parameters.compactMap { $0.defaultValue } + (body?.statements ?? [])
     }
 
@@ -193,9 +193,9 @@ class FunctionDeclaration: Statement {
 class ImportDeclaration: Statement {
     let modulePath: [String]
 
-    init(modulePath: [String], syntax: Syntax? = nil, file: Source.File? = nil, range: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(modulePath: [String], syntax: Syntax? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.modulePath = modulePath
-        super.init(type: .importDeclaration, syntax: syntax, file: file, range: range, extras: extras)
+        super.init(type: .importDeclaration, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
     override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
@@ -203,7 +203,7 @@ class ImportDeclaration: Statement {
             return nil
         }
         let modulePath = importDecl.path.map { $0.name.text }
-        let statement = ImportDeclaration(modulePath: modulePath, syntax: syntax, file: syntaxTree.source.file, range: syntax.range(in: syntaxTree.source), extras: extras)
+        let statement = ImportDeclaration(modulePath: modulePath, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
         return [statement]
     }
 
@@ -224,13 +224,13 @@ class TypeDeclaration: Statement {
     }
     private var _qualifiedName: String?
 
-    init(type: StatementType, name: String, qualifiedName: String? = nil, inherits: [TypeSignature] = [], modifiers: Modifiers? = nil, members: [Statement] = [], syntax: Syntax? = nil, file: Source.File? = nil, range: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(type: StatementType, name: String, qualifiedName: String? = nil, inherits: [TypeSignature] = [], modifiers: Modifiers? = nil, members: [Statement] = [], syntax: Syntax? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.name = name
         _qualifiedName = qualifiedName
         self.inherits = inherits
         self.modifiers = modifiers ?? Modifiers()
         self.members = members
-        super.init(type: type, syntax: syntax, file: file, range: range, extras: extras)
+        super.init(type: type, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
     override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
@@ -251,8 +251,8 @@ class TypeDeclaration: Statement {
         let (inherits, messages) = classDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], nil)
         let modifiers = Modifiers.for(syntax: classDecl.modifiers)
         let members = StatementDecoder.decode(syntaxListContainer: classDecl.members, in: syntaxTree)
-        let statement = TypeDeclaration(type: .classDeclaration, name: name, inherits: inherits, modifiers: modifiers, members: members, syntax: syntax, file: syntaxTree.source.file, range: syntax.range(in: syntaxTree.source), extras: extras)
-        statement.statementMessages = messages ?? []
+        let statement = TypeDeclaration(type: .classDeclaration, name: name, inherits: inherits, modifiers: modifiers, members: members, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
+        statement.derivationMessages = messages ?? []
         return statement
     }
 
@@ -261,8 +261,8 @@ class TypeDeclaration: Statement {
         let (inherits, messages) = structDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], nil)
         let modifiers = Modifiers.for(syntax: structDecl.modifiers)
         let members = StatementDecoder.decode(syntaxListContainer: structDecl.members, in: syntaxTree)
-        let statement = TypeDeclaration(type: .structDeclaration, name: name, inherits: inherits, modifiers: modifiers, members: members, syntax: syntax, file: syntaxTree.source.file, range: syntax.range(in: syntaxTree.source), extras: extras)
-        statement.statementMessages = messages ?? []
+        let statement = TypeDeclaration(type: .structDeclaration, name: name, inherits: inherits, modifiers: modifiers, members: members, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
+        statement.derivationMessages = messages ?? []
         return statement
     }
 
@@ -271,8 +271,8 @@ class TypeDeclaration: Statement {
         let (inherits, messages) = protocolDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], nil)
         let modifiers = Modifiers.for(syntax: protocolDecl.modifiers)
         let members = StatementDecoder.decode(syntaxListContainer: protocolDecl.members, in: syntaxTree)
-        let statement = TypeDeclaration(type: .protocolDeclaration, name: name, inherits: inherits, modifiers: modifiers, members: members, syntax: syntax, file: syntaxTree.source.file, range: syntax.range(in: syntaxTree.source), extras: extras)
-        statement.statementMessages = messages ?? []
+        let statement = TypeDeclaration(type: .protocolDeclaration, name: name, inherits: inherits, modifiers: modifiers, members: members, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
+        statement.derivationMessages = messages ?? []
         return statement
     }
 
@@ -281,19 +281,19 @@ class TypeDeclaration: Statement {
         let (inherits, messages) = enumDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], nil)
         let modifiers = Modifiers.for(syntax: enumDecl.modifiers)
         let members = StatementDecoder.decode(syntaxListContainer: enumDecl.members, in: syntaxTree)
-        let statement = TypeDeclaration(type: .enumDeclaration, name: name, inherits: inherits, modifiers: modifiers, members: members, syntax: syntax, file: syntaxTree.source.file, range: syntax.range(in: syntaxTree.source), extras: extras)
-        statement.statementMessages = messages ?? []
+        let statement = TypeDeclaration(type: .enumDeclaration, name: name, inherits: inherits, modifiers: modifiers, members: members, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
+        statement.derivationMessages = messages ?? []
         return statement
     }
 
     override func resolve() {
         if _qualifiedName == nil {
-            _qualifiedName = StatementDecoder.qualifyDeclaredTypeName(name, declaration: self)
+            _qualifiedName = qualifyDeclaredTypeName(name)
         }
         inherits = inherits.map { $0.qualified(in: self) }
     }
 
-    override var children: [Statement] {
+    override var children: [SyntaxNode] {
         return members
     }
 
@@ -324,7 +324,7 @@ class VariableDeclaration: Statement {
     let willSet: Accessor<Statement>?
     let didSet: Accessor<Statement>?
 
-    init(name: String, declaredType: TypeSignature?, isLet: Bool = false, isAsync: Bool = false, isThrows: Bool = false, modifiers: Modifiers? = nil, value: Statement?, getter: Accessor<Statement>? = nil, setter: Accessor<Statement>? = nil, willSet: Accessor<Statement>? = nil, didSet: Accessor<Statement>? = nil, syntax: Syntax? = nil, file: Source.File? = nil, range: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(name: String, declaredType: TypeSignature?, isLet: Bool = false, isAsync: Bool = false, isThrows: Bool = false, modifiers: Modifiers? = nil, value: Statement?, getter: Accessor<Statement>? = nil, setter: Accessor<Statement>? = nil, willSet: Accessor<Statement>? = nil, didSet: Accessor<Statement>? = nil, syntax: Syntax? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.name = name
         self.declaredType = declaredType
         self.isLet = isLet
@@ -336,7 +336,7 @@ class VariableDeclaration: Statement {
         self.setter = setter
         self.willSet = willSet
         self.didSet = didSet
-        super.init(type: .variableDeclaration, syntax: syntax, file: file, range: range, extras: extras)
+        super.init(type: .variableDeclaration, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
     override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
@@ -398,7 +398,7 @@ class VariableDeclaration: Statement {
                     case "didSet":
                         didSet = Accessor(statements: statements)
                     default:
-                        messages.append(.unsupportedSyntax(syntax: Syntax(accessor), source: syntaxTree.source, range: syntax.range(in: syntaxTree.source)))
+                        messages.append(.unsupportedSyntax(Syntax(accessor), source: syntaxTree.source, sourceRange: syntax.range(in: syntaxTree.source)))
                     }
                 }
             case .getter(let codeBlockSyntax):
@@ -410,24 +410,24 @@ class VariableDeclaration: Statement {
         let patternSyntax = syntax.pattern
         switch patternSyntax.kind {
         case .expressionPattern:
-            throw Message.unsupportedSyntax(syntax: Syntax(patternSyntax), source: syntaxTree.source)
+            throw Message.unsupportedSyntax(Syntax(patternSyntax), source: syntaxTree.source)
         case .identifierPattern:
             let name = patternSyntax.as(IdentifierPatternSyntax.self)!.identifier.text
-            let declaration = VariableDeclaration(name: name, declaredType: declaredType, isLet: isLet, isAsync: isAsync, isThrows: isThrows, modifiers: modifiers, value: value, getter: getter, setter: setter, willSet: willSet, didSet: didSet, syntax: Syntax(syntax), file: syntaxTree.source.file, range: syntax.range(in: syntaxTree.source), extras: extras)
-            declaration.statementMessages = messages
+            let declaration = VariableDeclaration(name: name, declaredType: declaredType, isLet: isLet, isAsync: isAsync, isThrows: isThrows, modifiers: modifiers, value: value, getter: getter, setter: setter, willSet: willSet, didSet: didSet, syntax: Syntax(syntax), sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
+            declaration.derivationMessages = messages
             return declaration
         case .isTypePattern:
-            throw Message.unsupportedSyntax(syntax: Syntax(patternSyntax), source: syntaxTree.source)
+            throw Message.unsupportedSyntax(Syntax(patternSyntax), source: syntaxTree.source)
         case .missingPattern:
-            throw Message.unsupportedSyntax(syntax: Syntax(patternSyntax), source: syntaxTree.source)
+            throw Message.unsupportedSyntax(Syntax(patternSyntax), source: syntaxTree.source)
         case .tuplePattern:
-            throw Message.unsupportedSyntax(syntax: Syntax(patternSyntax), source: syntaxTree.source)
+            throw Message.unsupportedSyntax(Syntax(patternSyntax), source: syntaxTree.source)
         case .valueBindingPattern:
-            throw Message.unsupportedSyntax(syntax: Syntax(patternSyntax), source: syntaxTree.source)
+            throw Message.unsupportedSyntax(Syntax(patternSyntax), source: syntaxTree.source)
         case .wildcardPattern:
-            throw Message.unsupportedSyntax(syntax: Syntax(patternSyntax), source: syntaxTree.source)
+            throw Message.unsupportedSyntax(Syntax(patternSyntax), source: syntaxTree.source)
         default:
-            throw Message.unsupportedSyntax(syntax: Syntax(patternSyntax), source: syntaxTree.source)
+            throw Message.unsupportedSyntax(Syntax(patternSyntax), source: syntaxTree.source)
         }
     }
 
@@ -441,7 +441,7 @@ class VariableDeclaration: Statement {
         }
     }
 
-    override var children: [Statement] {
+    override var children: [SyntaxNode] {
         var children: [Statement] = []
         if let value {
             children.append(value)
