@@ -28,9 +28,17 @@ final class SwiftSymbolsTests: XCTestCase {
 
         let swiftURL = try tmpFile(named: "Source.swift", contents: swift)
         let symbolGraph = try await Process.buildSymbols(swift: swiftURL)
-        let graph = try XCTUnwrap(UnifiedSymbolGraph(fromSingleGraph: symbolGraph, at: swiftURL))
+
+        //let graph = try XCTUnwrap(UnifiedSymbolGraph(fromSingleGraph: symbolGraph, at: swiftURL))
         //graph.mergeGraph(graph: otherGraph, at: swiftURL2)
 
+        let collector = GraphCollector(extensionGraphAssociationStrategy: .extendingGraph)
+        collector.mergeSymbolGraph(symbolGraph, at: swiftURL)
+        // TODO: add more graphs for extensions, etc…
+        let (unifiedGraphs, graphSources) = collector.finishLoading()
+        XCTAssertEqual(["Source"], Array(graphSources.keys))
+        XCTAssertEqual(["Source"], Array(unifiedGraphs.keys))
+        let graph = try XCTUnwrap(unifiedGraphs["Source"])
         dump(graph)
 
         // symbols mapped by "precise identifier" (like "s:6Source9TopStructV3strSSSgvp")
@@ -157,6 +165,11 @@ extension Process {
     ///   - accessLevel: the default access level for the generated symbols
     /// - Returns: the parsed SymbolGraph that resulted from the compilation
     static func buildSymbols(swift swiftFileURL: URL, singlePass: Bool = false, sdk: String = "macosx", moduleName: String? = nil, accessLevel: String = "private") async throws -> SymbolGraph {
+        // symbolgraph-extract implementation:
+        // https://github.com/apple/swift-package-manager/blob/main/Sources/Commands/Utilities/SymbolGraphExtract.swift
+
+        // an alternative way to run this could be: `swift package dump-symbol-graph --minimum-access-level private`
+
         // another alternative could be to fork `swift build` against a Package.swift
         // https://www.swift.org/documentation/docc/documenting-a-swift-framework-or-package#Create-Documentation-for-a-Swift-Package
         // swift build --target DeckOfPlayingCards -Xswiftc -emit-symbol-graph -Xswiftc -emit-symbol-graph-dir -Xswiftc .build
@@ -167,21 +180,25 @@ extension Process {
         let moduleName = moduleName ?? urlBase.lastPathComponent // if the module name is not set, default to the last part of the URL
         let dir = urlBase.deletingLastPathComponent()
 
-        // get the correct sdk and target info, a la: swiftc -module-name Source -emit-module-path . Source.swift && swift symbolgraph-extract -output-dir . -target $(swiftc -print-target-info | jq -r .target.triple) -sdk $(xcrun --show-sdk-path --sdk macosx) -minimum-access-level internal -I . -module-name Source
+        // construct a command like: xcrun swift -frontend -target $(swiftc -print-target-info | jq -r .target.triple) -sdk $(xcrun --show-sdk-path --sdk macosx) -D DEBUG  -module-name Source -emit-module-path Source.swiftmodule Source.swift
 
-        let targetInfoData = try await xcrun("swiftc", "-print-target-info").stdout.readData() ?? Data()
+        // first get the correct sdk and target info, a la: swiftc -module-name Source -emit-module-path . Source.swift && swift symbolgraph-extract -output-dir . -target $(swiftc -print-target-info | jq -r .target.triple) -sdk $(xcrun --show-sdk-path --sdk macosx) -minimum-access-level internal -I . -module-name Source
+
+        // get the target info from the JSON emitted from `swift -print-target-info` (e.g., "arm64-apple-macosx13.0")
+        let targetInfoData = try await xcrun("swift", "-print-target-info").stdout.readData() ?? Data()
         let targetInfo = try JSONDecoder().decode(SwiftTarget.self, from: targetInfoData)
-        let sdKPath = try await xcrun("--show-sdk-path", "--sdk", sdk).stdout.readString()
 
-        // xcrun swift -frontend -target $(swiftc -print-target-info | jq -r .target.triple) -sdk $(xcrun --show-sdk-path --sdk macosx) -D DEBUG  -module-name Source -emit-module-path Source.swiftmodule Source.swift
+        // get the SDK path (e.g., for "xcrun --show-sdk-path --sdk macosx" it might return "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX13.1.sdk")
+        let sdKPath = try await xcrun("--show-sdk-path", "--sdk", sdk).stdout.readString()
 
         let modulePath = urlBase.appendingPathExtension("swiftmodule").path
 
         if singlePass {
-            try await xcrun("swiftc",
+            try await xcrun("swift",
+                            "-frontend",
+                            "-module-name", moduleName,
                             "-target", targetInfo.target.triple,
                             "-sdk", sdKPath,
-                            "-module-name", moduleName,
                             "-emit-module-path", modulePath,
                             "-emit-symbol-graph",
                             "-emit-symbol-graph-dir", dir.path,
@@ -193,7 +210,6 @@ extension Process {
                             "-module-name", moduleName,
                             "-target", targetInfo.target.triple,
                             "-sdk", sdKPath,
-                            //"-emit-module-path", dir.path, // different between `swiftc` and `swift -frontend`
                             "-emit-module-path", modulePath,
                             swiftFileURL.path)
             try await xcrun("swift",

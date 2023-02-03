@@ -11,6 +11,7 @@ let package = Package(
     ],
     products: [
         .library(name: "Skip", targets: ["Skip"]),
+        .library(name: "SkipPack", targets: ["SkipPack"]),
         .plugin(name: "Skippy", targets: ["Skippy"]),
     ],
     dependencies: [
@@ -23,6 +24,8 @@ let package = Package(
             .product(name: "SwiftSyntaxParser", package: "swift-syntax"),
             .product(name: "SymbolKit", package: "swift-docc-symbolkit"),
         ]),
+        .target(name: "SkipPack", dependencies: [
+        ]),
         .executableTarget(name: "SkipRunner", dependencies: [
             "Skip",
             .product(name: "SwiftSyntax", package: "swift-syntax"),
@@ -33,6 +36,7 @@ let package = Package(
                 capability: .command(intent: .custom(verb: "skip", description: "Run Skip transpiler")),
                 dependencies: ["SkipRunner"]),
         .testTarget(name: "SkipTests", dependencies: ["Skip"]),
+        .testTarget(name: "SkipPackTests", dependencies: ["SkipPack"]),
         .testTarget(name: "SkipRunnerTests", dependencies: [], plugins: ["Skippy"]),
     ]
 )
