@@ -68,16 +68,16 @@ The necessary gradle build files (`build.gradle.kts`, `settings.gradle.kts`, `gr
 
 Advantages of this layout:
 
-    1. It will be familiar to Swift/SPM developers 
-    1. It will be familiar to Kotlin/Gradle developers 
-    1. It will be simpler to implement multi-module packages
-    1. It could be easier to "separate" the two halves of the project if ever needed
+1. It will be familiar to Swift/SPM developers 
+1. It will be familiar to Kotlin/Gradle developers 
+1. It will be simpler to implement multi-module packages
+1. It could be easier to "separate" the two halves of the project if ever needed
     
 Disadvantages of this layout:
 
-    1. It is tricker to jump to the transpiled Kotlin when trying to debug the derived .kt for a given .swift
-    1. It creates an overall folder structure that is somewhat alien to everyone
-    1. What would the package name be? We probably need to retain the case of the original source Swift package (e.g., "CoreFoundation"), so that will always be un-idiomatic Java/Kotlin.
+1. It is tricker to jump to the transpiled Kotlin when trying to debug the derived .kt for a given .swift
+1. It creates an overall folder structure that is somewhat alien to everyone
+1. What would the package name be? We probably need to retain the case of the original source Swift package (e.g., "CoreFoundation"), so that will always be un-idiomatic Java/Kotlin.
 
 
 
@@ -127,15 +127,15 @@ transpiler is run).
 
 Advantages of this layout:
 
-    1. It will be very familiar to Swift developers
-    1. It doesn't introduce additional weird src/test/java/com/example… folders
-    1. It will be clear where to look to debug the derived Kotlin
-    1. It is a shallower and simpler folder structure, which makes it easier to understand
+1. It will be very familiar to Swift developers
+1. It doesn't introduce additional weird src/test/java/com/example… folders
+1. It will be clear where to look to debug the derived Kotlin
+1. It is a shallower and simpler folder structure, which makes it easier to understand
     
 Disadvantages of this layout:
 
-    1. It is unidiomatic for Kotlin/Gradle/Adroid conventions
-    1. It works OK for single-module builds, but multi-module would be uglier
+1. It is unidiomatic for Kotlin/Gradle/Adroid conventions
+1. It works OK for single-module builds, but multi-module would be uglier
 
 
 
