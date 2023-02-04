@@ -185,12 +185,12 @@ struct StatementExtras {
         }
         var joined = ""
         let indentationString = indentation.description
-        for entry in lines.enumerated() {
-            if entry.element == "\n" || entry.offset == 0 {
-                joined.append(entry.element)
+        for (index, string) in lines.enumerated() {
+            if string == "\n" || index == 0 {
+                joined.append(string)
             } else {
                 joined.append(indentationString)
-                joined.append(entry.element)
+                joined.append(string)
             }
         }
         return joined

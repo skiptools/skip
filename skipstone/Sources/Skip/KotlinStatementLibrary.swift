@@ -231,8 +231,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 }
             }
             output.append(name).append("(")
-            for entry in parameters.enumerated() {
-                let parameter = entry.element
+            for (index, parameter) in parameters.enumerated() {
                 let name = parameter.externalName.isEmpty ? parameter.internalName : parameter.externalName
                 output.append(name)
                 output.append(": ")
@@ -240,7 +239,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 if let defaultValue = parameter.defaultValue {
                     output.append(" = ").append(defaultValue, indentation: 0)
                 }
-                if entry.offset != parameters.count - 1 {
+                if index != parameters.count - 1 {
                     output.append(", ")
                 }
             }

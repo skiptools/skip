@@ -53,6 +53,10 @@ class NumericLiteral: Expression {
     }
 }
 
+class SequenceExpression: Expression {
+    
+}
+
 /// `"..."`
 class StringLiteral: Expression {
     let segments: [StringLiteralSegment<Expression>]
@@ -78,9 +82,7 @@ class StringLiteral: Expression {
                 guard let expressionSyntax = expressionSyntax.expressions.first?.expression else {
                     break
                 }
-                guard let expression = ExpressionDecoder.decode(syntax: Syntax(expressionSyntax), in: syntaxTree) else {
-                    return nil
-                }
+                let expression = ExpressionDecoder.decode(syntax: Syntax(expressionSyntax), in: syntaxTree)
                 segments.append(.expression(expression))
             }
         }

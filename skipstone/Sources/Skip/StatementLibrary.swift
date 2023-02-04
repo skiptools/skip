@@ -75,9 +75,6 @@ class Return: ExpressionStatement {
         var expression: Expression? = nil
         if let expressionSyntax = returnStmnt.expression {
             expression = ExpressionDecoder.decode(syntax: Syntax(expressionSyntax), in: syntaxTree)
-            if expression == nil {
-                throw Message.unsupportedSyntax(Syntax(expressionSyntax), source: syntaxTree.source)
-            }
         }
         let statement = Return(expression: expression, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
         return [statement]
@@ -347,9 +344,9 @@ class VariableDeclaration: Statement {
         let isLet = variableDecl.letOrVarKeyword.text == "let"
         let modifiers = Modifiers.for(syntax: variableDecl.modifiers)
         var statements: [Statement] = []
-        for entry in variableDecl.bindings.enumerated() {
-            let bindingExtras = entry.offset == 0 ? extras : nil
-            let statement = try decode(syntax: entry.element, isLet: isLet, modifiers: modifiers, extras: bindingExtras, in: syntaxTree)
+        for (index, syntax) in variableDecl.bindings.enumerated() {
+            let bindingExtras = index == 0 ? extras : nil
+            let statement = try decode(syntax: syntax, isLet: isLet, modifiers: modifiers, extras: bindingExtras, in: syntaxTree)
             statements.append(statement)
         }
         return statements

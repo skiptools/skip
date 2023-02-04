@@ -176,7 +176,7 @@ class ExpressionStatement: Statement {
     }
 
     override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
-        guard let expression = ExpressionDecoder.decode(syntax: syntax, in: syntaxTree) else {
+        guard let expression = ExpressionDecoder.decodeIfExpression(syntax: syntax, in: syntaxTree) else {
             return nil
         }
         return [ExpressionStatement(expression: expression, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]

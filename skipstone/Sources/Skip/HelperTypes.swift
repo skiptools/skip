@@ -11,6 +11,105 @@ struct Accessor<S> {
     var statements: [S]? // Nil if the accessor has no body, as in a protocol { get set }
 }
 
+/// Operator information.
+struct Operator: Equatable {
+    let symbol: String
+    let associativity: Associativity
+    let precedence: Int
+
+    /// Left associativity means `(a + b + c) == ((a + b) + c)`.
+    enum Associativity: Equatable {
+        case none
+        case left
+        case right
+    }
+
+    /// Whether this operator symbol is unrecognized.
+    var isUnknown: Bool {
+        return precedence == Self.unknownOperatorPrecedence
+    }
+
+    /// Return an operator for the given symbol.
+    static func with(symbol: String) -> Operator {
+        if let op = allBySymbol[symbol] {
+            return op
+        }
+        return Operator(symbol: symbol, associativity: unknownOperatorAssociativity, precedence: unknownOperatorPrecedence)
+    }
+
+    /// This information was obtained from https://developer.apple.com/documentation/swift/swift_standard_library/operator_declarations
+    private static let unknownOperatorPrecedence = 2
+    private static let unknownOperatorAssociativity: Associativity = .left
+    private static let all: [Operator] = [
+        Operator(symbol: "=", associativity: .right, precedence: 0),
+        Operator(symbol: "*=", associativity: .right, precedence: 0),
+        Operator(symbol: "/=", associativity: .right, precedence: 0),
+        Operator(symbol: "%=", associativity: .right, precedence: 0),
+        Operator(symbol: "+=", associativity: .right, precedence: 0),
+        Operator(symbol: "-=", associativity: .right, precedence: 0),
+        Operator(symbol: "<<=", associativity: .right, precedence: 0),
+        Operator(symbol: ">>=", associativity: .right, precedence: 0),
+        Operator(symbol: "&=", associativity: .right, precedence: 0),
+        Operator(symbol: "|=", associativity: .right, precedence: 0),
+        Operator(symbol: "^=", associativity: .right, precedence: 0),
+
+        Operator(symbol: "?:", associativity: .right, precedence: 1),
+
+        // Leave a gap here for unknownOperatorPrecedence
+
+        Operator(symbol: "||", associativity: .left, precedence: 3),
+
+        Operator(symbol: "&&", associativity: .left, precedence: 4),
+
+        Operator(symbol: "<", associativity: .none, precedence: 5),
+        Operator(symbol: "<=", associativity: .none, precedence: 5),
+        Operator(symbol: ">", associativity: .none, precedence: 5),
+        Operator(symbol: ">=", associativity: .none, precedence: 5),
+        Operator(symbol: "==", associativity: .none, precedence: 5),
+        Operator(symbol: "!=", associativity: .none, precedence: 5),
+        Operator(symbol: "===", associativity: .none, precedence: 5),
+        Operator(symbol: "~=", associativity: .none, precedence: 5),
+        Operator(symbol: ".==", associativity: .none, precedence: 5),
+        Operator(symbol: ".!=", associativity: .none, precedence: 5),
+        Operator(symbol: ".<", associativity: .none, precedence: 5),
+        Operator(symbol: ".<=", associativity: .none, precedence: 5),
+        Operator(symbol: ".>", associativity: .none, precedence: 5),
+        Operator(symbol: ".>=", associativity: .none, precedence: 5),
+
+        Operator(symbol: "??", associativity: .right, precedence: 6),
+
+        Operator(symbol: "is", associativity: .left, precedence: 7),
+        Operator(symbol: "as", associativity: .left, precedence: 7),
+        Operator(symbol: "as?", associativity: .left, precedence: 7),
+        Operator(symbol: "as!", associativity: .left, precedence: 7),
+
+        Operator(symbol: "..<", associativity: .none, precedence: 8),
+        Operator(symbol: "...", associativity: .none, precedence: 8),
+
+        Operator(symbol: "+", associativity: .left, precedence: 9),
+        Operator(symbol: "-", associativity: .left, precedence: 9),
+        Operator(symbol: "&+", associativity: .left, precedence: 9),
+        Operator(symbol: "&-", associativity: .left, precedence: 9),
+        Operator(symbol: "|", associativity: .left, precedence: 9),
+        Operator(symbol: "^", associativity: .left, precedence: 9),
+
+        Operator(symbol: "*", associativity: .left, precedence: 10),
+        Operator(symbol: "/", associativity: .left, precedence: 10),
+        Operator(symbol: "%", associativity: .left, precedence: 10),
+        Operator(symbol: "&*", associativity: .left, precedence: 10),
+        Operator(symbol: "&", associativity: .left, precedence: 10),
+
+        Operator(symbol: "<<", associativity: .none, precedence: 11),
+        Operator(symbol: ">>", associativity: .none, precedence: 11),
+    ]
+
+    private static let allBySymbol: [String: Operator] = {
+        return all.reduce(into: [String: Operator]()) { result, op in
+            result[op.symbol] = op
+        }
+    }()
+}
+
 /// A function parameter.
 struct Parameter<S>: Hashable {
     let externalName: String
