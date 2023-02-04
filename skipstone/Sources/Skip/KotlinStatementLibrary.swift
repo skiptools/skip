@@ -1,6 +1,6 @@
 class KotlinReturn: KotlinExpressionStatement {
     static func translate(statement: Return, translator: KotlinTranslator) -> KotlinExpressionStatement {
-        let kstatement = KotlinExpressionStatement(statement: statement)
+        let kstatement = KotlinReturn(statement: statement)
         if let expression = statement.expression {
             kstatement.expression = translator.translateExpression(expression)
         }

@@ -24,7 +24,9 @@ class KotlinExpression: KotlinSyntaxNode {
 
 /// Types of Kotlin expressions.
 enum KotlinExpressionType {
+    case binaryOperator
     case booleanLiteral
+    case identifier
     case numericLiteral
     case stringLiteral
 

@@ -1,3 +1,30 @@
+class KotlinBinaryOperator: KotlinExpression {
+    var op: Operator
+    var lhs: KotlinExpression
+    var rhs: KotlinExpression
+
+    static func translate(expression: BinaryOperator, translator: KotlinTranslator) -> KotlinBinaryOperator {
+        let klhs = translator.translateExpression(expression.lhs)
+        let krhs = translator.translateExpression(expression.rhs)
+        return KotlinBinaryOperator(expression: expression, lhs: klhs, rhs: krhs)
+    }
+
+    private init(expression: BinaryOperator, lhs: KotlinExpression, rhs: KotlinExpression) {
+        self.op = expression.op
+        self.lhs = lhs
+        self.rhs = rhs
+        super.init(type: .binaryOperator, expression: expression)
+    }
+
+    override var children: [KotlinSyntaxNode] {
+        return [lhs, rhs]
+    }
+
+    override func append(to output: OutputGenerator) {
+        output.append("(").append(lhs).append(" \(op.symbol) ").append(rhs).append(")")
+    }
+}
+
 class KotlinBooleanLiteral: KotlinExpression {
     var literal: Bool
 
@@ -8,6 +35,19 @@ class KotlinBooleanLiteral: KotlinExpression {
 
     override func append(to output: OutputGenerator) {
         output.append(String(describing: literal))
+    }
+}
+
+class KotlinIdentifier: KotlinExpression {
+    var name: String
+
+    init(expression: Identifier) {
+        self.name = expression.name
+        super.init(type: .identifier, expression: expression)
+    }
+
+    override func append(to output: OutputGenerator) {
+        output.append(name)
     }
 }
 

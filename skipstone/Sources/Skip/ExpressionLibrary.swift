@@ -1,5 +1,37 @@
 import SwiftSyntax
 
+/// `+, -, *, ...`
+class BinaryOperator: Expression {
+    let op: Operator
+    let lhs: Expression
+    let rhs: Expression
+
+    init(op: Operator, lhs: Expression, rhs: Expression, syntax: Syntax?, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        self.op = op
+        self.lhs = lhs
+        self.rhs = rhs
+        super.init(type: .binaryOperator, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    override class func decodeSequenceOperator(syntax: Syntax, sequence: Syntax, elements: [ExprSyntax], index: Int, in syntaxTree: SyntaxTree) throws -> Expression? {
+        guard syntax.kind == .binaryOperatorExpr, let binaryOperatorExpr = syntax.as(BinaryOperatorExprSyntax.self) else {
+            return nil
+        }
+        let op = Operator.with(symbol: binaryOperatorExpr.operatorToken.text)
+        let lhs = try ExpressionDecoder.decodeSequence(sequence: sequence, elements: Array(elements[..<index]), in: syntaxTree)
+        let rhs = try ExpressionDecoder.decodeSequence(sequence: sequence, elements: Array(elements[(index + 1)...]), in: syntaxTree)
+        return BinaryOperator(op: op, lhs: lhs, rhs: rhs, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+    }
+
+    override var children: [SyntaxNode] {
+        return [lhs, rhs]
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        return [PrettyPrintTree(root: op.symbol)]
+    }
+}
+
 /// `true, false`
 class BooleanLiteral: Expression {
     let literal: Bool
@@ -19,6 +51,28 @@ class BooleanLiteral: Expression {
 
     override var prettyPrintAttributes: [PrettyPrintTree] {
         return [PrettyPrintTree(root: String(describing: literal))]
+    }
+}
+
+/// `x`
+class Identifier: Expression {
+    let name: String
+
+    init(name: String, syntax: Syntax? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        self.name = name
+        super.init(type: .identifier, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    override class func decode(syntax: Syntax, in syntaxTree: SyntaxTree) throws -> Expression? {
+        guard syntax.kind == .identifierExpr, let identifierExpr = syntax.as(IdentifierExprSyntax.self) else {
+            return nil
+        }
+        let name = identifierExpr.identifier.text
+        return Identifier(name: name, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        return [PrettyPrintTree(root: name)]
     }
 }
 
@@ -51,10 +105,6 @@ class NumericLiteral: Expression {
     override var prettyPrintAttributes: [PrettyPrintTree] {
         return [PrettyPrintTree(root: literal)]
     }
-}
-
-class SequenceExpression: Expression {
-    
 }
 
 /// `"..."`

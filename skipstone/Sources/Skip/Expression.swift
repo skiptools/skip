@@ -27,7 +27,9 @@ class Expression: SyntaxNode {
 
 /// Supported Swift expression types.
 enum ExpressionType: CaseIterable {
+    case binaryOperator
     case booleanLiteral
+    case identifier
     case numericLiteral
     case stringLiteral
 
@@ -37,8 +39,12 @@ enum ExpressionType: CaseIterable {
     /// The Swift data type that represents this expression type.
     var representingType: Expression.Type? {
         switch self {
+        case .binaryOperator:
+            return BinaryOperator.self
         case .booleanLiteral:
             return BooleanLiteral.self
+        case .identifier:
+            return Identifier.self
         case .numericLiteral:
             return NumericLiteral.self
         case .stringLiteral:
