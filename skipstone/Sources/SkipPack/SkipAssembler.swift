@@ -219,6 +219,8 @@ public struct SkipAssembler {
                     for sourceURL in sources {
                         let destPath = URL(fileURLWithPath: sourceURL.relativePath, isDirectory: false, relativeTo: kotlinRoot)
                         logger.debug("copying: \(sourceURL.relativePath) to: \(destPath.path)")
+                        // try FileManager.default.copyItem(at: sourceURL, to: destPath)
+                        // only copy when the contents have changed, to avoid triggering unnecessary gradle rebuild
                         try write(String(contentsOf: sourceURL), to: destPath, ifChanged: true)
                     }
                 }
@@ -301,7 +303,10 @@ public struct SkipAssembler {
 
                     """ + kotlin
 
-                    kotlin += XCTestJunitConversions
+                    // only add the conversions to a single test case
+                    if kotlin.contains("SkipTranspilerTestCase") {
+                        kotlin += XCTestJunitConversions
+                    }
                 }
 
                 kotlin = """
@@ -341,12 +346,6 @@ public struct SkipAssembler {
 
                     \(localDependencies.map({ mod in "implementation(project(\":\(mod)\"))" }).joined(separator: "\n    "))
                 }
-
-                //kotlin {
-                //    jvmToolchain {
-                //        languageVersion.set(JavaLanguageVersion.of("11"))
-                //    }
-                //}
 
                 android {
                     namespace = group as String
@@ -701,9 +700,9 @@ private let XCTestJunitConversions = """
 // Mimics the API of XCTest for a JUnit test
 // Behavior difference: JUnit assert* thows an exception, but XCTAssert* just reports the failure and continues
 
-private typealias SkipTestCase = XCTestCase
+typealias SkipTranspilerTestCase = XCTestCase
 
-private interface XCTestCase {
+interface XCTestCase {
     fun XCTFail() = Assert.fail()
 
     fun XCTFail(msg: String) = Assert.fail(msg)

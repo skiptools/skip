@@ -216,6 +216,8 @@ dependencies {
 
 SkipPack
 SkipPackaging
+SkipCraft
+SkipGen
 SkipPackager
 SkipKit
 SkipAndroid
@@ -241,5 +243,5 @@ SkipBuild
 Skippiks
 Skippi
 SkipToMyLou
-
+Crave (2Gradle)
 SkipTest->SkipUnit?

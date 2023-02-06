@@ -6,7 +6,7 @@ import os.log
 fileprivate let logger = Logger(subsystem: "skip", category: "testing")
 
 /// The base class for executing a transpiled test case.
-open class SkipTestCase : XCTestCase {
+open class SkipTranspilerTestCase : XCTestCase {
     /// Whether the fork the tests from the XCTestCase
     public static var testInProcess = true
 
@@ -19,12 +19,9 @@ open class SkipTestCase : XCTestCase {
     }
 }
 
-extension SkipTestCase {
+extension SkipTranspilerTestCase {
     public func runGradleTests() async throws {
         guard let targets = targets else {
-            if type(of: self) == SkipTestCase.self {
-                return // we are the base type
-            }
             struct NoTargetsSpecifiedError : Error { }
             throw NoTargetsSpecifiedError()
         }
@@ -36,13 +33,13 @@ extension SkipTestCase {
             .deletingLastPathComponent()
 
         // turn SomeLibTests.SomeLibTests/ into SomeLibTests/
-        let testOutputBase = self.className.split(separator: ".").last ?? .init(self.className)
+        let testOutputBase = self.className.split(separator: ".").first ?? .init(self.className)
         try await SkipAssembler.transpileAndTest(testCase: Self.testInProcess ? self : nil, root: srcRoot, targets: targets, destRoot: "\(SkipAssembler.kipFolderName)/\(testOutputBase)")
     }
 }
 
 extension SkipAssembler {
-    @discardableResult public static func transpileAndTest(testCase: SkipTestCase?, root packageRoot: URL, sourceFolder: String = "Sources", testsFolder: String? = "Tests", targets: SkipTargetSet, destRoot: String, overwrite: Bool = true, studioID: String = androidStudioBundleID) async throws -> URL {
+    @discardableResult public static func transpileAndTest(testCase: SkipTranspilerTestCase?, root packageRoot: URL, sourceFolder: String = "Sources", testsFolder: String? = "Tests", targets: SkipTargetSet, destRoot: String, overwrite: Bool = true, studioID: String = androidStudioBundleID) async throws -> URL {
         logger.info("transpiling and testing: \(targets.target.moduleName) from: \(packageRoot.path)")
 
         // transpile and assemble the gradle project in the given destination
