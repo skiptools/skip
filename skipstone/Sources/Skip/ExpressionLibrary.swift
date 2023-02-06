@@ -1,5 +1,17 @@
 import SwiftSyntax
 
+/// `[...]`
+class ArrayLiteral: Expression {
+    let elements: [Expression]
+
+    init(elements: [Expression], syntax: Syntax?, sourceFile: Source.File?, sourceRange: Source.Range? = nil) {
+        self.elements = elements
+        super.init(type: .arrayLiteral, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    
+}
+
 /// `+, -, *, ...`
 class BinaryOperator: Expression {
     let op: Operator
