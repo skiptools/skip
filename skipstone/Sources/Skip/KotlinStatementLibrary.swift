@@ -351,9 +351,11 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var declaredType: TypeSignature?
     var isLet: Bool
     var isAsync: Bool
+    var isProperty = false
+    var isGlobal = false
     var isOpen = false
     var modifiers: Modifiers
-    var value: KotlinStatement?
+    var value: KotlinExpression?
     var getter: Accessor<KotlinStatement>?
     var setter: Accessor<KotlinStatement>?
     var willSet: Accessor<KotlinStatement>?
@@ -369,13 +371,16 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         let kstatement = KotlinVariableDeclaration(statement: statement)
         kstatement.declaredType = statement.declaredType
         if let owningTypeDeclaration = statement.owningTypeDeclaration {
-            kstatement.isOpen = !statement.modifiers.isFinal && statement.modifiers.visibility != .private && owningTypeDeclaration.type == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
-            if (translator.codebaseInfo?.isProtocolMember(declaration: statement, in: owningTypeDeclaration) == true) {
+            kstatement.isProperty = statement.parent === owningTypeDeclaration
+            kstatement.isOpen = kstatement.isProperty && !statement.modifiers.isFinal && statement.modifiers.visibility != .private && owningTypeDeclaration.type == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
+            if kstatement.isProperty && translator.codebaseInfo?.isProtocolMember(declaration: statement, in: owningTypeDeclaration) == true {
                 kstatement.modifiers.isOverride = true
             }
+        } else {
+            kstatement.isGlobal = true
         }
         if let value = statement.value {
-            kstatement.value = translator.translateStatement(value).first
+            kstatement.value = translator.translateExpression(value)
         }
         kstatement.getter = statement.getter?.translate(translator: translator)
         kstatement.setter = statement.setter?.translate(translator: translator)
@@ -397,7 +402,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
 
     override var children: [KotlinSyntaxNode] {
-        var children: [KotlinStatement] = []
+        var children: [KotlinSyntaxNode] = []
         if let value {
             children.append(value)
         }
@@ -421,9 +426,11 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if let declaration = extras?.declaration {
             output.append(declaration)
         } else {
-            output.append(modifiers.kotlinMemberString(isOpen: isOpen)).append(" ")
-            if case .unwrappedOptional = declaredType {
-                output.append("lateinit ")
+            if isProperty || isGlobal {
+                output.append(modifiers.kotlinMemberString(isOpen: isOpen)).append(" ")
+                if case .unwrappedOptional = declaredType {
+                    output.append("lateinit ")
+                }
             }
             if isLet || (getter != nil && setter == nil) {
                 output.append("val ")

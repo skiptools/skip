@@ -12,7 +12,12 @@ final class TriviaTests: XCTestCase {
             var s: String // EOL comment
 
             var i: Int
-            func f() {
+            func f() -> S {
+                // Copy
+                var copy = self
+                // Double
+                copy.s = s + s
+                return copy
             }
 
             // Func comment
@@ -28,7 +33,12 @@ final class TriviaTests: XCTestCase {
             internal var s: String // EOL comment
 
             internal var i: Long
-            internal fun f(): Unit {
+            internal fun f(): S {
+                // Copy
+                var copy = this
+                // Double
+                copy.s = s + s
+                return copy
             }
 
             // Func comment

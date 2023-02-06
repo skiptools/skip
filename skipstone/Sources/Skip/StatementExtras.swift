@@ -176,17 +176,17 @@ struct StatementExtras {
 
     /// Trailing trivia string, allowing us to preserve trailing comments.
     func trailingTrivia(indentation: Indentation) -> String {
-        return join(lines: trailingTrivia, indentation: indentation)
+        return join(lines: trailingTrivia, indentation: indentation, indentFirstLine: false)
     }
 
-    private func join(lines: [String], indentation: Indentation) -> String {
+    private func join(lines: [String], indentation: Indentation, indentFirstLine: Bool = true) -> String {
         guard !lines.isEmpty else {
             return ""
         }
         var joined = ""
         let indentationString = indentation.description
         for (index, string) in lines.enumerated() {
-            if string == "\n" || index == 0 {
+            if string == "\n" || (!indentFirstLine && index == 0) {
                 joined.append(string)
             } else {
                 joined.append(indentationString)

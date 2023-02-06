@@ -315,13 +315,13 @@ class VariableDeclaration: Statement {
     let isAsync: Bool
     let isThrows: Bool
     private(set) var modifiers: Modifiers
-    let value: Statement?
+    let value: Expression?
     let getter: Accessor<Statement>?
     let setter: Accessor<Statement>?
     let willSet: Accessor<Statement>?
     let didSet: Accessor<Statement>?
 
-    init(name: String, declaredType: TypeSignature?, isLet: Bool = false, isAsync: Bool = false, isThrows: Bool = false, modifiers: Modifiers? = nil, value: Statement?, getter: Accessor<Statement>? = nil, setter: Accessor<Statement>? = nil, willSet: Accessor<Statement>? = nil, didSet: Accessor<Statement>? = nil, syntax: Syntax? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(name: String, declaredType: TypeSignature?, isLet: Bool = false, isAsync: Bool = false, isThrows: Bool = false, modifiers: Modifiers? = nil, value: Expression?, getter: Accessor<Statement>? = nil, setter: Accessor<Statement>? = nil, willSet: Accessor<Statement>? = nil, didSet: Accessor<Statement>? = nil, syntax: Syntax? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.name = name
         self.declaredType = declaredType
         self.isLet = isLet
@@ -357,9 +357,9 @@ class VariableDeclaration: Statement {
         if let typeSyntax = syntax.typeAnnotation?.type {
             declaredType = TypeSignature.for(syntax: typeSyntax)
         }
-        var value: Statement? = nil
+        var value: Expression? = nil
         if let valueSyntax = syntax.initializer?.value {
-            value = StatementDecoder.decode(syntax: Syntax(valueSyntax), in: syntaxTree).first
+            value = ExpressionDecoder.decode(syntax: Syntax(valueSyntax), in: syntaxTree)
         }
 
         var getter: Accessor<Statement>? = nil
@@ -433,13 +433,13 @@ class VariableDeclaration: Statement {
             self.declaredType = declaredType.qualified(in: self)
         }
         // Variables in protocols or extensions inherit the visibility of the protocol or extension
-        if modifiers.visibility == .default, let owningTypeDeclaration, (owningTypeDeclaration.type == .protocolDeclaration || owningTypeDeclaration.type == .extensionDeclaration) {
+        if modifiers.visibility == .default, let owningTypeDeclaration, owningTypeDeclaration === parent, (owningTypeDeclaration.type == .protocolDeclaration || owningTypeDeclaration.type == .extensionDeclaration) {
             modifiers.visibility = owningTypeDeclaration.modifiers.visibility
         }
     }
 
     override var children: [SyntaxNode] {
-        var children: [Statement] = []
+        var children: [SyntaxNode] = []
         if let value {
             children.append(value)
         }

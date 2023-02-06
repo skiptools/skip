@@ -18,6 +18,10 @@ class ArrayLiteral: Expression {
         }
         return ArrayLiteral(elements: elements, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
+
+    override var children: [SyntaxNode] {
+        return elements
+    }
 }
 
 /// `+, -, *, ...`
@@ -92,7 +96,7 @@ class FunctionCall: Expression {
         let function = ExpressionDecoder.decode(syntax: Syntax(functionCallExpr.calledExpression), in: syntaxTree)
         var labeledExpressions = functionCallExpr.argumentList.map {
             let label = $0.label?.text
-            let expression = ExpressionDecoder.decode(syntax: Syntax($0), in: syntaxTree)
+            let expression = ExpressionDecoder.decode(syntax: Syntax($0.expression), in: syntaxTree)
             return LabeledExpression(label: label, expression: expression)
         }
         if let trailingClosure = functionCallExpr.trailingClosure {
@@ -107,6 +111,10 @@ class FunctionCall: Expression {
             }
         }
         return FunctionCall(function: function, arguments: labeledExpressions)
+    }
+
+    override var children: [SyntaxNode] {
+        return [function] + arguments.map { $0.expression }
     }
 }
 
@@ -153,6 +161,14 @@ class MemberAccess: Expression {
         }
         let member = memberAccessExpr.name.text
         return MemberAccess(base: base, member: member, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+    }
+
+    override var children: [SyntaxNode] {
+        return base == nil ? [] : [base!]
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        return [PrettyPrintTree(root: member)]
     }
 }
 
@@ -217,5 +233,31 @@ class StringLiteral: Expression {
             }
         }
         return StringLiteral(segments: segments, isMultiline: isMultiline, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+    }
+
+    override var children: [SyntaxNode] {
+        return segments.compactMap {
+            switch $0 {
+            case .expression(let expression):
+                return expression
+            case .string:
+                return nil
+            }
+        }
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        var expressionIndex = 0
+        let segmentsDescription = segments.map { (segment) -> String in
+            switch segment {
+            case .expression:
+                expressionIndex += 1
+                return "\\(\(expressionIndex - 1))"
+            case .string(let string):
+                return string
+            }
+        }.joined(separator: "")
+        let quotes = isMultiline ? "\"\"\"" : "\""
+        return [PrettyPrintTree(root: "\(quotes)\(segmentsDescription)\(quotes)")]
     }
 }

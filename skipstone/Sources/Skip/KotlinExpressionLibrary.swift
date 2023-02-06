@@ -18,7 +18,7 @@ class KotlinArrayLiteral: KotlinExpression {
     override func append(to output: OutputGenerator) {
         output.append("mutableListOf(")
         for (index, element) in elements.enumerated() {
-            element.append(to: output)
+            output.append(element)
             if index != elements.count - 1 {
                 output.append(", ")
             }
@@ -85,6 +85,24 @@ class KotlinFunctionCall: KotlinExpression {
         self.function = function
         super.init(type: .functionCall, expression: expression)
     }
+
+    override var children: [KotlinSyntaxNode] {
+        return [function] + arguments.map { $0.expression }
+    }
+
+    override func append(to output: OutputGenerator) {
+        output.append(function).append("(")
+        for (index, argument) in arguments.enumerated() {
+            if let label = argument.label {
+                output.append(label).append(" = ")
+            }
+            output.append(argument.expression)
+            if index < arguments.count - 1 {
+                output.append(", ")
+            }
+        }
+        output.append(")")
+    }
 }
 
 class KotlinIdentifier: KotlinExpression {
@@ -96,7 +114,11 @@ class KotlinIdentifier: KotlinExpression {
     }
 
     override func append(to output: OutputGenerator) {
-        output.append(name)
+        if name == "self" {
+            output.append("this")
+        } else {
+            output.append(name)
+        }
     }
 }
 
@@ -119,6 +141,13 @@ class KotlinMemberAccess: KotlinExpression {
 
     override var children: [KotlinSyntaxNode] {
         return base == nil ? [] : [base!]
+    }
+
+    override func append(to output: OutputGenerator) {
+        if let base {
+            output.append(base)
+        }
+        output.append(".").append(member)
     }
 }
 
@@ -181,9 +210,7 @@ class KotlinStringLiteral: KotlinExpression {
             case .string(let string):
                 output.append(string)
             case .expression(let expression):
-                output.append("${")
-                expression.append(to: output)
-                output.append("}")
+                output.append("${").append(expression).append("}")
             }
         }
         output.append(delimiter)
