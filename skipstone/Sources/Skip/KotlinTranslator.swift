@@ -102,12 +102,18 @@ public class KotlinTranslator {
 
     func translateExpression(_ expression: Expression) -> KotlinExpression {
         switch expression.type {
+        case .arrayLiteral:
+            return KotlinArrayLiteral.translate(expression: expression as! ArrayLiteral, translator: self)
         case .binaryOperator:
             return KotlinBinaryOperator.translate(expression: expression as! BinaryOperator, translator: self)
         case .booleanLiteral:
             return KotlinBooleanLiteral(expression: expression as! BooleanLiteral)
+        case .functionCall:
+            return KotlinFunctionCall.translate(expression: expression as! FunctionCall, translator: self)
         case .identifier:
             return KotlinIdentifier(expression: expression as! Identifier)
+        case .memberAccess:
+            return KotlinMemberAccess.translate(expression: expression as! MemberAccess, translator: self)
         case .numericLiteral:
             return KotlinNumericLiteral(expression: expression as! NumericLiteral)
         case .stringLiteral:

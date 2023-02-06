@@ -9,7 +9,15 @@ class ArrayLiteral: Expression {
         super.init(type: .arrayLiteral, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
-    
+    override class func decode(syntax: Syntax, in syntaxTree: SyntaxTree) throws -> Expression? {
+        guard syntax.kind == .arrayExpr, let arrayExpr = syntax.as(ArrayExprSyntax.self) else {
+            return nil
+        }
+        let elements = arrayExpr.elements.map {
+            ExpressionDecoder.decode(syntax: Syntax($0.expression), in: syntaxTree)
+        }
+        return ArrayLiteral(elements: elements, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+    }
 }
 
 /// `+, -, *, ...`
@@ -66,6 +74,42 @@ class BooleanLiteral: Expression {
     }
 }
 
+/// `function(...)`
+class FunctionCall: Expression {
+    let function: Expression
+    let arguments: [LabeledExpression<Expression>]
+
+    init(function: Expression, arguments: [LabeledExpression<Expression>], syntax: Syntax? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        self.function = function
+        self.arguments = arguments
+        super.init(type: .functionCall, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    override class func decode(syntax: Syntax, in syntaxTree: SyntaxTree) throws -> Expression? {
+        guard syntax.kind == .functionCallExpr, let functionCallExpr = syntax.as(FunctionCallExprSyntax.self) else {
+            return nil
+        }
+        let function = ExpressionDecoder.decode(syntax: Syntax(functionCallExpr.calledExpression), in: syntaxTree)
+        var labeledExpressions = functionCallExpr.argumentList.map {
+            let label = $0.label?.text
+            let expression = ExpressionDecoder.decode(syntax: Syntax($0), in: syntaxTree)
+            return LabeledExpression(label: label, expression: expression)
+        }
+        if let trailingClosure = functionCallExpr.trailingClosure {
+            let expression = ExpressionDecoder.decode(syntax: Syntax(trailingClosure), in: syntaxTree)
+            labeledExpressions.append(LabeledExpression(expression: expression))
+        }
+        if let multipleTrailingClosures = functionCallExpr.additionalTrailingClosures {
+            labeledExpressions += multipleTrailingClosures.map {
+                let label = $0.label.text
+                let expression = ExpressionDecoder.decode(syntax: Syntax($0.closure), in: syntaxTree)
+                return LabeledExpression(label: label, expression: expression)
+            }
+        }
+        return FunctionCall(function: function, arguments: labeledExpressions)
+    }
+}
+
 /// `x`
 class Identifier: Expression {
     let name: String
@@ -85,6 +129,30 @@ class Identifier: Expression {
 
     override var prettyPrintAttributes: [PrettyPrintTree] {
         return [PrettyPrintTree(root: name)]
+    }
+}
+
+/// `person.name`
+class MemberAccess: Expression {
+    let base: Expression?
+    let member: String
+
+    init(base: Expression?, member: String, syntax: Syntax? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        self.base = base
+        self.member = member
+        super.init(type: .memberAccess, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    override class func decode(syntax: Syntax, in syntaxTree: SyntaxTree) throws -> Expression? {
+        guard syntax.kind == .memberAccessExpr, let memberAccessExpr = syntax.as(MemberAccessExprSyntax.self) else {
+            return nil
+        }
+        var base: Expression? = nil
+        if let baseSyntax = memberAccessExpr.base {
+            base = ExpressionDecoder.decode(syntax: Syntax(baseSyntax), in: syntaxTree)
+        }
+        let member = memberAccessExpr.name.text
+        return MemberAccess(base: base, member: member, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 }
 

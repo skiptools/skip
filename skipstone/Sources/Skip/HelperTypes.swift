@@ -11,6 +11,12 @@ struct Accessor<S> {
     var statements: [S]? // Nil if the accessor has no body, as in a protocol { get set }
 }
 
+/// A labeled expression, as used in function call parameters.
+struct LabeledExpression<E> {
+    var label: String?
+    var expression: E
+}
+
 /// Operator information.
 struct Operator: Equatable {
     let symbol: String
@@ -389,12 +395,14 @@ struct Modifiers: PrettyPrintable {
 
     var visibility: Visibility
     let isStatic: Bool
+    let isMutating: Bool
     let isFinal: Bool
     var isOverride: Bool
 
-    init(visibility: Visibility = .default, isStatic: Bool = false, isFinal: Bool = false, isOverride: Bool = false) {
+    init(visibility: Visibility = .default, isStatic: Bool = false, isMutating: Bool = false, isFinal: Bool = false, isOverride: Bool = false) {
         self.visibility = visibility
         self.isStatic = isStatic
+        self.isMutating = isMutating
         self.isFinal = isFinal
         self.isOverride = isOverride
     }
@@ -406,6 +414,7 @@ struct Modifiers: PrettyPrintable {
         }
         var visibility: Visibility = .default
         var isStatic = false
+        var isMutating = false
         var isFinal = false
         var isOverride = false
         for modifier in syntax {
@@ -426,6 +435,8 @@ struct Modifiers: PrettyPrintable {
                 isStatic = true
             case "class":
                 isStatic = true
+            case "mutating":
+                isMutating = true
             case "final":
                 isFinal = true
             case "override":
@@ -434,7 +445,7 @@ struct Modifiers: PrettyPrintable {
                 break
             }
         }
-        return Modifiers(visibility: visibility, isStatic: isStatic, isFinal: isFinal, isOverride: isOverride)
+        return Modifiers(visibility: visibility, isStatic: isStatic, isMutating: isMutating, isFinal: isFinal, isOverride: isOverride)
     }
 
     var isEmpty: Bool {
@@ -448,6 +459,9 @@ struct Modifiers: PrettyPrintable {
         }
         if isStatic {
             children.append(PrettyPrintTree(root: "static"))
+        }
+        if isMutating {
+            children.append(PrettyPrintTree(root: "mutating"))
         }
         if isFinal {
             children.append(PrettyPrintTree(root: "final"))

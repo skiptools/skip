@@ -1,3 +1,32 @@
+class KotlinArrayLiteral: KotlinExpression {
+    var elements: [KotlinExpression] = []
+
+    static func translate(expression: ArrayLiteral, translator: KotlinTranslator) -> KotlinArrayLiteral {
+        let kexpression = KotlinArrayLiteral(expression: expression)
+        kexpression.elements = expression.elements.map { translator.translateExpression($0) }
+        return kexpression
+    }
+
+    private init(expression: ArrayLiteral) {
+        super.init(type: .arrayLiteral, expression: expression)
+    }
+
+    override var children: [KotlinSyntaxNode] {
+        return elements
+    }
+
+    override func append(to output: OutputGenerator) {
+        output.append("mutableListOf(")
+        for (index, element) in elements.enumerated() {
+            element.append(to: output)
+            if index != elements.count - 1 {
+                output.append(", ")
+            }
+        }
+        output.append(")")
+    }
+}
+
 class KotlinBinaryOperator: KotlinExpression {
     var op: Operator
     var lhs: KotlinExpression
@@ -21,7 +50,7 @@ class KotlinBinaryOperator: KotlinExpression {
     }
 
     override func append(to output: OutputGenerator) {
-        output.append("(").append(lhs).append(" \(op.symbol) ").append(rhs).append(")")
+        output.append(lhs).append(" \(op.symbol) ").append(rhs)
     }
 }
 
@@ -38,6 +67,26 @@ class KotlinBooleanLiteral: KotlinExpression {
     }
 }
 
+class KotlinFunctionCall: KotlinExpression {
+    var function: KotlinExpression
+    var arguments: [LabeledExpression<KotlinExpression>] = []
+
+    static func translate(expression: FunctionCall, translator: KotlinTranslator) -> KotlinFunctionCall {
+        let kfunction = translator.translateExpression(expression.function)
+        let kexpression = KotlinFunctionCall(expression: expression, function: kfunction)
+        kexpression.arguments = expression.arguments.map {
+            let kargumentExpression = translator.translateExpression($0.expression)
+            return LabeledExpression(label: $0.label, expression: kargumentExpression)
+        }
+        return kexpression
+    }
+
+    private init(expression: FunctionCall, function: KotlinExpression) {
+        self.function = function
+        super.init(type: .functionCall, expression: expression)
+    }
+}
+
 class KotlinIdentifier: KotlinExpression {
     var name: String
 
@@ -48,6 +97,28 @@ class KotlinIdentifier: KotlinExpression {
 
     override func append(to output: OutputGenerator) {
         output.append(name)
+    }
+}
+
+class KotlinMemberAccess: KotlinExpression {
+    var base: KotlinExpression?
+    var member: String
+
+    static func translate(expression: MemberAccess, translator: KotlinTranslator) -> KotlinMemberAccess {
+        let kexpression = KotlinMemberAccess(expression: expression)
+        if let base = expression.base {
+            kexpression.base = translator.translateExpression(base)
+        }
+        return kexpression
+    }
+
+    private init(expression: MemberAccess) {
+        self.member = expression.member
+        super.init(type: .memberAccess, expression: expression)
+    }
+
+    override var children: [KotlinSyntaxNode] {
+        return base == nil ? [] : [base!]
     }
 }
 
@@ -89,6 +160,17 @@ class KotlinStringLiteral: KotlinExpression {
 
     private init(expression: StringLiteral) {
         super.init(type: .stringLiteral, expression: expression)
+    }
+
+    override var children: [KotlinSyntaxNode] {
+        return segments.compactMap {
+            switch $0 {
+            case .expression(let kexpression):
+                return kexpression
+            case .string:
+                return nil
+            }
+        }
     }
 
     override func append(to output: OutputGenerator) {
