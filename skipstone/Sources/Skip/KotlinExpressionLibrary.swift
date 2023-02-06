@@ -16,7 +16,7 @@ class KotlinArrayLiteral: KotlinExpression {
     }
 
     override func append(to output: OutputGenerator) {
-        output.append("mutableListOf(")
+        output.append("arrayOf(")
         for (index, element) in elements.enumerated() {
             output.append(element)
             if index != elements.count - 1 {

@@ -90,6 +90,11 @@ class KotlinMessageStatement: KotlinStatement {
 class KotlinRawStatement: KotlinStatement {
     let sourceCode: String
 
+    init(sourceCode: String) {
+        self.sourceCode = sourceCode
+        super.init(type: .raw)
+    }
+
     init(statement: RawStatement) {
         self.sourceCode = statement.sourceCode
         super.init(type: .raw, statement: statement)

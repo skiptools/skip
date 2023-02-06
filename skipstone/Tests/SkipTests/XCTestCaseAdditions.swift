@@ -9,7 +9,12 @@ extension XCTestCase {
             let tp = Transpiler(sourceFiles: [Source.File(path: srcFile.path)])
             try await tp.transpile(handler: { transpilation in
                 //print("transpilation:", transpilation.output)
-                XCTAssertEqual(kotlin.trimmingCharacters(in: .whitespacesAndNewlines), transpilation.output.content.trimmingCharacters(in: .whitespacesAndNewlines), file: file, line: line)
+                var content = transpilation.output.content
+                let autoImport = "import SkipFoundation.*"
+                if content.hasPrefix(autoImport) {
+                    content = String(content.dropFirst(autoImport.count))
+                }
+                XCTAssertEqual(kotlin.trimmingCharacters(in: .whitespacesAndNewlines), content.trimmingCharacters(in: .whitespacesAndNewlines), file: file, line: line)
             })
         }
     }

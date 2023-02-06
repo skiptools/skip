@@ -21,12 +21,13 @@ public class KotlinTranslator {
 
     /// Translate syntax trees only.
     public func translateSyntaxTree() -> KotlinSyntaxTree {
-        var statements: [KotlinStatement] = []
+        var kstatements = syntaxTree.statements.flatMap { translateStatement($0) }
+        kstatements = addSkipFoundationImport(to: kstatements)
         if let packageName = codebaseInfo?.packageName {
-            statements.append(KotlinPackageDeclaration(name: packageName))
+            kstatements.insert(KotlinRawStatement(sourceCode: ""), at: 0)
+            kstatements.insert(KotlinPackageDeclaration(name: packageName), at: 0)
         }
-        statements += syntaxTree.statements.flatMap { translateStatement($0) }
-        return KotlinSyntaxTree(sourceFile: syntaxTree.source.file, statements: statements)
+        return KotlinSyntaxTree(sourceFile: syntaxTree.source.file, statements: kstatements)
     }
 
     func translateStatement(_ statement: Statement) -> [KotlinStatement] {
@@ -131,5 +132,31 @@ public class KotlinTranslator {
 //            rawExpression = RawExpression(sourceCode: "?", message: message, range: expression.range, in: syntaxTree)
 //        }
 //        return KotlinRawExpression(expression: rawExpression)
+    }
+
+    /// We depend on `SkipFoundation` for core functionality, so import it in all Kotlin translations.
+    private func addSkipFoundationImport(to statements: [KotlinStatement]) -> [KotlinStatement] {
+        var newStatements: [KotlinStatement] = []
+        var lastImportIndex: Int? = nil
+        for (index, statement) in statements.enumerated() {
+            guard let importStatement = statement as? KotlinImportDeclaration else {
+                newStatements.append(statement)
+                continue
+            }
+            if importStatement.modulePath == ["SkipFoundation"] {
+                return statements
+            }
+            lastImportIndex = index
+            newStatements.append(statement)
+        }
+
+        let foundationImport = KotlinImportDeclaration(modulePath: ["SkipFoundation"])
+        if let lastImportIndex {
+            newStatements.insert(foundationImport, at: lastImportIndex + 1)
+        } else {
+            newStatements.insert(KotlinRawStatement(sourceCode: ""), at: 0)
+            newStatements.insert(foundationImport, at: 0)
+        }
+        return newStatements
     }
 }

@@ -96,7 +96,7 @@ extension TypeSignature {
     private func kotlin(isQualified: Bool) -> String {
         switch self {
         case .array(let elementType):
-            return "MutableList<\(elementType.kotlin(isQualified: isQualified))>"
+            return "Array<\(elementType.kotlin(isQualified: isQualified))>"
         case .base(let name, let qualifiedName, let generics):
             let name = translateTypeName((isQualified ? qualifiedName : name) ?? name)
             guard !generics.isEmpty else {
@@ -150,8 +150,6 @@ extension TypeSignature {
         switch typeName {
         case "AnyObject":
             return "Any"
-        case "Array":
-            return "MutableList"
         case "Bool":
             return "Boolean"
         case "Character":

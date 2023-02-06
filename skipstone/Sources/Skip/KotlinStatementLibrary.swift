@@ -264,6 +264,11 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
 class KotlinImportDeclaration: KotlinStatement {
     let modulePath: [String]
 
+    init(modulePath: [String]) {
+        self.modulePath = modulePath
+        super.init(type: .importDeclaration)
+    }
+    
     init(statement: ImportDeclaration) {
         self.modulePath = statement.modulePath
         super.init(type: .importDeclaration, statement: statement)

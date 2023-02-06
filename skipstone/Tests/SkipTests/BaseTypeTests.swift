@@ -55,9 +55,9 @@ final class BaseTypeTests: XCTestCase {
         var tis: (Int, String)
         var tis2: (Int, String, Double)
         """, kotlin: """
-        internal var a: MutableList<Any>
-        internal var ai: MutableList<Long>
-        internal var ai2: MutableList<Long>
+        internal var a: Array<Any>
+        internal var ai: Array<Long>
+        internal var ai2: Array<Long>
         internal var m: MutableMap<Any, Any>
         internal var mis: MutableMap<Long, String>
         internal var mis2: MutableMap<Long, String>
