@@ -14,8 +14,8 @@ public struct Transpiler {
     }
 
     /// Perform transpilation, feeding results to the given handler.
-    public func transpile(handler: (Transpilation) throws -> Void) async throws {
-        let codebaseInfo = KotlinCodebaseInfo()
+    public func transpile(codebaseInfo: KotlinCodebaseInfo? = nil, handler: (Transpilation) throws -> Void) async throws {
+        let codebaseInfo = codebaseInfo ?? KotlinCodebaseInfo()
         codebaseInfo.packageName = packageName
         try await withThrowingTaskGroup(of: Void.self) { group in
             for sourceFile in sourceFiles {

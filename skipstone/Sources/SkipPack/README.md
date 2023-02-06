@@ -13,148 +13,233 @@ SkipTestCase is the base class for executing the transpilation of
 sources and tests.
 
 
-## Pipeline
+## Generate File System Layout
 
-Take a simple SPM that looks like:
+### Single-Module Project
 
-For each MODULE:
+A simple single-module project named `GreatCode` with a single Kotlin file
+and single test case will be output the the destination
+folder (e.g., `kip/GreatCodeTests.GreatCodeTest`) with
+a mostly-standard gradle/kotlin layout.
 
-1. Take `Sources/MODULE/*.swift` and transpile to `Sources/MODULE/*.kt`
-1. Take `Sources/MODULE/Resources/*.lproj/*.strings` and transpile to `Sources/MODULE/*.swift`
-
-## Q: what should the file system layout look for a skipped Swift/Kotlin library?
-
-
-### Option 1: Conventional SPM + conventional Gradle
-
-Swift files are placed in SPM-idiomatic `Sources/ModuleName/*.swift`
-and Kotlin files are placed in their own Gradle/Maven-idiomatic location: `src/main/java/package…names/*.kt`.
-The necessary gradle build files (`build.gradle.kts`, `settings.gradle.kts`, `gradle.properties`) are output at the root folder so that running `gradle build` works out of the box.
-
+The source layout:
 
 ```
 .
 ├── Package.swift
-├── README.md
 ├── Sources
-│   └── CrossFoundation
-│       ├── CrossFoundation.swift
-│       ├── Data.swift
-│       ├── Date.swift
-│       ├── FileManager.swift
-│       ├── JSON.swift
-│       ├── ProcessInfo.swift
-│       ├── Random.swift
-│       ├── URL.swift
-│       └── UUID.swift
-├── Tests
-│   └── CrossFoundationTests
-│       └── CrossFoundationTests.swift
-├── build.gradle.kts
-├── gradle.properties
-├── settings.gradle.kts
-└── src
-    ├── androidTest
-    │   └── java
-    │       └── com
-    │           └── CrossFoundation
-    │               └── CrossFoundationInstrumentedTest.kt
-    ├── main
-    │   └── java
-    │       └── com
-    │           └── CrossFoundation
-    │               ├── CrossFoundation.kt
-    │               ├── Data.kt
-    │               ├── Date.kt
-    │               ├── FileManager.kt
-    │               ├── JSON.kt
-    │               ├── ProcessInfo.kt
-    │               ├── URL.kt
-    │               ├── UUID.kt
-    │               └── Random.kt
-    └── test
-        └── java
-            └── com
-                └── CrossFoundation
-                    └── CrossFoundationTests.kt
+│   └── GreatCode
+│       └── GreatCode.swift
+└── Tests
+    └── GreatCodeTests.swift
+        └── GreatCodeTests.swift
+
 ```
 
-Advantages of this layout:
+Will translate to:
 
-1. It will be familiar to Swift/SPM developers 
-1. It will be familiar to Kotlin/Gradle developers 
-1. It will be simpler to implement multi-module packages
-1. It could be easier to "separate" the two halves of the project if ever needed
-    
-Disadvantages of this layout:
-
-1. It is tricker to jump to the transpiled Kotlin when trying to debug the derived .kt for a given .swift
-1. It creates an overall folder structure that is somewhat alien to everyone
-1. What would the package name be? We probably need to retain the case of the original source Swift package (e.g., "CoreFoundation"), so that will always be un-idiomatic Java/Kotlin.
-
-
-
-
-### Option 2: Conventional SPM + unconventional Gradle
-
-This option uses SPM's convention of Sources/ and Tests/ as the
-source roots and simply places the peer `.kt` files
-next to their equivalent `.swift` files. Additional Kotlin
-files can be hand-written in those folders to augment the
-transpiled `.kt` files (which will, themselves, always be
-overwritten by their peer `.swift` file when the
-transpiler is run).
 
 ```
 .
-├── Package.swift
-├── README.md
-├── Sources
-│   └── CrossFoundation
-│       ├── CrossFoundation.kt
-│       ├── CrossFoundation.swift
-│       ├── Data.kt
-│       ├── Data.swift
-│       ├── Date.kt
-│       ├── Date.swift
-│       ├── FileManager.kt
-│       ├── FileManager.swift
-│       ├── JSON.kt
-│       ├── JSON.swift
-│       ├── ProcessInfo.kt
-│       ├── ProcessInfo.swift
-│       ├── Random.kt
-│       ├── Random.swift
-│       ├── URL.kt
-│       ├── URL.swift
-│       ├── UUID.kt
-│       └── UUID.swift
-├── Tests
-│   └── CrossFoundationTests
-│       ├── CrossFoundationTests.kt
-│       └── CrossFoundationTests.swift
+├── GreatCode
+│   ├── build.gradle.kts
+│   └── src
+│       ├── main
+│       │   └── kotlin
+│       │       └── GreatCode
+│       │           └── GreatCode.kt
+│       └── test
+│           └── kotlin
+│               └── GreatCode
+│                   └── GreatCodeTests.kt
 ├── build.gradle.kts
+├── gradle
+│   └── wrapper
+│       ├── gradle-wrapper.jar
+│       └── gradle-wrapper.properties
 ├── gradle.properties
+├── gradlew
 └── settings.gradle.kts
 ```
 
-Advantages of this layout:
-
-1. It will be very familiar to Swift developers
-1. It doesn't introduce additional weird src/test/java/com/example… folders
-1. It will be clear where to look to debug the derived Kotlin
-1. It is a shallower and simpler folder structure, which makes it easier to understand
-    
-Disadvantages of this layout:
-
-1. It is unidiomatic for Kotlin/Gradle/Adroid conventions
-1. It works OK for single-module builds, but multi-module would be uglier
 
 
+### Multi-Module Project
+
+A Swift `Package.swift` with multiple modules will be translated into a
+[Gradle multi-project build](https://docs.gradle.org/current/userguide/multi_project_builds.html#sec:creating_multi_project_builds).
+
+Given the following `Package.swift`:
+
+```swift
+import PackageDescription
+
+let package = Package(
+    name: "MultiModule",
+    platforms: [
+        .macOS(.v12),
+        .iOS(.v16),
+    ],
+    products: [
+        .library(name: "SkipFoundation", targets: ["SkipFoundation"]),
+        .library(name: "SkipUI", targets: ["SkipUI"]),
+        .library(name: "SkipDemoLib", targets: ["SkipDemoLib"]),
+        .library(name: "SkipDemoApp", targets: ["SkipDemoApp"]),
+    ],
+    targets: [
+        .target(name: "SkipFoundation", dependencies: []),
+        .target(name: "SkipUI", dependencies: ["SkipFoundation"]),
+        .target(name: "SkipDemoLib", dependencies: ["SkipFoundation"]),
+        .target(name: "SkipDemoApp", dependencies: ["SkipDemoLib", "SkipUI"]),
+        
+        .testTarget(name: "SkipFoundationTests", dependencies: ["SkipFoundation"]),
+        .testTarget(name: "SkipUITests", dependencies: ["SkipUI"]),
+        .testTarget(name: "SkipDemoAppTests", dependencies: ["SkipDemoApp"]),
+        .testTarget(name: "SkipDemoLibTests", dependencies: ["SkipDemoLib"]),
+    ]
+)
+```
 
 
-### Option 3: Unconventional SPM + unconventional Gradle
+The following Gradle project structure will be generated.
 
-As SPM is expected to be the "dominant" side of the packaging equatation, 
-using an unconventional Swift packaging format was not considered.
+```
+.
+├── SkipDemoApp
+│   ├── build.gradle.kts
+│   └── src
+│       ├── main
+│       │   └── kotlin
+│       │       └── SkipDemoApp
+│       │           ├── ContentView.kt
+│       │           └── SkipDemoApp.kt
+│       └── test
+│           └── kotlin
+│               └── SkipDemoApp
+│                   └── SkipDemoAppTests.kt
+├── SkipDemoLib
+│   ├── build.gradle.kts
+│   └── src
+│       ├── main
+│       │   └── kotlin
+│       │       └── SkipDemoLib
+│       │           ├── CellularAutomaton.kt
+│       │           └── SkipDemoLib.kt
+│       └── test
+│           └── kotlin
+│               └── SkipDemoLib
+│                   └── SkipDemoLibTests.kt
+├── SkipFoundation
+│   ├── build.gradle.kts
+│   └── src
+│       ├── main
+│       │   └── kotlin
+│       │       └── SkipFoundation
+│       │           └── SkipFoundation.kt
+│       └── test
+│           └── kotlin
+│               └── SkipFoundation
+│                   └── SkipFoundationTests.kt
+├── SkipUI
+│   ├── build.gradle.kts
+│   └── src
+│       ├── main
+│       │   └── kotlin
+│       │       └── SkipUI
+│       │           └── SkipUI.kt
+│       └── test
+│           └── kotlin
+│               └── SkipUI
+│                   └── SkipUITests.kt
+├── build.gradle.kts
+├── gradle
+│   └── wrapper
+│       ├── gradle-wrapper.jar
+│       └── gradle-wrapper.properties
+├── gradle.properties
+├── gradlew
+└── settings.gradle.kts
+```
 
+For this project, the `settings.gradle.kts` will include each of the modules and look something like:
+
+```kotlin
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        google()
+        mavenCentral()
+    }
+}
+
+dependencyResolutionManagement {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+include(":SkipDemoApp")
+include(":SkipDemoLib")
+include(":SkipUI")
+include(":SkipFoundation")
+```
+
+The individual module `build.gradle.kts` files will have dependencies that match
+the inter-module dependencies in the `Package.swift` file.
+
+For example, `SkipDemoApp` depends on `SkipDemoLib` and `SkipUI`,
+both of which depend on `SkipFoundation`.
+
+`SkipDemoLib/build.gradle.kts`'s dependecies will include just the one dependency:
+
+```kotlin
+dependencies {
+    implementation(project(":SkipFoundation"))
+}
+```
+
+And `SkipDemoApp/build.gradle.kts`'s dependecies will reference all the dependencies:
+
+```kotlin
+dependencies {
+    implementation(project(":SkipDemoLib"))
+    implementation(project(":SkipFoundation"))
+    implementation(project(":SkipUI"))
+}
+```
+
+## Q: Output package name?
+
+
+## Q: Names?
+
+SkipPack
+SkipPackaging
+SkipPackager
+SkipKit
+SkipAndroid
+SkipDroid
+SkipStudio
+SkipGradle
+SkipGrad
+SkipIntegration
+SkipInteg
+SkipFlow
+SkipPing
+SkipJack
+SkipBuild
+SkipPipeline
+SkipPipe
+Skipper
+Skipple
+SkipIntake
+SkipProcessing
+SkipSet
+Skip
+SkipBuild
+Skippiks
+Skippi
+SkipToMyLou
+
+SkipTest->SkipUnit?

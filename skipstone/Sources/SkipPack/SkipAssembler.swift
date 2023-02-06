@@ -1,5 +1,6 @@
 import Foundation
 import Skip
+import SymbolKit
 import os.log
 #if canImport(Cocoa)
 import class Cocoa.NSWorkspace
@@ -32,6 +33,9 @@ public struct SkipTargetSet {
 }
 
 public struct SkipAssembler {
+    /// The output folder name for the kotlin interop project (kip)
+    public static let kipFolderName = "kip"
+
     /// The bundle identifier for the Android Studio.app installation
     public static let androidStudioBundleID = "com.google.android.studio"
 
@@ -103,8 +107,7 @@ public struct SkipAssembler {
         return try String(contentsOf: outputURL)
     }
 
-    // [GradleTarget]? = nil
-    public static func assemble(root packageRoot: URL, sourceFolder: String = "Sources", testsFolder: String? = "Tests", targets: SkipTargetSet, destRoot: String, overwrite: Bool = true, studioID: String = androidStudioBundleID) async throws -> URL {
+    public static func assemble(root packageRoot: URL, sourceFolder: String = "Sources", testsFolder: String? = "Tests", targets: SkipTargetSet, destRoot: String, overwrite: Bool = true, studioID: String = androidStudioBundleID) async throws -> (root: URL, files: [URL]) {
         let destRoot = URL(fileURLWithPath: destRoot, isDirectory: true, relativeTo: packageRoot)
 
         // use the passed-in list of modules, or else default to all the sources in the folder
@@ -116,9 +119,24 @@ public struct SkipAssembler {
 
         try fm.createDirectory(at: destRoot, withIntermediateDirectories: true)
 
+        var savedURLs: [URL] = []
+        /// Writes the given String to the specified URL, only if it has changed
+        func write(_ string: String, to url: URL, ifChanged: Bool, encoding: String.Encoding = .utf8) throws {
+            savedURLs.append(url)
+            // if the size has changed, always write; otherwise, compare string contents
+            if !ifChanged // i.e., always write
+                || (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) != string.lengthOfBytes(using: encoding) // compare sizes
+                || (try? String(contentsOf: url, encoding: encoding)) != string { // compare contents
+                try string.write(to: url, atomically: true, encoding: encoding)
+            }
+        }
+
         for targetSet in targets.deepTargetSet {
             let moduleName = targetSet.target.moduleName
             logger.info("module: \(moduleName)")
+
+            let symbolGraph: UnifiedSymbolGraph? = nil // TODO
+            let codebaseInfo = KotlinCodebaseInfo(packageName: moduleName, graph: symbolGraph)
 
             let moduleSwiftSourceRoot = URL(fileURLWithPath: moduleName, isDirectory: true, relativeTo: sourceRoot)
             let moduleSwiftTestRoot = testRoot.flatMap({ testRoot in URL(fileURLWithPath: moduleName + "Tests", isDirectory: true, relativeTo: testRoot) })
@@ -176,7 +194,7 @@ public struct SkipAssembler {
                     let sources = sourceURLs.keys.sorted().map({ Source.File(path: $0) })
 
                     let tp = Transpiler(sourceFiles: sources)
-                    try await tp.transpile(handler: { transpilation in
+                    try await tp.transpile(codebaseInfo: codebaseInfo, handler: { transpilation in
                         logger.trace("transpilation: \(transpilation.output.content)")
                         guard let sourceURL = sourceURLs[transpilation.sourceFile.path]?.first?.url else {
                             fatalError("missing source URL for path")
@@ -189,7 +207,7 @@ public struct SkipAssembler {
                         let kotlin = transpilation.output.content
 
                         let processed = try postProcess(kotlin: kotlin, options: testCase ? [.testCase] : [])
-                        try processed.write(to: destPath, atomically: true, encoding: .utf8)
+                        try write(processed, to: destPath, ifChanged: true)
                     })
                 }
 
@@ -333,7 +351,7 @@ public struct SkipAssembler {
 
                 """
 
-                try buildGradleSource.write(to: buildGradle, atomically: true, encoding: .utf8)
+                try write(buildGradleSource, to: buildGradle, ifChanged: true)
             }
 
             try createModuleLevelGradleBuild()
@@ -357,7 +375,7 @@ public struct SkipAssembler {
                 }
             }
             """
-            try buildGradleSource.write(to: buildGradle, atomically: true, encoding: .utf8)
+            try write(buildGradleSource, to: buildGradle, ifChanged: true)
 
             let gradleProperties = URL(fileURLWithPath: "gradle.properties", isDirectory: false, relativeTo: destRoot)
             let gradlePropertiesSource = """
@@ -383,7 +401,7 @@ public struct SkipAssembler {
             android.enableR8.fullMode=true
 
             """
-            try gradlePropertiesSource.write(to: gradleProperties, atomically: true, encoding: .utf8)
+            try write(gradlePropertiesSource, to: gradleProperties, ifChanged: true)
 
             let settingsGradle = URL(fileURLWithPath: "settings.gradle.kts", isDirectory: false, relativeTo: destRoot)
             var settingsGradleSource = """
@@ -407,7 +425,7 @@ public struct SkipAssembler {
                 settingsGradleSource += "\ninclude(\":\(target.moduleName)\")\n"
             }
 
-            try settingsGradleSource.write(to: settingsGradle, atomically: true, encoding: .utf8)
+            try write(settingsGradleSource, to: settingsGradle, ifChanged: true)
         }
 
         try createTopLevelGradleBuild()
@@ -447,15 +465,15 @@ public struct SkipAssembler {
                     zipStoreBase=GRADLE_USER_HOME
                     """
 
-                    try gradlePropertiesContents.write(to: gradleWrapperProps, atomically: true, encoding: .utf8)
+                    try write(gradlePropertiesContents, to: gradleWrapperProps, ifChanged: true)
 
-                    // finally create the idiomatic `gradelw` root script, but one which just uses the installed ADC java to run gradle
+                    // finally create the idiomatic `gradelw` root script, but one which just uses the installed Android Studio's JBR (https://github.com/JetBrains/JetBrainsRuntime) java to run gradle
                     let gradlewContents = """
                     #!/bin/bash
                     ${JAVA_HOME:-"$(mdfind "kMDItemCFBundleIdentifier == '\(studioID)'" | head -n 1)/Contents/jbr/Contents/Home"}/bin/java ${JAVA_OPTS} ${GRADLE_OPTS} -classpath "$(dirname "${0}")/gradle/wrapper/gradle-wrapper.jar":"${CLASSPATH}" org.gradle.wrapper.GradleWrapperMain ${@}
                     """
 
-                    try gradlewContents.write(to: gradlew, atomically: true, encoding: .utf8)
+                    try write(gradlewContents, to: gradlew, ifChanged: true)
                     try? fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: gradlew.path) // make the script executable
                 }
             }
@@ -463,7 +481,7 @@ public struct SkipAssembler {
 
         try await createGradleWrapper()
 
-        return destRoot
+        return (destRoot, savedURLs)
     }
 }
 

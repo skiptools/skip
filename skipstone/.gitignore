@@ -6,8 +6,8 @@
 xcuserdata/
 
 # Generated Gradle/Kotlin/Android build
-src/
-*gradle*
+kip/
+.kip/
 
 .*.swp
 .DS_Store

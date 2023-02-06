@@ -1,9 +1,14 @@
+import SymbolKit
+
 /// Wholistic information about the codebase needed when transpiling Swift to Kotlin.
 public class KotlinCodebaseInfo {
     /// The package being generated.
     public var packageName: String?
+    public var graph: UnifiedSymbolGraph?
 
-    init() {
+    public init(packageName: String? = nil, graph: UnifiedSymbolGraph? = nil) {
+        self.packageName = packageName
+        self.graph = graph
     }
 
     /// Gather codebase-level information from the given syntax tree.

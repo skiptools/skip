@@ -15,6 +15,10 @@ final class SkipDemoAppTests: SkipTestCase {
             SkipTargetSet(.lib("SkipDemoLib"), dependencies: [SkipTargetSet(.lib("SkipFoundation"))]),
         ])
     }
+
+    public func testTranspiledTests() async throws {
+        try await runGradleTests()
+    }
     #endif
 
     func testSkipDemoApp() throws {

@@ -35,7 +35,7 @@ let package = Package(
         .target(name: "SkipUI", dependencies: ["SkipFoundation"]),
         .target(name: "SkipDemoLib", dependencies: ["SkipFoundation"]),
         .target(name: "SkipDemoApp", dependencies: ["SkipDemoLib", "SkipUI"]),
-        .executableTarget(name: "SkipRunner", dependencies: ["Skip"]),
+        .executableTarget(name: "SkipRunner", dependencies: ["SkipPack"]),
         .plugin(name: "Skippy", capability: .buildTool(), dependencies: ["SkipRunner"]),
         .plugin(name: "SkipCommand",
                 capability: .command(intent: .custom(verb: "skip", description: "Run Skip transpiler")),

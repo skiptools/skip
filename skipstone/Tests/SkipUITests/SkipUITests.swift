@@ -10,6 +10,10 @@ final class SkipUITests: SkipTestCase {
     override var targets: SkipTargetSet? {
         SkipTargetSet(.app("SkipUI"), dependencies: [SkipTargetSet(.app("SkipFoundation"))])
     }
+
+    public func testTranspiledTests() async throws {
+        try await runGradleTests()
+    }
     #endif
     
     func testSkipUI() throws {
