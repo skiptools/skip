@@ -131,12 +131,34 @@ public struct SkipAssembler {
             }
         }
 
+        // if we are running tests from Xcode, this environment variable should be set; otherwise, assume the .build folder for an SPM build
+        let xcodeBuildFolder = ProcessInfo.processInfo.environment["__XCODE_BUILT_PRODUCTS_DIR_PATHS"] // also seems to be __XPC_DYLD_LIBRARY_PATH or __XPC_DYLD_FRAMEWORK_PATH; this will be something like ~/Library/Developer/Xcode/DerivedData/MODULENAME-bsjbchzxfwcrveckielnbyhybwdr/Build/Products/Debug
+
+        #if DEBUG
+        let swiftBuildFolder = ".build/debug"
+        #else
+        let swiftBuildFolder = ".build/release"
+        #endif
+
+        let moduleURL = URL(fileURLWithPath: xcodeBuildFolder ?? swiftBuildFolder, isDirectory: true)
+
+        // gather the symbols for all the targets
+        let collector = GraphCollector(extensionGraphAssociationStrategy: .extendingGraph)
+        for targetSet in targets.deepTargetSet {
+            let moduleName = targetSet.target.moduleName
+            let symbolGraphs = try await System.extractSymbols(moduleURL, moduleName: moduleName)
+            for (url, graph) in symbolGraphs {
+                logger.debug("adding symbol graph for: \(url)")
+                collector.mergeSymbolGraph(graph, at: url)
+            }
+        }
+        let (unifiedGraphs, _) = collector.finishLoading()
+
         for targetSet in targets.deepTargetSet {
             let moduleName = targetSet.target.moduleName
             logger.info("module: \(moduleName)")
 
-            let symbolGraph: UnifiedSymbolGraph? = nil // TODO
-            let codebaseInfo = KotlinCodebaseInfo(packageName: moduleName, graph: symbolGraph)
+            let codebaseInfo = KotlinCodebaseInfo(packageName: moduleName, graphs: unifiedGraphs)
 
             let moduleSwiftSourceRoot = URL(fileURLWithPath: moduleName, isDirectory: true, relativeTo: sourceRoot)
             let moduleSwiftTestRoot = testRoot.flatMap({ testRoot in URL(fileURLWithPath: moduleName + "Tests", isDirectory: true, relativeTo: testRoot) })

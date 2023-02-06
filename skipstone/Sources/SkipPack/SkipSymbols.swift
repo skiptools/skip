@@ -101,6 +101,40 @@ extension System {
         return graph
     }
 
+    public static func extractSymbols(_ urlBase: URL, moduleName: String, tmpDir: URL? = nil, sdk: String = "macosx", accessLevel: String = "private") async throws -> [URL: SymbolGraph] {
+        // fall back to using a temporary folder
+        let tmpDir = tmpDir ?? URL(fileURLWithPath: UUID().uuidString, isDirectory: true, relativeTo: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true))
+        try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+
+        // get the target info from the JSON emitted from `swift -print-target-info` (e.g., "arm64-apple-macosx13.0")
+        let targetInfoData = try await xcrun("swift", "-print-target-info").joined(separator: "\n").data(using: .utf8) ?? Data()
+        let targetInfo = try JSONDecoder().decode(SwiftTarget.self, from: targetInfoData)
+
+        // get the SDK path (e.g., for "xcrun --show-sdk-path --sdk macosx" it might return "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX13.1.sdk")
+        let sdKPath = try await xcrun("--show-sdk-path", "--sdk", sdk).joined(separator: "\n")
+
+        _ = try await xcrun("swift",
+                        "symbolgraph-extract",
+                        "-module-name", moduleName,
+                        "-include-spi-symbols",
+                        "-skip-inherited-docs",
+                        //"-v", // verbose
+                        //"-pretty-print",
+                        //"-skip-synthesized-members",
+                        "-output-dir", tmpDir.path,
+                        "-target", targetInfo.target.triple,
+                        "-sdk", sdKPath,
+                        "-minimum-access-level", accessLevel,
+                        "-I", urlBase.path)
+
+        let modulePath = urlBase.appendingPathComponent(moduleName).appendingPathExtension("swiftmodule")
+        let symbolFile = tmpDir.appendingPathComponent(moduleName).appendingPathExtension("symbols.json")
+        let graphData = try Data(contentsOf: symbolFile)
+        let graph = try JSONDecoder().decode(SymbolGraph.self, from: graphData)
+        // TODO: scan folder for "@" modules for extension loading
+        return [modulePath: graph]
+    }
+
     @discardableResult static func xcrun(_ args: String...) async throws -> [String] {
 #if os(macOS)
         // use xcrun, which will use whichever Swift we have set up with Xcode

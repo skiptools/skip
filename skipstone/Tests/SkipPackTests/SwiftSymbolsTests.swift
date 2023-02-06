@@ -53,7 +53,12 @@ final class SwiftSymbolsTests: XCTestCase {
         }
 
         // here is how we might index by position, noting that there may be more than one Symbol at a given position…
-        let locations: [SymbolGraph.LineList.SourceRange.Position?: [UnifiedSymbolGraph.Symbol]] = Dictionary(grouping: symbolNameMap.values.map({ (($0.mixins.values.first?["location"] as? SymbolKit.SymbolGraph.Symbol.Location)?.position, $0) }), by: \.0).mapValues({ $0.compactMap({ $0.1 }) })
+        let locationSymbols = symbolNameMap
+            .values
+            .map({ (location: ($0.mixins.values.first?["location"] as? SymbolKit.SymbolGraph.Symbol.Location)?.position, symbols: $0) })
+
+        let locations = Dictionary(grouping: locationSymbols, by: \.location)
+            .mapValues({ $0.compactMap({ $0.symbols }) })
 
         func symbol(at position: SymbolGraph.LineList.SourceRange.Position) throws -> UnifiedSymbolGraph.Symbol {
             try XCTUnwrap(locations[position]?.first)
@@ -138,11 +143,9 @@ final class SwiftSymbolsTests: XCTestCase {
         XCTAssertEqual("s:6Source9TopStructV03SubC0V10otherFieldShySiGvp", set.uniqueIdentifier)
         XCTAssertEqual(["var", " ", "otherField", ": ", "Set", "<", "Int", ">"], set.names.first!.value.subHeading?.map(\.spelling))
     }
-}
-
-extension XCTestCase {
+    
     /// Creates a temporary file with the given name and optional contents.
-    func tmpFile(named fileName: String, contents: String? = nil) throws -> URL {
+    private func tmpFile(named fileName: String, contents: String? = nil) throws -> URL {
         let tmpDir = URL(fileURLWithPath: UUID().uuidString, isDirectory: true, relativeTo: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true))
         try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
         let tmpFile = URL(fileURLWithPath: fileName, isDirectory: false, relativeTo: tmpDir)
