@@ -189,14 +189,17 @@ public struct SkipAssembler {
                 (true, moduleKotlinTestRoot, moduleSwiftTestRoot),
             ] {
                 // the sources we have scanned, which will all be transpiled together
-                var swiftSources: [URL] = []
+                var swiftSources: Set<URL> = []
+                var kotlinSources: Set<URL> = []
 
                 try await swiftRoot?.walkFileURL { fileURL in
                     logger.debug("file: \(fileURL.relativePath)")
                     let isDir = try fileURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory
                     switch fileURL.pathExtension {
                     case "swift" where isDir == false:
-                        swiftSources.append(fileURL)
+                        swiftSources.insert(fileURL)
+                    case "kt" where isDir == false:
+                        kotlinSources.insert(fileURL)
                     case "strings" where isDir == false:
                         // TODO: translation localized files to …/res/…
                         logger.warning("warning: unhandled strings: \(fileURL.relativePath)")
@@ -211,8 +214,19 @@ public struct SkipAssembler {
                     }
                 }
 
-                func transpileSources() async throws {
-                    let sourceURLs = Dictionary(grouping: swiftSources.map({ (path: $0.path, url: $0) }), by: \.path)
+                /// Copies over the raw Kotlin files from the source folder
+                func copyKotlinFiles(sources: Set<URL>) async throws {
+                    for sourceURL in sources {
+                        let destPath = URL(fileURLWithPath: sourceURL.relativePath, isDirectory: false, relativeTo: kotlinRoot)
+                        logger.debug("copying: \(sourceURL.relativePath) to: \(destPath.path)")
+                        try write(String(contentsOf: sourceURL), to: destPath, ifChanged: true)
+                    }
+                }
+
+                try await copyKotlinFiles(sources: kotlinSources)
+
+                func transpileSources(sources: Set<URL>) async throws {
+                    let sourceURLs = Dictionary(grouping: sources.map({ (path: $0.path, url: $0) }), by: \.path)
                     let sources = sourceURLs.keys.sorted().map({ Source.File(path: $0) })
 
                     let tp = Transpiler(sourceFiles: sources)
@@ -233,7 +247,7 @@ public struct SkipAssembler {
                     })
                 }
 
-                try await transpileSources()
+                try await transpileSources(sources: swiftSources)
             }
 
             struct TranslationOptions : OptionSet {

@@ -9,3 +9,10 @@ internal func SkipFoundationInternalModuleName() -> String {
 public func SkipFoundationPublicModuleName() -> String {
     return "SkipFoundation"
 }
+
+#if !SKIP
+// The non-Skip version is in FoundationHelpers.kt
+func foundationHelperDemo() -> String {
+    return "Swift"
+}
+#endif

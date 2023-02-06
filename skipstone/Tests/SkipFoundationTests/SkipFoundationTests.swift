@@ -17,5 +17,11 @@ final class SkipFoundationTests: SkipTestCase {
         XCTAssertEqual(3, 1 + 2)
         XCTAssertEqual("SkipFoundation", SkipFoundationInternalModuleName())
         XCTAssertEqual("SkipFoundation", SkipFoundationPublicModuleName())
+
+        #if SKIP
+        XCTAssertEqual("Kotlin", foundationHelperDemo())
+        #else
+        XCTAssertEqual("Swift", foundationHelperDemo())
+        #endif
     }
 }
