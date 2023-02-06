@@ -5,6 +5,10 @@
 ## User settings
 xcuserdata/
 
+# Generated Gradle/Kotlin/Android build
+src/
+*gradle*
+
 .*.swp
 .DS_Store
 

@@ -5,9 +5,22 @@ SkipPack
 A "Skip Package" is a set of conventions that defines a package
 that includes buildable artifacts for both:
 
-    - Swift Package Manager (SPM) Projects
-    - Gradle Kotlin Projects
+- Swift Package Manager (SPM) Projects
+- Gradle Kotlin Projects
 
+
+SkipTestCase is the base class for executing the transpilation of
+sources and tests.
+
+
+## Pipeline
+
+Take a simple SPM that looks like:
+
+For each MODULE:
+
+1. Take `Sources/MODULE/*.swift` and transpile to `Sources/MODULE/*.kt`
+1. Take `Sources/MODULE/Resources/*.lproj/*.strings` and transpile to `Sources/MODULE/*.swift`
 
 ## Q: what should the file system layout look for a skipped Swift/Kotlin library?
 
@@ -16,7 +29,7 @@ that includes buildable artifacts for both:
 
 Swift files are placed in SPM-idiomatic `Sources/ModuleName/*.swift`
 and Kotlin files are placed in their own Gradle/Maven-idiomatic location: `src/main/java/package…names/*.kt`.
-The necessary gradle build files (`build.gradle.kts`, `settings.gradle.kts`, `gradle.properties`) are output at the root folder so that runnint `gradle build` works out of the box.
+The necessary gradle build files (`build.gradle.kts`, `settings.gradle.kts`, `gradle.properties`) are output at the root folder so that running `gradle build` works out of the box.
 
 
 ```

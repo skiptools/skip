@@ -1,6 +1,9 @@
-import Skip
+import SkipPack
 import SymbolKit
 import XCTest
+import os.log
+
+fileprivate let logger = Logger(subsystem: "skip", category: "test")
 
 final class SwiftSymbolsTests: XCTestCase {
     func testSwiftSymbols() async throws {
@@ -39,7 +42,7 @@ final class SwiftSymbolsTests: XCTestCase {
         XCTAssertEqual(["Source"], Array(graphSources.keys))
         XCTAssertEqual(["Source"], Array(unifiedGraphs.keys))
         let graph = try XCTUnwrap(unifiedGraphs["Source"])
-        dump(graph)
+        //dump(graph)
 
         // symbols mapped by "precise identifier" (like "s:6Source9TopStructV3strSSSgvp")
         let symbolNameMap = graph.symbols
@@ -235,19 +238,19 @@ extension Process {
 
     @discardableResult static func xcrun(_ args: String...) async throws -> (stdout: Pipe, stderr: Pipe) {
         let process = Process()
-        #if os(macOS)
+#if os(macOS)
         // use xcrun, which will use whichever Swift we have set up with Xcode
         process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun", isDirectory: false)
-        #elseif os(Linux)
+#elseif os(Linux)
         // use `env` to resolve the swift/swiftc command in the current environment
         process.executableURL = URL(fileURLWithPath: "/usr/bin/env", isDirectory: false)
-        #else
-        #error("unsupported platform")
-        #endif
+#else
+#error("unsupported platform")
+#endif
 
         process.arguments = args
 
-        print("running: xcrun", args.joined(separator: " "))
+        logger.debug("running: xcrun \(args.joined(separator: " "))")
 
         let (stdout, stderr): (Pipe, Pipe)
         do {
@@ -260,52 +263,8 @@ extension Process {
         }
         return (stdout, stderr)
     }
-
-
-    /// Runs the process with the specified arguments, asyncronously waits for the result, and then returns the stdout and stderr.
-    public func execute() async throws -> (stdout: Pipe, stderr: Pipe) {
-        let (stdout, stderr) = (Pipe(), Pipe())
-        (self.standardOutput, self.standardError) = (stdout, stderr)
-        let cancel = { self.interrupt() }
-
-        return try await withTaskCancellationHandler {
-            return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<(Pipe, Pipe), Error>) in
-                self.terminationHandler = { task in
-                    if task.terminationStatus == 0 {
-                        continuation.resume(returning: (stdout, stderr))
-                    } else {
-                        continuation.resume(throwing: RunProcessError.nonZeroExit(task.terminationStatus, stdout, stderr))
-                    }
-                }
-
-                do {
-                    try self.run()
-                } catch {
-                    continuation.resume(throwing: RunProcessError.execError(error))
-                }
-            }
-        } onCancel: {
-            cancel()
-        }
-    }
-
-    public enum RunProcessError: Error {
-        case execError(Error)
-        case nonZeroExit(_ exitCode: Int32, _ stdout: Pipe, _ stderr: Pipe)
-    }
 }
 
-extension Pipe {
-    /// Reads all the remaining data available for the pipe.
-    func readData() throws -> Data? {
-        try fileHandleForReading.readToEnd()
-    }
-
-    /// Reads the whole pipe as a string.
-    func readString(trim: Bool = true) throws -> String {
-        (String(data: try readData() ?? Data(), encoding: .utf8) ?? "").trimmingCharacters(in: trim ? .whitespacesAndNewlines : .init())
-    }
-}
 
 /// Pared-down contents of the JSON output of `swiftc -print-target-info`
 struct SwiftTarget: Codable {
@@ -318,4 +277,17 @@ struct SwiftTarget: Codable {
     let compilerVersion: String?
 
     let target: Target
+}
+
+extension XCTestCase {
+    /// Creates a temporary file with the given name and optional contents.
+    func tmpFile(named fileName: String, contents: String? = nil) throws -> URL {
+        let tmpDir = URL(fileURLWithPath: UUID().uuidString, isDirectory: true, relativeTo: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true))
+        try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+        let tmpFile = URL(fileURLWithPath: fileName, isDirectory: false, relativeTo: tmpDir)
+        if let contents = contents {
+            try contents.write(to: tmpFile, atomically: true, encoding: .utf8)
+        }
+        return tmpFile
+    }
 }
