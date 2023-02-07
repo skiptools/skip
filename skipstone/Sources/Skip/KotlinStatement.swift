@@ -25,25 +25,6 @@ class KotlinStatement: KotlinSyntaxNode {
     }
 }
 
-/// Types of Kotlin statements.
-enum KotlinStatementType {
-    case expression
-    case `return`
-
-    case classDeclaration
-    case extensionDeclaration
-    case functionDeclaration
-    case importDeclaration
-    case interfaceDeclaration
-    case packageDeclaration
-    case variableDeclaration
-
-    /// A statement representing raw Kotlin code.
-    case raw
-    /// A statement that only exists to add a message to the syntax tree.
-    case message
-}
-
 /// Additional requirements for type members to handle extensions and companion objects in Kotlin.
 protocol KotlinMemberDeclaration: AnyObject {
     var extends: TypeSignature? { get set }

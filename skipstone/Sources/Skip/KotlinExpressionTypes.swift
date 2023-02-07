@@ -1,3 +1,17 @@
+/// Types of Kotlin expressions.
+enum KotlinExpressionType {
+    case arrayLiteral
+    case binaryOperator
+    case booleanLiteral
+    case functionCall
+    case identifier
+    case memberAccess
+    case numericLiteral
+    case stringLiteral
+
+    case raw
+}
+
 class KotlinArrayLiteral: KotlinExpression {
     var elements: [KotlinExpression] = []
 

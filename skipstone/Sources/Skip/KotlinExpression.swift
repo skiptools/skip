@@ -22,20 +22,6 @@ class KotlinExpression: KotlinSyntaxNode {
     }
 }
 
-/// Types of Kotlin expressions.
-enum KotlinExpressionType {
-    case arrayLiteral
-    case binaryOperator
-    case booleanLiteral
-    case functionCall
-    case identifier
-    case memberAccess
-    case numericLiteral
-    case stringLiteral
-
-    case raw
-}
-
 class KotlinRawExpression: KotlinExpression {
     let sourceCode: String
 

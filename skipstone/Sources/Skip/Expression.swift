@@ -25,46 +25,6 @@ class Expression: SyntaxNode {
     }
 }
 
-/// Supported Swift expression types.
-enum ExpressionType: CaseIterable {
-    case arrayLiteral
-    case binaryOperator
-    case booleanLiteral
-    case functionCall
-    case identifier
-    case memberAccess
-    case numericLiteral
-    case stringLiteral
-
-    /// An expression representing raw Swift code.
-    case raw
-
-    /// The Swift data type that represents this expression type.
-    var representingType: Expression.Type? {
-        switch self {
-        case .arrayLiteral:
-            return ArrayLiteral.self
-        case .binaryOperator:
-            return BinaryOperator.self
-        case .booleanLiteral:
-            return BooleanLiteral.self
-        case .functionCall:
-            return FunctionCall.self
-        case .identifier:
-            return Identifier.self
-        case .memberAccess:
-            return MemberAccess.self
-        case .numericLiteral:
-            return NumericLiteral.self
-        case .stringLiteral:
-            return StringLiteral.self
-
-        case .raw:
-            return RawExpression.self
-        }
-    }
-}
-
 /// Decode expressions from syntax.
 struct ExpressionDecoder {
     static func decodeIfExpression(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) -> Expression? {
