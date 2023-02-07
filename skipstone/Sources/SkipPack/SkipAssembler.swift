@@ -194,6 +194,8 @@ public struct SkipAssembler {
 
                 try await swiftRoot?.walkFileURL { fileURL in
                     logger.debug("file: \(fileURL.relativePath)")
+                    try Task.checkCancellation()
+
                     let isDir = try fileURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory
                     switch fileURL.pathExtension {
                     case "swift" where isDir == false:
@@ -225,8 +227,6 @@ public struct SkipAssembler {
                     }
                 }
 
-                try await copyKotlinFiles(sources: kotlinSources)
-
                 func transpileSources(sources: Set<URL>) async throws {
                     let sourceURLs = Dictionary(grouping: sources.map({ (path: $0.path, url: $0) }), by: \.path)
                     let sources = sourceURLs.keys.sorted().map({ Source.File(path: $0) })
@@ -250,6 +250,9 @@ public struct SkipAssembler {
                 }
 
                 try await transpileSources(sources: swiftSources)
+
+                // copy the kotlin files after transpilation, allowing override of same-named .kt/.swift files
+                try await copyKotlinFiles(sources: kotlinSources)
             }
 
             struct TranslationOptions : OptionSet {
@@ -265,12 +268,10 @@ public struct SkipAssembler {
                     kotlin = kotlin.replacingOccurrences(of: string, with: replacement)
                 }
 
-                replace("internal fun ", with: "fun ")
-
                 // replace("convenience constructor", with: "constructor") // Gryphon bug // construtor delegation doesn't work
 
-                replace(": RawRepresentable()", with: "")
-                replace("@JvmInline\n\ndata class", with: "@JvmInline value class")
+                //replace(": RawRepresentable()", with: "")
+                //replace("@JvmInline\n\ndata class", with: "@JvmInline value class")
 
 
                 // convert XCTest to a JUnit test runner
@@ -282,6 +283,7 @@ public struct SkipAssembler {
                     replace("private fun test", with: "@Test fun test")
                     replace("internal fun test", with: "@Test fun test")
                     replace("fun test", with: "@Test fun test")
+                    replace("@Test @Test fun test", with: "@Test fun test") // fixup multiple annotations
 
                     // add the test runner to the top
                     replace("internal class", with: """
@@ -651,6 +653,11 @@ public actor System {
         }
     }
 
+    public struct SystemProcessFailed : LocalizedError {
+        public let failureReason: String?
+        public let terminationStatus: Int32
+    }
+
     /// Runs the process with the specified arguments, asyncronously waits for the result, and then returns the stdout and stderr.
     @discardableResult public func wait() async throws -> Int32 {
         let cancel = { self.process.interrupt() }
@@ -658,10 +665,7 @@ public actor System {
             return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Int32, Error>) in
                 process.terminationHandler = { task in
                     if task.terminationStatus != 0 {
-                        struct SystemProcessFailed : LocalizedError {
-                            let failureReason: String?
-                        }
-                        continuation.resume(throwing: SystemProcessFailed(failureReason: "Error code \(task.terminationStatus) returned."))
+                        continuation.resume(throwing: SystemProcessFailed(failureReason: "Error code \(task.terminationStatus) returned.", terminationStatus: task.terminationStatus))
                     } else {
                         continuation.resume(returning: task.terminationStatus)
                     }

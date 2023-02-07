@@ -78,19 +78,30 @@ extension SkipAssembler {
             // "JAVA_HOME": "/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home",
         ]
 
-        try await System.exec(URL(fileURLWithPath: "/usr/bin/env", isDirectory: false), arguments: args, environment: env, workingDirectory: destRoot) { outputLine in
-            logger.debug("gradle: \(outputLine)")
-            // errors look like: java.lang.AssertionError at SkipFoundationTests.kt:13
-            let line = outputLine.trimmingCharacters(in: .whitespaces)
-            if line.hasPrefix("java.lang.AssertionError") {
-                if let fileLine = outputLine.components(separatedBy: " at ").last,
-                   let fileName = fileLine.split(separator: ":").first,
-                   let fileLine = Int(fileLine.split(separator: ":").last ?? "") {
-                    // the file is unfortunately only the last path component, so we need to manually find it to match it back to the issue so Xcode can jump to the right line in the generated content; so we look up the full path from the list of transpiled URLs (hoping the test file names are unique)
-                    let filePath = paths.first(where: { $0.lastPathComponent == fileName })?.path ?? String(fileName)
-                    testCase.record(XCTIssue(type: .assertionFailure, compactDescription: line, detailedDescription: line, sourceCodeContext: XCTSourceCodeContext(location: XCTSourceCodeLocation(filePath: filePath, lineNumber: fileLine)), associatedError: nil, attachments: []))
+        var issues: [XCTIssue] = []
+        do {
+            try await System.exec(URL(fileURLWithPath: "/usr/bin/env", isDirectory: false), arguments: args, environment: env, workingDirectory: destRoot) { outputLine in
+                logger.debug("gradle: \(outputLine)")
+                try Task.checkCancellation()
+
+                // errors look like: java.lang.AssertionError at SkipFoundationTests.kt:13
+                let line = outputLine.trimmingCharacters(in: .whitespaces)
+                if line.hasPrefix("java.lang.AssertionError") {
+                    if let fileLine = outputLine.components(separatedBy: " at ").last,
+                       let fileName = fileLine.split(separator: ":").first,
+                       let fileLine = Int(fileLine.split(separator: ":").last ?? "") {
+                        // the file is unfortunately only the last path component, so we need to manually find it to match it back to the issue so Xcode can jump to the right line in the generated content; so we look up the full path from the list of transpiled URLs (hoping the test file names are unique)
+                        let filePath = paths.first(where: { $0.lastPathComponent == fileName })?.path ?? String(fileName)
+                        let issue = XCTIssue(type: .assertionFailure, compactDescription: line, detailedDescription: line, sourceCodeContext: XCTSourceCodeContext(location: XCTSourceCodeLocation(filePath: filePath, lineNumber: fileLine)), associatedError: nil, attachments: [])
+                        issues.append(issue)
+                        testCase.record(issue)
+                    }
                 }
-                //XCTFail(line)
+            }
+        } catch let error as System.SystemProcessFailed {
+            // Gradle fails either due to build failures or test failures; since we're already creating issues for the test failures, we shouldn't add an additional failure
+            if issues.isEmpty {
+                throw error
             }
         }
 
