@@ -29,13 +29,13 @@ final class BaseTypeTests: XCTestCase {
         internal var c: Char
         internal var d: Double
         internal var f: Float
-        internal var i: Long
+        internal var i: Int
         internal var i8: Byte
         internal var i16: Short
         internal var i32: Int
         internal var i64: Long
         internal var s: String
-        internal var ui: ULong
+        internal var ui: UInt
         internal var ui8: UByte
         internal var ui16: UShort
         internal var ui32: UInt
@@ -56,13 +56,13 @@ final class BaseTypeTests: XCTestCase {
         var tis2: (Int, String, Double)
         """, kotlin: """
         internal var a: Array<Any>
-        internal var ai: Array<Long>
-        internal var ai2: Array<Long>
+        internal var ai: Array<Int>
+        internal var ai2: Array<Int>
         internal var m: MutableMap<Any, Any>
-        internal var mis: MutableMap<Long, String>
-        internal var mis2: MutableMap<Long, String>
-        internal var tis: Pair<Long, String>
-        internal var tis2: Triple<Long, String, Double>
+        internal var mis: MutableMap<Int, String>
+        internal var mis2: MutableMap<Int, String>
+        internal var tis: Pair<Int, String>
+        internal var tis2: Triple<Int, String, Double>
         """)
     }
 
@@ -80,7 +80,7 @@ final class BaseTypeTests: XCTestCase {
         var c: CustomType?
         var u: CustomType!
         """, kotlin: """
-        internal var i: Long?
+        internal var i: Int?
         internal var c: CustomType?
         internal lateinit var u: CustomType
         """)

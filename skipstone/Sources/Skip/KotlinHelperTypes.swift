@@ -157,7 +157,7 @@ extension TypeSignature {
         case "Dictionary":
             return "MutableMap"
         case "Int":
-            return "Long"
+            return "Int"
         case "Int8":
             return "Byte"
         case "Int16":
@@ -169,7 +169,7 @@ extension TypeSignature {
         case "Set":
             return "MutableSet"
         case "UInt":
-            return "ULong"
+            return "UInt"
         case "UInt8":
             return "UByte"
         case "UInt16":

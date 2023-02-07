@@ -119,6 +119,8 @@ public class KotlinTranslator {
             return KotlinNumericLiteral(expression: expression as! NumericLiteral)
         case .stringLiteral:
             return KotlinStringLiteral.translate(expression: expression as! StringLiteral, translator: self)
+        case .subscript:
+            return KotlinSubscript.translate(expression: expression as! Subscript, translator: self)
         case .raw:
             return KotlinRawExpression(expression: expression as! RawExpression)
         }

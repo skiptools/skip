@@ -10,6 +10,7 @@ enum ExpressionType: CaseIterable {
     case memberAccess
     case numericLiteral
     case stringLiteral
+    case `subscript`
 
     /// An expression representing raw Swift code.
     case raw
@@ -33,6 +34,8 @@ enum ExpressionType: CaseIterable {
             return NumericLiteral.self
         case .stringLiteral:
             return StringLiteral.self
+        case .subscript:
+            return Subscript.self
 
         case .raw:
             return RawExpression.self
@@ -299,5 +302,45 @@ class StringLiteral: Expression {
         }.joined(separator: "")
         let quotes = isMultiline ? "\"\"\"" : "\""
         return [PrettyPrintTree(root: "\(quotes)\(segmentsDescription)\(quotes)")]
+    }
+}
+
+/// `array[0]`
+class Subscript: Expression {
+    let base: Expression
+    let arguments: [LabeledExpression<Expression>]
+
+    init(base: Expression, arguments: [LabeledExpression<Expression>], syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        self.base = base
+        self.arguments = arguments
+        super.init(type: .subscript, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
+        guard syntax.kind == .subscriptExpr, let subscriptExpr = syntax.as(SubscriptExprSyntax.self) else {
+            return nil
+        }
+        let base = ExpressionDecoder.decode(syntax: subscriptExpr.calledExpression, in: syntaxTree)
+        var labeledExpressions = subscriptExpr.argumentList.map {
+            let label = $0.label?.text
+            let expression = ExpressionDecoder.decode(syntax: $0.expression, in: syntaxTree)
+            return LabeledExpression(label: label, expression: expression)
+        }
+        if let trailingClosure = subscriptExpr.trailingClosure {
+            let expression = ExpressionDecoder.decode(syntax: trailingClosure, in: syntaxTree)
+            labeledExpressions.append(LabeledExpression(expression: expression))
+        }
+        if let multipleTrailingClosures = subscriptExpr.additionalTrailingClosures {
+            labeledExpressions += multipleTrailingClosures.map {
+                let label = $0.label.text
+                let expression = ExpressionDecoder.decode(syntax: $0.closure, in: syntaxTree)
+                return LabeledExpression(label: label, expression: expression)
+            }
+        }
+        return Subscript(base: base, arguments: labeledExpressions)
+    }
+
+    override var children: [SyntaxNode] {
+        return [base] + arguments.map { $0.expression }
     }
 }

@@ -5,13 +5,18 @@ func f2(param: Int) -> Int {
 }
 
 struct ArrayHolder {
-    var array: [Int] = []
+    var array = [0] {
+        didSet {
+            arraySets += 1
+        }
+    }
+    var arraySets = 0
 
-    mutating func add(value: Int) {
-        array.append(value)
+    mutating func addToFirst(value: Int) {
+        array[0] += value
     }
 
-    func adding(value: Int) -> ArrayHolder {
+    func appending(value: Int) -> ArrayHolder {
         var holder = self
         holder.array.append(value)
         return holder

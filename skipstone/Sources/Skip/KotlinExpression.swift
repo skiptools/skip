@@ -13,6 +13,27 @@ class KotlinExpression: KotlinSyntaxNode {
         self.messages = expression.messages
     }
 
+    /// Return an expression that creates a by-value copy of the result of this expression if needed to maintain proper semantics for value types.
+    ///
+    /// - Seealso: `SkipFoundation.Any.valref()`
+    final var valueReference: KotlinExpression {
+        guard mayBeSharedMutableValueExpression else {
+            return self
+        }
+        let valueReferenceFunction = KotlinMemberAccess(base: self, member: "valref")
+        return KotlinFunctionCall(function: valueReferenceFunction, arguments: [])
+    }
+
+    /// Return true if this expression may evaluate to a shared mutable value type.
+    var mayBeSharedMutableValueExpression: Bool {
+        return false
+    }
+
+    /// Return true if this is a multi-part expression requiring parenthesization to operate on.
+    var isCompoundExpression: Bool {
+        return false
+    }
+
     final override func append(to output: OutputGenerator, indentation: Indentation) {
         output.append(indentation)
         append(to: output)

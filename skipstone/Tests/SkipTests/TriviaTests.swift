@@ -32,13 +32,13 @@ final class TriviaTests: XCTestCase {
         internal data class S {
             internal var s: String // EOL comment
 
-            internal var i: Long
+            internal var i: Int
             internal fun f(): S {
                 // Copy
-                var copy = this
+                var copy = this.valref()
                 // Double
                 copy.s = s + s
-                return copy
+                return copy.valref()
             }
 
             // Func comment

@@ -8,6 +8,7 @@ enum KotlinExpressionType {
     case memberAccess
     case numericLiteral
     case stringLiteral
+    case `subscript`
 
     case raw
 }
@@ -24,6 +25,8 @@ class KotlinArrayLiteral: KotlinExpression {
     private init(expression: ArrayLiteral) {
         super.init(type: .arrayLiteral, expression: expression)
     }
+
+    // Note that we do not return true from mayBeSharedMutableValueExpression because a literal is not shared
 
     override var children: [KotlinSyntaxNode] {
         return elements
@@ -48,7 +51,10 @@ class KotlinBinaryOperator: KotlinExpression {
 
     static func translate(expression: BinaryOperator, translator: KotlinTranslator) -> KotlinBinaryOperator {
         let klhs = translator.translateExpression(expression.lhs)
-        let krhs = translator.translateExpression(expression.rhs)
+        var krhs = translator.translateExpression(expression.rhs)
+        if expression.op.isAssignment {
+            krhs = krhs.valueReference
+        }
         return KotlinBinaryOperator(expression: expression, lhs: klhs, rhs: krhs)
     }
 
@@ -59,12 +65,30 @@ class KotlinBinaryOperator: KotlinExpression {
         super.init(type: .binaryOperator, expression: expression)
     }
 
+    override var mayBeSharedMutableValueExpression: Bool {
+        return !op.isAssignment && lhs.mayBeSharedMutableValueExpression
+    }
+
+    override var isCompoundExpression: Bool {
+        return true
+    }
+
     override var children: [KotlinSyntaxNode] {
         return [lhs, rhs]
     }
 
     override func append(to output: OutputGenerator) {
-        output.append(lhs).append(" \(op.symbol) ").append(rhs)
+        if lhs.isCompoundExpression {
+            output.append("(").append(lhs).append(")")
+        } else {
+            output.append(lhs)
+        }
+        output.append(" \(op.symbol) ")
+        if rhs.isCompoundExpression {
+            output.append("(").append(rhs).append(")")
+        } else {
+            output.append(rhs)
+        }
     }
 }
 
@@ -89,15 +113,25 @@ class KotlinFunctionCall: KotlinExpression {
         let kfunction = translator.translateExpression(expression.function)
         let kexpression = KotlinFunctionCall(expression: expression, function: kfunction)
         kexpression.arguments = expression.arguments.map {
-            let kargumentExpression = translator.translateExpression($0.expression)
+            let kargumentExpression = translator.translateExpression($0.expression).valueReference
             return LabeledExpression(label: $0.label, expression: kargumentExpression)
         }
         return kexpression
     }
 
+    init(function: KotlinExpression, arguments: [LabeledExpression<KotlinExpression>]) {
+        self.function = function
+        self.arguments = arguments
+        super.init(type: .functionCall)
+    }
+
     private init(expression: FunctionCall, function: KotlinExpression) {
         self.function = function
         super.init(type: .functionCall, expression: expression)
+    }
+
+    override var mayBeSharedMutableValueExpression: Bool {
+        return true
     }
 
     override var children: [KotlinSyntaxNode] {
@@ -127,6 +161,10 @@ class KotlinIdentifier: KotlinExpression {
         super.init(type: .identifier, expression: expression)
     }
 
+    override var mayBeSharedMutableValueExpression: Bool {
+        return true
+    }
+
     override func append(to output: OutputGenerator) {
         if name == "self" {
             output.append("this")
@@ -148,9 +186,19 @@ class KotlinMemberAccess: KotlinExpression {
         return kexpression
     }
 
+    init(base: KotlinExpression?, member: String) {
+        self.base = base
+        self.member = member
+        super.init(type: .memberAccess)
+    }
+
     private init(expression: MemberAccess) {
         self.member = expression.member
         super.init(type: .memberAccess, expression: expression)
+    }
+
+    override var mayBeSharedMutableValueExpression: Bool {
+        return true
     }
 
     override var children: [KotlinSyntaxNode] {
@@ -159,7 +207,11 @@ class KotlinMemberAccess: KotlinExpression {
 
     override func append(to output: OutputGenerator) {
         if let base {
-            output.append(base)
+            if base.isCompoundExpression {
+                output.append("(").append(base).append(")")
+            } else {
+                output.append(base)
+            }
         }
         output.append(".").append(member)
     }
@@ -228,5 +280,58 @@ class KotlinStringLiteral: KotlinExpression {
             }
         }
         output.append(delimiter)
+    }
+}
+
+class KotlinSubscript: KotlinExpression {
+    var base: KotlinExpression
+    var arguments: [LabeledExpression<KotlinExpression>] = []
+
+    static func translate(expression: Subscript, translator: KotlinTranslator) -> KotlinSubscript {
+        let kbase = translator.translateExpression(expression.base)
+        let kexpression = KotlinSubscript(expression: expression, base: kbase)
+        kexpression.arguments = expression.arguments.map {
+            let kargumentExpression = translator.translateExpression($0.expression).valueReference
+            return LabeledExpression(label: $0.label, expression: kargumentExpression)
+        }
+        return kexpression
+    }
+
+    init(base: KotlinExpression, arguments: [LabeledExpression<KotlinExpression>]) {
+        self.base = base
+        self.arguments = arguments
+        super.init(type: .subscript)
+    }
+
+    private init(expression: Subscript, base: KotlinExpression) {
+        self.base = base
+        super.init(type: .subscript, expression: expression)
+    }
+
+    override var mayBeSharedMutableValueExpression: Bool {
+        return true
+    }
+
+    override var children: [KotlinSyntaxNode] {
+        return [base] + arguments.map { $0.expression }
+    }
+
+    override func append(to output: OutputGenerator) {
+        if base.isCompoundExpression {
+            output.append("(").append(base).append(")")
+        } else {
+            output.append(base)
+        }
+        output.append("[")
+        for (index, argument) in arguments.enumerated() {
+            if let label = argument.label {
+                output.append(label).append(" = ")
+            }
+            output.append(argument.expression)
+            if index < arguments.count - 1 {
+                output.append(", ")
+            }
+        }
+        output.append("]")
     }
 }

@@ -35,6 +35,11 @@ struct Operator: Equatable {
         return precedence == Self.unknownOperatorPrecedence
     }
 
+    /// Whether this is an assignment operator.
+    var isAssignment: Bool {
+        return precedence == 0
+    }
+
     /// Return an operator for the given symbol.
     static func with(symbol: String) -> Operator {
         if let op = allBySymbol[symbol] {

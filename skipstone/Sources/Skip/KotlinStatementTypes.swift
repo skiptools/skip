@@ -21,7 +21,7 @@ class KotlinReturn: KotlinExpressionStatement {
     static func translate(statement: Return, translator: KotlinTranslator) -> KotlinExpressionStatement {
         let kstatement = KotlinReturn(statement: statement)
         if let expression = statement.expression {
-            kstatement.expression = translator.translateExpression(expression)
+            kstatement.expression = translator.translateExpression(expression).valueReference
         }
         return kstatement
     }
@@ -404,7 +404,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             kstatement.isGlobal = true
         }
         if let value = statement.value {
-            kstatement.value = translator.translateExpression(value)
+            kstatement.value = translator.translateExpression(value).valueReference
         }
         kstatement.getter = statement.getter?.translate(translator: translator)
         kstatement.setter = statement.setter?.translate(translator: translator)
@@ -498,6 +498,8 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                     output.append(setterBodyIndentation).append("val \(parameterName) = newValue\n")
                 }
                 output.append(setterStatements, indentation: setterBodyIndentation)
+            } else {
+                output.append(setterBodyIndentation).append("field = newValue\n")
             }
             if let didSetStatements = didSet?.statements {
                 output.append(didSetStatements, indentation: setterBodyIndentation)
