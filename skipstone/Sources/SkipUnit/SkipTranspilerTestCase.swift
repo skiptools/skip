@@ -1,4 +1,4 @@
-@_exported import SkipPack
+@_exported import SkipBuild
 @_exported import XCTest
 import Skip
 import os.log
@@ -10,21 +10,17 @@ open class SkipTranspilerTestCase : XCTestCase {
     /// Whether the fork the tests from the XCTestCase
     public static var testInProcess = true
 
-    /// The list of modules that should be the transpilation target
-    open var targets: SkipTargetSet? { nil }
-
-
     open override func setUp() async throws {
         try await super.setUp()
     }
 }
 
 extension SkipTranspilerTestCase {
-    public func runGradleTests() async throws {
-        guard let targets = targets else {
-            struct NoTargetsSpecifiedError : Error { }
-            throw NoTargetsSpecifiedError()
-        }
+    public func transpileAndTest(targets: SkipTargetSet) async throws {
+//        guard let targets = targets else {
+//            struct NoTargetsSpecifiedError : Error { }
+//            throw NoTargetsSpecifiedError()
+//        }
 
         // locate the root package for this test case (assuming shallow test directory structure of Tests/ModuleName/TestCase.swift)
         let srcRoot = URL(fileURLWithPath: targets.sourceBase.description, isDirectory: false)

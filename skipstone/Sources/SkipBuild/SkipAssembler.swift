@@ -156,6 +156,8 @@ public struct SkipAssembler {
 
         for targetSet in targets.deepTargetSet {
             let moduleName = targetSet.target.moduleName
+
+            // FIXME: the package name is currently just the module name (like "MyModule"), which works when testing locally, but when building an Android library it might raise the error: “AAPT: error: attribute 'package' in <manifest> tag is not a valid Android package name: 'MyModule'.”
             logger.info("module: \(moduleName)")
 
             let codebaseInfo = KotlinCodebaseInfo(packageName: moduleName, graphs: unifiedGraphs)
@@ -422,7 +424,7 @@ public struct SkipAssembler {
             #org.gradle.jvmargs=-Xmx2048m
 
             # Turn on parallel compilation, caching and on-demand configuration
-            org.gradle.configureondemand=true
+            #org.gradle.configureondemand=true
             org.gradle.caching=true
             org.gradle.parallel=true
 

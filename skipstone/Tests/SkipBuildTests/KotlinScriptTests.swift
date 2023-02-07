@@ -1,4 +1,4 @@
-import SkipPack
+import SkipBuild
 import XCTest
 
 final class KotlinScriptTests: XCTestCase {

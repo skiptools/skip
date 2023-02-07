@@ -1,5 +1,5 @@
 
-SkipPack
+SkipBuild
 ========
 
 A "Skip Package" is a set of conventions that defines a package
@@ -8,10 +8,7 @@ that includes buildable artifacts for both:
 - Swift Package Manager (SPM) Projects
 - Gradle Kotlin Projects
 
-
-SkipTestCase is the base class for executing the transpilation of
-sources and tests.
-
+SkipUnit is the base class for executing the transpilation of sources and tests.
 
 ## Generate File System Layout
 
@@ -244,4 +241,3 @@ Skippiks
 Skippi
 SkipToMyLou
 Crave (2Gradle)
-SkipTest->SkipUnit?

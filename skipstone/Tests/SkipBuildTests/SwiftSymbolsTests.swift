@@ -1,4 +1,4 @@
-import SkipPack
+import SkipBuild
 import SymbolKit
 import XCTest
 import os.log
