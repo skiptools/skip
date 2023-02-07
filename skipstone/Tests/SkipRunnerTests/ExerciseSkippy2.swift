@@ -13,7 +13,6 @@ struct ArrayHolder {
 
     func adding(value: Int) -> ArrayHolder {
         var holder = self
-        // Huh?
         holder.array.append(value)
         return holder
     }
