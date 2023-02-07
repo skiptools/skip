@@ -20,7 +20,7 @@ struct StatementExtras {
     let trailingTrivia: [String]
 
     /// Decode the trivia on the given syntax to parse extras.
-    static func decode(syntax: Syntax) -> StatementExtras? {
+    static func decode(syntax: SyntaxProtocol) -> StatementExtras? {
         let trailingTriviaString = processTrailingTrivia(syntax: syntax)
         guard let trivia = syntax.leadingTrivia else {
             guard !trailingTriviaString.isEmpty else {
@@ -121,7 +121,7 @@ struct StatementExtras {
         return StatementExtras(directives: directives, leadingTrivia: triviaLines, trailingTrivia: [trailingTriviaString])
     }
 
-    private static func processTrailingTrivia(syntax: Syntax) -> String {
+    private static func processTrailingTrivia(syntax: SyntaxProtocol) -> String {
         guard let trailingTrivia = syntax.trailingTrivia else {
             return ""
         }
@@ -129,7 +129,7 @@ struct StatementExtras {
     }
 
     /// All statements contained in our directives.
-    func statements(syntax: Syntax, in syntaxTree: SyntaxTree) -> (statements: [Statement], replace: Bool) {
+    func statements(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) -> (statements: [Statement], replace: Bool) {
         var statements: [Statement] = []
         var replace = false
         for directive in directives {

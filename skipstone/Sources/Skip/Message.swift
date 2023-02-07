@@ -68,7 +68,7 @@ public struct Message: Error, CustomStringConvertible {
 }
 
 extension Message {
-    static func unsupportedSyntax(_ syntax: Syntax, source: Source? = nil, sourceRange: Source.Range? = nil) -> Message {
+    static func unsupportedSyntax(_ syntax: SyntaxProtocol, source: Source? = nil, sourceRange: Source.Range? = nil) -> Message {
         var range = sourceRange
         if range == nil, let source {
             range = syntax.range(in: source)

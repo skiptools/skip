@@ -4,7 +4,7 @@ import SwiftSyntax
 class Expression: SyntaxNode {
     let type: ExpressionType
 
-    init(type: ExpressionType, syntax: Syntax? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(type: ExpressionType, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
         self.type = type
         super.init(nodeName: String(describing: type), syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
@@ -12,7 +12,7 @@ class Expression: SyntaxNode {
     /// Attempt to construct an expression of this type from the given syntax.
     ///
     /// - Throws: `Message` when unable to decode a compatible syntax.
-    class func decode(syntax: Syntax, in syntaxTree: SyntaxTree) throws -> Expression? {
+    class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
         return nil
     }
 
@@ -20,7 +20,7 @@ class Expression: SyntaxNode {
     ///
     /// - Throws: `Message` when unable to decode a compatible syntax.
     /// - Seealso: `ExpressionDecoder.decodeSequence`
-    class func decodeSequenceOperator(syntax: Syntax, sequence: Syntax, elements: [ExprSyntax], index: Int, in syntaxTree: SyntaxTree) throws -> Expression? {
+    class func decodeSequenceOperator(syntax: SyntaxProtocol, sequence: SyntaxProtocol, elements: [ExprSyntax], index: Int, in syntaxTree: SyntaxTree) throws -> Expression? {
         return nil
     }
 }
@@ -67,7 +67,7 @@ enum ExpressionType: CaseIterable {
 
 /// Decode expressions from syntax.
 struct ExpressionDecoder {
-    static func decodeIfExpression(syntax: Syntax, in syntaxTree: SyntaxTree) -> Expression? {
+    static func decodeIfExpression(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) -> Expression? {
         do {
             if syntax.kind == .sequenceExpr, let sequenceExpr = syntax.as(SequenceExprSyntax.self) {
                 return try decodeSequence(sequence: syntax, elements: Array(sequenceExpr.elements), in: syntaxTree)
@@ -83,26 +83,26 @@ struct ExpressionDecoder {
         return nil
     }
 
-    static func decode(syntax: Syntax, in syntaxTree: SyntaxTree) -> Expression {
+    static func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) -> Expression {
         guard let expression = decodeIfExpression(syntax: syntax, in: syntaxTree) else {
             return RawExpression(syntax: syntax, message: .unsupportedSyntax(syntax, source: syntaxTree.source), in: syntaxTree)
         }
         return expression
     }
 
-    static func decodeSequence(sequence: Syntax, elements: [ExprSyntax], in syntaxTree: SyntaxTree) throws -> Expression {
+    static func decodeSequence(sequence: SyntaxProtocol, elements: [ExprSyntax], in syntaxTree: SyntaxTree) throws -> Expression {
         guard !elements.isEmpty else {
             throw Message.unsupportedSyntax(sequence, source: syntaxTree.source)
         }
         if elements.count == 1 {
-            return decode(syntax: Syntax(elements[0]), in: syntaxTree)
+            return decode(syntax: elements[0], in: syntaxTree)
         }
         guard let lowestPrecedenceIndex = indexOfLowestPrecedenceOperator(in: elements) else {
             throw Message.unsupportedSyntax(sequence, source: syntaxTree.source)
         }
         let operatorElement = elements[lowestPrecedenceIndex]
         for expressionType in ExpressionType.allCases {
-            if let representingType = expressionType.representingType, let expression = try representingType.decodeSequenceOperator(syntax: Syntax(operatorElement), sequence: sequence, elements: elements, index: lowestPrecedenceIndex, in: syntaxTree) {
+            if let representingType = expressionType.representingType, let expression = try representingType.decodeSequenceOperator(syntax: operatorElement, sequence: sequence, elements: elements, index: lowestPrecedenceIndex, in: syntaxTree) {
                 return expression
             }
         }
@@ -162,7 +162,7 @@ struct ExpressionDecoder {
 class RawExpression: Expression {
     let sourceCode: String
 
-    init(sourceCode: String, message: Message? = nil, syntax: Syntax? = nil, range: Source.Range?, in syntaxTree: SyntaxTree? = nil) {
+    init(sourceCode: String, message: Message? = nil, syntax: SyntaxProtocol? = nil, range: Source.Range?, in syntaxTree: SyntaxTree? = nil) {
         self.sourceCode = sourceCode
         var range: Source.Range? = nil
         if let source = syntaxTree?.source {
@@ -174,7 +174,7 @@ class RawExpression: Expression {
         }
     }
 
-    init(syntax: Syntax, message: Message? = nil, in syntaxTree: SyntaxTree) {
+    init(syntax: SyntaxProtocol, message: Message? = nil, in syntaxTree: SyntaxTree) {
         self.sourceCode = syntax.sourceCode(in: syntaxTree.source)
         let source = syntaxTree.source
         let range = syntax.range(in: source)
@@ -186,7 +186,7 @@ class RawExpression: Expression {
         }
     }
 
-    override class func decode(syntax: Syntax, in syntaxTree: SyntaxTree) -> Expression? {
+    override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) -> Expression? {
         return nil
     }
 

@@ -5,11 +5,11 @@ import SwiftSyntax
 /// Nodes are generally immutable after `resolve` is called with the parent set, allowing each node to finalize itself with any contextual information.
 class SyntaxNode: SourceDerived, PrettyPrintable {
     let nodeName: String
-    let syntax: Syntax?
+    let syntax: SyntaxProtocol?
     let sourceFile: Source.File?
     let sourceRange: Source.Range?
 
-    init(nodeName: String, syntax: Syntax? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(nodeName: String, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
         self.nodeName = nodeName
         self.syntax = syntax
         self.sourceFile = sourceFile

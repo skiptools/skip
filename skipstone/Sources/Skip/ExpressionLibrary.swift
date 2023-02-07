@@ -4,17 +4,17 @@ import SwiftSyntax
 class ArrayLiteral: Expression {
     let elements: [Expression]
 
-    init(elements: [Expression], syntax: Syntax?, sourceFile: Source.File?, sourceRange: Source.Range? = nil) {
+    init(elements: [Expression], syntax: SyntaxProtocol?, sourceFile: Source.File?, sourceRange: Source.Range? = nil) {
         self.elements = elements
         super.init(type: .arrayLiteral, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
-    override class func decode(syntax: Syntax, in syntaxTree: SyntaxTree) throws -> Expression? {
+    override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
         guard syntax.kind == .arrayExpr, let arrayExpr = syntax.as(ArrayExprSyntax.self) else {
             return nil
         }
         let elements = arrayExpr.elements.map {
-            ExpressionDecoder.decode(syntax: Syntax($0.expression), in: syntaxTree)
+            ExpressionDecoder.decode(syntax: $0.expression, in: syntaxTree)
         }
         return ArrayLiteral(elements: elements, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
@@ -30,14 +30,14 @@ class BinaryOperator: Expression {
     let lhs: Expression
     let rhs: Expression
 
-    init(op: Operator, lhs: Expression, rhs: Expression, syntax: Syntax?, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(op: Operator, lhs: Expression, rhs: Expression, syntax: SyntaxProtocol?, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
         self.op = op
         self.lhs = lhs
         self.rhs = rhs
         super.init(type: .binaryOperator, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
-    override class func decodeSequenceOperator(syntax: Syntax, sequence: Syntax, elements: [ExprSyntax], index: Int, in syntaxTree: SyntaxTree) throws -> Expression? {
+    override class func decodeSequenceOperator(syntax: SyntaxProtocol, sequence: SyntaxProtocol, elements: [ExprSyntax], index: Int, in syntaxTree: SyntaxTree) throws -> Expression? {
         guard syntax.kind == .binaryOperatorExpr, let binaryOperatorExpr = syntax.as(BinaryOperatorExprSyntax.self) else {
             return nil
         }
@@ -60,12 +60,12 @@ class BinaryOperator: Expression {
 class BooleanLiteral: Expression {
     let literal: Bool
 
-    init(literal: Bool, syntax: Syntax? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(literal: Bool, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
         self.literal = literal
         super.init(type: .booleanLiteral, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
-    override class func decode(syntax: Syntax, in syntaxTree: SyntaxTree) -> Expression? {
+    override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) -> Expression? {
         guard syntax.kind == .booleanLiteralExpr, let booleanLiteralExpr = syntax.as(BooleanLiteralExprSyntax.self) else {
             return nil
         }
@@ -83,30 +83,30 @@ class FunctionCall: Expression {
     let function: Expression
     let arguments: [LabeledExpression<Expression>]
 
-    init(function: Expression, arguments: [LabeledExpression<Expression>], syntax: Syntax? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(function: Expression, arguments: [LabeledExpression<Expression>], syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
         self.function = function
         self.arguments = arguments
         super.init(type: .functionCall, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
-    override class func decode(syntax: Syntax, in syntaxTree: SyntaxTree) throws -> Expression? {
+    override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
         guard syntax.kind == .functionCallExpr, let functionCallExpr = syntax.as(FunctionCallExprSyntax.self) else {
             return nil
         }
-        let function = ExpressionDecoder.decode(syntax: Syntax(functionCallExpr.calledExpression), in: syntaxTree)
+        let function = ExpressionDecoder.decode(syntax: functionCallExpr.calledExpression, in: syntaxTree)
         var labeledExpressions = functionCallExpr.argumentList.map {
             let label = $0.label?.text
-            let expression = ExpressionDecoder.decode(syntax: Syntax($0.expression), in: syntaxTree)
+            let expression = ExpressionDecoder.decode(syntax: $0.expression, in: syntaxTree)
             return LabeledExpression(label: label, expression: expression)
         }
         if let trailingClosure = functionCallExpr.trailingClosure {
-            let expression = ExpressionDecoder.decode(syntax: Syntax(trailingClosure), in: syntaxTree)
+            let expression = ExpressionDecoder.decode(syntax: trailingClosure, in: syntaxTree)
             labeledExpressions.append(LabeledExpression(expression: expression))
         }
         if let multipleTrailingClosures = functionCallExpr.additionalTrailingClosures {
             labeledExpressions += multipleTrailingClosures.map {
                 let label = $0.label.text
-                let expression = ExpressionDecoder.decode(syntax: Syntax($0.closure), in: syntaxTree)
+                let expression = ExpressionDecoder.decode(syntax: $0.closure, in: syntaxTree)
                 return LabeledExpression(label: label, expression: expression)
             }
         }
@@ -122,12 +122,12 @@ class FunctionCall: Expression {
 class Identifier: Expression {
     let name: String
 
-    init(name: String, syntax: Syntax? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(name: String, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
         self.name = name
         super.init(type: .identifier, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
-    override class func decode(syntax: Syntax, in syntaxTree: SyntaxTree) throws -> Expression? {
+    override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
         guard syntax.kind == .identifierExpr, let identifierExpr = syntax.as(IdentifierExprSyntax.self) else {
             return nil
         }
@@ -145,19 +145,19 @@ class MemberAccess: Expression {
     let base: Expression?
     let member: String
 
-    init(base: Expression?, member: String, syntax: Syntax? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(base: Expression?, member: String, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
         self.base = base
         self.member = member
         super.init(type: .memberAccess, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
-    override class func decode(syntax: Syntax, in syntaxTree: SyntaxTree) throws -> Expression? {
+    override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
         guard syntax.kind == .memberAccessExpr, let memberAccessExpr = syntax.as(MemberAccessExprSyntax.self) else {
             return nil
         }
         var base: Expression? = nil
         if let baseSyntax = memberAccessExpr.base {
-            base = ExpressionDecoder.decode(syntax: Syntax(baseSyntax), in: syntaxTree)
+            base = ExpressionDecoder.decode(syntax: baseSyntax, in: syntaxTree)
         }
         let member = memberAccessExpr.name.text
         return MemberAccess(base: base, member: member, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
@@ -177,13 +177,13 @@ class NumericLiteral: Expression {
     let literal: String
     let isFloatingPoint: Bool
 
-    init(literal: String, isFloatingPoint: Bool, syntax: Syntax? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(literal: String, isFloatingPoint: Bool, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
         self.literal = literal
         self.isFloatingPoint = isFloatingPoint
         super.init(type: .numericLiteral, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
-    override class func decode(syntax: Syntax, in syntaxTree: SyntaxTree) -> Expression? {
+    override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) -> Expression? {
         let literal: String
         let isFloatingPoint: Bool
         if syntax.kind == .floatLiteralExpr, let floatLiteralExpr = syntax.as(FloatLiteralExprSyntax.self) {
@@ -208,13 +208,13 @@ class StringLiteral: Expression {
     let segments: [StringLiteralSegment<Expression>]
     let isMultiline: Bool
 
-    init(segments: [StringLiteralSegment<Expression>], isMultiline: Bool = false, syntax: Syntax? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(segments: [StringLiteralSegment<Expression>], isMultiline: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
         self.segments = segments
         self.isMultiline = isMultiline
         super.init(type: .stringLiteral, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
-    override class func decode(syntax: Syntax, in syntaxTree: SyntaxTree) -> Expression? {
+    override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) -> Expression? {
         guard syntax.kind == .stringLiteralExpr, let stringLiteralExpr = syntax.as(StringLiteralExprSyntax.self) else {
             return nil
         }
@@ -228,7 +228,7 @@ class StringLiteral: Expression {
                 guard let expressionSyntax = expressionSyntax.expressions.first?.expression else {
                     break
                 }
-                let expression = ExpressionDecoder.decode(syntax: Syntax(expressionSyntax), in: syntaxTree)
+                let expression = ExpressionDecoder.decode(syntax: expressionSyntax, in: syntaxTree)
                 segments.append(.expression(expression))
             }
         }

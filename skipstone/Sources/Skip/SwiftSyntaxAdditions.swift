@@ -66,7 +66,7 @@ extension FunctionSignatureSyntax {
             let isVariadic = parameterSyntax.ellipsis?.text == "..."
             var defaultValue: Statement? = nil
             if let defaultArgument = parameterSyntax.defaultArgument {
-                defaultValue = StatementDecoder.decode(syntax: Syntax(defaultArgument), in: syntaxTree).first
+                defaultValue = StatementDecoder.decode(syntax: defaultArgument, in: syntaxTree).first
             }
             return Parameter<Statement>(externalName: parameterSyntax.firstName?.text ?? "", internalName: parameterSyntax.secondName?.text, type: type, isVariadic: isVariadic, defaultValue: defaultValue)
         }
@@ -98,7 +98,7 @@ private class PrettyPrintVisitor: SyntaxVisitor {
 /// An element in a list of syntaxes (e.g. a list of declarations or statements). These lists, like `MemberDeclListSyntax`
 /// and `CodeBlockItemListSyntax`, usually wrap their elements in these containers. This protocol allows us to use them generically.
 protocol SyntaxListElement: SyntaxProtocol {
-    var content: Syntax { get }
+    var content: SyntaxProtocol { get }
 }
 
 /// A syntax that represents a list of elements, e.g. a list of statements or declarations.
@@ -109,7 +109,6 @@ protocol SyntaxList: Sequence where Element: SyntaxListElement {
 protocol SyntaxListContainer {
     associatedtype ElementList: SyntaxList
     var syntaxList: ElementList { get }
-    var endSyntax: Syntax { get }
 }
 
 // MARK: - Conformances
@@ -118,15 +117,11 @@ extension SourceFileSyntax: SyntaxListContainer {
     var syntaxList: CodeBlockItemListSyntax {
         return self.statements
     }
-
-    var endSyntax: Syntax {
-        return Syntax(self.eofToken)
-    }
 }
 
 extension CodeBlockItemSyntax: SyntaxListElement {
-    var content: Syntax {
-        return Syntax(item)
+    var content: SyntaxProtocol {
+        return item
     }
 }
 
@@ -137,15 +132,11 @@ extension CodeBlockSyntax: SyntaxListContainer {
     var syntaxList: CodeBlockItemListSyntax {
         return self.statements
     }
-
-    var endSyntax: Syntax {
-        return Syntax(self.rightBrace)
-    }
 }
 
 extension MemberDeclListItemSyntax: SyntaxListElement {
-    var content: Syntax {
-        return Syntax(self.decl)
+    var content: SyntaxProtocol {
+        return self.decl
     }
 }
 
@@ -156,18 +147,10 @@ extension MemberDeclBlockSyntax: SyntaxListContainer {
     var syntaxList: MemberDeclListSyntax {
         return self.members
     }
-
-    var endSyntax: Syntax {
-        return Syntax(self.rightBrace)
-    }
 }
 
 extension ClosureExprSyntax: SyntaxListContainer {
     var syntaxList: CodeBlockItemListSyntax {
         return self.statements
-    }
-
-    var endSyntax: Syntax {
-        return Syntax(self.rightBrace)
     }
 }

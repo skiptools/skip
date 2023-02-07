@@ -5,7 +5,7 @@ class Statement: SyntaxNode {
     let type: StatementType
     let extras: StatementExtras?
 
-    init(type: StatementType, syntax: Syntax? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(type: StatementType, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.type = type
         self.extras = extras
         super.init(nodeName: String(describing: type), syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
@@ -14,7 +14,7 @@ class Statement: SyntaxNode {
     /// Attempt to construct statements of this type from the given syntax.
     ///
     /// - Throws: `Message` when unable to decode a compatible syntax.
-    class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+    class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
         return nil
     }
 
@@ -127,7 +127,7 @@ enum StatementType: CaseIterable {
 
 /// Decode statements from syntax.
 struct StatementDecoder {
-    static func decode(syntax: Syntax, in syntaxTree: SyntaxTree) -> [Statement] {
+    static func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) -> [Statement] {
         let extras = StatementExtras.decode(syntax: syntax)
         var statements: [Statement] = []
         if let extras {
@@ -170,12 +170,12 @@ struct StatementDecoder {
 class ExpressionStatement: Statement {
     let expression: Expression?
 
-    init(type: StatementType = .expression, expression: Expression? = nil, syntax: Syntax? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(type: StatementType = .expression, expression: Expression? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.expression = expression
         super.init(type: type, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
-    override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
         guard let expression = ExpressionDecoder.decodeIfExpression(syntax: syntax, in: syntaxTree) else {
             return nil
         }
@@ -194,7 +194,7 @@ class MessageStatement: Statement {
         self.messages = [message]
     }
 
-    override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
         return nil
     }
 }
@@ -203,7 +203,7 @@ class MessageStatement: Statement {
 class RawStatement: Statement {
     let sourceCode: String
 
-    init(sourceCode: String, syntax: Syntax? = nil, message: Message? = nil, extras: StatementExtras? = nil, in syntaxTree: SyntaxTree? = nil) {
+    init(sourceCode: String, syntax: SyntaxProtocol? = nil, message: Message? = nil, extras: StatementExtras? = nil, in syntaxTree: SyntaxTree? = nil) {
         self.sourceCode = sourceCode
         var range: Source.Range? = nil
         if let source = syntaxTree?.source {
@@ -215,7 +215,7 @@ class RawStatement: Statement {
         }
     }
 
-    init(syntax: Syntax, message: Message? = nil, extras: StatementExtras? = nil, in syntaxTree: SyntaxTree) {
+    init(syntax: SyntaxProtocol, message: Message? = nil, extras: StatementExtras? = nil, in syntaxTree: SyntaxTree) {
         self.sourceCode = syntax.sourceCode(in: syntaxTree.source)
         let source = syntaxTree.source
         let range = syntax.range(in: source)
@@ -227,7 +227,7 @@ class RawStatement: Statement {
         }
     }
 
-    override class func decode(syntax: Syntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
         return nil
     }
 
