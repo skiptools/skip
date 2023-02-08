@@ -93,6 +93,37 @@ extension TypeSignature {
         }
     }
 
+    var kotlinMayBeSharedMutableValue: Bool {
+        switch self {
+        case .array:
+            return true
+        case .base(let name, let qualifiedName, _):
+            let name = qualifiedName ?? name
+            if let typeInfo = Self.builtinTypeInfo[name] {
+                return typeInfo.mayBeSharedMutableValue
+            }
+            return true
+        case .classRestricted:
+            return false
+        case .composition:
+            return false
+        case .dictionary:
+            return true
+        case .function:
+            return false
+        case .optional(let type):
+            return type.kotlinMayBeSharedMutableValue
+        case .member:
+            return true
+        case .metaType:
+            return false
+        case .tuple:
+            return false
+        case .unwrappedOptional(let type):
+            return type.kotlinMayBeSharedMutableValue
+        }
+    }
+
     private func kotlin(isQualified: Bool) -> String {
         switch self {
         case .array(let elementType):
@@ -108,7 +139,7 @@ extension TypeSignature {
         case .composition:
             return "Any"
         case .dictionary(let keyType, let valueType):
-            return "MutableMap<\(keyType.kotlin(isQualified: isQualified)), \(valueType.kotlin(isQualified: isQualified))>"
+            return "Dictionary<\(keyType.kotlin(isQualified: isQualified)), \(valueType.kotlin(isQualified: isQualified))>"
         case .function(let paramTypes, let returnType):
             return "(\(paramTypes.map { $0.kotlin(isQualified: isQualified) }.joined(separator: ", "))) -> \(returnType.kotlin(isQualified: isQualified))"
         case .optional(let type):
@@ -136,52 +167,40 @@ extension TypeSignature {
 
     private func translateTypeName(_ typeName: String) -> String {
         guard let lastSeparator = typeName.lastIndex(of: ".") else {
-            return translateUnqualifiedTypeName(typeName)
+            return translateSwiftTypeName(typeName, isQualified: false)
+        }
+        let typeNameQualification = String(typeName[..<lastSeparator])
+        guard typeNameQualification == "Swift" else {
+            return typeName
         }
         let lastTypeName = String(typeName[typeName.index(after: lastSeparator)...])
-        let translatedLastTypeName = translateUnqualifiedTypeName(lastTypeName)
-        guard translatedLastTypeName != lastTypeName else {
-            return typeName
-        }
-        return typeName[...lastSeparator] + translatedLastTypeName
+        return translateSwiftTypeName(lastTypeName, isQualified: true)
     }
 
-    private func translateUnqualifiedTypeName(_ typeName: String) -> String {
-        switch typeName {
-        case "AnyObject":
-            return "Any"
-        case "Bool":
-            return "Boolean"
-        case "Character":
-            return "Char"
-        case "Dictionary":
-            return "MutableMap"
-        case "Int":
-            return "Int"
-        case "Int8":
-            return "Byte"
-        case "Int16":
-            return "Short"
-        case "Int32":
-            return "Int"
-        case "Int64":
-            return "Long"
-        case "Set":
-            return "MutableSet"
-        case "UInt":
-            return "UInt"
-        case "UInt8":
-            return "UByte"
-        case "UInt16":
-            return "UShort"
-        case "UInt32":
-            return "UInt"
-        case "UInt64":
-            return "ULong"
-        case "Void":
-            return "Unit"
-        default:
-            return typeName
+    private func translateSwiftTypeName(_ typeName: String, isQualified: Bool) -> String {
+        guard let typeInfo = Self.builtinTypeInfo[typeName] else {
+            return isQualified ? "Swift.\(typeName)" : typeName
         }
+        return isQualified ? "\(typeInfo.package).\(typeInfo.name)" : typeInfo.name
     }
+
+    private static let builtinTypeInfo: [String: (name: String, package: String, mayBeSharedMutableValue: Bool)] = [
+        "Any": ("Any", "kotlin", true),
+        "AnyObject": ("Any", "kotlin", false),
+        "Array": ("Array", "SkipFoundation", true),
+        "Bool": ("Boolean", "kotlin", false),
+        "Character": ("Char", "kotlin", false),
+        "Dictionary": ("Dictionary", "SkipFoundation", true),
+        "Int": ("Int", "kotlin", false),
+        "Int8": ("Byte", "kotlin", false),
+        "Int16": ("Short", "kotlin", false),
+        "Int32": ("Int", "kotlin", false),
+        "Int64": ("Long", "kotlin", false),
+        "Set": ("Set", "SkipFoundation", true),
+        "UInt": ("UInt", "kotlin", false),
+        "UInt8": ("UByte", "kotlin", false),
+        "UInt16": ("UShort", "kotlin", false),
+        "UInt32": ("UInt", "kotlin", false),
+        "UInt64": ("ULong", "kotlin", false),
+    ]
 }

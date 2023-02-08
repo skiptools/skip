@@ -17,7 +17,7 @@ class KotlinExpression: KotlinSyntaxNode {
     ///
     /// - Seealso: `SkipFoundation.Any.valref()`
     final var valueReference: KotlinExpression {
-        guard mayBeSharedMutableValueExpression else {
+        guard mayBeSharedMutableValueExpression(orType: false) else {
             return self
         }
         let valueReferenceFunction = KotlinMemberAccess(base: self, member: "valref")
@@ -25,7 +25,7 @@ class KotlinExpression: KotlinSyntaxNode {
     }
 
     /// Return true if this expression may evaluate to a shared mutable value type.
-    var mayBeSharedMutableValueExpression: Bool {
+    func mayBeSharedMutableValueExpression(orType: Bool) -> Bool {
         return false
     }
 

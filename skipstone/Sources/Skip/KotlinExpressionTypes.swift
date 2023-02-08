@@ -26,7 +26,10 @@ class KotlinArrayLiteral: KotlinExpression {
         super.init(type: .arrayLiteral, expression: expression)
     }
 
-    // Note that we do not return true from mayBeSharedMutableValueExpression because a literal is not shared
+    override func mayBeSharedMutableValueExpression(orType: Bool) -> Bool {
+        // Array literals are not shared, but if we're using this expression to determine the type, then it can be
+        return orType
+    }
 
     override var children: [KotlinSyntaxNode] {
         return elements
@@ -65,8 +68,8 @@ class KotlinBinaryOperator: KotlinExpression {
         super.init(type: .binaryOperator, expression: expression)
     }
 
-    override var mayBeSharedMutableValueExpression: Bool {
-        return !op.isAssignment && lhs.mayBeSharedMutableValueExpression
+    override func mayBeSharedMutableValueExpression(orType: Bool) -> Bool {
+        return !op.isAssignment && lhs.mayBeSharedMutableValueExpression(orType: orType)
     }
 
     override var isCompoundExpression: Bool {
@@ -130,7 +133,7 @@ class KotlinFunctionCall: KotlinExpression {
         super.init(type: .functionCall, expression: expression)
     }
 
-    override var mayBeSharedMutableValueExpression: Bool {
+    override func mayBeSharedMutableValueExpression(orType: Bool) -> Bool {
         return true
     }
 
@@ -161,7 +164,7 @@ class KotlinIdentifier: KotlinExpression {
         super.init(type: .identifier, expression: expression)
     }
 
-    override var mayBeSharedMutableValueExpression: Bool {
+    override func mayBeSharedMutableValueExpression(orType: Bool) -> Bool {
         return true
     }
 
@@ -197,7 +200,7 @@ class KotlinMemberAccess: KotlinExpression {
         super.init(type: .memberAccess, expression: expression)
     }
 
-    override var mayBeSharedMutableValueExpression: Bool {
+    override func mayBeSharedMutableValueExpression(orType: Bool) -> Bool {
         return true
     }
 
@@ -308,7 +311,7 @@ class KotlinSubscript: KotlinExpression {
         super.init(type: .subscript, expression: expression)
     }
 
-    override var mayBeSharedMutableValueExpression: Bool {
+    override func mayBeSharedMutableValueExpression(orType: Bool) -> Bool {
         return true
     }
 

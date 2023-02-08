@@ -2,14 +2,18 @@ package skip.foundation
 
 interface ValueSemantics {
     fun valcopy(): ValueSemantics
-    var onUpdate: (() -> Unit)?
+    var onUpdate: ((Any) -> Unit)?
 }
 
-fun <T> T.valref(onUpdate: (() -> Unit)? = null): T {
+@Suppress("UNCHECKED_CAST")
+fun <T> T.valref(onUpdate: ((T) -> Unit)? = null): T {
     if (this is ValueSemantics) {
         val copy = valcopy()
-        copy.onUpdate = onUpdate
-        @Suppress("UNCHECKED_CAST")
+        copy.onUpdate = {
+            if (onUpdate != null) {
+                onUpdate(it as T)
+            }
+        }
         return copy as T
     }
     return this

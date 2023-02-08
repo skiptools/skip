@@ -41,4 +41,35 @@ final class ArrayTests: XCTestCase {
 
         XCTAssertEqual(array.count, 3)
     }
+
+    func testDidSet() {
+        let holder = ArrayHolder()
+        XCTAssertEqual(holder.arraySetCount, 0)
+
+        holder.array.append(1)
+        XCTAssertEqual(holder.array.count, 1)
+        XCTAssertEqual(holder.arraySetCount, 1)
+
+        var array = holder.array
+        XCTAssertEqual(array.count, 1)
+        array.append(2)
+        XCTAssertEqual(array.count, 2)
+        XCTAssertEqual(holder.array.count, 1)
+        XCTAssertEqual(holder.arraySetCount, 1)
+
+        holder.array.append(3)
+        holder.array.append(4)
+        XCTAssertEqual(holder.array.count, 3)
+        XCTAssertEqual(holder.arraySetCount, 3)
+        XCTAssertEqual(array.count, 2)
+    }
+}
+
+class ArrayHolder {
+    var array: [Int] = [] {
+        didSet {
+            arraySetCount += 1
+        }
+    }
+    var arraySetCount = 0
 }

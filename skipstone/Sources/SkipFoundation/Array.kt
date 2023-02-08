@@ -36,20 +36,33 @@ class Array<T>: ValueSemantics, Iterable<T> {
     }
 
     override fun iterator(): Iterator<T> {
-        return storage.iterator()
+        val storageIterator = storage.iterator()
+        return object: Iterator<T> {
+            override fun hasNext(): Boolean {
+                return storageIterator.hasNext()
+            }
+            override fun next(): T {
+                return storageIterator.next().valref()
+            }
+        }
     }
 
     operator fun get(index: Int): T {
-        return storage[index]
+        return storage[index].valref({
+            set(index, it)
+        })
+    }
+
+    operator fun set(index: Int, element: T) {
+        copyStorageIfNeeded()
+        storage[index] = element.valref()
+        onUpdate?.invoke(this)
     }
 
     fun append(element: T) {
-        if (isStorageShared) {
-            storage = ArrayStorage(storage)
-            isStorageShared = false
-        }
-        storage.add(element.valref({ this.onUpdate?.invoke() }))
-        onUpdate?.invoke()
+        copyStorageIfNeeded()
+        storage.add(element.valref())
+        onUpdate?.invoke(this)
     }
 
     val count: Int
@@ -59,33 +72,24 @@ class Array<T>: ValueSemantics, Iterable<T> {
         if (other === this) {
             return true
         }
-        if (other as? Array<T> == null) {
+        if (other as? Array<*> == null) {
             return false
         }
         return other.storage == storage
     }
 
-    override var onUpdate: (() -> Unit)? = null
+    override var onUpdate: ((Any) -> Unit)? = null
 
     override fun valcopy(): ValueSemantics {
-        var copy: Array<T>? = null
-        for (i in 0 until storage.count()) {
-            val valref = storage[i].valref({ this.onUpdate?.invoke() })
-            if (copy != null) {
-                copy.storage.add(valref)
-            } else if (valref !== storage[i]) {
-                copy = Array()
-                copy.storage.addAll(storage.slice(0 until i))
-                copy.storage.add(valref)
-            }
-        }
-        if (copy != null) {
-            return copy
-        }
-
-        // We didn't find any elements that needed copying, so share storage
         isStorageShared = true
         return Array(storage = storage)
+    }
+
+    private fun copyStorageIfNeeded() {
+        if (isStorageShared) {
+            storage = ArrayStorage(storage)
+            isStorageShared = false
+        }
     }
 
     private class ArrayStorage<T>(): ArrayList<T>() {

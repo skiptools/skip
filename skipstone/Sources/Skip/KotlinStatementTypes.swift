@@ -478,7 +478,21 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             }
             output.append("\n")
         }
-        if let getterStatements = getter?.statements {
+
+        if isProperty && mayBeSharedMutableValue {
+            let onUpdate = "{ this.\(name) = it }"
+            let getterIndentation = indentation.inc()
+            output.append(getterIndentation).append("get() {\n")
+            let getterBodyIndentation = getterIndentation.inc()
+            if let getterStatements = getter?.statements {
+                output.append(getterBodyIndentation).append("return {\n")
+                output.append(getterStatements, indentation: getterBodyIndentation.inc())
+                output.append(getterBodyIndentation).append("}().valref(\(onUpdate))\n")
+            } else {
+                output.append(getterBodyIndentation).append("return field.valref(\(onUpdate))\n")
+            }
+            output.append(getterIndentation).append("}\n")
+        } else if let getterStatements = getter?.statements {
             let getterIndentation = indentation.inc()
             output.append(getterIndentation).append("get() {\n")
             output.append(getterStatements, indentation: getterIndentation.inc())
@@ -486,8 +500,13 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         }
         if setter?.statements != nil || willSet?.statements != nil || didSet?.statements != nil {
             let setterIndentation = indentation.inc()
-            output.append(setterIndentation).append("set(newValue) {\n")
             let setterBodyIndentation = setterIndentation.inc()
+            if mayBeSharedMutableValue {
+                output.append(setterIndentation).append("set(newGivenValue) {\n")
+                output.append(setterBodyIndentation).append("val newValue = newGivenValue.valref()\n")
+            } else {
+                output.append(setterIndentation).append("set(newValue) {\n")
+            }
             if let willSetStatements = willSet?.statements {
                 if let parameterName = willSet?.parameterName, parameterName != "newValue" {
                     output.append(setterBodyIndentation).append("val \(parameterName) = newValue\n")
@@ -500,12 +519,25 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 }
                 output.append(setterStatements, indentation: setterBodyIndentation)
             } else {
+                if didSet?.statements != nil {
+                    output.append(setterBodyIndentation).append("val oldValue = field\n")
+                }
                 output.append(setterBodyIndentation).append("field = newValue\n")
             }
             if let didSetStatements = didSet?.statements {
                 output.append(didSetStatements, indentation: setterBodyIndentation)
             }
             output.append(setterIndentation).append("}\n")
+        }
+    }
+
+    private var mayBeSharedMutableValue: Bool {
+        if let declaredType {
+            return declaredType.kotlinMayBeSharedMutableValue
+        } else if let value {
+            return value.mayBeSharedMutableValueExpression(orType: true)
+        } else {
+            return true
         }
     }
 }
