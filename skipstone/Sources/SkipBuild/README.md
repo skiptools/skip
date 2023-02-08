@@ -175,10 +175,10 @@ dependencyResolutionManagement {
     }
 }
 
-include(":SkipDemoApp")
-include(":SkipDemoLib")
-include(":SkipUI")
-include(":SkipFoundation")
+val modules = file("modules").listFiles().filter { it.isDirectory }.map { it.name }
+for (module in modules) {
+    include("modules:$module")
+}
 ```
 
 The individual module `build.gradle.kts` files will have dependencies that match

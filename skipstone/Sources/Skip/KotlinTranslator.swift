@@ -173,19 +173,24 @@ public class KotlinTranslator {
                 newStatements.append(statement)
                 continue
             }
-            if importStatement.modulePath == ["SkipFoundation"] {
+            if importStatement.modulePath == ["SkipKotlin"] {
                 return statements
             }
             lastImportIndex = index
             newStatements.append(statement)
         }
 
-        let foundationImport = KotlinImportDeclaration(modulePath: ["SkipFoundation"])
-        if let lastImportIndex {
-            newStatements.insert(foundationImport, at: lastImportIndex + 1)
-        } else {
+        var kotlinImports: [KotlinStatement] = []
+        kotlinImports.append(KotlinImportDeclaration(modulePath: ["SkipKotlin"]))
+        kotlinImports.append(KotlinRawStatement(sourceCode: "import skip.kotlin.Array")) // otherwise: Type mismatch: inferred type is skip.kotlin.Array<???> but kotlin.Array<Int> was expected
+
+        if lastImportIndex == nil {
             newStatements.insert(KotlinRawStatement(sourceCode: ""), at: 0)
-            newStatements.insert(foundationImport, at: 0)
+        }
+
+        let importIndex = (lastImportIndex ?? -1) + 1
+        for kotlinImport in kotlinImports.reversed() {
+            newStatements.insert(kotlinImport, at: importIndex)
         }
         return newStatements
     }

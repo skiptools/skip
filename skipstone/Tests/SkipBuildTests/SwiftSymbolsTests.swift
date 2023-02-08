@@ -30,8 +30,8 @@ final class SwiftSymbolsTests: XCTestCase {
         """
 
         let swiftURL = try tmpFile(named: "Source.swift", contents: swift)
-        let symbolGraph = try await System.buildSymbols(swift: swiftURL)
-
+        let sg = try await System.buildSymbols(swift: swiftURL)
+        let symbolGraph = try XCTUnwrap(sg)
         //let graph = try XCTUnwrap(UnifiedSymbolGraph(fromSingleGraph: symbolGraph, at: swiftURL))
         //graph.mergeGraph(graph: otherGraph, at: swiftURL2)
 

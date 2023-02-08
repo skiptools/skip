@@ -187,10 +187,10 @@ extension TypeSignature {
     private static let builtinTypeInfo: [String: (name: String, package: String, mayBeSharedMutableValue: Bool)] = [
         "Any": ("Any", "kotlin", true),
         "AnyObject": ("Any", "kotlin", false),
-        "Array": ("Array", "SkipFoundation", true),
+        "Array": ("Array", "SkipKotlin", true),
         "Bool": ("Boolean", "kotlin", false),
         "Character": ("Char", "kotlin", false),
-        "Dictionary": ("Dictionary", "SkipFoundation", true),
+        "Dictionary": ("Dictionary", "SkipKotlin", true),
         "Int": ("Int", "kotlin", false),
         "Int8": ("Byte", "kotlin", false),
         "Int16": ("Short", "kotlin", false),

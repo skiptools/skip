@@ -8,8 +8,16 @@ final class TranspiledTests: SkipTranspilerTestCase {
     #if !SKIP
     public func testTranspiledTests() async throws {
         try await transpileAndTest(targets: SkipTargetSet(.app("SkipDemoApp"), dependencies: [
-            SkipTargetSet(.lib("SkipUI"), dependencies: [SkipTargetSet(.lib("SkipFoundation"))]),
-            SkipTargetSet(.lib("SkipDemoLib"), dependencies: [SkipTargetSet(.lib("SkipFoundation"))]),
+            SkipTargetSet(.lib("SkipUI"), dependencies: [
+                SkipTargetSet(.lib("SkipFoundation"), dependencies: [
+                    SkipTargetSet(.lib("SkipKotlin"))
+                ])
+            ]),
+            SkipTargetSet(.lib("SkipDemoLib"), dependencies: [
+                SkipTargetSet(.lib("SkipFoundation"), dependencies: [
+                    SkipTargetSet(.lib("SkipKotlin"))
+                ])
+            ]),
         ]))
     }
     #else

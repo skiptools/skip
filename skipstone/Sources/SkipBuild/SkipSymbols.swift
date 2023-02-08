@@ -32,7 +32,7 @@ extension System {
     ///   - url: the URL of the Swift file to compile. If this is a `Package.swift` file, then the build will be run with `swift build`, otherwise it will use `swiftc` for a single file.
     ///   - accessLevel: the default access level for the generated symbols
     /// - Returns: the parsed SymbolGraph that resulted from the compilation
-    public static func buildSymbols(swift swiftFileURL: URL, singlePass: Bool = false, sdk: String = "macosx", moduleName: String? = nil, accessLevel: String = "private") async throws -> SymbolGraph {
+    public static func buildSymbols(swift swiftFileURL: URL, singlePass: Bool = false, sdk: String = "macosx", moduleName: String? = nil, accessLevel: String = "private") async throws -> SymbolGraph? {
         // symbolgraph-extract implementation:
         // https://github.com/apple/swift-package-manager/blob/main/Sources/Commands/Utilities/SymbolGraphExtract.swift
 
@@ -113,6 +113,13 @@ extension System {
         // get the SDK path (e.g., for "xcrun --show-sdk-path --sdk macosx" it might return "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX13.1.sdk")
         let sdKPath = try await xcrun("--show-sdk-path", "--sdk", sdk).joined(separator: "\n")
 
+        let modulePath = urlBase.appendingPathComponent(moduleName).appendingPathExtension("swiftmodule")
+
+        if !FileManager.default.isReadableFile(atPath: modulePath.path) {
+            // permit missing modules; this is so SkipKotlin does not need to be a swift dependency of other packages
+            return [:]
+        }
+
         _ = try await xcrun("swift",
                         "symbolgraph-extract",
                         "-module-name", moduleName,
@@ -127,7 +134,6 @@ extension System {
                         "-minimum-access-level", accessLevel,
                         "-I", urlBase.path)
 
-        let modulePath = urlBase.appendingPathComponent(moduleName).appendingPathExtension("swiftmodule")
         let symbolFile = tmpDir.appendingPathComponent(moduleName).appendingPathExtension("symbols.json")
         let graphData = try Data(contentsOf: symbolFile)
         let graph = try JSONDecoder().decode(SymbolGraph.self, from: graphData)

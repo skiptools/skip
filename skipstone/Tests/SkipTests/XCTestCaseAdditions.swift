@@ -10,7 +10,8 @@ extension XCTestCase {
             try await tp.transpile(codebaseInfo: KotlinCodebaseInfo(), handler: { transpilation in
                 //print("transpilation:", transpilation.output)
                 var content = transpilation.output.content
-                let autoImport = "import skip.foundation.*"
+                let autoImport = "import skip.kotlin."
+                content = content.split(separator: "\n", omittingEmptySubsequences: false).filter({ !$0.hasPrefix(autoImport) }).joined(separator: "\n")
                 if content.hasPrefix(autoImport) {
                     content = String(content.dropFirst(autoImport.count))
                 }

@@ -3,7 +3,8 @@
 import Skip
 import os.log
 
-fileprivate let logger = Logger(subsystem: "skip", category: "testing")
+fileprivate let logger = Logger(subsystem: "skip", category: "unit")
+fileprivate let gradleLogger = Logger(subsystem: "skip", category: "gradle")
 
 /// The base class for executing a transpiled test case.
 open class SkipTranspilerTestCase : XCTestCase {
@@ -77,7 +78,16 @@ extension SkipAssembler {
         var issues: [XCTIssue] = []
         do {
             try await System.exec(URL(fileURLWithPath: "/usr/bin/env", isDirectory: false), arguments: args, environment: env, workingDirectory: destRoot) { outputLine in
-                logger.debug("gradle: \(outputLine)")
+                if outputLine.hasPrefix("w: ") {
+                    gradleLogger.warning("\(outputLine)")
+                    // breakpoint here to stop on build warning
+                } else if outputLine.hasPrefix("e: ") {
+                    gradleLogger.error("\(outputLine)")
+                    // breakpoint here to stop on build error
+                } else {
+                    gradleLogger.debug("\(outputLine)")
+                }
+
                 try Task.checkCancellation()
 
                 // errors look like: java.lang.AssertionError at SkipFoundationTests.kt:13

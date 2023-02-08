@@ -1,5 +1,4 @@
 #if !SKIP
-@testable import SkipFoundation
 import SkipUnit
 #endif
 

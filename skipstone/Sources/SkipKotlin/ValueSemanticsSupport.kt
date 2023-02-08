@@ -1,4 +1,4 @@
-package skip.foundation
+package skip.kotlin
 
 interface ValueSemantics {
     fun valcopy(): ValueSemantics

@@ -7,7 +7,7 @@ import SkipUnit
 final class TranspiledTests: SkipTranspilerTestCase {
     #if !SKIP
     public func testTranspiledTests() async throws {
-        try await transpileAndTest(targets: SkipTargetSet(.lib("SkipDemoLib"), dependencies: [SkipTargetSet(.lib("SkipFoundation"))]))
+        try await transpileAndTest(targets: SkipTargetSet(.lib("SkipDemoLib"), dependencies: [SkipTargetSet(.lib("SkipFoundation"), dependencies: [SkipTargetSet(.lib("SkipKotlin"))])]))
     }
     #else
     public func testEmptyTest() {

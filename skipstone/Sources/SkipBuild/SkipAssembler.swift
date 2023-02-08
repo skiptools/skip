@@ -107,7 +107,7 @@ public struct SkipAssembler {
         return try String(contentsOf: outputURL)
     }
 
-    public static func assemble(root packageRoot: URL, moduleRootPath: String, sourceFolder: String, testsFolder: String?, targets: SkipTargetSet, destRoot: String, overwrite: Bool = true, studioID: String = androidStudioBundleID) async throws -> (root: URL, files: [URL]) {
+    public static func assemble(root packageRoot: URL, moduleRootPath: String, sourceFolder: String, testsFolder: String?, targets: SkipTargetSet, destRoot: String, overwrite: Bool = true, studioID: String = androidStudioBundleID, wildcardModules: Bool = true) async throws -> (root: URL, files: [URL]) {
         let destRoot = URL(fileURLWithPath: destRoot, isDirectory: true, relativeTo: packageRoot)
 
         // use the passed-in list of modules, or else default to all the sources in the folder
@@ -197,39 +197,35 @@ public struct SkipAssembler {
                 // the sources we have scanned, which will all be transpiled together
                 var swiftSources: Set<URL> = []
                 var kotlinSources: Set<URL> = []
+                var buildFiles: Set<URL> = []
 
                 try await swiftRoot?.walkFileURL { fileURL in
                     logger.debug("file: \(fileURL.relativePath)")
                     try Task.checkCancellation()
 
                     let isDir = try fileURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory
-                    switch fileURL.pathExtension {
-                    case "swift" where isDir == false:
+                    switch (fileURL.lastPathComponent, fileURL.pathExtension) {
+                    case (_, "swift") where isDir == false:
                         swiftSources.insert(fileURL)
-                    case "kt" where isDir == false:
+                    case ("build.gradle.kts", _):
+                        buildFiles.insert(fileURL)
+                    case ("gradle.properties", _):
+                        buildFiles.insert(fileURL)
+                    case ("settings.gradle.kts", _):
+                        buildFiles.insert(fileURL)
+                    case (_, "kt") where isDir == false:
                         kotlinSources.insert(fileURL)
-                    case "strings" where isDir == false:
+                    case (_, "strings") where isDir == false:
                         // TODO: translation localized files to …/res/…
                         logger.warning("warning: unhandled strings: \(fileURL.relativePath)")
                         break
-                    case "xcassets" where isDir == true:
+                    case (_, "xcassets") where isDir == true:
                         // TODO: translate assets to somewhere
                         logger.warning("warning: unhandled xcassets: \(fileURL.relativePath)")
                         break
                     default:
                         logger.warning("warning: unhandled path: \(fileURL.relativePath)")
                         break
-                    }
-                }
-
-                /// Copies over the raw Kotlin files from the source folder
-                func copyKotlinFiles(sources: Set<URL>) async throws {
-                    for sourceURL in sources {
-                        let destPath = URL(fileURLWithPath: sourceURL.relativePath, isDirectory: false, relativeTo: kotlinRoot)
-                        logger.debug("copying: \(sourceURL.relativePath) to: \(destPath.path)")
-                        // try FileManager.default.copyItem(at: sourceURL, to: destPath)
-                        // only copy when the contents have changed, to avoid triggering unnecessary gradle rebuild
-                        try write(String(contentsOf: sourceURL), to: destPath, ifChanged: true)
                     }
                 }
 
@@ -257,8 +253,25 @@ public struct SkipAssembler {
 
                 try await transpileSources(sources: swiftSources)
 
+                /// Copies over the raw Kotlin files from the source folder
+                func copySourceFiles(sources: Set<URL>) async throws {
+                    for sourceURL in sources {
+                        let destPath = URL(fileURLWithPath: sourceURL.relativePath, isDirectory: false, relativeTo: kotlinRoot)
+                        logger.debug("copying: \(sourceURL.relativePath) to: \(destPath.path)")
+                        // try FileManager.default.copyItem(at: sourceURL, to: destPath)
+                        // only copy when the contents have changed, to avoid triggering unnecessary gradle rebuild
+                        try write(String(contentsOf: sourceURL), to: destPath, ifChanged: true)
+                    }
+                }
+
+
                 // copy the kotlin files after transpilation, allowing override of same-named .kt/.swift files
-                try await copyKotlinFiles(sources: kotlinSources)
+                try await copySourceFiles(sources: kotlinSources)
+
+                // finally, copy over the build files, overriding the generated ones
+                // FIXME: this is run over the Sources/, so top-level build files won't by copied to the correct destination
+                // try await copySourceFiles(sources: buildFiles)
+
             }
 
             struct TranslationOptions : OptionSet {
@@ -416,27 +429,12 @@ public struct SkipAssembler {
 
             let gradleProperties = URL(fileURLWithPath: "gradle.properties", isDirectory: false, relativeTo: destRoot)
             let gradlePropertiesSource = """
-            # Project-wide Gradle settings.
+            # Project-wide Gradle settings
             # http://www.gradle.org/docs/current/userguide/build_environment.html
-
             #org.gradle.jvmargs=-Xmx2048m
-
-            # Turn on parallel compilation, caching and on-demand configuration
-            #org.gradle.configureondemand=true
-            org.gradle.caching=true
-            org.gradle.parallel=true
-
-            # AndroidX package structure to make it clearer which packages are bundled with the
-            # Android operating system, and which are packaged with your app's APK
-            # https://developer.android.com/topic/libraries/support-library/androidx-rn
             android.useAndroidX=true
-
-            # Kotlin code style for this project: "official" or "obsolete":
+            android.enableJetifier=true
             kotlin.code.style=official
-
-            # Enable R8 full mode.
-            android.enableR8.fullMode=true
-
             """
             try write(gradlePropertiesSource, to: gradleProperties, ifChanged: true)
 
@@ -461,8 +459,17 @@ public struct SkipAssembler {
             
             """
 
-            for moduleName in Set(targets.deepTargets.map(\.moduleName)).sorted() {
-                settingsGradleSource += "include(\"\(moduleRootPath):\(moduleName)\")\n"
+            if wildcardModules {
+                settingsGradleSource += """
+                val modules = file("modules").listFiles().filter { it.isDirectory }.map { it.name }
+                for (module in modules) {
+                    include("modules:$module")
+                }
+                """
+            } else {
+                for moduleName in Set(targets.deepTargets.map(\.moduleName)).sorted() {
+                    settingsGradleSource += "include(\"\(moduleRootPath):\(moduleName)\")\n"
+                }
             }
 
             try write(settingsGradleSource, to: settingsGradle, ifChanged: true)
