@@ -7,10 +7,10 @@ extension XCTestCase {
         let srcFile = try tmpFile(named: "Source.swift", contents: swift)
         if let kotlin = kotlin {
             let tp = Transpiler(sourceFiles: [Source.File(path: srcFile.path)])
-            try await tp.transpile(handler: { transpilation in
+            try await tp.transpile(codebaseInfo: KotlinCodebaseInfo(), handler: { transpilation in
                 //print("transpilation:", transpilation.output)
                 var content = transpilation.output.content
-                let autoImport = "import SkipFoundation.*"
+                let autoImport = "import skip.foundation.*"
                 if content.hasPrefix(autoImport) {
                     content = String(content.dropFirst(autoImport.count))
                 }

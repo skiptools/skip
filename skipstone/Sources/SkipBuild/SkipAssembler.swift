@@ -107,7 +107,7 @@ public struct SkipAssembler {
         return try String(contentsOf: outputURL)
     }
 
-    public static func assemble(root packageRoot: URL, sourceFolder: String = "Sources", testsFolder: String? = "Tests", targets: SkipTargetSet, destRoot: String, overwrite: Bool = true, studioID: String = androidStudioBundleID) async throws -> (root: URL, files: [URL]) {
+    public static func assemble(root packageRoot: URL, moduleRootPath: String, sourceFolder: String, testsFolder: String?, targets: SkipTargetSet, destRoot: String, overwrite: Bool = true, studioID: String = androidStudioBundleID) async throws -> (root: URL, files: [URL]) {
         let destRoot = URL(fileURLWithPath: destRoot, isDirectory: true, relativeTo: packageRoot)
 
         // use the passed-in list of modules, or else default to all the sources in the folder
@@ -157,16 +157,19 @@ public struct SkipAssembler {
         for targetSet in targets.deepTargetSet {
             let moduleName = targetSet.target.moduleName
 
-            // FIXME: the package name is currently just the module name (like "MyModule"), which works when testing locally, but when building an Android library it might raise the error: “AAPT: error: attribute 'package' in <manifest> tag is not a valid Android package name: 'MyModule'.”
-            logger.info("module: \(moduleName)")
+            let packageName = KotlinTranslator.packageName(forModule: moduleName)
 
-            let codebaseInfo = KotlinCodebaseInfo(packageName: moduleName, graphs: unifiedGraphs)
+            logger.info("module: \(moduleName) package: \(packageName)")
+
+            let codebaseInfo = KotlinCodebaseInfo(packageName: packageName, graphs: unifiedGraphs)
 
             let moduleSwiftSourceRoot = URL(fileURLWithPath: moduleName, isDirectory: true, relativeTo: sourceRoot)
             let moduleSwiftTestRoot = testRoot.flatMap({ testRoot in URL(fileURLWithPath: moduleName + "Tests", isDirectory: true, relativeTo: testRoot) })
 
             try Task.checkCancellation()
-            let moduleRoot = URL(fileURLWithPath: moduleName, isDirectory: true, relativeTo: destRoot)
+            let moduleRootFolder = URL(fileURLWithPath: moduleRootPath, isDirectory: true, relativeTo: destRoot)
+
+            let moduleRoot = URL(fileURLWithPath: moduleName, isDirectory: true, relativeTo: moduleRootFolder)
 
             // translate sources: Sources/MODULE/**/*.swift -> DEST/MODULE/src/main/java/MODULE/**/*.kt
             try fm.createDirectory(at: moduleRoot, withIntermediateDirectories: true)
@@ -174,8 +177,9 @@ public struct SkipAssembler {
             // resources (e.g., drawable/, font/, values/)
             //let moduleResRoot = URL(fileURLWithPath: "src/main/res", isDirectory: true, relativeTo: moduleRoot)
 
-            // the package path is simply the module name (e.g., "CrossLibrary") rather than the more idiomatic "com.example.package"
-            let packagePath = moduleName
+            // if package path were simply the module name (e.g., "CrossLibrary") rather than the more idiomatic "com.example.package"
+            // let packagePath = moduleName
+            let packagePath = packageName.split(separator: ".").joined(separator: "/")
 
             let moduleKotlinSourceRoot = URL(fileURLWithPath: "src/main/kotlin", isDirectory: true, relativeTo: moduleRoot)
                 .appendingPathComponent(packagePath, isDirectory: true)
@@ -289,14 +293,6 @@ public struct SkipAssembler {
 
                     // add the test runner to the top
                     replace("internal class", with: """
-                    @RunWith(org.robolectric.RobolectricTestRunner::class)
-                    @org.robolectric.annotation.Config(manifest=org.robolectric.annotation.Config.NONE)
-                    internal class
-                    """)
-
-                    kotlin += "\n\n"
-
-                    kotlin = """
                     import kotlin.test.*
                     import org.junit.Test
                     import org.junit.Assert
@@ -305,7 +301,10 @@ public struct SkipAssembler {
                     import kotlinx.coroutines.*
                     import kotlinx.coroutines.test.*
 
-                    """ + kotlin
+                    @RunWith(org.robolectric.RobolectricTestRunner::class)
+                    @org.robolectric.annotation.Config(manifest=org.robolectric.annotation.Config.NONE)
+                    internal class
+                    """)
 
                     // only add the conversions to a single test case
                     if kotlin.contains("SkipTranspilerTestCase") {
@@ -317,7 +316,6 @@ public struct SkipAssembler {
                 // =========================================
                 // GENERATED FILE; EDITS WILL BE OVERWRITTEN
                 // =========================================
-                package \(moduleName)
 
                 """ + kotlin
 
@@ -332,7 +330,7 @@ public struct SkipAssembler {
                 // the module-level build config
                 let buildGradle = URL(fileURLWithPath: "build.gradle.kts", isDirectory: false, relativeTo: moduleRoot)
                 let buildGradleSource = """
-                group = "\(packagePath)"
+                group = "\(packageName)"
 
                 plugins {
                     kotlin("android") version "1.8.+"
@@ -348,7 +346,7 @@ public struct SkipAssembler {
                     testImplementation("org.robolectric:robolectric:4.+")
                     androidTestImplementation("com.android.support.test:runner:+")
 
-                    \(localDependencies.map({ mod in "implementation(project(\":\(mod)\"))" }).joined(separator: "\n    "))
+                    \(localDependencies.map({ mod in "implementation(project(\":\(moduleRootPath):\(mod)\"))" }).joined(separator: "\n    "))
                 }
 
                 android {
@@ -459,9 +457,12 @@ public struct SkipAssembler {
                     mavenCentral()
                 }
             }
+
+            
             """
-            for target in targets.deepTargets {
-                settingsGradleSource += "\ninclude(\":\(target.moduleName)\")\n"
+
+            for moduleName in Set(targets.deepTargets.map(\.moduleName)).sorted() {
+                settingsGradleSource += "include(\"\(moduleRootPath):\(moduleName)\")\n"
             }
 
             try write(settingsGradleSource, to: settingsGradle, ifChanged: true)

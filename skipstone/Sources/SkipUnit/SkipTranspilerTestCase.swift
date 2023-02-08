@@ -35,11 +35,11 @@ extension SkipTranspilerTestCase {
 }
 
 extension SkipAssembler {
-    @discardableResult public static func transpileAndTest(testCase: SkipTranspilerTestCase?, root packageRoot: URL, sourceFolder: String = "Sources", testsFolder: String? = "Tests", targets: SkipTargetSet, destRoot: String, overwrite: Bool = true, studioID: String = androidStudioBundleID) async throws -> URL {
+    @discardableResult public static func transpileAndTest(testCase: SkipTranspilerTestCase?, root packageRoot: URL, moduleRootPath: String = "modules", sourceFolder: String = "Sources", testsFolder: String? = "Tests", targets: SkipTargetSet, destRoot: String, overwrite: Bool = true, studioID: String = androidStudioBundleID) async throws -> URL {
         logger.info("transpiling and testing: \(targets.target.moduleName) from: \(packageRoot.path)")
 
         // transpile and assemble the gradle project in the given destination
-        let (destRoot, paths) = try await SkipAssembler.assemble(root: packageRoot, targets: targets, destRoot: destRoot)
+        let (destRoot, paths) = try await SkipAssembler.assemble(root: packageRoot, moduleRootPath: moduleRootPath, sourceFolder: sourceFolder, testsFolder: testsFolder, targets: targets, destRoot: destRoot)
 
         #if DEBUG
         let target = "testDebugUnitTest"
@@ -122,7 +122,7 @@ extension XCTestCase {
         let srcFile = try tmpFile(named: "Source.swift", contents: swift)
         if let kotlin = kotlin {
             let tp = Transpiler(sourceFiles: [Source.File(path: srcFile.path)])
-            try await tp.transpile(handler: { transpilation in
+            try await tp.transpile(codebaseInfo: KotlinCodebaseInfo(), handler: { transpilation in
                 logger.debug("transpilation: \(transpilation.output.content)")
                 XCTAssertEqual(kotlin.trimmingCharacters(in: .whitespacesAndNewlines), transpilation.output.content.trimmingCharacters(in: .whitespacesAndNewlines), file: file, line: line)
             })

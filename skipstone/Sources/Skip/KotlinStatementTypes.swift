@@ -296,13 +296,14 @@ class KotlinImportDeclaration: KotlinStatement {
     override func append(to output: OutputGenerator, indentation: Indentation) {
         output.append(indentation)
         output.append("import ")
-        output.append(modulePath.joined(separator: "."))
+        output.append(KotlinTranslator.packageName(forModule: modulePath.joined(separator: ".")))
         if modulePath.count == 1 {
             output.append(".*")
         }
         output.append("\n")
     }
 }
+
 
 class KotlinInterfaceDeclaration: KotlinStatement {
     let name: String

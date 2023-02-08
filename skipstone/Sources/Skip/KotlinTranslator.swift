@@ -7,6 +7,34 @@ public class KotlinTranslator {
         self.syntaxTree = syntaxTree
     }
 
+    /// Converts a `CamelCased` module name to a `lower.cased` dot-separated package name.
+    /// - Parameters:
+    ///   - moduleName: the module name to convert
+    ///   - fallbackPrefix: the package name to prefix if the module name doesn't result in a package name containing dots
+    /// - Returns: the dot-separated package name
+    public static func packageName(forModule moduleName: String, fallbackPrefix: String? = "skipmodule") -> String {
+        var lastLower = false
+        var packageName = ""
+        var hasDot = false
+        for c in moduleName {
+            let lower = c.lowercased()
+            if lower == String(c) {
+                lastLower = true
+            } else {
+                if lastLower == true {
+                    packageName += "."
+                    hasDot = true
+                }
+                lastLower = false
+            }
+            packageName += lower
+        }
+        if !hasDot, let fallbackPrefix = fallbackPrefix {
+            packageName = fallbackPrefix + "." + packageName
+        }
+        return packageName
+    }
+
     /// Translate and transpile to source code.
     public func transpile(codebaseInfo: KotlinCodebaseInfo) -> Transpilation {
         self.codebaseInfo = codebaseInfo

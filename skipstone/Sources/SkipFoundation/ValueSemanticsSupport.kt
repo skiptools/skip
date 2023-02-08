@@ -1,4 +1,4 @@
-package SkipFoundation
+package skip.foundation
 
 interface ValueSemantics {
     fun valcopy(): ValueSemantics

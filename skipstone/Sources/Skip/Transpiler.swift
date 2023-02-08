@@ -6,7 +6,6 @@ import SwiftSyntax
 public struct Transpiler {
     public let sourceFiles: [Source.File]
     public var preprocessorSymbols: Set<String> = []
-    public var packageName: String?
 
     /// Supply files to transpile. Only `.swift` files will be processed.
     public init(sourceFiles: [Source.File]) {
@@ -14,9 +13,7 @@ public struct Transpiler {
     }
 
     /// Perform transpilation, feeding results to the given handler.
-    public func transpile(codebaseInfo: KotlinCodebaseInfo? = nil, handler: (Transpilation) throws -> Void) async throws {
-        let codebaseInfo = codebaseInfo ?? KotlinCodebaseInfo()
-        codebaseInfo.packageName = packageName
+    public func transpile(codebaseInfo: KotlinCodebaseInfo, handler: (Transpilation) throws -> Void) async throws {
         try await withThrowingTaskGroup(of: Void.self) { group in
             for sourceFile in sourceFiles {
                 group.addTask {

@@ -1,4 +1,4 @@
-package SkipFoundation
+package skip.foundation
 
 fun <T> arrayOf(vararg elements: T): Array<T> {
     val array = Array<T>()
