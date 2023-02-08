@@ -42,7 +42,7 @@ final class ArrayTests: XCTestCase {
         XCTAssertEqual(array.count, 3)
     }
 
-    func testDidSet() {
+    func testAppendDidSet() {
         let holder = ArrayHolder()
         XCTAssertEqual(holder.arraySetCount, 0)
 
@@ -63,6 +63,44 @@ final class ArrayTests: XCTestCase {
         XCTAssertEqual(holder.arraySetCount, 3)
         XCTAssertEqual(array.count, 2)
     }
+
+    func testSubscriptDidSet() {
+        let holder = ArrayHolder()
+        holder.array.append(1)
+        XCTAssertEqual(holder.array.count, 1)
+        XCTAssertEqual(holder.arraySetCount, 1)
+
+        var array = holder.array
+        array[0] = 100
+        XCTAssertEqual(holder.array[0], 1)
+        XCTAssertEqual(holder.array.count, 1)
+        XCTAssertEqual(holder.arraySetCount, 1)
+
+        holder.array[0] = 99
+        XCTAssertEqual(holder.array[0], 99)
+        XCTAssertEqual(holder.array.count, 1)
+        XCTAssertEqual(holder.arraySetCount, 2)
+        XCTAssertEqual(array[0], 100)
+    }
+
+    func testNestedSubscriptDidSet() {
+        let holder = ArrayHolder()
+        holder.arrayOfArrays.append([1, 2, 3])
+        XCTAssertEqual(holder.arrayOfArrays.count, 1)
+        XCTAssertEqual(holder.arraySetCount, 1)
+
+        var array = holder.arrayOfArrays
+        array[0][1] = 200
+        XCTAssertEqual(holder.arrayOfArrays[0], [1, 2, 3])
+        XCTAssertEqual(holder.arrayOfArrays.count, 1)
+        XCTAssertEqual(holder.arraySetCount, 1)
+
+        holder.arrayOfArrays[0][1] = 199
+        XCTAssertEqual(holder.arrayOfArrays[0][1], 199)
+        XCTAssertEqual(holder.arrayOfArrays.count, 1)
+        XCTAssertEqual(holder.arraySetCount, 2)
+        XCTAssertEqual(array[0][1], 200)
+    }
 }
 
 class ArrayHolder {
@@ -72,4 +110,10 @@ class ArrayHolder {
         }
     }
     var arraySetCount = 0
+
+    var arrayOfArrays: [[Int]] = [] {
+        didSet {
+            arraySetCount += 1
+        }
+    }
 }
