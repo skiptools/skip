@@ -100,6 +100,32 @@ final class ArrayTests: XCTestCase {
         XCTAssertEqual(holder.arraySetCount, 2)
         XCTAssertEqual(array[0][1], 200)
     }
+
+    func testDeepNestedArrays() {
+        var nested: [[[[[Int]]]]] = [[[[[1]]]]]
+        let nested0: [[[Int]]] = [[[-1]]]
+
+        nested[0][0][0][0][0] = nested[0][0][0][0][0] + 1
+        nested[0][0] = nested0
+        nested[0][0][0][0][0] = nested[0][0][0][0][0] + 1
+        XCTAssertEqual(nested[0][0][0][0][0], 0)
+    }
+
+    func testArrayReferences() {
+        var arr: [Int] = []
+        arr.append(1)
+        var arr2 = arr
+        arr2.append(2)
+        var arr3 = arr2
+        arr3.append(3)
+
+        arr.append(0)
+
+        XCTAssertEqual(arr.count, 2)
+        XCTAssertEqual(arr2.count, 2)
+        XCTAssertEqual(arr3.count, 3)
+
+    }
 }
 
 class ArrayHolder {

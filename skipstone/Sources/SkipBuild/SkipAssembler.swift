@@ -342,6 +342,7 @@ public struct SkipAssembler {
                 let localDependencies = Set(targetSet.dependencies.map(\.target.moduleName)).sorted()
                 //let localDependencies = Set(targetSet.dependencies.flatMap(\.deepTargets).map(\.moduleName)).sorted()
 
+                // - api: “dependencies appearing in the api configurations will be transitively exposed to consumers of the library, and as such will appear on the compile classpath of consumers. Dependencies found in the implementation configuration will, on the other hand, not be exposed to consumers, and therefore not leak into the consumers' compile classpath.”
                 func modDependency(mod: String, api: Bool = true) -> String {
                     let dep = api ? "api" : "implementation"
 
