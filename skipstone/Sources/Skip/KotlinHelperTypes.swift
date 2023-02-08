@@ -197,10 +197,12 @@ extension TypeSignature {
         "Int32": ("Int", "kotlin", false),
         "Int64": ("Long", "kotlin", false),
         "Set": ("Set", "SkipFoundation", true),
+        "String": ("String", "kotlin", false),
         "UInt": ("UInt", "kotlin", false),
         "UInt8": ("UByte", "kotlin", false),
         "UInt16": ("UShort", "kotlin", false),
         "UInt32": ("UInt", "kotlin", false),
         "UInt64": ("ULong", "kotlin", false),
+        "Void": ("Unit", "kotlin", false),
     ]
 }

@@ -294,11 +294,16 @@ class KotlinImportDeclaration: KotlinStatement {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
+        guard !modulePath.isEmpty else {
+            return
+        }
         output.append(indentation)
         output.append("import ")
-        output.append(KotlinTranslator.packageName(forModule: modulePath.joined(separator: ".")))
+        output.append(KotlinTranslator.packageName(forModule: modulePath[0]))
         if modulePath.count == 1 {
             output.append(".*")
+        } else {
+            output.append(".").append(modulePath[1...].joined(separator: "."))
         }
         output.append("\n")
     }

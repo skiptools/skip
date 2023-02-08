@@ -9,9 +9,9 @@ public class KotlinTranslator {
 
     /// Converts a `CamelCased` module name to a `lower.cased` dot-separated package name.
     /// - Parameters:
-    ///   - moduleName: the module name to convert
-    ///   - fallbackPrefix: the package name to prefix if the module name doesn't result in a package name containing dots
-    /// - Returns: the dot-separated package name
+    ///   - moduleName: The module name to convert.
+    ///   - fallbackPrefix: The package name to prefix if the module name doesn't result in a package name containing dots.
+    /// - Returns: The dot-separated package name.
     public static func packageName(forModule moduleName: String, fallbackPrefix: String? = "skipmodule") -> String {
         var lastLower = false
         var packageName = ""

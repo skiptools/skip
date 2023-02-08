@@ -58,9 +58,9 @@ final class BaseTypeTests: XCTestCase {
         internal var a: Array<Any>
         internal var ai: Array<Int>
         internal var ai2: Array<Int>
-        internal var m: MutableMap<Any, Any>
-        internal var mis: MutableMap<Int, String>
-        internal var mis2: MutableMap<Int, String>
+        internal var m: Dictionary<Any, Any>
+        internal var mis: Dictionary<Int, String>
+        internal var mis2: Dictionary<Int, String>
         internal var tis: Pair<Int, String>
         internal var tis2: Triple<Int, String, Double>
         """)
