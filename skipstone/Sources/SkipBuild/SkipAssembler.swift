@@ -299,6 +299,8 @@ public struct SkipAssembler {
                 if options.contains(.testCase) {
                     // replace common XCTest assertions with their JUnit equivalent
 
+                    //replace(" try ", with: " ") // trim out `try`
+
                     // any functions prefixed with "test" will get the JUnit @Test annotation
                     replace("open fun test", with: "@Test fun test")
                     replace("private fun test", with: "@Test fun test")
