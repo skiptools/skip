@@ -2,7 +2,7 @@ import SwiftSyntax
 
 /// A block of code.
 struct CodeBlock<S> {
-    let statements: [S]
+    var statements: [S]
 }
 
 /// A variable accessor.
@@ -123,14 +123,14 @@ struct Operator: Equatable {
 
 /// A function parameter.
 struct Parameter<S>: Hashable {
-    let externalName: String
+    var externalName: String
     var internalName: String {
         return _internalName ?? externalName
     }
     private let _internalName: String?
-    private(set) var type: TypeSignature?
-    let isVariadic: Bool
-    let defaultValue: S?
+    var type: TypeSignature?
+    var isVariadic: Bool
+    var defaultValue: S?
 
     init(externalName: String, internalName: String? = nil, type: TypeSignature?, isVariadic: Bool = false, defaultValue: S? = nil) {
         self.externalName = externalName
@@ -158,12 +158,6 @@ struct Parameter<S>: Hashable {
         return PrettyPrintTree(root: externalName.isEmpty ? "_" : externalName, children: children)
     }
 
-    func qualifiedType(in statement: Statement) -> Parameter<S> {
-        var parameter = self
-        parameter.type = type?.qualified(in: statement)
-        return parameter
-    }
-
     static func ==(lhs: Parameter<S>, rhs: Parameter<S>) -> Bool {
         return lhs.externalName == rhs.externalName && lhs.type == rhs.type && lhs.isVariadic == rhs.isVariadic
     }
@@ -184,7 +178,7 @@ enum StringLiteralSegment<E> {
 /// A source code type signature.
 indirect enum TypeSignature: CustomStringConvertible, Hashable {
     case array(TypeSignature)
-    case base(String, String?, [TypeSignature]) // A<B, C> (Second string is qualified name if resolved)
+    case base(String, [TypeSignature]) // A<B, C>
     case classRestricted // 'class'
     case composition([TypeSignature]) // (A & B & C)
     case dictionary(TypeSignature, TypeSignature)
@@ -196,40 +190,31 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
     case unwrappedOptional(TypeSignature)
 
     var description: String {
-        return description(isQualified: false)
-    }
-
-    var qualifiedDescription: String {
-        return description(isQualified: true)
-    }
-
-    private func description(isQualified: Bool) -> String {
         switch self {
         case .array(let elementType):
-            return "[\(elementType.description(isQualified: isQualified))]"
-        case .base(let name, let qualifiedName, let generics):
-            let name = (isQualified ? qualifiedName : name) ?? name
+            return "[\(elementType.description)]"
+        case .base(let name, let generics):
             guard !generics.isEmpty else {
                 return name
             }
-            return "\(name)<\(generics.map { $0.description(isQualified: isQualified) }.joined(separator: ", "))>"
+            return "\(name)<\(generics.map { $0.description }.joined(separator: ", "))>"
         case .classRestricted:
             return "class"
         case .composition(let types):
-            return "(\(types.map { $0.description(isQualified: isQualified) }.joined(separator: " & ")))"
+            return "(\(types.map { $0.description }.joined(separator: " & ")))"
         case .dictionary(let keyType, let valueType):
-            return "[\(keyType.description(isQualified: isQualified)): \(valueType.description(isQualified: isQualified))]"
+            return "[\(keyType.description): \(valueType.description)]"
         case .function(let paramTypes, let returnType):
-            return "(\(paramTypes.map { $0.description(isQualified: isQualified) }.joined(separator: ", ")) -> \(returnType.description(isQualified: isQualified))"
+            return "(\(paramTypes.map { $0.description }.joined(separator: ", ")) -> \(returnType.description)"
         case .optional(let type):
-            return "\(type.description(isQualified: isQualified))?"
+            return "\(type.description)?"
         case .member(let baseType, let type):
-            return "\(baseType.description(isQualified: isQualified)).\(type)"
+            return "\(baseType.description).\(type)"
         case .metaType(let baseType):
-            return "\(baseType.description(isQualified: isQualified)).Type"
+            return "\(baseType.description).Type"
         case .tuple(let labels, let types):
             let descriptions = zip(labels, types).map {
-                let typeDescription = $0.1.description(isQualified: isQualified)
+                let typeDescription = $0.1.description
                 guard let label = $0.0 else {
                     return typeDescription
                 }
@@ -237,7 +222,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
             }
             return "(\(descriptions.joined(separator: ", ")))"
         case .unwrappedOptional(let type):
-            return "\(type.description(isQualified: isQualified))!"
+            return "\(type.description)!"
         }
     }
 
@@ -266,7 +251,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
                     return nil
                 }
             }
-            return .base(name, nil, genericTypes)
+            return .base(name, genericTypes)
         case .compositionType:
             guard let compositionType = syntax.as(CompositionTypeSyntax.self) else {
                 return nil
@@ -310,7 +295,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
                     return nil
                 }
             }
-            return .member(baseType, .base(name, nil, genericTypes))
+            return .member(baseType, .base(name, genericTypes))
         case .metatypeType:
             guard let metaType = syntax.as(MetatypeTypeSyntax.self), let baseType = self.for(syntax: metaType.baseType) else {
                 return nil
@@ -353,36 +338,6 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
             fallthrough
         default:
             return nil
-        }
-    }
-
-    func qualified(in statement: Statement) -> TypeSignature {
-        switch self {
-        case .array(let elementType):
-            return .array(elementType.qualified(in: statement))
-        case .base(let name, let qualifiedName, let generics):
-            if qualifiedName != nil {
-                return self
-            }
-            return .base(name, statement.qualifyReferencedTypeName(name), generics.map { $0.qualified(in: statement) })
-        case .classRestricted:
-            return self
-        case .composition(let types):
-            return .composition(types.map { $0.qualified(in: statement) })
-        case .dictionary(let keyType, let valueType):
-            return .dictionary(keyType.qualified(in: statement), valueType.qualified(in: statement))
-        case .function(let parameterTypes, let returnType):
-            return .function(parameterTypes.map { $0.qualified(in: statement) }, returnType.qualified(in: statement))
-        case .member(let baseType, let type):
-            return .member(baseType.qualified(in: statement), type)
-        case .metaType(let type):
-            return .metaType(type.qualified(in: statement))
-        case .optional(let type):
-            return .optional(type.qualified(in: statement))
-        case .tuple(let labels, let types):
-            return .tuple(labels, types.map { $0.qualified(in: statement) })
-        case .unwrappedOptional(let type):
-            return .unwrappedOptional(type.qualified(in: statement))
         }
     }
 }

@@ -195,7 +195,7 @@ class ExtensionDeclaration: TypeDeclaration {
 
     init(extends: TypeSignature, inherits: [TypeSignature] = [], modifiers: Modifiers? = nil, members: [Statement] = [], syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.extends = extends
-        super.init(type: .extensionDeclaration, name: extends.description, qualifiedName: extends.description, inherits: inherits, modifiers: modifiers, members: members, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+        super.init(type: .extensionDeclaration, name: extends.description, inherits: inherits, modifiers: modifiers, members: members, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
     override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
@@ -215,11 +215,11 @@ class ExtensionDeclaration: TypeDeclaration {
 /// `func f() { ... }`
 class FunctionDeclaration: Statement {
     let name: String
-    private(set) var returnType: TypeSignature?
-    private(set) var parameters: [Parameter<Statement>]
+    let returnType: TypeSignature?
+    let parameters: [Parameter<Statement>]
     let isAsync: Bool
     let isThrows: Bool
-    private(set) var modifiers: Modifiers
+    let modifiers: Modifiers
     let body: CodeBlock<Statement>?
 
     init(name: String, returnType: TypeSignature?, parameters: [Parameter<Statement>], isAsync: Bool = false, isThrows: Bool = false, modifiers: Modifiers? = nil, body: CodeBlock<Statement>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
@@ -249,17 +249,6 @@ class FunctionDeclaration: Statement {
         let statement = FunctionDeclaration(name: name, returnType: returnType, parameters: parameters, isAsync: isAsync, isThrows: isThrows, modifiers: modifiers, body: body, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
         statement.messages = messages
         return [statement]
-    }
-
-    override func resolve() {
-        if let returnType {
-            self.returnType = returnType.qualified(in: self)
-        }
-        parameters = parameters.map { $0.qualifiedType(in: self) }
-        // Functions in protocols or extensions inherit the visibility of the protocol or extension
-        if modifiers.visibility == .default, let owningTypeDeclaration, (owningTypeDeclaration.type == .protocolDeclaration || owningTypeDeclaration.type == .extensionDeclaration) {
-            modifiers.visibility = owningTypeDeclaration.modifiers.visibility
-        }
     }
 
     override var children: [SyntaxNode] {
@@ -314,17 +303,12 @@ class ImportDeclaration: Statement {
 /// `class/struct/enum Type { ... }`
 class TypeDeclaration: Statement {
     let name: String
-    private(set) var inherits: [TypeSignature]
+    let inherits: [TypeSignature]
     let modifiers: Modifiers
     let members: [Statement]
-    var qualifiedName: String {
-        return _qualifiedName ?? name
-    }
-    private var _qualifiedName: String?
 
-    init(type: StatementType, name: String, qualifiedName: String? = nil, inherits: [TypeSignature] = [], modifiers: Modifiers? = nil, members: [Statement] = [], syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(type: StatementType, name: String, inherits: [TypeSignature] = [], modifiers: Modifiers? = nil, members: [Statement] = [], syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.name = name
-        _qualifiedName = qualifiedName
         self.inherits = inherits
         self.modifiers = modifiers ?? Modifiers()
         self.members = members
@@ -384,13 +368,6 @@ class TypeDeclaration: Statement {
         return statement
     }
 
-    override func resolve() {
-        if _qualifiedName == nil {
-            _qualifiedName = qualifyDeclaredTypeName(name)
-        }
-        inherits = inherits.map { $0.qualified(in: self) }
-    }
-
     override var children: [SyntaxNode] {
         return members
     }
@@ -411,11 +388,11 @@ class TypeDeclaration: Statement {
 /// `let/var v ...`
 class VariableDeclaration: Statement {
     let name: String
-    private(set) var declaredType: TypeSignature?
+    let declaredType: TypeSignature?
     let isLet: Bool
     let isAsync: Bool
     let isThrows: Bool
-    private(set) var modifiers: Modifiers
+    let modifiers: Modifiers
     let value: Expression?
     let getter: Accessor<Statement>?
     let setter: Accessor<Statement>?
@@ -526,16 +503,6 @@ class VariableDeclaration: Statement {
             throw Message.unsupportedSyntax(patternSyntax, source: syntaxTree.source)
         default:
             throw Message.unsupportedSyntax(patternSyntax, source: syntaxTree.source)
-        }
-    }
-
-    override func resolve() {
-        if let declaredType {
-            self.declaredType = declaredType.qualified(in: self)
-        }
-        // Variables in protocols or extensions inherit the visibility of the protocol or extension
-        if modifiers.visibility == .default, let owningTypeDeclaration, owningTypeDeclaration === parent, (owningTypeDeclaration.type == .protocolDeclaration || owningTypeDeclaration.type == .extensionDeclaration) {
-            modifiers.visibility = owningTypeDeclaration.modifiers.visibility
         }
     }
 

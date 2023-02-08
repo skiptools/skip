@@ -34,10 +34,10 @@ public class KotlinCodebaseInfo {
         case .protocolDeclaration:
             fallthrough
         case .structDeclaration:
-            typeInfo[(statement as! TypeDeclaration).qualifiedName] = statement.type
+            typeInfo[(statement as! TypeDeclaration).name] = statement.type
         case .extensionDeclaration:
             let declaration = statement as! ExtensionDeclaration
-            let key = declaration.extends.qualifiedDescription
+            let key = declaration.extends.description
             if var declarations = extensionDeclarations[key] {
                 declarations.append(declaration)
                 extensionDeclarations[key] = declarations
@@ -51,7 +51,7 @@ public class KotlinCodebaseInfo {
 
     /// Return all extensions of a given type.
     func extensions(of declaration: TypeDeclaration) -> [ExtensionDeclaration] {
-        return extensionDeclarations[declaration.qualifiedName] ?? []
+        return extensionDeclarations[declaration.name] ?? []
     }
 
     /// Whether the given qualified type name is a class, struct, etc *within this module*.

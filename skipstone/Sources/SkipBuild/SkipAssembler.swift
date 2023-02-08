@@ -6,7 +6,7 @@ import os.log
 import class Cocoa.NSWorkspace
 #endif
 
-/// The set of targets for this transpilation.l
+/// The set of targets for this transpilation.
 public struct SkipTargetSet {
     public let sourceBase: StaticString
     public let target: GradleTarget

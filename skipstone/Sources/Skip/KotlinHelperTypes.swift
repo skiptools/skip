@@ -49,12 +49,44 @@ extension Parameter where S: Statement {
 extension TypeSignature {
     /// Kotlin description of this type.
     var kotlin: String {
-        return kotlin(isQualified: false)
-    }
-
-    /// Kotlin description of the qualified form of this type.
-    var qualifiedKotlin: String {
-        return kotlin(isQualified: true)
+        switch self {
+        case .array(let elementType):
+            return "Array<\(elementType.kotlin)>"
+        case .base(let name, let generics):
+            let name = translateTypeName(name)
+            guard !generics.isEmpty else {
+                return name
+            }
+            return "\(name)<\(generics.map { $0.kotlin }.joined(separator: ", "))>"
+        case .classRestricted:
+            return "Any"
+        case .composition:
+            return "Any"
+        case .dictionary(let keyType, let valueType):
+            return "Dictionary<\(keyType.kotlin), \(valueType.kotlin)>"
+        case .function(let paramTypes, let returnType):
+            return "(\(paramTypes.map { $0.kotlin }.joined(separator: ", "))) -> \(returnType.kotlin)"
+        case .optional(let type):
+            return "\(type.kotlin)?"
+        case .member(let baseType, let type):
+            return "\(baseType.kotlin).\(type.kotlin)"
+        case .metaType(let baseType):
+            return "\(baseType.kotlin)::"
+        case .tuple(_, let types):
+            if types.isEmpty {
+                return "Unit"
+            }
+            let generics = types.map { $0.kotlin }.joined(separator: ", ")
+            if types.count == 2 {
+                return "Pair<\(generics)>"
+            } else if types.count == 3 {
+                return "Triple<\(generics)>"
+            } else {
+                return "Any"
+            }
+        case .unwrappedOptional(let type):
+            return type.kotlin
+        }
     }
 
     /// Add appropriate messages if this type is not supported.
@@ -62,7 +94,7 @@ extension TypeSignature {
         switch self {
         case .array(let elementType):
             elementType.appendKotlinMessages(to: statement)
-        case .base(_, _, let generics):
+        case .base(_, let generics):
             generics.forEach { $0.appendKotlinMessages(to: statement) }
         case .classRestricted:
             break
@@ -97,8 +129,7 @@ extension TypeSignature {
         switch self {
         case .array:
             return true
-        case .base(let name, let qualifiedName, _):
-            let name = qualifiedName ?? name
+        case .base(let name, _):
             if let typeInfo = Self.builtinTypeInfo[name] {
                 return typeInfo.mayBeSharedMutableValue
             }
@@ -121,47 +152,6 @@ extension TypeSignature {
             return false
         case .unwrappedOptional(let type):
             return type.kotlinMayBeSharedMutableValue
-        }
-    }
-
-    private func kotlin(isQualified: Bool) -> String {
-        switch self {
-        case .array(let elementType):
-            return "Array<\(elementType.kotlin(isQualified: isQualified))>"
-        case .base(let name, let qualifiedName, let generics):
-            let name = translateTypeName((isQualified ? qualifiedName : name) ?? name)
-            guard !generics.isEmpty else {
-                return name
-            }
-            return "\(name)<\(generics.map { $0.kotlin(isQualified: isQualified) }.joined(separator: ", "))>"
-        case .classRestricted:
-            return "Any"
-        case .composition:
-            return "Any"
-        case .dictionary(let keyType, let valueType):
-            return "Dictionary<\(keyType.kotlin(isQualified: isQualified)), \(valueType.kotlin(isQualified: isQualified))>"
-        case .function(let paramTypes, let returnType):
-            return "(\(paramTypes.map { $0.kotlin(isQualified: isQualified) }.joined(separator: ", "))) -> \(returnType.kotlin(isQualified: isQualified))"
-        case .optional(let type):
-            return "\(type.kotlin(isQualified: isQualified))?"
-        case .member(let baseType, let type):
-            return "\(baseType.kotlin(isQualified: isQualified)).\(type.kotlin(isQualified: false))"
-        case .metaType(let baseType):
-            return "\(baseType.kotlin(isQualified: isQualified))::"
-        case .tuple(_, let types):
-            if types.isEmpty {
-                return "Unit"
-            }
-            let generics = types.map { $0.kotlin(isQualified: isQualified) }.joined(separator: ", ")
-            if types.count == 2 {
-                return "Pair<\(generics)>"
-            } else if types.count == 3 {
-                return "Triple<\(generics)>"
-            } else {
-                return "Any"
-            }
-        case .unwrappedOptional(let type):
-            return type.kotlin(isQualified: isQualified)
         }
     }
 

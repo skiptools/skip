@@ -121,7 +121,7 @@ class KotlinClassDeclaration: KotlinStatement {
                         output.append(", ")
                     }
                 }
-                output.append(inherits.map({ $0.qualifiedKotlin }).joined(separator: ", "))
+                output.append(inherits.map({ $0.kotlin }).joined(separator: ", "))
             }
         }
         output.append(" {\n")
@@ -147,11 +147,11 @@ class KotlinClassDeclaration: KotlinStatement {
     }
 
     private func buildSuperclassCall(translator: KotlinTranslator) {
-        guard let superclass = inherits.first, translator.codebaseInfo?.declarationType(of: superclass.qualifiedDescription) == .classDeclaration else {
+        guard let superclass = inherits.first, translator.codebaseInfo?.declarationType(of: superclass.description) == .classDeclaration else {
             return
         }
         // TODO: Call superclass default constructor with our default constructor params
-        superclassCall = "\(superclass.qualifiedKotlin)()"
+        superclassCall = "\(superclass.kotlin)()"
     }
 }
 
@@ -160,7 +160,7 @@ struct KotlinExtensionDeclaration {
         // If the extension is on a type outside this module or is on a protocol, use Kotlin extension
         // functions. Otherwise do not translate the extension - instead we'll move its members into
         // our declaration of its extended type
-        let declarationType = translator.codebaseInfo?.declarationType(of: statement.extends.qualifiedDescription)
+        let declarationType = translator.codebaseInfo?.declarationType(of: statement.extends.description)
         guard declarationType == nil || declarationType == .protocolDeclaration else {
             return []
         }
@@ -206,12 +206,13 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         let kstatement = KotlinFunctionDeclaration(statement: statement)
         kstatement.returnType = statement.returnType
         kstatement.parameters = statement.parameters.map { $0.translate(translator: translator) }
-        if let owningTypeDeclaration = statement.owningTypeDeclaration {
-            kstatement.isOpen = !statement.modifiers.isFinal && statement.modifiers.visibility != .private && owningTypeDeclaration.type == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
-            if (translator.codebaseInfo?.isProtocolMember(declaration: statement, in: owningTypeDeclaration) == true) {
-                kstatement.modifiers.isOverride = true
-            }
-        }
+        //~~~
+//        if let owningTypeDeclaration = statement.owningTypeDeclaration {
+//            kstatement.isOpen = !statement.modifiers.isFinal && statement.modifiers.visibility != .private && owningTypeDeclaration.type == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
+//            if (translator.codebaseInfo?.isProtocolMember(declaration: statement, in: owningTypeDeclaration) == true) {
+//                kstatement.modifiers.isOverride = true
+//            }
+//        }
         if let body = statement.body {
             let bodyStatements = body.statements.flatMap { translator.translateStatement($0) }
             kstatement.body = CodeBlock(statements: bodyStatements)
@@ -244,7 +245,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
 
             output.append("fun ")
             if let extends {
-                output.append(extends.qualifiedKotlin).append(".")
+                output.append(extends.kotlin).append(".")
                 if isStatic {
                     output.append("Companion.")
                 }
@@ -254,7 +255,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 let name = parameter.externalName.isEmpty ? parameter.internalName : parameter.externalName
                 output.append(name)
                 output.append(": ")
-                output.append(parameter.type?.qualifiedKotlin ?? "Any")
+                output.append(parameter.type?.kotlin ?? "Any")
                 if let defaultValue = parameter.defaultValue {
                     output.append(" = ").append(defaultValue, indentation: 0)
                 }
@@ -262,7 +263,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                     output.append(", ")
                 }
             }
-            output.append("): \(returnType?.qualifiedKotlin ?? "Unit")")
+            output.append("): \(returnType?.kotlin ?? "Unit")")
         }
         if let body {
             output.append(" {\n")
@@ -354,7 +355,7 @@ class KotlinInterfaceDeclaration: KotlinStatement {
             output.append("interface ").append(name)
             if !inherits.isEmpty {
                 output.append(": ")
-                output.append(inherits.map({ $0.qualifiedKotlin }).joined(separator: ", "))
+                output.append(inherits.map({ $0.kotlin }).joined(separator: ", "))
             }
         }
         output.append(" {\n")
@@ -400,15 +401,16 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     static func translate(statement: VariableDeclaration, translator: KotlinTranslator) -> KotlinVariableDeclaration {
         let kstatement = KotlinVariableDeclaration(statement: statement)
         kstatement.declaredType = statement.declaredType
-        if let owningTypeDeclaration = statement.owningTypeDeclaration {
-            kstatement.isProperty = statement.parent === owningTypeDeclaration
-            kstatement.isOpen = kstatement.isProperty && !statement.modifiers.isFinal && statement.modifiers.visibility != .private && owningTypeDeclaration.type == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
-            if kstatement.isProperty && translator.codebaseInfo?.isProtocolMember(declaration: statement, in: owningTypeDeclaration) == true {
-                kstatement.modifiers.isOverride = true
-            }
-        } else {
-            kstatement.isGlobal = true
-        }
+        //~~~
+//        if let owningTypeDeclaration = statement.owningTypeDeclaration {
+//            kstatement.isProperty = statement.parent === owningTypeDeclaration
+//            kstatement.isOpen = kstatement.isProperty && !statement.modifiers.isFinal && statement.modifiers.visibility != .private && owningTypeDeclaration.type == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
+//            if kstatement.isProperty && translator.codebaseInfo?.isProtocolMember(declaration: statement, in: owningTypeDeclaration) == true {
+//                kstatement.modifiers.isOverride = true
+//            }
+//        } else {
+//            kstatement.isGlobal = true
+//        }
         if let value = statement.value {
             kstatement.value = translator.translateExpression(value).valueReference
         }
@@ -468,7 +470,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 output.append("var ")
             }
             if let extends {
-                output.append(extends.qualifiedKotlin).append(".")
+                output.append(extends.kotlin).append(".")
                 if isStatic {
                     output.append("Companion.")
                 }
@@ -476,7 +478,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             output.append(name)
 
             if let declaredType {
-                output.append(": ").append(declaredType.qualifiedKotlin)
+                output.append(": ").append(declaredType.kotlin)
             }
             if let value {
                 output.append(" = ").append(value, indentation: 0)
