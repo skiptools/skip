@@ -1,6 +1,6 @@
 #if !SKIP
 @testable import SkipDemoApp
-import SkipUnit
+import XCTest
 #endif
 import SkipDemoLib
 import SkipFoundation

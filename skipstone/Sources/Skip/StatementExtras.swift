@@ -95,7 +95,7 @@ struct StatementExtras {
                     directiveLines.append(String(trimmedLine.dropFirst(insertPrefix.count)).trimmingCharacters(in: .whitespaces) + "\n")
                 } else if trimmedLine.hasPrefix(replacePrefix) {
                     directive = .replace("", nil)
-                    directiveLines.append(String(trimmedLine.dropFirst(insertPrefix.count)).trimmingCharacters(in: .whitespaces) + "\n")
+                    directiveLines.append(String(trimmedLine.dropFirst(replacePrefix.count)).trimmingCharacters(in: .whitespaces) + "\n")
                 } else if trimmedLine.hasPrefix(declarationPrefix) {
                     directive = .declaration("")
                     directiveLines.append(String(trimmedLine.dropFirst(declarationPrefix.count)).trimmingCharacters(in: .whitespaces) + "\n")

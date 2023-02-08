@@ -107,7 +107,7 @@ public struct SkipAssembler {
         return try String(contentsOf: outputURL)
     }
 
-    public static func assemble(root packageRoot: URL, moduleRootPath: String, sourceFolder: String, testsFolder: String?, targets: SkipTargetSet, destRoot: String, overwrite: Bool = true, studioID: String = androidStudioBundleID, wildcardModules: Bool = true) async throws -> (root: URL, files: [URL]) {
+    public static func assemble(root packageRoot: URL, moduleRootPath: String?, sourceFolder: String, testsFolder: String?, targets: SkipTargetSet, destRoot: String, overwrite: Bool = true, studioID: String = androidStudioBundleID) async throws -> (root: URL, files: [URL]) {
         let destRoot = URL(fileURLWithPath: destRoot, isDirectory: true, relativeTo: packageRoot)
 
         // use the passed-in list of modules, or else default to all the sources in the folder
@@ -167,9 +167,11 @@ public struct SkipAssembler {
             let moduleSwiftTestRoot = testRoot.flatMap({ testRoot in URL(fileURLWithPath: moduleName + "Tests", isDirectory: true, relativeTo: testRoot) })
 
             try Task.checkCancellation()
-            let moduleRootFolder = URL(fileURLWithPath: moduleRootPath, isDirectory: true, relativeTo: destRoot)
 
-            let moduleRoot = URL(fileURLWithPath: moduleName, isDirectory: true, relativeTo: moduleRootFolder)
+            // only place the modules in a sub-folder if it has been specified
+            let moduleRootFolder = moduleRootPath.flatMap({ URL(fileURLWithPath: $0, isDirectory: true, relativeTo: destRoot) })
+
+            let moduleRoot = URL(fileURLWithPath: moduleName, isDirectory: true, relativeTo: moduleRootFolder ?? destRoot)
 
             // translate sources: Sources/MODULE/**/*.swift -> DEST/MODULE/src/main/java/MODULE/**/*.kt
             try fm.createDirectory(at: moduleRoot, withIntermediateDirectories: true)
@@ -337,8 +339,18 @@ public struct SkipAssembler {
 
             func createModuleLevelGradleBuild() throws {
                 // we'd prefer to just specify the shallow dependencies here and let gradle resolve the transitive module dependencies, but it seems to not be supported, so instead we need to specify the deep dependencies (uniqued; in no particular order)
-                //let localDependencies = Set(targetSet.dependencies.map(\.target.moduleName)).sorted()
-                let localDependencies = Set(targetSet.dependencies.flatMap(\.deepTargets).map(\.moduleName)).sorted()
+                let localDependencies = Set(targetSet.dependencies.map(\.target.moduleName)).sorted()
+                //let localDependencies = Set(targetSet.dependencies.flatMap(\.deepTargets).map(\.moduleName)).sorted()
+
+                func modDependency(mod: String, api: Bool = true) -> String {
+                    let dep = api ? "api" : "implementation"
+
+                    if let moduleRootPath = moduleRootPath {
+                        return "\(dep)(project(\":\(moduleRootPath):\(mod)\"))"
+                    } else {
+                        return "\(dep)(project(\":\(mod)\"))"
+                    }
+                }
 
                 // the module-level build config
                 let buildGradle = URL(fileURLWithPath: "build.gradle.kts", isDirectory: false, relativeTo: moduleRoot)
@@ -359,7 +371,7 @@ public struct SkipAssembler {
                     testImplementation("org.robolectric:robolectric:4.+")
                     androidTestImplementation("com.android.support.test:runner:+")
 
-                    \(localDependencies.map({ mod in "implementation(project(\":\(moduleRootPath):\(mod)\"))" }).joined(separator: "\n    "))
+                    \(localDependencies.map({ modDependency(mod: $0) }).joined(separator: "\n    "))
                 }
 
                 android {
@@ -386,6 +398,8 @@ public struct SkipAssembler {
                     }
                     kotlinOptions {
                         jvmTarget = "11"
+                    }
+                    lintOptions {
                     }
                 }
 
@@ -459,16 +473,18 @@ public struct SkipAssembler {
             
             """
 
-            if wildcardModules {
+            if let moduleRootPath = moduleRootPath {
+                // just include everything under the module root path
                 settingsGradleSource += """
-                val modules = file("modules").listFiles().filter { it.isDirectory }.map { it.name }
+                val modules = file("\(moduleRootPath)").listFiles().filter { it.isDirectory }.map { it.name }
                 for (module in modules) {
-                    include("modules:$module")
+                    include("\(moduleRootPath):$module")
                 }
                 """
             } else {
+                // not module root; modules are stored in a shallow folder
                 for moduleName in Set(targets.deepTargets.map(\.moduleName)).sorted() {
-                    settingsGradleSource += "include(\"\(moduleRootPath):\(moduleName)\")\n"
+                    settingsGradleSource += "include(\":\(moduleName)\")\n"
                 }
             }
 

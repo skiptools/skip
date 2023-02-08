@@ -1,6 +1,6 @@
 #if !SKIP
 @testable import SkipFoundation
-import SkipUnit
+import XCTest
 #endif
 
 final class SkipFoundationTests: XCTestCase {

@@ -1,5 +1,5 @@
 #if !SKIP
-import SkipUnit
+import XCTest
 #endif
 
 final class ArrayTests: XCTestCase {
