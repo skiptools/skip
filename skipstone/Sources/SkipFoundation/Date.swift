@@ -36,7 +36,15 @@ extension Date {
 
 #else
 
+// SKIP INSERT: public val SkipDate.Companion.distantPast: Date get() = Date.create(-62135769600.0)
+// SKIP INSERT: public val SkipDate.Companion.distantFuture: Date get() = Date.create(64092211200.0)
+
 extension SkipDate {
+    #warning("TODO: translate static getters")
+    // public static var distantPast: Date { Date.create(-62135769600.0) }
+    // public static var distantFuture: Date { Date.create(64092211200.0) }
+
+
     public static func create(timeIntervalSince1970: TimeInterval) -> SkipDate {
         return SkipDate(rawValue: PlatformDate((timeIntervalSince1970 * 1000.0).toLong()))
     }
@@ -46,7 +54,16 @@ extension SkipDate {
         return rawValue.getTime() / 1000.0
     }
 
-    // FIXME: skip calculated prop yet supported
+    public func ISO8601Format() -> String {
+        // local time zone specific
+        // return java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", java.util.Locale.getDefault()).format(rawValue)
+        var dateFormat = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.getDefault())
+        dateFormat.timeZone = java.util.TimeZone.getTimeZone("GMT")
+        return dateFormat.format(rawValue)
+
+    }
+
+    #warning("TODO: translate calclated prop")
 //    public var timeIntervalSince1970: TimeInterval {
 //        rawValue.getTime() / 1000.0
 //    }
