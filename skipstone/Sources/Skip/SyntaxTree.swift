@@ -13,6 +13,19 @@ public class SyntaxTree: PrettyPrintable {
         self.preprocessorSymbols = preprocessorSymbols
         self.syntax = Parser.parse(source: source.content)
         self.statements = StatementDecoder.decode(syntaxListContainer: syntax, in: self)
+
+        // Resolve nodes breadth first so that a child can use information from its parent's siblings
+        var resolveQueue: [SyntaxNode] = statements
+        while !resolveQueue.isEmpty {
+            let node = resolveQueue.removeFirst()
+            node.resolve()
+            node.children.forEach { $0.parent = node }
+            resolveQueue += node.children
+        }
+
+        //~~~
+        let context = TypeInferenceContext(symbolInfo: nil, syntaxTree: self)
+        statements.forEach { $0.inferTypes(context: context) }
     }
 
     public var prettyPrintTree: PrettyPrintTree {

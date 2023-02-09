@@ -62,6 +62,25 @@ class ArrayLiteral: Expression {
         return ArrayLiteral(elements: elements, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
+    override func inferTypes(context: TypeInferenceContext, expecting: InferredType = .none) -> TypeInferenceContext {
+        if expecting.element != .none {
+            elementType = expecting.element
+            elements.forEach { $0.inferTypes(context: context, expecting: elementType) }
+        } else {
+            for element in elements {
+                element.inferTypes(context: context)
+                elementType = context.commonType(elementType, element.inferredType)
+            }
+        }
+        return context
+    }
+
+    private var elementType: InferredType = .none
+
+    override var inferredType: InferredType {
+        return .array(elementType)
+    }
+
     override var children: [SyntaxNode] {
         return elements
     }
@@ -90,6 +109,28 @@ class BinaryOperator: Expression {
         return BinaryOperator(op: op, lhs: lhs, rhs: rhs, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
+    override func inferTypes(context: TypeInferenceContext, expecting: InferredType = .none) -> TypeInferenceContext {
+        lhs.inferTypes(context: context, expecting: expecting)
+        if op.isAssignment {
+            rhs.inferTypes(context: context, expecting: lhs.inferredType)
+            resultType = .void
+        } else if op.isComparison {
+            rhs.inferTypes(context: context, expecting: lhs.inferredType)
+            resultType = .boolean
+        } else {
+            rhs.inferTypes(context: context)
+            let common = context.commonType(lhs.inferredType, rhs.inferredType)
+            resultType = common == .none ? expecting : common
+        }
+        return context
+    }
+
+    private var resultType: InferredType = .none
+
+    override var inferredType: InferredType {
+        return resultType
+    }
+
     override var children: [SyntaxNode] {
         return [lhs, rhs]
     }
@@ -116,6 +157,10 @@ class BooleanLiteral: Expression {
         return BooleanLiteral(literal: literal, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
+    override var inferredType: InferredType {
+        return .boolean
+    }
+
     override var prettyPrintAttributes: [PrettyPrintTree] {
         return [PrettyPrintTree(root: String(describing: literal))]
     }
@@ -124,9 +169,9 @@ class BooleanLiteral: Expression {
 /// `function(...)`
 class FunctionCall: Expression {
     let function: Expression
-    let arguments: [LabeledExpression<Expression>]
+    let arguments: [LabeledValue<Expression>]
 
-    init(function: Expression, arguments: [LabeledExpression<Expression>], syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(function: Expression, arguments: [LabeledValue<Expression>], syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
         self.function = function
         self.arguments = arguments
         super.init(type: .functionCall, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
@@ -140,24 +185,64 @@ class FunctionCall: Expression {
         var labeledExpressions = functionCallExpr.argumentList.map {
             let label = $0.label?.text
             let expression = ExpressionDecoder.decode(syntax: $0.expression, in: syntaxTree)
-            return LabeledExpression(label: label, expression: expression)
+            return LabeledValue(label: label, value: expression)
         }
         if let trailingClosure = functionCallExpr.trailingClosure {
             let expression = ExpressionDecoder.decode(syntax: trailingClosure, in: syntaxTree)
-            labeledExpressions.append(LabeledExpression(expression: expression))
+            labeledExpressions.append(LabeledValue(value: expression))
         }
         if let multipleTrailingClosures = functionCallExpr.additionalTrailingClosures {
             labeledExpressions += multipleTrailingClosures.map {
                 let label = $0.label.text
                 let expression = ExpressionDecoder.decode(syntax: $0.closure, in: syntaxTree)
-                return LabeledExpression(label: label, expression: expression)
+                return LabeledValue(label: label, value: expression)
             }
         }
         return FunctionCall(function: function, arguments: labeledExpressions)
     }
 
+    override func inferTypes(context: TypeInferenceContext, expecting: InferredType = .none) -> TypeInferenceContext {
+        let base: Expression?
+        let name: String
+        switch function.type {
+        case .identifier:
+            base = nil
+            name = (function as! Identifier).name
+        case .memberAccess:
+            let memberAccess = function as! MemberAccess
+            base = memberAccess.base
+            name = memberAccess.member
+        default:
+            function.inferTypes(context: context)
+            arguments.forEach { $0.value.inferTypes(context: context) }
+            returnType = expecting
+            return context
+        }
+
+        base?.inferTypes(context: context)
+        // First attempt to get function using only pre-known parameter types
+        var parameters = arguments.map { LabeledValue<InferredType>(label: $0.label, value: $0.value.inferredType) }
+        if let candidateFunction = context.function(name, of: base?.inferredType, parameters: parameters) {
+            for (index, argument) in arguments.enumerated() {
+                argument.value.inferTypes(context: context, expecting: candidateFunction.parameters[index])
+            }
+        } else {
+            arguments.forEach { $0.value.inferTypes(context: context) }
+        }
+        // Re-map now that we've filled in parameter inferred types
+        parameters = arguments.map { LabeledValue<InferredType>(label: $0.label, value: $0.value.inferredType) }
+        returnType = context.function(name, of: base?.inferredType, parameters: parameters)?.returnType ?? expecting
+        return context
+    }
+
+    private var returnType: InferredType = .none
+
+    override var inferredType: InferredType {
+        return returnType
+    }
+
     override var children: [SyntaxNode] {
-        return [function] + arguments.map { $0.expression }
+        return [function] + arguments.map { $0.value }
     }
 }
 
@@ -176,6 +261,17 @@ class Identifier: Expression {
         }
         let name = identifierExpr.identifier.text
         return Identifier(name: name, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: InferredType = .none) -> TypeInferenceContext {
+        identifierType = context.identifier(name) ?? expecting
+        return context
+    }
+
+    private var identifierType: InferredType = .none
+
+    override var inferredType: InferredType {
+        return identifierType
     }
 
     override var prettyPrintAttributes: [PrettyPrintTree] {
@@ -204,6 +300,18 @@ class MemberAccess: Expression {
         }
         let member = memberAccessExpr.name.text
         return MemberAccess(base: base, member: member, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: InferredType = .none) -> TypeInferenceContext {
+        base?.inferTypes(context: context)
+        memberType = context.member(member, of: base?.inferredType) ?? expecting
+        return context
+    }
+
+    private var memberType: InferredType = .none
+
+    override var inferredType: InferredType {
+        return memberType
     }
 
     override var children: [SyntaxNode] {
@@ -239,6 +347,10 @@ class NumericLiteral: Expression {
             return nil
         }
         return NumericLiteral(literal: literal, isFloatingPoint: isFloatingPoint, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+    }
+
+    override var inferredType: InferredType {
+        return isFloatingPoint ? .double : .int
     }
 
     override var prettyPrintAttributes: [PrettyPrintTree] {
@@ -278,6 +390,10 @@ class StringLiteral: Expression {
         return StringLiteral(segments: segments, isMultiline: isMultiline, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
+    override var inferredType: InferredType {
+        return .string
+    }
+
     override var children: [SyntaxNode] {
         return segments.compactMap {
             switch $0 {
@@ -308,9 +424,9 @@ class StringLiteral: Expression {
 /// `array[0]`
 class Subscript: Expression {
     let base: Expression
-    let arguments: [LabeledExpression<Expression>]
+    let arguments: [LabeledValue<Expression>]
 
-    init(base: Expression, arguments: [LabeledExpression<Expression>], syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(base: Expression, arguments: [LabeledValue<Expression>], syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
         self.base = base
         self.arguments = arguments
         super.init(type: .subscript, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
@@ -324,23 +440,46 @@ class Subscript: Expression {
         var labeledExpressions = subscriptExpr.argumentList.map {
             let label = $0.label?.text
             let expression = ExpressionDecoder.decode(syntax: $0.expression, in: syntaxTree)
-            return LabeledExpression(label: label, expression: expression)
+            return LabeledValue(label: label, value: expression)
         }
         if let trailingClosure = subscriptExpr.trailingClosure {
             let expression = ExpressionDecoder.decode(syntax: trailingClosure, in: syntaxTree)
-            labeledExpressions.append(LabeledExpression(expression: expression))
+            labeledExpressions.append(LabeledValue(value: expression))
         }
         if let multipleTrailingClosures = subscriptExpr.additionalTrailingClosures {
             labeledExpressions += multipleTrailingClosures.map {
                 let label = $0.label.text
                 let expression = ExpressionDecoder.decode(syntax: $0.closure, in: syntaxTree)
-                return LabeledExpression(label: label, expression: expression)
+                return LabeledValue(label: label, value: expression)
             }
         }
         return Subscript(base: base, arguments: labeledExpressions)
     }
 
+    override func inferTypes(context: TypeInferenceContext, expecting: InferredType = .none) -> TypeInferenceContext {
+        base.inferTypes(context: context)
+        // First attempt to get function using only pre-known parameter types
+        var parameters = arguments.map { LabeledValue<InferredType>(label: $0.label, value: $0.value.inferredType) }
+        if let candidateFunction = context.function("subscript", of: base.inferredType, parameters: parameters) {
+            for (index, argument) in arguments.enumerated() {
+                argument.value.inferTypes(context: context, expecting: candidateFunction.parameters[index])
+            }
+        } else {
+            arguments.forEach { $0.value.inferTypes(context: context) }
+        }
+        // Re-map now that we've filled in parameter inferred types
+        parameters = arguments.map { LabeledValue<InferredType>(label: $0.label, value: $0.value.inferredType) }
+        returnType = context.function("subscript", of: base.inferredType, parameters: parameters)?.returnType ?? expecting
+        return context
+    }
+
+    private var returnType: InferredType = .none
+
+    override var inferredType: InferredType {
+        return returnType
+    }
+
     override var children: [SyntaxNode] {
-        return [base] + arguments.map { $0.expression }
+        return [base] + arguments.map { $0.value }
     }
 }

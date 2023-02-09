@@ -1,11 +1,11 @@
 extension Accessor where S: Statement {
     /// Translate to an equivalent Kotlin accessor.
     func translate(translator: KotlinTranslator) -> Accessor<KotlinStatement> {
-        var kstatements: [KotlinStatement]? = nil
-        if let statements {
-            kstatements = statements.flatMap { translator.translateStatement($0) }
+        if let body {
+            let kstatements = body.statements.flatMap { translator.translateStatement($0) }
+            return Accessor<KotlinStatement>(parameterName: parameterName, body: CodeBlock(statements: kstatements))
         }
-        return Accessor<KotlinStatement>(parameterName: parameterName, statements: kstatements)
+        return Accessor<KotlinStatement>(parameterName: parameterName)
     }
 }
 

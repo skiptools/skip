@@ -8,20 +8,20 @@ struct CodeBlock<S> {
 /// A variable accessor.
 struct Accessor<S> {
     var parameterName: String?
-    var statements: [S]? // Nil if the accessor has no body, as in a protocol { get set }
+    var body: CodeBlock<S>? // Nil if the accessor has no body, as in a protocol { get set }
 }
 
-/// A labeled expression, as used in function call parameters.
-struct LabeledExpression<E> {
+/// A labeled value, as used in function call parameters.
+struct LabeledValue<V> {
     var label: String?
-    var expression: E
+    var value: V
 }
 
 /// Operator information.
 struct Operator: Equatable {
     let symbol: String
     let associativity: Associativity
-    let precedence: Int
+    let precedence: Precedence
 
     /// Left associativity means `(a + b + c) == ((a + b) + c)`.
     enum Associativity: Equatable {
@@ -32,12 +32,17 @@ struct Operator: Equatable {
 
     /// Whether this operator symbol is unrecognized.
     var isUnknown: Bool {
-        return precedence == Self.unknownOperatorPrecedence
+        return precedence == .unknown
     }
 
     /// Whether this is an assignment operator.
     var isAssignment: Bool {
-        return precedence == 0
+        return precedence == .assignment
+    }
+
+    /// Whether this is a comparison operator.
+    var isComparison: Bool {
+        return precedence == .comparison
     }
 
     /// Return an operator for the given symbol.
@@ -45,73 +50,84 @@ struct Operator: Equatable {
         if let op = allBySymbol[symbol] {
             return op
         }
-        return Operator(symbol: symbol, associativity: unknownOperatorAssociativity, precedence: unknownOperatorPrecedence)
+        return Operator(symbol: symbol, associativity: .left, precedence: .unknown)
+    }
+
+    enum Precedence: Int {
+        case assignment = 0
+        case ternary
+        case unknown
+        case or
+        case and
+        case comparison
+        case nilCoalescing
+        case cast
+        case range
+        case addition
+        case multiplication
+        case shift
     }
 
     /// This information was obtained from https://developer.apple.com/documentation/swift/swift_standard_library/operator_declarations
-    private static let unknownOperatorPrecedence = 2
-    private static let unknownOperatorAssociativity: Associativity = .left
     private static let all: [Operator] = [
-        Operator(symbol: "=", associativity: .right, precedence: 0),
-        Operator(symbol: "*=", associativity: .right, precedence: 0),
-        Operator(symbol: "/=", associativity: .right, precedence: 0),
-        Operator(symbol: "%=", associativity: .right, precedence: 0),
-        Operator(symbol: "+=", associativity: .right, precedence: 0),
-        Operator(symbol: "-=", associativity: .right, precedence: 0),
-        Operator(symbol: "<<=", associativity: .right, precedence: 0),
-        Operator(symbol: ">>=", associativity: .right, precedence: 0),
-        Operator(symbol: "&=", associativity: .right, precedence: 0),
-        Operator(symbol: "|=", associativity: .right, precedence: 0),
-        Operator(symbol: "^=", associativity: .right, precedence: 0),
+        Operator(symbol: "=", associativity: .right, precedence: .assignment),
+        Operator(symbol: "*=", associativity: .right, precedence: .assignment),
+        Operator(symbol: "/=", associativity: .right, precedence: .assignment),
+        Operator(symbol: "%=", associativity: .right, precedence: .assignment),
+        Operator(symbol: "+=", associativity: .right, precedence: .assignment),
+        Operator(symbol: "-=", associativity: .right, precedence: .assignment),
+        Operator(symbol: "<<=", associativity: .right, precedence: .assignment),
+        Operator(symbol: ">>=", associativity: .right, precedence: .assignment),
+        Operator(symbol: "&=", associativity: .right, precedence: .assignment),
+        Operator(symbol: "|=", associativity: .right, precedence: .assignment),
+        Operator(symbol: "^=", associativity: .right, precedence: .assignment),
 
-        Operator(symbol: "?:", associativity: .right, precedence: 1),
+        Operator(symbol: "?:", associativity: .right, precedence: .ternary),
 
-        // Leave a gap here for unknownOperatorPrecedence
+        Operator(symbol: "||", associativity: .left, precedence: .or),
 
-        Operator(symbol: "||", associativity: .left, precedence: 3),
+        Operator(symbol: "&&", associativity: .left, precedence: .and),
 
-        Operator(symbol: "&&", associativity: .left, precedence: 4),
+        Operator(symbol: "<", associativity: .none, precedence: .comparison),
+        Operator(symbol: "<=", associativity: .none, precedence: .comparison),
+        Operator(symbol: ">", associativity: .none, precedence: .comparison),
+        Operator(symbol: ">=", associativity: .none, precedence: .comparison),
+        Operator(symbol: "==", associativity: .none, precedence: .comparison),
+        Operator(symbol: "!=", associativity: .none, precedence: .comparison),
+        Operator(symbol: "===", associativity: .none, precedence: .comparison),
+        Operator(symbol: "~=", associativity: .none, precedence: .comparison),
+        Operator(symbol: ".==", associativity: .none, precedence: .comparison),
+        Operator(symbol: ".!=", associativity: .none, precedence: .comparison),
+        Operator(symbol: ".<", associativity: .none, precedence: .comparison),
+        Operator(symbol: ".<=", associativity: .none, precedence: .comparison),
+        Operator(symbol: ".>", associativity: .none, precedence: .comparison),
+        Operator(symbol: ".>=", associativity: .none, precedence: .comparison),
 
-        Operator(symbol: "<", associativity: .none, precedence: 5),
-        Operator(symbol: "<=", associativity: .none, precedence: 5),
-        Operator(symbol: ">", associativity: .none, precedence: 5),
-        Operator(symbol: ">=", associativity: .none, precedence: 5),
-        Operator(symbol: "==", associativity: .none, precedence: 5),
-        Operator(symbol: "!=", associativity: .none, precedence: 5),
-        Operator(symbol: "===", associativity: .none, precedence: 5),
-        Operator(symbol: "~=", associativity: .none, precedence: 5),
-        Operator(symbol: ".==", associativity: .none, precedence: 5),
-        Operator(symbol: ".!=", associativity: .none, precedence: 5),
-        Operator(symbol: ".<", associativity: .none, precedence: 5),
-        Operator(symbol: ".<=", associativity: .none, precedence: 5),
-        Operator(symbol: ".>", associativity: .none, precedence: 5),
-        Operator(symbol: ".>=", associativity: .none, precedence: 5),
+        Operator(symbol: "??", associativity: .right, precedence: .nilCoalescing),
 
-        Operator(symbol: "??", associativity: .right, precedence: 6),
+        Operator(symbol: "is", associativity: .left, precedence: .cast),
+        Operator(symbol: "as", associativity: .left, precedence: .cast),
+        Operator(symbol: "as?", associativity: .left, precedence: .cast),
+        Operator(symbol: "as!", associativity: .left, precedence: .cast),
 
-        Operator(symbol: "is", associativity: .left, precedence: 7),
-        Operator(symbol: "as", associativity: .left, precedence: 7),
-        Operator(symbol: "as?", associativity: .left, precedence: 7),
-        Operator(symbol: "as!", associativity: .left, precedence: 7),
+        Operator(symbol: "..<", associativity: .none, precedence: .range),
+        Operator(symbol: "...", associativity: .none, precedence: .range),
 
-        Operator(symbol: "..<", associativity: .none, precedence: 8),
-        Operator(symbol: "...", associativity: .none, precedence: 8),
+        Operator(symbol: "+", associativity: .left, precedence: .addition),
+        Operator(symbol: "-", associativity: .left, precedence: .addition),
+        Operator(symbol: "&+", associativity: .left, precedence: .addition),
+        Operator(symbol: "&-", associativity: .left, precedence: .addition),
+        Operator(symbol: "|", associativity: .left, precedence: .addition),
+        Operator(symbol: "^", associativity: .left, precedence: .addition),
 
-        Operator(symbol: "+", associativity: .left, precedence: 9),
-        Operator(symbol: "-", associativity: .left, precedence: 9),
-        Operator(symbol: "&+", associativity: .left, precedence: 9),
-        Operator(symbol: "&-", associativity: .left, precedence: 9),
-        Operator(symbol: "|", associativity: .left, precedence: 9),
-        Operator(symbol: "^", associativity: .left, precedence: 9),
+        Operator(symbol: "*", associativity: .left, precedence: .multiplication),
+        Operator(symbol: "/", associativity: .left, precedence: .multiplication),
+        Operator(symbol: "%", associativity: .left, precedence: .multiplication),
+        Operator(symbol: "&*", associativity: .left, precedence: .multiplication),
+        Operator(symbol: "&", associativity: .left, precedence: .multiplication),
 
-        Operator(symbol: "*", associativity: .left, precedence: 10),
-        Operator(symbol: "/", associativity: .left, precedence: 10),
-        Operator(symbol: "%", associativity: .left, precedence: 10),
-        Operator(symbol: "&*", associativity: .left, precedence: 10),
-        Operator(symbol: "&", associativity: .left, precedence: 10),
-
-        Operator(symbol: "<<", associativity: .none, precedence: 11),
-        Operator(symbol: ">>", associativity: .none, precedence: 11),
+        Operator(symbol: "<<", associativity: .none, precedence: .shift),
+        Operator(symbol: ">>", associativity: .none, precedence: .shift),
     ]
 
     private static let allBySymbol: [String: Operator] = {
@@ -128,14 +144,14 @@ struct Parameter<S>: Hashable {
         return _internalName ?? externalName
     }
     private let _internalName: String?
-    var type: TypeSignature?
+    var declaredType: TypeSignature?
     var isVariadic: Bool
     var defaultValue: S?
 
-    init(externalName: String, internalName: String? = nil, type: TypeSignature?, isVariadic: Bool = false, defaultValue: S? = nil) {
+    init(externalName: String, internalName: String? = nil, declaredType: TypeSignature?, isVariadic: Bool = false, defaultValue: S? = nil) {
         self.externalName = externalName
         _internalName = internalName
-        self.type = type
+        self.declaredType = declaredType
         self.isVariadic = isVariadic
         self.defaultValue = defaultValue
     }
@@ -145,8 +161,8 @@ struct Parameter<S>: Hashable {
         if let internalName = _internalName {
             children.append(PrettyPrintTree(root: internalName))
         }
-        if let type {
-            var typeDescription = type.description
+        if let declaredType {
+            var typeDescription = declaredType.description
             if isVariadic {
                 typeDescription += "..."
             }
@@ -158,13 +174,19 @@ struct Parameter<S>: Hashable {
         return PrettyPrintTree(root: externalName.isEmpty ? "_" : externalName, children: children)
     }
 
+    func qualifiedType(in node: SyntaxNode) -> Parameter<S> {
+        var parameter = self
+        parameter.declaredType = declaredType?.qualified(in: node)
+        return parameter
+    }
+
     static func ==(lhs: Parameter<S>, rhs: Parameter<S>) -> Bool {
-        return lhs.externalName == rhs.externalName && lhs.type == rhs.type && lhs.isVariadic == rhs.isVariadic
+        return lhs.externalName == rhs.externalName && lhs.declaredType == rhs.declaredType && lhs.isVariadic == rhs.isVariadic
     }
 
     func hash(into hasher: inout Hasher) {
         hasher.combine(externalName)
-        hasher.combine(type)
+        hasher.combine(declaredType)
         hasher.combine(isVariadic)
     }
 }
@@ -338,6 +360,33 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
             fallthrough
         default:
             return nil
+        }
+    }
+
+    func qualified(in node: SyntaxNode) -> TypeSignature {
+        switch self {
+        case .array(let elementType):
+            return .array(elementType.qualified(in: node))
+        case .base(let name, let generics):
+            return .base(node.qualifyReferencedTypeName(name), generics.map { $0.qualified(in: node) })
+        case .classRestricted:
+            return self
+        case .composition(let types):
+            return .composition(types.map { $0.qualified(in: node) })
+        case .dictionary(let keyType, let valueType):
+            return .dictionary(keyType.qualified(in: node), valueType.qualified(in: node))
+        case .function(let parameterTypes, let returnType):
+            return .function(parameterTypes.map { $0.qualified(in: node) }, returnType.qualified(in: node))
+        case .member(let baseType, let type):
+            return .member(baseType.qualified(in: node), type)
+        case .metaType(let type):
+            return .metaType(type.qualified(in: node))
+        case .optional(let type):
+            return .optional(type.qualified(in: node))
+        case .tuple(let labels, let types):
+            return .tuple(labels, types.map { $0.qualified(in: node) })
+        case .unwrappedOptional(let type):
+            return .unwrappedOptional(type.qualified(in: node))
         }
     }
 }
