@@ -4,7 +4,7 @@ import XCTest
 #endif
 
 final class DateTests: XCTestCase {
-    var logger = Logger(subsystem: "test", category: "DataTests")
+    var logger = Logger(subsystem: "test", category: "DateTests")
 
     func testDate() throws {
         let date: Date = Date()
