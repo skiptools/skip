@@ -6,10 +6,12 @@ import XCTest
 final class DateTests: XCTestCase {
     var logger = Logger(subsystem: "test", category: "DateTests")
 
-    func testDate() throws {
+    func testDateTime() throws {
         let date: Date = Date()
         XCTAssertNotEqual(0, date.getTime())
+    }
 
+    func testISOFormatting() throws {
         let d = Date.create(timeIntervalSince1970: 172348932.0)
         XCTAssertEqual(172348932.0, d.getTime())
         logger.info("date: \(d.ISO8601Format())")

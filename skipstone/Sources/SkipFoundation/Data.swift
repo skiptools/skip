@@ -23,8 +23,6 @@ public struct SkipData : RawRepresentable {
 
 #if !SKIP
 
-#warning("FIXME: restore throws once we can remove `try`")
-
 extension Data {
     /// static init until constructor overload works
     public static func contentsOfFile(filePath: String) -> Data {

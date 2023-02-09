@@ -5,6 +5,10 @@ import struct Swift.SystemRandomNumberGenerator
 public typealias RandomNumberGenerator = Swift.RandomNumberGenerator
 public typealias SystemRandomNumberGenerator = Swift.SystemRandomNumberGenerator
 
+/// A seeded random number generator that is not cryptographically secure.
+///
+/// The implementation follows the Java `java.util.Random` seeded random:
+/// it uses a 48-bit seed, which is modified using a linear congruential formula. (See Donald Knuth, The Art of Computer Programming, Volume 2, Section 3.2.1.)
 public struct PseudoRandomNumberGenerator : RandomNumberGenerator {
     private let multiplier: Int64 = 0x5DEECE66D
     private let addend: Int64 = 0xB
@@ -59,6 +63,7 @@ extension RandomNumberGenerator {
 //}
 
 #else
+
 public typealias PlatformPseudoRandomNumberGenerator = java.util.Random
 public typealias PlatformSystemRandomNumberGenerator = java.security.SecureRandom
 
