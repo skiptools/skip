@@ -18,13 +18,12 @@ public class SyntaxTree: PrettyPrintable {
         var resolveQueue: [SyntaxNode] = statements
         while !resolveQueue.isEmpty {
             let node = resolveQueue.removeFirst()
-            node.resolve()
+            node.resolveAttributes()
             node.children.forEach { $0.parent = node }
             resolveQueue += node.children
         }
 
-        //~~~
-        let context = TypeInferenceContext(symbolInfo: nil, syntaxTree: self)
+        let context = TypeInferenceContext()
         statements.forEach { $0.inferTypes(context: context) }
     }
 

@@ -154,7 +154,7 @@ class IfDefined: Statement {
         }
     }
 
-    override func inferTypes(context: TypeInferenceContext, expecting: InferredType = .none) -> TypeInferenceContext {
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature = .none) -> TypeInferenceContext {
         if parent == nil || parent is TypeDeclaration {
             // Treat as top-level statements
             statements.forEach { $0.inferTypes(context: context) }
@@ -197,8 +197,8 @@ class Return: ExpressionStatement {
         return [statement]
     }
 
-    override func inferTypes(context: TypeInferenceContext, expecting: InferredType = .none) -> TypeInferenceContext {
-        expression?.inferTypes(context: context, expecting: expecting == .none ? context.expectedReturn : expecting)
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature = .none) -> TypeInferenceContext {
+        expression?.inferTypes(context: context, expecting: expecting.or(context.expectedReturn))
         return context
     }
 
@@ -220,14 +220,18 @@ class ExtensionDeclaration: TypeDeclaration {
     }
 
     override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
-        guard syntax.kind == .extensionDecl, let extensionDecl = syntax.as(ExtensionDeclSyntax.self), let extends = TypeSignature.for(syntax: extensionDecl.extendedType) else {
+        guard syntax.kind == .extensionDecl, let extensionDecl = syntax.as(ExtensionDeclSyntax.self) else {
             return nil
         }
-        let (inherits, messages) = extensionDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], nil)
+        let extends = TypeSignature.for(syntax: extensionDecl.extendedType)
+        guard extends != .none else {
+            return nil
+        }
+        let (inherits, messages) = extensionDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], [])
         let modifiers = Modifiers.for(syntax: extensionDecl.modifiers)
         let members = StatementDecoder.decode(syntaxListContainer: extensionDecl.members, in: syntaxTree)
         let statement = ExtensionDeclaration(extends: extends, inherits: inherits, modifiers: modifiers, members: members, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
-        statement.messages = messages ?? []
+        statement.messages = messages
         return [statement]
     }
 }
@@ -236,14 +240,14 @@ class ExtensionDeclaration: TypeDeclaration {
 /// `func f() { ... }`
 class FunctionDeclaration: Statement {
     let name: String
-    private(set) var returnType: TypeSignature?
+    private(set) var returnType: TypeSignature
     private(set) var parameters: [Parameter<Statement>]
     let isAsync: Bool
     let isThrows: Bool
     private(set) var modifiers: Modifiers
     let body: CodeBlock<Statement>?
 
-    init(name: String, returnType: TypeSignature?, parameters: [Parameter<Statement>], isAsync: Bool = false, isThrows: Bool = false, modifiers: Modifiers? = nil, body: CodeBlock<Statement>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(name: String, returnType: TypeSignature = .none, parameters: [Parameter<Statement>], isAsync: Bool = false, isThrows: Bool = false, modifiers: Modifiers? = nil, body: CodeBlock<Statement>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.name = name
         self.returnType = returnType
         self.parameters = parameters
@@ -272,10 +276,8 @@ class FunctionDeclaration: Statement {
         return [statement]
     }
 
-    override func resolve() {
-        if let returnType {
-            self.returnType = returnType.qualified(in: self)
-        }
+    override func resolveAttributes() {
+        returnType = returnType.qualified(in: self)
         parameters = parameters.map { $0.qualifiedType(in: self) }
         // Functions in protocols or extensions inherit the visibility of the protocol or extension
         if modifiers.visibility == .default, let owningTypeDeclaration = parent as? TypeDeclaration, (owningTypeDeclaration.type == .protocolDeclaration || owningTypeDeclaration.type == .extensionDeclaration) {
@@ -283,10 +285,10 @@ class FunctionDeclaration: Statement {
         }
     }
 
-    override func inferTypes(context: TypeInferenceContext, expecting: InferredType = .none) -> TypeInferenceContext {
-        parameters.forEach { $0.defaultValue?.inferTypes(context: context, expecting: $0.declaredType?.inferredType ?? .none) }
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature = .none) -> TypeInferenceContext {
+        parameters.forEach { $0.defaultValue?.inferTypes(context: context, expecting: $0.declaredType) }
         if let statements = body?.statements {
-            var bodyContext = context.pushing(self).expectingReturn(returnType?.inferredType ?? .none)
+            var bodyContext = context.pushing(self).expectingReturn(returnType)
             statements.forEach { bodyContext = $0.inferTypes(context: bodyContext) }
         }
         return context
@@ -298,7 +300,7 @@ class FunctionDeclaration: Statement {
 
     override var prettyPrintAttributes: [PrettyPrintTree] {
         var attrs = [PrettyPrintTree(root: name)]
-        if let returnType {
+        if returnType != .none {
             attrs.append(PrettyPrintTree(root: returnType.description))
         }
         if !parameters.isEmpty {
@@ -414,14 +416,14 @@ class TypeDeclaration: Statement {
         return statement
     }
 
-    override func resolve() {
+    override func resolveAttributes() {
         if _qualifiedName == nil {
             _qualifiedName = qualifyDeclaredTypeName(name)
         }
         inherits = inherits.map { $0.qualified(in: self) }
     }
 
-    override func inferTypes(context: TypeInferenceContext, expecting: InferredType = .none) -> TypeInferenceContext {
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature = .none) -> TypeInferenceContext {
         let memberContext = context.pushing(self)
         members.forEach { $0.inferTypes(context: memberContext) }
         return context
@@ -447,7 +449,7 @@ class TypeDeclaration: Statement {
 /// `let/var v ...`
 class VariableDeclaration: Statement {
     let name: String
-    private(set) var declaredType: TypeSignature?
+    private(set) var declaredType: TypeSignature
     let isLet: Bool
     let isAsync: Bool
     let isThrows: Bool
@@ -458,7 +460,7 @@ class VariableDeclaration: Statement {
     let willSet: Accessor<Statement>?
     let didSet: Accessor<Statement>?
 
-    init(name: String, declaredType: TypeSignature?, isLet: Bool = false, isAsync: Bool = false, isThrows: Bool = false, modifiers: Modifiers? = nil, value: Expression?, getter: Accessor<Statement>? = nil, setter: Accessor<Statement>? = nil, willSet: Accessor<Statement>? = nil, didSet: Accessor<Statement>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(name: String, declaredType: TypeSignature = .none, isLet: Bool = false, isAsync: Bool = false, isThrows: Bool = false, modifiers: Modifiers? = nil, value: Expression?, getter: Accessor<Statement>? = nil, setter: Accessor<Statement>? = nil, willSet: Accessor<Statement>? = nil, didSet: Accessor<Statement>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.name = name
         self.declaredType = declaredType
         self.isLet = isLet
@@ -490,7 +492,7 @@ class VariableDeclaration: Statement {
     }
 
     private static func decode(syntax: PatternBindingSyntax, isLet: Bool, modifiers: Modifiers?, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> Statement {
-        var declaredType: TypeSignature? = nil
+        var declaredType: TypeSignature = .none
         if let typeSyntax = syntax.typeAnnotation?.type {
             declaredType = TypeSignature.for(syntax: typeSyntax)
         }
@@ -567,19 +569,17 @@ class VariableDeclaration: Statement {
         }
     }
 
-    override func resolve() {
-        if let declaredType {
-            self.declaredType = declaredType.qualified(in: self)
-        }
+    override func resolveAttributes() {
+        declaredType = declaredType.qualified(in: self)
         // Variables in protocols or extensions inherit the visibility of the protocol or extension
         if modifiers.visibility == .default, let owningTypeDeclaration = parent as? TypeDeclaration, (owningTypeDeclaration.type == .protocolDeclaration || owningTypeDeclaration.type == .extensionDeclaration) {
             modifiers.visibility = owningTypeDeclaration.modifiers.visibility
         }
     }
 
-    override func inferTypes(context: TypeInferenceContext, expecting: InferredType = .none) -> TypeInferenceContext {
-        value?.inferTypes(context: context, expecting: declaredType?.inferredType ?? .none)
-        let inferredType = declaredType?.inferredType ?? value?.inferredType ?? .none
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature = .none) -> TypeInferenceContext {
+        value?.inferTypes(context: context, expecting: declaredType)
+        let inferredType = declaredType.or(value?.inferredType ?? .none)
         if let statements = getter?.body?.statements {
             var bodyContext = context.expectingReturn(inferredType)
             statements.forEach { bodyContext = $0.inferTypes(context: bodyContext) }
@@ -626,7 +626,7 @@ class VariableDeclaration: Statement {
 
     override var prettyPrintAttributes: [PrettyPrintTree] {
         var attrs = [PrettyPrintTree(root: name)]
-        if let declaredType {
+        if declaredType != .none {
             attrs.append(PrettyPrintTree(root: declaredType.description))
         }
         if isAsync {

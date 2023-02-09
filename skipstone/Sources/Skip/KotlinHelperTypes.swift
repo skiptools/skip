@@ -42,7 +42,7 @@ extension Parameter where S: Statement {
         if let defaultValue {
             kdefaultValue = translator.translateStatement(defaultValue).first
         }
-        return Parameter<KotlinStatement>(externalName: externalName, internalName: internalName, type: type, isVariadic: isVariadic, defaultValue: kdefaultValue)
+        return Parameter<KotlinStatement>(externalName: externalName, internalName: internalName, declaredType: declaredType, isVariadic: isVariadic, defaultValue: kdefaultValue)
     }
 }
 
@@ -50,28 +50,53 @@ extension TypeSignature {
     /// Kotlin description of this type.
     var kotlin: String {
         switch self {
+        case .any:
+            return "Any"
+        case .anyObject:
+            return "Any"
         case .array(let elementType):
             return "Array<\(elementType.kotlin)>"
-        case .base(let name, let generics):
-            let name = translateTypeName(name)
-            guard !generics.isEmpty else {
-                return name
-            }
-            return "\(name)<\(generics.map { $0.kotlin }.joined(separator: ", "))>"
-        case .classRestricted:
-            return "Any"
+        case .bool:
+            return "Boolean"
+        case .character:
+            return "Char"
         case .composition:
             return "Any"
         case .dictionary(let keyType, let valueType):
             return "Dictionary<\(keyType.kotlin), \(valueType.kotlin)>"
+        case .double:
+            return "Double"
+        case .float:
+            return "Float"
         case .function(let paramTypes, let returnType):
             return "(\(paramTypes.map { $0.kotlin }.joined(separator: ", "))) -> \(returnType.kotlin)"
+        case .int:
+            return "Int"
+        case .int8:
+            return "Byte"
+        case .int16:
+            return "Short"
+        case .int32:
+            return "Int"
+        case .int64:
+            return "Long"
         case .optional(let type):
             return "\(type.kotlin)?"
         case .member(let baseType, let type):
             return "\(baseType.kotlin).\(type.kotlin)"
         case .metaType(let baseType):
             return "\(baseType.kotlin)::"
+        case .named(let name, let generics):
+            guard !generics.isEmpty else {
+                return name
+            }
+            return "\(name)<\(generics.map { $0.kotlin }.joined(separator: ", "))>"
+        case .none:
+            return description
+        case .set:
+            return description
+        case .string:
+            return "String"
         case .tuple(_, let types):
             if types.isEmpty {
                 return "Unit"
@@ -84,115 +109,163 @@ extension TypeSignature {
             } else {
                 return "Any"
             }
+        case .uint:
+            return "UInt"
+        case .uint8:
+            return "UByte"
+        case .uint16:
+            return "UShort"
+        case .uint32:
+            return "UInt"
+        case .uint64:
+            return "ULong"
         case .unwrappedOptional(let type):
             return type.kotlin
+        case .void:
+            return "Unit"
         }
     }
 
     /// Add appropriate messages if this type is not supported.
-    func appendKotlinMessages(to statement: KotlinStatement) {
+    func appendKotlinMessages(to node: KotlinSyntaxNode) {
         switch self {
+        case .any:
+            break
+        case .anyObject:
+            break
         case .array(let elementType):
-            elementType.appendKotlinMessages(to: statement)
-        case .base(_, let generics):
-            generics.forEach { $0.appendKotlinMessages(to: statement) }
-        case .classRestricted:
+            elementType.appendKotlinMessages(to: node)
+        case .bool:
+            break
+        case .character:
             break
         case .composition:
-            statement.messages.append(.kotlinComposedTypes(statement))
+            node.messages.append(.kotlinComposedTypes(node))
         case .dictionary(let keyType, let valueType):
-            keyType.appendKotlinMessages(to: statement)
-            valueType.appendKotlinMessages(to: statement)
+            keyType.appendKotlinMessages(to: node)
+            valueType.appendKotlinMessages(to: node)
+        case .double:
+            break
+        case .float:
+            break
         case .function(let parameterTypes, let returnType):
-            parameterTypes.forEach { $0.appendKotlinMessages(to: statement) }
-            returnType.appendKotlinMessages(to: statement)
+            parameterTypes.forEach { $0.appendKotlinMessages(to: node) }
+            returnType.appendKotlinMessages(to: node)
+        case .int:
+            break
+        case .int8:
+            break
+        case .int16:
+            break
+        case .int32:
+            break
+        case .int64:
+            break
         case .member(_, let type):
-            type.appendKotlinMessages(to: statement)
+            type.appendKotlinMessages(to: node)
         case .metaType(let type):
-            type.appendKotlinMessages(to: statement)
+            type.appendKotlinMessages(to: node)
+        case .named(_, let generics):
+            generics.forEach { $0.appendKotlinMessages(to: node) }
+        case .none:
+            break
         case .optional(let type):
-            type.appendKotlinMessages(to: statement)
+            type.appendKotlinMessages(to: node)
+        case .set(let elementType):
+            elementType.appendKotlinMessages(to: node)
+        case .string:
+            break
         case .tuple(let labels, let types):
             if labels.contains(where: { $0 != nil }) {
-                statement.messages.append(.kotlinTupleLabels(statement))
+                node.messages.append(.kotlinTupleLabels(node))
             }
             if types.count > 3 {
-                statement.messages.append(.kotlinTupleArity(statement))
+                node.messages.append(.kotlinTupleArity(node))
             }
-            types.forEach { $0.appendKotlinMessages(to: statement) }
+            types.forEach { $0.appendKotlinMessages(to: node) }
+        case .uint:
+            break
+        case .uint8:
+            break
+        case .uint16:
+            break
+        case .uint32:
+            break
+        case .uint64:
+            break
         case .unwrappedOptional(let type):
-            type.appendKotlinMessages(to: statement)
+            type.appendKotlinMessages(to: node)
+        case .void:
+            break
         }
     }
 
-    var kotlinMayBeSharedMutableValue: Bool {
+    func kotlinMayBeSharedMutableValue(codebaseInfo: KotlinCodebaseInfo?) -> Bool {
         switch self {
+        case .any:
+            return true
+        case .anyObject:
+            return false
         case .array:
             return true
-        case .base(let name, _):
-            if let typeInfo = Self.builtinTypeInfo[name] {
-                return typeInfo.mayBeSharedMutableValue
-            }
-            return true
-        case .classRestricted:
+        case .bool:
+            return false
+        case .character:
             return false
         case .composition:
-            return false
+            return true
         case .dictionary:
             return true
+        case .double:
+            return false
+        case .float:
+            return false
         case .function:
             return false
+        case .int:
+            return false
+        case .int8:
+            return false
+        case .int16:
+            return false
+        case .int32:
+            return false
+        case .int64:
+            return false
+        case .named(let name, _):
+            guard let codebaseInfo else {
+                return true
+            }
+            return codebaseInfo.mayBeMutableValueType(name: name)
+        case .none:
+            return true
         case .optional(let type):
-            return type.kotlinMayBeSharedMutableValue
+            return type.kotlinMayBeSharedMutableValue(codebaseInfo: codebaseInfo)
         case .member:
+            // TODO
             return true
         case .metaType:
             return false
+        case .set:
+            return true
+        case .string:
+            return false
         case .tuple:
             return false
+        case .uint:
+            return false
+        case .uint8:
+            return false
+        case .uint16:
+            return false
+        case .uint32:
+            return false
+        case .uint64:
+            return false
         case .unwrappedOptional(let type):
-            return type.kotlinMayBeSharedMutableValue
+            return type.kotlinMayBeSharedMutableValue(codebaseInfo: codebaseInfo)
+        case .void:
+            return false
         }
     }
-
-    private func translateTypeName(_ typeName: String) -> String {
-        guard let lastSeparator = typeName.lastIndex(of: ".") else {
-            return translateSwiftTypeName(typeName, isQualified: false)
-        }
-        let typeNameQualification = String(typeName[..<lastSeparator])
-        guard typeNameQualification == "Swift" else {
-            return typeName
-        }
-        let lastTypeName = String(typeName[typeName.index(after: lastSeparator)...])
-        return translateSwiftTypeName(lastTypeName, isQualified: true)
-    }
-
-    private func translateSwiftTypeName(_ typeName: String, isQualified: Bool) -> String {
-        guard let typeInfo = Self.builtinTypeInfo[typeName] else {
-            return isQualified ? "Swift.\(typeName)" : typeName
-        }
-        return isQualified ? "\(typeInfo.package).\(typeInfo.name)" : typeInfo.name
-    }
-
-    private static let builtinTypeInfo: [String: (name: String, package: String, mayBeSharedMutableValue: Bool)] = [
-        "Any": ("Any", "kotlin", true),
-        "AnyObject": ("Any", "kotlin", false),
-        "Array": ("Array", "SkipKotlin", true),
-        "Bool": ("Boolean", "kotlin", false),
-        "Character": ("Char", "kotlin", false),
-        "Dictionary": ("Dictionary", "SkipKotlin", true),
-        "Int": ("Int", "kotlin", false),
-        "Int8": ("Byte", "kotlin", false),
-        "Int16": ("Short", "kotlin", false),
-        "Int32": ("Int", "kotlin", false),
-        "Int64": ("Long", "kotlin", false),
-        "Set": ("Set", "SkipFoundation", true),
-        "String": ("String", "kotlin", false),
-        "UInt": ("UInt", "kotlin", false),
-        "UInt8": ("UByte", "kotlin", false),
-        "UInt16": ("UShort", "kotlin", false),
-        "UInt32": ("UInt", "kotlin", false),
-        "UInt64": ("ULong", "kotlin", false),
-        "Void": ("Unit", "kotlin", false),
-    ]
 }

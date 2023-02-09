@@ -189,7 +189,7 @@ struct KotlinExtensionDeclaration {
 
 class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     let name: String
-    var returnType: TypeSignature?
+    var returnType: TypeSignature = .none
     var parameters: [Parameter<KotlinStatement>] = []
     var isAsync: Bool
     var isOpen = false
@@ -206,19 +206,18 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         let kstatement = KotlinFunctionDeclaration(statement: statement)
         kstatement.returnType = statement.returnType
         kstatement.parameters = statement.parameters.map { $0.translate(translator: translator) }
-        //~~~
-//        if let owningTypeDeclaration = statement.owningTypeDeclaration {
-//            kstatement.isOpen = !statement.modifiers.isFinal && statement.modifiers.visibility != .private && owningTypeDeclaration.type == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
-//            if (translator.codebaseInfo?.isProtocolMember(declaration: statement, in: owningTypeDeclaration) == true) {
-//                kstatement.modifiers.isOverride = true
-//            }
-//        }
+        if let owningTypeDeclaration = statement.owningTypeDeclaration {
+            kstatement.isOpen = !statement.modifiers.isFinal && statement.modifiers.visibility != .private && owningTypeDeclaration.type == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
+            if (translator.codebaseInfo?.isProtocolMember(declaration: statement, in: owningTypeDeclaration) == true) {
+                kstatement.modifiers.isOverride = true
+            }
+        }
         if let body = statement.body {
             let bodyStatements = body.statements.flatMap { translator.translateStatement($0) }
             kstatement.body = CodeBlock(statements: bodyStatements)
         }
-        kstatement.returnType?.appendKotlinMessages(to: kstatement)
-        kstatement.parameters.forEach { $0.type?.appendKotlinMessages(to: kstatement) }
+        kstatement.returnType.appendKotlinMessages(to: kstatement)
+        kstatement.parameters.forEach { $0.declaredType.appendKotlinMessages(to: kstatement) }
         return kstatement
     }
 
@@ -255,15 +254,15 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 let name = parameter.externalName.isEmpty ? parameter.internalName : parameter.externalName
                 output.append(name)
                 output.append(": ")
-                output.append(parameter.type?.kotlin ?? "Any")
+                output.append(parameter.declaredType.or(.any).kotlin)
                 if let defaultValue = parameter.defaultValue {
-                    output.append(" = ").append(defaultValue, indentation: 0)
+                    output.append(" = ").append(defaultValue)
                 }
                 if index != parameters.count - 1 {
                     output.append(", ")
                 }
             }
-            output.append("): \(returnType?.kotlin ?? "Unit")")
+            output.append("): \(returnType.or(.void).kotlin)")
         }
         if let body {
             output.append(" {\n")
@@ -309,7 +308,6 @@ class KotlinImportDeclaration: KotlinStatement {
         output.append("\n")
     }
 }
-
 
 class KotlinInterfaceDeclaration: KotlinStatement {
     let name: String
@@ -379,7 +377,7 @@ class KotlinPackageDeclaration: KotlinStatement {
 
 class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     let name: String
-    var declaredType: TypeSignature?
+    var declaredType: TypeSignature = .none
     var isLet: Bool
     var isAsync: Bool
     var isProperty = false
@@ -391,6 +389,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var setter: Accessor<KotlinStatement>?
     var willSet: Accessor<KotlinStatement>?
     var didSet: Accessor<KotlinStatement>?
+    var mayBeSharedMutableValue = false
 
     // KotlinMemberDeclaration
     var extends: TypeSignature?
@@ -401,16 +400,15 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     static func translate(statement: VariableDeclaration, translator: KotlinTranslator) -> KotlinVariableDeclaration {
         let kstatement = KotlinVariableDeclaration(statement: statement)
         kstatement.declaredType = statement.declaredType
-        //~~~
-//        if let owningTypeDeclaration = statement.owningTypeDeclaration {
-//            kstatement.isProperty = statement.parent === owningTypeDeclaration
-//            kstatement.isOpen = kstatement.isProperty && !statement.modifiers.isFinal && statement.modifiers.visibility != .private && owningTypeDeclaration.type == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
-//            if kstatement.isProperty && translator.codebaseInfo?.isProtocolMember(declaration: statement, in: owningTypeDeclaration) == true {
-//                kstatement.modifiers.isOverride = true
-//            }
-//        } else {
-//            kstatement.isGlobal = true
-//        }
+        if let owningTypeDeclaration = statement.owningTypeDeclaration {
+            kstatement.isProperty = statement.parent === owningTypeDeclaration
+            kstatement.isOpen = kstatement.isProperty && !statement.modifiers.isFinal && statement.modifiers.visibility != .private && owningTypeDeclaration.type == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
+            if kstatement.isProperty && translator.codebaseInfo?.isProtocolMember(declaration: statement, in: owningTypeDeclaration) == true {
+                kstatement.modifiers.isOverride = true
+            }
+        } else {
+            kstatement.isGlobal = true
+        }
         if let value = statement.value {
             kstatement.value = translator.translateExpression(value).valueReference
         }
@@ -418,7 +416,15 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         kstatement.setter = statement.setter?.translate(translator: translator)
         kstatement.willSet = statement.willSet?.translate(translator: translator)
         kstatement.didSet = statement.didSet?.translate(translator: translator)
-        kstatement.declaredType?.appendKotlinMessages(to: kstatement)
+        if kstatement.declaredType != .none {
+            kstatement.mayBeSharedMutableValue = kstatement.declaredType.kotlinMayBeSharedMutableValue(codebaseInfo: translator.codebaseInfo)
+        } else if let kvalue = kstatement.value {
+            kstatement.mayBeSharedMutableValue = kvalue.mayBeSharedMutableValueExpression(orType: true)
+        } else {
+            kstatement.mayBeSharedMutableValue = true
+        }
+        
+        kstatement.declaredType.appendKotlinMessages(to: kstatement)
         if statement.isAsync {
             kstatement.messages.append(.kotlinAsyncProperties(kstatement))
         }
@@ -438,16 +444,16 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if let value {
             children.append(value)
         }
-        if let statements = getter?.statements {
+        if let statements = getter?.body?.statements {
             children += statements
         }
-        if let statements = setter?.statements {
+        if let statements = setter?.body?.statements {
             children += statements
         }
-        if let statements = willSet?.statements {
+        if let statements = willSet?.body?.statements {
             children += statements
         }
-        if let statements = didSet?.statements {
+        if let statements = didSet?.body?.statements {
             children += statements
         }
         return children
@@ -477,7 +483,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             }
             output.append(name)
 
-            if let declaredType {
+            if declaredType != .none {
                 output.append(": ").append(declaredType.kotlin)
             }
             if let value {
@@ -491,7 +497,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             let getterIndentation = indentation.inc()
             output.append(getterIndentation).append("get() {\n")
             let getterBodyIndentation = getterIndentation.inc()
-            if let getterStatements = getter?.statements {
+            if let getterStatements = getter?.body?.statements {
                 output.append(getterBodyIndentation).append("return {\n")
                 output.append(getterStatements, indentation: getterBodyIndentation.inc())
                 output.append(getterBodyIndentation).append("}().valref(\(onUpdate))\n")
@@ -499,13 +505,13 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 output.append(getterBodyIndentation).append("return field.valref(\(onUpdate))\n")
             }
             output.append(getterIndentation).append("}\n")
-        } else if let getterStatements = getter?.statements {
+        } else if let getterStatements = getter?.body?.statements {
             let getterIndentation = indentation.inc()
             output.append(getterIndentation).append("get() {\n")
             output.append(getterStatements, indentation: getterIndentation.inc())
             output.append(getterIndentation).append("}\n")
         }
-        if setter?.statements != nil || willSet?.statements != nil || didSet?.statements != nil {
+        if setter?.body != nil || willSet?.body != nil || didSet?.body != nil {
             let setterIndentation = indentation.inc()
             let setterBodyIndentation = setterIndentation.inc()
             if mayBeSharedMutableValue {
@@ -514,37 +520,27 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             } else {
                 output.append(setterIndentation).append("set(newValue) {\n")
             }
-            if let willSetStatements = willSet?.statements {
+            if let willSetStatements = willSet?.body?.statements {
                 if let parameterName = willSet?.parameterName, parameterName != "newValue" {
                     output.append(setterBodyIndentation).append("val \(parameterName) = newValue\n")
                 }
                 output.append(willSetStatements, indentation: setterBodyIndentation)
             }
-            if let setterStatements = setter?.statements {
+            if let setterStatements = setter?.body?.statements {
                 if let parameterName = setter?.parameterName, parameterName != "newValue" && parameterName != willSet?.parameterName {
                     output.append(setterBodyIndentation).append("val \(parameterName) = newValue\n")
                 }
                 output.append(setterStatements, indentation: setterBodyIndentation)
             } else {
-                if didSet?.statements != nil {
+                if didSet?.body?.statements != nil {
                     output.append(setterBodyIndentation).append("val oldValue = field\n")
                 }
                 output.append(setterBodyIndentation).append("field = newValue\n")
             }
-            if let didSetStatements = didSet?.statements {
+            if let didSetStatements = didSet?.body?.statements {
                 output.append(didSetStatements, indentation: setterBodyIndentation)
             }
             output.append(setterIndentation).append("}\n")
-        }
-    }
-
-    private var mayBeSharedMutableValue: Bool {
-        if let declaredType {
-            return declaredType.kotlinMayBeSharedMutableValue
-        } else if let value {
-            return value.mayBeSharedMutableValueExpression(orType: true)
-        } else {
-            return true
         }
     }
 }

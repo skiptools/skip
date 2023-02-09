@@ -109,7 +109,7 @@ struct ExpressionDecoder {
             }
             // Select the current operator to segment the expression list on if it has lower precedence OR has equal precedence
             // but is left associative, keeping the previous expressions evaluating first
-            if op.precedence < minOperator!.precedence || (op.precedence == minOperator!.precedence && op.associativity == .left) {
+            if op.precedence.rawValue < minOperator!.precedence.rawValue || (op.precedence == minOperator!.precedence && op.associativity == .left) {
                 minOperator = op
                 minIndex = index
             }

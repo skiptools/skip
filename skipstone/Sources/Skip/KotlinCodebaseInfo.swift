@@ -70,4 +70,10 @@ public class KotlinCodebaseInfo {
         // TODO: Needs to check all protocol conformances of the given type, including protocols of protocols, etc
         return false
     }
+
+    /// Whether the given type name may map to a mutable value type.
+    func mayBeMutableValueType(name: String) -> Bool {
+        // TODO
+        return true
+    }
 }

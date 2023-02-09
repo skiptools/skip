@@ -21,10 +21,15 @@ class KotlinExpression: KotlinSyntaxNode {
             return self
         }
         let valueReferenceFunction = KotlinMemberAccess(base: self, member: "valref")
-        return KotlinFunctionCall(function: valueReferenceFunction, arguments: [])
+        let functionCall = KotlinFunctionCall(function: valueReferenceFunction, arguments: [])
+        functionCall.mayBeSharedMutableValue = true
+        return functionCall
     }
 
     /// Return true if this expression may evaluate to a shared mutable value type.
+    ///
+    /// - Parameters:
+    ///   - Parameter orType: If set, also return true if the type of this expression may be a shared mutable value. E.g. an array literal is not shared, but its type is a shared mutable type.
     func mayBeSharedMutableValueExpression(orType: Bool) -> Bool {
         return false
     }

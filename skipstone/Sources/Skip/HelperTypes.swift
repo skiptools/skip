@@ -144,11 +144,11 @@ struct Parameter<S>: Hashable {
         return _internalName ?? externalName
     }
     private let _internalName: String?
-    var declaredType: TypeSignature?
+    var declaredType: TypeSignature
     var isVariadic: Bool
     var defaultValue: S?
 
-    init(externalName: String, internalName: String? = nil, declaredType: TypeSignature?, isVariadic: Bool = false, defaultValue: S? = nil) {
+    init(externalName: String, internalName: String? = nil, declaredType: TypeSignature = .none, isVariadic: Bool = false, defaultValue: S? = nil) {
         self.externalName = externalName
         _internalName = internalName
         self.declaredType = declaredType
@@ -161,7 +161,7 @@ struct Parameter<S>: Hashable {
         if let internalName = _internalName {
             children.append(PrettyPrintTree(root: internalName))
         }
-        if let declaredType {
+        if declaredType != .none {
             var typeDescription = declaredType.description
             if isVariadic {
                 typeDescription += "..."
@@ -176,7 +176,7 @@ struct Parameter<S>: Hashable {
 
     func qualifiedType(in node: SyntaxNode) -> Parameter<S> {
         var parameter = self
-        parameter.declaredType = declaredType?.qualified(in: node)
+        parameter.declaredType = declaredType.qualified(in: node)
         return parameter
     }
 
@@ -199,153 +199,191 @@ enum StringLiteralSegment<E> {
 
 /// A source code type signature.
 indirect enum TypeSignature: CustomStringConvertible, Hashable {
+    case any
+    case anyObject
     case array(TypeSignature)
-    case base(String, [TypeSignature]) // A<B, C>
-    case classRestricted // 'class'
+    case bool
+    case character
     case composition([TypeSignature]) // (A & B & C)
     case dictionary(TypeSignature, TypeSignature)
+    case double
+    case float
     case function([TypeSignature], TypeSignature)
+    case int
+    case int8
+    case int16
+    case int32
+    case int64
     case member(TypeSignature, TypeSignature) // A.B
     case metaType(TypeSignature) // A.Type
+    case named(String, [TypeSignature]) // A<B, C>
+    case none
     case optional(TypeSignature)
-    case tuple([String?], [TypeSignature])
+    case set(TypeSignature)
+    case string
+    case tuple([String?], [TypeSignature]) // (a: A, b: B)
+    case uint
+    case uint8
+    case uint16
+    case uint32
+    case uint64
     case unwrappedOptional(TypeSignature)
+    case void
 
-    var description: String {
+    /// The element type of this array.
+    var elementType: TypeSignature {
         switch self {
         case .array(let elementType):
-            return "[\(elementType.description)]"
-        case .base(let name, let generics):
-            guard !generics.isEmpty else {
-                return name
-            }
-            return "\(name)<\(generics.map { $0.description }.joined(separator: ", "))>"
-        case .classRestricted:
-            return "class"
-        case .composition(let types):
-            return "(\(types.map { $0.description }.joined(separator: " & ")))"
-        case .dictionary(let keyType, let valueType):
-            return "[\(keyType.description): \(valueType.description)]"
-        case .function(let paramTypes, let returnType):
-            return "(\(paramTypes.map { $0.description }.joined(separator: ", ")) -> \(returnType.description)"
-        case .optional(let type):
-            return "\(type.description)?"
-        case .member(let baseType, let type):
-            return "\(baseType.description).\(type)"
-        case .metaType(let baseType):
-            return "\(baseType.description).Type"
-        case .tuple(let labels, let types):
-            let descriptions = zip(labels, types).map {
-                let typeDescription = $0.1.description
-                guard let label = $0.0 else {
-                    return typeDescription
-                }
-                return "\(label): \(typeDescription)"
-            }
-            return "(\(descriptions.joined(separator: ", ")))"
-        case .unwrappedOptional(let type):
-            return "\(type.description)!"
+            return elementType
+        default:
+            return .none
         }
     }
 
+    /// The parameter types of this function.
+    var parameterTypes: [TypeSignature] {
+        switch self {
+        case .function(let parameterTypes, _):
+            return parameterTypes
+        default:
+            return []
+        }
+    }
+
+    /// The return type of this function.
+    var returnType: TypeSignature {
+        switch self {
+        case .function(_, let returnType):
+            return returnType
+        default:
+            return .none
+        }
+    }
+
+    /// Return the given type signature if `self == .none`, otherwise return `self`.
+    func or(_ typeSignature: TypeSignature) -> TypeSignature {
+        return self == .none ? typeSignature : self
+    }
+
     /// Create a type signature for the given syntax.
-    static func `for`(syntax: TypeSyntax) -> TypeSignature? {
+    static func `for`(syntax: TypeSyntax) -> TypeSignature {
         switch syntax.kind {
         case .arrayType:
-            guard let arrayType = syntax.as(ArrayTypeSyntax.self), let elementType = self.for(syntax: arrayType.elementType) else {
-                return nil
+            guard let arrayType = syntax.as(ArrayTypeSyntax.self) else {
+                return .none
             }
-            return .array(elementType)
+            let elementType = self.for(syntax: arrayType.elementType)
+            return elementType == .none ? .none : .array(elementType)
         case .attributedType:
             guard let attributedType = syntax.as(AttributedTypeSyntax.self) else {
-                return nil
+                return .none
             }
             return self.for(syntax: attributedType.baseType)
         case .simpleTypeIdentifier:
             guard let simpleType = syntax.as(SimpleTypeIdentifierSyntax.self) else {
-                return nil
+                return .none
             }
             let name = simpleType.name.text
             var genericTypes: [TypeSignature] = []
             if let generics = simpleType.genericArgumentClause?.arguments {
-                genericTypes = generics.compactMap { self.for(syntax: $0.argumentType) }
-                guard genericTypes.count == generics.count else {
-                    return nil
+                genericTypes = generics.map { self.for(syntax: $0.argumentType) }
+                guard !genericTypes.contains(.none) else {
+                    return .none
                 }
             }
-            return .base(name, genericTypes)
+            return self.for(name: name, genericTypes: genericTypes)
         case .compositionType:
             guard let compositionType = syntax.as(CompositionTypeSyntax.self) else {
-                return nil
+                return .none
             }
-            let types = compositionType.elements.compactMap { self.for(syntax: $0.type) }
-            guard types.count == compositionType.elements.count else {
-                return nil
+            let types = compositionType.elements.map { self.for(syntax: $0.type) }
+            guard !types.contains(.none) else {
+                return .none
             }
             return .composition(types)
         case .dictionaryType:
-            guard let dictionaryType = syntax.as(DictionaryTypeSyntax.self), let keyType = self.for(syntax: dictionaryType.keyType), let valueType = self.for(syntax: dictionaryType.valueType) else {
-                return nil
+            guard let dictionaryType = syntax.as(DictionaryTypeSyntax.self) else {
+                return .none
+            }
+            let keyType = self.for(syntax: dictionaryType.keyType)
+            let valueType = self.for(syntax: dictionaryType.valueType)
+            guard keyType != .none, valueType != .none else {
+                return .none
             }
             return .dictionary(keyType, valueType)
         case .constrainedSugarType:
             guard let constrainedSugarType = syntax.as(ConstrainedSugarTypeSyntax.self) else {
-                return nil
+                return .none
             }
             return self.for(syntax: constrainedSugarType.baseType)
         case .functionType:
             guard let functionType = syntax.as(FunctionTypeSyntax.self) else {
-                return nil
+                return .none
             }
-            let argumentTypes = functionType.arguments.compactMap { self.for(syntax: $0.type) }
-            guard argumentTypes.count == functionType.arguments.count else {
-                return nil
-            }
-            guard let returnType = self.for(syntax: functionType.returnType) else {
-                return nil
+            let argumentTypes = functionType.arguments.map { self.for(syntax: $0.type) }
+            let returnType = self.for(syntax: functionType.returnType)
+            guard !argumentTypes.contains(.none) && returnType != .none else {
+                return .none
             }
             return .function(argumentTypes, returnType)
         case .memberTypeIdentifier:
-            guard let memberType = syntax.as(MemberTypeIdentifierSyntax.self), let baseType = self.for(syntax: memberType.baseType) else {
-                return nil
+            guard let memberType = syntax.as(MemberTypeIdentifierSyntax.self) else {
+                return .none
+            }
+            let baseType = self.for(syntax: memberType.baseType)
+            guard baseType != .none else {
+                return .none
             }
             let name = memberType.name.text
             var genericTypes: [TypeSignature] = []
             if let generics = memberType.genericArgumentClause?.arguments {
-                genericTypes = generics.compactMap { self.for(syntax: $0.argumentType) }
-                guard genericTypes.count == generics.count else {
-                    return nil
+                genericTypes = generics.map { self.for(syntax: $0.argumentType) }
+                guard !genericTypes.contains(.none) else {
+                    return .none
                 }
             }
-            return .member(baseType, .base(name, genericTypes))
+            return .member(baseType, .named(name, genericTypes))
         case .metatypeType:
-            guard let metaType = syntax.as(MetatypeTypeSyntax.self), let baseType = self.for(syntax: metaType.baseType) else {
-                return nil
+            guard let metaType = syntax.as(MetatypeTypeSyntax.self) else {
+                return .none
+            }
+            let baseType = self.for(syntax: metaType.baseType)
+            guard baseType != .none else {
+                return .none
             }
             return .metaType(baseType)
         case .optionalType:
-            guard let optionalType = syntax.as(OptionalTypeSyntax.self), let wrappedType = self.for(syntax: optionalType.wrappedType) else {
-                return nil
+            guard let optionalType = syntax.as(OptionalTypeSyntax.self) else {
+                return .none
+            }
+            let wrappedType = self.for(syntax: optionalType.wrappedType)
+            guard wrappedType != .none else {
+                return .none
             }
             return .optional(wrappedType)
         case .tupleType:
             guard let tupleType = syntax.as(TupleTypeSyntax.self) else {
-                return nil
+                return .none
             }
             let elementsSyntax = tupleType.elements
-            let elements = elementsSyntax.compactMap { (syntax: TupleTypeElementSyntax) -> (String?, TypeSignature)? in
-                guard let type = self.for(syntax: syntax.type) else {
-                    return nil
-                }
+            let elements = elementsSyntax.map { (syntax: TupleTypeElementSyntax) -> (String?, TypeSignature) in
+                let type = self.for(syntax: syntax.type)
                 return (syntax.name?.text, type)
             }
-            guard elements.count == tupleType.elements.count else {
-                return nil
+            guard !elements.isEmpty else {
+                return .void
+            }
+            guard !elements.contains(where: { $0.1 == .none }) else {
+                return .none
             }
             return .tuple(elements.map(\.0), elements.map(\.1))
         case .implicitlyUnwrappedOptionalType:
-            guard let unwrappedOptionalType = syntax.as(ImplicitlyUnwrappedOptionalTypeSyntax.self), let wrappedType = self.for(syntax: unwrappedOptionalType.wrappedType) else {
-                return nil
+            guard let unwrappedOptionalType = syntax.as(ImplicitlyUnwrappedOptionalTypeSyntax.self) else {
+                return .none
+            }
+            let wrappedType = self.for(syntax: unwrappedOptionalType.wrappedType)
+            guard wrappedType != .none else {
+                return .none
             }
             return .unwrappedOptional(wrappedType)
 
@@ -359,34 +397,212 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
         case .packReferenceType:
             fallthrough
         default:
-            return nil
+            return .none
         }
     }
 
+    private static func `for`(name: String, genericTypes: [TypeSignature]) -> TypeSignature {
+        switch name {
+        case "Any":
+            return genericTypes.isEmpty ? .any : .named(name, genericTypes)
+        case "AnyObject":
+            return genericTypes.isEmpty ? .anyObject : .named(name, genericTypes)
+        case "Array":
+            return genericTypes.count == 1 ? .array(genericTypes[0]) : .named(name, genericTypes)
+        case "Bool":
+            return genericTypes.isEmpty ? .bool : .named(name, genericTypes)
+        case "Character":
+            return genericTypes.isEmpty ? .character : .named(name, genericTypes)
+        case "Dictionary":
+            return genericTypes.count == 2 ? .dictionary(genericTypes[0], genericTypes[1]) : .named(name, genericTypes)
+        case "Double":
+            return genericTypes.isEmpty ? .double : .named(name, genericTypes)
+        case "Float":
+            return genericTypes.isEmpty ? .float : .named(name, genericTypes)
+        case "Int":
+            return genericTypes.isEmpty ? .int : .named(name, genericTypes)
+        case "Int8":
+            return genericTypes.isEmpty ? .int8 : .named(name, genericTypes)
+        case "Int16":
+            return genericTypes.isEmpty ? .int16 : .named(name, genericTypes)
+        case "Int32":
+            return genericTypes.isEmpty ? .int32 : .named(name, genericTypes)
+        case "Int64":
+            return genericTypes.isEmpty ? .int64 : .named(name, genericTypes)
+        case "Set":
+            return genericTypes.count == 1 ? .set(genericTypes[0]) : .named(name, genericTypes)
+        case "String":
+            return genericTypes.isEmpty ? .string : .named(name, genericTypes)
+        case "UInt":
+            return genericTypes.isEmpty ? .uint : .named(name, genericTypes)
+        case "UInt8":
+            return genericTypes.isEmpty ? .uint8 : .named(name, genericTypes)
+        case "UInt16":
+            return genericTypes.isEmpty ? .uint16 : .named(name, genericTypes)
+        case "UInt32":
+            return genericTypes.isEmpty ? .uint32 : .named(name, genericTypes)
+        case "UInt64":
+            return genericTypes.isEmpty ? .uint64 : .named(name, genericTypes)
+        case "Void":
+            return genericTypes.isEmpty ? .void : .named(name, genericTypes)
+        default:
+            return .named(name, genericTypes)
+        }
+    }
+
+    /// Qualify local type names with any enclosing types.
     func qualified(in node: SyntaxNode) -> TypeSignature {
         switch self {
+        case .any:
+            return self
+        case .anyObject:
+            return self
         case .array(let elementType):
             return .array(elementType.qualified(in: node))
-        case .base(let name, let generics):
-            return .base(node.qualifyReferencedTypeName(name), generics.map { $0.qualified(in: node) })
-        case .classRestricted:
+        case .bool:
+            return self
+        case .character:
             return self
         case .composition(let types):
             return .composition(types.map { $0.qualified(in: node) })
         case .dictionary(let keyType, let valueType):
             return .dictionary(keyType.qualified(in: node), valueType.qualified(in: node))
+        case .double:
+            return self
+        case .float:
+            return self
         case .function(let parameterTypes, let returnType):
             return .function(parameterTypes.map { $0.qualified(in: node) }, returnType.qualified(in: node))
+        case .int:
+            return self
+        case .int8:
+            return self
+        case .int16:
+            return self
+        case .int32:
+            return self
+        case .int64:
+            return self
         case .member(let baseType, let type):
             return .member(baseType.qualified(in: node), type)
         case .metaType(let type):
             return .metaType(type.qualified(in: node))
+        case .named(let name, let generics):
+            return .named(node.qualifyReferencedTypeName(name), generics.map { $0.qualified(in: node) })
+        case .none:
+            return self
         case .optional(let type):
             return .optional(type.qualified(in: node))
+        case .set(let elementType):
+            return .set(elementType.qualified(in: node))
+        case .string:
+            return self
         case .tuple(let labels, let types):
             return .tuple(labels, types.map { $0.qualified(in: node) })
+        case .uint:
+            return self
+        case .uint8:
+            return self
+        case .uint16:
+            return self
+        case .uint32:
+            return self
+        case .uint64:
+            return self
         case .unwrappedOptional(let type):
             return .unwrappedOptional(type.qualified(in: node))
+        case .void:
+            return self
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .any:
+            return "Any"
+        case .anyObject:
+            return "AnyObject"
+        case .array(let elementType):
+            return "[\(elementType.description)]"
+        case .bool:
+            return "Bool"
+        case .character:
+            return "Character"
+        case .composition(let types):
+            return "(\(types.map { $0.description }.joined(separator: " & ")))"
+        case .dictionary(let keyType, let valueType):
+            return "[\(keyType.description): \(valueType.description)]"
+        case .double:
+            return "Double"
+        case .float:
+            return "Float"
+        case .function(let paramTypes, let returnType):
+            return "(\(paramTypes.map { $0.description }.joined(separator: ", "))) -> \(returnType.description)"
+        case .int:
+            return "Int"
+        case .int8:
+            return "Int8"
+        case .int16:
+            return "Int16"
+        case .int32:
+            return "Int32"
+        case .int64:
+            return "Int64"
+        case .member(let baseType, let type):
+            return "\(baseType.description).\(type)"
+        case .metaType(let baseType):
+            switch baseType {
+            case .function:
+                return "(\(baseType.description)).Type"
+            default:
+                return "\(baseType.description).Type"
+            }
+        case .named(let name, let generics):
+            guard !generics.isEmpty else {
+                return name
+            }
+            return "\(name)<\(generics.map { $0.description }.joined(separator: ", "))>"
+        case .none:
+            return "<none>"
+        case .optional(let type):
+            switch type {
+            case .function:
+                return "(\(type.description))?"
+            default:
+                return "\(type.description)?"
+            }
+        case .set(let type):
+            return "Set<\(type.description)>"
+        case .string:
+            return "String"
+        case .tuple(let labels, let types):
+            let descriptions = zip(labels, types).map {
+                let typeDescription = $0.1.description
+                guard let label = $0.0 else {
+                    return typeDescription
+                }
+                return "\(label): \(typeDescription)"
+            }
+            return "(\(descriptions.joined(separator: ", ")))"
+        case .uint:
+            return "UInt"
+        case .uint8:
+            return "UInt8"
+        case .uint16:
+            return "UInt16"
+        case .uint32:
+            return "UInt32"
+        case .uint64:
+            return "UInt64"
+        case .unwrappedOptional(let type):
+            switch type {
+            case .function:
+                return "(\(type.description))!"
+            default:
+                return "\(type.description)!"
+            }
+        case .void:
+            return "Void"
         }
     }
 }

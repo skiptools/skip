@@ -32,7 +32,8 @@ extension InheritedTypeListSyntax {
     func typeSignatures(in syntaxTree: SyntaxTree) -> ([TypeSignature], [Message]) {
         var messages: [Message] = []
         let typeSignatures = compactMap { typeSyntax in
-            if let typeSignature = TypeSignature.for(syntax: typeSyntax.typeName) {
+            let typeSignature = TypeSignature.for(syntax: typeSyntax.typeName)
+            if typeSignature != .none {
                 return typeSignature
             } else {
                 messages.append(.unsupportedTypeSignature(typeSyntax.typeName, source: syntaxTree.source, sourceRange: typeSyntax.range(in: syntaxTree.source)))
@@ -45,21 +46,22 @@ extension InheritedTypeListSyntax {
 
 extension FunctionSignatureSyntax {
     /// The return type and parameters in this signature, and optional messages warning of any issues.
-    func typeSignatures(in syntaxTree: SyntaxTree) -> (TypeSignature?, [Parameter<Statement>], [Message]) {
-        var returnType: TypeSignature? = nil
+    func typeSignatures(in syntaxTree: SyntaxTree) -> (TypeSignature, [Parameter<Statement>], [Message]) {
+        var returnType: TypeSignature = .none
         var messages: [Message] = []
         if let output = output {
             returnType = TypeSignature.for(syntax: output.returnType)
-            if returnType == nil {
+            if returnType == .none {
+                returnType = .void
                 messages.append(.unsupportedTypeSignature(output.returnType, source: syntaxTree.source, sourceRange: output.range(in: syntaxTree.source)))
             }
         }
         let parameters = input.parameterList.map { parameterSyntax in
-            var type: TypeSignature? = nil
+            var type: TypeSignature = .none
             if let typeSyntax = parameterSyntax.type {
                 type = TypeSignature.for(syntax: typeSyntax)
-                if type == nil {
-                    type = .base("Any", [])
+                if type == .none {
+                    type = .any
                     messages.append(.unsupportedTypeSignature(typeSyntax, source: syntaxTree.source, sourceRange: typeSyntax.range(in: syntaxTree.source)))
                 }
             }
@@ -68,7 +70,7 @@ extension FunctionSignatureSyntax {
             if let defaultArgument = parameterSyntax.defaultArgument {
                 defaultValue = StatementDecoder.decode(syntax: defaultArgument, in: syntaxTree).first
             }
-            return Parameter<Statement>(externalName: parameterSyntax.firstName?.text ?? "", internalName: parameterSyntax.secondName?.text, type: type, isVariadic: isVariadic, defaultValue: defaultValue)
+            return Parameter<Statement>(externalName: parameterSyntax.firstName?.text ?? "", internalName: parameterSyntax.secondName?.text, declaredType: type, isVariadic: isVariadic, defaultValue: defaultValue)
         }
         return (returnType, parameters, messages)
     }

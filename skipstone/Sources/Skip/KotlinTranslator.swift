@@ -140,7 +140,7 @@ public class KotlinTranslator {
         case .functionCall:
             return KotlinFunctionCall.translate(expression: expression as! FunctionCall, translator: self)
         case .identifier:
-            return KotlinIdentifier(expression: expression as! Identifier)
+            return KotlinIdentifier.translate(expression: expression as! Identifier, translator: self)
         case .memberAccess:
             return KotlinMemberAccess.translate(expression: expression as! MemberAccess, translator: self)
         case .numericLiteral:

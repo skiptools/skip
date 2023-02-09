@@ -14,20 +14,20 @@ class SyntaxNode: SourceDerived, PrettyPrintable {
         self.sourceRange = sourceRange
     }
 
-    /// Resolve contextual information after the parent node is set.
-    func resolve() {
+    /// Resolve contextual information about this node's attributes after the parent node is set.
+    func resolveAttributes() {
     }
 
     /// Perform type inference.
     ///
     /// This is called after `resolve`.
-    @discardableResult func inferTypes(context: TypeInferenceContext, expecting: InferredType = .none) -> TypeInferenceContext {
+    @discardableResult func inferTypes(context: TypeInferenceContext, expecting: TypeSignature = .none) -> TypeInferenceContext {
         children.forEach { $0.inferTypes(context: context) }
         return context
     }
 
     /// The inferred type of this expression.
-    var inferredType: InferredType {
+    var inferredType: TypeSignature {
         return .none
     }
 
@@ -44,7 +44,7 @@ class SyntaxNode: SourceDerived, PrettyPrintable {
     final var prettyPrintTree: PrettyPrintTree {
         var subtrees = prettyPrintAttributes
         if inferredType != .none {
-            subtrees.append(PrettyPrintTree(root: "inferredType", children: [PrettyPrintTree(root: String(describing: inferredType))]))
+            subtrees.append(PrettyPrintTree(root: "inferredType", children: [PrettyPrintTree(root: inferredType.description)]))
         }
         subtrees += children.map { $0.prettyPrintTree }
         return PrettyPrintTree(root: nodeName, children: subtrees)
