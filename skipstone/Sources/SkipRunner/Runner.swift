@@ -59,7 +59,7 @@ private struct TranspileAction: Action {
     func perform(on sourceFiles: [Source.File], options: Options) async throws {
         var transpiler = Transpiler(sourceFiles: sourceFiles)
         transpiler.preprocessorSymbols = Set(options.preprocessorSymbols)
-        try await transpiler.transpile(codebaseInfo: KotlinCodebaseInfo()) { transpilation in
+        try await transpiler.transpile { transpilation in
             for message in transpilation.messages {
                 print(message)
             }

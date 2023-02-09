@@ -8,7 +8,6 @@ enum KotlinStatementType {
     case functionDeclaration
     case importDeclaration
     case interfaceDeclaration
-    case packageDeclaration
     case variableDeclaration
 
     /// A statement representing raw Kotlin code.
@@ -359,19 +358,6 @@ class KotlinInterfaceDeclaration: KotlinStatement {
         output.append(" {\n")
         children.forEach { output.append($0, indentation: indentation.inc()) }
         output.append(indentation).append("}\n")
-    }
-}
-
-class KotlinPackageDeclaration: KotlinStatement {
-    let name: String
-
-    init(name: String) {
-        self.name = name
-        super.init(type: .packageDeclaration)
-    }
-
-    override func append(to output: OutputGenerator, indentation: Indentation) {
-        output.append(indentation).append("package \(name)\n\n")
     }
 }
 

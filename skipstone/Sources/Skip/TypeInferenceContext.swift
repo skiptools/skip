@@ -1,5 +1,11 @@
 /// Contextual information used in type inference.
 struct TypeInferenceContext {
+    private let symbolInfo: SymbolInfo?
+
+    init(symbolInfo: SymbolInfo? = nil) {
+        self.symbolInfo = symbolInfo
+    }
+    
     var expectedReturn: TypeSignature = .none
 
     func pushing(_ typeDeclaration: TypeDeclaration) -> TypeInferenceContext {

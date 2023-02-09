@@ -8,7 +8,7 @@ public class SyntaxTree: PrettyPrintable {
     let preprocessorSymbols: Set<String>
     var statements: [Statement] = []
 
-    public init(source: Source, preprocessorSymbols: Set<String> = []) {
+    public init(source: Source, preprocessorSymbols: Set<String> = [], symbolInfo: SymbolInfo? = nil) {
         self.source = source
         self.preprocessorSymbols = preprocessorSymbols
         self.syntax = Parser.parse(source: source.content)
@@ -23,7 +23,7 @@ public class SyntaxTree: PrettyPrintable {
             resolveQueue += node.children
         }
 
-        let context = TypeInferenceContext()
+        let context = TypeInferenceContext(symbolInfo: symbolInfo)
         statements.forEach { $0.inferTypes(context: context) }
     }
 

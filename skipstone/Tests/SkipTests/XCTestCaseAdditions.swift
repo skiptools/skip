@@ -7,16 +7,13 @@ extension XCTestCase {
         let srcFile = try tmpFile(named: "Source.swift", contents: swift)
         if let kotlin = kotlin {
             let tp = Transpiler(sourceFiles: [Source.File(path: srcFile.path)])
-            try await tp.transpile(codebaseInfo: KotlinCodebaseInfo(), handler: { transpilation in
+            try await tp.transpile { transpilation in
                 //print("transpilation:", transpilation.output)
                 var content = transpilation.output.content
-                let autoImport = "import skip.kotlin."
-                content = content.split(separator: "\n", omittingEmptySubsequences: false).filter({ !$0.hasPrefix(autoImport) }).joined(separator: "\n")
-                if content.hasPrefix(autoImport) {
-                    content = String(content.dropFirst(autoImport.count))
-                }
+                let autoImportPrefix = "import skip.kotlin."
+                content = content.split(separator: "\n", omittingEmptySubsequences: false).filter({ !$0.hasPrefix(autoImportPrefix) }).joined(separator: "\n")
                 XCTAssertEqual(kotlin.trimmingCharacters(in: .whitespacesAndNewlines), content.trimmingCharacters(in: .whitespacesAndNewlines), file: file, line: line)
-            })
+            }
         }
     }
 

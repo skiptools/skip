@@ -1,7 +1,7 @@
 /// Translates a Swift syntax tree to Kotlin code.
 public class KotlinTranslator {
     let syntaxTree: SyntaxTree
-    var codebaseInfo: KotlinCodebaseInfo?
+    private(set) var codebaseInfo: KotlinCodebaseInfo?
 
     public init(syntaxTree: SyntaxTree) {
         self.syntaxTree = syntaxTree
@@ -49,13 +49,20 @@ public class KotlinTranslator {
 
     /// Translate syntax trees only.
     public func translateSyntaxTree() -> KotlinSyntaxTree {
-        var kstatements = syntaxTree.statements.flatMap { translateStatement($0) }
-        kstatements = addSkipFoundationImport(to: kstatements)
+        var packageStatements: [KotlinStatement] = []
         if let packageName = codebaseInfo?.packageName {
-            kstatements.insert(KotlinRawStatement(sourceCode: ""), at: 0)
-            kstatements.insert(KotlinPackageDeclaration(name: packageName), at: 0)
+            packageStatements = [
+                KotlinRawStatement(sourceCode: "package \(packageName)"),
+                KotlinRawStatement(sourceCode: ""),
+            ]
         }
-        return KotlinSyntaxTree(sourceFile: syntaxTree.source.file, statements: kstatements)
+        let requiredImportStatements = [
+            KotlinRawStatement(sourceCode: "import skip.kotlin.*"),
+            KotlinRawStatement(sourceCode: "import skip.kotlin.Array"), // Override kotlin.Array
+            KotlinRawStatement(sourceCode: ""),
+        ]
+        let translatedStatements = syntaxTree.statements.flatMap { translateStatement($0) }
+        return KotlinSyntaxTree(sourceFile: syntaxTree.source.file, statements: packageStatements + requiredImportStatements + translatedStatements)
     }
 
     func translateStatement(_ statement: Statement) -> [KotlinStatement] {
@@ -162,36 +169,5 @@ public class KotlinTranslator {
 //            rawExpression = RawExpression(sourceCode: "?", message: message, range: expression.range, in: syntaxTree)
 //        }
 //        return KotlinRawExpression(expression: rawExpression)
-    }
-
-    /// We depend on `SkipFoundation` for core functionality, so import it in all Kotlin translations.
-    private func addSkipFoundationImport(to statements: [KotlinStatement]) -> [KotlinStatement] {
-        var newStatements: [KotlinStatement] = []
-        var lastImportIndex: Int? = nil
-        for (index, statement) in statements.enumerated() {
-            guard let importStatement = statement as? KotlinImportDeclaration else {
-                newStatements.append(statement)
-                continue
-            }
-            if importStatement.modulePath == ["SkipKotlin"] {
-                return statements
-            }
-            lastImportIndex = index
-            newStatements.append(statement)
-        }
-
-        var kotlinImports: [KotlinStatement] = []
-        kotlinImports.append(KotlinImportDeclaration(modulePath: ["SkipKotlin"]))
-        kotlinImports.append(KotlinRawStatement(sourceCode: "import skip.kotlin.Array")) // otherwise: Type mismatch: inferred type is skip.kotlin.Array<???> but kotlin.Array<Int> was expected
-
-        if lastImportIndex == nil {
-            newStatements.insert(KotlinRawStatement(sourceCode: ""), at: 0)
-        }
-
-        let importIndex = (lastImportIndex ?? -1) + 1
-        for kotlinImport in kotlinImports.reversed() {
-            newStatements.insert(kotlinImport, at: importIndex)
-        }
-        return newStatements
     }
 }

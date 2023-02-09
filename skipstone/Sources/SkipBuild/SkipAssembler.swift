@@ -161,7 +161,7 @@ public struct SkipAssembler {
 
             logger.info("module: \(moduleName) package: \(packageName)")
 
-            let codebaseInfo = KotlinCodebaseInfo(packageName: packageName, graphs: unifiedGraphs)
+            let symbolInfo = SymbolInfo(graphs: unifiedGraphs)
 
             let moduleSwiftSourceRoot = URL(fileURLWithPath: moduleName, isDirectory: true, relativeTo: sourceRoot)
             let moduleSwiftTestRoot = testRoot.flatMap({ testRoot in URL(fileURLWithPath: moduleName + "Tests", isDirectory: true, relativeTo: testRoot) })
@@ -235,8 +235,8 @@ public struct SkipAssembler {
                     let sourceURLs = Dictionary(grouping: sources.map({ (path: $0.path, url: $0) }), by: \.path)
                     let sources = sourceURLs.keys.sorted().map({ Source.File(path: $0) })
 
-                    let tp = Transpiler(sourceFiles: sources)
-                    try await tp.transpile(codebaseInfo: codebaseInfo, handler: { transpilation in
+                    let tp = Transpiler(sourceFiles: sources, packageName: packageName, symbolInfo: symbolInfo)
+                    try await tp.transpile { transpilation in
                         logger.trace("transpilation: \(transpilation.output.content)")
                         guard let sourceURL = sourceURLs[transpilation.sourceFile.path]?.first?.url else {
                             fatalError("missing source URL for path")
@@ -250,7 +250,7 @@ public struct SkipAssembler {
 
                         let processed = try postProcess(kotlin: kotlin, options: testCase ? [.testCase] : [])
                         try write(processed, to: destPath, ifChanged: true)
-                    })
+                    }
                 }
 
                 try await transpileSources(sources: swiftSources)

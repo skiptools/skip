@@ -135,10 +135,10 @@ extension XCTestCase {
         let srcFile = try tmpFile(named: "Source.swift", contents: swift)
         if let kotlin = kotlin {
             let tp = Transpiler(sourceFiles: [Source.File(path: srcFile.path)])
-            try await tp.transpile(codebaseInfo: KotlinCodebaseInfo(), handler: { transpilation in
+            try await tp.transpile { transpilation in
                 logger.debug("transpilation: \(transpilation.output.content)")
                 XCTAssertEqual(kotlin.trimmingCharacters(in: .whitespacesAndNewlines), transpilation.output.content.trimmingCharacters(in: .whitespacesAndNewlines), file: file, line: line)
-            })
+            }
         }
     }
 
