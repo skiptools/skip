@@ -1,7 +1,7 @@
 #if !SKIP
 import struct Foundation.Data
 public typealias Data = Foundation.Data
-public typealias PlatformData = Foundation.Data
+public typealias PlatformData = Foundation.NSData
 #else
 public typealias Data = SkipData
 public typealias PlatformData = kotlin.ByteArray

@@ -1,7 +1,7 @@
 #if !SKIP
 import struct Foundation.Date
 public typealias Date = Foundation.Date
-public typealias PlatformDate = Foundation.Date
+public typealias PlatformDate = Foundation.NSDate
 #else
 public typealias Date = SkipDate
 public typealias PlatformDate = java.util.Date

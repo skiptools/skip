@@ -1,7 +1,7 @@
 #if !SKIP
 import struct Foundation.URL
 public typealias URL = Foundation.URL
-public typealias PlatformURL = Foundation.URL
+public typealias PlatformURL = Foundation.NSURL
 #else
 public typealias URL = SkipURL
 public typealias PlatformURL = java.net.URL
@@ -21,10 +21,6 @@ public struct SkipURL : RawRepresentable {
 }
 
 extension SkipURL {
-    public var path: String {
-        return rawValue.path
-    }
-
     public var host: String? {
         return rawValue.host
     }
@@ -36,6 +32,10 @@ extension SkipURL {
 #else // stuff that doesn't compile in Swift (yet?)
 
 extension SkipURL {
+    public var path: String {
+        return rawValue.path
+    }
+
     public static func `init`(string: String) -> SkipURL {
         return SkipURL(PlatformURL(string))
     }

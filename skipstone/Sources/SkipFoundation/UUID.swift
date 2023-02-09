@@ -1,7 +1,7 @@
 #if !SKIP
 import struct Foundation.UUID
 public typealias UUID = Foundation.UUID
-public typealias PlatformUUID = Foundation.UUID
+public typealias PlatformUUID = Foundation.NSUUID
 #else
 public typealias UUID = SkipUUID
 public typealias PlatformUUID = java.util.UUID
@@ -23,10 +23,10 @@ public struct SkipUUID : RawRepresentable {
 
 #if !SKIP
 
-extension PlatformUUID {
+extension UUID {
     // FIXME: optional support
     public static func fromUUIDString(uuid: String) -> UUID! {
-        return UUID(uuidString: uuid)
+        return PlatformUUID(uuidString: uuid) as? UUID
     }
 }
 
