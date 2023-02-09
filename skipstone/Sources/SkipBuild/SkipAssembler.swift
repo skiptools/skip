@@ -131,16 +131,7 @@ public struct SkipAssembler {
             }
         }
 
-        // if we are running tests from Xcode, this environment variable should be set; otherwise, assume the .build folder for an SPM build
-        let xcodeBuildFolder = ProcessInfo.processInfo.environment["__XCODE_BUILT_PRODUCTS_DIR_PATHS"] // also seems to be __XPC_DYLD_LIBRARY_PATH or __XPC_DYLD_FRAMEWORK_PATH; this will be something like ~/Library/Developer/Xcode/DerivedData/MODULENAME-bsjbchzxfwcrveckielnbyhybwdr/Build/Products/Debug
-
-        #if DEBUG
-        let swiftBuildFolder = ".build/debug"
-        #else
-        let swiftBuildFolder = ".build/release"
-        #endif
-
-        let moduleURL = URL(fileURLWithPath: xcodeBuildFolder ?? swiftBuildFolder, isDirectory: true)
+        let moduleURL = URL.moduleBuildFolder
 
         // gather the symbols for all the targets
         let collector = GraphCollector(extensionGraphAssociationStrategy: .extendingGraph)
@@ -549,6 +540,25 @@ public struct SkipAssembler {
         try await createGradleWrapper()
 
         return (destRoot, savedURLs)
+    }
+}
+
+extension URL {
+    /// The folder where built modules will be placed.
+    ///
+    /// When running within Xcode, which will query the `__XCODE_BUILT_PRODUCTS_DIR_PATHS` environment.
+    /// Otherwise, it assumes SPM's standard ".build" folder relative to the working directory.
+    public static var moduleBuildFolder: URL {
+        // if we are running tests from Xcode, this environment variable should be set; otherwise, assume the .build folder for an SPM build
+        let xcodeBuildFolder = ProcessInfo.processInfo.environment["__XCODE_BUILT_PRODUCTS_DIR_PATHS"] // also seems to be __XPC_DYLD_LIBRARY_PATH or __XPC_DYLD_FRAMEWORK_PATH; this will be something like ~/Library/Developer/Xcode/DerivedData/MODULENAME-bsjbchzxfwcrveckielnbyhybwdr/Build/Products/Debug
+
+        #if DEBUG
+        let swiftBuildFolder = ".build/debug"
+        #else
+        let swiftBuildFolder = ".build/release"
+        #endif
+
+        return URL(fileURLWithPath: xcodeBuildFolder ?? swiftBuildFolder, isDirectory: true)
     }
 }
 
