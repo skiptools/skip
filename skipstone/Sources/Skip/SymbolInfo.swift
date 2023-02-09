@@ -8,6 +8,12 @@ import SymbolKit
 /// info is optional for operations other than final transpilation.
 public struct SymbolInfo {
     public init(graphs: [String: UnifiedSymbolGraph]) {
+        for graph in graphs {
+            print("MODULE: \(graph.key)")
+            let unifiedGraph = graph.value
+            print("GRAPH: \(unifiedGraph)")
 
+        }
+        print("-----------------------------")
     }
 }
