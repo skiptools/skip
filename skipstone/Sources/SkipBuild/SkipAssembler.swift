@@ -323,7 +323,8 @@ public struct SkipAssembler {
                     internal class
                     """)
 
-                    // only add the conversions to a single test case
+                    // only add the conversions to a SkipTranspilerTestCase test case subclass
+                    // this allows us to just have the conversions in a single generated file
                     if kotlin.contains("SkipTranspilerTestCase") {
                         kotlin += XCTestJunitConversions
                     }
@@ -754,15 +755,15 @@ interface XCTestCase {
     fun XCTAssertNotNil(a: Any?) = Assert.assertNotNull(a)
     fun XCTAssertNotNil(a: Any?, msg: String) = Assert.assertNotNull(msg, a)
 
-    fun XCTAssertIdentical(a: Any?, b: Any?) = Assert.assertSame(a, b)
-    fun XCTAssertIdentical(a: Any?, b: Any?, msg: String) = Assert.assertSame(msg, a, b)
-    fun XCTAssertNotIdentical(a: Any?, b: Any?) = Assert.assertNotSame(a, b)
-    fun XCTAssertNotIdentical(a: Any?, b: Any?, msg: String) = Assert.assertNotSame(msg, a, b)
+    fun XCTAssertIdentical(a: Any?, b: Any?) = Assert.assertSame(b, a)
+    fun XCTAssertIdentical(a: Any?, b: Any?, msg: String) = Assert.assertSame(msg, b, a)
+    fun XCTAssertNotIdentical(a: Any?, b: Any?) = Assert.assertNotSame(b, a)
+    fun XCTAssertNotIdentical(a: Any?, b: Any?, msg: String) = Assert.assertNotSame(msg, b, a)
 
-    fun XCTAssertEqual(a: Any?, b: Any?) = Assert.assertEquals(a, b)
-    fun XCTAssertEqual(a: Any?, b: Any?, msg: String) = Assert.assertEquals(msg, a, b)
-    fun XCTAssertNotEqual(a: Any?, b: Any?) = Assert.assertNotEquals(a, b)
-    fun XCTAssertNotEqual(a: Any?, b: Any?, msg: String) = Assert.assertNotEquals(msg, a, b)
+    fun XCTAssertEqual(a: Any?, b: Any?) = Assert.assertEquals(b, a)
+    fun XCTAssertEqual(a: Any?, b: Any?, msg: String) = Assert.assertEquals(msg, b, a)
+    fun XCTAssertNotEqual(a: Any?, b: Any?) = Assert.assertNotEquals(b, a)
+    fun XCTAssertNotEqual(a: Any?, b: Any?, msg: String) = Assert.assertNotEquals(msg, b, a)
 
     // additional overloads needed for XCTAssert*() which have different signatures on Linux (@autoclosures) than on Darwin platforms (direct values)
 

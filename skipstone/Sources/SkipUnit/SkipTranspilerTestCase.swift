@@ -61,7 +61,7 @@ extension SkipAssembler {
             "--no-daemon",
             "--console", "plain",
             verbose ? "--info" : nil,
-            "--stacktrace",
+            //"--stacktrace",
             "--rerun-tasks", // re-run tests
             "--project-dir", destRoot.path,
             target,
@@ -84,6 +84,9 @@ extension SkipAssembler {
                 } else if outputLine.hasPrefix("e: ") {
                     gradleLogger.error("\(outputLine)")
                     // breakpoint here to stop on build error
+                } else if outputLine.trimmingCharacters(in: .whitespaces).hasPrefix("java.lang.AssertionError ") {
+                    gradleLogger.error("\(outputLine)")
+                    // breakpoint here to stop on assertion
                 } else {
                     gradleLogger.debug("\(outputLine)")
                 }

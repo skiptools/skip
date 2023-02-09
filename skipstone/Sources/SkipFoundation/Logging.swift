@@ -52,39 +52,39 @@ extension Logger {
     }
 
     public func log(message: OSLogMessage) {
-        Log.i(subsystem + "-" + category, message)
+        Log.i(subsystem + "/" + category, message)
     }
 
     public func trace(message: OSLogMessage) {
-        Log.v(subsystem + "-" + category, message)
+        Log.v(subsystem + "/" + category, message)
     }
 
     public func debug(message: OSLogMessage) {
-        Log.d(subsystem + "-" + category, message)
+        Log.d(subsystem + "/" + category, message)
     }
 
     public func info(message: OSLogMessage) {
-        Log.i(subsystem + "-" + category, message)
+        Log.i(subsystem + "/" + category, message)
     }
 
     public func notice(message: OSLogMessage) {
-        Log.i(subsystem + "-" + category, message)
+        Log.i(subsystem + "/" + category, message)
     }
 
     public func warning(message: OSLogMessage) {
-        Log.w(subsystem + "-" + category, message)
+        Log.w(subsystem + "/" + category, message)
     }
 
     public func error(message: OSLogMessage) {
-        Log.e(subsystem + "-" + category, message)
+        Log.e(subsystem + "/" + category, message)
     }
 
     public func critical(message: OSLogMessage) {
-        Log.wtf(subsystem + "-" + category, message)
+        Log.wtf(subsystem + "/" + category, message)
     }
 
     public func fault(message: OSLogMessage) {
-        Log.wtf(subsystem + "-" + category, message)
+        Log.wtf(subsystem + "/" + category, message)
     }
 }
 #endif
