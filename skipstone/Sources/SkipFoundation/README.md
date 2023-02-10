@@ -318,11 +318,11 @@ There is no _Complete_ status for test coverage because there are always additio
 
     The classes provided in this group are responsible for parsing and validating XML. They should be an interface for representing libxml2 in a more object-oriented manner.
 
-    | Entity Name   | Status          | Test Coverage | Notes                          |
-    |---------------|-----------------|---------------|--------------------------------|
-    | `XMLDocument` | Unimplemented   | None          |                                |
-    | `XMLDTD`      | Unimplemented   | None          |                                |
-    | `XMLDTDNode`  | Unimplemented   | None          |                                |
-    | `XMLElement`  | Unimplemented   | None          |                                |
-    | `XMLNode`     | Unimplemented   | None          |                                |
-    | `XMLParser`   | Unimplemented   | None          |                                |
+    | Entity Name   | Status          | Test Coverage | Notes                                        |
+    |---------------|-----------------|---------------|----------------------------------------------|
+    | `XMLDocument` | Unimplemented   | None          | `org.w3c.dom.Document`?                      |
+    | `XMLDTD`      | Unimplemented   | None          | `org.w3c.dom.DocumentType`?                  |
+    | `XMLElement`  | Unimplemented   | None          | `org.w3c.dom.Element`?                       |
+    | `XMLNode`     | Unimplemented   | None          | `org.w3c.dom.Node`?                          |
+    | `XMLParser`   | Unimplemented   | None          | `javax.xml.parsers.SAXParserFactory`?        |
+    | `XMLParser`+  | Unimplemented   | None          | `javax.xml.parsers.DocumentBuilderFactory`?  |
