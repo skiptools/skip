@@ -58,6 +58,7 @@ There is no _Complete_ status for test coverage because there are always additio
     | Entity Name      | Status          | Test Coverage | Notes                                       |
     |------------------|-----------------|---------------|---------------------------------------------|
     | `NSPasteBoard`   | Unimplemented   | None          | `android.content.ClipboardManager`?         |
+    | `NSCache`        | Unimplemented   | None          | `Map<SoftReference, V>`?                    |
 
 
 * **UserDefaults**: A mechanism for storing values to persist as user settings and local.
@@ -178,18 +179,17 @@ There is no _Complete_ status for test coverage because there are always additio
     |-----------------------|-----------------|---------------|--------------------------------|
     | `IndexPath`           | Unimplemented   | None          |                                |
     | `IndexSet`            | Unimplemented   | None          |                                |
-    | `NSCache`             | Unimplemented   | None          | `Map<SoftReference, V>`?       |
     | `NSIndexSet`          | Unimplemented   | None          |                                |
+    | `NSMutableIndexSet`   | Unimplemented   | None          |                                |
     | `NSOrderedSet`        | Unimplemented   | None          |                                |
     | `NSMutableOrderedSet` | Unimplemented   | None          |                                |
-    | `NSDictionary`        | Unimplemented   | None          |                                |
+    | `NSDictionary`        | Unimplemented   | None          | `java.util.HashMap`            |
     | `NSMutableDictionary` | Unimplemented   | None          |                                |
-    | `NSMutableIndexSet`   | Unimplemented   | None          |                                |
     | `NSIndexPath`         | Unimplemented   | None          |                                |
-    | `NSArray`             | Unimplemented   | None          |                                |
-    | `NSMutableArray`      | Unimplemented   | None          |                                |
-    | `NSSet`               | Unimplemented   | None          |                                |
-    | `NSMutableSet`        | Unimplemented   | None          |                                |
+    | `NSArray`             | Unimplemented   | None          | `java.util.ArrayList`?         |
+    | `NSMutableArray`      | Unimplemented   | None          | "                              |
+    | `NSSet`               | Unimplemented   | None          | `java.util.HashSet`            |
+    | `NSMutableSet`        | Unimplemented   | None          | "                              |
     | `NSCountedSet`        | Unimplemented   | None          |                                |
     | `NSSortDescriptor`    | Unimplemented   | None          |                                |
 
