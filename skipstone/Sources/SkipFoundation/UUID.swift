@@ -7,6 +7,7 @@ public typealias UUID = SkipUUID
 public typealias PlatformUUID = java.util.UUID
 #endif
 
+// SKIP INSERT: public operator fun SkipUUID.Companion.invoke(uuidString: String): SkipUUID? { return SkipUUID.fromString(uuidString) }
 
 // SKIP REPLACE: @JvmInline public value class SkipUUID(val rawValue: PlatformUUID = PlatformUUID.randomUUID()) { companion object { } }
 public struct SkipUUID : RawRepresentable {
@@ -34,11 +35,6 @@ extension UUID {
             }
         }
     }
-
-    // FIXME: optional support
-    public static func fromUUIDString(uuid: String) -> UUID! {
-        return PlatformUUID(uuidString: uuid) as? UUID
-    }
 }
 
 #else
@@ -46,20 +42,23 @@ extension UUID {
 // SKIP INSERT: public fun UUID(mostSigBits: Long, leastSigBits: Long): SkipUUID { return SkipUUID(PlatformUUID(mostSigBits, leastSigBits)) }
 
 extension SkipUUID {
+    public static func fromString(uuidString: String) -> SkipUUID? {
+        // Java throws an exception for bad UUID, but Foundation expects it to return nil
+        return try? SkipUUID(rawValue: PlatformUUID.fromString(uuidString))
+    }
 
     // TODO: constructor support (remove SKIP INSERT above)
-    public init(mostSigBits: Int64, leastSigBits: Int64) {
-        SkipUUID(mostSigBits, leastSigBits)
-    }
+//    public init(mostSigBits: Int64, leastSigBits: Int64) {
+//        SkipUUID(mostSigBits, leastSigBits)
+//    }
 
     public var uuidString: String {
         // java.util.UUID is lowercase, Foundation.UUID is uppercase
         return rawValue.toString().uppercase()
     }
 
-    
-    public static func fromUUIDString(uuid: String) -> SkipUUID {
-        return SkipUUID(rawValue: PlatformUUID.fromString(uuid))
+    public var description: String {
+        return uuidString
     }
 }
 

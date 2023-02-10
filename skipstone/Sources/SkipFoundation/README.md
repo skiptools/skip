@@ -1,9 +1,9 @@
-SkipFoundation
-==============
+CrossFoundation
+===============
 
 # Implementation Status
 
-This document lays out the structure of the CrossFoundation project, and provides the current implementation status of each major feature.
+This document lays out the structure of the CrossFoundation project, and provides the current implementation status of each major feature area.
 
 
 #### Table Key
@@ -21,7 +21,6 @@ This document lays out the structure of the CrossFoundation project, and provide
 * _Incomplete_: Unit tests exist for this entity, but there are critical paths that are not being tested
 * _Substantial_: Most, if not all, of this entity's critical paths are being tested
 
-There is no _Complete_ status for test coverage because there are always additional tests to be implemented. Even entities with _Substantial_ coverage are missing tests (e.g. `NSCoding` conformance, `NSCopying` conformance, `description`s, etc.)
 
 ### Entities
 
@@ -71,8 +70,6 @@ There is no _Complete_ status for test coverage because there are always additio
 
 * **URL**: Networking primitives
 
-    The classes in this group provide functionality for manipulating URLs and paths via a common model object. The group also has classes for creating and receiving network connections.
-
     | Entity Name                  | Status          | Test Coverage | Notes                         |
     |------------------------------|-----------------|---------------|-------------------------------|
     | `URL`                        | Incomplete      | Incomplete    | `java.net.URL`                |
@@ -84,13 +81,7 @@ There is no _Complete_ status for test coverage because there are always additio
     | `NSHTTPURLResponse`          | Unimplemented   | None          |                               |
     | `URLResourceValues`          | Unimplemented   | None          |                               |
     | `URLSession`                 | Unimplemented   | None          |                               |
-    |  `URLSessionConfiguration`   | Unimplemented   | None          |                               |
-    |  `URLSessionDelegate`        | Unimplemented   | None          |                               |
-    |  `URLSessionTask`            | Unimplemented   | None          |                               |
-    |  `URLSessionDataTask`        | Unimplemented   | None          |                               |
-    |  `URLSessionUploadTask`      | Unimplemented   | None          |                               |
-    |  `URLSessionDownloadTask`    | Unimplemented   | None          |                               |
-    |  `URLSessionStreamTask`      | Unimplemented   | None          |                               |
+    | `URLSessionConfiguration`    | Unimplemented   | None          |                               |
     | `URLCache`                   | Unimplemented   | None          |                               |
     | `URLCredential`              | Unimplemented   | None          |                               |
     | `URLCredentialStorage`       | Unimplemented   | None          |                               |
@@ -106,8 +97,6 @@ There is no _Complete_ status for test coverage because there are always additio
     | `HTTPCookie`                 | Unimplemented   | None          |                               |
     | `HTTPCookiePropertyKey`      | Unimplemented   | None          |                               |
     | `HTTPCookieStorage`          | Unimplemented   | None          |                               |
-    | `Host`                       | Unimplemented   | None          |                               |
-    | `Configuration`              | Unimplemented   | None          |                               |
     | `HTTPBodySource`             | Unimplemented   | None          |                               |
     | `HTTPMessage`                | Unimplemented   | None          |                               |
     | `MultiHandle`                | Unimplemented   | None          |                               |
@@ -115,8 +104,6 @@ There is no _Complete_ status for test coverage because there are always additio
     | `TransferState`              | Unimplemented   | None          |                               |
 
 * **Formatters**: Locale and language-correct formatted values.
-
-    This group contains the base `NSFormatter` class and its subclasses. These formatters can be used for dates, numbers, sizes, energy, and many other types.
 
     | Entity Name                     | Status          | Test Coverage | Notes                         |
     |---------------------------------|-----------------|---------------|-------------------------------|
@@ -139,24 +126,23 @@ There is no _Complete_ status for test coverage because there are always additio
 
     | Entity Name      | Status          | Test Coverage | Notes                                       |
     |------------------|-----------------|---------------|---------------------------------------------|
-    | `FileManager`    | Incomplete      | None          | `java.io.File`                              |
+    | `os.log.Logger`* | Incomplete      | Incomplete    | `android.util.Log`                          |
+    | `FileManager`    | Incomplete      | Incomplete    | `java.io.File`                              |
     | `Bundle`         | Unimplemented   | None          | `android.content.res.Resources`?            |
     | `FileHandle`     | Unimplemented   | None          | `java.io.FileDescriptor`?                   |
     | `Pipe`           | Unimplemented   | None          | `java.nio.channels.Pipe`?                   |
     | `Process`        | Unimplemented   | None          | `java.lang.Process`?                        |
     | `ProcessInfo`    | Unimplemented   | None          |                                             |
-    | `Thread`         | Unimplemented   | None          | `java.lang.Thread`?                         |
-    | `Operation`      | Unimplemented   | None          |                                             |
-    | `BlockOperation` | Unimplemented   | None          |                                             |
-    | `OperationQueue` | Unimplemented   | None          |                                             |
     | `Lock`           | Unimplemented   | None          | `java.util.concurrent.locks.Lock`?          |
     | `ConditionLock`  | Unimplemented   | None          |                                             |
     | `RecursiveLock`  | Unimplemented   | None          | `java.util.concurrent.locks.ReentrantLock`? |
     | `Condition`      | Unimplemented   | None          |                                             |
+    | `Thread`         | Unimplemented   | None          | `java.lang.Thread`?                         |
+    | `Operation`      | Unimplemented   | None          |                                             |
+    | `BlockOperation` | Unimplemented   | None          |                                             |
+    | `OperationQueue` | Unimplemented   | None          |                                             |
 
 * **Runtime**: The basis for interoperability.
-
-    The classes and methods in this group provide an interface for interoperability between C code and Swift. They also provide common layers used throughout the framework such as the root class `NSObject`.
 
     | Entity Name             | Status          | Test Coverage | Notes                        |
     |-------------------------|-----------------|---------------|------------------------------|
@@ -170,10 +156,6 @@ There is no _Complete_ status for test coverage because there are always additio
 
 
 * **Collections**: A group of classes to contain objects.
-
-    The classes provided in this group provide basic collections. The primary role for these classes is to provide an interface layer between the CoreFoundation implementations and the standard library implementations. Additionally, they have useful extras like serialization support. There are also additional collection types that the standard library does not support.
-
-     > _Note_: See [Known Issues](Issues.md) for more information about bridging between Foundation collection types and Swift standard library collection types.
 
     | Entity Name           | Status          | Test Coverage | Notes                          |
     |-----------------------|-----------------|---------------|--------------------------------|
@@ -210,60 +192,54 @@ There is no _Complete_ status for test coverage because there are always additio
 
     | Entity Name      | Status          | Test Coverage | Notes                    |
     |------------------|-----------------|---------------|--------------------------|
-    | `Stream`         | Unimplemented   | None          |                          |
+    | `RunLoop`        | Unimplemented   | None          | `android.os.Looper`      |
+    | `Timer`          | Unimplemented   | None          | `java.util.Timer`        |
     | `InputStream`    | Unimplemented   | None          | `java.io.InputStream`?   |
     | `NSInputStream`  | Unimplemented   | None          | "                        |
     | `NSOutputStream` | Unimplemented   | None          | `java.io.OutputStream`?  |
+    | `Stream`         | Unimplemented   | None          |                          |
     | `NSStream`       | Unimplemented   | None          |                          |
     | `Port`           | Unimplemented   | None          |                          |
     | `MessagePort`    | Unimplemented   | None          |                          |
     | `SocketPort`     | Unimplemented   | None          |                          |
     | `PortMessage`    | Unimplemented   | None          |                          |
-    | `RunLoop`        | Unimplemented   | None          |                          |
-    | `Timer`          | Unimplemented   | None          |                          |
 
 * **String**: A set of classes for scanning, manipulating and storing string values.
 
-    The NSString implementation is present to provide an interface layer between CoreFoundation and Swift, but it also adds additional functionality on top of the Swift standard library String type. Other classes in this group provide mechanisms to scan, match regular expressions, store attributes in run arrays attached to strings, and represent sets of characters.
-
-    > _Note_: See [Known Issues](Issues.md) for more information about bridging between the Foundation NSString types and Swift standard library String type.
-
-    | Entity Name                 | Status          | Test Coverage | Notes                      |
-    |-----------------------------|-----------------|---------------|----------------------------|
-    | `NSRegularExpression`       | Unimplemented   | None          | `java.util.regex.Matcher`? |
-    | `CharacterSet`              | Unimplemented   | None          |                            |
-    | `NSCharacterSet`            | Unimplemented   | None          |                            |
-    | `NSMutableCharacterSet`     | Unimplemented   | None          |                            |
-    | `Scanner`                   | Unimplemented   | None          |                            |
-    | `NSAttributedString`        | Unimplemented   | None          |                            |
-    | `NSMutableAttributedString` | Unimplemented   | None          |                            |
-    | `NSTextCheckingResult`      | Unimplemented   | None          |                            |
-    | `NSString`                  | Unimplemented   | None          |                            |
-    | `NSStringEncodings`         | Unimplemented   | None          |                            |
-    | `NSStringAPI`               | Unimplemented   | None          |                            |
-    | `ExtraStringAPIs`           | Unimplemented   | None          |                            |
+    | Entity Name                 | Status          | Test Coverage | Notes                         |
+    |-----------------------------|-----------------|---------------|-------------------------------|
+    | `NSRegularExpression`       | Unimplemented   | None          | `java.util.regex.Matcher`?    |
+    | `Scanner`                   | Unimplemented   | None          | `java.util.Scanner`           |
+    | `CharacterSet`              | Unimplemented   | None          |                               |
+    | `NSCharacterSet`            | Unimplemented   | None          |                               |
+    | `NSMutableCharacterSet`     | Unimplemented   | None          |                               |
+    | `NSAttributedString`        | Unimplemented   | None          | `java.text.AttributedString`? |
+    | `NSMutableAttributedString` | Unimplemented   | None          | "                             |
+    | `NSTextCheckingResult`      | Unimplemented   | None          |                               |
+    | `NSString`                  | Unimplemented   | None          |                               |
+    | `NSStringEncodings`         | Unimplemented   | None          |                               |
+    | `NSStringAPI`               | Unimplemented   | None          |                               |
 
 * **Number**: A set of classes and methods for representing numeric values and structures.
 
     | Entity Name                       | Status          | Test Coverage | Notes                        |
     |-----------------------------------|-----------------|---------------|------------------------------|
-    | `NSRange`                         | Unimplemented   | None          |                              |
-    | `Decimal`                         | Unimplemented   | None          |                              |
-    | `NSDecimalNumber`                 | Unimplemented   | None          |                              |
-    | `NSDecimalNumberHandler`          | Unimplemented   | None          |                              |
+    | `CGFloat`                         | Unimplemented   | None          |                              |
     | `CGPoint`                         | Unimplemented   | None          |                              |
     | `CGSize`                          | Unimplemented   | None          |                              |
     | `CGRect`                          | Unimplemented   | None          |                              |
-    | `NSEdgeInsets`                    | Unimplemented   | None          |                              |
-    | `NSGeometry`                      | Unimplemented   | None          |                              |
-    | `CGFloat`                         | Unimplemented   | None          |                              |
-    | `AffineTransform`                 | Unimplemented   | None          |                              |
-    | `NSAffineTransform`               | Unimplemented   | None          |                              |
+    | `NSRange`                         | Unimplemented   | None          |                              |
     | `NSNumber`                        | Unimplemented   | None          |                              |
+    | `NSValue`                         | Unimplemented   | None          |                              |
     | `NSConcreteValue`                 | Unimplemented   | None          |                              |
     | `NSSpecialValue`                  | Unimplemented   | None          |                              |
-    | `NSValue`                         | Unimplemented   | None          |                              |
-    | `Dimension`                       | Unimplemented   | None          |                              |
+    | `Decimal`                         | Unimplemented   | None          |                              |
+    | `NSDecimalNumber`                 | Unimplemented   | None          |                              |
+    | `NSDecimalNumberHandler`          | Unimplemented   | None          |                              |
+    | `NSEdgeInsets`                    | Unimplemented   | None          |                              |
+    | `NSGeometry`                      | Unimplemented   | None          |                              |
+    | `AffineTransform`                 | Unimplemented   | None          |                              |
+    | `NSAffineTransform`               | Unimplemented   | None          |                              |
     
 * **Measurement**: A set of classes and methods for handling measurement and conversions.
 
@@ -271,6 +247,7 @@ There is no _Complete_ status for test coverage because there are always additio
     |-----------------------------------|-----------------|---------------|------------------------------|
     | `Measurement`                     | Unimplemented   | None          |                              |
     | `NSMeasurement`                   | Unimplemented   | None          |                              |
+    | `Dimension`                       | Unimplemented   | None          |                              |
     | `UnitConverter`                   | Unimplemented   | None          |                              |
     | `UnitConverterLinear`             | Unimplemented   | None          |                              |
     | `Unit`                            | Unimplemented   | None          |                              |
@@ -308,15 +285,13 @@ There is no _Complete_ status for test coverage because there are always additio
     |-----------------------------|-----------------|---------------|--------------------------|
     | `NSJSONSerialization`       | Unimplemented   | None          | `kotlinx.serialization`? |
     | `PropertyListSerialization` | Unimplemented   | None          |                          |
-    | `NSKeyedArchiver`           | Unimplemented   | None          |                          |
-    | `NSKeyedCoderOldStyleArray` | Unimplemented   | None          |                          |
-    | `NSKeyedUnarchiver`         | Unimplemented   | None          |                          |
-    | `NSKeyedArchiverHelpers`    | Unimplemented   | None          |                          |
-    | `NSCoder`                   | Unimplemented   | None          |                          |
+    | `NSKeyedArchiver`           | N/A             | None          |                          |
+    | `NSKeyedCoderOldStyleArray` | N/A             | None          |                          |
+    | `NSKeyedUnarchiver`         | N/A             | None          |                          |
+    | `NSKeyedArchiverHelpers`    | N/A             | None          |                          |
+    | `NSCoder`                   | N/A             | None          |                          |
     
 * **XML**: A group of classes for parsing and representing XML documents and elements.
-
-    The classes provided in this group are responsible for parsing and validating XML. They should be an interface for representing libxml2 in a more object-oriented manner.
 
     | Entity Name   | Status          | Test Coverage | Notes                                        |
     |---------------|-----------------|---------------|----------------------------------------------|
