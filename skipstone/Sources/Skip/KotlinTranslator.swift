@@ -156,6 +156,8 @@ public class KotlinTranslator {
             return KotlinStringLiteral.translate(expression: expression as! StringLiteral, translator: self)
         case .subscript:
             return KotlinSubscript.translate(expression: expression as! Subscript, translator: self)
+        case .try:
+            return KotlinTry.translate(expression: expression as! Try, translator: self)
         case .raw:
             return KotlinRawExpression(expression: expression as! RawExpression)
         }

@@ -11,6 +11,7 @@ enum ExpressionType: CaseIterable {
     case numericLiteral
     case stringLiteral
     case `subscript`
+    case `try`
 
     /// An expression representing raw Swift code.
     case raw
@@ -36,6 +37,8 @@ enum ExpressionType: CaseIterable {
             return StringLiteral.self
         case .subscript:
             return Subscript.self
+        case .try:
+            return Try.self
 
         case .raw:
             return RawExpression.self
@@ -481,5 +484,57 @@ class Subscript: Expression {
 
     override var children: [SyntaxNode] {
         return [base] + arguments.map { $0.value }
+    }
+}
+
+/// `try f()`
+class Try: Expression {
+    let trying: Expression
+    let isOptional: Bool // try?
+
+    init(trying: Expression, isOptional: Bool = false, syntax: SyntaxProtocol?, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        self.trying = trying
+        self.isOptional = isOptional
+        super.init(type: .try, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
+        guard syntax.kind == .tryExpr, let tryExpr = syntax.as(TryExprSyntax.self) else {
+            return nil
+        }
+        let expression = ExpressionDecoder.decode(syntax: tryExpr.expression, in: syntaxTree)
+        let isOptional = tryExpr.questionOrExclamationMark?.text == "?"
+        return Try(trying: expression, isOptional: isOptional, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature = .none) -> TypeInferenceContext {
+        if isOptional, case .optional(let typeSignature) = expecting {
+            return trying.inferTypes(context: context, expecting: typeSignature)
+        } else {
+            return trying.inferTypes(context: context, expecting: expecting)
+        }
+    }
+
+    override var inferredType: TypeSignature {
+        let inferredType = trying.inferredType
+        guard isOptional else {
+            return inferredType
+        }
+        switch inferredType {
+        case .none:
+            return .none
+        case .optional:
+            return inferredType
+        default:
+            return .optional(inferredType)
+        }
+    }
+
+    override var children: [SyntaxNode] {
+        return [trying]
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        return isOptional ? [PrettyPrintTree(root: "try?")] : []
     }
 }

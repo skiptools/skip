@@ -9,6 +9,7 @@ enum KotlinExpressionType {
     case numericLiteral
     case stringLiteral
     case `subscript`
+    case `try`
 
     case raw
 }
@@ -346,5 +347,42 @@ class KotlinSubscript: KotlinExpression {
             }
         }
         output.append("]")
+    }
+}
+
+class KotlinTry: KotlinExpression {
+    var trying: KotlinExpression
+    var isOptional = false
+
+    static func translate(expression: Try, translator: KotlinTranslator) -> KotlinTry {
+        let ktrying = translator.translateExpression(expression.trying)
+        let kexpression = KotlinTry(expression: expression, trying: ktrying)
+        kexpression.isOptional = expression.isOptional
+        return kexpression
+    }
+
+    private init(expression: Try, trying: KotlinExpression) {
+        self.trying = trying
+        super.init(type: .try, expression: expression)
+    }
+
+    override func mayBeSharedMutableValueExpression(orType: Bool) -> Bool {
+        return trying.mayBeSharedMutableValueExpression(orType: orType)
+    }
+
+    override var isCompoundExpression: Bool {
+        return isOptional || trying.isCompoundExpression
+    }
+
+    override var children: [KotlinSyntaxNode] {
+        return [trying]
+    }
+
+    override func append(to output: OutputGenerator) {
+        if isOptional {
+            output.append("try { ").append(trying).append(" } catch (_e_: Exception) { null }")
+        } else {
+            output.append(trying)
+        }
     }
 }
