@@ -19,17 +19,17 @@ public struct Transpiler {
     /// Perform transpilation, feeding results to the given handler.
     public func transpile(handler: (Transpilation) throws -> Void) async throws {
         let codebaseInfo = KotlinCodebaseInfo(packageName: packageName, symbolInfo: symbolInfo)
-        try await withThrowingTaskGroup(of: Void.self) { group in
+        try await withThrowingTaskGroup(of: SyntaxTree.self) { group in
             for sourceFile in sourceFiles {
                 group.addTask {
-                    let syntaxTree = try SyntaxTree(source: Source(file: sourceFile), preprocessorSymbols: preprocessorSymbols, symbolInfo: symbolInfo)
-                    codebaseInfo.gather(from: syntaxTree)
+                    return try SyntaxTree(source: Source(file: sourceFile), preprocessorSymbols: preprocessorSymbols, symbolInfo: symbolInfo)
                 }
             }
-            try await group.waitForAll()
+            for try await syntaxTree in group {
+                codebaseInfo.gather(from: syntaxTree)
+            }
         }
-
-        let transpilations = try await withThrowingTaskGroup(of: Transpilation.self) { group in
+        try await withThrowingTaskGroup(of: Transpilation.self) { group in
             for sourceFile in sourceFiles {
                 group.addTask {
                     let syntaxTree = try SyntaxTree(source: Source(file: sourceFile), preprocessorSymbols: preprocessorSymbols)
@@ -37,13 +37,9 @@ public struct Transpiler {
                     return translator.transpile(codebaseInfo: codebaseInfo)
                 }
             }
-            var transpilations: [Transpilation] = []
             for try await transpilation in group {
-                transpilations.append(transpilation)
+                try handler(transpilation)
             }
-            return transpilations
         }
-
-        try transpilations.forEach { try handler($0) }
     }
 }
