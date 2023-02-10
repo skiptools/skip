@@ -32,7 +32,7 @@ public struct Transpiler {
         try await withThrowingTaskGroup(of: Transpilation.self) { group in
             for sourceFile in sourceFiles {
                 group.addTask {
-                    let syntaxTree = try SyntaxTree(source: Source(file: sourceFile), preprocessorSymbols: preprocessorSymbols)
+                    let syntaxTree = try SyntaxTree(source: Source(file: sourceFile), preprocessorSymbols: preprocessorSymbols, symbolInfo: symbolInfo)
                     let translator = KotlinTranslator(syntaxTree: syntaxTree)
                     return translator.transpile(codebaseInfo: codebaseInfo)
                 }
