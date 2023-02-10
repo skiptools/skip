@@ -152,7 +152,7 @@ public struct SkipAssembler {
 
             logger.info("module: \(moduleName) package: \(packageName)")
 
-            let symbolInfo = SymbolInfo(graphs: unifiedGraphs)
+            let symbolInfo = SymbolInfo(moduleName: moduleName, graphs: unifiedGraphs)
 
             let moduleSwiftSourceRoot = URL(fileURLWithPath: moduleName, isDirectory: true, relativeTo: sourceRoot)
             let moduleSwiftTestRoot = testRoot.flatMap({ testRoot in URL(fileURLWithPath: moduleName + "Tests", isDirectory: true, relativeTo: testRoot) })

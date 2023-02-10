@@ -10,7 +10,12 @@ public struct Array<T> {
     }
 
     public subscript(index: Int) -> T {
-        fatalError()
+        get {
+            fatalError()
+        }
+        set {
+            fatalError()
+        }
     }
 
     public mutating func append(_ element: T) {
