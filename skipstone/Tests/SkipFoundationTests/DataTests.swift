@@ -9,13 +9,13 @@ final class DataTests: XCTestCase {
     func testData() throws {
         let hostsFile: URL = URL.init(fileURLWithPath: "/etc/hosts", isDirectory: false)
 
-        let hostsData: Data = Data.contentsOfURL(url: hostsFile)
+        let hostsData: Data = try Data(contentsOf: hostsFile)
         XCTAssertNotEqual(0, hostsData.count)
 
         // FIXME: force-unwrap doesn't transpile
         // SKIP REPLACE: val url: URL = URL.init(string = "https://www.example.com")
         let url: URL = URL.init(string: "https://www.example.com")!
-        let urlData: Data = Data.contentsOfURL(url: url)
+        let urlData: Data = try Data(contentsOf: url)
 
         logger.log("downloaded url size: \(urlData.count)") // ~1256
         XCTAssertNotEqual(0, urlData.count)
@@ -23,7 +23,7 @@ final class DataTests: XCTestCase {
         // FIXME: force-unwrap doesn't transpile
         // SKIP REPLACE: val url2: URL = URL.init(string = "domains/reserved", relativeTo = URL.init(string = "https://www.iana.org"))
         let url2: URL = URL.init(string: "domains/reserved", relativeTo: URL.init(string: "https://www.iana.org"))!
-        let url2Data: Data = Data.contentsOfURL(url: url2)
+        let url2Data: Data = try Data(contentsOf: url2)
 
         logger.log("downloaded url2 size: \(url2Data.count)") // ~1256
         XCTAssertNotEqual(0, url2Data.count)

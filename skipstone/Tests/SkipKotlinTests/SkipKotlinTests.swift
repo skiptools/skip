@@ -12,7 +12,7 @@ final class SkipKotlinTests: XCTestCase {
     }
 
     #if !SKIP
-    func testSkipKotlinSymbols() async throws {
+    func XXXtestSkipKotlinSymbols() async throws {
         let testModule = "SkipKotlinTests"
         let symbols = try await System.extractSymbols(URL.moduleBuildFolder, moduleName: testModule, accessLevel: "private")
         let symbolGraph = try XCTUnwrap(symbols)

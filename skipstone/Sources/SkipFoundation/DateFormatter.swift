@@ -23,6 +23,16 @@ public struct SkipDateFormatter : RawRepresentable {
 #if SKIP
 
 extension SkipDateFormatter {
+    public var dateFormat: String {
+        get {
+            return rawValue.toPattern()
+        }
+
+        set {
+            rawValue.applyPattern(newValue)
+        }
+    }
+
     public static func dateFormat(fromTemplate: String, options: Int, locale: Locale) -> SkipDateFormatter {
         // TODO: check options?
         return SkipDateFormatter(rawValue: PlatformDateFormatter(fromTemplate, locale.rawValue))

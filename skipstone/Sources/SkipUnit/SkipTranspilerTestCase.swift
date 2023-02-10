@@ -86,7 +86,10 @@ extension SkipAssembler {
                     // breakpoint here to stop on build error
                 } else if outputLine.trimmingCharacters(in: .whitespaces).hasPrefix("java.lang.AssertionError ") {
                     gradleLogger.error("\(outputLine)")
-                    // breakpoint here to stop on assertion
+                    // breakpoint here to stop on test case assertion
+                } else if outputLine.trimmingCharacters(in: .whitespaces).hasPrefix("org.junit.ComparisonFailure ") {
+                    gradleLogger.error("\(outputLine)")
+                    // breakpoint here to stop on test case comparison error
                 } else {
                     gradleLogger.debug("\(outputLine)")
                 }

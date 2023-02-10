@@ -11,6 +11,17 @@ final class DateTests: XCTestCase {
         XCTAssertNotEqual(0, date.getTime())
     }
 
+    func testMultipleConstructorsSameParams() throws {
+        let d1 = Date(timeIntervalSince1970: 99999.0)
+        let d2 = Date(timeIntervalSinceReferenceDate: 99999.0)
+
+        XCTAssertEqual(99999.0, d1.timeIntervalSince1970)
+        XCTAssertEqual(978407199.0, d2.timeIntervalSince1970)
+
+        XCTAssertEqual(-978207201.0, d1.timeIntervalSinceReferenceDate)
+        XCTAssertEqual(99999.0, d2.timeIntervalSinceReferenceDate)
+    }
+
     func testISOFormatting() throws {
         let d = Date.create(timeIntervalSince1970: 172348932.0)
         XCTAssertEqual(172348932.0, d.getTime())
@@ -32,5 +43,9 @@ final class DateTests: XCTestCase {
 
         XCTAssertEqual(64092211200.0, Date.distantFuture.getTime())
         XCTAssertEqual("4001-01-01T00:00:00Z", Date.distantFuture.ISO8601Format())
+    }
+
+    func testAbsoluteTimeGetCurrent() {
+        XCTAssertNotEqual(0, CFAbsoluteTimeGetCurrent())
     }
 }

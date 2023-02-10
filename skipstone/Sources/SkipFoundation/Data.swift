@@ -23,18 +23,10 @@ public struct SkipData : RawRepresentable {
 
 #if !SKIP
 
-extension Data {
-    /// static init until constructor overload works
-    public static func contentsOfFile(filePath: String) -> Data {
-        return try! NSData(contentsOfFile: filePath) as Data
-    }
-
-    public static func contentsOfURL(url: URL) -> Data {
-        return try! NSData(contentsOf: url) as Data
-    }
-}
-
 #else
+
+// SKIP INSERT: public operator fun SkipData.Companion.invoke(contentsOf: URL): SkipData { return SkipData.contentsOfURL(url = contentsOf) }
+// SKIP XXX INSERT: public fun Data(contentsOf: URL): SkipData { return SkipData.contentsOfURL(url = contentsOf) }
 
 /// A byte buffer in memory.
 ///

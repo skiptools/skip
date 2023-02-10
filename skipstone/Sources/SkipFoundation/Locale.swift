@@ -7,7 +7,10 @@ public typealias Locale = SkipLocale
 public typealias PlatformLocale = java.util.Locale
 #endif
 
-// SKIP INSERT: public fun Locale(identifier: String): SkipLocale { return SkipLocale(PlatformLocale(identifier)) }
+// two different ways of simulator constructor extensions
+
+// SKIP INSERT: public operator fun SkipLocale.Companion.invoke(identifier: String): SkipLocale { return SkipLocale(PlatformLocale(identifier)) }
+// SKIP XXX INSERT: public fun Locale(identifier: String): SkipLocale { return SkipLocale(PlatformLocale(identifier)) }
 
 // SKIP REPLACE: @JvmInline public value class SkipLocale(val rawValue: PlatformLocale) { companion object { } }
 public struct SkipLocale : RawRepresentable {
