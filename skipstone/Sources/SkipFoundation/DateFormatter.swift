@@ -4,10 +4,11 @@ public typealias DateFormatter = Foundation.DateFormatter
 public typealias PlatformDateFormatter = Foundation.DateFormatter
 #else
 public typealias DateFormatter = SkipDateFormatter
-public typealias PlatformDateFormatter = java.text.SimpleDateFormat
+public typealias PlatformDateFormatter = java.text.DateFormat
 #endif
 
-// SKIP REPLACE: @JvmInline public value class SkipDateFormatter(val rawValue: PlatformDateFormatter = PlatformDateFormatter()) { companion object { } }
+
+// SKIP REPLACE: @JvmInline public value class SkipDateFormatter(val rawValue: PlatformDateFormatter) { companion object { } }
 public struct SkipDateFormatter : RawRepresentable {
     public let rawValue: PlatformDateFormatter
 
@@ -20,24 +21,17 @@ public struct SkipDateFormatter : RawRepresentable {
     }
 }
 
-#if SKIP
+#if !SKIP
 
 extension SkipDateFormatter {
-    public var dateFormat: String {
-        get {
-            return rawValue.toPattern()
-        }
-
-        set {
-            rawValue.applyPattern(newValue)
-        }
-    }
-
-    public static func dateFormat(fromTemplate: String, options: Int, locale: Locale) -> SkipDateFormatter {
-        // TODO: check options?
-        return SkipDateFormatter(rawValue: PlatformDateFormatter(fromTemplate, locale.rawValue))
-    }
 }
+
 #else
 
+// SKIP XXX INSERT: public operator fun SkipDateFormatter.Companion.invoke(): SkipDateFormatter { return SkipDateFormatter(PlatformDateFormatter()) }
+
+extension SkipDateFormatter {
+}
+
 #endif
+
