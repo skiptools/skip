@@ -150,6 +150,17 @@ class RawExpression: Expression {
         return nil
     }
 
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        expectedType = expecting
+        return context
+    }
+
+    private var expectedType: TypeSignature = .none
+
+    override var inferredType: TypeSignature {
+        return expectedType
+    }
+
     override var prettyPrintAttributes: [PrettyPrintTree] {
         return [PrettyPrintTree(root: sourceCode)]
     }

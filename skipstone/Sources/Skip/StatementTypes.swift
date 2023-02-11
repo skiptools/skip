@@ -154,10 +154,10 @@ class IfDefined: Statement {
         }
     }
 
-    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature = .none) -> TypeInferenceContext {
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
         if parent == nil || parent is TypeDeclaration {
             // Treat as top-level statements
-            statements.forEach { $0.inferTypes(context: context) }
+            statements.forEach { $0.inferTypes(context: context, expecting: .none) }
             return context
         } else if statements.count == 1 {
             // Pass on expected type
@@ -165,7 +165,7 @@ class IfDefined: Statement {
         } else {
             // Treat as code block
             var blockContext = context
-            statements.forEach { blockContext = $0.inferTypes(context: context) }
+            statements.forEach { blockContext = $0.inferTypes(context: context, expecting: .none) }
             return blockContext
         }
     }
@@ -197,7 +197,7 @@ class Return: ExpressionStatement {
         return [statement]
     }
 
-    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature = .none) -> TypeInferenceContext {
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
         expression?.inferTypes(context: context, expecting: expecting.or(context.expectedReturn))
         return context
     }
@@ -285,11 +285,11 @@ class FunctionDeclaration: Statement {
         }
     }
 
-    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature = .none) -> TypeInferenceContext {
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
         parameters.forEach { $0.defaultValue?.inferTypes(context: context, expecting: $0.declaredType) }
         if let statements = body?.statements {
-            var bodyContext = context.pushing(self).expectingReturn(returnType)
-            statements.forEach { bodyContext = $0.inferTypes(context: bodyContext) }
+            var bodyContext = context.pushing(self)
+            statements.forEach { bodyContext = $0.inferTypes(context: bodyContext, expecting: .none) }
         }
         return context
     }
@@ -423,9 +423,9 @@ class TypeDeclaration: Statement {
         inherits = inherits.map { $0.qualified(in: self) }
     }
 
-    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature = .none) -> TypeInferenceContext {
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
         let memberContext = context.pushing(self)
-        members.forEach { $0.inferTypes(context: memberContext) }
+        members.forEach { $0.inferTypes(context: memberContext, expecting: .none) }
         return context
     }
 
@@ -577,24 +577,24 @@ class VariableDeclaration: Statement {
         }
     }
 
-    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature = .none) -> TypeInferenceContext {
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
         value?.inferTypes(context: context, expecting: declaredType)
         let inferredType = declaredType.or(value?.inferredType ?? .none)
         if let statements = getter?.body?.statements {
             var bodyContext = context.expectingReturn(inferredType)
-            statements.forEach { bodyContext = $0.inferTypes(context: bodyContext) }
+            statements.forEach { bodyContext = $0.inferTypes(context: bodyContext, expecting: .none) }
         }
         if let statements = setter?.body?.statements {
             var bodyContext = context.addingIdentifier(setter?.parameterName ?? "newValue", type: inferredType)
-            statements.forEach { bodyContext = $0.inferTypes(context: bodyContext) }
+            statements.forEach { bodyContext = $0.inferTypes(context: bodyContext, expecting: .none) }
         }
         if let statements = willSet?.body?.statements {
             var bodyContext = context.addingIdentifier(willSet?.parameterName ?? "newValue", type: inferredType)
-            statements.forEach { bodyContext = $0.inferTypes(context: bodyContext) }
+            statements.forEach { bodyContext = $0.inferTypes(context: bodyContext, expecting: .none) }
         }
         if let statements = didSet?.body?.statements {
             var bodyContext = context.addingIdentifier(didSet?.parameterName ?? "oldValue", type: inferredType)
-            statements.forEach { bodyContext = $0.inferTypes(context: bodyContext) }
+            statements.forEach { bodyContext = $0.inferTypes(context: bodyContext, expecting: .none) }
         }
         if parent == nil || parent is TypeDeclaration {
             return context

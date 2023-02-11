@@ -30,21 +30,6 @@ struct Operator: Equatable {
         case right
     }
 
-    /// Whether this operator symbol is unrecognized.
-    var isUnknown: Bool {
-        return precedence == .unknown
-    }
-
-    /// Whether this is an assignment operator.
-    var isAssignment: Bool {
-        return precedence == .assignment
-    }
-
-    /// Whether this is a comparison operator.
-    var isComparison: Bool {
-        return precedence == .comparison
-    }
-
     /// Return an operator for the given symbol.
     static func with(symbol: String) -> Operator {
         if let op = allBySymbol[symbol] {
@@ -263,6 +248,64 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
     /// Return the given type signature if `self == .none`, otherwise return `self`.
     func or(_ typeSignature: TypeSignature) -> TypeSignature {
         return self == .none ? typeSignature : self
+    }
+
+    /// Whether this is a floating point number.
+    var isFloatingPoint: Bool {
+        switch self {
+        case .double:
+            return true
+        case .float:
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// Whether this is a number type.
+    var isNumeric: Bool {
+        switch self {
+        case .double:
+            return true
+        case .float:
+            return true
+        case .int:
+            return true
+        case .int8:
+            return true
+        case .int16:
+            return true
+        case .int32:
+            return true
+        case .int64:
+            return true
+        case .uint:
+            return true
+        case .uint8:
+            return true
+        case .uint16:
+            return true
+        case .uint32:
+            return true
+        case .uint64:
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// Whether this is a string type.
+    var isStringy: Bool {
+        switch self {
+        case .array(let elementType):
+            return elementType == .character
+        case .character:
+            return true
+        case .string:
+            return true
+        default:
+            return false
+        }
     }
 
     /// Create a type signature for the given syntax.

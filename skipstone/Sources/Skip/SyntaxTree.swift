@@ -23,8 +23,8 @@ public class SyntaxTree: PrettyPrintable {
             resolveQueue += node.children
         }
 
-        let context = TypeInferenceContext(symbolInfo: symbolInfo)
-        statements.forEach { $0.inferTypes(context: context) }
+        let context = TypeInferenceContext(symbolInfo: symbolInfo, sourceFile: source.file, statements: statements)
+        statements.forEach { $0.inferTypes(context: context, expecting: .none) }
     }
 
     public var prettyPrintTree: PrettyPrintTree {

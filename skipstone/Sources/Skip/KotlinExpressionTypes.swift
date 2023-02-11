@@ -57,7 +57,7 @@ class KotlinBinaryOperator: KotlinExpression {
     static func translate(expression: BinaryOperator, translator: KotlinTranslator) -> KotlinBinaryOperator {
         let klhs = translator.translateExpression(expression.lhs)
         var krhs = translator.translateExpression(expression.rhs)
-        if expression.op.isAssignment {
+        if expression.op.precedence == .assignment {
             krhs = krhs.valueReference
         }
         let kexpression = KotlinBinaryOperator(expression: expression, lhs: klhs, rhs: krhs)

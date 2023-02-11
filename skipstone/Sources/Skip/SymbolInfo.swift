@@ -1,3 +1,4 @@
+import Foundation
 import SymbolKit
 
 /// Provides information about code symbols.
@@ -16,98 +17,136 @@ public class SymbolInfo {
     public init(moduleName: String, graphs: [String: UnifiedSymbolGraph]) {
         self.moduleName = moduleName
         for entry in graphs {
-            dump(entry.value) //~~~
-            processGraph(entry.value, module: entry.key)
+            processGraph(entry.value, moduleName: entry.key)
         }
     }
 
-    private func processGraph(_ graph: UnifiedSymbolGraph, module: String) {
+    private func processGraph(_ graph: UnifiedSymbolGraph, moduleName: String) {
         for entry in graph.symbols {
-            guard let symbol = processSymbol(entry.value, module: module) else {
-                continue
+            if let symbol = symbol(for: entry.value, moduleName: moduleName) {
+                symbolsByIdentifier[symbol.symbol.uniqueIdentifier] = symbol
             }
-            symbolsByIdentifier[symbol.identifier] = symbol
-
+        }
+        if let relationships = graph.relationshipsByLanguage.first(where: { $0.key.interfaceLanguage == "swift" })?.value {
+            for relationship in relationships {
+                processRelationship(relationship)
+            }
+        }
+        for symbol in symbolsByIdentifier.values {
             var symbolsWithName = symbolsByName[symbol.name] ?? []
             symbolsWithName.append(symbol)
             symbolsByName[symbol.name] = symbolsWithName
         }
     }
 
-    private func processSymbol(_ symbol: UnifiedSymbolGraph.Symbol, module: String) -> Symbol? {
-        guard let selector = symbol.accessLevel.keys.first(where: { $0.interfaceLanguage == "swift" }) else {
+    private func symbol(for symbol: UnifiedSymbolGraph.Symbol, moduleName: String) -> Symbol? {
+        guard let symbol = Symbol(symbol: symbol, moduleName: moduleName) else {
             return nil
         }
-        let publicOnly = module == moduleName
-        guard !publicOnly || symbol.accessLevel[selector]?.rawValue == "public" || symbol.accessLevel[selector]?.rawValue == "open" else {
+        // No need to record symbols for non-public API of another module
+        guard moduleName != self.moduleName || symbol.visibility == .public || symbol.visibility == .open else {
             return nil
         }
+        return symbol
+    }
 
-        guard let mixins = symbol.mixins[selector], let declarationFragments = mixins[SymbolGraph.Symbol.DeclarationFragments.mixinKey] as? SymbolGraph.Symbol.DeclarationFragments else {
-            return nil
+    private func processRelationship(_ relationship: SymbolGraph.Relationship) {
+        guard var source = symbolsByIdentifier[relationship.source], var target = symbolsByIdentifier[relationship.target] else {
+            return
         }
-        guard let kind = symbol.kind[selector] else {
-            return nil
-        }
-        switch kind.identifier {
-        case .case:
-            print("CASE")
-        case .class:
-            print("CLASS")
-        case .enum:
-            print("ENUM")
-        case .func:
-            print("FUNC")
-            guard let functionSignature = mixins[SymbolGraph.Symbol.FunctionSignature.mixinKey] as? SymbolGraph.Symbol.FunctionSignature else {
-                return nil
-            }
-        case .`init`:
-            print("INIT")
-        case .extension:
-            print("EXTENSION")
-        case .method:
-            print("METHOD")
-        case .operator:
-            print("OPERATOR")
-        case .property:
-            return Property(symbol: symbol, selector: selector, declarationFragments: declarationFragments)
-        case .protocol:
-            print("PROTOCOL")
-        case .struct:
-            print("STRUCT")
-        case .subscript:
-            print("SUBSCRIPT")
-        case .var:
-            print("VAR")
-        default:
-            return nil
-        }
-        print("SYMBOL: \(symbol)")
-        return nil
+        source.relationships.append(Symbol.Relationship(kind: relationship.kind, targetIdentifier: target.symbol.uniqueIdentifier, isInverse: false))
+        target.relationships.append(Symbol.Relationship(kind: relationship.kind, targetIdentifier: source.symbol.uniqueIdentifier, isInverse: true))
+        symbolsByIdentifier[source.symbol.uniqueIdentifier] = source
+        symbolsByIdentifier[target.symbol.uniqueIdentifier] = target
     }
 }
 
-private class Module {
-    func addSymbol(_ symbol: Symbol, identifier: String) {
+private struct Symbol {
+    let symbol: UnifiedSymbolGraph.Symbol
+    let name: String
+    let moduleName: String
+    let sourceURL: URL?
+    var relationships: [Relationship] = []
 
+    private let selector: UnifiedSymbolGraph.Selector
+    private let mixins: [String: Mixin]
+    private let declarationFragments: SymbolGraph.Symbol.DeclarationFragments
+
+    init?(symbol: UnifiedSymbolGraph.Symbol, moduleName: String) {
+        guard let selector = symbol.names.keys.first(where: { $0.interfaceLanguage == "swift" }) else {
+            return nil
+        }
+        guard let mixins = symbol.mixins[selector] else {
+            return nil
+        }
+        guard let declarationFragments = mixins[SymbolGraph.Symbol.DeclarationFragments.mixinKey] as? SymbolGraph.Symbol.DeclarationFragments else {
+            return nil
+        }
+        guard let name = declarationFragments.declarationFragments.first(where: { $0.kind == .identifier })?.spelling else {
+            return nil
+        }
+
+        self.selector = selector
+        self.symbol = symbol
+        self.name = name
+        self.moduleName = moduleName
+        self.sourceURL = (mixins[SymbolGraph.Symbol.Location.mixinKey] as? SymbolGraph.Symbol.Location)?.url
+        self.mixins = mixins
+        self.declarationFragments = declarationFragments
     }
-}
 
-private protocol Symbol {
+    var kind: SymbolGraph.Symbol.KindIdentifier? {
+        return symbol.kind[selector]?.identifier
+    }
 
-}
+    var visibility: Visibility {
+        guard let rawValue = symbol.accessLevel[selector]?.rawValue else {
+            return .internal
+        }
+        return Visibility(rawValue: rawValue) ?? .internal
+    }
 
-private struct Property: Symbol {
-    init?(symbol: UnifiedSymbolGraph.Symbol, selector: UnifiedSymbolGraph.Selector, declarationFragments: SymbolGraph.Symbol.DeclarationFragments) {
+    var isVariableReadOnly: Bool {
+        return declarationFragments.hasKeyword("let") || (declarationFragments.hasKeyword("get") && !declarationFragments.hasKeyword("set"))
+    }
 
+    var variableType: SymbolGraph.Symbol.DeclarationFragments.Fragment? {
+        return declarationFragments.declarationFragments.first { $0.kind == .typeIdentifier }
+    }
+
+    var returnType: SymbolGraph.Symbol.DeclarationFragments.Fragment? {
+        guard let functionSignature = mixins[SymbolGraph.Symbol.FunctionSignature.mixinKey] as? SymbolGraph.Symbol.FunctionSignature else {
+            return nil
+        }
+        return functionSignature.returns.first { $0.kind == .typeIdentifier }
+    }
+
+    var parameterTypes: [(String, SymbolGraph.Symbol.DeclarationFragments.Fragment?)] {
+        guard let functionSignature = mixins[SymbolGraph.Symbol.FunctionSignature.mixinKey] as? SymbolGraph.Symbol.FunctionSignature else {
+            return []
+        }
+        return functionSignature.parameters.map { parameter in
+            let name = parameter.name
+            let typeFragment = parameter.declarationFragments.first { $0.kind == .typeIdentifier }
+            return (name, typeFragment)
+        }
+    }
+
+    enum Visibility: String, RawRepresentable {
+        case `public`
+        case `open`
+        case `internal`
+        case `private`
+    }
+
+    struct Relationship {
+        let kind: SymbolGraph.Relationship.Kind
+        let targetIdentifier: String
+        let isInverse: Bool
     }
 }
 
 private extension SymbolGraph.Symbol.DeclarationFragments {
-    var identifier: String? {
-        return declarationFragments.first(where: { $0.kind == .identifier })?.spelling
-    }
-
     func hasKeyword(_ keyword: String) -> Bool {
         return declarationFragments.contains { $0.kind == .keyword && $0.spelling == keyword }
     }

@@ -21,8 +21,8 @@ class SyntaxNode: SourceDerived, PrettyPrintable {
     /// Perform type inference.
     ///
     /// This is called after `resolve`.
-    @discardableResult func inferTypes(context: TypeInferenceContext, expecting: TypeSignature = .none) -> TypeInferenceContext {
-        children.forEach { $0.inferTypes(context: context) }
+    @discardableResult func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        children.forEach { $0.inferTypes(context: context, expecting: .none) }
         return context
     }
 

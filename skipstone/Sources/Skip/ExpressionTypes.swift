@@ -65,14 +65,14 @@ class ArrayLiteral: Expression {
         return ArrayLiteral(elements: elements, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
-    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature = .none) -> TypeInferenceContext {
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
         if expecting.elementType != .none {
             elementType = expecting.elementType
             elements.forEach { $0.inferTypes(context: context, expecting: elementType) }
         } else {
             for element in elements {
-                element.inferTypes(context: context)
-                elementType = context.commonType(elementType, element.inferredType)
+                element.inferTypes(context: context, expecting: elementType)
+                elementType = elementType.or(element.inferredType)
             }
         }
         return context
@@ -112,18 +112,60 @@ class BinaryOperator: Expression {
         return BinaryOperator(op: op, lhs: lhs, rhs: rhs, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
-    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature = .none) -> TypeInferenceContext {
-        lhs.inferTypes(context: context, expecting: expecting)
-        if op.isAssignment {
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        func doubleCheckLHS() {
+            // We attempt to evaluate lhs first, but maybe we were only able to figure out rhs
+            if lhs.inferredType == .none && rhs.inferredType != .none {
+                lhs.inferTypes(context: context, expecting: rhs.inferredType)
+            }
+        }
+        switch op.precedence {
+        case .assignment:
+            lhs.inferTypes(context: context, expecting: .none)
             rhs.inferTypes(context: context, expecting: lhs.inferredType)
+            doubleCheckLHS()
             resultType = .void
-        } else if op.isComparison {
-            rhs.inferTypes(context: context, expecting: lhs.inferredType)
+        case .ternary:
+            // TODO
+            break
+        case .unknown:
+            lhs.inferTypes(context: context, expecting: expecting)
+            rhs.inferTypes(context: context, expecting: expecting)
+            resultType = lhs.inferredType
+        case .or:
+            fallthrough
+        case .and:
+            lhs.inferTypes(context: context, expecting: .bool)
+            rhs.inferTypes(context: context, expecting: .bool)
             resultType = .bool
-        } else {
-            rhs.inferTypes(context: context)
-            let common = context.commonType(lhs.inferredType, rhs.inferredType)
-            resultType = common.or(expecting)
+        case .comparison:
+            lhs.inferTypes(context: context, expecting: .none)
+            rhs.inferTypes(context: context, expecting: lhs.inferredType)
+            doubleCheckLHS()
+            resultType = .bool
+        case .nilCoalescing:
+            // TODO
+            break
+        case .cast:
+            // TODO
+            break
+        case .range:
+            lhs.inferTypes(context: context, expecting: .none)
+            rhs.inferTypes(context: context, expecting: lhs.inferredType)
+            doubleCheckLHS()
+            resultType = context.operationResult(lhs.inferredType, rhs.inferredType)
+        case .addition:
+            fallthrough
+        case .multiplication:
+            lhs.inferTypes(context: context, expecting: .none)
+            rhs.inferTypes(context: context, expecting: lhs.inferredType)
+            doubleCheckLHS()
+            resultType = context.operationResult(lhs.inferredType, rhs.inferredType)
+        case .shift:
+            lhs.inferTypes(context: context, expecting: .none)
+            rhs.inferTypes(context: context, expecting: .int)
+            doubleCheckLHS()
+            resultType = lhs.inferredType
         }
         return context
     }
@@ -204,37 +246,43 @@ class FunctionCall: Expression {
         return FunctionCall(function: function, arguments: labeledExpressions)
     }
 
-    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature = .none) -> TypeInferenceContext {
-        let base: Expression?
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        let baseType: TypeSignature
+        let isMember: Bool
         let name: String
         switch function.type {
         case .identifier:
-            base = nil
+            baseType = .none
+            isMember = false
             name = (function as! Identifier).name
         case .memberAccess:
             let memberAccess = function as! MemberAccess
-            base = memberAccess.base
+            memberAccess.base?.inferTypes(context: context, expecting: .none)
+            baseType = memberAccess.base?.inferredType ?? expecting
+            isMember = true
             name = memberAccess.member
         default:
-            function.inferTypes(context: context)
-            arguments.forEach { $0.value.inferTypes(context: context) }
+            function.inferTypes(context: context, expecting: .none)
             returnType = expecting
             return context
         }
 
-        base?.inferTypes(context: context)
-        // First attempt to get function using only pre-known parameter types
-        var parameters = arguments.map { LabeledValue<TypeSignature>(label: $0.label, value: $0.value.inferredType) }
-        if let candidateFunction = context.function(name, of: base?.inferredType, parameters: parameters) {
+        // First we infer argument types without knowing the function, so we expect .none
+        arguments.forEach { $0.value.inferTypes(context: context, expecting: .none) }
+        let parameters = arguments.map { LabeledValue<TypeSignature>(label: $0.label, value: $0.value.inferredType) }
+        let (candidateFunction, message) = context.function(name, of: isMember ? baseType : nil, parameters: parameters)
+        if candidateFunction != .none {
+            // Re-infer arguments now that we know the parameter types
             for (index, argument) in arguments.enumerated() {
                 argument.value.inferTypes(context: context, expecting: candidateFunction.parameterTypes[index])
             }
+            returnType = candidateFunction.returnType
         } else {
-            arguments.forEach { $0.value.inferTypes(context: context) }
+            returnType = expecting
         }
-        // Re-map now that we've filled in parameter inferred types
-        parameters = arguments.map { LabeledValue<TypeSignature>(label: $0.label, value: $0.value.inferredType) }
-        returnType = context.function(name, of: base?.inferredType, parameters: parameters)?.returnType ?? expecting
+        if let message {
+            messages.append(message)
+        }
         return context
     }
 
@@ -266,8 +314,12 @@ class Identifier: Expression {
         return Identifier(name: name, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
-    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature = .none) -> TypeInferenceContext {
-        identifierType = context.identifier(name) ?? expecting
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        let (identifierType, message) = context.identifier(name)
+        self.identifierType = identifierType.or(expecting)
+        if let message {
+            messages.append(message)
+        }
         return context
     }
 
@@ -305,9 +357,9 @@ class MemberAccess: Expression {
         return MemberAccess(base: base, member: member, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
-    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature = .none) -> TypeInferenceContext {
-        base?.inferTypes(context: context)
-        memberType = context.member(member, of: base?.inferredType) ?? expecting
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        base?.inferTypes(context: context, expecting: expecting)
+        memberType = context.member(member, of: base?.inferredType ?? expecting)
         return context
     }
 
@@ -393,8 +445,22 @@ class StringLiteral: Expression {
         return StringLiteral(segments: segments, isMultiline: isMultiline, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        for segment in segments {
+            if case .expression(let expression) = segment {
+                expression.inferTypes(context: context, expecting: .none)
+            }
+        }
+        if expecting == .character && segments.count == 1, case .string(let string) = segments[0], string.count == 1 {
+            literalType = .character
+        }
+        return context
+    }
+
+    private var literalType: TypeSignature = .string
+
     override var inferredType: TypeSignature {
-        return .string
+        return literalType
     }
 
     override var children: [SyntaxNode] {
@@ -459,20 +525,25 @@ class Subscript: Expression {
         return Subscript(base: base, arguments: labeledExpressions)
     }
 
-    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature = .none) -> TypeInferenceContext {
-        base.inferTypes(context: context)
-        // First attempt to get function using only pre-known parameter types
-        var parameters = arguments.map { LabeledValue<TypeSignature>(label: $0.label, value: $0.value.inferredType) }
-        if let candidateFunction = context.function("subscript", of: base.inferredType, parameters: parameters) {
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        base.inferTypes(context: context, expecting: .none)
+
+        // First we infer argument types without knowing the function, so we expect .none
+        arguments.forEach { $0.value.inferTypes(context: context, expecting: .none) }
+        let parameters = arguments.map { LabeledValue<TypeSignature>(label: $0.label, value: $0.value.inferredType) }
+        let (candidateFunction, message) = context.subscript(of: base.inferredType, parameters: parameters)
+        if candidateFunction != .none {
+            // Re-infer arguments now that we know the parameter types
             for (index, argument) in arguments.enumerated() {
                 argument.value.inferTypes(context: context, expecting: candidateFunction.parameterTypes[index])
             }
+            returnType = candidateFunction.returnType
         } else {
-            arguments.forEach { $0.value.inferTypes(context: context) }
+            returnType = expecting
         }
-        // Re-map now that we've filled in parameter inferred types
-        parameters = arguments.map { LabeledValue<TypeSignature>(label: $0.label, value: $0.value.inferredType) }
-        returnType = context.function("subscript", of: base.inferredType, parameters: parameters)?.returnType ?? expecting
+        if let message {
+            messages.append(message)
+        }
         return context
     }
 
@@ -507,9 +578,9 @@ class Try: Expression {
         return Try(trying: expression, isOptional: isOptional, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
-    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature = .none) -> TypeInferenceContext {
-        if isOptional, case .optional(let typeSignature) = expecting {
-            return trying.inferTypes(context: context, expecting: typeSignature)
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        if isOptional, case .optional(let type) = expecting {
+            return trying.inferTypes(context: context, expecting: type)
         } else {
             return trying.inferTypes(context: context, expecting: expecting)
         }

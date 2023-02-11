@@ -81,6 +81,14 @@ class ExpressionStatement: Statement {
         return [ExpressionStatement(expression: expression, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
     }
 
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        return expression?.inferTypes(context: context, expecting: expecting) ?? context
+    }
+
+    override var inferredType: TypeSignature {
+        return expression?.inferredType ?? .none
+    }
+
     override var children: [SyntaxNode] {
         return expression == nil ? [] : [expression!]
     }
@@ -124,6 +132,17 @@ class RawStatement: Statement {
         } else {
             self.messages = [.unsupportedSyntax(syntax, source: source, sourceRange: range)]
         }
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        expectedType = expecting
+        return context
+    }
+
+    private var expectedType: TypeSignature = .none
+
+    override var inferredType: TypeSignature {
+        return expectedType
     }
 
     override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
