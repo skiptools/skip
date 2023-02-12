@@ -1,7 +1,6 @@
 package skip.demo.app
 
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -35,6 +34,15 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.*
+
+import skip.foundation.Logger
+import skip.foundation.OSLogMessage
+import skip.foundation.info
+import skip.foundation.debug
+import skip.foundation.error
+import skip.foundation.warning
+
+public val logger: Logger = Logger(subsystem = "activity", category = "DemoApp")
 
 class DemoApp : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -115,12 +123,16 @@ class ContentView: View() {
                         .background(Color.Yellow)
                         .border(2),
                     ButtonView(onClick = {
+                        logger.info("model.modelValue += 1")
                         model.modelValue += 1
                         // NOTE: This is forcing recomposition and a re-call of CustomView(). To test
                         // that CustomView responds to "model" updates independently, comment this out
                         tapCount += 1
                     }),
-                    ButtonView(onClick = { envObject.environmentObjectValue += 1 }),
+                    ButtonView(onClick = {
+                        logger.info("environmentObjectValue += 1")
+                        envObject.environmentObjectValue += 1
+                    }),
                     // TODO: I removed bottom sheet because its layout conflicts with the tabs.
                     // Need to figure it out with Android Scaffold layouts
 //                    TextView("Bottom sheet presented: $isSheetPresented"),
@@ -152,7 +164,7 @@ class ContentView: View() {
         // then see if the context's state graph has state we can restore from. Composables lose even
         // remembered state when navigating away, and this is how we restore our tabs and back stacks
         val restoreState = if (isFirstCompose) context.restoreStateNode?.value as? State else null
-        Log.println(Log.WARN, "", "Compose ContentView isFirstCompose=$isFirstCompose, restore state = ${context.restoreStateNode?.value})")
+        logger.warning("Compose ContentView isFirstCompose=$isFirstCompose, restore state = ${context.restoreStateNode?.value})")
         val state = remember { restoreState ?: State(tapCount, isSheetPresented, model, envObject) }
         // Populate restore state for next time in case we navigate away
         context.restoreStateNode?.value = state
@@ -254,7 +266,7 @@ class CustomView(/* @ObservedObject */ var model: ModelObservableObject): View()
             isFirstCompose = false
         }
         val restoreState = if (isFirstCompose) context.restoreStateNode?.value as? State else null
-        Log.println(Log.WARN, "", "Compose CustomView isFirstCompose=$isFirstCompose, restore state = ${context.restoreStateNode?.value})")
+        logger.warning("Compose CustomView isFirstCompose=$isFirstCompose, restore state = ${context.restoreStateNode?.value})")
         val state = remember { restoreState ?: State(tapCount, textFieldValue, stateObject) }
         context.restoreStateNode?.value = state
 
@@ -491,7 +503,7 @@ class NavigationStack(val destinationMap: (Any) -> View, val content: () -> View
             isFirstCompose = false
         }
         val restoreState = if (isFirstCompose) context.restoreStateNode?.value as? State else null
-        Log.println(Log.WARN, "", "Compose NavigationStack isFirstCompose=$isFirstCompose, restore state = ${context.restoreStateNode?.value})")
+        logger.warning("Compose NavigationStack isFirstCompose=$isFirstCompose, restore state = ${context.restoreStateNode?.value})")
         val state = remember { restoreState ?: State(mutableStateListOf(Pair("", null))) }
         val stack = state.stack
         context.restoreStateNode?.value = state
@@ -558,7 +570,7 @@ class TabView(val contentViews: () -> List<View>): View() {
                     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                         view.Compose(tabContext)
                         tabState[0] = tabContext.restoreStateNode
-                        Log.println(Log.WARN, "", "0 restore state: ${tabContext.restoreStateNode?.value}")
+                        logger.warning("0 restore state: ${tabContext.restoreStateNode?.value}")
                     }
                 }
                 composable("1") {
@@ -568,7 +580,7 @@ class TabView(val contentViews: () -> List<View>): View() {
                     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                         view.Compose(tabContext)
                         tabState[1] = tabContext.restoreStateNode
-                        Log.println(Log.WARN, "", "1 restore state: ${tabContext.restoreStateNode?.value}")
+                        logger.warning("1 restore state: ${tabContext.restoreStateNode?.value}")
                     }
                 }
                 composable("2") {
@@ -578,7 +590,7 @@ class TabView(val contentViews: () -> List<View>): View() {
                     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                         view.Compose(tabContext)
                         tabState[2] = tabContext.restoreStateNode
-                        Log.println(Log.WARN, "", "2 restore state: ${tabContext.restoreStateNode?.value}")
+                        logger.warning("2 restore state: ${tabContext.restoreStateNode?.value}")
                     }
                 }
             }
