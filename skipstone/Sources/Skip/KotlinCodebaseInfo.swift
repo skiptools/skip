@@ -2,11 +2,11 @@
 public class KotlinCodebaseInfo {
     /// The package being generated.
     public let packageName: String?
-    public let symbolInfo: SymbolInfo?
+    public let symbols: Symbols?
 
-    public init(packageName: String? = nil, symbolInfo: SymbolInfo? = nil) {
+    public init(packageName: String? = nil, symbols: Symbols? = nil) {
         self.packageName = packageName
-        self.symbolInfo = symbolInfo
+        self.symbols = symbols
     }
 
     /// Gather codebase-level information from the given syntax tree.

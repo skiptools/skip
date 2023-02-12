@@ -198,7 +198,7 @@ public struct SkipAssembler {
 
             logger.info("module: \(moduleName) package: \(packageName)")
 
-            let symbolInfo = SymbolInfo(moduleName: moduleName, graphs: unifiedGraphs)
+            let symbols = Symbols(moduleName: moduleName, graphs: unifiedGraphs)
 
             let moduleSwiftSourceRoot = URL(fileURLWithPath: moduleName, isDirectory: true, relativeTo: sourceRoot)
             let moduleSwiftTestRoot = testRoot.flatMap({ testRoot in URL(fileURLWithPath: moduleName + "Tests", isDirectory: true, relativeTo: testRoot) })
@@ -287,7 +287,7 @@ public struct SkipAssembler {
                     let sourceURLs = Dictionary(grouping: sources.map({ (path: $0.path, url: $0) }), by: \.path)
                     let sources = sourceURLs.keys.sorted().map({ Source.File(path: $0) })
 
-                    let tp = Transpiler(sourceFiles: sources, packageName: packageName, symbolInfo: symbolInfo)
+                    let tp = Transpiler(sourceFiles: sources, packageName: packageName, symbols: symbols)
                     try await tp.transpile { transpilation in
                         logger.trace("transpilation: \(transpilation.output.content)")
                         guard let sourceURL = sourceURLs[transpilation.sourceFile.path]?.first?.url else {

@@ -1,27 +1,28 @@
 /// Contextual information used in type inference.
 struct TypeInferenceContext {
-    let symbolInfo: SymbolInfo?
-    let sourceFile: Source.File?
+    let symbols: Symbols.Context?
     private var typePath: [TypeDeclaration] = []
     private var functionPath: [FunctionDeclaration] = []
     private var localIdentifierTypes: [String: TypeSignature] = [:]
-    private let importedModuleNames: Set<String>
 
     /// Create a top-level context for type inference.
     ///
     /// - Parameters:
-    ///   - Parameter symbolInfo: Available symbol information.
+    ///   - Parameter symbols: Available symbol information.
     ///   - Parameter sourceFile: Source file for this context.
     ///   - Parameter statements: Top-level statements from which to determine imports.
-    init(symbolInfo: SymbolInfo? = nil, sourceFile: Source.File?, statements: [Statement]) {
-        self.symbolInfo = symbolInfo
-        self.sourceFile = sourceFile
-        self.importedModuleNames = Set(statements.compactMap { statement in
-            guard statement.type == .importDeclaration, let importDeclaration = statement as? ImportDeclaration else {
-                return nil
+    init(symbols: Symbols? = nil, sourceFile: Source.File?, statements: [Statement]) {
+        if let symbols {
+            let importedModuleNames: [String] = statements.compactMap { statement in
+                guard statement.type == .importDeclaration, let importDeclaration = statement as? ImportDeclaration else {
+                    return nil
+                }
+                return importDeclaration.modulePath.first
             }
-            return importDeclaration.modulePath.first
-        })
+            self.symbols = symbols.context(importedModuleNames: importedModuleNames, sourceFile: sourceFile)
+        } else {
+            self.symbols = nil
+        }
     }
 
     /// The type we're expecting to return from the current code block.
@@ -76,25 +77,25 @@ struct TypeInferenceContext {
             }
             return .named(typeDeclaration.qualifiedName, [])
         }
-        guard let symbolInfo else {
+        guard let symbols else {
             return .none
         }
 
         for typeDeclaration in typePath.reversed() {
-            let symbolType = symbolInfo.type(of: name, in: .named(typeDeclaration.qualifiedName, []))
+            let symbolType = symbols.type(of: name, in: .named(typeDeclaration.qualifiedName, []))
             if symbolType != .none {
                 return symbolType
             }
         }
-        return symbolInfo.type(of: name, importedModuleNames: importedModuleNames, sourceFile: sourceFile)
+        return symbols.type(of: name)
     }
 
     /// Return the type of the given member.
     func member(_ name: String, in type: TypeSignature) -> TypeSignature {
-        guard let symbolInfo else {
+        guard let symbols else {
             return .none
         }
-        return symbolInfo.type(of: name, in: type)
+        return symbols.type(of: name, in: type)
     }
 
     /// Return the signatures of the functions matching the given parameters.
@@ -104,21 +105,21 @@ struct TypeInferenceContext {
     /// - Parameters:
     ///   - Parameter type: The function's owning type if this is a member function, or nil if not.
     func function(_ name: String, in type: TypeSignature?, parameters: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
-        guard let symbolInfo else {
+        guard let symbols else {
             return []
         }
         if let type {
-            return symbolInfo.functionSignature(of: name, in: type, arguments: parameters)
+            return symbols.functionSignature(of: name, in: type, arguments: parameters)
         }
 
         // Not a known member function. Check functions that can be invoked without a target type
         for typeDeclaration in typePath.reversed() {
-            let results = symbolInfo.functionSignature(of: name, in: .named(typeDeclaration.qualifiedName, []), arguments: parameters)
+            let results = symbols.functionSignature(of: name, in: .named(typeDeclaration.qualifiedName, []), arguments: parameters)
             if !results.isEmpty {
                 return results
             }
         }
-        return symbolInfo.functionSignature(of: name, arguments: parameters, importedModuleNames: importedModuleNames, sourceFile: sourceFile)
+        return symbols.functionSignature(of: name, arguments: parameters)
     }
 
     /// Return the signatures of the subscripts matching the given parameters.
@@ -128,10 +129,10 @@ struct TypeInferenceContext {
     /// - Parameters:
     ///   - Parameter type: The subscript's owning type.
     func `subscript`(in type: TypeSignature, parameters: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
-        guard let symbolInfo else {
+        guard let symbols else {
             return []
         }
-        return symbolInfo.subscriptSignature(in: type, arguments: parameters)
+        return symbols.subscriptSignature(in: type, arguments: parameters)
     }
 
     /// For an operation on two types, return the probable result type.

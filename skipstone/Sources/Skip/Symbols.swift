@@ -7,7 +7,7 @@ import SymbolKit
 ///
 /// The build artifacts required to extract symbol information are not always present for build plugins or command line tools, so all symbol
 /// info is optional for operations other than final transpilation.
-public class SymbolInfo {
+public class Symbols {
     /// The current module name.
     public let moduleName: String
 
@@ -21,29 +21,96 @@ public class SymbolInfo {
         }
     }
 
-    /// Return the type of the given member.
-    func type(of member: String, in type: TypeSignature) -> TypeSignature {
-        return .none
+    /// Create a context that can access the given imported modules.
+    func context(importedModuleNames: [String] = [], sourceFile: Source.File? = nil) -> Context {
+        return Context(symbols: self, importedModuleNames: Set(importedModuleNames), sourceFile: sourceFile)
     }
 
-    /// Return the type of the given identifier.
-    func type(of identifier: String, importedModuleNames: Set<String> = [], sourceFile: Source.File? = nil) -> TypeSignature {
-        return .none
-    }
+    /// A context for accessing symbol information.
+    struct Context {
+        private let symbols: Symbols
+        private let importedModuleNames: Set<String>
+        private let sourceFile: Source.File?
 
-    /// Return the signatures of the possible member functions being called with the given arguments.
-    func functionSignature(of name: String, in type: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
-        return []
-    }
+        fileprivate init(symbols: Symbols, importedModuleNames: Set<String>, sourceFile: Source.File?) {
+            self.symbols = symbols
+            self.importedModuleNames = importedModuleNames
+            self.sourceFile = sourceFile
+        }
 
-    /// Return the signatures of the possible functions being called with the given arguments.
-    func functionSignature(of name: String, arguments: [LabeledValue<TypeSignature>], importedModuleNames: Set<String> = [], sourceFile: Source.File? = nil) -> [TypeSignature] {
-        return []
-    }
+        /// Return the type of the given member.
+        func type(of member: String, in type: TypeSignature) -> TypeSignature {
+            if case .tuple(let labels, let types) = type {
+                for (index, label) in labels.enumerated() {
+                    if member == label || member == "\(index)" {
+                        return types[index]
+                    }
+                }
+                return .none
+            }
 
-    /// Return the signatures of the possible subscripts being called with the given arguments.
-    func subscriptSignature(in type: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
-        return []
+            let typeNames = candidateTypeNames(for: type)
+            for typeName in typeNames {
+                let type = self.type(of: member, in: typeName)
+                if type != .none {
+                    return type
+                }
+            }
+            return .none
+        }
+
+        private func type(of member: String, in typeName: String) -> TypeSignature {
+            return .none //~~~
+        }
+
+        /// Return the type of the given identifier.
+        func type(of identifier: String) -> TypeSignature {
+            return .none
+        }
+
+        /// Return the signatures of the possible member functions being called with the given arguments.
+        func functionSignature(of name: String, in type: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
+            return []
+        }
+
+        /// Return the signatures of the possible functions being called with the given arguments.
+        func functionSignature(of name: String, arguments: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
+            return []
+        }
+
+        /// Return the signatures of the possible subscripts being called with the given arguments.
+        func subscriptSignature(in type: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
+            return []
+        }
+
+        private func candidateTypeNames(for type: TypeSignature) -> [String] {
+            switch type {
+            case .array:
+                return ["Array"]
+            case .composition(let types):
+                return types.flatMap { candidateTypeNames(for: $0) }
+            case .dictionary:
+                return ["Dictionary"]
+            case .function:
+                return []
+            case .member:
+                return []
+            case .named(let name, _):
+                return [name]
+            case .none:
+                return []
+            case .optional(let type):
+                return candidateTypeNames(for: type)
+            case .set:
+                return ["Set"]
+            case .unwrappedOptional(let type):
+                return candidateTypeNames(for: type)
+            case .void:
+                return []
+            default:
+                return [type.description]
+            }
+        }
     }
 
     private func processGraph(_ graph: UnifiedSymbolGraph, moduleName: String) {
