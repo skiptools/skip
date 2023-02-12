@@ -236,7 +236,7 @@ extension TypeSignature {
             guard let codebaseInfo else {
                 return true
             }
-            return codebaseInfo.mayBeMutableValueType(name: name)
+            return codebaseInfo.mayBeMutableValueType(qualifiedName: name)
         case .none:
             return true
         case .optional(let type):

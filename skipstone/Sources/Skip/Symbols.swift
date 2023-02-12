@@ -26,6 +26,40 @@ public class Symbols {
         return Context(symbols: self, importedModuleNames: Set(importedModuleNames), sourceFile: sourceFile)
     }
 
+    /// Whether the given name maps to a symbol that is known to be a mutable value type.
+    ///
+    /// - Returns: true if a symbol exists for a mutable value type, false if only immutable type symbols exist, and nil if no type symbol exists.
+    func containsMutableValueType(name: String) -> Bool? {
+        guard let candidates = symbolsByName[name] else {
+            return nil
+        }
+        var hasType = false
+        for candidate in candidates {
+            guard let kind = candidate.kind else {
+                continue
+            }
+            switch kind {
+            case .class:
+                hasType = true
+            case .enum:
+                hasType = true
+            case .struct:
+                if isMutableStruct(candidate) {
+                    return true
+                }
+                hasType = true
+            case .protocol:
+                if !isAnyObjectRestrictedProtocol(candidate) {
+                    return true
+                }
+                hasType = true
+            default:
+                break
+            }
+        }
+        return hasType ? false : nil
+    }
+
     /// A context for accessing symbol information.
     struct Context {
         private let symbols: Symbols
@@ -59,28 +93,83 @@ public class Symbols {
             return .none
         }
 
-        private func type(of member: String, in typeName: String) -> TypeSignature {
-            return .none //~~~
-        }
-
         /// Return the type of the given identifier.
         func type(of identifier: String) -> TypeSignature {
-            return .none
+            let candidates = symbols.symbolsByName[identifier, default: []].filter { $0.kind == .var }
+            return ranked(candidates).first?.variableType?.typeSignature ?? .none
         }
 
         /// Return the signatures of the possible member functions being called with the given arguments.
         func functionSignature(of name: String, in type: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
+            if case .tuple(let labels, let types) = type {
+                for (index, label) in labels.enumerated() {
+                    if name == label || name == "\(index)" {
+                        let function = matchFunction(types[index], arguments: arguments)
+                        return function == .none ? [] : [function]
+                    }
+                }
+                return []
+            }
+
+            let typeNames = candidateTypeNames(for: type)
+            for typeName in typeNames {
+                let functions = self.functionSignature(of: name, in: typeName, arguments: arguments)
+                if !functions.isEmpty {
+                    return functions
+                }
+            }
             return []
         }
 
         /// Return the signatures of the possible functions being called with the given arguments.
         func functionSignature(of name: String, arguments: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
-            return []
+            let candidates = symbols.symbolsByName[name, default: []]
+                .filter { $0.kind == .func }
+                .compactMap { matchFunction($0, arguments: arguments) }
+            return ranked(candidates).map(\.signature)
         }
 
         /// Return the signatures of the possible subscripts being called with the given arguments.
         func subscriptSignature(in type: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
+            let candidates = symbols.symbolsByName["subscript", default: []]
+                .filter { $0.kind == .subscript }
+                .compactMap { matchFunction($0, arguments: arguments) }
+            return ranked(candidates).map(\.signature)
+        }
+
+        private func type(of member: String, in typeName: String) -> TypeSignature {
+            //~~~
+            return .none
+        }
+
+        private func functionSignature(of name: String, in typeName: String, arguments: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
             return []
+        }
+
+        private func matchFunction(_ symbol: Symbol, arguments: [LabeledValue<TypeSignature>]) -> (symbol: Symbol, signature: TypeSignature)? {
+            return nil
+        }
+
+        private func matchFunction(_ signature: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> TypeSignature {
+            return .none
+        }
+
+        private func ranked(_ symbols: [Symbol]) -> [Symbol] {
+            return zip(symbols, symbols.map { rankScore(of: $0) })
+                .filter { $0.1 > 0 } // score > 0
+                .sorted { $0.1 < $1.1 } // sort on score
+                .map(\.0) // return symbol
+        }
+
+        private func ranked(_ functions: [(symbol: Symbol, signature: TypeSignature)]) -> [(symbol: Symbol, signature: TypeSignature)] {
+            return zip(functions, functions.map { rankScore(of: $0.symbol) })
+                .filter { $0.1 > 0 }  // score > 0
+                .sorted { $0.1 < $1.1 } // sort on score
+                .map(\.0) // return function
+        }
+
+        private func rankScore(of symbol: Symbol) -> Int {
+            return 0
         }
 
         private func candidateTypeNames(for type: TypeSignature) -> [String] {
@@ -111,6 +200,14 @@ public class Symbols {
                 return [type.description]
             }
         }
+    }
+
+    private func isMutableStruct(_ symbol: Symbol) -> Bool {
+        return false
+    }
+
+    private func isAnyObjectRestrictedProtocol(_ symbol: Symbol) -> Bool {
+        return false
     }
 
     private func processGraph(_ graph: UnifiedSymbolGraph, moduleName: String) {
@@ -241,5 +338,12 @@ private struct Symbol {
 private extension SymbolGraph.Symbol.DeclarationFragments {
     func hasKeyword(_ keyword: String) -> Bool {
         return declarationFragments.contains { $0.kind == .keyword && $0.spelling == keyword }
+    }
+}
+
+private extension SymbolGraph.Symbol.DeclarationFragments.Fragment {
+    var typeSignature: TypeSignature {
+        //~~~
+        return .none
     }
 }

@@ -2,7 +2,7 @@
 public class KotlinCodebaseInfo {
     /// The package being generated.
     public let packageName: String?
-    public let symbols: Symbols?
+    let symbols: Symbols?
 
     public init(packageName: String? = nil, symbols: Symbols? = nil) {
         self.packageName = packageName
@@ -19,19 +19,36 @@ public class KotlinCodebaseInfo {
         return []
     }
 
-    private var typeInfo: [String: StatementType] = [:]
+    private var typeInfo: [String: (type: StatementType, mayBeMutableValueType: Bool?)] = [:]
     private var extensionDeclarations: [String: [ExtensionDeclaration]] = [:]
 
     private func gather(from statement: Statement) {
         switch statement.type {
         case .classDeclaration:
-            fallthrough
+            typeInfo[(statement as! TypeDeclaration).qualifiedName] = (.classDeclaration, false)
         case .enumDeclaration:
-            fallthrough
+            typeInfo[(statement as! TypeDeclaration).qualifiedName] = (.enumDeclaration, false)
         case .protocolDeclaration:
-            fallthrough
+            let typeDeclaration = statement as! TypeDeclaration
+            // A protocol may not be mutable value if it extends from AnyObject, may be if it extends from nothing,
+            // and we're not sure if it extends from other protocols which may themselves extend from AnyObject. We'll
+            // check its symbols later
+            let mayBeMutableValueType: Bool? = typeDeclaration.inherits.contains(.anyObject) ? false : typeDeclaration.inherits.isEmpty ? true : nil
+            typeInfo[typeDeclaration.qualifiedName] = (.protocolDeclaration, mayBeMutableValueType)
         case .structDeclaration:
-            typeInfo[(statement as! TypeDeclaration).name] = statement.type
+            let typeDeclaration = statement as! TypeDeclaration
+            let mayBeMutableValueType = typeDeclaration.members.contains { member in
+                switch member.type {
+                case .variableDeclaration:
+                    let variableDeclaration = member as! VariableDeclaration
+                    return !variableDeclaration.isLet && (variableDeclaration.getter == nil || variableDeclaration.setter != nil)
+                case .functionDeclaration:
+                    return (member as! FunctionDeclaration).modifiers.isMutating
+                default:
+                    return false
+                }
+            }
+            typeInfo[typeDeclaration.qualifiedName] = (.protocolDeclaration, mayBeMutableValueType)
         case .extensionDeclaration:
             let declaration = statement as! ExtensionDeclaration
             let key = declaration.extends.description
@@ -48,12 +65,12 @@ public class KotlinCodebaseInfo {
 
     /// Return all extensions of a given type.
     func extensions(of declaration: TypeDeclaration) -> [ExtensionDeclaration] {
-        return extensionDeclarations[declaration.name] ?? []
+        return extensionDeclarations[declaration.qualifiedName] ?? []
     }
 
     /// Whether the given qualified type name is a class, struct, etc *within this module*.
-    func declarationType(of typeName: String) -> StatementType? {
-        return typeInfo[typeName]
+    func declarationType(of qualifiedName: String) -> StatementType? {
+        return typeInfo[qualifiedName]?.type
     }
 
     /// Whether a function with the given signature is implementing an inherited protocol function of the given type.
@@ -68,9 +85,11 @@ public class KotlinCodebaseInfo {
         return false
     }
 
-    /// Whether the given type name may map to a mutable value type.
-    func mayBeMutableValueType(name: String) -> Bool {
-        // TODO
-        return true
+    /// Whether the given qualified type name may map to a mutable value type.
+    func mayBeMutableValueType(qualifiedName: String) -> Bool {
+        if let mayBeMutableValueType = typeInfo[qualifiedName]?.mayBeMutableValueType {
+            return mayBeMutableValueType
+        }
+        return symbols?.containsMutableValueType(name: qualifiedName) != false
     }
 }
