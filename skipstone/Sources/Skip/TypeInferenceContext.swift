@@ -57,35 +57,81 @@ struct TypeInferenceContext {
     }
 
     /// Return the type of the given identifier.
-    func identifier(_ name: String) -> (TypeSignature, Message?) {
+    func identifier(_ name: String) -> TypeSignature {
         // First check local identifiers
         if let identifierType = localIdentifierTypes[name] {
-            return (identifierType, nil)
+            return identifierType
         }
         // Next check function parameters
         for functionDeclaration in functionPath.reversed() {
             for parameter in functionDeclaration.parameters {
                 if parameter.internalName == name {
-                    return (parameter.declaredType, nil)
+                    return parameter.declaredType
                 }
             }
         }
-        if let symbolInfo {
-        //~~~    return symbolInfo.typeSignature(identifier: name, typePath: typePath, sourceFile: sourceFile)
+        if name == "self" {
+            guard let typeDeclaration = typePath.last else {
+                return .none
+            }
+            return .named(typeDeclaration.qualifiedName, [])
         }
-        return (.none, nil)
+        guard let symbolInfo else {
+            return .none
+        }
+
+        for typeDeclaration in typePath.reversed() {
+            let symbolType = symbolInfo.type(of: name, in: .named(typeDeclaration.qualifiedName, []))
+            if symbolType != .none {
+                return symbolType
+            }
+        }
+        return symbolInfo.type(of: name, importedModuleNames: importedModuleNames, sourceFile: sourceFile)
     }
 
-    func member(_ name: String, of type: TypeSignature?) -> TypeSignature {
-        return .none
+    /// Return the type of the given member.
+    func member(_ name: String, in type: TypeSignature) -> TypeSignature {
+        guard let symbolInfo else {
+            return .none
+        }
+        return symbolInfo.type(of: name, in: type)
     }
 
-    func function(_ name: String, of type: TypeSignature?, parameters: [LabeledValue<TypeSignature>]) -> (TypeSignature, Message?) {
-        return (.none, nil)
+    /// Return the signature of the function matching the given parameters.
+    ///
+    /// The match on the parameter types will attempt to allow for unknown types.
+    ///
+    /// - Parameters:
+    ///   - Parameter type: The function's owning type if this is a member function, or nil if not.
+    func function(_ name: String, in type: TypeSignature?, parameters: [LabeledValue<TypeSignature>]) -> (TypeSignature, Message?) {
+        guard let symbolInfo else {
+            return (.none, nil)
+        }
+        if let type {
+            return symbolInfo.functionSignature(of: name, in: type, arguments: parameters)
+        }
+
+        // Not a known member function. Check functions that can be invoked without a target type
+        for typeDeclaration in typePath.reversed() {
+            let result = symbolInfo.functionSignature(of: name, in: .named(typeDeclaration.qualifiedName, []), arguments: parameters)
+            if result.function != .none {
+                return result
+            }
+        }
+        return symbolInfo.functionSignature(of: name, arguments: parameters, importedModuleNames: importedModuleNames, sourceFile: sourceFile)
     }
 
-    func `subscript`(of type: TypeSignature?, parameters: [LabeledValue<TypeSignature>]) -> (TypeSignature, Message?) {
-        return (.none, nil)
+    /// Return the signature of the subscript matching the given parameters.
+    ///
+    /// The match on the parameter types will attempt to allow for unknown types.
+    ///
+    /// - Parameters:
+    ///   - Parameter type: The subscript's owning type.
+    func `subscript`(in type: TypeSignature, parameters: [LabeledValue<TypeSignature>]) -> (TypeSignature, Message?) {
+        guard let symbolInfo else {
+            return (.none, nil)
+        }
+        return symbolInfo.subscriptSignature(in: type, arguments: parameters)
     }
 
     /// For an operation on two types, return the probable result type.

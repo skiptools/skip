@@ -270,7 +270,7 @@ class FunctionCall: Expression {
         // First we infer argument types without knowing the function, so we expect .none
         arguments.forEach { $0.value.inferTypes(context: context, expecting: .none) }
         let parameters = arguments.map { LabeledValue<TypeSignature>(label: $0.label, value: $0.value.inferredType) }
-        let (candidateFunction, message) = context.function(name, of: isMember ? baseType : nil, parameters: parameters)
+        let (candidateFunction, message) = context.function(name, in: isMember ? baseType : nil, parameters: parameters)
         if candidateFunction != .none {
             // Re-infer arguments now that we know the parameter types
             for (index, argument) in arguments.enumerated() {
@@ -315,11 +315,7 @@ class Identifier: Expression {
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
-        let (identifierType, message) = context.identifier(name)
-        self.identifierType = identifierType.or(expecting)
-        if let message {
-            messages.append(message)
-        }
+        identifierType = context.identifier(name).or(expecting)
         return context
     }
 
@@ -359,7 +355,7 @@ class MemberAccess: Expression {
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
         base?.inferTypes(context: context, expecting: expecting)
-        memberType = context.member(member, of: base?.inferredType ?? expecting)
+        memberType = context.member(member, in: base?.inferredType ?? expecting)
         return context
     }
 
@@ -531,7 +527,7 @@ class Subscript: Expression {
         // First we infer argument types without knowing the function, so we expect .none
         arguments.forEach { $0.value.inferTypes(context: context, expecting: .none) }
         let parameters = arguments.map { LabeledValue<TypeSignature>(label: $0.label, value: $0.value.inferredType) }
-        let (candidateFunction, message) = context.subscript(of: base.inferredType, parameters: parameters)
+        let (candidateFunction, message) = context.subscript(in: base.inferredType, parameters: parameters)
         if candidateFunction != .none {
             // Re-infer arguments now that we know the parameter types
             for (index, argument) in arguments.enumerated() {

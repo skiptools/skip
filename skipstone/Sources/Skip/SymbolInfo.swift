@@ -21,6 +21,31 @@ public class SymbolInfo {
         }
     }
 
+    /// Return the type of the given member.
+    func type(of member: String, in type: TypeSignature) -> TypeSignature {
+        return .none
+    }
+
+    /// Return the type of the given identifier.
+    func type(of identifier: String, importedModuleNames: Set<String> = [], sourceFile: Source.File? = nil) -> TypeSignature {
+        return .none
+    }
+
+    /// Return the signature of the member function being called with the given arguments.
+    func functionSignature(of name: String, in type: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> (function: TypeSignature, message: Message?) {
+        return (.none, nil)
+    }
+
+    /// Return the signature of the function being called with the given arguments.
+    func functionSignature(of name: String, arguments: [LabeledValue<TypeSignature>], importedModuleNames: Set<String> = [], sourceFile: Source.File? = nil) -> (function: TypeSignature, message: Message?) {
+        return (.none, nil)
+    }
+
+    /// Return the signature of the subscript being called with the given arguments.
+    func subscriptSignature(in type: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> (function: TypeSignature, message: Message?) {
+        return (.none, nil)
+    }
+
     private func processGraph(_ graph: UnifiedSymbolGraph, moduleName: String) {
         for entry in graph.symbols {
             if let symbol = symbol(for: entry.value, moduleName: moduleName) {
