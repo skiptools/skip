@@ -137,13 +137,31 @@ public struct SkipAssembler {
 
         var savedURLs: [URL] = []
         /// Writes the given String to the specified URL, only if it has changed
-        func write(_ string: String, to url: URL, ifChanged: Bool, encoding: String.Encoding = .utf8) throws {
-            savedURLs.append(url)
-            // if the size has changed, always write; otherwise, compare string contents
-            if !ifChanged // i.e., always write
-                || (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) != string.lengthOfBytes(using: encoding) // compare sizes
-                || (try? String(contentsOf: url, encoding: encoding)) != string { // compare contents
-                try string.write(to: url, atomically: true, encoding: encoding)
+        func write(_ string: @autoclosure () throws -> String, to destURL: URL, linkFrom: URL? = nil, ifChanged: Bool, encoding: String.Encoding = .utf8) throws {
+            savedURLs.append(destURL)
+            // create a symbolic link if necessary
+            if let linkFrom = linkFrom {
+                let linkPath = destURL.pathRelative(to: linkFrom) ?? destURL.path
+                logger.info("linking from \(destURL.path) to \(linkPath)")
+
+                if (try? FileManager.default.destinationOfSymbolicLink(atPath: destURL.path)) != linkFrom.path {
+                    try? FileManager.default.removeItem(at: destURL)
+                    try FileManager.default.createSymbolicLink(atPath: destURL.path, withDestinationPath: linkPath)
+                    // assert(try! string() == String(contentsOf: destURL, encoding: encoding)) // verify that the link was created successfully
+                }
+            } else {
+                let str = try string()
+                // if the size has changed, always write; otherwise, compare string contents
+                if !ifChanged // i.e., always write
+                    || (try? destURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) != str.lengthOfBytes(using: encoding) // compare sizes
+                    || (try? String(contentsOf: destURL, encoding: encoding)) != str { // compare contents
+                    try str.write(to: destURL, atomically: true, encoding: encoding)
+
+                    // remove write attributes from the file, since it is generated
+                    var attrs = try FileManager.default.attributesOfItem(atPath: destURL.path)
+                    attrs[.posixPermissions] = 0o444 // read-only
+                    try FileManager.default.setAttributes(attrs, ofItemAtPath: destURL.path)
+                }
             }
         }
 
@@ -269,7 +287,7 @@ public struct SkipAssembler {
                         logger.debug("copying: \(sourceURL.relativePath) to: \(destPath.path)")
                         // try FileManager.default.copyItem(at: sourceURL, to: destPath)
                         // only copy when the contents have changed, to avoid triggering unnecessary gradle rebuild
-                        try write(String(contentsOf: sourceURL), to: destPath, ifChanged: true)
+                        try write(String(contentsOf: sourceURL), to: destPath, linkFrom: sourceURL, ifChanged: true)
                     }
                 }
 
@@ -696,6 +714,34 @@ extension URL {
             try await block(fileURL)
         }
     }
+
+
+    /// Calculates the relative path between two URLs.
+    ///
+    /// This can be used for creating symbolic links that retain the relative file system hierarchy.
+    public func pathRelative(to destinationURL: URL) -> String? {
+        let sourceComponents = self.pathComponents
+        let destinationComponents = destinationURL.pathComponents
+
+        var commonPathComponents = [String]()
+        for (index, component) in sourceComponents.enumerated() {
+            if index < destinationComponents.count && component == destinationComponents[index] {
+                commonPathComponents.append(component)
+            } else {
+                break
+            }
+        }
+
+        let commonPath = NSString.path(withComponents: commonPathComponents)
+        let destinationPath = destinationURL.path
+        let destinationPathWithoutCommonPrefix = destinationPath.replacingOccurrences(of: commonPath, with: "")
+
+        let relativePathComponents = Array(repeating: "..", count: sourceComponents.count - commonPathComponents.count - 1) + destinationPathWithoutCommonPrefix.split(separator: "/").map(String.init)
+        let relativePath = NSString.path(withComponents: relativePathComponents)
+
+        return relativePath
+    }
+
 }
 
 extension Process {
