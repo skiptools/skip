@@ -83,4 +83,12 @@ extension Message {
         }
         return Message(severity: .error, message: "Skip does not support this Swift type syntax [\(typeSyntax.kind)]", source: source, sourceRange: range)
     }
+
+    static func ambiguousFunctionCall(sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) -> Message {
+        return Message(severity: .warning, message: "Skip is unable to disambiguate this function call. Consider adding explicit types to the values supplied as arguments", sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    static func unknownMemberBaseType(member: String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) -> Message {
+        return Message(severity: .error, message: "Skip is unable to determine the owning type for member '\(member)'", sourceFile: sourceFile, sourceRange: sourceRange)
+    }
 }

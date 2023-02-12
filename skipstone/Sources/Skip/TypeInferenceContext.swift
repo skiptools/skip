@@ -1,7 +1,7 @@
 /// Contextual information used in type inference.
 struct TypeInferenceContext {
-    private let symbolInfo: SymbolInfo?
-    private let sourceFile: Source.File?
+    let symbolInfo: SymbolInfo?
+    let sourceFile: Source.File?
     private var typePath: [TypeDeclaration] = []
     private var functionPath: [FunctionDeclaration] = []
     private var localIdentifierTypes: [String: TypeSignature] = [:]
@@ -97,15 +97,15 @@ struct TypeInferenceContext {
         return symbolInfo.type(of: name, in: type)
     }
 
-    /// Return the signature of the function matching the given parameters.
+    /// Return the signatures of the functions matching the given parameters.
     ///
     /// The match on the parameter types will attempt to allow for unknown types.
     ///
     /// - Parameters:
     ///   - Parameter type: The function's owning type if this is a member function, or nil if not.
-    func function(_ name: String, in type: TypeSignature?, parameters: [LabeledValue<TypeSignature>]) -> (TypeSignature, Message?) {
+    func function(_ name: String, in type: TypeSignature?, parameters: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
         guard let symbolInfo else {
-            return (.none, nil)
+            return []
         }
         if let type {
             return symbolInfo.functionSignature(of: name, in: type, arguments: parameters)
@@ -113,23 +113,23 @@ struct TypeInferenceContext {
 
         // Not a known member function. Check functions that can be invoked without a target type
         for typeDeclaration in typePath.reversed() {
-            let result = symbolInfo.functionSignature(of: name, in: .named(typeDeclaration.qualifiedName, []), arguments: parameters)
-            if result.function != .none {
-                return result
+            let results = symbolInfo.functionSignature(of: name, in: .named(typeDeclaration.qualifiedName, []), arguments: parameters)
+            if !results.isEmpty {
+                return results
             }
         }
         return symbolInfo.functionSignature(of: name, arguments: parameters, importedModuleNames: importedModuleNames, sourceFile: sourceFile)
     }
 
-    /// Return the signature of the subscript matching the given parameters.
+    /// Return the signatures of the subscripts matching the given parameters.
     ///
     /// The match on the parameter types will attempt to allow for unknown types.
     ///
     /// - Parameters:
     ///   - Parameter type: The subscript's owning type.
-    func `subscript`(in type: TypeSignature, parameters: [LabeledValue<TypeSignature>]) -> (TypeSignature, Message?) {
+    func `subscript`(in type: TypeSignature, parameters: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
         guard let symbolInfo else {
-            return (.none, nil)
+            return []
         }
         return symbolInfo.subscriptSignature(in: type, arguments: parameters)
     }

@@ -247,19 +247,21 @@ class FunctionCall: Expression {
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
-        let baseType: TypeSignature
-        let isMember: Bool
+        let baseType: TypeSignature?
         let name: String
         switch function.type {
         case .identifier:
-            baseType = .none
-            isMember = false
+            baseType = nil
             name = (function as! Identifier).name
         case .memberAccess:
             let memberAccess = function as! MemberAccess
-            memberAccess.base?.inferTypes(context: context, expecting: .none)
-            baseType = memberAccess.base?.inferredType ?? expecting
-            isMember = true
+            if memberAccess.base == nil {
+                // Supply expected result type as probable base type when base is missing
+                _ = memberAccess.inferTypes(context: context, expecting: expecting)
+            } else {
+                _ = memberAccess.inferTypes(context: context, expecting: .none)
+            }
+            baseType = memberAccess.baseType
             name = memberAccess.member
         default:
             function.inferTypes(context: context, expecting: .none)
@@ -270,18 +272,19 @@ class FunctionCall: Expression {
         // First we infer argument types without knowing the function, so we expect .none
         arguments.forEach { $0.value.inferTypes(context: context, expecting: .none) }
         let parameters = arguments.map { LabeledValue<TypeSignature>(label: $0.label, value: $0.value.inferredType) }
-        let (candidateFunction, message) = context.function(name, in: isMember ? baseType : nil, parameters: parameters)
-        if candidateFunction != .none {
+        let candidateFunctions = context.function(name, in: baseType, parameters: parameters)
+        if !candidateFunctions.isEmpty {
+            if candidateFunctions.count > 1 {
+                messages.append(.ambiguousFunctionCall(sourceFile: sourceFile, sourceRange: sourceRange))
+            }
+            let function = candidateFunctions.first { $0.returnType == expecting } ?? candidateFunctions[0]
             // Re-infer arguments now that we know the parameter types
             for (index, argument) in arguments.enumerated() {
-                argument.value.inferTypes(context: context, expecting: candidateFunction.parameterTypes[index])
+                argument.value.inferTypes(context: context, expecting: function.parameterTypes[index])
             }
-            returnType = candidateFunction.returnType
+            returnType = function.returnType
         } else {
             returnType = expecting
-        }
-        if let message {
-            messages.append(message)
         }
         return context
     }
@@ -333,10 +336,12 @@ class Identifier: Expression {
 /// `person.name`
 class MemberAccess: Expression {
     let base: Expression?
+    private(set) var baseType: TypeSignature
     let member: String
 
-    init(base: Expression?, member: String, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(base: Expression?, baseType: TypeSignature = .none, member: String, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
         self.base = base
+        self.baseType = baseType
         self.member = member
         super.init(type: .memberAccess, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
@@ -354,8 +359,16 @@ class MemberAccess: Expression {
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
-        base?.inferTypes(context: context, expecting: expecting)
-        memberType = context.member(member, in: base?.inferredType ?? expecting)
+        if let base {
+            base.inferTypes(context: context, expecting: .none)
+            baseType = baseType.or(base.inferredType)
+        } else {
+            baseType = baseType.or(expecting)
+        }
+        if baseType == .none {
+            messages.append(.unknownMemberBaseType(member: member, sourceFile: sourceFile, sourceRange: sourceRange))
+        }
+        memberType = context.member(member, in: baseType).or(expecting)
         return context
     }
 
@@ -527,18 +540,19 @@ class Subscript: Expression {
         // First we infer argument types without knowing the function, so we expect .none
         arguments.forEach { $0.value.inferTypes(context: context, expecting: .none) }
         let parameters = arguments.map { LabeledValue<TypeSignature>(label: $0.label, value: $0.value.inferredType) }
-        let (candidateFunction, message) = context.subscript(in: base.inferredType, parameters: parameters)
-        if candidateFunction != .none {
+        let candidateFunctions = context.subscript(in: base.inferredType, parameters: parameters)
+        if !candidateFunctions.isEmpty {
+            if candidateFunctions.count > 1 {
+                messages.append(.ambiguousFunctionCall(sourceFile: sourceFile, sourceRange: sourceRange))
+            }
+            let function = candidateFunctions.first { $0.returnType == expecting } ?? candidateFunctions[0]
             // Re-infer arguments now that we know the parameter types
             for (index, argument) in arguments.enumerated() {
-                argument.value.inferTypes(context: context, expecting: candidateFunction.parameterTypes[index])
+                argument.value.inferTypes(context: context, expecting: function.parameterTypes[index])
             }
-            returnType = candidateFunction.returnType
+            returnType = function.returnType
         } else {
             returnType = expecting
-        }
-        if let message {
-            messages.append(message)
         }
         return context
     }

@@ -31,19 +31,19 @@ public class SymbolInfo {
         return .none
     }
 
-    /// Return the signature of the member function being called with the given arguments.
-    func functionSignature(of name: String, in type: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> (function: TypeSignature, message: Message?) {
-        return (.none, nil)
+    /// Return the signatures of the possible member functions being called with the given arguments.
+    func functionSignature(of name: String, in type: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
+        return []
     }
 
-    /// Return the signature of the function being called with the given arguments.
-    func functionSignature(of name: String, arguments: [LabeledValue<TypeSignature>], importedModuleNames: Set<String> = [], sourceFile: Source.File? = nil) -> (function: TypeSignature, message: Message?) {
-        return (.none, nil)
+    /// Return the signatures of the possible functions being called with the given arguments.
+    func functionSignature(of name: String, arguments: [LabeledValue<TypeSignature>], importedModuleNames: Set<String> = [], sourceFile: Source.File? = nil) -> [TypeSignature] {
+        return []
     }
 
-    /// Return the signature of the subscript being called with the given arguments.
-    func subscriptSignature(in type: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> (function: TypeSignature, message: Message?) {
-        return (.none, nil)
+    /// Return the signatures of the possible subscripts being called with the given arguments.
+    func subscriptSignature(in type: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
+        return []
     }
 
     private func processGraph(_ graph: UnifiedSymbolGraph, moduleName: String) {
