@@ -12,12 +12,5 @@ extension MyApp: App {
         }
     }
 }
+
 #endif
-
-internal func SkipDemoAppInternalModuleName() -> String {
-    return "SkipDemoApp"
-}
-
-public func SkipDemoAppPublicModuleName() -> String {
-    return "SkipDemoApp"
-}

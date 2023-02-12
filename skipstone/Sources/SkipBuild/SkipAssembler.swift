@@ -107,7 +107,23 @@ public struct SkipAssembler {
         return try String(contentsOf: outputURL)
     }
 
-    public static func assemble(root packageRoot: URL, moduleRootPath: String?, sourceFolder: String, testsFolder: String?, targets: SkipTargetSet, destRoot: String, overwrite: Bool = true, studioID: String = androidStudioBundleID) async throws -> (root: URL, files: [URL]) {
+    public static func assemble(root packageRoot: URL,
+                                moduleRootPath: String?,
+                                sourceFolder: String,
+                                testsFolder: String?,
+                                targets: SkipTargetSet,
+                                destRoot: String,
+                                overwrite: Bool = true,
+                                javaVersion: String = "11",
+                                minAndroidSdk: String = "24",
+                                targetAndroidSdk: String = "33",
+                                kotlinVersion: String = "1.8.10",
+                                androidAppLibVersion: String = "7.3.1",
+                                kotlinCompilerExtensionVersion: String = "1.4.2",
+                                composeUIVersion: String = "1.1.1",
+                                composeNavVersion: String = "2.5.3",
+                                studioID: String = androidStudioBundleID
+    ) async throws -> (root: URL, files: [URL]) {
         let destRoot = URL(fileURLWithPath: destRoot, isDirectory: true, relativeTo: packageRoot)
 
         // use the passed-in list of modules, or else default to all the sources in the folder
@@ -351,20 +367,36 @@ public struct SkipAssembler {
                 let buildGradle = URL(fileURLWithPath: "build.gradle.kts", isDirectory: false, relativeTo: moduleRoot)
                 let buildGradleSource = """
                 group = "\(packageName)"
+                val composeUIVersion: String by rootProject.extra
+                val composeNavVersion: String by rootProject.extra
 
                 plugins {
-                    kotlin("android") version "1.8.+"
-                    kotlin("plugin.serialization") version "1.8.+"
-                    id("com.android.library") version "7.+"
+                    kotlin("android")
+                    kotlin("plugin.serialization")
+                    id("\(targetSet.target.pluginType)")
                 }
 
                 dependencies {
                     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:+")
-                    testImplementation("org.jetbrains.kotlin:kotlin-test:1.8.+")
-                    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:1.8.+")
+                    testImplementation("org.jetbrains.kotlin:kotlin-test:\(kotlinVersion)")
+                    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:\(kotlinVersion)")
                     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.6.+")
                     testImplementation("org.robolectric:robolectric:4.+")
                     androidTestImplementation("com.android.support.test:runner:+")
+
+                    \(targetSet.target.isApp ? """
+                        implementation("androidx.core:core-ktx:1.7.0")
+                        implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.3.1")
+                        implementation("androidx.activity:activity-compose:1.3.1")
+                        implementation("androidx.compose.material:material:1.2.0")
+                        implementation("androidx.compose.ui:ui:$composeUIVersion")
+                        implementation("androidx.compose.ui:ui-tooling-preview:$composeUIVersion")
+                        implementation("androidx.navigation:navigation-compose:$composeNavVersion")
+                        debugImplementation("androidx.compose.ui:ui-tooling:$composeUIVersion")
+                        debugImplementation("androidx.compose.ui:ui-test-manifest:$composeUIVersion")
+                        androidTestImplementation("androidx.compose.ui:ui-test-junit4:$composeUIVersion")
+                    """ : """
+                    """)
 
                     \(localDependencies.map({ modDependency(mod: $0) }).joined(separator: "\n    "))
                 }
@@ -380,22 +412,28 @@ public struct SkipAssembler {
                     sourceSets.getByName("androidTest") {
                         kotlin.setSrcDirs(listOf("src/test/kotlin"))
                     }
-                    compileSdkVersion(33)
+                    compileSdkVersion(\(targetAndroidSdk))
                     defaultConfig {
-                        minSdk = 24
-                        targetSdk = 33
+                        targetSdk = \(targetAndroidSdk)
+                        minSdk = \(minAndroidSdk)
                         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
                     }
 
                     compileOptions {
-                        sourceCompatibility = JavaVersion.VERSION_11
-                        targetCompatibility = JavaVersion.VERSION_11
+                        sourceCompatibility = JavaVersion.VERSION_\(javaVersion)
+                        targetCompatibility = JavaVersion.VERSION_\(javaVersion)
                     }
                     kotlinOptions {
-                        jvmTarget = "11"
+                        jvmTarget = "\(javaVersion)"
                     }
-                    lintOptions {
-                    }
+                    \(targetSet.target.isApp ? """
+                        buildFeatures {
+                            compose = true
+                        }
+                        composeOptions {
+                            kotlinCompilerExtensionVersion = "\(kotlinCompilerExtensionVersion)"
+                        }
+                    """ : "")
                 }
 
                 tasks.withType<Test> {
@@ -414,6 +452,37 @@ public struct SkipAssembler {
             }
 
             try createModuleLevelGradleBuild()
+
+
+            let androidManifest = URL(fileURLWithPath: "src/main/AndroidManifest.xml", isDirectory: false, relativeTo: moduleRoot)
+
+            func createAndroidManifest() throws {
+                let manifestContents = """
+                <?xml version="1.0" encoding="utf-8"?>
+                <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+                    xmlns:tools="http://schemas.android.com/tools">
+                    <application
+                        android:allowBackup="true"
+                        android:supportsRtl="true"
+                        tools:targetApi="\(targetAndroidSdk)">
+                        <activity
+                            android:name=".DemoApp"
+                            android:exported="true">
+                            <intent-filter>
+                                <action android:name="android.intent.action.MAIN" />
+                                <category android:name="android.intent.category.LAUNCHER" />
+                            </intent-filter>
+                        </activity>
+                    </application>
+                </manifest>
+                """
+
+                try write(manifestContents, to: androidManifest, ifChanged: true)
+            }
+
+            if targetSet.target.isApp {
+                try createAndroidManifest()
+            }
         }
 
         func createTopLevelGradleBuild() throws {
@@ -427,11 +496,21 @@ public struct SkipAssembler {
                 }
             }
 
+            val composeUIVersion by extra { "\(composeUIVersion)" }
+            val composeNavVersion by extra { "\(composeNavVersion)" }
+
             subprojects {
                 repositories {
                     google()
                     mavenCentral()
                 }
+            }
+
+            plugins {
+                id("com.android.application") version "\(androidAppLibVersion)" apply false
+                id("com.android.library") version "\(androidAppLibVersion)" apply false
+                id("org.jetbrains.kotlin.android") version "\(kotlinVersion)" apply false
+                kotlin("plugin.serialization") version "\(kotlinVersion)" apply false
             }
             """
             try write(buildGradleSource, to: buildGradle, ifChanged: true)
@@ -440,7 +519,7 @@ public struct SkipAssembler {
             let gradlePropertiesSource = """
             # Project-wide Gradle settings
             # http://www.gradle.org/docs/current/userguide/build_environment.html
-            #org.gradle.jvmargs=-Xmx2048m
+            org.gradle.jvmargs=-Xmx2g
             android.useAndroidX=true
             android.enableJetifier=true
             kotlin.code.style=official
@@ -487,6 +566,7 @@ public struct SkipAssembler {
         }
 
         try createTopLevelGradleBuild()
+
 
         /// Creates the gradlew command and the gradle/wrapper/gradle-wrapper.jar that is expected by convention
         /// - Parameter gradleVersion: the version to specify (a release from https://gradle.org/releases/ like "7.6")
@@ -573,6 +653,27 @@ public enum GradleTarget {
         switch self {
         case .app(let moduleName): return moduleName
         case .lib(let moduleName): return moduleName
+        }
+    }
+
+    var pluginType: String {
+        switch self {
+        case .app: return "com.android.application"
+        case .lib: return "com.android.library"
+        }
+    }
+
+    var isApp: Bool {
+        switch self {
+        case .app: return true
+        case .lib: return false
+        }
+    }
+
+    var isLibrary: Bool {
+        switch self {
+        case .app: return false
+        case .lib: return true
         }
     }
 }
