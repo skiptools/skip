@@ -61,6 +61,17 @@ struct TextFieldView : View {
 
 }
 
+struct TextView : View {
+    let text: String
+
+    init(_ text: String) {
+        self.text = text
+    }
+
+    var body: some View {
+        Text(text)
+    }
+}
 
 //class RootView: View() {
 //    fun body(): View {

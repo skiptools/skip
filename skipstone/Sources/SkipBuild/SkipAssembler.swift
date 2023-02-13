@@ -158,6 +158,7 @@ public struct SkipAssembler {
                 if !ifChanged // i.e., always write
                     || (try? destURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) != str.lengthOfBytes(using: encoding) // compare sizes
                     || (try? Data(contentsOf: destURL, options: [.alwaysMapped])) != str.data(using: encoding) { // compare contents
+                    try? FileManager.default.removeItem(at: destURL) // need to manually delete for non-writable permissions
                     try str.write(to: destURL, atomically: true, encoding: encoding)
 
                     // remove write attributes from the file, since it is generated

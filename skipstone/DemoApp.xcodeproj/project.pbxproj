@@ -12,7 +12,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		496BBA3D29999DB9001C7B64 /* Skip */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = Skip; sourceTree = "<group>"; };
+		494E6B0F299A830F00B1A14D /* Skip */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = Skip; sourceTree = "<group>"; };
 		499814D029998BE700A3D586 /* DemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DemoApp.swift; path = Sources/DemoApp/DemoApp.swift; sourceTree = "<group>"; };
 		49C1768F29998A2C00BD96E7 /* DemoApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DemoApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -40,7 +40,7 @@
 			isa = PBXGroup;
 			children = (
 				499814D029998BE700A3D586 /* DemoApp.swift */,
-				496BBA3D29999DB9001C7B64 /* Skip */,
+				494E6B0F299A830F00B1A14D /* Skip */,
 				49C1769029998A2C00BD96E7 /* Products */,
 				499814D229998D4E00A3D586 /* Frameworks */,
 			);

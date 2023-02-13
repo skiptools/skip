@@ -15,15 +15,17 @@ SkipUnit is the base class for executing the transpilation of sources and tests.
 
 1. Use `plugins { id("com.android.application") }` in `build.gradle.kts`
 
-### Async -> kotlinx.coroutines
+### Resources
 
-1. Add dependency `implementation("org.jetbrains.kotlinx:kotlinx-coroutines:$coroutinesVersion")`
-1. Add `android { buildFeatures { compose = true } }` to `build.gradle.kts`
+1. Copy data resources into Android.res
+1. Generate symbolic constants for strings?
+1. Convert Foundation.NSLocalizedString to lookup
+1. Convert SwiftUI.Text and SwiftUI.LocalizedStringKey to lookup (handling interpolation)
 
-### Compose -> androidx.compose.ui
+### Testing -> junit
 
-1. Add dependency `implementation("androidx.compose.ui:ui:$composeUIVersion")`
-1. Add `android { buildFeatures { compose = true } }` to `build.gradle.kts`
+1. Convert "XCTestCase" superclass to "junit.Test"
+1. Add @Test annotation to all "fun test" functions
     
 ### Codable -> kotlinx.serialization.json
 
@@ -31,10 +33,15 @@ SkipUnit is the base class for executing the transpilation of sources and tests.
 1. Use `json = kotlinx.serialization.json.Json.encodeToString(ob)`
 1. Use `ob = kotlinx.serialization.json.Json.decodeFromString<Ob>(json)`
 
-### Testing -> junit
+### Compose -> androidx.compose.ui
 
-1. Convert "XCTestCase" superclass to "junit.Test"
-1. Add @Test annotation to all "fun test" functions
+1. Add dependency `implementation("androidx.compose.ui:ui:$composeUIVersion")`
+1. Add `android { buildFeatures { compose = true } }` to `build.gradle.kts`
+
+### Async -> kotlinx.coroutines
+
+1. Add dependency `implementation("org.jetbrains.kotlinx:kotlinx-coroutines:$coroutinesVersion")`
+1. Add `android { buildFeatures { compose = true } }` to `build.gradle.kts`
 
 ### Testing async -> org.jetbrains.kotlinx:kotlinx-coroutines-test
 
