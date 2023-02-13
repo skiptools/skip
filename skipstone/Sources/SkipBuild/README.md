@@ -9,11 +9,12 @@ that includes buildable artifacts for both:
 
 SkipUnit is the base class for executing the transpilation of sources and tests.
 
-## Build PlugIns
+## Build Phases
 
 ### App
 
 1. Use `plugins { id("com.android.application") }` in `build.gradle.kts`
+1. Info.plist -> AndroidManifest.xml
 
 ### Resources
 

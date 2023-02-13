@@ -5,6 +5,34 @@ import os.log
 
 fileprivate let logger = Logger(subsystem: "skip", category: "symbols")
 
+/// A cache of symbols
+public actor SymbolCache {
+    private var cache: [SymbolKey: [URL: SymbolGraph]] = [:]
+
+    public init() {
+    }
+
+    private struct SymbolKey : Hashable {
+        let moduleName: String
+        let accessLevel: String
+    }
+
+    public func symbols(for moduleName: String, accessLevel: String = "internal") async throws -> SymbolGraph {
+        let key = SymbolKey(moduleName: moduleName, accessLevel: accessLevel)
+        if let symbols = cache[key] {
+            return symbols.values.first! // otherwise a NoSymbolsFoundError would have been throws
+        }
+
+        let symbols = try await System.extractSymbols(moduleNames: [moduleName], accessLevel: accessLevel)
+        guard let firstSymbols = symbols.values.first else {
+            struct NoSymbolsFoundError : Error { }
+            throw NoSymbolsFoundError()
+        }
+        cache[key] = symbols
+        return firstSymbols
+    }
+}
+
 extension UnifiedSymbolGraph.Symbol {
     /// The location of this symbol, as stored in the `mixins` container.
     public var location: SymbolGraph.Symbol.Location? {
@@ -102,7 +130,7 @@ extension System {
         return graph
     }
 
-    public static func extractSymbols(_ urlBase: URL, moduleName: String, tmpDir: URL? = nil, sdk: String = "macosx", accessLevel: String = "private") async throws -> [URL: SymbolGraph] {
+    public static func extractSymbols(_ urlBase: URL = URL.moduleBuildFolder, moduleNames: [String], tmpDir: URL? = nil, sdk: String = "macosx", accessLevel: String = "private") async throws -> [URL: SymbolGraph] {
         // fall back to using a temporary folder
         let tmpDir = tmpDir ?? URL(fileURLWithPath: UUID().uuidString, isDirectory: true, relativeTo: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true))
         try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
@@ -114,32 +142,39 @@ extension System {
         // get the SDK path (e.g., for "xcrun --show-sdk-path --sdk macosx" it might return "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX13.1.sdk")
         let sdKPath = try await xcrun("--show-sdk-path", "--sdk", sdk).joined(separator: "\n")
 
-        let modulePath = urlBase.appendingPathComponent(moduleName).appendingPathExtension("swiftmodule")
+        var modulePaths: [URL: SymbolGraph] = [:]
 
-        if !FileManager.default.isReadableFile(atPath: modulePath.path) {
-            // permit missing modules; this is so SkipKotlin does not need to be a swift dependency of other packages
-            return [:]
+        for moduleName in moduleNames {
+            let modulePath = urlBase.appendingPathComponent(moduleName).appendingPathExtension("swiftmodule")
+
+            if !FileManager.default.isReadableFile(atPath: modulePath.path) {
+                // permit missing modules; this is so SkipKotlin does not need to be a swift dependency of other packages
+                return [:]
+            }
+
+            _ = try await xcrun("swift",
+                                "symbolgraph-extract",
+                                "-module-name", moduleName,
+                                "-include-spi-symbols",
+                                "-skip-inherited-docs",
+                                //"-v", // verbose
+                                //"-pretty-print",
+                                //"-skip-synthesized-members",
+                                "-output-dir", tmpDir.path,
+                                "-target", targetInfo.target.triple,
+                                "-sdk", sdKPath,
+                                "-minimum-access-level", accessLevel,
+                                "-F", "\(sdKPath)/../../Library/Frameworks/", // needed for XCTest imports
+                                "-I", urlBase.path)
+
+            let symbolFile = tmpDir.appendingPathComponent(moduleName).appendingPathExtension("symbols.json")
+            let graphData = try Data(contentsOf: symbolFile)
+            let graph = try JSONDecoder().decode(SymbolGraph.self, from: graphData)
+            modulePaths[modulePath] = graph
+            // TODO: scan folder for "@" modules for extension loading
         }
 
-        _ = try await xcrun("swift",
-                        "symbolgraph-extract",
-                        "-module-name", moduleName,
-                        "-include-spi-symbols",
-                        "-skip-inherited-docs",
-                        //"-v", // verbose
-                        //"-pretty-print",
-                        //"-skip-synthesized-members",
-                        "-output-dir", tmpDir.path,
-                        "-target", targetInfo.target.triple,
-                        "-sdk", sdKPath,
-                        "-minimum-access-level", accessLevel,
-                        "-I", urlBase.path)
-
-        let symbolFile = tmpDir.appendingPathComponent(moduleName).appendingPathExtension("symbols.json")
-        let graphData = try Data(contentsOf: symbolFile)
-        let graph = try JSONDecoder().decode(SymbolGraph.self, from: graphData)
-        // TODO: scan folder for "@" modules for extension loading
-        return [modulePath: graph]
+        return modulePaths
     }
 
     @discardableResult static func xcrun(_ args: String...) async throws -> [String] {
@@ -153,8 +188,9 @@ extension System {
 #error("unsupported platform")
 #endif
         var out: [String] = []
+        logger.trace("running: \(args.joined(separator: " "))")
         try await exec(runcmd, arguments: args, environment: nil, workingDirectory: nil, outputHandler: { output in
-            //logger.debug("xcrun: \(output)")
+            logger.debug("xcrun: \(output)")
             out.append(output)
         })
         return out

@@ -50,15 +50,15 @@ public struct SkipAssembler {
         struct BundleIDNotFound : LocalizedError {
             let failureReason: String? = "Android Studio not found; install from: https://developer.android.com/studio/"
         }
-        #if canImport(Cocoa)
+#if canImport(Cocoa)
         guard let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
             throw BundleIDNotFound()
         }
         return appURL
-        #else
+#else
         // TODO: figure out how to find studio in Linux
         throw BundleIDNotFound()
-        #endif
+#endif
     }
 
     static var kotlinCompiler: URL {
@@ -100,8 +100,13 @@ public struct SkipAssembler {
         let outputURL = URL(fileURLWithPath: "output.js", isDirectory: false, relativeTo: tmpDir)
 
         var output: [String] = []
-        try await System.exec(arguments: ["/bin/sh", kotlinCompiler.path, "-output", outputURL.path, sourceURL.path], environment: env, workingDirectory: tmpDir) { line in
-            logger.info("kotlinToJS: \(line)")
+        try await System.exec(arguments: ["/bin/sh",
+                                          kotlinCompiler.path,
+                                          "-Xuse-deprecated-legacy-compiler",
+                                          "-output", outputURL.path,
+                                          sourceURL.path
+                                         ], environment: env, workingDirectory: tmpDir) { line in
+            print("kotlinToJS: \(line)")
             output.append(line)
         }
 
@@ -175,7 +180,7 @@ public struct SkipAssembler {
         let collector = GraphCollector(extensionGraphAssociationStrategy: .extendingGraph)
         for targetSet in targets.deepTargetSet {
             let moduleName = targetSet.target.moduleName
-            let symbolGraphs = try await System.extractSymbols(moduleURL, moduleName: moduleName)
+            let symbolGraphs = try await System.extractSymbols(moduleURL, moduleNames: [moduleName])
             for (url, graph) in symbolGraphs {
                 logger.debug("adding symbol graph for: \(url)")
                 collector.mergeSymbolGraph(graph, at: url)
@@ -663,11 +668,11 @@ extension URL {
         // if we are running tests from Xcode, this environment variable should be set; otherwise, assume the .build folder for an SPM build
         let xcodeBuildFolder = ProcessInfo.processInfo.environment["__XCODE_BUILT_PRODUCTS_DIR_PATHS"] // also seems to be __XPC_DYLD_LIBRARY_PATH or __XPC_DYLD_FRAMEWORK_PATH; this will be something like ~/Library/Developer/Xcode/DerivedData/MODULENAME-bsjbchzxfwcrveckielnbyhybwdr/Build/Products/Debug
 
-        #if DEBUG
+#if DEBUG
         let swiftBuildFolder = ".build/debug"
-        #else
+#else
         let swiftBuildFolder = ".build/release"
-        #endif
+#endif
 
         return URL(fileURLWithPath: xcodeBuildFolder ?? swiftBuildFolder, isDirectory: true)
     }

@@ -38,7 +38,7 @@ let package = Package(
         .target(name: "SkipDemoLib", dependencies: ["SkipFoundation"]),
         .target(name: "SkipDemoApp", dependencies: ["SkipDemoLib", "SkipUI"]),
 
-        .testTarget(name: "SkipTests", dependencies: ["Skip"]),
+        .testTarget(name: "SkipTests", dependencies: ["Skip", "SkipBuild"]),
         .testTarget(name: "SkipRunnerTests", dependencies: [], plugins: ["Skippy"]),
         .testTarget(name: "SkipBuildTests", dependencies: ["SkipBuild"]),
         .testTarget(name: "SkipUnitTests", dependencies: ["SkipUnit"]),
