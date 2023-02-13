@@ -444,7 +444,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
         }
     }
 
-    private static func `for`(name: String, genericTypes: [TypeSignature]) -> TypeSignature {
+    static func `for`(name: String, genericTypes: [TypeSignature]) -> TypeSignature {
         switch name {
         case "Any":
             return genericTypes.isEmpty ? .any : .named(name, genericTypes)
