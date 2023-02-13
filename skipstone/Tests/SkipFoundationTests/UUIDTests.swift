@@ -25,6 +25,16 @@ final class UUIDTests: XCTestCase {
         XCTAssertEqual("00000000-0000-0064-0000-000000000064", UUID(mostSigBits: 100, leastSigBits: 100).uuidString)
         XCTAssertEqual("112210F4-7DE9-8115-0DB4-DA5F49F8B478", UUID(mostSigBits: 1234567890123456789, leastSigBits: 987654321098765432).uuidString)
         XCTAssertEqual("00000000-0005-3D9D-0000-000151280C98", UUID(mostSigBits: 343453, leastSigBits: 5656546456).uuidString)
+
+        // SKIP REPLACE: val mx = Long.MAX_VALUE
+        let mx = Int64.max
+        // SKIP REPLACE: val mn = Long.MIN_VALUE
+        let mn = Int64.min
+
+        XCTAssertEqual("7FFFFFFF-FFFF-FFFF-7FFF-FFFFFFFFFFFF", UUID(mostSigBits: mx, leastSigBits: mx).uuidString)
+        XCTAssertEqual("7FFFFFFF-FFFF-FFFF-8000-000000000000", UUID(mostSigBits: mx, leastSigBits: mn).uuidString)
+        XCTAssertEqual("80000000-0000-0000-8000-000000000000", UUID(mostSigBits: mn, leastSigBits: mn).uuidString)
+        XCTAssertEqual("7FFFFFFF-FFFF-FFFF-8000-000000000000", UUID(mostSigBits: mx, leastSigBits: mn).uuidString)
     }
 
     func test_UUIDEquality() {

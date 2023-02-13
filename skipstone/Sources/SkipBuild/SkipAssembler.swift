@@ -918,8 +918,8 @@ interface XCTestCase {
 
     fun XCTFail(msg: String) = Assert.fail(msg)
 
-    fun <T> XCTUnwrap (ob: T): T { Assert.assertNotNull(ob); return ob }
-    fun <T> XCTUnwrap(ob: T, msg: String): T { Assert.assertNotNull(msg, ob); return ob }
+    fun <T> XCTUnwrap (ob: T?): T { Assert.assertNotNull(ob); if (ob != null) { return ob }; throw AssertionError() }
+    fun <T> XCTUnwrap(ob: T?, msg: String): T { Assert.assertNotNull(msg, ob); if (ob != null) { return ob }; throw AssertionError() }
 
     fun XCTAssert(a: Boolean) = Assert.assertTrue(a as Boolean)
     fun XCTAssertTrue(a: Boolean) = Assert.assertTrue(a as Boolean)

@@ -5,12 +5,12 @@ import XCTest
 
 final class URLTests: XCTestCase {
     func testURLs() throws {
-        let url: URL? = URL.init(string: "https://www.example.org/path/to/file.ext")
-        XCTAssertEqual("https://www.example.org/path/to/file.ext", url?.absoluteString)
-        XCTAssertEqual("/path/to/file.ext", url?.path)
-        XCTAssertEqual("www.example.org", url?.host)
-        XCTAssertEqual("ext", url?.pathExtension)
-        XCTAssertEqual("file.ext", url?.lastPathComponent)
+        let url: URL? = URL(string: "https://github.com/jectivex/CrossFoundation.git")
+        XCTAssertEqual("https://github.com/jectivex/CrossFoundation.git", url?.absoluteString)
+        XCTAssertEqual("/jectivex/CrossFoundation.git", url?.path)
+        XCTAssertEqual("github.com", url?.host)
+        XCTAssertEqual("git", url?.pathExtension)
+        XCTAssertEqual("CrossFoundation.git", url?.lastPathComponent)
         XCTAssertEqual(false, url?.isFileURL)
     }
 }

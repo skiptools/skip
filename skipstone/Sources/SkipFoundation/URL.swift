@@ -7,6 +7,14 @@ public typealias URL = SkipURL
 public typealias PlatformURL = java.net.URL
 #endif
 
+// Two separate string initializers:
+
+// SKIP INSERT: public operator fun SkipURL.Companion.invoke(fileURLWithPath: String, isDirectory: Boolean = false): SkipURL { return SkipURL.init(fileURLWithPath = fileURLWithPath, isDirectory = isDirectory) }
+// SKIP INSERT: public operator fun SkipURL.Companion.invoke(string: String, relativeTo: URL? = null): SkipURL { return SkipURL.init(string = string, relativeTo = relativeTo) }
+
+// alternative factor method (only needed when the parameters are exactly the same)
+// SKIP XXX INSERT: public fun URL(string: String, relativeTo: URL? = null): SkipURL? { return SkipURL.init(string = string, relativeTo = relativeTo) }
+
 // SKIP REPLACE: @JvmInline public value class SkipURL(val rawValue: PlatformURL) { companion object { } }
 public struct SkipURL : RawRepresentable {
     public let rawValue: PlatformURL
@@ -40,8 +48,8 @@ extension SkipURL {
         return SkipURL(PlatformURL(string))
     }
 
-    public static func `init`(string: String, relativeTo: SkipURL) -> SkipURL {
-        return SkipURL(PlatformURL(relativeTo.rawValue, string))
+    public static func `init`(string: String, relativeTo: SkipURL?) -> SkipURL {
+        return SkipURL(PlatformURL(relativeTo?.rawValue, string))
     }
 
     public static func `init`(fileURLWithPath path: String, isDirectory: Bool) -> SkipURL {
