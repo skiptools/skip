@@ -17,39 +17,19 @@ public actor SymbolCache {
         let accessLevel: String
     }
 
-    public func symbols(for moduleName: String, accessLevel: String = "internal") async throws -> SymbolGraph {
+    public func symbols(for moduleName: String, accessLevel: String = "internal") async throws -> [URL: SymbolGraph] {
         let key = SymbolKey(moduleName: moduleName, accessLevel: accessLevel)
         if let symbols = cache[key] {
-            return symbols.values.first! // otherwise a NoSymbolsFoundError would have been throws
+            return symbols
         }
 
         let symbols = try await System.extractSymbols(moduleNames: [moduleName], accessLevel: accessLevel)
-        guard let firstSymbols = symbols.values.first else {
+        guard !symbols.isEmpty else {
             struct NoSymbolsFoundError : Error { }
             throw NoSymbolsFoundError()
         }
         cache[key] = symbols
-        return firstSymbols
-    }
-}
-
-extension UnifiedSymbolGraph.Symbol {
-    /// The location of this symbol, as stored in the `mixins` container.
-    public var location: SymbolGraph.Symbol.Location? {
-        mixins.values.first?["location"] as? SymbolGraph.Symbol.Location
-    }
-
-    /// The fragments of this symbol, as stored in the `mixins` container.
-    public var fragments: [SymbolGraph.Symbol.DeclarationFragments.Fragment]? {
-        (mixins.values.first?["declarationFragments"] as? SymbolGraph.Symbol.DeclarationFragments)?.declarationFragments
-    }
-}
-
-/// Position is Equatable but not Hashable
-extension SymbolGraph.LineList.SourceRange.Position : Hashable {
-    public func hash(into hasher: inout Hasher) {
-        self.line.hash(into: &hasher)
-        self.character.hash(into: &hasher)
+        return symbols
     }
 }
 

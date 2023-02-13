@@ -156,12 +156,12 @@ public class Symbols {
             for relationship in candidate.relationships {
                 switch relationship.kind {
                 case .memberOf:
-                    guard relationship.isInverse, let member = symbols.symbolsByIdentifier[relationship.targetIdentifier] else {
+                    guard relationship.isInverse, let member = symbols.symbolsByIdentifier[relationship.targetIdentifier ?? ""] else {
                         break
                     }
                     return member.typeSignature(symbols: symbols)
                 case .inheritsFrom:
-                    guard !relationship.isInverse, let inheritsFrom = symbols.symbolsByIdentifier[relationship.targetIdentifier] else {
+                    guard !relationship.isInverse, let inheritsFrom = symbols.symbolsByIdentifier[relationship.targetIdentifier ?? ""] else {
                         break
                     }
                     let type = type(of: member, in: inheritsFrom)
@@ -193,14 +193,14 @@ public class Symbols {
             for relationship in candidate.relationships {
                 switch relationship.kind {
                 case .memberOf:
-                    guard relationship.isInverse, let member = symbols.symbolsByIdentifier[relationship.targetIdentifier] else {
+                    guard relationship.isInverse, let member = symbols.symbolsByIdentifier[relationship.targetIdentifier ?? ""] else {
                         break
                     }
                     if let function = matchFunction(member, arguments: arguments) {
                         functions.append(function)
                     }
                 case .inheritsFrom:
-                    guard !relationship.isInverse, let inheritsFrom = symbols.symbolsByIdentifier[relationship.targetIdentifier] else {
+                    guard !relationship.isInverse, let inheritsFrom = symbols.symbolsByIdentifier[relationship.targetIdentifier ?? ""] else {
                         break
                     }
                     functions += functionSignature(of: name, in: inheritsFrom, arguments: arguments)
@@ -332,7 +332,7 @@ public class Symbols {
             guard relationship.kind == .memberOf && relationship.isInverse else {
                 continue
             }
-            guard let member = symbolsByIdentifier[relationship.targetIdentifier], let memberKind = member.kind else {
+            guard let member = symbolsByIdentifier[relationship.targetIdentifier ?? ""], let memberKind = member.kind else {
                 // Assume any unknown member might be mutating
                 return true
             }
@@ -341,7 +341,7 @@ public class Symbols {
                 if member.isVariableReadWrite {
                     return true
                 }
-            case .func:
+            case .method:
                 if member.isFunctionMutating {
                     return true
                 }
@@ -353,11 +353,14 @@ public class Symbols {
     }
 
     private func isAnyObjectRestrictedProtocol(_ symbol: Symbol) -> Bool {
+        if symbol.isAnyObjectRestricted {
+            return true
+        }
         for relationship in symbol.relationships {
-            guard relationship.kind == .inheritsFrom, !relationship.isInverse, let inheritsFrom = symbolsByIdentifier[relationship.targetIdentifier] else {
+            guard relationship.kind == .conformsTo, !relationship.isInverse, let conformsTo = symbolsByIdentifier[relationship.targetIdentifier ?? ""] else {
                 continue
             }
-            if inheritsFrom.name == "AnyObject" || inheritsFrom.name == "class" || isAnyObjectRestrictedProtocol(inheritsFrom) {
+            if isAnyObjectRestrictedProtocol(conformsTo) {
                 return true
             }
         }
@@ -394,11 +397,18 @@ public class Symbols {
     }
 
     private func processRelationship(_ relationship: SymbolGraph.Relationship) {
-        guard var source = symbolsByIdentifier[relationship.source], var target = symbolsByIdentifier[relationship.target] else {
+        guard var source = symbolsByIdentifier[relationship.source] else {
             return
         }
-        source.relationships.append(Symbol.Relationship(kind: relationship.kind, targetIdentifier: target.symbol.uniqueIdentifier, isInverse: false))
-        target.relationships.append(Symbol.Relationship(kind: relationship.kind, targetIdentifier: source.symbol.uniqueIdentifier, isInverse: true))
+        guard var target = symbolsByIdentifier[relationship.target] else {
+            if let fallback = relationship.targetFallback, fallback.hasPrefix("Swift.") {
+                source.relationships.append(Symbol.Relationship(kind: relationship.kind, targetIdentifier: nil, targetSwiftType: String(fallback.dropFirst("Swift.".count)), isInverse: false))
+                symbolsByIdentifier[source.symbol.uniqueIdentifier] = source
+            }
+            return
+        }
+        source.relationships.append(Symbol.Relationship(kind: relationship.kind, targetIdentifier: target.symbol.uniqueIdentifier, targetSwiftType: nil, isInverse: false))
+        target.relationships.append(Symbol.Relationship(kind: relationship.kind, targetIdentifier: source.symbol.uniqueIdentifier, targetSwiftType: nil, isInverse: true))
         symbolsByIdentifier[source.symbol.uniqueIdentifier] = source
         symbolsByIdentifier[target.symbol.uniqueIdentifier] = target
     }
@@ -455,7 +465,7 @@ private struct Symbol {
         }
         switch kind {
         case .case:
-            guard let memberOf = relationships.first(where: { $0.kind == .memberOf && !$0.isInverse }), let e = symbols.symbolsByIdentifier[memberOf.targetIdentifier] else {
+            guard let memberOf = relationships.first(where: { $0.kind == .memberOf && !$0.isInverse }), let e = symbols.symbolsByIdentifier[memberOf.targetIdentifier ?? ""] else {
                 return .none
             }
             return e.typeSignature(symbols: symbols)
@@ -464,8 +474,15 @@ private struct Symbol {
         case .enum:
             return .named(name, [])
         case .extension:
-            guard let extensionTo = relationships.first(where: { $0.kind == .extensionTo && !$0.isInverse }), let t = symbols.symbolsByIdentifier[extensionTo.targetIdentifier] else {
+            guard let extensionTo = relationships.first(where: { $0.kind == .extensionTo && !$0.isInverse }) else {
                 return .none
+            }
+            guard let t = symbols.symbolsByIdentifier[extensionTo.targetIdentifier ?? ""] else {
+                if let swiftTypeName = extensionTo.targetSwiftType {
+                    return TypeSignature.for(name: swiftTypeName, genericTypes: [])
+                } else {
+                    return .none
+                }
             }
             return t.typeSignature(symbols: symbols)
         case .method:
@@ -486,6 +503,17 @@ private struct Symbol {
         default:
             return .none
         }
+    }
+
+    var isAnyObjectRestricted: Bool {
+        // We get a fragment like ': AnyObject'
+        for fragment in declarationFragments.declarationFragments {
+            guard fragment.spelling.contains(":") else {
+                continue
+            }
+            return fragment.spelling.split(whereSeparator: { $0.isWhitespace || $0 == "," || $0 == ":" }).contains("AnyObject")
+        }
+        return false
     }
 
     var isVariableReadWrite: Bool {
@@ -528,7 +556,8 @@ private struct Symbol {
 
     struct Relationship {
         let kind: SymbolGraph.Relationship.Kind
-        let targetIdentifier: String
+        let targetIdentifier: String?
+        let targetSwiftType: String?
         let isInverse: Bool
     }
 
