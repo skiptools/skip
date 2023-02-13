@@ -9,6 +9,39 @@ that includes buildable artifacts for both:
 
 SkipUnit is the base class for executing the transpilation of sources and tests.
 
+## Build PlugIns
+
+### App
+
+1. Use `plugins { id("com.android.application") }` in `build.gradle.kts`
+
+### Async -> kotlinx.coroutines
+
+1. Add dependency `implementation("org.jetbrains.kotlinx:kotlinx-coroutines:$coroutinesVersion")`
+1. Add `android { buildFeatures { compose = true } }` to `build.gradle.kts`
+
+### Compose -> androidx.compose.ui
+
+1. Add dependency `implementation("androidx.compose.ui:ui:$composeUIVersion")`
+1. Add `android { buildFeatures { compose = true } }` to `build.gradle.kts`
+    
+### Codable -> kotlinx.serialization.json
+
+1. Add @Serializable annotation to encodable classes
+1. Use `json = kotlinx.serialization.json.Json.encodeToString(ob)`
+1. Use `ob = kotlinx.serialization.json.Json.decodeFromString<Ob>(json)`
+
+### Testing -> junit
+
+1. Convert "XCTestCase" superclass to "junit.Test"
+1. Add @Test annotation to all "fun test" functions
+
+### Testing async -> org.jetbrains.kotlinx:kotlinx-coroutines-test
+
+1. Add `testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutinesVersion")`
+1. Convert async tests to use [runTest](https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-test/kotlinx.coroutines.test/run-test.html)
+
+
 ## Generate File System Layout
 
 ### Single-Module Project

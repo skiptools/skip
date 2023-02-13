@@ -25,6 +25,7 @@ extension SymbolGraph.LineList.SourceRange.Position : Hashable {
     }
 }
 
+#if os(macOS) || os(Linux)
 extension System {
     /// Takes the Swift file at the given URL and compiles it with the parameters for extracting symbols, and then returns the parsed symbol graph.
     ///
@@ -159,6 +160,7 @@ extension System {
         return out
     }
 }
+#endif
 
 
 /// Pared-down contents of the JSON output of `swiftc -print-target-info`

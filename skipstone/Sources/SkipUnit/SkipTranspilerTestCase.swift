@@ -29,12 +29,17 @@ extension SkipTranspilerTestCase {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
 
+        #if os(macOS) || os(Linux)
         // turn SomeLibTests.SomeLibTests/ into SomeLibTests/
         let testOutputBase = self.className.split(separator: ".").first ?? .init(self.className)
         try await SkipAssembler.transpileAndTest(testCase: Self.testInProcess ? self : nil, root: srcRoot, targets: targets, destRoot: "\(SkipAssembler.kipFolderName)/\(testOutputBase)")
+        #else
+        throw XCTSkip("skipping transpileAndTest on unsupported platform")
+        #endif
     }
 }
 
+#if os(macOS) || os(Linux)
 extension SkipAssembler {
     @discardableResult public static func transpileAndTest(testCase: SkipTranspilerTestCase?, root packageRoot: URL, moduleRootPath: String = "modules", sourceFolder: String = "Sources", testsFolder: String? = "Tests", targets: SkipTargetSet, destRoot: String, overwrite: Bool = true, studioID: String = androidStudioBundleID) async throws -> URL {
         logger.info("transpiling and testing: \(targets.target.moduleName) from: \(packageRoot.path)")
@@ -120,6 +125,7 @@ extension SkipAssembler {
         return destRoot
     }
 }
+#endif
 
 extension XCTestCase {
     /// Checks that the given Swift compiles to the specified Kotlin.

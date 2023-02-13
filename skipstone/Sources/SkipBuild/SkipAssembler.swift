@@ -32,6 +32,8 @@ public struct SkipTargetSet {
 
 }
 
+#if os(macOS) || os(Linux)
+
 public struct SkipAssembler {
     /// The output folder name for the kotlin interop project (kip)
     public static let kipFolderName = "kip"
@@ -118,7 +120,7 @@ public struct SkipAssembler {
                                 minAndroidSdk: String = "24",
                                 targetAndroidSdk: String = "33",
                                 kotlinVersion: String = "1.8.10",
-                                androidAppLibVersion: String = "7.3.1",
+                                androidAppLibVersion: String = "7.4.1",
                                 kotlinCompilerExtensionVersion: String = "1.4.2",
                                 composeUIVersion: String = "1.1.1",
                                 composeNavVersion: String = "2.5.3",
@@ -144,7 +146,8 @@ public struct SkipAssembler {
                 let linkPath = destURL.pathRelative(to: linkFrom) ?? destURL.path
                 logger.info("linking from \(destURL.path) to \(linkPath)")
 
-                if (try? FileManager.default.destinationOfSymbolicLink(atPath: destURL.path)) != linkFrom.path {
+                // only re-create the link if it is not currently pointing to the expected destination
+                if (try? FileManager.default.destinationOfSymbolicLink(atPath: destURL.path)) != linkPath {
                     try? FileManager.default.removeItem(at: destURL)
                     try FileManager.default.createSymbolicLink(atPath: destURL.path, withDestinationPath: linkPath)
                     // assert(try! string() == String(contentsOf: destURL, encoding: encoding)) // verify that the link was created successfully
@@ -154,7 +157,7 @@ public struct SkipAssembler {
                 // if the size has changed, always write; otherwise, compare string contents
                 if !ifChanged // i.e., always write
                     || (try? destURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) != str.lengthOfBytes(using: encoding) // compare sizes
-                    || (try? String(contentsOf: destURL, encoding: encoding)) != str { // compare contents
+                    || (try? Data(contentsOf: destURL, options: [.alwaysMapped])) != str.data(using: encoding) { // compare contents
                     try str.write(to: destURL, atomically: true, encoding: encoding)
 
                     // remove write attributes from the file, since it is generated
@@ -274,14 +277,21 @@ public struct SkipAssembler {
                         let kotlin = transpilation.output.content
 
                         let processed = try postProcess(kotlin: kotlin, options: testCase ? [.testCase] : [])
-                        try write(processed, to: destPath, ifChanged: true)
+
+                        // only write it out if we aren't about to overwrite it with the raw Kotlin link
+                        // we perform this check so we don't touch the files unnecessarily and stymie incremental builds
+                        if kotlinSources.contains(sourceURL.deletingPathExtension().appendingPathExtension("kt")) {
+                            logger.debug("skipping overridden kotlin path: \(sourceURL.relativePath)")
+                        } else {
+                            try write(processed, to: destPath, ifChanged: true)
+                        }
                     }
                 }
 
                 try await transpileSources(sources: swiftSources)
 
                 /// Copies over the raw Kotlin files from the source folder
-                func copySourceFiles(sources: Set<URL>) async throws {
+                func linkKotlinSourceFiles(sources: Set<URL>) async throws {
                     for sourceURL in sources {
                         let destPath = URL(fileURLWithPath: sourceURL.relativePath, isDirectory: false, relativeTo: kotlinRoot)
                         logger.debug("copying: \(sourceURL.relativePath) to: \(destPath.path)")
@@ -293,11 +303,11 @@ public struct SkipAssembler {
 
 
                 // copy the kotlin files after transpilation, allowing override of same-named .kt/.swift files
-                try await copySourceFiles(sources: kotlinSources)
+                try await linkKotlinSourceFiles(sources: kotlinSources)
 
                 // finally, copy over the build files, overriding the generated ones
                 // FIXME: this is run over the Sources/, so top-level build files won't by copied to the correct destination
-                // try await copySourceFiles(sources: buildFiles)
+                // try await linkKotlinSourceFiles(sources: buildFiles)
 
             }
 
@@ -356,9 +366,10 @@ public struct SkipAssembler {
                 }
 
                 kotlin = """
-                // =========================================
-                // GENERATED FILE; EDITS WILL BE OVERWRITTEN
-                // =========================================
+                // =============================================
+                //             SKIP GENERATED FILE
+                //           EDITS WILL BE OVERWRITTEN
+                // =============================================
 
                 """ + kotlin
 
@@ -401,7 +412,6 @@ public struct SkipAssembler {
                     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.6.+")
                     testImplementation("org.robolectric:robolectric:4.+")
                     androidTestImplementation("com.android.support.test:runner:+")
-
                     \(targetSet.target.isApp ? """
                         implementation("androidx.core:core-ktx:1.7.0")
                         implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.3.1")
@@ -641,6 +651,8 @@ public struct SkipAssembler {
     }
 }
 
+#endif
+
 extension URL {
     /// The folder where built modules will be placed.
     ///
@@ -744,6 +756,7 @@ extension URL {
 
 }
 
+#if os(macOS) || os(Linux)
 extension Process {
     /// Create a process with the given exeuctable and arguments.
     /// - Parameters:
@@ -872,6 +885,7 @@ public actor System {
         }
     }
 }
+#endif
 
 extension Pipe {
     /// Reads all the remaining data available for the pipe.
