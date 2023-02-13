@@ -12,7 +12,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		494E6B0F299A830F00B1A14D /* Skip */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = Skip; sourceTree = "<group>"; };
+		494E6B0F299A830F00B1A14D /* Skip */ = {isa = PBXFileReference; lastKnownFileType = text; name = Skip; path = .; sourceTree = SOURCE_ROOT; };
 		499814D029998BE700A3D586 /* DemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DemoApp.swift; path = Sources/DemoApp/DemoApp.swift; sourceTree = "<group>"; };
 		49C1768F29998A2C00BD96E7 /* DemoApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DemoApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
