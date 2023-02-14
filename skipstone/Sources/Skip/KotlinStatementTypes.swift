@@ -38,17 +38,6 @@ class KotlinReturn: KotlinExpressionStatement {
     }
 }
 
-class KotlinNull: KotlinStatement {
-    init(statement: Statement) {
-        super.init(type: .raw, statement: statement)
-    }
-
-    override func append(to output: OutputGenerator, indentation: Indentation) {
-        output.append(indentation).append("null").append("\n")
-    }
-}
-
-
 // MARK: - Declarations
 
 class KotlinClassDeclaration: KotlinStatement {

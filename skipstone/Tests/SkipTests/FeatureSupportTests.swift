@@ -46,7 +46,7 @@ final class FeatureSupportTests: XCTestCase {
 
     func testReturnNil() async throws {
         // "return nil" should be translated to "return null"
-        try await check(expectFailure: true, swift: """
+        try await check(expectFailure: false, swift: """
         struct Foo {
             public func doSomething() -> String? {
                 return nil

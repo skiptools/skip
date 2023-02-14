@@ -3,6 +3,7 @@ enum KotlinExpressionType {
     case arrayLiteral
     case binaryOperator
     case booleanLiteral
+    case nullLiteral
     case functionCall
     case identifier
     case memberAccess
@@ -109,6 +110,16 @@ class KotlinBooleanLiteral: KotlinExpression {
 
     override func append(to output: OutputGenerator) {
         output.append(String(describing: literal))
+    }
+}
+
+class KotlinNullLiteral: KotlinExpression {
+    init(expression: NilLiteral) {
+        super.init(type: .nullLiteral, expression: expression)
+    }
+
+    override func append(to output: OutputGenerator) {
+        output.append("null")
     }
 }
 

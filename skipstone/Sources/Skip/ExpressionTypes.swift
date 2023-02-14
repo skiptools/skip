@@ -5,6 +5,7 @@ enum ExpressionType: CaseIterable {
     case arrayLiteral
     case binaryOperator
     case booleanLiteral
+    case nilLiteral
     case functionCall
     case identifier
     case memberAccess
@@ -25,6 +26,8 @@ enum ExpressionType: CaseIterable {
             return BinaryOperator.self
         case .booleanLiteral:
             return BooleanLiteral.self
+        case .nilLiteral:
+            return NilLiteral.self
         case .functionCall:
             return FunctionCall.self
         case .identifier:
@@ -200,6 +203,31 @@ class BooleanLiteral: Expression {
         }
         let literal = booleanLiteralExpr.booleanLiteral.text == "true"
         return BooleanLiteral(literal: literal, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+    }
+
+    override var inferredType: TypeSignature {
+        return .bool
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        return [PrettyPrintTree(root: String(describing: literal))]
+    }
+}
+
+/// `nil`
+class NilLiteral: Expression {
+    let literal: NilLiteralExprSyntax
+
+    init(literal: NilLiteralExprSyntax, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        self.literal = literal
+        super.init(type: .nilLiteral, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) -> Expression? {
+        guard syntax.kind == .nilLiteralExpr, let nilLiteralExpr = syntax.as(NilLiteralExprSyntax.self) else {
+            return nil
+        }
+        return NilLiteral(literal: nilLiteralExpr, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
     override var inferredType: TypeSignature {
