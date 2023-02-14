@@ -17,6 +17,7 @@ enum StatementType: CaseIterable {
     case `switch`
     case `throw`
     case `while`
+    case `nil`
 
     case classDeclaration
     case enumDeclaration
@@ -69,6 +70,8 @@ enum StatementType: CaseIterable {
             return nil
         case .while:
             return nil
+        case .nil:
+            return Nil.self
 
         case .classDeclaration:
             return TypeDeclaration.self
@@ -206,6 +209,30 @@ class Return: ExpressionStatement {
         return [PrettyPrintTree(root: "return")] + super.prettyPrintAttributes
     }
 }
+
+class Nil: ExpressionStatement {
+    init(expression: Expression? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        super.init(type: .nil, expression: expression, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+        guard syntax.kind == .nilLiteralExpr else {
+            return nil
+        }
+
+        return [Nil(syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        expression?.inferTypes(context: context, expecting: expecting.or(context.expectedReturn))
+        return context
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        return [PrettyPrintTree(root: "return")] + super.prettyPrintAttributes
+    }
+}
+
 
 // MARK: - Declarations
 

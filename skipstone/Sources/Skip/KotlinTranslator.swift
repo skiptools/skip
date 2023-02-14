@@ -108,6 +108,8 @@ public class KotlinTranslator {
             break
         case .while:
             break
+        case .nil:
+            return [KotlinRawStatement(statement: RawStatement(sourceCode: "null"))]
         case .classDeclaration:
             return [KotlinClassDeclaration.translate(statement: statement as! TypeDeclaration, translator: self)]
         case .enumDeclaration:
