@@ -222,15 +222,6 @@ class Nil: ExpressionStatement {
 
         return [Nil(syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
     }
-
-    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
-        expression?.inferTypes(context: context, expecting: expecting.or(context.expectedReturn))
-        return context
-    }
-
-    override var prettyPrintAttributes: [PrettyPrintTree] {
-        return [PrettyPrintTree(root: "return")] + super.prettyPrintAttributes
-    }
 }
 
 
