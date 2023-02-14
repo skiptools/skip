@@ -25,11 +25,31 @@ final class FeatureSupportTests: XCTestCase {
     }
 
     func testNilToNull() async throws {
-        // "nil" should be translated to null, but is instead still "nil", and return statement should be added
-        try await check(expectFailure: true, swift: """
+        // "nil" should be translated to null
+        try await check(expectFailure: false, swift: """
         struct Foo {
             public func doSomething() -> String? {
                 nil
+            }
+        }
+        """, kotlin: """
+        internal data class Foo {
+            public fun doSomething(): String? {
+                null
+            }
+
+            companion object {
+            }
+        }
+        """)
+    }
+
+    func testReturnNil() async throws {
+        // "return nil" should be translated to "return null"
+        try await check(expectFailure: false, swift: """
+        struct Foo {
+            public func doSomething() -> String? {
+                return nil
             }
         }
         """, kotlin: """

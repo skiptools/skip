@@ -7,7 +7,6 @@ final class BundleTests: XCTestCase {
     var logger = Logger(subsystem: "test", category: "BundleTests")
 
     func testBundle() throws {
-        // SKIP INSERT: val nil = null
         let resourceURL: URL = try XCTUnwrap(Bundle.module.url(forResource: "textasset", withExtension: "txt", subdirectory: nil, localization: nil))
         logger.info("resourceURL: \(resourceURL.absoluteString)")
 
@@ -31,7 +30,6 @@ final class BundleTests: XCTestCase {
         #if !SKIP
         typealias Map = Dictionary
         #endif
-        // SKIP INSERT: val nil = null
 
         let plist = try PropertyListSerialization.propertyList(from: data, format: nil)
 

@@ -5,6 +5,7 @@ enum ExpressionType: CaseIterable {
     case arrayLiteral
     case binaryOperator
     case booleanLiteral
+    case nilLiteral
     case functionCall
     case identifier
     case memberAccess
@@ -25,6 +26,8 @@ enum ExpressionType: CaseIterable {
             return BinaryOperator.self
         case .booleanLiteral:
             return BooleanLiteral.self
+        case .nilLiteral:
+            return NilLiteral.self
         case .functionCall:
             return FunctionCall.self
         case .identifier:
@@ -208,6 +211,36 @@ class BooleanLiteral: Expression {
 
     override var prettyPrintAttributes: [PrettyPrintTree] {
         return [PrettyPrintTree(root: String(describing: literal))]
+    }
+}
+
+/// `nil`
+class NilLiteral: Expression {
+    init(syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        super.init(type: .nilLiteral, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) -> Expression? {
+        guard syntax.kind == .nilLiteralExpr, let _ = syntax.as(NilLiteralExprSyntax.self) else {
+            return nil
+        }
+        return NilLiteral(syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        switch expecting {
+        case .optional(let t):
+            returnType = .optional(t)
+        default:
+            returnType = .optional(.none)
+        }
+        return context
+    }
+
+    private var returnType: TypeSignature = .optional(.none)
+
+    override var inferredType: TypeSignature {
+        return returnType
     }
 }
 
