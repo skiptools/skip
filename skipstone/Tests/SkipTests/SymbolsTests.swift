@@ -9,6 +9,9 @@ final class SymbolsTests: XCTestCase {
 
     override func setUp() async throws {
         let collector = GraphCollector(extensionGraphAssociationStrategy: .extendingGraph)
+        for entry in try await symbolCache.symbols(for: "SkipKotlin", accessLevel: "public") {
+            collector.mergeSymbolGraph(entry.value, at: entry.key)
+        }
         for entry in try await symbolCache.symbols(for: "SkipTests", accessLevel: "private") {
             collector.mergeSymbolGraph(entry.value, at: entry.key)
         }
@@ -32,6 +35,51 @@ final class SymbolsTests: XCTestCase {
         XCTAssertEqual(false, symbols.containsMutableValueType(name: "SymbolsTestsTransitiveAnyObjectRestrictedProtocol"))
     }
 
+    func testIdentifierType() {
+        let context = symbols.context()
+        XCTAssertEqual(.string, context.type(of: "symbolsTestsVar"))
+        XCTAssertEqual(.array(.int), context.type(of: "symbolsTestsArrayVar"))
+        XCTAssertEqual(.dictionary(.string, .int), context.type(of: "symbolsTestsDictionaryVar"))
+        XCTAssertEqual(.named("SymbolsTestsClass", []), context.type(of: "symbolsTestsNamedVar"))
+    }
+
+    func testMemberType() {
+        let context = symbols.context()
+        XCTAssertEqual(.int, context.type(of: "count", in: .array(.int)))
+
+        XCTAssertEqual(.int, context.type(of: "letVar", in: .named("SymbolsTestsImmutableStruct", [])))
+        XCTAssertEqual(.int, context.type(of: "computedVar", in: .named("SymbolsTestsImmutableStruct", [])))
+
+        XCTAssertEqual(.named("SymbolsTestsEnum", []), context.type(of: "case1", in: .named("SymbolsTestsEnum", [])))
+
+        XCTAssertEqual(.function([.string], .int), context.type(of: "f", in: .named("SymbolsTestsImmutableStruct", [])))
+
+        XCTAssertEqual(.string, context.type(of: "1", in: .tuple(["i", "s"], [.int, .string])))
+        XCTAssertEqual(.string, context.type(of: "s", in: .tuple(["i", "s"], [.int, .string])))
+    }
+
+    func testSubscript() {
+        let context = symbols.context()
+        XCTAssertEqual([.function([.int], .int)], context.subscriptSignature(in: .array(.int), arguments: [LabeledValue<TypeSignature>(label: nil, value: .int)]))
+        XCTAssertEqual([.function([.string], .int)], context.subscriptSignature(in: .dictionary(.string, .int), arguments: [LabeledValue<TypeSignature>(label: nil, value: .int)]))
+    }
+
+    func testFunction() {
+        let context = symbols.context()
+        XCTAssertEqual([.function([.int, .string], .int)], context.functionSignature(of: "baseF", in: .named("SymbolsTestsClass", []), arguments: [LabeledValue<TypeSignature>(label: nil, value: .none), LabeledValue<TypeSignature>(label: "p2", value: .none)]))
+        XCTAssertEqual([.function([.int], .int)], context.functionSignature(of: "baseF", in: .named("SymbolsTestsClass", []), arguments: [LabeledValue<TypeSignature>(label: nil, value: .none)]))
+    }
+
+    func testTrailingClosures() {
+        XCTExpectFailure()
+        XCTFail("TODO: Test functions with trailing closures")
+    }
+
+    func testCustomSubscript() {
+        XCTExpectFailure()
+        XCTFail("TODO: Test custom subscript operators")
+    }
+
     func testNestedTypes() {
         XCTExpectFailure()
         XCTFail("TODO: Test nested type symbols")
@@ -39,11 +87,22 @@ final class SymbolsTests: XCTestCase {
 
     func testGenerics() {
         XCTExpectFailure()
-        XCTFail("TODO: Test generics symbols")
+        XCTFail("TODO: Test generics symbols, including standard type declarations like Dictionary<String, Int>")
     }
 }
 
-class SymbolsTestsClass {
+private var symbolsTestsVar = "string"
+private var symbolsTestsArrayVar = [1]
+private var symbolsTestsDictionaryVar: [String: Int] = [:]
+private var symbolsTestsNamedVar = SymbolsTestsClass()
+
+class SymbolsTestsBaseClass {
+    func baseF(_ p1: Int, p2: String = "") -> Int {
+        return 1
+    }
+}
+
+class SymbolsTestsClass: SymbolsTestsBaseClass {
 }
 
 enum SymbolsTestsEnum {
@@ -56,7 +115,7 @@ struct SymbolsTestsImmutableStruct {
     var computedVar: Int {
         return 1
     }
-    func f() -> Int {
+    func f(p: String) -> Int {
         return 1
     }
 }

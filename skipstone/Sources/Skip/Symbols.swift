@@ -19,6 +19,11 @@ public class Symbols {
         for entry in graphs {
             processGraph(entry.value, moduleName: entry.key)
         }
+        for symbol in symbolsByIdentifier.values {
+            var symbolsWithName = symbolsByName[symbol.name] ?? []
+            symbolsWithName.append(symbol)
+            symbolsByName[symbol.name] = symbolsWithName
+        }
     }
 
     /// Create a context that can access the given imported modules.
@@ -68,8 +73,16 @@ public class Symbols {
 
         fileprivate init(symbols: Symbols, importedModuleNames: Set<String>, sourceFile: Source.File?) {
             self.symbols = symbols
+            var importedModuleNames = importedModuleNames
+            importedModuleNames.insert("SkipKotlin") // Contains our supported subset of the Swift builtin module
             self.importedModuleNames = importedModuleNames
             self.sourceFile = sourceFile
+        }
+
+        /// Return the type of the given identifier.
+        func type(of identifier: String) -> TypeSignature {
+            let candidates = symbols.symbolsByName[identifier, default: []].filter { $0.kind == .var }
+            return ranked(candidates).first?.typeSignature(symbols: symbols) ?? .none
         }
 
         /// Return the type of the given member.
@@ -91,12 +104,6 @@ public class Symbols {
                 }
             }
             return .none
-        }
-
-        /// Return the type of the given identifier.
-        func type(of identifier: String) -> TypeSignature {
-            let candidates = symbols.symbolsByName[identifier, default: []].filter { $0.kind == .var }
-            return ranked(candidates).first?.typeSignature(symbols: symbols) ?? .none
         }
 
         /// Return the signatures of the possible member functions being called with the given arguments.
@@ -131,6 +138,12 @@ public class Symbols {
 
         /// Return the signatures of the possible subscripts being called with the given arguments.
         func subscriptSignature(in type: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
+            if case .array(let elementType) = type, arguments.count == 1 {
+                return [.function([.int], elementType)]
+            } else if case .dictionary(let keyType, let valueType) = type, arguments.count == 1 {
+                return [.function([keyType], valueType)]
+            }
+
             let typeNames = candidateTypeNames(for: type)
             for typeName in typeNames {
                 let functions = self.functionSignature(of: "subscript", in: typeName, arguments: arguments)
@@ -156,10 +169,10 @@ public class Symbols {
             for relationship in candidate.relationships {
                 switch relationship.kind {
                 case .memberOf:
-                    guard relationship.isInverse, let member = symbols.symbolsByIdentifier[relationship.targetIdentifier ?? ""] else {
+                    guard relationship.isInverse, let memberSymbol = symbols.symbolsByIdentifier[relationship.targetIdentifier ?? ""], memberSymbol.name == member else {
                         break
                     }
-                    return member.typeSignature(symbols: symbols)
+                    return memberSymbol.typeSignature(symbols: symbols)
                 case .inheritsFrom:
                     guard !relationship.isInverse, let inheritsFrom = symbols.symbolsByIdentifier[relationship.targetIdentifier ?? ""] else {
                         break
@@ -193,7 +206,7 @@ public class Symbols {
             for relationship in candidate.relationships {
                 switch relationship.kind {
                 case .memberOf:
-                    guard relationship.isInverse, let member = symbols.symbolsByIdentifier[relationship.targetIdentifier ?? ""] else {
+                    guard relationship.isInverse, let member = symbols.symbolsByIdentifier[relationship.targetIdentifier ?? ""], member.name == name else {
                         break
                     }
                     if let function = matchFunction(member, arguments: arguments) {
@@ -212,7 +225,7 @@ public class Symbols {
         }
 
         private func matchFunction(_ symbol: Symbol, arguments: [LabeledValue<TypeSignature>]) -> (symbol: Symbol, signature: TypeSignature)? {
-            let parameters = symbol.parameters
+            let parameters = symbol.parameters(symbols: symbols)
             guard parameters.count >= arguments.count else {
                 return nil
             }
@@ -224,7 +237,7 @@ public class Symbols {
                 guard let matchingIndex = matchArgument(argument, to: parameters, startIndex: parameterIndex) else {
                     return nil
                 }
-                matchingParameterTypes.append(parameters[matchingIndex].type?.typeSignature(symbols: symbols).or(argument.value) ?? argument.value)
+                matchingParameterTypes.append(parameters[matchingIndex].type.or(argument.value))
                 parameterIndex = matchingIndex + 1
             }
             // Make sure there are no more required parameters
@@ -234,7 +247,7 @@ public class Symbols {
                 }
             }
 
-            let returnType = symbol.returnType?.typeSignature(symbols: symbols) ?? .none
+            let returnType = symbol.returnType(symbols: symbols)
             return (symbol, .function(matchingParameterTypes, returnType))
         }
 
@@ -258,7 +271,7 @@ public class Symbols {
                     // If there is no label, then either this parameter has to have no label or it has to be a trailing closure
                     if parameter.label == "_" {
                         return startIndex + index
-                    } else if let type = parameter.type, case .function = type.typeSignature(symbols: symbols) {
+                    } else if case .function = parameter.type {
                         return startIndex + index
                     } else if !parameter.hasDefaultValue {
                         return nil
@@ -371,17 +384,12 @@ public class Symbols {
         for entry in graph.symbols {
             if let symbol = symbol(for: entry.value, moduleName: moduleName) {
                 symbolsByIdentifier[symbol.symbol.uniqueIdentifier] = symbol
-            }
+            } 
         }
         if let relationships = graph.relationshipsByLanguage.first(where: { $0.key.interfaceLanguage == "swift" })?.value {
             for relationship in relationships {
                 processRelationship(relationship)
             }
-        }
-        for symbol in symbolsByIdentifier.values {
-            var symbolsWithName = symbolsByName[symbol.name] ?? []
-            symbolsWithName.append(symbol)
-            symbolsByName[symbol.name] = symbolsWithName
         }
     }
 
@@ -435,13 +443,19 @@ private struct Symbol {
         guard let declarationFragments = mixins[SymbolGraph.Symbol.DeclarationFragments.mixinKey] as? SymbolGraph.Symbol.DeclarationFragments else {
             return nil
         }
-        guard let name = declarationFragments.declarationFragments.first(where: { $0.kind == .identifier })?.spelling else {
-            return nil
-        }
 
+        if symbol.kind[selector]?.identifier == .`init` {
+            self.name = "init"
+        } else if symbol.kind[selector]?.identifier == .subscript {
+            self.name = "subscript"
+        } else {
+            guard let name = declarationFragments.declarationFragments.first(where: { $0.kind == .identifier })?.spelling else {
+                return nil
+            }
+            self.name = name
+        }
         self.selector = selector
         self.symbol = symbol
-        self.name = name
         self.moduleName = moduleName
         self.sourceURL = (mixins[SymbolGraph.Symbol.Location.mixinKey] as? SymbolGraph.Symbol.Location)?.url
         self.mixins = mixins
@@ -488,13 +502,13 @@ private struct Symbol {
         case .method:
             fallthrough
         case .func:
-            let rt = returnType?.typeSignature(symbols: symbols) ?? .none
-            let pts = parameters.map { $0.type?.typeSignature(symbols: symbols) ?? .none }
+            let rt = returnType(symbols: symbols)
+            let pts = parameters(symbols: symbols).map { $0.type }
             return .function(pts, rt)
         case .property:
             fallthrough
         case .var:
-            return variableType?.typeSignature(symbols: symbols) ?? .none
+            return variableType(symbols: symbols)
         case .protocol:
             return .named(name, [])
         case .struct:
@@ -524,26 +538,57 @@ private struct Symbol {
         return declarationFragments.hasKeyword("mutating")
     }
 
-    var variableType: SymbolGraph.Symbol.DeclarationFragments.Fragment? {
-        return declarationFragments.declarationFragments.first { $0.kind == .typeIdentifier }
+    func variableType(symbols: Symbols) -> TypeSignature {
+        return typeSignature(in: declarationFragments.declarationFragments, symbols: symbols)
     }
 
-    var returnType: SymbolGraph.Symbol.DeclarationFragments.Fragment? {
-        guard let functionSignature = mixins[SymbolGraph.Symbol.FunctionSignature.mixinKey] as? SymbolGraph.Symbol.FunctionSignature else {
-            return nil
+    func returnType(symbols: Symbols) -> TypeSignature {
+        let declarationFragments = declarationFragments.declarationFragments
+        guard let beginReturnTypeIndex = declarationFragments.lastIndex(where: { $0.spelling.hasSuffix(" -> ") }), beginReturnTypeIndex < declarationFragments.count - 1 else {
+            return .none
         }
-        return functionSignature.returns.first { $0.kind == .typeIdentifier }
+        return typeSignature(in: Array(declarationFragments[beginReturnTypeIndex...]), symbols: symbols)
     }
 
-    var parameters: [Parameter] {
-        guard let functionSignature = mixins[SymbolGraph.Symbol.FunctionSignature.mixinKey] as? SymbolGraph.Symbol.FunctionSignature else {
-            return []
+    func parameters(symbols: Symbols) -> [Parameter] {
+        var parameters: [Parameter] = []
+        var currentParameter: Parameter? = nil
+        for (index, fragment) in declarationFragments.declarationFragments.enumerated() {
+            if fragment.kind == .externalParameter {
+                if let currentParameter {
+                    parameters.append(currentParameter)
+                }
+                currentParameter = Parameter(label: fragment.spelling, hasDefaultValue: false, type: .none)
+            } else if fragment.kind == .typeIdentifier {
+                currentParameter?.type = typeSignature(in: Array(declarationFragments.declarationFragments[max(0, index - 1)...]), symbols: symbols)
+            } else if fragment.spelling.hasPrefix(" = ") {
+                currentParameter?.hasDefaultValue = true
+                if fragment.spelling.hasSuffix(" -> ") {
+                    break
+                }
+            } else if fragment.spelling.hasSuffix(" -> ") {
+                break
+            }
         }
-        return functionSignature.parameters.map { parameter in
-            let name = parameter.name
-            let hasDefaultValue = parameter.declarationFragments.contains { $0.spelling == "=" }
-            let typeFragment = parameter.declarationFragments.first { $0.kind == .typeIdentifier }
-            return Parameter(label: name, hasDefaultValue: hasDefaultValue, type: typeFragment)
+        if let currentParameter {
+            parameters.append(currentParameter)
+        }
+        return parameters
+    }
+
+    private func typeSignature(in fragments: [SymbolGraph.Symbol.DeclarationFragments.Fragment], symbols: Symbols) -> TypeSignature {
+        guard let typeIndex = fragments.firstIndex(where: { $0.kind == .typeIdentifier }) else {
+            return .none
+        }
+        let type = fragments[typeIndex].typeSignature(symbols: symbols)
+        // ': [', 'int', ']'
+        if typeIndex > 0 && typeIndex < fragments.count - 1 && fragments[typeIndex - 1].spelling == ": [" && fragments[typeIndex + 1].spelling == "]" {
+            return .array(type)
+        } else if typeIndex > 0 && typeIndex < fragments.count - 3 && fragments[typeIndex - 1].spelling == ": [" && fragments[typeIndex + 1].spelling == " : " && fragments[typeIndex + 2].kind == .typeIdentifier {
+            let valueType = fragments[typeIndex + 2].typeSignature(symbols: symbols)
+            return.dictionary(type, valueType)
+        } else {
+            return type
         }
     }
 
@@ -562,9 +607,9 @@ private struct Symbol {
     }
 
     struct Parameter {
-        let label: String
-        let hasDefaultValue: Bool
-        let type: SymbolGraph.Symbol.DeclarationFragments.Fragment?
+        var label: String
+        var hasDefaultValue: Bool
+        var type: TypeSignature
     }
 }
 
