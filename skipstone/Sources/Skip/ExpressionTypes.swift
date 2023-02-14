@@ -227,8 +227,20 @@ class NilLiteral: Expression {
         return NilLiteral(syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        switch expecting {
+        case .optional(let t):
+            returnType = .optional(t)
+        default:
+            returnType = .optional(.none)
+        }
+        return context
+    }
+
+    private var returnType: TypeSignature = .optional(.none)
+
     override var inferredType: TypeSignature {
-        return .optional(.none)
+        return returnType
     }
 }
 
