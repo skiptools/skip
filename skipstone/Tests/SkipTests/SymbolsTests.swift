@@ -67,13 +67,20 @@ final class SymbolsTests: XCTestCase {
 
     func testFunction() {
         let context = symbols.context()
+        XCTAssertEqual([.function([], .void)], context.functionSignature(of: "voidF", in: .named("SymbolsTestsClass", []), arguments: []))
+
         XCTAssertEqual([.function([.int, .string], .int)], context.functionSignature(of: "baseF", in: .named("SymbolsTestsClass", []), arguments: [LabeledValue<TypeSignature>(label: nil, value: .none), LabeledValue<TypeSignature>(label: "p2", value: .none)]))
         XCTAssertEqual([.function([.int], .int)], context.functionSignature(of: "baseF", in: .named("SymbolsTestsClass", []), arguments: [LabeledValue<TypeSignature>(label: nil, value: .none)]))
     }
 
     func testTrailingClosures() {
-        XCTExpectFailure()
-        XCTFail("TODO: Test functions with trailing closures")
+        let context = symbols.context()
+        XCTAssertEqual([.function([.int, .function([.string], .int)], .string)], context.functionSignature(of: "trailingClosureF1", in: .named("SymbolsTestsClass", []), arguments: [LabeledValue<TypeSignature>(label: "p1", value: .none), LabeledValue<TypeSignature>(label: "tc1", value: .none)]))
+
+        //~~~
+//        func trailingClosureF1(p1: Int, tc1: (String) -> Int) -> String {
+//            return ""
+//        }
     }
 
     func testCustomSubscript() {
@@ -104,6 +111,16 @@ class SymbolsTestsBaseClass {
 }
 
 class SymbolsTestsClass: SymbolsTestsBaseClass {
+    func voidF() {
+    }
+
+    func trailingClosureF1(p1: Int, tc1: @escaping (String) -> Void = { _ in }) -> String {
+        return ""
+    }
+
+    func trailingClosureF2(p1: Int, tc1: (String) -> Int, tc2: () -> Void) -> String {
+        return ""
+    }
 }
 
 enum SymbolsTestsEnum {

@@ -545,7 +545,7 @@ private struct Symbol {
     func returnType(symbols: Symbols) -> TypeSignature {
         let declarationFragments = declarationFragments.declarationFragments
         guard let beginReturnTypeIndex = declarationFragments.lastIndex(where: { $0.spelling.hasSuffix(" -> ") }), beginReturnTypeIndex < declarationFragments.count - 1 else {
-            return .none
+            return .void
         }
         return typeSignature(in: Array(declarationFragments[beginReturnTypeIndex...]), symbols: symbols)
     }
@@ -627,3 +627,42 @@ private extension SymbolGraph.Symbol.DeclarationFragments.Fragment {
         return TypeSignature.for(name: spelling, genericTypes: [])
     }
 }
+
+
+//~~~
+
+//func returnType(symbols: Symbols) -> TypeSignature {
+//    let (_, returnType) = parseFunctionSignature(symbols: symbols)
+//    return returnType
+//}
+//
+//func parameters(symbols: Symbols) -> [Parameter] {
+//    let (parameters, _) = parseFunctionSignature(symbols: symbols)
+//    return parameters
+//}
+//
+//private func parseFunctionSignature(symbols: Symbols) -> ([Parameter], TypeSignature) {
+//    var parameters: [Parameter] = []
+//    var currentParameter: Parameter? = nil
+//    for (index, fragment) in declarationFragments.declarationFragments.enumerated() {
+//        if fragment.kind == .externalParameter {
+//            if let currentParameter {
+//                parameters.append(currentParameter)
+//            }
+//            currentParameter = Parameter(label: fragment.spelling, hasDefaultValue: false, type: .none)
+//        } else if fragment.kind == .typeIdentifier {
+//            currentParameter?.type = typeSignature(in: Array(declarationFragments.declarationFragments[max(0, index - 1)...]), symbols: symbols)
+//        } else if fragment.spelling.hasPrefix(" = ") {
+//            currentParameter?.hasDefaultValue = true
+//            if fragment.spelling.hasSuffix(" -> ") {
+//                break
+//            }
+//        } else if fragment.spelling.hasSuffix(" -> ") {
+//            break
+//        }
+//    }
+//    if let currentParameter {
+//        parameters.append(currentParameter)
+//    }
+//    return parameters
+//}

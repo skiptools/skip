@@ -245,9 +245,42 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
         }
     }
 
-    /// Return the given type signature if `self == .none`, otherwise return `self`.
+    /// Attempt to replace `.none` cases in this type signature with information from the given signature.
     func or(_ typeSignature: TypeSignature) -> TypeSignature {
-        return self == .none ? typeSignature : self
+        switch self {
+        case .array(.none):
+            if case .array = typeSignature {
+                return typeSignature
+            }
+        case .dictionary(let keyType, let valueType):
+            if case .dictionary(let keyType2, let valueType2) = typeSignature {
+                let resolvedKeyType = keyType.or(keyType2)
+                let resolvedValueType = valueType.or(valueType2)
+                return .dictionary(resolvedKeyType, resolvedValueType)
+            }
+        case .none:
+            return typeSignature
+        case .optional(.none):
+            if case .optional = typeSignature {
+                return typeSignature
+            }
+        case .set(.none):
+            if case .set = typeSignature {
+                return typeSignature
+            }
+        case .tuple(let labels, let types):
+            if case .tuple(_, let types2) = typeSignature, types.count == types2.count {
+                let resolvedTypes = zip(types, types2).map { $0.0.or($0.1) }
+                return .tuple(labels, resolvedTypes)
+            }
+        case .unwrappedOptional(.none):
+            if case .unwrappedOptional = typeSignature {
+                return typeSignature
+            }
+        default:
+            break
+        }
+        return self
     }
 
     /// Whether this is a floating point number.
