@@ -17,4 +17,28 @@ final class BundleTests: XCTestCase {
         let str = try String(contentsOf: resourceURL)
         XCTAssertEqual("Some text\n", str)
     }
+
+    func testLocalizedStrings() throws {
+        let locstr = """
+        /* A comment */
+        "Yes" = "Oui";
+        "The \\\"same\\\" text in English" = "Le \\\"même\\\" texte en anglais";
+        """
+
+        let data = try XCTUnwrap(locstr.data(using: StringEncoding.utf8, allowLossyConversion: false))
+
+        // weird hackery for skip transpilation
+        #if !SKIP
+        typealias Map = Dictionary
+        #endif
+        // SKIP INSERT: val nil = null
+
+        let plist = try PropertyListSerialization.propertyList(from: data, format: nil)
+
+        let dict = try XCTUnwrap(plist as? Map<String, String>)
+
+        XCTAssertEqual("Oui", dict["Yes"])
+        logger.debug("KEYS: \(dict.keys)")
+        XCTAssertEqual("Le \"même\" texte en anglais", dict["The \"same\" text in English"])
+    }
 }

@@ -35,11 +35,7 @@ extension SkipBundle {
         get {
             // this could work better, but JDK 1.9 method is unable to be found…
             // SkipBundle(rawValue: java.lang.StackWalker().getInstance(java.lang.StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass())
-            SkipBundle(rawValue: Class.forName(Thread.currentThread().getStackTrace()[2].getClassName()) as Class<Any>)
-        }
-
-        set {
-            // unused, but needed by Skip
+            return SkipBundle(rawValue: Class.forName(Thread.currentThread().getStackTrace()[2].getClassName()) as Class<Any>)
         }
     }
 
@@ -48,18 +44,12 @@ extension SkipBundle {
         get {
             var url: java.net.URL? = rawValue.getResource(".")
             if (url != null) {
-                SkipURL(url)
+                return SkipURL(url)
             } else {
-                null
+                return null
             }
         }
-
-        set {
-            // unused, but needed by Skip
-        }
     }
-
-    //url(forResource: "textasset", withExtension: "txt", subdirectory: nil, localization: nil)
 
     public func url(forResource: String, withExtension: String?, subdirectory: String?, localization: String?) -> URL? {
         var res = forResource
