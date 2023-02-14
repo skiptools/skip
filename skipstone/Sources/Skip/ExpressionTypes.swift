@@ -216,26 +216,19 @@ class BooleanLiteral: Expression {
 
 /// `nil`
 class NilLiteral: Expression {
-    let literal: NilLiteralExprSyntax
-
-    init(literal: NilLiteralExprSyntax, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
-        self.literal = literal
+    init(syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
         super.init(type: .nilLiteral, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
     override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) -> Expression? {
-        guard syntax.kind == .nilLiteralExpr, let nilLiteralExpr = syntax.as(NilLiteralExprSyntax.self) else {
+        guard syntax.kind == .nilLiteralExpr, let _ = syntax.as(NilLiteralExprSyntax.self) else {
             return nil
         }
-        return NilLiteral(literal: nilLiteralExpr, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+        return NilLiteral(syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
     override var inferredType: TypeSignature {
-        return .none // is this correct? maybe optional?
-    }
-
-    override var prettyPrintAttributes: [PrettyPrintTree] {
-        return [PrettyPrintTree(root: String(describing: literal))]
+        return .optional(.none)
     }
 }
 
