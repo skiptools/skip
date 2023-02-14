@@ -73,12 +73,20 @@ final class FeatureSupportTests: XCTestCase {
         """)
     }
 
-    func testClosures() async throws {
+    func testClosureAnonymousArg() async throws {
         // closure $0 should be converted to `it`
         try await check(expectFailure: true, swift: """
         [1,2,3].map({ $0 })
         """, kotlin: """
         arrayOf(1, 2, 3).map({ it })
+        """)
+    }
+
+    func testClosureNamedArg() async throws {
+        try await check(expectFailure: true, swift: """
+        [1,2,3].map({ x in x + x })
+        """, kotlin: """
+        arrayOf(1, 2, 3).map({ x -> x + x })
         """)
     }
 
@@ -99,4 +107,17 @@ final class FeatureSupportTests: XCTestCase {
         mapOf("a" to 1, "b" to 2.0).map { (_0, _1) -> _1 }
         """)
     }
+
+    func testInOutParameters() async throws {
+        // pointer parameters could be simulated with a binding-style Ref type
+        // or maybe it could use a property delegate like var encoding: String.Encoding? by SomeDelegate()
+        try await check(expectFailure: true, swift: """
+        var encoding: String.Encoding? = nil
+        let contents = String(contentsOfFile: "/etc/hosts", usedEncoding: &encoding)
+        """, kotlin: """
+        var encoding: String.Encoding? = null
+        val contents = String(contentsOfFile = "/etc/hosts", usedEncoding = PointerTo<String.Encoding>(get = { encoding }, set = { encoding = it }))
+        """)
+    }
+
 }
