@@ -65,7 +65,7 @@ public struct Source {
     }
 
     /// A Swift source file.
-    public struct File {
+    public struct File: Hashable {
         public let path: String
 
         public init(path: String) {

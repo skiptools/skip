@@ -20,19 +20,20 @@ final class SymbolsTests: XCTestCase {
     }
 
     func testHasMutableValueType() {
-        XCTAssertNil(symbols.containsMutableValueType(name: "NonExistantTypeName"))
+        let context = symbols.context()
+        XCTAssertNil(context.isMutableValueType(qualifiedName: "NonExistantTypeName"))
 
-        XCTAssertEqual(false, symbols.containsMutableValueType(name: "SymbolsTestsClass"))
-        XCTAssertEqual(false, symbols.containsMutableValueType(name: "SymbolsTestsEnum"))
-        XCTAssertEqual(false, symbols.containsMutableValueType(name: "SymbolsTestsImmutableStruct"))
+        XCTAssertEqual(false, context.isMutableValueType(qualifiedName: "SymbolsTestsClass"))
+        XCTAssertEqual(false, context.isMutableValueType(qualifiedName: "SymbolsTestsEnum"))
+        XCTAssertEqual(false, context.isMutableValueType(qualifiedName: "SymbolsTestsImmutableStruct"))
 
-        XCTAssertEqual(true, symbols.containsMutableValueType(name: "SymbolsTestsMutableVarStruct"))
-        XCTAssertEqual(true, symbols.containsMutableValueType(name: "SymbolsTestsMutableComputedVarStruct"))
-        XCTAssertEqual(true, symbols.containsMutableValueType(name: "SymbolsTestsMutableFuncStruct"))
+        XCTAssertEqual(true, context.isMutableValueType(qualifiedName: "SymbolsTestsMutableVarStruct"))
+        XCTAssertEqual(true, context.isMutableValueType(qualifiedName: "SymbolsTestsMutableComputedVarStruct"))
+        XCTAssertEqual(true, context.isMutableValueType(qualifiedName: "SymbolsTestsMutableFuncStruct"))
 
-        XCTAssertEqual(true, symbols.containsMutableValueType(name: "SymbolsTestsNonAnyObjectRestrictedProtocol"))
-        XCTAssertEqual(false, symbols.containsMutableValueType(name: "SymbolsTestsAnyObjectRestrictedProtocol"))
-        XCTAssertEqual(false, symbols.containsMutableValueType(name: "SymbolsTestsTransitiveAnyObjectRestrictedProtocol"))
+        XCTAssertEqual(true, context.isMutableValueType(qualifiedName: "SymbolsTestsNonAnyObjectRestrictedProtocol"))
+        XCTAssertEqual(false, context.isMutableValueType(qualifiedName: "SymbolsTestsAnyObjectRestrictedProtocol"))
+        XCTAssertEqual(false, context.isMutableValueType(qualifiedName: "SymbolsTestsTransitiveAnyObjectRestrictedProtocol"))
     }
 
     func testIdentifierType() {

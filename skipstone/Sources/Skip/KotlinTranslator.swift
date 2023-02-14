@@ -1,7 +1,8 @@
 /// Translates a Swift syntax tree to Kotlin code.
 public class KotlinTranslator {
     let syntaxTree: SyntaxTree
-    private(set) var codebaseInfo: KotlinCodebaseInfo?
+    private(set) var codebaseInfo: KotlinCodebaseInfo.Context?
+    private(set) var packageName: String?
 
     public init(syntaxTree: SyntaxTree) {
         self.syntaxTree = syntaxTree
@@ -37,7 +38,14 @@ public class KotlinTranslator {
 
     /// Translate and transpile to source code.
     public func transpile(codebaseInfo: KotlinCodebaseInfo) -> Transpilation {
-        self.codebaseInfo = codebaseInfo
+        let importedModuleNames: [String] = syntaxTree.statements.compactMap { statement in
+            guard statement.type == .importDeclaration, let importDeclaration = statement as? ImportDeclaration else {
+                return nil
+            }
+            return importDeclaration.modulePath.first
+        }
+        self.codebaseInfo = codebaseInfo.context(importedModuleNames: importedModuleNames, sourceFile: syntaxTree.source.file)
+        self.packageName = codebaseInfo.packageName
         
         let kotlinSyntaxTree = translateSyntaxTree()
         let messages = codebaseInfo.messages(for: syntaxTree.source.file) + kotlinSyntaxTree.messages
@@ -50,7 +58,7 @@ public class KotlinTranslator {
     /// Translate syntax trees only.
     public func translateSyntaxTree() -> KotlinSyntaxTree {
         var packageStatements: [KotlinStatement] = []
-        if let packageName = codebaseInfo?.packageName {
+        if let packageName {
             packageStatements = [
                 KotlinRawStatement(sourceCode: "package \(packageName)"),
                 KotlinRawStatement(sourceCode: ""),

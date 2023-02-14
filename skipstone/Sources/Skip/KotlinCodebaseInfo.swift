@@ -2,7 +2,7 @@
 public class KotlinCodebaseInfo {
     /// The package being generated.
     public let packageName: String?
-    let symbols: Symbols?
+    private let symbols: Symbols?
 
     public init(packageName: String? = nil, symbols: Symbols? = nil) {
         self.packageName = packageName
@@ -19,22 +19,22 @@ public class KotlinCodebaseInfo {
         return []
     }
 
-    private var typeInfo: [String: (type: StatementType, mayBeMutableValueType: Bool?)] = [:]
-    private var extensionDeclarations: [String: [ExtensionDeclaration]] = [:]
+    fileprivate var typeInfo: [String: [TypeInfo]] = [:]
+    fileprivate var extensionInfo: [String: [ExtensionInfo]] = [:]
 
     private func gather(from statement: Statement) {
         switch statement.type {
         case .classDeclaration:
-            typeInfo[(statement as! TypeDeclaration).qualifiedName] = (.classDeclaration, false)
+            addTypeInfo(for: statement as! TypeDeclaration, mayBeMutableValueType: false)
         case .enumDeclaration:
-            typeInfo[(statement as! TypeDeclaration).qualifiedName] = (.enumDeclaration, false)
+            addTypeInfo(for: statement as! TypeDeclaration, mayBeMutableValueType: false)
         case .protocolDeclaration:
             let typeDeclaration = statement as! TypeDeclaration
             // A protocol may not be mutable value if it extends from AnyObject, may be if it extends from nothing,
             // and we're not sure if it extends from other protocols which may themselves extend from AnyObject. We'll
             // check its symbols later
             let mayBeMutableValueType: Bool? = typeDeclaration.inherits.contains(.anyObject) ? false : typeDeclaration.inherits.isEmpty ? true : nil
-            typeInfo[typeDeclaration.qualifiedName] = (.protocolDeclaration, mayBeMutableValueType)
+            addTypeInfo(for: typeDeclaration, mayBeMutableValueType: mayBeMutableValueType)
         case .structDeclaration:
             let typeDeclaration = statement as! TypeDeclaration
             let mayBeMutableValueType = typeDeclaration.members.contains { member in
@@ -48,48 +48,93 @@ public class KotlinCodebaseInfo {
                     return false
                 }
             }
-            typeInfo[typeDeclaration.qualifiedName] = (.protocolDeclaration, mayBeMutableValueType)
+            addTypeInfo(for: typeDeclaration, mayBeMutableValueType: mayBeMutableValueType)
         case .extensionDeclaration:
             let declaration = statement as! ExtensionDeclaration
             let key = declaration.extends.description
-            if var declarations = extensionDeclarations[key] {
-                declarations.append(declaration)
-                extensionDeclarations[key] = declarations
-            } else {
-                extensionDeclarations[key] = [declaration]
-            }
+            var infos = extensionInfo[key, default: []]
+            infos.append(ExtensionInfo(declaration: declaration, sourceFile: statement.sourceFile))
+            extensionInfo[key] = infos
         default:
             break
         }
     }
 
-    /// Return all extensions of a given type.
-    func extensions(of declaration: TypeDeclaration) -> [ExtensionDeclaration] {
-        return extensionDeclarations[declaration.qualifiedName] ?? []
+    private func addTypeInfo(for typeDeclaration: TypeDeclaration, mayBeMutableValueType: Bool?) {
+        var infos = typeInfo[typeDeclaration.qualifiedName, default: []]
+        infos.append(TypeInfo(declarationType: typeDeclaration.type, mayBeMutableValueType: mayBeMutableValueType, isPrivate: typeDeclaration.modifiers.visibility == .private, sourceFile: typeDeclaration.sourceFile))
+        typeInfo[typeDeclaration.qualifiedName] = infos
     }
 
-    /// Whether the given qualified type name is a class, struct, etc *within this module*.
-    func declarationType(of qualifiedName: String) -> StatementType? {
-        return typeInfo[qualifiedName]?.type
+    /// Create a context that can access the given imported modules.
+    func context(importedModuleNames: [String] = [], sourceFile: Source.File? = nil) -> Context {
+        return Context(codebaseInfo: self, symbols: symbols?.context(importedModuleNames: importedModuleNames, sourceFile: sourceFile), sourceFile: sourceFile)
     }
 
-    /// Whether a function with the given signature is implementing an inherited protocol function of the given type.
-    func isProtocolMember(declaration: FunctionDeclaration, in typeDeclaration: TypeDeclaration) -> Bool {
-        // TODO: Needs to check all protocol conformances of the given type, including protocols of protocols, etc
-        return false
-    }
+    /// A context for accessing codebase information.
+    struct Context {
+        let symbols: Symbols.Context?
+        private let codebaseInfo: KotlinCodebaseInfo
+        private let sourceFile: Source.File?
 
-    /// Whether a property with the given signature is implementing an inherited protocol property of the given type.
-    func isProtocolMember(declaration: VariableDeclaration, in typeDeclaration: TypeDeclaration) -> Bool {
-        // TODO: Needs to check all protocol conformances of the given type, including protocols of protocols, etc
-        return false
-    }
-
-    /// Whether the given qualified type name may map to a mutable value type.
-    func mayBeMutableValueType(qualifiedName: String) -> Bool {
-        if let mayBeMutableValueType = typeInfo[qualifiedName]?.mayBeMutableValueType {
-            return mayBeMutableValueType
+        fileprivate init(codebaseInfo: KotlinCodebaseInfo, symbols: Symbols.Context?, sourceFile: Source.File?) {
+            self.codebaseInfo = codebaseInfo
+            self.symbols = symbols
+            self.sourceFile = sourceFile
         }
-        return symbols?.containsMutableValueType(name: qualifiedName) != false
+
+        /// Return all extensions of a given type.
+        func extensions(of declaration: TypeDeclaration) -> [ExtensionDeclaration] {
+            return codebaseInfo.extensionInfo[declaration.qualifiedName, default: []].compactMap { info in
+                guard declaration.modifiers.visibility != .private || declaration.sourceFile == info.sourceFile else {
+                    return nil
+                }
+                return info.declaration
+            }
+        }
+
+        /// Whether the given qualified type name is a class, struct, etc *within this module*.
+        func declarationType(of qualifiedName: String) -> StatementType? {
+            for info in codebaseInfo.typeInfo[qualifiedName, default: []] {
+                if !info.isPrivate || info.sourceFile == sourceFile {
+                    return info.declarationType
+                }
+            }
+            return nil
+        }
+
+        /// Whether a function with the given signature is implementing an inherited protocol function of the given type.
+        func isProtocolMember(declaration: FunctionDeclaration, in typeDeclaration: TypeDeclaration) -> Bool {
+            // TODO: Needs to check all protocol conformances of the given type, including protocols of protocols, etc
+            return false
+        }
+
+        /// Whether a property with the given signature is implementing an inherited protocol property of the given type.
+        func isProtocolMember(declaration: VariableDeclaration, in typeDeclaration: TypeDeclaration) -> Bool {
+            // TODO: Needs to check all protocol conformances of the given type, including protocols of protocols, etc
+            return false
+        }
+
+        /// Whether the given qualified type name may map to a mutable value type.
+        func mayBeMutableValueType(qualifiedName: String) -> Bool {
+            for info in codebaseInfo.typeInfo[qualifiedName, default: []] {
+                if !info.isPrivate || info.sourceFile == sourceFile, let mayBeMutableValueType = info.mayBeMutableValueType {
+                    return mayBeMutableValueType
+                }
+            }
+            return symbols?.isMutableValueType(qualifiedName: qualifiedName) != false
+        }
     }
+}
+
+private struct TypeInfo {
+    let declarationType: StatementType
+    let mayBeMutableValueType: Bool?
+    let isPrivate: Bool
+    let sourceFile: Source.File?
+}
+
+private struct ExtensionInfo {
+    let declaration: ExtensionDeclaration
+    let sourceFile: Source.File?
 }

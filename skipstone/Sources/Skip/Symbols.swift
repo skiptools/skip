@@ -31,40 +31,6 @@ public class Symbols {
         return Context(symbols: self, importedModuleNames: Set(importedModuleNames), sourceFile: sourceFile)
     }
 
-    /// Whether the given name maps to a symbol that is known to be a mutable value type.
-    ///
-    /// - Returns: true if a symbol exists for a mutable value type, false if only immutable type symbols exist, and nil if no type symbol exists.
-    func containsMutableValueType(name: String) -> Bool? {
-        guard let candidates = symbolsByName[name] else {
-            return nil
-        }
-        var hasType = false
-        for candidate in candidates {
-            guard let kind = candidate.kind else {
-                continue
-            }
-            switch kind {
-            case .class:
-                hasType = true
-            case .enum:
-                hasType = true
-            case .struct:
-                if isMutableStruct(candidate) {
-                    return true
-                }
-                hasType = true
-            case .protocol:
-                if !isAnyObjectRestrictedProtocol(candidate) {
-                    return true
-                }
-                hasType = true
-            default:
-                break
-            }
-        }
-        return hasType ? false : nil
-    }
-
     /// A context for accessing symbol information.
     struct Context {
         private let symbols: Symbols
@@ -77,6 +43,40 @@ public class Symbols {
             importedModuleNames.insert("SkipKotlin") // Contains our supported subset of the Swift builtin module
             self.importedModuleNames = importedModuleNames
             self.sourceFile = sourceFile
+        }
+
+        /// Whether the given name maps to a symbol that is known to be a mutable value type.
+        ///
+        /// - Returns: true if a symbol exists for a mutable value type, false if only immutable type symbols exist, and nil if no type symbol exists.
+        func isMutableValueType(qualifiedName: String) -> Bool? {
+            guard let candidates = symbols.symbolsByName[qualifiedName] else {
+                return nil
+            }
+            var hasType = false
+            for candidate in ranked(candidates) {
+                guard let kind = candidate.kind else {
+                    continue
+                }
+                switch kind {
+                case .class:
+                    hasType = true
+                case .enum:
+                    hasType = true
+                case .struct:
+                    if isMutableStruct(candidate) {
+                        return true
+                    }
+                    hasType = true
+                case .protocol:
+                    if !isAnyObjectRestrictedProtocol(candidate) {
+                        return true
+                    }
+                    hasType = true
+                default:
+                    break
+                }
+            }
+            return hasType ? false : nil
         }
 
         /// Return the type of the given identifier.
@@ -186,6 +186,46 @@ public class Symbols {
                 }
             }
             return .none
+        }
+
+        private func isMutableStruct(_ symbol: Symbol) -> Bool {
+            for relationship in symbol.relationships {
+                guard relationship.kind == .memberOf && relationship.isInverse else {
+                    continue
+                }
+                guard let member = symbols.symbolsByIdentifier[relationship.targetIdentifier ?? ""], let memberKind = member.kind else {
+                    // Assume any unknown member might be mutating
+                    return true
+                }
+                switch memberKind {
+                case .property:
+                    if member.isVariableReadWrite {
+                        return true
+                    }
+                case .method:
+                    if member.isFunctionMutating {
+                        return true
+                    }
+                default:
+                    break
+                }
+            }
+            return false
+        }
+
+        private func isAnyObjectRestrictedProtocol(_ symbol: Symbol) -> Bool {
+            if symbol.isAnyObjectRestricted {
+                return true
+            }
+            for relationship in symbol.relationships {
+                guard relationship.kind == .conformsTo, !relationship.isInverse, let conformsTo = symbols.symbolsByIdentifier[relationship.targetIdentifier ?? ""] else {
+                    continue
+                }
+                if isAnyObjectRestrictedProtocol(conformsTo) {
+                    return true
+                }
+            }
+            return false
         }
 
         private func functionSignature(of name: String, in typeName: String, arguments: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
@@ -338,46 +378,6 @@ public class Symbols {
                 return [type.description]
             }
         }
-    }
-
-    private func isMutableStruct(_ symbol: Symbol) -> Bool {
-        for relationship in symbol.relationships {
-            guard relationship.kind == .memberOf && relationship.isInverse else {
-                continue
-            }
-            guard let member = symbolsByIdentifier[relationship.targetIdentifier ?? ""], let memberKind = member.kind else {
-                // Assume any unknown member might be mutating
-                return true
-            }
-            switch memberKind {
-            case .property:
-                if member.isVariableReadWrite {
-                    return true
-                }
-            case .method:
-                if member.isFunctionMutating {
-                    return true
-                }
-            default:
-                break
-            }
-        }
-        return false
-    }
-
-    private func isAnyObjectRestrictedProtocol(_ symbol: Symbol) -> Bool {
-        if symbol.isAnyObjectRestricted {
-            return true
-        }
-        for relationship in symbol.relationships {
-            guard relationship.kind == .conformsTo, !relationship.isInverse, let conformsTo = symbolsByIdentifier[relationship.targetIdentifier ?? ""] else {
-                continue
-            }
-            if isAnyObjectRestrictedProtocol(conformsTo) {
-                return true
-            }
-        }
-        return false
     }
 
     private func processGraph(_ graph: UnifiedSymbolGraph, moduleName: String) {

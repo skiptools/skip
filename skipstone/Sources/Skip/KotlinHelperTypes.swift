@@ -200,7 +200,7 @@ extension TypeSignature {
         }
     }
 
-    func kotlinMayBeSharedMutableValue(codebaseInfo: KotlinCodebaseInfo?) -> Bool {
+    func kotlinMayBeSharedMutableValue(codebaseInfo: KotlinCodebaseInfo.Context?) -> Bool {
         switch self {
         case .any:
             return true
