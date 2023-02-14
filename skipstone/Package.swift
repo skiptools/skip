@@ -43,7 +43,7 @@ let package = Package(
         .testTarget(name: "SkipBuildTests", dependencies: ["SkipBuild"]),
         .testTarget(name: "SkipUnitTests", dependencies: ["SkipUnit"]),
         .testTarget(name: "SkipKotlinTests", dependencies: ["SkipKotlin", "SkipUnit"]),
-        .testTarget(name: "SkipFoundationTests", dependencies: ["SkipFoundation", "SkipUnit"]),
+        .testTarget(name: "SkipFoundationTests", dependencies: ["SkipFoundation", "SkipUnit"], resources: [.process("Resources")]),
         .testTarget(name: "SkipUITests", dependencies: ["SkipUI", "SkipUnit"]),
         .testTarget(name: "SkipDemoAppTests", dependencies: ["SkipDemoApp", "SkipUnit"]),
         .testTarget(name: "SkipDemoLibTests", dependencies: ["SkipDemoLib", "SkipUnit"]),

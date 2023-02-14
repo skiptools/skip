@@ -25,6 +25,8 @@ public struct SkipData : RawRepresentable {
 
 #else
 
+// SKIP INSERT: public operator fun String.Companion.invoke(contentsOf: URL): String { return contentsOf.rawValue.readText() }
+
 // SKIP INSERT: public operator fun SkipData.Companion.invoke(contentsOf: URL): SkipData { return SkipData.contentsOfURL(url = contentsOf) }
 // SKIP XXX INSERT: public fun Data(contentsOf: URL): SkipData { return SkipData.contentsOfURL(url = contentsOf) }
 

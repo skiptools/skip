@@ -129,6 +129,8 @@ public struct SkipAssembler {
                                 kotlinCompilerExtensionVersion: String = "1.4.2",
                                 composeUIVersion: String = "1.1.1",
                                 composeNavVersion: String = "2.5.3",
+                                resourcesPrefix: String = "Resources/",
+                                resourcesDestPrefix: String = "resources/",
                                 studioID: String = androidStudioBundleID
     ) async throws -> (root: URL, files: [URL]) {
         let destRoot = URL(fileURLWithPath: destRoot, isDirectory: true, relativeTo: packageRoot)
@@ -150,6 +152,7 @@ public struct SkipAssembler {
             if let linkFrom = linkFrom {
                 let linkPath = destURL.pathRelative(to: linkFrom) ?? destURL.path
                 logger.info("linking from \(destURL.path) to \(linkPath)")
+                try? FileManager.default.createDirectory(at: destURL.deletingLastPathComponent(), withIntermediateDirectories: true)
 
                 // only re-create the link if it is not currently pointing to the expected destination
                 if (try? FileManager.default.destinationOfSymbolicLink(atPath: destURL.path)) != linkPath {
@@ -219,21 +222,30 @@ public struct SkipAssembler {
 
             let moduleKotlinSourceRoot = URL(fileURLWithPath: "src/main/kotlin", isDirectory: true, relativeTo: moduleRoot)
                 .appendingPathComponent(packagePath, isDirectory: true)
+            let moduleKotlinSourceResourcesRoot = URL(fileURLWithPath: "src/main/resources", isDirectory: true, relativeTo: moduleRoot)
+                .appendingPathComponent(packagePath, isDirectory: true)
+//            let moduleKotlinSourceAssetsRoot = URL(fileURLWithPath: "src/main/assets", isDirectory: true, relativeTo: moduleRoot)
+//                .appendingPathComponent(packagePath, isDirectory: true)
             let moduleKotlinTestRoot = URL(fileURLWithPath: "src/test/kotlin", isDirectory: true, relativeTo: moduleRoot)
                 .appendingPathComponent(packagePath, isDirectory: true)
+            let moduleKotlinTestResourcesRoot = URL(fileURLWithPath: "src/test/resources", isDirectory: true, relativeTo: moduleRoot)
+                .appendingPathComponent(packagePath, isDirectory: true)
+//            let moduleKotlinTestAssetsRoot = URL(fileURLWithPath: "src/test/assets", isDirectory: true, relativeTo: moduleRoot)
+//                .appendingPathComponent(packagePath, isDirectory: true)
 
             try fm.createDirectory(at: moduleKotlinSourceRoot, withIntermediateDirectories: true)
 
             logger.info("scanning: \(moduleSwiftSourceRoot.path)")
 
-            for (testCase, kotlinRoot, swiftRoot) in [
-                (false, moduleKotlinSourceRoot, moduleSwiftSourceRoot),
-                (true, moduleKotlinTestRoot, moduleSwiftTestRoot),
+            for (testCase, kotlinRoot, swiftRoot, assetsRoot) in [
+                (false, moduleKotlinSourceRoot, moduleSwiftSourceRoot, moduleKotlinSourceResourcesRoot),
+                (true, moduleKotlinTestRoot, moduleSwiftTestRoot, moduleKotlinTestResourcesRoot),
             ] {
                 // the sources we have scanned, which will all be transpiled together
                 var swiftSources: Set<URL> = []
                 var kotlinSources: Set<URL> = []
                 var buildFiles: Set<URL> = []
+                var resourceFiles: Set<URL> = []
 
                 try await swiftRoot?.walkFileURL { fileURL in
                     logger.debug("file: \(fileURL.relativePath)")
@@ -241,6 +253,10 @@ public struct SkipAssembler {
 
                     let isDir = try fileURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory
                     switch (fileURL.lastPathComponent, fileURL.pathExtension) {
+                    case (_, _) where fileURL.relativePath.hasPrefix(resourcesPrefix):
+                        resourceFiles.insert(fileURL)
+//                    case (_, _) where fileURL.relativePath.hasPrefix("Bundle/"): // TODO: folder structure-retaining copy
+//                        bundleFiles.insert(fileURL)
                     case (_, "swift") where isDir == false:
                         swiftSources.insert(fileURL)
                     case ("build.gradle.kts", _):
@@ -259,6 +275,8 @@ public struct SkipAssembler {
                         // TODO: translate assets to somewhere
                         logger.warning("warning: unhandled xcassets: \(fileURL.relativePath)")
                         break
+                    case (_, _) where isDir == true:
+                        break // ignore unrecognized folders
                     default:
                         logger.warning("warning: unhandled path: \(fileURL.relativePath)")
                         break
@@ -297,19 +315,26 @@ public struct SkipAssembler {
                 try await transpileSources(sources: swiftSources)
 
                 /// Copies over the raw Kotlin files from the source folder
-                func linkKotlinSourceFiles(sources: Set<URL>) async throws {
+                func linkSourceFiles(sources: Set<URL>, assets: Bool) async throws {
                     for sourceURL in sources {
-                        let destPath = URL(fileURLWithPath: sourceURL.relativePath, isDirectory: false, relativeTo: kotlinRoot)
-                        logger.debug("copying: \(sourceURL.relativePath) to: \(destPath.path)")
+                        var destPath = sourceURL.relativePath
+                        if assets && destPath.hasPrefix(resourcesPrefix) {
+                            destPath = String(destPath.dropFirst(resourcesPrefix.count))
+                        }
+                        let destURL = URL(fileURLWithPath: destPath, isDirectory: false, relativeTo: assets ? assetsRoot : kotlinRoot)
+                        logger.debug("copying: \(sourceURL.relativePath) to: \(destURL.path)")
                         // try FileManager.default.copyItem(at: sourceURL, to: destPath)
                         // only copy when the contents have changed, to avoid triggering unnecessary gradle rebuild
-                        try write(String(contentsOf: sourceURL), to: destPath, linkFrom: sourceURL, ifChanged: true)
+                        try write(String(contentsOf: sourceURL), to: destURL, linkFrom: sourceURL, ifChanged: true)
                     }
                 }
 
 
                 // copy the kotlin files after transpilation, allowing override of same-named .kt/.swift files
-                try await linkKotlinSourceFiles(sources: kotlinSources)
+                try await linkSourceFiles(sources: kotlinSources, assets: false)
+
+                // link over resource files
+                try await linkSourceFiles(sources: resourceFiles, assets: true)
 
                 // finally, copy over the build files, overriding the generated ones
                 // FIXME: this is run over the Sources/, so top-level build files won't by copied to the correct destination
@@ -439,12 +464,15 @@ public struct SkipAssembler {
                     namespace = group as String
                     sourceSets.getByName("main") {
                         kotlin.setSrcDirs(listOf("src/main/kotlin"))
+                        assets.srcDirs("src/main/assets")
                     }
                     sourceSets.getByName("test") {
                         kotlin.setSrcDirs(listOf("src/test/kotlin"))
+                        assets.srcDirs("src/test/assets")
                     }
                     sourceSets.getByName("androidTest") {
                         kotlin.setSrcDirs(listOf("src/test/kotlin"))
+                        assets.srcDirs("src/test/assets")
                     }
                     compileSdkVersion(\(targetAndroidSdk))
                     defaultConfig {
@@ -459,6 +487,11 @@ public struct SkipAssembler {
                     }
                     kotlinOptions {
                         jvmTarget = "\(javaVersion)"
+                    }
+                    kotlin {
+                        jvmToolchain {
+                            languageVersion.set(JavaLanguageVersion.of("\(javaVersion)"))
+                        }
                     }
                     \(targetSet.target.isApp ? """
                         buildFeatures {
@@ -479,7 +512,6 @@ public struct SkipAssembler {
                 tasks.withType<Test>().configureEach {
                     systemProperties.put("robolectric.logging", "stdout")
                 }
-
                 """
 
                 try write(buildGradleSource, to: buildGradle, ifChanged: true)
