@@ -231,7 +231,7 @@ class NilLiteral: Expression {
     }
 
     override var inferredType: TypeSignature {
-        return .bool
+        return .none // is this correct? maybe optional?
     }
 
     override var prettyPrintAttributes: [PrettyPrintTree] {
