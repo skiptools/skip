@@ -264,6 +264,10 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
             if case .optional = typeSignature {
                 return typeSignature
             }
+            if case .unwrappedOptional(let type) = typeSignature {
+                return .optional(type)
+            }
+            return .optional(typeSignature)
         case .set(.none):
             if case .set = typeSignature {
                 return typeSignature
@@ -277,6 +281,10 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
             if case .unwrappedOptional = typeSignature {
                 return typeSignature
             }
+            if case .optional(let type) = typeSignature {
+                return .unwrappedOptional(type)
+            }
+            return .unwrappedOptional(typeSignature)
         default:
             break
         }

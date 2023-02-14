@@ -228,19 +228,14 @@ class NilLiteral: Expression {
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
-        switch expecting {
-        case .optional(let t):
-            returnType = .optional(t)
-        default:
-            returnType = .optional(.none)
-        }
+        resultType = resultType.or(expecting)
         return context
     }
 
-    private var returnType: TypeSignature = .optional(.none)
+    private var resultType: TypeSignature = .optional(.none)
 
     override var inferredType: TypeSignature {
-        return returnType
+        return resultType
     }
 }
 
@@ -315,7 +310,7 @@ class FunctionCall: Expression {
             for (index, argument) in arguments.enumerated() {
                 argument.value.inferTypes(context: context, expecting: function.parameterTypes[index])
             }
-            returnType = function.returnType
+            returnType = function.returnType.or(expecting)
         } else {
             returnType = expecting
         }
@@ -583,7 +578,7 @@ class Subscript: Expression {
             for (index, argument) in arguments.enumerated() {
                 argument.value.inferTypes(context: context, expecting: function.parameterTypes[index])
             }
-            returnType = function.returnType
+            returnType = function.returnType.or(expecting)
         } else {
             returnType = expecting
         }
