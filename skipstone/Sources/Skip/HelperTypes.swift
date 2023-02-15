@@ -349,6 +349,105 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
         }
     }
 
+    /// Whether this type may be represented by the given type using fuzzy matching.
+    func isCompatible(with type: TypeSignature) -> Bool {
+        if type == self {
+            return true
+        }
+
+        var type = type
+        if case .optional(let wrappedType) = type {
+            type = wrappedType
+        } else if case .unwrappedOptional(let wrappedType) = type {
+            type = wrappedType
+        }
+        if type == self {
+            return true
+        }
+
+        switch self {
+        case .any:
+            return true
+        case .anyObject:
+            return true
+        case .array(let elementType):
+            if case .array(let elementType2) = type {
+                return elementType.isCompatible(with: elementType2)
+            }
+            if case .set(let elementType2) = type {
+                return elementType.isCompatible(with: elementType2)
+            }
+        case .character:
+            if type.isStringy {
+                return true
+            }
+        case .dictionary(let keyType, let valueType):
+            if case .dictionary(let keyType2, let valueType2) = type {
+                return keyType.isCompatible(with: keyType2) && valueType.isCompatible(with: valueType2)
+            }
+        case .double:
+            fallthrough
+        case .float:
+            fallthrough
+        case .int:
+            fallthrough
+        case .int8:
+            fallthrough
+        case .int16:
+            fallthrough
+        case .int32:
+            fallthrough
+        case .int64:
+            fallthrough
+        case .uint:
+            fallthrough
+        case .uint8:
+            fallthrough
+        case .uint16:
+            fallthrough
+        case .uint32:
+            fallthrough
+        case .uint64:
+            if type.isNumeric {
+                return true
+            }
+        case .function:
+            if case .function = type {
+                return true
+            }
+        case .named(let name, _):
+            if case .named(let name2, _) = type {
+                return name == name2
+            }
+        case .none:
+            return true
+        case .optional(let wrappedType):
+            return wrappedType.isCompatible(with: type)
+        case .set(let elementType):
+            if case .array(let elementType2) = type {
+                return elementType.isCompatible(with: elementType2)
+            }
+            if case .set(let elementType2) = type {
+                return elementType.isCompatible(with: elementType2)
+            }
+        case .string:
+            if type.isStringy {
+                return true
+            }
+        case .tuple(_, let types):
+            if case .tuple(_, let types2) = type {
+                return types.count == types2.count && !zip(types, types2).contains(where: { !$0.0.isCompatible(with: $0.1) })
+            }
+        case .unwrappedOptional(let wrappedType):
+            return wrappedType.isCompatible(with: type)
+        case .void:
+            return type == .none
+        default:
+            break
+        }
+        return type == .none || type == .any || type == .anyObject
+    }
+
     /// Create a type signature for the given syntax.
     static func `for`(syntax: TypeSyntax) -> TypeSignature {
         switch syntax.kind {

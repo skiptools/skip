@@ -85,7 +85,7 @@ final class SymbolsTests: XCTestCase {
         let f3Type: TypeSignature = .function([.optional(.dictionary(.int, .string)), .function([], .array(.int))], .function([.named("SymbolsTestsEnum", [])], .int))
         XCTAssertEqual([f3Type], context.functionSignature(of: "trailingClosureF3", in: .named("SymbolsTestsClass", []), arguments: [LabeledValue<TypeSignature>(label: nil, value: .none), LabeledValue<TypeSignature>(label: "tc1", value: .none)]))
         XCTAssertEqual([f3Type], context.functionSignature(of: "trailingClosureF3", in: .named("SymbolsTestsClass", []), arguments: [LabeledValue<TypeSignature>(label: nil, value: .none), LabeledValue<TypeSignature>(label: nil, value: .none)]))
-//        XCTAssertEqual([.function([.function([], .array(.int))], .function([.named("SymbolsTestsEnum", [])], .int))], context.functionSignature(of: "trailingClosureF3", in: .named("SymbolsTestsClass", []), arguments: [LabeledValue<TypeSignature>(label: nil, value: .none)]))
+        XCTAssertEqual([.function([.function([], .array(.int))], .function([.named("SymbolsTestsEnum", [])], .int))], context.functionSignature(of: "trailingClosureF3", in: .named("SymbolsTestsClass", []), arguments: [LabeledValue<TypeSignature>(label: nil, value: .function([], .none))]))
     }
 
     func testCustomSubscript() {

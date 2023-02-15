@@ -307,9 +307,9 @@ public class Symbols {
                     }
                 } else {
                     // If there is no label, then either this parameter has to have no label or it has to be a trailing closure
-                    if parameter.label == "_" {
+                    if parameter.label == "_" && parameter.type.isCompatible(with: argument.value) {
                         return startIndex + index
-                    } else if case .function = parameter.type {
+                    } else if case .function = parameter.type, parameter.type.isCompatible(with: argument.value) {
                         return startIndex + index
                     } else if !parameter.hasDefaultValue {
                         return nil
