@@ -674,6 +674,7 @@ private struct Symbol {
         var inParentheses = false
         var inBraces = false
         var inGenerics = false
+        var isOptional = false
         outer: while i < s.count {
             if let fragment = specialFragments[i] {
                 switch fragment.kind {
@@ -706,6 +707,10 @@ private struct Symbol {
                 if inBraces {
                     i += 1
                 }
+                if i < s.count && s[i] == "?" {
+                    isOptional = true
+                    i += 1
+                }
                 break outer
             case "(":
                 inParentheses = true
@@ -724,6 +729,10 @@ private struct Symbol {
                         i = endIndex
                     } else {
                         i += 1
+                        if i < s.count && s[i] == "?" {
+                            isOptional = true
+                            i += 1
+                        }
                     }
                 }
                 break outer
@@ -737,6 +746,10 @@ private struct Symbol {
             case ">":
                 if inGenerics {
                     i += 1
+                    if i < s.count && s[i] == "?" {
+                        isOptional = true
+                        i += 1
+                    }
                 }
                 break outer
             case "?":
@@ -759,12 +772,21 @@ private struct Symbol {
         if inBraces {
             if !types.isEmpty {
                 type = types.count == 1 ? .array(types[0]) : .dictionary(types[0], types[1])
+                if isOptional {
+                    type = .optional(type!)
+                }
             }
         } else if inParentheses {
             if let returnType {
                 type = .function(types, returnType)
+                if isOptional {
+                    type = .optional(type!)
+                }
             } else if !types.isEmpty {
                 type = .tuple(Array<String?>(repeating: nil, count: types.count), types)
+                if isOptional {
+                    type = .optional(type!)
+                }
             } else {
                 type = .void // ()
             }
@@ -773,6 +795,9 @@ private struct Symbol {
                 type = .named(name, genericTypes)
             } else {
                 type = types[0]
+            }
+            if isOptional {
+                type = .optional(type!)
             }
         }
         return (type, i)

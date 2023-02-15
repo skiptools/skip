@@ -82,7 +82,7 @@ final class SymbolsTests: XCTestCase {
         XCTAssertEqual([f2Type], context.functionSignature(of: "trailingClosureF2", in: .named("SymbolsTestsClass", []), arguments: [LabeledValue<TypeSignature>(label: "p1", value: .none), LabeledValue<TypeSignature>(label: nil, value: .none), LabeledValue<TypeSignature>(label: "tc2", value: .none)]))
         XCTAssertEqual([.function([], .void)], context.functionSignature(of: "trailingClosureF2", in: .named("SymbolsTestsClass", []), arguments: []))
 
-        let f3Type: TypeSignature = .function([.dictionary(.int, .string), .function([], .array(.int))], .function([.named("SymbolsTestsEnum", [])], .int))
+        let f3Type: TypeSignature = .function([.optional(.dictionary(.int, .string)), .function([], .array(.int))], .function([.named("SymbolsTestsEnum", [])], .int))
         XCTAssertEqual([f3Type], context.functionSignature(of: "trailingClosureF3", in: .named("SymbolsTestsClass", []), arguments: [LabeledValue<TypeSignature>(label: nil, value: .none), LabeledValue<TypeSignature>(label: "tc1", value: .none)]))
         XCTAssertEqual([f3Type], context.functionSignature(of: "trailingClosureF3", in: .named("SymbolsTestsClass", []), arguments: [LabeledValue<TypeSignature>(label: nil, value: .none), LabeledValue<TypeSignature>(label: nil, value: .none)]))
 //        XCTAssertEqual([.function([.function([], .array(.int))], .function([.named("SymbolsTestsEnum", [])], .int))], context.functionSignature(of: "trailingClosureF3", in: .named("SymbolsTestsClass", []), arguments: [LabeledValue<TypeSignature>(label: nil, value: .none)]))
@@ -131,7 +131,7 @@ class SymbolsTestsClass: SymbolsTestsBaseClass {
     func trailingClosureF2(p1: String = "\\\",[(Int)]", tc1: (String, String) -> Int = { _, _ in 0 }, tc2: () -> Void = {}) {
     }
 
-    func trailingClosureF3(_ p1: [Int: String] = [1: "1"], tc1: () -> [Int]) -> (SymbolsTestsEnum) -> Int {
+    func trailingClosureF3(_ p1: [Int: String]? = [1: "1"], tc1: () -> [Int]) -> (SymbolsTestsEnum) -> Int {
         return { _ in 0 }
     }
 }
