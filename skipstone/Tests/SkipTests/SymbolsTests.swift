@@ -77,15 +77,25 @@ final class SymbolsTests: XCTestCase {
         let context = symbols.context()
         XCTAssertEqual([.function([.int, .function([.string], .int)], .string)], context.functionSignature(of: "trailingClosureF1", in: .named("SymbolsTestsClass", []), arguments: [LabeledValue<TypeSignature>(label: "p1", value: .none), LabeledValue<TypeSignature>(label: "tc1", value: .none)]))
 
-        //~~~
-//        func trailingClosureF1(p1: Int, tc1: (String) -> Int) -> String {
-//            return ""
-//        }
+        let f2Type: TypeSignature = .function([.string, .function([.string, .string], .int), .function([], .void)], .void)
+        XCTAssertEqual([f2Type], context.functionSignature(of: "trailingClosureF2", in: .named("SymbolsTestsClass", []), arguments: [LabeledValue<TypeSignature>(label: "p1", value: .none), LabeledValue<TypeSignature>(label: "tc1", value: .none), LabeledValue<TypeSignature>(label: "tc2", value: .none)]))
+        XCTAssertEqual([f2Type], context.functionSignature(of: "trailingClosureF2", in: .named("SymbolsTestsClass", []), arguments: [LabeledValue<TypeSignature>(label: "p1", value: .none), LabeledValue<TypeSignature>(label: nil, value: .none), LabeledValue<TypeSignature>(label: "tc2", value: .none)]))
+        XCTAssertEqual([.function([], .void)], context.functionSignature(of: "trailingClosureF2", in: .named("SymbolsTestsClass", []), arguments: []))
+
+        let f3Type: TypeSignature = .function([.dictionary(.int, .string), .function([], .array(.int))], .function([.named("SymbolsTestsEnum", [])], .int))
+        XCTAssertEqual([f3Type], context.functionSignature(of: "trailingClosureF3", in: .named("SymbolsTestsClass", []), arguments: [LabeledValue<TypeSignature>(label: nil, value: .none), LabeledValue<TypeSignature>(label: "tc1", value: .none)]))
+        XCTAssertEqual([f3Type], context.functionSignature(of: "trailingClosureF3", in: .named("SymbolsTestsClass", []), arguments: [LabeledValue<TypeSignature>(label: nil, value: .none), LabeledValue<TypeSignature>(label: nil, value: .none)]))
+//        XCTAssertEqual([.function([.function([], .array(.int))], .function([.named("SymbolsTestsEnum", [])], .int))], context.functionSignature(of: "trailingClosureF3", in: .named("SymbolsTestsClass", []), arguments: [LabeledValue<TypeSignature>(label: nil, value: .none)]))
     }
 
     func testCustomSubscript() {
         XCTExpectFailure()
         XCTFail("TODO: Test custom subscript operators")
+    }
+
+    func testTuples() {
+        XCTExpectFailure()
+        XCTFail("TODO: Test tuple symbols, including tuples as parameter and return types")
     }
 
     func testNestedTypes() {
@@ -114,12 +124,15 @@ class SymbolsTestsClass: SymbolsTestsBaseClass {
     func voidF() {
     }
 
-    func trailingClosureF1(p1: Int, tc1: @escaping (String) -> Void = { _ in }) -> String {
+    func trailingClosureF1(p1: Int, tc1: @escaping (String) -> Int) -> String {
         return ""
     }
 
-    func trailingClosureF2(p1: Int, tc1: (String) -> Int, tc2: () -> Void) -> String {
-        return ""
+    func trailingClosureF2(p1: String = "\\\",[(Int)]", tc1: (String, String) -> Int = { _, _ in 0 }, tc2: () -> Void = {}) {
+    }
+
+    func trailingClosureF3(_ p1: [Int: String] = [1: "1"], tc1: () -> [Int]) -> (SymbolsTestsEnum) -> Int {
+        return { _ in 0 }
     }
 }
 

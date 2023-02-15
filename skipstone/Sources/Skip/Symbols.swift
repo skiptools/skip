@@ -265,7 +265,7 @@ public class Symbols {
         }
 
         private func matchFunction(_ symbol: Symbol, arguments: [LabeledValue<TypeSignature>]) -> (symbol: Symbol, signature: TypeSignature)? {
-            let parameters = symbol.parameters(symbols: symbols)
+            let (parameters, returnType) = symbol.functionSignature(symbols: symbols)
             guard parameters.count >= arguments.count else {
                 return nil
             }
@@ -286,8 +286,6 @@ public class Symbols {
                     return nil
                 }
             }
-
-            let returnType = symbol.returnType(symbols: symbols)
             return (symbol, .function(matchingParameterTypes, returnType))
         }
 
@@ -502,9 +500,8 @@ private struct Symbol {
         case .method:
             fallthrough
         case .func:
-            let rt = returnType(symbols: symbols)
-            let pts = parameters(symbols: symbols).map { $0.type }
-            return .function(pts, rt)
+            let (pts, rt) = functionSignature(symbols: symbols)
+            return .function(pts.map { $0.type }, rt)
         case .property:
             fallthrough
         case .var:
@@ -539,57 +536,246 @@ private struct Symbol {
     }
 
     func variableType(symbols: Symbols) -> TypeSignature {
-        return typeSignature(in: declarationFragments.declarationFragments, symbols: symbols)
-    }
-
-    func returnType(symbols: Symbols) -> TypeSignature {
-        let declarationFragments = declarationFragments.declarationFragments
-        guard let beginReturnTypeIndex = declarationFragments.lastIndex(where: { $0.spelling.hasSuffix(" -> ") }), beginReturnTypeIndex < declarationFragments.count - 1 else {
-            return .void
-        }
-        return typeSignature(in: Array(declarationFragments[beginReturnTypeIndex...]), symbols: symbols)
-    }
-
-    func parameters(symbols: Symbols) -> [Parameter] {
-        var parameters: [Parameter] = []
-        var currentParameter: Parameter? = nil
-        for (index, fragment) in declarationFragments.declarationFragments.enumerated() {
-            if fragment.kind == .externalParameter {
-                if let currentParameter {
-                    parameters.append(currentParameter)
-                }
-                currentParameter = Parameter(label: fragment.spelling, hasDefaultValue: false, type: .none)
-            } else if fragment.kind == .typeIdentifier {
-                currentParameter?.type = typeSignature(in: Array(declarationFragments.declarationFragments[max(0, index - 1)...]), symbols: symbols)
-            } else if fragment.spelling.hasPrefix(" = ") {
-                currentParameter?.hasDefaultValue = true
-                if fragment.spelling.hasSuffix(" -> ") {
-                    break
-                }
-            } else if fragment.spelling.hasSuffix(" -> ") {
-                break
-            }
-        }
-        if let currentParameter {
-            parameters.append(currentParameter)
-        }
-        return parameters
-    }
-
-    private func typeSignature(in fragments: [SymbolGraph.Symbol.DeclarationFragments.Fragment], symbols: Symbols) -> TypeSignature {
-        guard let typeIndex = fragments.firstIndex(where: { $0.kind == .typeIdentifier }) else {
+        guard let typeIndex = declarationFragments.declarationFragments.firstIndex(where: { $0.spelling.hasPrefix(": ") }) else {
             return .none
         }
-        let type = fragments[typeIndex].typeSignature(symbols: symbols)
-        // ': [', 'int', ']'
-        if typeIndex > 0 && typeIndex < fragments.count - 1 && fragments[typeIndex - 1].spelling == ": [" && fragments[typeIndex + 1].spelling == "]" {
-            return .array(type)
-        } else if typeIndex > 0 && typeIndex < fragments.count - 3 && fragments[typeIndex - 1].spelling == ": [" && fragments[typeIndex + 1].spelling == " : " && fragments[typeIndex + 2].kind == .typeIdentifier {
-            let valueType = fragments[typeIndex + 2].typeSignature(symbols: symbols)
-            return.dictionary(type, valueType)
-        } else {
-            return type
+        let (string, specialFragments) = processFragments(Array(declarationFragments.declarationFragments[typeIndex...]), dropFirst: 2)
+        return typeSignature(for: string, specialFragments: specialFragments, symbols: symbols)
+    }
+
+    func functionSignature(symbols: Symbols) -> ([Parameter], TypeSignature) {
+        guard let typeIndex = declarationFragments.declarationFragments.firstIndex(where: { $0.spelling.hasPrefix("(") }) else {
+            return ([], .none)
         }
+        let (string, specialFragments) = processFragments(Array(declarationFragments.declarationFragments[typeIndex...]))
+        return functionSignature(for: string, specialFragments: specialFragments, symbols: symbols)
+    }
+
+    private func processFragments(_ fragments: [SymbolGraph.Symbol.DeclarationFragments.Fragment], dropFirst: Int = 0) -> (String, [Int: SymbolGraph.Symbol.DeclarationFragments.Fragment]) {
+        var specialFragments: [Int: SymbolGraph.Symbol.DeclarationFragments.Fragment] = [:]
+        var string = ""
+        for (index, fragment) in fragments.enumerated() {
+            if fragment.kind != .text {
+                specialFragments[string.count] = fragment
+                string += fragment.spelling
+            } else if index == 0 {
+                string += fragment.spelling.dropFirst(dropFirst)
+            } else {
+                string += fragment.spelling
+            }
+        }
+        return (string, specialFragments)
+    }
+
+    private func functionSignature(for string: String, specialFragments: [Int: SymbolGraph.Symbol.DeclarationFragments.Fragment], symbols: Symbols) -> ([Parameter], TypeSignature) {
+        let s = Array(string)
+        var i = 0
+        var parameters: [Parameter] = []
+        var parameter: Parameter? = nil
+        var returnType: TypeSignature = .void
+        var skippingDefaultValue = false
+        var defaultValueParenthesesDepth = 0
+        var inString = false
+        var backslashCount = 0
+        outer: while i < s.count {
+            if let fragment = specialFragments[i] {
+                switch fragment.kind {
+                case .externalParameter:
+                    if let parameter {
+                        parameters.append(parameter)
+                    }
+                    skippingDefaultValue = false
+                    // Each parameter starts with an externalParameter fragment for its label
+                    parameter = Parameter(label: fragment.spelling, hasDefaultValue: false, type: .none)
+                    fallthrough
+                case .internalParameter:
+                    // Skip over the fragment and check for a declared type
+                    i += fragment.spelling.count
+                    if i < s.count && s[i] == ":" {
+                        let (type, endIndex) = typeSignature(for: s, startIndex: i + 1, specialFragments: specialFragments, symbols: symbols)
+                        if let type {
+                            parameter?.type = type
+                        }
+                        i = endIndex
+                    }
+                    continue outer
+                case .keyword:
+                    i += fragment.spelling.count
+                    continue outer
+                default:
+                    break
+                }
+            }
+
+            switch s[i] {
+            case "\\":
+                if inString {
+                    backslashCount += 1
+                }
+            case "\"":
+                if inString {
+                    if backslashCount % 2 == 0 {
+                        inString = false
+                    }
+                } else {
+                    inString = true
+                }
+            case "=":
+                if inString || skippingDefaultValue {
+                    break
+                }
+                parameter?.hasDefaultValue = true
+                skippingDefaultValue = true
+            case "(":
+                if inString {
+                    break
+                }
+                if skippingDefaultValue {
+                    defaultValueParenthesesDepth += 1
+                }
+            case ")":
+                if inString {
+                    break
+                }
+                if skippingDefaultValue && defaultValueParenthesesDepth > 0 {
+                    defaultValueParenthesesDepth -= 1
+                } else {
+                    // This should mark the end of the parameters
+                    if let parameter {
+                        parameters.append(parameter)
+                    }
+                    if i + 3 < s.count && s[i + 1] == " " && s[i + 2] == "-" && s[i + 3] == ">" {
+                        returnType = typeSignature(for: s, startIndex: i + 4, specialFragments: specialFragments, symbols: symbols).0?.or(.void) ?? .void
+                    }
+                    break outer
+                }
+            default:
+                break
+            }
+
+            if s[i] != "\\" {
+                backslashCount = 0
+            }
+            i += 1
+        }
+        return (parameters, returnType)
+    }
+
+    private func typeSignature(for string: String, specialFragments: [Int: SymbolGraph.Symbol.DeclarationFragments.Fragment], symbols: Symbols) -> TypeSignature {
+        let (type, _) = typeSignature(for: Array(string), startIndex: 0, specialFragments: specialFragments, symbols: symbols)
+        return type ?? .none
+    }
+
+    private func typeSignature(for s: [Character], startIndex: Int, specialFragments: [Int: SymbolGraph.Symbol.DeclarationFragments.Fragment], symbols: Symbols) -> (TypeSignature?, Int) {
+        var i = startIndex
+        var types: [TypeSignature] = []
+        var genericTypes: [TypeSignature] = []
+        var returnType: TypeSignature? = nil
+        var inParentheses = false
+        var inBraces = false
+        var inGenerics = false
+        outer: while i < s.count {
+            if let fragment = specialFragments[i] {
+                switch fragment.kind {
+                case .typeIdentifier:
+                    let type = fragment.typeSignature(symbols: symbols)
+                    if inGenerics {
+                        genericTypes.append(type)
+                    } else {
+                        types.append(type)
+                    }
+                    i += fragment.spelling.count
+                    continue outer
+                case .keyword:
+                    i += fragment.spelling.count
+                    continue outer
+                default:
+                    break
+                }
+            }
+
+            switch s[i] {
+            case "[":
+                inBraces = true
+                let (type, endIndex) = typeSignature(for: s, startIndex: i + 1, specialFragments: specialFragments, symbols: symbols)
+                if let type {
+                    types.append(type)
+                }
+                i = endIndex
+            case "]":
+                if inBraces {
+                    i += 1
+                }
+                break outer
+            case "(":
+                inParentheses = true
+                let (type, endIndex) = typeSignature(for: s, startIndex: i + 1, specialFragments: specialFragments, symbols: symbols)
+                if let type {
+                    types.append(type)
+                }
+                i = endIndex
+            case ")":
+                if inParentheses {
+                    if i + 3 < s.count && s[i + 1] == " " && s[i + 2] == "-" && s[i + 3] == ">" {
+                        let (type, endIndex) = typeSignature(for: s, startIndex: i + 4, specialFragments: specialFragments, symbols: symbols)
+                        if let type {
+                            returnType = type
+                        }
+                        i = endIndex
+                    } else {
+                        i += 1
+                    }
+                }
+                break outer
+            case "<":
+                inGenerics = true
+                let (type, endIndex) = typeSignature(for: s, startIndex: i + 1, specialFragments: specialFragments, symbols: symbols)
+                if let type {
+                    genericTypes.append(type)
+                }
+                i = endIndex
+            case ">":
+                if inGenerics {
+                    i += 1
+                }
+                break outer
+            case "?":
+                if inGenerics, let type = genericTypes.last {
+                    genericTypes[genericTypes.count - 1] = .optional(type)
+                } else if !inGenerics, let type = types.last {
+                    types[types.count - 1] = .optional(type)
+                }
+                i += 1
+            default:
+                if inBraces || inParentheses || inGenerics || s[i].isWhitespace {
+                    i += 1
+                } else {
+                    break outer
+                }
+            }
+        }
+
+        var type: TypeSignature? = nil
+        if inBraces {
+            if !types.isEmpty {
+                type = types.count == 1 ? .array(types[0]) : .dictionary(types[0], types[1])
+            }
+        } else if inParentheses {
+            if let returnType {
+                type = .function(types, returnType)
+            } else if !types.isEmpty {
+                type = .tuple(Array<String?>(repeating: nil, count: types.count), types)
+            } else {
+                type = .void // ()
+            }
+        } else if !types.isEmpty {
+            if case .named(let name, _) = types[0] {
+                type = .named(name, genericTypes)
+            } else {
+                type = types[0]
+            }
+        }
+        return (type, i)
     }
 
     enum Visibility: String, RawRepresentable {
@@ -627,42 +813,3 @@ private extension SymbolGraph.Symbol.DeclarationFragments.Fragment {
         return TypeSignature.for(name: spelling, genericTypes: [])
     }
 }
-
-
-//~~~
-
-//func returnType(symbols: Symbols) -> TypeSignature {
-//    let (_, returnType) = parseFunctionSignature(symbols: symbols)
-//    return returnType
-//}
-//
-//func parameters(symbols: Symbols) -> [Parameter] {
-//    let (parameters, _) = parseFunctionSignature(symbols: symbols)
-//    return parameters
-//}
-//
-//private func parseFunctionSignature(symbols: Symbols) -> ([Parameter], TypeSignature) {
-//    var parameters: [Parameter] = []
-//    var currentParameter: Parameter? = nil
-//    for (index, fragment) in declarationFragments.declarationFragments.enumerated() {
-//        if fragment.kind == .externalParameter {
-//            if let currentParameter {
-//                parameters.append(currentParameter)
-//            }
-//            currentParameter = Parameter(label: fragment.spelling, hasDefaultValue: false, type: .none)
-//        } else if fragment.kind == .typeIdentifier {
-//            currentParameter?.type = typeSignature(in: Array(declarationFragments.declarationFragments[max(0, index - 1)...]), symbols: symbols)
-//        } else if fragment.spelling.hasPrefix(" = ") {
-//            currentParameter?.hasDefaultValue = true
-//            if fragment.spelling.hasSuffix(" -> ") {
-//                break
-//            }
-//        } else if fragment.spelling.hasSuffix(" -> ") {
-//            break
-//        }
-//    }
-//    if let currentParameter {
-//        parameters.append(currentParameter)
-//    }
-//    return parameters
-//}
