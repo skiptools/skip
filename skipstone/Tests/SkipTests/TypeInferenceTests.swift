@@ -95,10 +95,15 @@ final class TypeInferenceTests: XCTestCase {
     }
 }
 
+enum TypeInferenceTestsDuplicateEnum { // Ensure we're not just guessing when we see e.g. .case1
+    case case1
+    case case2
+}
 enum TypeInferenceTestsEnum {
     case case1
     case case2
 }
+
 
 func typeInferenceTestsEnumParamFunc(_ value: TypeInferenceTestsEnum) {
 }
