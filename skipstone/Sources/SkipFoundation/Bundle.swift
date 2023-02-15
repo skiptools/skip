@@ -31,14 +31,6 @@ extension SkipBundle {
 // SKIP XXX INSERT: public operator fun SkipBundle.Companion.invoke(contentsOf: URL): SkipBundle { return SkipBundle(TODO) }
 
 extension SkipBundle {
-    public static var module: SkipBundle {
-        get {
-            // this could work better, but JDK 1.9 method is unable to be found…
-            // SkipBundle(rawValue: java.lang.StackWalker().getInstance(java.lang.StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass())
-            return SkipBundle(rawValue: Class.forName(Thread.currentThread().getStackTrace()[2].getClassName()) as Class<Any>)
-        }
-    }
-
     // FIXME: this probably won't return what we expect, since the resources may live in another classloader
     public var resourceURL: SkipURL? {
         get {
@@ -52,14 +44,19 @@ extension SkipBundle {
     }
 
     public func url(forResource: String, withExtension: String?, subdirectory: String?, localization: String?) -> URL? {
+        // similar behavior to: https://github.com/apple/swift-corelibs-foundation/blob/69ab3975ea636d1322ad19bbcea38ce78b65b26a/CoreFoundation/PlugIn.subproj/CFBundle_Resources.c#L1114
         var res = forResource
         if (withExtension != null) {
             res += "." + withExtension
         }
+        if (localization != null) {
+            //let lprojExtension = "lproj" // _CFBundleLprojExtension
+            var lprojExtensionWithDot = ".lproj" // _CFBundleLprojExtensionWithDot
+            res = localization + lprojExtensionWithDot + "/" + res
+        }
         if (subdirectory != null) {
             res = subdirectory + "/" + res
         }
-        // TODO: localization?
         var url: java.net.URL? = rawValue.getResource(res)
         if (url != null) {
             return SkipURL(url)

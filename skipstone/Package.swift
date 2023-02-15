@@ -5,6 +5,7 @@ import PackageDescription
 
 let package = Package(
     name: "Skip",
+    defaultLocalization: "en",
     platforms: [
         .macOS(.v13),
         .iOS(.v16),
@@ -33,10 +34,10 @@ let package = Package(
         .target(name: "SkipBuild", dependencies: ["Skip"]),
         .target(name: "SkipUnit", dependencies: ["SkipBuild"]),
         .target(name: "SkipKotlin", dependencies: []),
-        .target(name: "SkipFoundation", dependencies: []),
-        .target(name: "SkipUI", dependencies: ["SkipFoundation"]),
-        .target(name: "SkipDemoLib", dependencies: ["SkipFoundation"]),
-        .target(name: "SkipDemoApp", dependencies: ["SkipDemoLib", "SkipUI"]),
+        .target(name: "SkipFoundation", dependencies: [], resources: [.process("Resources")]),
+        .target(name: "SkipUI", dependencies: ["SkipFoundation"], resources: [.process("Resources")]),
+        .target(name: "SkipDemoLib", dependencies: ["SkipFoundation"], resources: [.process("Resources")]),
+        .target(name: "SkipDemoApp", dependencies: ["SkipDemoLib", "SkipUI"], resources: [.process("Resources")]),
 
         .testTarget(name: "SkipTests", dependencies: ["Skip", "SkipKotlin", "SkipBuild"]),
         .testTarget(name: "SkipRunnerTests", dependencies: [], plugins: ["Skippy"]),
@@ -44,9 +45,9 @@ let package = Package(
         .testTarget(name: "SkipUnitTests", dependencies: ["SkipUnit"]),
         .testTarget(name: "SkipKotlinTests", dependencies: ["SkipKotlin", "SkipUnit"]),
         .testTarget(name: "SkipFoundationTests", dependencies: ["SkipFoundation", "SkipUnit"], resources: [.process("Resources")]),
-        .testTarget(name: "SkipUITests", dependencies: ["SkipUI", "SkipUnit"]),
-        .testTarget(name: "SkipDemoAppTests", dependencies: ["SkipDemoApp", "SkipUnit"]),
-        .testTarget(name: "SkipDemoLibTests", dependencies: ["SkipDemoLib", "SkipUnit"]),
+        .testTarget(name: "SkipUITests", dependencies: ["SkipUI", "SkipUnit"], resources: [.process("Resources")]),
+        .testTarget(name: "SkipDemoAppTests", dependencies: ["SkipDemoApp", "SkipUnit"], resources: [.process("Resources")]),
+        .testTarget(name: "SkipDemoLibTests", dependencies: ["SkipDemoLib", "SkipUnit"], resources: [.process("Resources")]),
 
         .executableTarget(name: "SkipRunner", dependencies: ["SkipBuild"]),
         .plugin(name: "Skippy", capability: .buildTool(), dependencies: ["SkipRunner"]),

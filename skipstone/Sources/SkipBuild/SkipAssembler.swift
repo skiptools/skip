@@ -146,19 +146,22 @@ public struct SkipAssembler {
 
         var savedURLs: [URL] = []
         /// Writes the given String to the specified URL, only if it has changed
-        func write(_ string: @autoclosure () throws -> String, to destURL: URL, linkFrom: URL? = nil, ifChanged: Bool, encoding: String.Encoding = .utf8) throws {
+        func write(_ string: @autoclosure () throws -> String, to destURL: URL, linkFrom: URL? = nil, ifChanged: Bool = true, encoding: String.Encoding = .utf8) throws {
             savedURLs.append(destURL)
             // create a symbolic link if necessary
             if let linkFrom = linkFrom {
-                let linkPath = destURL.pathRelative(to: linkFrom) ?? destURL.path
-                logger.info("linking from \(destURL.path) to \(linkPath)")
-                try? FileManager.default.createDirectory(at: destURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+                let linkURL = destURL
+                let linkPath = linkURL.pathRelative(to: linkFrom) ?? linkURL.path
+                logger.info("linking from \(linkURL.path) to \(linkPath)")
+                try? FileManager.default.createDirectory(at: linkURL.deletingLastPathComponent(), withIntermediateDirectories: true)
 
                 // only re-create the link if it is not currently pointing to the expected destination
-                if (try? FileManager.default.destinationOfSymbolicLink(atPath: destURL.path)) != linkPath {
-                    try? FileManager.default.removeItem(at: destURL)
-                    try FileManager.default.createSymbolicLink(atPath: destURL.path, withDestinationPath: linkPath)
-                    // assert(try! string() == String(contentsOf: destURL, encoding: encoding)) // verify that the link was created successfully
+                if (try? FileManager.default.destinationOfSymbolicLink(atPath: linkURL.path)) != linkPath {
+                    //assert(try! linkURL.deletingLastPathComponent().appendingPathComponent(linkPath, isDirectory: false).resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true, linkPath)
+
+                    try? FileManager.default.removeItem(at: linkURL)
+                    try FileManager.default.createSymbolicLink(atPath: linkURL.path, withDestinationPath: linkPath)
+                    assert(try! string() == String(contentsOf: linkURL, encoding: encoding)) // verify that the link was created successfully
                 }
             } else {
                 let str = try string()
@@ -197,6 +200,7 @@ public struct SkipAssembler {
             let packageName = KotlinTranslator.packageName(forModule: moduleName)
 
             logger.info("module: \(moduleName) package: \(packageName)")
+            let isSkipKotlinModule = moduleName == "SkipKotlin" // special handling for lowest-level
 
             let symbols = Symbols(moduleName: moduleName, graphs: unifiedGraphs)
 
@@ -253,7 +257,7 @@ public struct SkipAssembler {
 
                     let isDir = try fileURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory
                     switch (fileURL.lastPathComponent, fileURL.pathExtension) {
-                    case (_, _) where fileURL.relativePath.hasPrefix(resourcesPrefix):
+                    case (_, _) where fileURL.relativePath.hasPrefix(resourcesPrefix) && isDir == false:
                         resourceFiles.insert(fileURL)
 //                    case (_, _) where fileURL.relativePath.hasPrefix("Bundle/"): // TODO: folder structure-retaining copy
 //                        bundleFiles.insert(fileURL)
@@ -307,7 +311,7 @@ public struct SkipAssembler {
                         if kotlinSources.contains(sourceURL.deletingPathExtension().appendingPathExtension("kt")) {
                             logger.debug("skipping overridden kotlin path: \(sourceURL.relativePath)")
                         } else {
-                            try write(processed, to: destPath, ifChanged: true)
+                            try write(processed, to: destPath)
                         }
                     }
                 }
@@ -325,7 +329,7 @@ public struct SkipAssembler {
                         logger.debug("copying: \(sourceURL.relativePath) to: \(destURL.path)")
                         // try FileManager.default.copyItem(at: sourceURL, to: destPath)
                         // only copy when the contents have changed, to avoid triggering unnecessary gradle rebuild
-                        try write(String(contentsOf: sourceURL), to: destURL, linkFrom: sourceURL, ifChanged: true)
+                        try write(String(contentsOf: sourceURL), to: destURL, linkFrom: sourceURL)
                     }
                 }
 
@@ -335,6 +339,28 @@ public struct SkipAssembler {
 
                 // link over resource files
                 try await linkSourceFiles(sources: resourceFiles, assets: true)
+
+                func synthesizeBundleModule() throws {
+                    let src = """
+                    package \(packageName)
+
+                    import skip.foundation.*
+
+                    public final class \(moduleName)Module {
+                    }
+
+                    internal val SkipBundle.Companion.module: Bundle get() = Bundle(rawValue = \(moduleName)Module::class.java as Class<Any>)
+                    """
+                    
+                    let bundleModuleURL = URL(fileURLWithPath: "BundleModule.kt", isDirectory: false, relativeTo: kotlinRoot)
+                    try write(src, to: bundleModuleURL)
+                }
+
+                if !isSkipKotlinModule { // only foundation and higher have the Bundle class
+                    //if !resourceFiles.isEmpty { // always synthesize?
+                    try synthesizeBundleModule()
+                    //}
+                }
 
                 // finally, copy over the build files, overriding the generated ones
                 // FIXME: this is run over the Sources/, so top-level build files won't by copied to the correct destination
@@ -514,7 +540,7 @@ public struct SkipAssembler {
                 }
                 """
 
-                try write(buildGradleSource, to: buildGradle, ifChanged: true)
+                try write(buildGradleSource, to: buildGradle)
             }
 
             try createModuleLevelGradleBuild()
@@ -543,7 +569,7 @@ public struct SkipAssembler {
                 </manifest>
                 """
 
-                try write(manifestContents, to: androidManifest, ifChanged: true)
+                try write(manifestContents, to: androidManifest)
             }
 
             if targetSet.target.isApp {
@@ -579,7 +605,7 @@ public struct SkipAssembler {
                 kotlin("plugin.serialization") version "\(kotlinVersion)" apply false
             }
             """
-            try write(buildGradleSource, to: buildGradle, ifChanged: true)
+            try write(buildGradleSource, to: buildGradle)
 
             let gradleProperties = URL(fileURLWithPath: "gradle.properties", isDirectory: false, relativeTo: destRoot)
             let gradlePropertiesSource = """
@@ -590,7 +616,7 @@ public struct SkipAssembler {
             android.enableJetifier=true
             kotlin.code.style=official
             """
-            try write(gradlePropertiesSource, to: gradleProperties, ifChanged: true)
+            try write(gradlePropertiesSource, to: gradleProperties)
 
             let settingsGradle = URL(fileURLWithPath: "settings.gradle.kts", isDirectory: false, relativeTo: destRoot)
             var settingsGradleSource = """
@@ -628,7 +654,7 @@ public struct SkipAssembler {
                 }
             }
 
-            try write(settingsGradleSource, to: settingsGradle, ifChanged: true)
+            try write(settingsGradleSource, to: settingsGradle)
         }
 
         try createTopLevelGradleBuild()
@@ -669,7 +695,7 @@ public struct SkipAssembler {
                     zipStoreBase=GRADLE_USER_HOME
                     """
 
-                    try write(gradlePropertiesContents, to: gradleWrapperProps, ifChanged: true)
+                    try write(gradlePropertiesContents, to: gradleWrapperProps)
 
                     // finally create the idiomatic `gradelw` root script, but one which just uses the installed Android Studio's JBR (https://github.com/JetBrains/JetBrainsRuntime) java to run gradle
                     let gradlewContents = """
@@ -677,7 +703,7 @@ public struct SkipAssembler {
                     ${JAVA_HOME:-"$(mdfind "kMDItemCFBundleIdentifier == '\(studioID)'" | head -n 1)/Contents/jbr/Contents/Home"}/bin/java ${JAVA_OPTS} ${GRADLE_OPTS} -classpath "$(dirname "${0}")/gradle/wrapper/gradle-wrapper.jar":"${CLASSPATH}" org.gradle.wrapper.GradleWrapperMain ${@}
                     """
 
-                    try write(gradlewContents, to: gradlew, ifChanged: true)
+                    try write(gradlewContents, to: gradlew)
                     try? fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: gradlew.path) // make the script executable
                 }
             }
