@@ -69,6 +69,22 @@ class SyntaxNode: SourceDerived, PrettyPrintable {
         return nil
     }
 
+    /// Find the nearest function declaration by traversing up the syntax tree.
+    ///
+    /// Returns `nil` if we encounter a type before a function.
+    final var owningFunctionDeclaration: FunctionDeclaration? {
+        var current: SyntaxNode? = self
+        while current != nil {
+            if let owningFunctionDeclaration = current as? FunctionDeclaration {
+                return owningFunctionDeclaration
+            } else if current is TypeDeclaration {
+                return nil
+            }
+            current = current?.parent
+        }
+        return nil
+    }
+
     /// Traverse up the syntax tree to fully qualify a type name.
     final func qualifyReferencedTypeName(_ typeName: String) -> String {
         // Look for a qualified name whose last token(s) are the given type name

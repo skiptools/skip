@@ -392,7 +392,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             if kstatement.isProperty && translator.codebaseInfo?.isProtocolMember(declaration: statement, in: owningTypeDeclaration) == true {
                 kstatement.modifiers.isOverride = true
             }
-        } else {
+        } else if statement.owningFunctionDeclaration == nil {
             kstatement.isGlobal = true
         }
         if let value = statement.value {

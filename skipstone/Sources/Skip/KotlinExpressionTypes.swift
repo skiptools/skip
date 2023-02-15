@@ -204,6 +204,7 @@ class KotlinIdentifier: KotlinExpression {
 class KotlinMemberAccess: KotlinExpression {
     var base: KotlinExpression?
     var member: String
+    var inferredType: TypeSignature = .none
     var mayBeSharedMutableValue = false
 
     static func translate(expression: MemberAccess, translator: KotlinTranslator) -> KotlinMemberAccess {
@@ -211,11 +212,12 @@ class KotlinMemberAccess: KotlinExpression {
         if let base = expression.base {
             kexpression.base = translator.translateExpression(base)
         }
+        kexpression.inferredType = expression.inferredType
         kexpression.mayBeSharedMutableValue = expression.inferredType.kotlinMayBeSharedMutableValue(codebaseInfo: translator.codebaseInfo)
         return kexpression
     }
 
-    init(base: KotlinExpression?, member: String) {
+    init(base: KotlinExpression, member: String) {
         self.base = base
         self.member = member
         super.init(type: .memberAccess)
@@ -241,8 +243,11 @@ class KotlinMemberAccess: KotlinExpression {
             } else {
                 output.append(base)
             }
+            output.append(".")
+        } else if inferredType != .none {
+            output.append(inferredType).append(".")
         }
-        output.append(".").append(member)
+        output.append(member)
     }
 }
 
