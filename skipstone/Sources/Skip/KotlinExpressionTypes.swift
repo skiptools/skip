@@ -115,7 +115,6 @@ class KotlinBooleanLiteral: KotlinExpression {
 }
 
 class KotlinClosure: KotlinExpression {
-    // TODO: isAsync
     var returnType: TypeSignature = .none
     var parameters: [Parameter<Void>] = []
     var statements: [KotlinStatement] = []
@@ -139,6 +138,7 @@ class KotlinClosure: KotlinExpression {
     }
 
     override func append(to output: OutputGenerator) {
+        // TODO: Parameters, $0, $1 etc substitutions, return labels and return statements
         let indentation = output.indentationLevel
         output.append("{\n")
         output.append(statements, indentation: indentation.inc())
@@ -192,17 +192,29 @@ class KotlinFunctionCall: KotlinExpression {
     }
 
     override func append(to output: OutputGenerator) {
-        output.append(function).append("(")
-        for (index, argument) in arguments.enumerated() {
-            if let label = argument.label {
-                output.append(label).append(" = ")
-            }
-            output.append(argument.value)
-            if index < arguments.count - 1 {
-                output.append(", ")
+        let hasTrailingClosure = arguments.last?.value.type == .closure
+        let lastParenthesizedIndex = hasTrailingClosure ? arguments.count - 2 : arguments.count - 1
+        output.append(function)
+        if !hasTrailingClosure || arguments.count > 1 {
+            output.append("(")
+        }
+        if lastParenthesizedIndex >= 0 {
+            for (index, argument) in arguments[0...lastParenthesizedIndex].enumerated() {
+                if let label = argument.label {
+                    output.append(label).append(" = ")
+                }
+                output.append(argument.value)
+                if index < lastParenthesizedIndex {
+                    output.append(", ")
+                }
             }
         }
-        output.append(")")
+        if !hasTrailingClosure || arguments.count > 1 {
+            output.append(")")
+        }
+        if hasTrailingClosure {
+            output.append(" ").append(arguments.last!.value)
+        }
     }
 }
 
@@ -237,6 +249,7 @@ class KotlinIdentifier: KotlinExpression {
 class KotlinMemberAccess: KotlinExpression {
     var base: KotlinExpression?
     var member: String
+    var isMemberContinuedOnNextLine = false
     var inferredType: TypeSignature = .none
     var mayBeSharedMutableValue = false
 
@@ -244,6 +257,7 @@ class KotlinMemberAccess: KotlinExpression {
         let kexpression = KotlinMemberAccess(expression: expression)
         if let base = expression.base {
             kexpression.base = translator.translateExpression(base)
+            kexpression.isMemberContinuedOnNextLine = expression.isMemberContinuedOnNextLine
         }
         kexpression.inferredType = expression.inferredType
         kexpression.mayBeSharedMutableValue = expression.inferredType.kotlinMayBeSharedMutableValue(codebaseInfo: translator.codebaseInfo)
@@ -275,6 +289,9 @@ class KotlinMemberAccess: KotlinExpression {
                 output.append("(").append(base).append(")")
             } else {
                 output.append(base)
+            }
+            if isMemberContinuedOnNextLine {
+                output.append("\n").append(output.indentationLevel.inc())
             }
             output.append(".")
         } else if inferredType != .none {

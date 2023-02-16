@@ -446,6 +446,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
+        let isReadOnly = isLet || (getter != nil && setter == nil)
         output.append(indentation)
         if let declaration = extras?.declaration {
             output.append(declaration)
@@ -456,7 +457,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                     output.append("lateinit ")
                 }
             }
-            if isLet || (getter != nil && setter == nil) {
+            if isReadOnly {
                 output.append("val ")
             } else {
                 output.append("var ")
@@ -478,8 +479,8 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             output.append("\n")
         }
 
-        if isProperty && mayBeSharedMutableValue {
-            let onUpdate = "{ this.\(name) = it }"
+        if mayBeSharedMutableValue {
+            let onUpdate = isReadOnly ? "" : isProperty ? "{ this.\(name) = it }" : "{ \(name) = it }"
             let getterIndentation = indentation.inc()
             output.append(getterIndentation).append("get() {\n")
             let getterBodyIndentation = getterIndentation.inc()
@@ -526,6 +527,11 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             if let didSetStatements = didSet?.body?.statements {
                 output.append(didSetStatements, indentation: setterBodyIndentation)
             }
+            output.append(setterIndentation).append("}\n")
+        } else if !isReadOnly && mayBeSharedMutableValue {
+            let setterIndentation = indentation.inc()
+            output.append(setterIndentation).append("set(newValue) {\n")
+            output.append(setterIndentation.inc()).append("field = newValue.valref()\n")
             output.append(setterIndentation).append("}\n")
         }
     }
