@@ -33,7 +33,7 @@ final class FeatureSupportTests: XCTestCase {
         """, kotlin: """
         internal data class Foo {
             public fun doSomething(): String? {
-                null
+                return null
             }
 
             companion object {

@@ -17,6 +17,8 @@ enum KotlinStatementType {
 }
 
 class KotlinReturn: KotlinExpressionStatement {
+    var label: String? = nil
+
     static func translate(statement: Return, translator: KotlinTranslator) -> KotlinExpressionStatement {
         let kstatement = KotlinReturn(statement: statement)
         if let expression = statement.expression {
@@ -25,15 +27,28 @@ class KotlinReturn: KotlinExpressionStatement {
         return kstatement
     }
 
-    init(statement: Return) {
+    init(expression: KotlinExpression) {
+        super.init(type: .return, sourceFile: expression.sourceFile, sourceRange: expression.sourceRange)
+        self.expression = expression.valueReference
+    }
+
+    private init(statement: Return) {
         super.init(type: .return, statement: statement)
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
         if let expression {
-            output.append(indentation).append("return ").append(expression).append("\n")
+            output.append(indentation).append("return")
+            if let label {
+                output.append("@\(label)")
+            }
+            output.append(" ").append(expression).append("\n")
         } else {
             output.append(indentation).append("return")
+            if let label {
+                output.append("@\(label)")
+            }
+            output.append("\n")
         }
     }
 }
@@ -212,8 +227,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             }
         }
         if let body = statement.body {
-            let bodyStatements = body.statements.flatMap { translator.translateStatement($0) }
-            kstatement.body = CodeBlock(statements: bodyStatements)
+            kstatement.body = body.translate(translator: translator, isReturnExpected: kstatement.returnType != .void)
         }
         kstatement.returnType.appendKotlinMessages(to: kstatement)
         kstatement.parameters.forEach { $0.declaredType.appendKotlinMessages(to: kstatement) }
@@ -398,10 +412,10 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if let value = statement.value {
             kstatement.value = translator.translateExpression(value).valueReference
         }
-        kstatement.getter = statement.getter?.translate(translator: translator)
-        kstatement.setter = statement.setter?.translate(translator: translator)
-        kstatement.willSet = statement.willSet?.translate(translator: translator)
-        kstatement.didSet = statement.didSet?.translate(translator: translator)
+        kstatement.getter = statement.getter?.translate(translator: translator, isReturnExpected: true)
+        kstatement.setter = statement.setter?.translate(translator: translator, isReturnExpected: false)
+        kstatement.willSet = statement.willSet?.translate(translator: translator, isReturnExpected: false)
+        kstatement.didSet = statement.didSet?.translate(translator: translator, isReturnExpected: false)
         if kstatement.declaredType != .none {
             kstatement.mayBeSharedMutableValue = kstatement.declaredType.kotlinMayBeSharedMutableValue(codebaseInfo: translator.codebaseInfo)
         } else if let kvalue = kstatement.value {
@@ -479,17 +493,16 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             output.append("\n")
         }
 
-        if mayBeSharedMutableValue {
-            let onUpdate = isReadOnly ? "" : isProperty ? "{ this.\(name) = it }" : "{ \(name) = it }"
+        if mayBeSharedMutableValue && (isProperty || isGlobal) {
+            let onUpdate: String? = isReadOnly ? nil : isProperty ? "{ this.\(name) = it }" : "{ \(name) = it }"
             let getterIndentation = indentation.inc()
             output.append(getterIndentation).append("get() {\n")
             let getterBodyIndentation = getterIndentation.inc()
             if let getterStatements = getter?.body?.statements {
-                output.append(getterBodyIndentation).append("return {\n")
-                output.append(getterStatements, indentation: getterBodyIndentation.inc())
-                output.append(getterBodyIndentation).append("}().valref(\(onUpdate))\n")
+                getterStatements.updateReturns(onValueReferenceUpdate: onUpdate)
+                output.append(getterStatements, indentation: getterBodyIndentation)
             } else {
-                output.append(getterBodyIndentation).append("return field.valref(\(onUpdate))\n")
+                output.append(getterBodyIndentation).append("return field.valref(\(onUpdate ?? ""))\n")
             }
             output.append(getterIndentation).append("}\n")
         } else if let getterStatements = getter?.body?.statements {
@@ -528,7 +541,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 output.append(didSetStatements, indentation: setterBodyIndentation)
             }
             output.append(setterIndentation).append("}\n")
-        } else if !isReadOnly && mayBeSharedMutableValue {
+        } else if !isReadOnly && mayBeSharedMutableValue && (isProperty || isGlobal) {
             let setterIndentation = indentation.inc()
             output.append(setterIndentation).append("set(newValue) {\n")
             output.append(setterIndentation.inc()).append("field = newValue.valref()\n")

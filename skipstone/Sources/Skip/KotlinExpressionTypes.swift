@@ -12,6 +12,7 @@ enum KotlinExpressionType {
     case stringLiteral
     case `subscript`
     case `try`
+    case valueReference
 
     case raw
 }
@@ -118,6 +119,7 @@ class KotlinClosure: KotlinExpression {
     var returnType: TypeSignature = .none
     var parameters: [Parameter<Void>] = []
     var statements: [KotlinStatement] = []
+    var returnLabel: String? = nil
 
     static func translate(expression: Closure, translator: KotlinTranslator) -> KotlinClosure {
         let kexpression = KotlinClosure(expression: expression)
@@ -125,6 +127,9 @@ class KotlinClosure: KotlinExpression {
         kexpression.parameters = expression.parameters
         kexpression.statements = expression.statements.flatMap {
             return translator.translateStatement($0)
+        }
+        if kexpression.statements.updateReturns(label: "_r_") {
+            kexpression.returnLabel = "_r_"
         }
         return kexpression
     }
@@ -138,8 +143,11 @@ class KotlinClosure: KotlinExpression {
     }
 
     override func append(to output: OutputGenerator) {
-        // TODO: Parameters, $0, $1 etc substitutions, return labels and return statements
+        // TODO: Parameters, $0, $1 etc substitutions
         let indentation = output.indentationLevel
+        if let returnLabel {
+            output.append(returnLabel).append("@")
+        }
         output.append("{\n")
         output.append(statements, indentation: indentation.inc())
         output.append(indentation).append("}")
@@ -450,5 +458,37 @@ class KotlinTry: KotlinExpression {
         } else {
             output.append(trying)
         }
+    }
+}
+
+class KotlinValueReference: KotlinExpression {
+    var base: KotlinExpression
+    var onUpdate: String?
+
+    init(base: KotlinExpression, onUpdate: String? = nil) {
+        self.base = base
+        self.onUpdate = onUpdate
+        super.init(type: .valueReference)
+    }
+
+    override func mayBeSharedMutableValueExpression(orType: Bool) -> Bool {
+        return orType
+    }
+
+    override var children: [KotlinSyntaxNode] {
+        return [base]
+    }
+
+    override func append(to output: OutputGenerator) {
+        if base.isCompoundExpression {
+            output.append("(").append(base).append(")")
+        } else {
+            output.append(base)
+        }
+        output.append(".valref(")
+        if let onUpdate {
+            output.append(onUpdate)
+        }
+        output.append(")")
     }
 }

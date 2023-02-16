@@ -16,6 +16,20 @@ class KotlinStatement: KotlinSyntaxNode {
         self.messages = statement.messages
     }
 
+    /// Visit this statement and its children depth first, performing the given action.
+    ///
+    /// - Parameters:
+    ///   - Parameter perform: The action to perform. Return `true` to recurse into this statement's children.`
+    func visitStatements(perform: (KotlinStatement) -> Bool) {
+        if perform(self) {
+            for child in children {
+                if let statement = child as? KotlinStatement {
+                    statement.visitStatements(perform: perform)
+                }
+            }
+        }
+    }
+
     final override var setsIndentationLevel: Bool {
         return true
     }
@@ -44,6 +58,10 @@ class KotlinExpressionStatement: KotlinStatement {
             kstatement.expression = translator.translateExpression(expression)
         }
         return kstatement
+    }
+
+    init(type: KotlinStatementType = .expression, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        super.init(type: type, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
     init(type: KotlinStatementType = .expression, statement: ExpressionStatement) {
