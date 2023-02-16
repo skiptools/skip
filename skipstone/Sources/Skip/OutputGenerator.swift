@@ -19,7 +19,13 @@ class OutputGenerator {
         return ret
     }
 
+    /// The last indentation level used.
+    private(set) var indentationLevel: Indentation = 0
+
     @discardableResult func append(_ node: OutputNode, indentation: Indentation = 0) -> OutputGenerator {
+        if node.setsIndentationLevel {
+            indentationLevel = indentation
+        }
         append(node.leadingTrivia(indentation: indentation))
         let startOffset = content.utf8.count
         node.append(to: self, indentation: indentation)
@@ -67,6 +73,11 @@ class OutputGenerator {
 protocol OutputNode {
     var sourceFile: Source.File? { get }
     var sourceRange: Source.Range? { get }
+
+    /// Whether this node type's requested indentation should establish the current indentation level.
+    ///
+    /// - Seealso: ``OutputGenerator/indentationLevel``
+    var setsIndentationLevel: Bool { get }
 
     /// Any leading trivia before the output. Trivia is not part of the ranges.
     func leadingTrivia(indentation: Indentation) -> String

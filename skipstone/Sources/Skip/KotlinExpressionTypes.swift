@@ -3,6 +3,7 @@ enum KotlinExpressionType {
     case arrayLiteral
     case binaryOperator
     case booleanLiteral
+    case closure
     case nullLiteral
     case functionCall
     case identifier
@@ -110,6 +111,38 @@ class KotlinBooleanLiteral: KotlinExpression {
 
     override func append(to output: OutputGenerator) {
         output.append(String(describing: literal))
+    }
+}
+
+class KotlinClosure: KotlinExpression {
+    // TODO: isAsync
+    var returnType: TypeSignature = .none
+    var parameters: [Parameter<Void>] = []
+    var statements: [KotlinStatement] = []
+
+    static func translate(expression: Closure, translator: KotlinTranslator) -> KotlinClosure {
+        let kexpression = KotlinClosure(expression: expression)
+        kexpression.returnType = expression.returnType
+        kexpression.parameters = expression.parameters
+        kexpression.statements = expression.statements.flatMap {
+            return translator.translateStatement($0)
+        }
+        return kexpression
+    }
+
+    private init(expression: Closure) {
+        super.init(type: .closure, expression: expression)
+    }
+
+    override var children: [KotlinSyntaxNode] {
+        return statements
+    }
+
+    override func append(to output: OutputGenerator) {
+        let indentation = output.indentationLevel
+        output.append("{\n")
+        output.append(statements, indentation: indentation.inc())
+        output.append(indentation).append("}")
     }
 }
 

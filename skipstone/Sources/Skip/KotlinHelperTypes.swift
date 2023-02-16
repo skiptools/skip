@@ -35,13 +35,13 @@ extension Modifiers {
     }
 }
 
-extension Parameter where S: Statement {
+extension Parameter where E: Expression {
     /// Translate to an equivalent Kotlin parameter.
-    func translate(translator: KotlinTranslator) -> Parameter<KotlinStatement> {
-        var kdefaultValue: KotlinStatement? = nil
+    func translate(translator: KotlinTranslator) -> Parameter<KotlinExpression> {
+        var kdefaultValue: KotlinExpression? = nil
         if let defaultValue {
-            kdefaultValue = translator.translateStatement(defaultValue).first
+            kdefaultValue = translator.translateExpression(defaultValue)
         }
-        return Parameter<KotlinStatement>(externalName: externalName, internalName: internalName, declaredType: declaredType, isVariadic: isVariadic, defaultValue: kdefaultValue)
+        return Parameter<KotlinExpression>(externalName: externalName, internalName: internalName, declaredType: declaredType, isVariadic: isVariadic, defaultValue: kdefaultValue)
     }
 }

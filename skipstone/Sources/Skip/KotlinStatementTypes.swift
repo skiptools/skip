@@ -189,7 +189,7 @@ struct KotlinExtensionDeclaration {
 class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     let name: String
     var returnType: TypeSignature = .none
-    var parameters: [Parameter<KotlinStatement>] = []
+    var parameters: [Parameter<KotlinExpression>] = []
     var isAsync: Bool
     var isOpen = false
     var modifiers: Modifiers

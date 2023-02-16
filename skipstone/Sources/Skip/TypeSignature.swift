@@ -76,6 +76,17 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
                 let resolvedValueType = valueType.or(valueType2)
                 return .dictionary(resolvedKeyType, resolvedValueType)
             }
+        case .function(let parameterTypes, let returnType):
+            if case .function(let parameterTypes2, let returnType2) = typeSignature {
+                // We may use an empty parameter types array to represent .none
+                var resolvedParameterTypes: [TypeSignature] = parameterTypes
+                if parameterTypes.isEmpty {
+                    resolvedParameterTypes = parameterTypes2
+                } else if parameterTypes.count == parameterTypes2.count {
+                    resolvedParameterTypes = zip(parameterTypes, parameterTypes2).map { $0.0.or($0.1) }
+                }
+                return .function(resolvedParameterTypes, returnType.or(returnType2))
+            }
         case .none:
             return typeSignature
         case .optional(.none):

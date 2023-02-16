@@ -242,13 +242,13 @@ class ExtensionDeclaration: TypeDeclaration {
 class FunctionDeclaration: Statement {
     let name: String
     private(set) var returnType: TypeSignature
-    private(set) var parameters: [Parameter<Statement>]
+    private(set) var parameters: [Parameter<Expression>]
     let isAsync: Bool
     let isThrows: Bool
     private(set) var modifiers: Modifiers
     let body: CodeBlock<Statement>?
 
-    init(name: String, returnType: TypeSignature = .none, parameters: [Parameter<Statement>], isAsync: Bool = false, isThrows: Bool = false, modifiers: Modifiers? = nil, body: CodeBlock<Statement>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(name: String, returnType: TypeSignature = .none, parameters: [Parameter<Expression>], isAsync: Bool = false, isThrows: Bool = false, modifiers: Modifiers? = nil, body: CodeBlock<Statement>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.name = name
         self.returnType = returnType
         self.parameters = parameters

@@ -5,6 +5,7 @@ enum ExpressionType: CaseIterable {
     case arrayLiteral
     case binaryOperator
     case booleanLiteral
+    case closure
     case nilLiteral
     case functionCall
     case identifier
@@ -26,6 +27,8 @@ enum ExpressionType: CaseIterable {
             return BinaryOperator.self
         case .booleanLiteral:
             return BooleanLiteral.self
+        case .closure:
+            return Closure.self
         case .nilLiteral:
             return NilLiteral.self
         case .functionCall:
@@ -211,6 +214,70 @@ class BooleanLiteral: Expression {
 
     override var prettyPrintAttributes: [PrettyPrintTree] {
         return [PrettyPrintTree(root: String(describing: literal))]
+    }
+}
+
+/// `{ ... }`
+class Closure: Expression {
+    // TODO: Capture list
+    private(set) var returnType: TypeSignature
+    private(set) var parameters: [Parameter<Void>]
+    let isAsync: Bool
+    let isThrows: Bool
+    let statements: [Statement]
+
+    init(returnType: TypeSignature = .none, parameters: [Parameter<Void>], isAsync: Bool = false, isThrows: Bool = false, statements: [Statement] = [], syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        self.returnType = returnType
+        self.parameters = parameters
+        self.isAsync = isAsync
+        self.isThrows = isThrows
+        self.statements = statements
+        super.init(type: .closure, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) -> Expression? {
+        guard syntax.kind == .closureExpr, let closureExpr = syntax.as(ClosureExprSyntax.self) else {
+            return nil
+        }
+        let (returnType, parameters, messages) = closureExpr.signature?.typeSignatures(in: syntaxTree) ?? (.none, [], [])
+        let isAsync = closureExpr.signature?.asyncKeyword?.text == "async" || closureExpr.signature?.throwsTok?.text == "async"
+        let isThrows = closureExpr.signature?.asyncKeyword?.text == "throws" || closureExpr.signature?.throwsTok?.text == "throws"
+        let statements = StatementDecoder.decode(syntaxList: closureExpr.statements, in: syntaxTree)
+        let expression = Closure(returnType: returnType, parameters: parameters, isAsync: isAsync, isThrows: isThrows, statements: statements, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+        expression.messages = messages
+        return expression
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        functionType = .function(parameters.map(\.declaredType), .none).or(expecting)
+        return context
+    }
+
+    var functionType: TypeSignature = .function([], .none)
+
+    override var inferredType: TypeSignature {
+        return functionType
+    }
+
+    override var children: [SyntaxNode] {
+        return statements
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        var attrs: [PrettyPrintTree] = []
+        if returnType != .none {
+            attrs.append(PrettyPrintTree(root: returnType.description))
+        }
+        if !parameters.isEmpty {
+            attrs.append(PrettyPrintTree(root: "parameters", children: parameters.map { $0.prettyPrintTree }))
+        }
+        if isAsync {
+            attrs.append(PrettyPrintTree(root: "async"))
+        }
+        if isThrows {
+            attrs.append(PrettyPrintTree(root: "throws"))
+        }
+        return attrs
     }
 }
 

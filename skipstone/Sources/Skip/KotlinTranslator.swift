@@ -152,6 +152,8 @@ public class KotlinTranslator {
             return KotlinBinaryOperator.translate(expression: expression as! BinaryOperator, translator: self)
         case .booleanLiteral:
             return KotlinBooleanLiteral(expression: expression as! BooleanLiteral)
+        case .closure:
+            return KotlinClosure.translate(expression: expression as! Closure, translator: self)
         case .nilLiteral:
             return KotlinNullLiteral(expression: expression as! NilLiteral)
         case .functionCall:

@@ -16,6 +16,10 @@ class KotlinStatement: KotlinSyntaxNode {
         self.messages = statement.messages
     }
 
+    final override var setsIndentationLevel: Bool {
+        return true
+    }
+
     final override func leadingTrivia(indentation: Indentation) -> String {
         return extras?.leadingTrivia(indentation: indentation) ?? ""
     }

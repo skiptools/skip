@@ -23,6 +23,10 @@ class KotlinSyntaxNode: SourceDerived, OutputNode {
         return messages + children.flatMap { $0.subtreeMessages }
     }
 
+    var setsIndentationLevel: Bool {
+        return false
+    }
+
     func leadingTrivia(indentation: Indentation) -> String {
         return ""
     }

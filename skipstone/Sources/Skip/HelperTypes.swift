@@ -123,7 +123,7 @@ struct Operator: Equatable {
 }
 
 /// A function parameter.
-struct Parameter<S>: Hashable {
+struct Parameter<E>: Hashable {
     var externalName: String
     var internalName: String {
         return _internalName ?? externalName
@@ -131,9 +131,9 @@ struct Parameter<S>: Hashable {
     private let _internalName: String?
     var declaredType: TypeSignature
     var isVariadic: Bool
-    var defaultValue: S?
+    var defaultValue: E?
 
-    init(externalName: String, internalName: String? = nil, declaredType: TypeSignature = .none, isVariadic: Bool = false, defaultValue: S? = nil) {
+    init(externalName: String, internalName: String? = nil, declaredType: TypeSignature = .none, isVariadic: Bool = false, defaultValue: E? = nil) {
         self.externalName = externalName
         _internalName = internalName
         self.declaredType = declaredType
@@ -159,13 +159,13 @@ struct Parameter<S>: Hashable {
         return PrettyPrintTree(root: externalName.isEmpty ? "_" : externalName, children: children)
     }
 
-    func qualifiedType(in node: SyntaxNode) -> Parameter<S> {
+    func qualifiedType(in node: SyntaxNode) -> Parameter<E> {
         var parameter = self
         parameter.declaredType = declaredType.qualified(in: node)
         return parameter
     }
 
-    static func ==(lhs: Parameter<S>, rhs: Parameter<S>) -> Bool {
+    static func ==(lhs: Parameter<E>, rhs: Parameter<E>) -> Bool {
         return lhs.externalName == rhs.externalName && lhs.declaredType == rhs.declaredType && lhs.isVariadic == rhs.isVariadic
     }
 

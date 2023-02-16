@@ -46,17 +46,48 @@ extension InheritedTypeListSyntax {
 
 extension FunctionSignatureSyntax {
     /// The return type and parameters in this signature, and optional messages warning of any issues.
-    func typeSignatures(in syntaxTree: SyntaxTree) -> (TypeSignature, [Parameter<Statement>], [Message]) {
-        var returnType: TypeSignature = .none
+    func typeSignatures(in syntaxTree: SyntaxTree) -> (TypeSignature, [Parameter<Expression>], [Message]) {
         var messages: [Message] = []
-        if let output = output {
-            returnType = TypeSignature.for(syntax: output.returnType)
-            if returnType == .none {
-                returnType = .void
-                messages.append(.unsupportedTypeSignature(output.returnType, source: syntaxTree.source, sourceRange: output.range(in: syntaxTree.source)))
+        let returnType = output?.typeSignature(in: syntaxTree, messages: &messages) ?? .none
+        let parameters = input.parameters(in: syntaxTree, messages: &messages)
+        return (returnType, parameters, messages)
+    }
+}
+
+extension ClosureSignatureSyntax {
+    /// The return type and parameters in this signature, and optional messages warning of any issues.
+    func typeSignatures(in syntaxTree: SyntaxTree) -> (TypeSignature, [Parameter<Void>], [Message]) {
+        var messages: [Message] = []
+        let returnType = output?.typeSignature(in: syntaxTree, messages: &messages) ?? .none
+        let parameters: [Parameter<Void>]
+        switch input {
+        case .simpleInput(let syntax):
+            parameters = syntax.map { Parameter<Void>(externalName: $0.name.text) }
+        case .input(let syntax):
+            parameters = syntax.parameters(in: syntaxTree, messages: &messages).map {
+                return Parameter<Void>(externalName: $0.externalName, declaredType: $0.declaredType, isVariadic: $0.isVariadic)
             }
+        case .none:
+            parameters = []
         }
-        let parameters = input.parameterList.map { parameterSyntax in
+        return (returnType, parameters, messages)
+    }
+}
+
+extension ReturnClauseSyntax {
+    fileprivate func typeSignature(in syntaxTree: SyntaxTree, messages: inout [Message]) -> TypeSignature {
+        var signature = TypeSignature.for(syntax: returnType)
+        if signature == .none {
+            signature = .void
+            messages.append(.unsupportedTypeSignature(returnType, source: syntaxTree.source, sourceRange: range(in: syntaxTree.source)))
+        }
+        return signature
+    }
+}
+
+extension ParameterClauseSyntax {
+    fileprivate func parameters(in syntaxTree: SyntaxTree, messages: inout [Message]) -> [Parameter<Expression>] {
+        return parameterList.map { parameterSyntax in
             var type: TypeSignature = .none
             if let typeSyntax = parameterSyntax.type {
                 type = TypeSignature.for(syntax: typeSyntax)
@@ -66,13 +97,12 @@ extension FunctionSignatureSyntax {
                 }
             }
             let isVariadic = parameterSyntax.ellipsis?.text == "..."
-            var defaultValue: Statement? = nil
+            var defaultValue: Expression? = nil
             if let defaultArgument = parameterSyntax.defaultArgument {
-                defaultValue = StatementDecoder.decode(syntax: defaultArgument, in: syntaxTree).first
+                defaultValue = ExpressionDecoder.decode(syntax: defaultArgument, in: syntaxTree)
             }
-            return Parameter<Statement>(externalName: parameterSyntax.firstName?.text ?? "", internalName: parameterSyntax.secondName?.text, declaredType: type, isVariadic: isVariadic, defaultValue: defaultValue)
+            return Parameter<Expression>(externalName: parameterSyntax.firstName?.text ?? "", internalName: parameterSyntax.secondName?.text, declaredType: type, isVariadic: isVariadic, defaultValue: defaultValue)
         }
-        return (returnType, parameters, messages)
     }
 }
 
