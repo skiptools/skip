@@ -99,7 +99,7 @@ extension ParameterClauseSyntax {
             let isVariadic = parameterSyntax.ellipsis?.text == "..."
             var defaultValue: Expression? = nil
             if let defaultArgument = parameterSyntax.defaultArgument {
-                defaultValue = ExpressionDecoder.decode(syntax: defaultArgument, in: syntaxTree)
+                defaultValue = ExpressionDecoder.decode(syntax: defaultArgument.value, in: syntaxTree)
             }
             return Parameter<Expression>(externalName: parameterSyntax.firstName?.text ?? "", internalName: parameterSyntax.secondName?.text, declaredType: type, isVariadic: isVariadic, defaultValue: defaultValue)
         }

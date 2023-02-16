@@ -4,8 +4,7 @@ import XCTest
 /// A test case that verifies that transpilation are *not* working as hoped.
 final class FeatureSupportTests: XCTestCase {
     func testDefaultArgs() async throws {
-        // double equals sign in function: doSomething(a: String = = "abc")
-        try await check(expectFailure: true, swift: """
+        try await check(swift: """
         struct Foo {
             public func doSomething(a: String = "abc") -> String {
                 return a
@@ -13,8 +12,7 @@ final class FeatureSupportTests: XCTestCase {
         }
         """, kotlin: """
         internal data class Foo {
-            public fun doSomething(a: String = "abc"
-        ): String {
+            public fun doSomething(a: String = "abc"): String {
                 return a
             }
 
@@ -26,7 +24,7 @@ final class FeatureSupportTests: XCTestCase {
 
     func testNilToNull() async throws {
         // "nil" should be translated to null
-        try await check(expectFailure: false, swift: """
+        try await check(swift: """
         struct Foo {
             public func doSomething() -> String? {
                 nil
