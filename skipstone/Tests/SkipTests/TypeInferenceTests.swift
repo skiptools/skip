@@ -84,6 +84,25 @@ final class TypeInferenceTests: XCTestCase {
         """)
     }
 
+    func testLocalParameterType() async throws {
+        try await check(symbols: symbols, swift: """
+        func f(cls: TypeInferenceTestsClass) -> Bool {
+            let c = cls
+            return c == .instance
+        }
+        """, kotlin: """
+        internal fun f(cls: TypeInferenceTestsClass): Boolean {
+            val c = cls
+            return c == TypeInferenceTestsClass.instance
+        }
+        """)
+    }
+
+    func testInit() async throws {
+        XCTExpectFailure()
+        XCTFail("TODO: Test using .init to call constructors")
+    }
+
     func testNestedTypes() {
         XCTExpectFailure()
         XCTFail("TODO: Test nested type symbols")
@@ -95,15 +114,15 @@ final class TypeInferenceTests: XCTestCase {
     }
 }
 
-enum TypeInferenceTestsDuplicateEnum { // Ensure we're not just guessing when we see e.g. .case1
-    case case1
-    case case2
-}
 enum TypeInferenceTestsEnum {
     case case1
     case case2
 }
-
+// Ensure we're not just guessing when we see e.g. .case1
+enum TypeInferenceTestsDuplicateEnum {
+    case case1
+    case case2
+}
 
 func typeInferenceTestsEnumParamFunc(_ value: TypeInferenceTestsEnum) {
 }
@@ -115,9 +134,19 @@ func typeInferenceTestsEnumReturnFunc() -> TypeInferenceTestsEnum {
 class TypeInferenceTestsClass {
     static let instance = TypeInferenceTestsClass()
 
+    var v = 1
+
+    init(v: Int = 1) {
+        self.v = v
+    }
+
     func classReturnMemberFunc() -> TypeInferenceTestsClass {
         return .instance
     }
+}
+// Ensure we're not just guessing when we see e.g. .instance
+class TypeInferenceTestsDuplicateClass {
+    static let instance = TypeInferenceTestsDuplicateClass()
 }
 
 class TypeInferenceTestsClass2 {

@@ -7,3 +7,16 @@ func f2() throws -> Int? {
 func f3() throws -> Int {
     return 1
 }
+
+struct S {
+    var p1: Int
+    var p2: String?
+
+    static func factory() -> S {
+        return S(p1: 1)
+    }
+
+    static func factory2() -> S {
+        return .init(p1: 1)
+    }
+}

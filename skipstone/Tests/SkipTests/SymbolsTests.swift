@@ -73,6 +73,16 @@ final class SymbolsTests: XCTestCase {
         XCTAssertEqual([.function([.function([], .array(.int))], .function([.named("SymbolsTestsEnum", [])], .int))], context.functionSignature(of: "trailingClosureF3", in: .named("SymbolsTestsClass", []), arguments: [LabeledValue<TypeSignature>(label: nil, value: .function([], .none))]))
     }
 
+    func testConstructor() async throws {
+        let context = try await symbols.context()
+        XCTAssertEqual([.function([.int], .named("SymbolsTestsMutableVarStruct", []))], context.functionSignature(of: "SymbolsTestsMutableVarStruct", arguments: [LabeledValue<TypeSignature>(label: "v", value: .none)]))
+    }
+
+    func testSuperclassConstructor() {
+        XCTExpectFailure()
+        XCTFail("TODO: Test custom superclass constructors called on a subclass")
+    }
+
     func testCustomSubscript() {
         XCTExpectFailure()
         XCTFail("TODO: Test custom subscript operators")

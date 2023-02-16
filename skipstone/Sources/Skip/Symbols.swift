@@ -130,10 +130,29 @@ public class Symbols {
 
         /// Return the signatures of the possible functions being called with the given arguments.
         func functionSignature(of name: String, arguments: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
-            let candidates = symbols.symbolsByName[name, default: []]
-                .filter { $0.kind == .func }
-                .compactMap { matchFunction($0, arguments: arguments) }
-            return ranked(candidates).map(\.signature)
+            let symbolsWithName = symbols.symbolsByName[name, default: []]
+            let funcs = symbolsWithName.filter { $0.kind == .func }
+            let funcsCandidates = funcs.compactMap { matchFunction($0, arguments: arguments) }
+
+            let types = symbolsWithName.filter { $0.kind == .class || $0.kind == .struct || $0.kind == .enum || $0.kind == .extension }
+            var initsCandidates: [(Symbol, TypeSignature)] = []
+            for type in types {
+                let typeSignature = type.typeSignature(symbols: symbols)
+                for relationship in type.relationships {
+                    guard relationship.kind == .memberOf && relationship.isInverse else {
+                        continue
+                    }
+                    guard let member = symbols.symbolsByIdentifier[relationship.targetIdentifier ?? ""], member.kind == .`init` else {
+                        continue
+                    }
+                    guard let (symbol, signature) = matchFunction(member, arguments: arguments), case .function(let argumentTypes, _) = signature else {
+                        continue
+                    }
+                    // Remap return type of .init from .void to owning type
+                    initsCandidates.append((symbol, .function(argumentTypes, typeSignature)))
+                }
+            }
+            return ranked(funcsCandidates + initsCandidates).map(\.signature)
         }
 
         /// Return the signatures of the possible subscripts being called with the given arguments.
