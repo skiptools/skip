@@ -250,7 +250,7 @@ class FunctionDeclaration: Statement {
     private(set) var modifiers: Modifiers
     let body: CodeBlock<Statement>?
 
-    init(name: String, returnType: TypeSignature = .none, parameters: [Parameter<Expression>], isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes? = nil, modifiers: Modifiers? = nil, body: CodeBlock<Statement>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(name: String, returnType: TypeSignature = .void, parameters: [Parameter<Expression>], isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes? = nil, modifiers: Modifiers? = nil, body: CodeBlock<Statement>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.name = name
         self.returnType = returnType
         self.parameters = parameters

@@ -24,6 +24,12 @@ final class BaseTypeTests: XCTestCase {
         var v: Void
         """, kotlin: """
         internal var a: Any
+            get() {
+                return field.valref({ a = it })
+            }
+            set(newValue) {
+                field = newValue.valref()
+            }
         internal var ao: Any
         internal var b: Boolean
         internal var c: Char
@@ -56,11 +62,47 @@ final class BaseTypeTests: XCTestCase {
         var tis2: (Int, String, Double)
         """, kotlin: """
         internal var a: Array<Any>
+            get() {
+                return field.valref({ a = it })
+            }
+            set(newValue) {
+                field = newValue.valref()
+            }
         internal var ai: Array<Int>
+            get() {
+                return field.valref({ ai = it })
+            }
+            set(newValue) {
+                field = newValue.valref()
+            }
         internal var ai2: Array<Int>
+            get() {
+                return field.valref({ ai2 = it })
+            }
+            set(newValue) {
+                field = newValue.valref()
+            }
         internal var m: Dictionary<Any, Any>
+            get() {
+                return field.valref({ m = it })
+            }
+            set(newValue) {
+                field = newValue.valref()
+            }
         internal var mis: Dictionary<Int, String>
+            get() {
+                return field.valref({ mis = it })
+            }
+            set(newValue) {
+                field = newValue.valref()
+            }
         internal var mis2: Dictionary<Int, String>
+            get() {
+                return field.valref({ mis2 = it })
+            }
+            set(newValue) {
+                field = newValue.valref()
+            }
         internal var tis: Pair<Int, String>
         internal var tis2: Triple<Int, String, Double>
         """)
@@ -71,6 +113,12 @@ final class BaseTypeTests: XCTestCase {
         var c: CustomType
         """, kotlin: """
         internal var c: CustomType
+            get() {
+                return field.valref({ c = it })
+            }
+            set(newValue) {
+                field = newValue.valref()
+            }
         """)
     }
 
@@ -82,7 +130,19 @@ final class BaseTypeTests: XCTestCase {
         """, kotlin: """
         internal var i: Int?
         internal var c: CustomType?
+            get() {
+                return field.valref({ c = it })
+            }
+            set(newValue) {
+                field = newValue.valref()
+            }
         internal lateinit var u: CustomType
+            get() {
+                return field.valref({ u = it })
+            }
+            set(newValue) {
+                field = newValue.valref()
+            }
         """)
     }
 }

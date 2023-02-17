@@ -48,7 +48,7 @@ extension FunctionSignatureSyntax {
     /// The return type and parameters in this signature, and optional messages warning of any issues.
     func typeSignatures(in syntaxTree: SyntaxTree) -> (TypeSignature, [Parameter<Expression>], [Message]) {
         var messages: [Message] = []
-        let returnType = output?.typeSignature(in: syntaxTree, messages: &messages) ?? .none
+        let returnType = output?.typeSignature(in: syntaxTree, messages: &messages) ?? .void
         let parameters = input.parameters(in: syntaxTree, messages: &messages)
         return (returnType, parameters, messages)
     }
