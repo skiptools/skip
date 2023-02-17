@@ -224,14 +224,14 @@ class Closure: Expression {
     private(set) var parameters: [Parameter<Void>]
     let isAsync: Bool
     let isThrows: Bool
-    let statements: [Statement]
+    let body: CodeBlock<Statement>
 
-    init(returnType: TypeSignature = .none, parameters: [Parameter<Void>], isAsync: Bool = false, isThrows: Bool = false, statements: [Statement] = [], syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(returnType: TypeSignature = .none, parameters: [Parameter<Void>], isAsync: Bool = false, isThrows: Bool = false, body: CodeBlock<Statement> = CodeBlock<Statement>(statements: []), syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
         self.returnType = returnType
         self.parameters = parameters
         self.isAsync = isAsync
         self.isThrows = isThrows
-        self.statements = statements
+        self.body = body
         super.init(type: .closure, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
@@ -243,7 +243,8 @@ class Closure: Expression {
         let isAsync = closureExpr.signature?.asyncKeyword?.text == "async" || closureExpr.signature?.throwsTok?.text == "async"
         let isThrows = closureExpr.signature?.asyncKeyword?.text == "throws" || closureExpr.signature?.throwsTok?.text == "throws"
         let statements = StatementDecoder.decode(syntaxList: closureExpr.statements, in: syntaxTree)
-        let expression = Closure(returnType: returnType, parameters: parameters, isAsync: isAsync, isThrows: isThrows, statements: statements, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+        let body = CodeBlock<Statement>(statements: statements)
+        let expression = Closure(returnType: returnType, parameters: parameters, isAsync: isAsync, isThrows: isThrows, body: body, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
         expression.messages = messages
         return expression
     }
@@ -260,7 +261,7 @@ class Closure: Expression {
     }
 
     override var children: [SyntaxNode] {
-        return statements
+        return body.statements
     }
 
     override var prettyPrintAttributes: [PrettyPrintTree] {

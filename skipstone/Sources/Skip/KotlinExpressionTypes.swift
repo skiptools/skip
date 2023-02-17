@@ -61,7 +61,7 @@ class KotlinBinaryOperator: KotlinExpression {
         let klhs = translator.translateExpression(expression.lhs)
         var krhs = translator.translateExpression(expression.rhs)
         if expression.op.precedence == .assignment {
-            krhs = krhs.valueReference
+            krhs = krhs.valueReference()
         }
         let kexpression = KotlinBinaryOperator(expression: expression, lhs: klhs, rhs: krhs)
         kexpression.mayBeSharedMutableValue = expression.inferredType.kotlinMayBeSharedMutableValue(codebaseInfo: translator.codebaseInfo)
@@ -118,28 +118,28 @@ class KotlinBooleanLiteral: KotlinExpression {
 class KotlinClosure: KotlinExpression {
     var returnType: TypeSignature = .none
     var parameters: [Parameter<Void>] = []
-    var statements: [KotlinStatement] = []
+    var body: CodeBlock<KotlinStatement>
     var returnLabel: String? = nil
 
     static func translate(expression: Closure, translator: KotlinTranslator) -> KotlinClosure {
-        let kexpression = KotlinClosure(expression: expression)
+        let (kstatements, didLabel) = expression.body.statements.flatMap { translator.translateStatement($0) }.withExpectedReturn(.labelIfPresent("_r_"))
+        let body = CodeBlock(statements: kstatements)
+        let kexpression = KotlinClosure(expression: expression, body: body)
         kexpression.returnType = expression.returnType
         kexpression.parameters = expression.parameters
-        kexpression.statements = expression.statements.flatMap {
-            return translator.translateStatement($0)
-        }
-        if kexpression.statements.updateReturns(label: "_r_") {
+        if didLabel {
             kexpression.returnLabel = "_r_"
         }
         return kexpression
     }
 
-    private init(expression: Closure) {
+    private init(expression: Closure, body: CodeBlock<KotlinStatement>) {
+        self.body = body
         super.init(type: .closure, expression: expression)
     }
 
     override var children: [KotlinSyntaxNode] {
-        return statements
+        return body.statements
     }
 
     override func append(to output: OutputGenerator) {
@@ -149,7 +149,7 @@ class KotlinClosure: KotlinExpression {
             output.append(returnLabel).append("@")
         }
         output.append("{\n")
-        output.append(statements, indentation: indentation.inc())
+        output.append(body.statements, indentation: indentation.inc())
         output.append(indentation).append("}")
     }
 }
@@ -167,16 +167,16 @@ class KotlinNullLiteral: KotlinExpression {
 class KotlinFunctionCall: KotlinExpression {
     var function: KotlinExpression
     var arguments: [LabeledValue<KotlinExpression>] = []
-    var mayBeSharedMutableValue = false
+    var mayBeSharedMutableValueType = false
 
     static func translate(expression: FunctionCall, translator: KotlinTranslator) -> KotlinFunctionCall {
         let kfunction = translator.translateExpression(expression.function)
         let kexpression = KotlinFunctionCall(expression: expression, function: kfunction)
         kexpression.arguments = expression.arguments.map {
-            let kargumentExpression = translator.translateExpression($0.value).valueReference
+            let kargumentExpression = translator.translateExpression($0.value).valueReference()
             return LabeledValue(label: $0.label, value: kargumentExpression)
         }
-        kexpression.mayBeSharedMutableValue = expression.inferredType.kotlinMayBeSharedMutableValue(codebaseInfo: translator.codebaseInfo)
+        kexpression.mayBeSharedMutableValueType = expression.inferredType.kotlinMayBeSharedMutableValue(codebaseInfo: translator.codebaseInfo)
         return kexpression
     }
 
@@ -192,7 +192,8 @@ class KotlinFunctionCall: KotlinExpression {
     }
 
     override func mayBeSharedMutableValueExpression(orType: Bool) -> Bool {
-        return mayBeSharedMutableValue
+        // The result of a function call is never a shared value because we always valref() on return
+        return orType && mayBeSharedMutableValueType
     }
 
     override var children: [KotlinSyntaxNode] {
@@ -384,7 +385,7 @@ class KotlinSubscript: KotlinExpression {
         let kbase = translator.translateExpression(expression.base)
         let kexpression = KotlinSubscript(expression: expression, base: kbase)
         kexpression.arguments = expression.arguments.map {
-            let kargumentExpression = translator.translateExpression($0.value).valueReference
+            let kargumentExpression = translator.translateExpression($0.value).valueReference()
             return LabeledValue(label: $0.label, value: kargumentExpression)
         }
         kexpression.mayBeSharedMutableValue = expression.inferredType.kotlinMayBeSharedMutableValue(codebaseInfo: translator.codebaseInfo)
@@ -473,6 +474,13 @@ class KotlinValueReference: KotlinExpression {
 
     override func mayBeSharedMutableValueExpression(orType: Bool) -> Bool {
         return orType
+    }
+
+    override func valueReference(onUpdate: String? = nil) -> KotlinExpression {
+        if let onUpdate {
+            self.onUpdate = onUpdate
+        }
+        return self
     }
 
     override var children: [KotlinSyntaxNode] {

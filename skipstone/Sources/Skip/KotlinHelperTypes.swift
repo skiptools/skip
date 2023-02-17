@@ -1,31 +1,47 @@
+/// The type of return statement expected from a code block.
+enum ExpectedReturn {
+    /// No return is expected.
+    case no
+    /// A return is required.
+    case yes
+    /// If any returns are present, given them the given label.
+    case labelIfPresent(String)
+    /// Call `valref` on returned values with the given `onUpdate` code.
+    case valueReference(String?)
+}
+
 extension Accessor where S: Statement {
     /// Translate to an equivalent Kotlin accessor.
-    func translate(translator: KotlinTranslator, isReturnExpected: Bool) -> Accessor<KotlinStatement> {
+    func translate(translator: KotlinTranslator, expectedReturn: ExpectedReturn) -> Accessor<KotlinStatement> {
         if let body {
-            return Accessor<KotlinStatement>(parameterName: parameterName, body: body.translate(translator: translator, isReturnExpected: isReturnExpected))
+            return Accessor<KotlinStatement>(parameterName: parameterName, body: body.translate(translator: translator, expectedReturn: expectedReturn))
         }
         return Accessor<KotlinStatement>(parameterName: parameterName)
     }
 }
 
 extension Array where Element: KotlinStatement {
-    /// If this statement block is using an implicit return value, add an explicit return statement.
+    /// Perform any necessary updates to the return statements in this block.
     ///
-    /// Assumes that this block must return a value.
-    func withReturn() -> [KotlinStatement] {
-        guard count == 1, self[0].type == .expression, let expression = (self[0] as! KotlinExpressionStatement).expression else {
-            return self
+    /// - Returns: The updated statements and whether any return statements were potentially updated.
+    func withExpectedReturn(_ expectedReturn: ExpectedReturn) -> ([KotlinStatement], Bool) {
+        var label: String?
+        var valref = false
+        var returnRequired = false
+        var onUpdate: String? = nil
+        switch expectedReturn {
+        case .no:
+            return (self, false)
+        case .yes:
+            returnRequired = true
+        case .labelIfPresent(let l):
+            label = l
+        case .valueReference(let update):
+            onUpdate = update
+            valref = true
+            returnRequired = true
         }
-        return [KotlinReturn(expression: expression)]
-    }
 
-    /// Update all return statements in this code block.
-    ///
-    /// - Parameters:
-    ///   - Parameter label: Label all return statements: `return@label ...`.
-    ///   - Parameter onValueReferenceUpdate: Modify all `valref` returns to perform the given update when the value is modified.
-    /// - Returns: Whether any return statements were found.
-    @discardableResult func updateReturns(label: String? = nil, onValueReferenceUpdate: String? = nil) -> Bool {
         var didFindReturn = false
         forEach {
             $0.visitStatements {
@@ -34,25 +50,33 @@ extension Array where Element: KotlinStatement {
                     if let label {
                         returnStatement.label = label
                     }
-                    if let onValueReferenceUpdate, let valueReference = returnStatement.expression as? KotlinValueReference {
-                        valueReference.onUpdate = onValueReferenceUpdate
+                    if valref {
+                        returnStatement.expression = returnStatement.expression?.valueReference(onUpdate: onUpdate)
                     }
                     return false
                 }
                 return true
             }
         }
-        return didFindReturn
+        if didFindReturn {
+            return (self, true)
+        }
+
+        // If this was an implicit return, replace it with an explicit one if a return is required
+        guard returnRequired, count == 1, self[0].type == .expression, var expression = (self[0] as! KotlinExpressionStatement).expression else {
+            return (self, false)
+        }
+        if valref {
+            expression = expression.valueReference(onUpdate: onUpdate)
+        }
+        return ([KotlinReturn(expression: expression)], true)
     }
 }
 
 extension CodeBlock where S: Statement {
     /// Translate to an equivalent Kotlin code block.
-    func translate(translator: KotlinTranslator, isReturnExpected: Bool) -> CodeBlock<KotlinStatement> {
-        var kstatements = statements.flatMap { translator.translateStatement($0) }
-        if isReturnExpected {
-            kstatements = kstatements.withReturn()
-        }
+    func translate(translator: KotlinTranslator, expectedReturn: ExpectedReturn) -> CodeBlock<KotlinStatement> {
+        let (kstatements, _) = statements.flatMap { translator.translateStatement($0) }.withExpectedReturn(expectedReturn)
         return CodeBlock<KotlinStatement>(statements: kstatements)
     }
 }

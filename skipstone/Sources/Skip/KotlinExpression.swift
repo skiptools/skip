@@ -16,11 +16,13 @@ class KotlinExpression: KotlinSyntaxNode {
     /// Return an expression that creates a by-value copy of the result of this expression if needed to maintain proper semantics for value types.
     ///
     /// - Seealso: `SkipFoundation.Any.valref()`
-    final var valueReference: KotlinExpression {
-        guard mayBeSharedMutableValueExpression(orType: false) else {
+    func valueReference(onUpdate: String? = nil) -> KotlinExpression {
+        // If an update block is supplied, we need to perform a valref even if the value isn't shared so
+        // that the update is called on any mutation
+        guard mayBeSharedMutableValueExpression(orType: onUpdate != nil) else {
             return self
         }
-        return KotlinValueReference(base: self)
+        return KotlinValueReference(base: self, onUpdate: onUpdate)
     }
 
     /// Return true if this expression may evaluate to a shared mutable value type.

@@ -22,14 +22,14 @@ class KotlinReturn: KotlinExpressionStatement {
     static func translate(statement: Return, translator: KotlinTranslator) -> KotlinExpressionStatement {
         let kstatement = KotlinReturn(statement: statement)
         if let expression = statement.expression {
-            kstatement.expression = translator.translateExpression(expression).valueReference
+            kstatement.expression = translator.translateExpression(expression)
         }
         return kstatement
     }
 
     init(expression: KotlinExpression) {
         super.init(type: .return, sourceFile: expression.sourceFile, sourceRange: expression.sourceRange)
-        self.expression = expression.valueReference
+        self.expression = expression
     }
 
     private init(statement: Return) {
@@ -227,7 +227,8 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             }
         }
         if let body = statement.body {
-            kstatement.body = body.translate(translator: translator, isReturnExpected: kstatement.returnType != .void)
+            let expectedReturn: ExpectedReturn = statement.returnType == .void ? .no : .valueReference(nil)
+            kstatement.body = body.translate(translator: translator, expectedReturn: expectedReturn)
         }
         kstatement.returnType.appendKotlinMessages(to: kstatement)
         kstatement.parameters.forEach { $0.declaredType.appendKotlinMessages(to: kstatement) }
@@ -390,6 +391,8 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var willSet: Accessor<KotlinStatement>?
     var didSet: Accessor<KotlinStatement>?
     var mayBeSharedMutableValue = false
+    var isReadOnly = false
+    var onUpdate: String?
 
     // KotlinMemberDeclaration
     var extends: TypeSignature?
@@ -410,12 +413,10 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             kstatement.isGlobal = true
         }
         if let value = statement.value {
-            kstatement.value = translator.translateExpression(value).valueReference
+            kstatement.value = translator.translateExpression(value).valueReference()
         }
-        kstatement.getter = statement.getter?.translate(translator: translator, isReturnExpected: true)
-        kstatement.setter = statement.setter?.translate(translator: translator, isReturnExpected: false)
-        kstatement.willSet = statement.willSet?.translate(translator: translator, isReturnExpected: false)
-        kstatement.didSet = statement.didSet?.translate(translator: translator, isReturnExpected: false)
+
+        kstatement.isReadOnly = statement.isLet || (statement.getter != nil && statement.setter == nil)
         if kstatement.declaredType != .none {
             kstatement.mayBeSharedMutableValue = kstatement.declaredType.kotlinMayBeSharedMutableValue(codebaseInfo: translator.codebaseInfo)
         } else if let kvalue = kstatement.value {
@@ -423,7 +424,16 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         } else {
             kstatement.mayBeSharedMutableValue = true
         }
-        
+        if kstatement.mayBeSharedMutableValue {
+            kstatement.onUpdate = kstatement.isReadOnly ? nil : kstatement.isProperty ? "{ this.\(kstatement.name) = it }" : "{ \(kstatement.name) = it }"
+            kstatement.getter = statement.getter?.translate(translator: translator, expectedReturn: .valueReference(kstatement.onUpdate))
+        } else {
+            kstatement.getter = statement.getter?.translate(translator: translator, expectedReturn: .yes)
+        }
+        kstatement.setter = statement.setter?.translate(translator: translator, expectedReturn: .no)
+        kstatement.willSet = statement.willSet?.translate(translator: translator, expectedReturn: .no)
+        kstatement.didSet = statement.didSet?.translate(translator: translator, expectedReturn: .no)
+
         kstatement.declaredType.appendKotlinMessages(to: kstatement)
         if statement.isAsync {
             kstatement.messages.append(.kotlinAsyncProperties(kstatement))
@@ -460,7 +470,6 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
-        let isReadOnly = isLet || (getter != nil && setter == nil)
         output.append(indentation)
         if let declaration = extras?.declaration {
             output.append(declaration)
@@ -493,22 +502,15 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             output.append("\n")
         }
 
-        if mayBeSharedMutableValue && (isProperty || isGlobal) {
-            let onUpdate: String? = isReadOnly ? nil : isProperty ? "{ this.\(name) = it }" : "{ \(name) = it }"
-            let getterIndentation = indentation.inc()
-            output.append(getterIndentation).append("get() {\n")
-            let getterBodyIndentation = getterIndentation.inc()
-            if let getterStatements = getter?.body?.statements {
-                getterStatements.updateReturns(onValueReferenceUpdate: onUpdate)
-                output.append(getterStatements, indentation: getterBodyIndentation)
-            } else {
-                output.append(getterBodyIndentation).append("return field.valref(\(onUpdate ?? ""))\n")
-            }
-            output.append(getterIndentation).append("}\n")
-        } else if let getterStatements = getter?.body?.statements {
+        if let getterStatements = getter?.body?.statements {
             let getterIndentation = indentation.inc()
             output.append(getterIndentation).append("get() {\n")
             output.append(getterStatements, indentation: getterIndentation.inc())
+            output.append(getterIndentation).append("}\n")
+        } else if mayBeSharedMutableValue && (isProperty || isGlobal) {
+            let getterIndentation = indentation.inc()
+            output.append(getterIndentation).append("get() {\n")
+            output.append(getterIndentation.inc()).append("return field.valref(\(onUpdate ?? ""))\n")
             output.append(getterIndentation).append("}\n")
         }
         if setter?.body != nil || willSet?.body != nil || didSet?.body != nil {
