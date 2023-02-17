@@ -272,3 +272,50 @@ struct Modifiers: PrettyPrintable {
         return PrettyPrintTree(root: "modifiers", children: children)
     }
 }
+
+/// @Attributes on a declaration.
+struct Attributes: PrettyPrintable {
+    let attributes: [Attribute]
+
+    init(attributes: [Attribute] = []) {
+        self.attributes = attributes
+    }
+
+    /// Decode the attribute information in the given syntax.
+    static func `for`(syntax: AttributeListSyntax?) -> Attributes {
+        guard let syntax else {
+            return Attributes()
+        }
+        let attributes = syntax.compactMap {
+            switch $0 {
+            case .attribute(let syntax):
+                return Attribute.for(syntax: syntax)
+            case .ifConfigDecl:
+                return nil
+            }
+        }
+        return Attributes(attributes: attributes)
+    }
+
+    var isEmpty: Bool {
+        return attributes.isEmpty
+    }
+
+    var prettyPrintTree: PrettyPrintTree {
+        let children = attributes.map {
+            return PrettyPrintTree(root: "@\($0.signature)")
+        }
+        return PrettyPrintTree(root: "attributes", children: children)
+    }
+}
+
+/// @Attribute on a declaration.
+struct Attribute {
+    let signature: TypeSignature
+
+    /// Decode the attribute information in the given syntax.
+    static func `for`(syntax: AttributeSyntax) -> Attribute? {
+        let signature = TypeSignature.for(syntax: syntax.attributeName)
+        return signature == .none ? nil : Attribute(signature: signature)
+    }
+}
