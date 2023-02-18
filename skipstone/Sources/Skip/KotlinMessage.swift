@@ -38,4 +38,8 @@ extension Message {
     static func kotlinTupleLabels(_ sourceDerived: SourceDerived) -> Message {
         return Message(severity: .error, message: "Kotlin uses Pair for 2-tuples and Triple for 3-tuples. It does not support custom tuple element labels. Consider creating a struct instead", sourceDerived: sourceDerived)
     }
+
+    static func kotlinViewBuilderUnsupportedStatement(_ sourceDerived: SourceDerived) -> Message {
+        return Message(severity: .error, message: "This Swift construct is not supported within a @ViewBuilder when translating to Kotlin UI", sourceDerived: sourceDerived)
+    }
 }

@@ -56,15 +56,18 @@ class KotlinReturn: KotlinExpressionStatement {
 // MARK: - Declarations
 
 class KotlinClassDeclaration: KotlinStatement {
-    let name: String
-    var inherits: [TypeSignature]
+    var name: String
+    var inherits: [TypeSignature] = []
     var superclassCall: String?
-    var modifiers: Modifiers
-    var isDataClass: Bool
+    var modifiers = Modifiers()
+    var isDataClass = false
     var members: [KotlinStatement] = []
 
     static func translate(statement: TypeDeclaration, translator: KotlinTranslator) -> KotlinClassDeclaration {
         let kstatement = KotlinClassDeclaration(statement: statement)
+        kstatement.inherits = statement.inherits
+        kstatement.modifiers = statement.modifiers
+        kstatement.isDataClass = Self.isDataClass(typeDeclaration: statement)
         kstatement.buildSuperclassCall(translator: translator)
         var members = statement.members.flatMap { translator.translateStatement($0) }
         // Move extensions of this type into the type itself rather than use Kotlin extension functions.
@@ -82,9 +85,6 @@ class KotlinClassDeclaration: KotlinStatement {
 
     private init(statement: TypeDeclaration) {
         self.name = statement.name
-        self.inherits = statement.inherits
-        self.modifiers = statement.modifiers
-        self.isDataClass = Self.isDataClass(typeDeclaration: statement)
         super.init(type: .classDeclaration, statement: statement)
     }
 
@@ -202,12 +202,12 @@ struct KotlinExtensionDeclaration {
 }
 
 class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
-    let name: String
+    var name: String
     var returnType: TypeSignature = .none
     var parameters: [Parameter<KotlinExpression>] = []
-    var isAsync: Bool
+    var isAsync = false
     var isOpen = false
-    var modifiers: Modifiers
+    var modifiers = Modifiers()
     var body: CodeBlock<KotlinStatement>?
 
     // KotlinMemberDeclaration
@@ -218,6 +218,8 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
 
     static func translate(statement: FunctionDeclaration, translator: KotlinTranslator) -> KotlinFunctionDeclaration {
         let kstatement = KotlinFunctionDeclaration(statement: statement)
+        kstatement.isAsync = statement.isAsync
+        kstatement.modifiers = statement.modifiers
         kstatement.returnType = statement.returnType
         kstatement.parameters = statement.parameters.map { $0.translate(translator: translator) }
         if let owningTypeDeclaration = statement.owningTypeDeclaration {
@@ -235,10 +237,13 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         return kstatement
     }
 
+    init(name: String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        self.name = name
+        super.init(type: .functionDeclaration, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
     private init(statement: FunctionDeclaration) {
         self.name = statement.name
-        self.isAsync = statement.isAsync
-        self.modifiers = statement.modifiers
         super.init(type: .functionDeclaration, statement: statement)
     }
 
@@ -295,11 +300,11 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
 }
 
 class KotlinImportDeclaration: KotlinStatement {
-    let modulePath: [String]
+    var modulePath: [String]
 
-    init(modulePath: [String]) {
+    init(modulePath: [String], sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
         self.modulePath = modulePath
-        super.init(type: .importDeclaration)
+        super.init(type: .importDeclaration, sourceFile: sourceFile, sourceRange: sourceRange)
     }
     
     init(statement: ImportDeclaration) {
@@ -324,13 +329,15 @@ class KotlinImportDeclaration: KotlinStatement {
 }
 
 class KotlinInterfaceDeclaration: KotlinStatement {
-    let name: String
-    var inherits: [TypeSignature]
-    var modifiers: Modifiers
+    var name: String
+    var inherits: [TypeSignature] = []
+    var modifiers = Modifiers()
     var members: [KotlinStatement] = []
 
     static func translate(statement: TypeDeclaration, translator: KotlinTranslator) -> KotlinInterfaceDeclaration {
         let kstatement = KotlinInterfaceDeclaration(statement: statement)
+        kstatement.inherits = statement.inherits
+        kstatement.modifiers = statement.modifiers
         kstatement.members = statement.members.flatMap { translator.translateStatement($0) }
         kstatement.inherits.forEach { $0.appendKotlinMessages(to: kstatement) }
         return kstatement
@@ -338,8 +345,6 @@ class KotlinInterfaceDeclaration: KotlinStatement {
 
     private init(statement: TypeDeclaration) {
         self.name = statement.name
-        self.inherits = statement.inherits
-        self.modifiers = statement.modifiers
         super.init(type: .interfaceDeclaration, statement: statement)
     }
 
@@ -377,14 +382,14 @@ class KotlinInterfaceDeclaration: KotlinStatement {
 }
 
 class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
-    let name: String
+    var name: String
     var declaredType: TypeSignature = .none
-    var isLet: Bool
-    var isAsync: Bool
+    var isLet = false
+    var isAsync = false
     var isProperty = false
     var isGlobal = false
     var isOpen = false
-    var modifiers: Modifiers
+    var modifiers = Modifiers()
     var value: KotlinExpression?
     var getter: Accessor<KotlinStatement>?
     var setter: Accessor<KotlinStatement>?
@@ -402,6 +407,9 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
 
     static func translate(statement: VariableDeclaration, translator: KotlinTranslator) -> KotlinVariableDeclaration {
         let kstatement = KotlinVariableDeclaration(statement: statement)
+        kstatement.isLet = statement.isLet
+        kstatement.isAsync = statement.isAsync
+        kstatement.modifiers = statement.modifiers
         kstatement.declaredType = statement.declaredType
         if let owningTypeDeclaration = statement.owningTypeDeclaration {
             kstatement.isProperty = statement.parent === owningTypeDeclaration
@@ -409,7 +417,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             if kstatement.isProperty && translator.codebaseInfo?.isProtocolMember(declaration: statement, in: owningTypeDeclaration) == true {
                 kstatement.modifiers.isOverride = true
             }
-        } else if statement.owningFunctionDeclaration == nil {
+        } else if statement.parent == nil {
             kstatement.isGlobal = true
         }
         if let value = statement.value {
@@ -443,9 +451,6 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
 
     private init(statement: VariableDeclaration) {
         self.name = statement.name
-        self.isLet = statement.isLet
-        self.isAsync = statement.isAsync
-        self.modifiers = statement.modifiers
         super.init(type: .variableDeclaration, statement: statement)
     }
 

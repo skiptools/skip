@@ -12,8 +12,32 @@ class KotlinSyntaxNode: SourceDerived, OutputNode {
         self.sourceRange = sourceRange
     }
 
+    /// Visit this node and its children depth first, performing the given action.
+    ///
+    /// - Parameters:
+    ///   - Parameter perform: The action to perform.
+    func visit(perform: (KotlinSyntaxNode) -> KotlinVisitResult) {
+        if case .recurse(let onLeave) = perform(self) {
+            for child in children {
+                child.visit(perform: perform)
+            }
+            if let onLeave {
+                onLeave(self)
+            }
+        }
+    }
+
+    weak var parent: KotlinSyntaxNode?
     var children: [KotlinSyntaxNode] {
         return []
+    }
+
+    /// Fixup parent references below this node after editing the node graph.
+    final func fixupParentReferences() {
+        for child in children {
+            child.parent = self
+            child.fixupParentReferences()
+        }
     }
 
     var messages: [Message] = []
@@ -37,4 +61,11 @@ class KotlinSyntaxNode: SourceDerived, OutputNode {
 
     func append(to output: OutputGenerator, indentation: Indentation) {
     }
+}
+
+enum KotlinVisitResult {
+    /// Skip the content of this node.
+    case skip
+    /// Recurse into the content of this node, optionally invoking the given block when leaving this node's content.
+    case recurse(((KotlinSyntaxNode) -> Void)?)
 }

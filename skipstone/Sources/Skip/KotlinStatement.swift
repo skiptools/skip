@@ -19,13 +19,16 @@ class KotlinStatement: KotlinSyntaxNode {
     /// Visit this statement and its children depth first, performing the given action.
     ///
     /// - Parameters:
-    ///   - Parameter perform: The action to perform. Return `true` to recurse into this statement's children.`
-    func visitStatements(perform: (KotlinStatement) -> Bool) {
-        if perform(self) {
+    ///   - Parameter perform: The action to perform.
+    func visitStatements(perform: (KotlinStatement) -> KotlinVisitResult) {
+        if case .recurse(let onLeave) = perform(self) {
             for child in children {
                 if let statement = child as? KotlinStatement {
                     statement.visitStatements(perform: perform)
                 }
+            }
+            if let onLeave {
+                onLeave(self)
             }
         }
     }

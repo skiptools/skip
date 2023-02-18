@@ -19,11 +19,16 @@ enum KotlinExpressionType {
 
 class KotlinArrayLiteral: KotlinExpression {
     var elements: [KotlinExpression] = []
+    var useMultilineFormatting = false
 
     static func translate(expression: ArrayLiteral, translator: KotlinTranslator) -> KotlinArrayLiteral {
         let kexpression = KotlinArrayLiteral(expression: expression)
         kexpression.elements = expression.elements.map { translator.translateExpression($0) }
         return kexpression
+    }
+
+    init(sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        super.init(type: .arrayLiteral, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
     private init(expression: ArrayLiteral) {
@@ -42,10 +47,16 @@ class KotlinArrayLiteral: KotlinExpression {
     override func append(to output: OutputGenerator) {
         output.append("arrayOf(")
         for (index, element) in elements.enumerated() {
+            if (useMultilineFormatting) {
+                output.append("\n").append(output.indentationLevel.inc())
+            }
             output.append(element)
             if index != elements.count - 1 {
                 output.append(", ")
             }
+        }
+        if (useMultilineFormatting) {
+            output.append("\n").append(output.indentationLevel)
         }
         output.append(")")
     }
@@ -258,7 +269,7 @@ class KotlinIdentifier: KotlinExpression {
 class KotlinMemberAccess: KotlinExpression {
     var base: KotlinExpression?
     var member: String
-    var isMemberContinuedOnNextLine = false
+    var useMultlineFormatting = false
     var inferredType: TypeSignature = .none
     var mayBeSharedMutableValue = false
 
@@ -266,7 +277,7 @@ class KotlinMemberAccess: KotlinExpression {
         let kexpression = KotlinMemberAccess(expression: expression)
         if let base = expression.base {
             kexpression.base = translator.translateExpression(base)
-            kexpression.isMemberContinuedOnNextLine = expression.isMemberContinuedOnNextLine
+            kexpression.useMultlineFormatting = expression.useMultlineFormatting
         }
         kexpression.inferredType = expression.inferredType
         kexpression.mayBeSharedMutableValue = expression.inferredType.kotlinMayBeSharedMutableValue(codebaseInfo: translator.codebaseInfo)
@@ -299,7 +310,7 @@ class KotlinMemberAccess: KotlinExpression {
             } else {
                 output.append(base)
             }
-            if isMemberContinuedOnNextLine {
+            if useMultlineFormatting {
                 output.append("\n").append(output.indentationLevel.inc())
             }
             output.append(".")

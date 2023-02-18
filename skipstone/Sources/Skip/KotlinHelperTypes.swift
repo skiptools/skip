@@ -23,7 +23,7 @@ extension Accessor where S: Statement {
 extension Array where Element: KotlinStatement {
     /// Perform any necessary updates to the return statements in this block.
     ///
-    /// - Returns: The updated statements and whether any return statements were potentially updated.
+    /// - Returns: The updated statements and whether any return statements were found.
     func withExpectedReturn(_ expectedReturn: ExpectedReturn) -> ([KotlinStatement], Bool) {
         var label: String?
         var valref = false
@@ -31,7 +31,8 @@ extension Array where Element: KotlinStatement {
         var onUpdate: String? = nil
         switch expectedReturn {
         case .no:
-            return (self, false)
+            // Don't shortcut and return here because we need to return whether any return statements were found
+            break
         case .yes:
             returnRequired = true
         case .labelIfPresent(let l):
@@ -53,9 +54,9 @@ extension Array where Element: KotlinStatement {
                     if valref {
                         returnStatement.expression = returnStatement.expression?.valueReference(onUpdate: onUpdate)
                     }
-                    return false
+                    return .skip
                 }
-                return true
+                return .recurse(nil)
             }
         }
         if didFindReturn {
@@ -76,7 +77,14 @@ extension Array where Element: KotlinStatement {
 extension CodeBlock where S: Statement {
     /// Translate to an equivalent Kotlin code block.
     func translate(translator: KotlinTranslator, expectedReturn: ExpectedReturn) -> CodeBlock<KotlinStatement> {
-        let (kstatements, _) = statements.flatMap { translator.translateStatement($0) }.withExpectedReturn(expectedReturn)
+        var kstatements = statements.flatMap { translator.translateStatement($0) }
+        switch expectedReturn {
+        case .no:
+            break
+        default:
+            let (statementsWithReturn, _) = kstatements.withExpectedReturn(expectedReturn)
+            kstatements = statementsWithReturn
+        }
         return CodeBlock<KotlinStatement>(statements: kstatements)
     }
 }

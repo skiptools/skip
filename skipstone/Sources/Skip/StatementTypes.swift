@@ -102,38 +102,25 @@ enum StatementType: CaseIterable {
 }
 
 /// `#if SYMBOL ... #endif`
+///
+/// - Note: We never instantiate this class. It is only used ot extract the statements from an `#if`.
 class IfDefined: Statement {
-    let symbol: String
-    let statements: [Statement]
-
-    init(symbol: String, statements: [Statement] = [], syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
-        self.symbol = symbol
-        self.statements = statements
-        super.init(type: .ifDefined, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
-    }
-
     override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
         guard syntax.kind == .ifConfigDecl, let ifConfigDecl = syntax.as(IfConfigDeclSyntax.self) else {
             return nil
         }
 
         // Look for a clause that matches a defined symbol, or an 'else'
-        var symbol: String? = nil
         var clause: IfConfigClauseSyntax? = nil
         for ifConfigClause in ifConfigDecl.clauses {
             let clauseSymbol = ifConfigClause.condition?.description ?? ""
             guard clauseSymbol == "SKIP" || syntaxTree.preprocessorSymbols.contains(clauseSymbol) || ifConfigClause.poundKeyword.text == "#else" else {
                 continue
             }
-            symbol = clauseSymbol.isEmpty ? "#else" : clauseSymbol
             clause = ifConfigClause
             break
         }
-
-        let resolvedSymbol = symbol ?? ifConfigDecl.clauses.first?.condition?.description ?? ""
-        let statements = try extractStatements(from: clause, in: syntaxTree)
-        let statement = IfDefined(symbol: resolvedSymbol, statements: statements, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
-        return [statement]
+        return try extractStatements(from: clause, in: syntaxTree)
     }
 
     private static func extractStatements(from clause: IfConfigClauseSyntax?, in syntaxTree: SyntaxTree) throws -> [Statement] {
@@ -152,30 +139,6 @@ class IfDefined: Statement {
         case .attributes(let syntax):
             throw Message.unsupportedSyntax(syntax, source: syntaxTree.source)
         }
-    }
-
-    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
-        if parent == nil || parent is TypeDeclaration {
-            // Treat as top-level statements
-            statements.forEach { $0.inferTypes(context: context, expecting: .none) }
-            return context
-        } else if statements.count == 1 {
-            // Pass on expected type
-            return statements[0].inferTypes(context: context, expecting: expecting)
-        } else {
-            // Treat as code block
-            var blockContext = context
-            statements.forEach { blockContext = $0.inferTypes(context: context, expecting: .none) }
-            return blockContext
-        }
-    }
-
-    override var children: [SyntaxNode] {
-        return statements
-    }
-
-    override var prettyPrintAttributes: [PrettyPrintTree] {
-        return [PrettyPrintTree(root: symbol)]
     }
 }
 

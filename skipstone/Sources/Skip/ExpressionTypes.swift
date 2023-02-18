@@ -434,13 +434,13 @@ class MemberAccess: Expression {
     let base: Expression?
     private(set) var baseType: TypeSignature
     let member: String
-    let isMemberContinuedOnNextLine: Bool
+    let useMultlineFormatting: Bool
 
-    init(base: Expression?, baseType: TypeSignature = .none, member: String, isMemberContinuedOnNextLine: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(base: Expression?, baseType: TypeSignature = .none, member: String, useMultlineFormatting: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
         self.base = base
         self.baseType = baseType
         self.member = member
-        self.isMemberContinuedOnNextLine = isMemberContinuedOnNextLine
+        self.useMultlineFormatting = useMultlineFormatting
         super.init(type: .memberAccess, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
@@ -453,7 +453,7 @@ class MemberAccess: Expression {
             base = ExpressionDecoder.decode(syntax: baseSyntax, in: syntaxTree)
         }
         let member = memberAccessExpr.name.text
-        let isMemberContinuedOnNextLine = base != nil && memberAccessExpr.dot.leadingTrivia.contains {
+        let useMultlineFormatting = base != nil && memberAccessExpr.dot.leadingTrivia.contains {
             switch $0 {
             case .newlines:
                 return true
@@ -461,7 +461,7 @@ class MemberAccess: Expression {
                 return false
             }
         }
-        return MemberAccess(base: base, member: member, isMemberContinuedOnNextLine: isMemberContinuedOnNextLine, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+        return MemberAccess(base: base, member: member, useMultlineFormatting: useMultlineFormatting, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
