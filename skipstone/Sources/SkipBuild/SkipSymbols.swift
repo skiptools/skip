@@ -52,6 +52,7 @@ extension System {
         // swift build --target DeckOfPlayingCards -Xswiftc -emit-symbol-graph -Xswiftc -emit-symbol-graph-dir -Xswiftc .build
         // this is based on how docc gathers symbols: https://github.com/apple/swift-docc/blob/main/Sources/generate-symbol-graph/main.swift#L157
         // e.g.: swift build -Xswiftc -emit-symbol-graph -Xswiftc -emit-symbol-graph-dir -Xswiftc ./.build/ -Xswiftc -symbol-graph-minimum-access-level -Xswiftc private
+        // but we also omit synthesized members because they blow up the symbol graph size of any SwiftUI view
 
         let urlBase = swiftFileURL.deletingPathExtension()
         let moduleName = moduleName ?? urlBase.lastPathComponent // if the module name is not set, default to the last part of the URL
@@ -80,6 +81,7 @@ extension System {
                             "-emit-symbol-graph",
                             "-emit-symbol-graph-dir", dir.path,
                             "-symbol-graph-minimum-access-level", accessLevel,
+                            "-skip-synthesized-members",
                             swiftFileURL.path)
         } else {
             try await xcrun("swift",
@@ -94,6 +96,7 @@ extension System {
                             "-module-name", moduleName,
                             "-include-spi-symbols",
                             "-skip-inherited-docs",
+                            "-skip-synthesized-members",
                             //"-v", // verbose
                             //"-pretty-print",
                             //"-skip-synthesized-members",
@@ -137,6 +140,7 @@ extension System {
                                 "-module-name", moduleName,
                                 "-include-spi-symbols",
                                 "-skip-inherited-docs",
+                                "-skip-synthesized-members",
                                 //"-v", // verbose
                                 //"-pretty-print",
                                 //"-skip-synthesized-members",
