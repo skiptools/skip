@@ -45,8 +45,18 @@ extension Array where Element: KotlinStatement {
 
         var didFindReturn = false
         forEach {
-            $0.visitStatements {
-                if let returnStatement = $0 as? KotlinReturn {
+            $0.visitStatements { statement in
+                switch statement.type {
+                case .expression:
+                    // Skip closures that may have their own returns
+                    if (statement as! KotlinExpressionStatement).expression is KotlinClosure {
+                        return .skip
+                    }
+                case .functionDeclaration:
+                    // Skip embedded functions that may have their own returns
+                    return .skip
+                case .return:
+                    let returnStatement = statement as! KotlinReturn
                     didFindReturn = true
                     if let label {
                         returnStatement.label = label
@@ -55,6 +65,8 @@ extension Array where Element: KotlinStatement {
                         returnStatement.expression = returnStatement.expression?.valueReference(onUpdate: onUpdate)
                     }
                     return .skip
+                default:
+                    break
                 }
                 return .recurse(nil)
             }
