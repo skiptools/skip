@@ -37,14 +37,6 @@ class KotlinExpression: KotlinSyntaxNode {
     var isCompoundExpression: Bool {
         return false
     }
-
-    final override func append(to output: OutputGenerator, indentation: Indentation) {
-        output.append(indentation)
-        append(to: output)
-    }
-
-    func append(to output: OutputGenerator) {
-    }
 }
 
 class KotlinRawExpression: KotlinExpression {
@@ -55,7 +47,7 @@ class KotlinRawExpression: KotlinExpression {
         super.init(type: .raw, expression: expression)
     }
 
-    override func append(to output: OutputGenerator) {
+    override func append(to output: OutputGenerator, indentation: Indentation) {
         output.append(sourceCode)
     }
 }

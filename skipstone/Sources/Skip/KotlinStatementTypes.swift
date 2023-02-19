@@ -42,7 +42,7 @@ class KotlinReturn: KotlinExpressionStatement {
             if let label {
                 output.append("@\(label)")
             }
-            output.append(" ").append(expression).append("\n")
+            output.append(" ").append(expression, indentation: indentation).append("\n")
         } else {
             output.append(indentation).append("return")
             if let label {
@@ -275,7 +275,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 output.append(": ")
                 output.append(parameter.declaredType.or(.any).kotlin)
                 if let defaultValue = parameter.defaultValue {
-                    output.append(" = ").append(defaultValue)
+                    output.append(" = ").append(defaultValue, indentation: indentation)
                 }
                 if index != parameters.count - 1 {
                     output.append(", ")
@@ -502,7 +502,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 output.append(": ").append(declaredType.kotlin)
             }
             if let value {
-                output.append(" = ").append(value, indentation: 0)
+                output.append(" = ").append(value, indentation: indentation)
             }
             output.append("\n")
         }

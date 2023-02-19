@@ -33,10 +33,6 @@ class KotlinStatement: KotlinSyntaxNode {
         }
     }
 
-    final override var setsIndentationLevel: Bool {
-        return true
-    }
-
     final override func leadingTrivia(indentation: Indentation) -> String {
         return extras?.leadingTrivia(indentation: indentation) ?? ""
     }
@@ -77,7 +73,7 @@ class KotlinExpressionStatement: KotlinStatement {
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
         if let expression {
-            output.append(indentation).append(expression).append("\n")
+            output.append(indentation).append(expression, indentation: indentation).append("\n")
         }
     }
 }

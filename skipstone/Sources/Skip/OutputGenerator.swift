@@ -19,13 +19,7 @@ class OutputGenerator {
         return ret
     }
 
-    /// The last indentation level used.
-    private(set) var indentationLevel: Indentation = 0
-
-    @discardableResult func append(_ node: OutputNode, indentation: Indentation = 0) -> OutputGenerator {
-        if node.setsIndentationLevel {
-            indentationLevel = indentation
-        }
+    @discardableResult func append(_ node: OutputNode, indentation: Indentation) -> OutputGenerator {
         append(node.leadingTrivia(indentation: indentation))
         let startOffset = content.utf8.count
         node.append(to: self, indentation: indentation)
@@ -48,7 +42,7 @@ class OutputGenerator {
         return self
     }
 
-    @discardableResult func append(_ nodes: [OutputNode], indentation: Indentation = 0) -> OutputGenerator {
+    @discardableResult func append(_ nodes: [OutputNode], indentation: Indentation) -> OutputGenerator {
         nodes.forEach { append($0, indentation: indentation) }
         return self
     }

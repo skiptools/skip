@@ -44,19 +44,20 @@ class KotlinArrayLiteral: KotlinExpression {
         return elements
     }
 
-    override func append(to output: OutputGenerator) {
+    override func append(to output: OutputGenerator, indentation: Indentation) {
         output.append("arrayOf(")
+        let elementIndentation = useMultilineFormatting ? indentation.inc() : indentation
         for (index, element) in elements.enumerated() {
             if (useMultilineFormatting) {
-                output.append("\n").append(output.indentationLevel.inc())
+                output.append("\n").append(elementIndentation)
             }
-            output.append(element)
+            output.append(element, indentation: elementIndentation)
             if index != elements.count - 1 {
                 output.append(", ")
             }
         }
         if (useMultilineFormatting) {
-            output.append("\n").append(output.indentationLevel)
+            output.append("\n").append(indentation)
         }
         output.append(")")
     }
@@ -98,17 +99,17 @@ class KotlinBinaryOperator: KotlinExpression {
         return [lhs, rhs]
     }
 
-    override func append(to output: OutputGenerator) {
+    override func append(to output: OutputGenerator, indentation: Indentation) {
         if lhs.isCompoundExpression {
-            output.append("(").append(lhs).append(")")
+            output.append("(").append(lhs, indentation: indentation).append(")")
         } else {
-            output.append(lhs)
+            output.append(lhs, indentation: indentation)
         }
         output.append(" \(op.symbol) ")
         if rhs.isCompoundExpression {
-            output.append("(").append(rhs).append(")")
+            output.append("(").append(rhs, indentation: indentation).append(")")
         } else {
-            output.append(rhs)
+            output.append(rhs, indentation: indentation)
         }
     }
 }
@@ -121,7 +122,7 @@ class KotlinBooleanLiteral: KotlinExpression {
         super.init(type: .booleanLiteral, expression: expression)
     }
 
-    override func append(to output: OutputGenerator) {
+    override func append(to output: OutputGenerator, indentation: Indentation) {
         output.append(String(describing: literal))
     }
 }
@@ -153,9 +154,8 @@ class KotlinClosure: KotlinExpression {
         return body.statements
     }
 
-    override func append(to output: OutputGenerator) {
+    override func append(to output: OutputGenerator, indentation: Indentation) {
         // TODO: Parameters, $0, $1 etc substitutions
-        let indentation = output.indentationLevel
         if let returnLabel {
             output.append(returnLabel).append("@")
         }
@@ -170,7 +170,7 @@ class KotlinNullLiteral: KotlinExpression {
         super.init(type: .nullLiteral, expression: expression)
     }
 
-    override func append(to output: OutputGenerator) {
+    override func append(to output: OutputGenerator, indentation: Indentation) {
         output.append("null")
     }
 }
@@ -211,10 +211,10 @@ class KotlinFunctionCall: KotlinExpression {
         return [function] + arguments.map { $0.value }
     }
 
-    override func append(to output: OutputGenerator) {
+    override func append(to output: OutputGenerator, indentation: Indentation) {
         let hasTrailingClosure = arguments.last?.value.type == .closure
         let lastParenthesizedIndex = hasTrailingClosure ? arguments.count - 2 : arguments.count - 1
-        output.append(function)
+        output.append(function, indentation: indentation)
         if !hasTrailingClosure || arguments.count > 1 {
             output.append("(")
         }
@@ -223,7 +223,7 @@ class KotlinFunctionCall: KotlinExpression {
                 if let label = argument.label {
                     output.append(label).append(" = ")
                 }
-                output.append(argument.value)
+                output.append(argument.value, indentation: indentation)
                 if index < lastParenthesizedIndex {
                     output.append(", ")
                 }
@@ -233,7 +233,7 @@ class KotlinFunctionCall: KotlinExpression {
             output.append(")")
         }
         if hasTrailingClosure {
-            output.append(" ").append(arguments.last!.value)
+            output.append(" ").append(arguments.last!.value, indentation: indentation)
         }
     }
 }
@@ -257,7 +257,7 @@ class KotlinIdentifier: KotlinExpression {
         return mayBeSharedMutableValue
     }
 
-    override func append(to output: OutputGenerator) {
+    override func append(to output: OutputGenerator, indentation: Indentation) {
         if name == "self" {
             output.append("this")
         } else {
@@ -303,15 +303,15 @@ class KotlinMemberAccess: KotlinExpression {
         return base == nil ? [] : [base!]
     }
 
-    override func append(to output: OutputGenerator) {
+    override func append(to output: OutputGenerator, indentation: Indentation) {
         if let base {
             if base.isCompoundExpression {
-                output.append("(").append(base).append(")")
+                output.append("(").append(base, indentation: indentation).append(")")
             } else {
-                output.append(base)
+                output.append(base, indentation: indentation)
             }
             if useMultlineFormatting {
-                output.append("\n").append(output.indentationLevel.inc())
+                output.append("\n").append(indentation.inc())
             }
             output.append(".")
         } else if inferredType != .none {
@@ -331,7 +331,7 @@ class KotlinNumericLiteral: KotlinExpression {
         super.init(type: .numericLiteral, expression: expression)
     }
 
-    override func append(to output: OutputGenerator) {
+    override func append(to output: OutputGenerator, indentation: Indentation) {
         output.append(literal.replacingOccurrences(of: "_", with: ""))
     }
 }
@@ -372,7 +372,7 @@ class KotlinStringLiteral: KotlinExpression {
         }
     }
 
-    override func append(to output: OutputGenerator) {
+    override func append(to output: OutputGenerator, indentation: Indentation) {
         let delimiter = isMultiline ? "\"\"\"" : "\""
         output.append(delimiter)
         for segment in segments {
@@ -380,7 +380,7 @@ class KotlinStringLiteral: KotlinExpression {
             case .string(let string):
                 output.append(string)
             case .expression(let expression):
-                output.append("${").append(expression).append("}")
+                output.append("${").append(expression, indentation: indentation).append("}")
             }
         }
         output.append(delimiter)
@@ -416,18 +416,18 @@ class KotlinSubscript: KotlinExpression {
         return [base] + arguments.map { $0.value }
     }
 
-    override func append(to output: OutputGenerator) {
+    override func append(to output: OutputGenerator, indentation: Indentation) {
         if base.isCompoundExpression {
-            output.append("(").append(base).append(")")
+            output.append("(").append(base, indentation: indentation).append(")")
         } else {
-            output.append(base)
+            output.append(base, indentation: indentation)
         }
         output.append("[")
         for (index, argument) in arguments.enumerated() {
             if let label = argument.label {
                 output.append(label).append(" = ")
             }
-            output.append(argument.value)
+            output.append(argument.value, indentation: indentation)
             if index < arguments.count - 1 {
                 output.append(", ")
             }
@@ -464,11 +464,11 @@ class KotlinTry: KotlinExpression {
         return [trying]
     }
 
-    override func append(to output: OutputGenerator) {
+    override func append(to output: OutputGenerator, indentation: Indentation) {
         if isOptional {
-            output.append("try { ").append(trying).append(" } catch (_e_: Exception) { null }")
+            output.append("try { ").append(trying, indentation: indentation).append(" } catch (_e_: Exception) { null }")
         } else {
-            output.append(trying)
+            output.append(trying, indentation: indentation)
         }
     }
 }
@@ -498,11 +498,11 @@ class KotlinValueReference: KotlinExpression {
         return [base]
     }
 
-    override func append(to output: OutputGenerator) {
+    override func append(to output: OutputGenerator, indentation: Indentation) {
         if base.isCompoundExpression {
-            output.append("(").append(base).append(")")
+            output.append("(").append(base, indentation: indentation).append(")")
         } else {
-            output.append(base)
+            output.append(base, indentation: indentation)
         }
         output.append(".valref(")
         if let onUpdate {
