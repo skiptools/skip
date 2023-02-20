@@ -195,7 +195,7 @@ public class KotlinTranslator {
     }
 
     private func applyPlugins(to syntaxTree: KotlinSyntaxTree, codebaseInfo: KotlinCodebaseInfo.Context) -> KotlinSyntaxTree {
-        let plugins = [KotlinSwiftUITranslator(codebaseInfo: codebaseInfo)]
+        let plugins: [KotlinTranslatorPlugin] = [KotlinConstructorPlugin(codebaseInfo: codebaseInfo), KotlinSwiftUIPlugin(codebaseInfo: codebaseInfo)]
         var appliedSyntaxTree = syntaxTree
         plugins.forEach { appliedSyntaxTree = $0.apply(to: syntaxTree) }
         return appliedSyntaxTree

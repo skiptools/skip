@@ -105,7 +105,7 @@ public class KotlinCodebaseInfo {
         }
 
         /// The signatures of all constructors of the given type.
-        func constructorSignatures(of qualifiedName: String) -> [TypeSignature] {
+        func constructorParameters(of qualifiedName: String) -> [[ConstructorParameter]] {
             //~~~
             return []
         }
@@ -131,6 +131,13 @@ public class KotlinCodebaseInfo {
             }
             return symbols?.isMutableValueType(qualifiedName: qualifiedName) != false
         }
+    }
+
+    struct ConstructorParameter {
+        let label: String
+        let type: TypeSignature
+        let isVariadic: Bool
+        let defaultValue: KotlinExpression?
     }
 }
 

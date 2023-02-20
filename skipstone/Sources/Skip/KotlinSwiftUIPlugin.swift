@@ -1,7 +1,7 @@
 /// Translate SwiftUI to syntactically correct Kotlin.
 ///
 /// We rely on our Kotlin UI libraries to provide the implementation of the SwiftUI-like API that this translation will result in.
-class KotlinSwiftUITranslator: KotlinTranslatorPlugin {
+class KotlinSwiftUIPlugin: KotlinTranslatorPlugin {
     private let codebaseInfo: KotlinCodebaseInfo.Context
 
     init(codebaseInfo: KotlinCodebaseInfo.Context) {

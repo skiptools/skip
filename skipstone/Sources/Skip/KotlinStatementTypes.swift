@@ -4,6 +4,7 @@ enum KotlinStatementType {
     case `return`
 
     case classDeclaration
+    case constructorDeclaration
     case extensionDeclaration
     case functionDeclaration
     case importDeclaration
@@ -57,6 +58,7 @@ class KotlinReturn: KotlinExpressionStatement {
 
 class KotlinClassDeclaration: KotlinStatement {
     var name: String
+    var qualifiedName: String
     var inherits: [TypeSignature] = []
     var superclassCall: String?
     var modifiers = Modifiers()
@@ -84,6 +86,7 @@ class KotlinClassDeclaration: KotlinStatement {
 
     private init(statement: TypeDeclaration) {
         self.name = statement.name
+        self.qualifiedName = statement.qualifiedName
         super.init(type: .classDeclaration, statement: statement)
     }
 
@@ -250,7 +253,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
 
     private init(statement: FunctionDeclaration) {
         self.name = statement.isInit ? "constructor" : statement.name
-        super.init(type: .functionDeclaration, statement: statement)
+        super.init(type: statement.isInit ? .constructorDeclaration : .functionDeclaration, statement: statement)
     }
 
     override var children: [KotlinSyntaxNode] {
@@ -278,6 +281,9 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             }
             output.append(name).append("(")
             for (index, parameter) in parameters.enumerated() {
+                if parameter.isVariadic {
+                    output.append("varargs ")
+                }
                 let name = parameter.externalName.isEmpty ? parameter.internalName : parameter.externalName
                 output.append(name)
                 output.append(": ")
