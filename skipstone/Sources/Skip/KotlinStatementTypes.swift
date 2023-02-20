@@ -68,7 +68,6 @@ class KotlinClassDeclaration: KotlinStatement {
         kstatement.inherits = statement.inherits
         kstatement.modifiers = statement.modifiers
         kstatement.isDataClass = Self.isDataClass(typeDeclaration: statement)
-        kstatement.buildSuperclassCall(translator: translator)
         var members = statement.members.flatMap { translator.translateStatement($0) }
         // Move extensions of this type into the type itself rather than use Kotlin extension functions.
         // Kotlin extension functions act like static functions, which can lead to different behavior
@@ -159,14 +158,6 @@ class KotlinClassDeclaration: KotlinStatement {
         // TODO: Must have at least one stored property
         return true
     }
-
-    private func buildSuperclassCall(translator: KotlinTranslator) {
-        guard let superclass = inherits.first, translator.codebaseInfo?.declarationType(of: superclass.description) == .classDeclaration else {
-            return
-        }
-        // TODO: Call superclass default constructor with our default constructor params
-        superclassCall = "\(superclass.kotlin)()"
-    }
 }
 
 struct KotlinExtensionDeclaration {
@@ -209,6 +200,10 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var isOpen = false
     var modifiers = Modifiers()
     var body: CodeBlock<KotlinStatement>?
+    var delegatingConstructorCall: String?
+    var isConstructor: Bool {
+        return name == "constructor"
+    }
 
     // KotlinMemberDeclaration
     var extends: TypeSignature?
@@ -234,6 +229,17 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         }
         kstatement.returnType.appendKotlinMessages(to: kstatement)
         kstatement.parameters.forEach { $0.declaredType.appendKotlinMessages(to: kstatement) }
+
+        if statement.isOptionalInit {
+            kstatement.messages.append(.kotlinConstructorNullReturn(statement))
+        }
+        if let owningTypeDeclaration = statement.owningTypeDeclaration, owningTypeDeclaration === statement.parent, owningTypeDeclaration.type == .protocolDeclaration {
+            if statement.isInit {
+                kstatement.messages.append(.kotlinProtocolConstructor(statement))
+            } else if statement.modifiers.isStatic {
+                kstatement.messages.append(.kotlinProtocolStaticFunction(statement))
+            }
+        }
         return kstatement
     }
 
@@ -243,7 +249,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
 
     private init(statement: FunctionDeclaration) {
-        self.name = statement.name
+        self.name = statement.isInit ? "constructor" : statement.name
         super.init(type: .functionDeclaration, statement: statement)
     }
 
@@ -256,12 +262,14 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if let declaration = extras?.declaration {
             output.append(declaration)
         } else {
-            output.append(modifiers.kotlinMemberString(isOpen: isOpen)).append(" ")
+            output.append(modifiers.kotlinMemberString(isOpen: isOpen && !isConstructor)).append(" ")
             if isAsync {
                 output.append("suspend ")
             }
 
-            output.append("fun ")
+            if !isConstructor {
+                output.append("fun ")
+            }
             if let extends {
                 output.append(extends.kotlin).append(".")
                 if isStatic {
@@ -281,7 +289,10 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                     output.append(", ")
                 }
             }
-            output.append("): \(returnType.or(.void).kotlin)")
+            output.append(")")
+            if !isConstructor {
+                output.append(": \(returnType.or(.void).kotlin)")
+            }
         }
         if let body {
             output.append(" {\n")

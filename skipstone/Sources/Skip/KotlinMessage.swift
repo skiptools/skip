@@ -17,6 +17,10 @@ extension Message {
         return Message(severity: .error, message: "Kotlin does not support composed types. Consider creating a single type that conforms to these types", sourceDerived: sourceDerived)
     }
 
+    static func kotlinConstructorNullReturn(_ sourceDerived: SourceDerived) -> Message {
+        return Message(severity: .error, message: "Kotlin does not support constructors that return nil. Consider creating a factory function", sourceDerived: sourceDerived)
+    }
+
     // TODO: Kotlin interfaces can have default implementations inline. Move inheritance and implementations into generated interface
     static func kotlinExtensionAddProtocolsToInterface(_ sourceDerived: SourceDerived) -> Message {
         return Message(severity: .error, message: "Cannot use an extension to add additional protocols to a Kotlin interface", sourceDerived: sourceDerived)
@@ -28,6 +32,14 @@ extension Message {
 
     static func kotlinExtensionUnsupportedMember(_ sourceDerived: SourceDerived) -> Message {
         return Message(severity: .error, message: "This declaration is not supported in a Kotlin extension", sourceDerived: sourceDerived)
+    }
+
+    static func kotlinProtocolConstructor(_ sourceDerived: SourceDerived) -> Message {
+        return Message(severity: .error, message: "Kotlin does not support constructors in protocols", sourceDerived: sourceDerived)
+    }
+
+    static func kotlinProtocolStaticFunction(_ sourceDerived: SourceDerived) -> Message {
+        return Message(severity: .error, message: "Kotlin does not support static functions in protocols", sourceDerived: sourceDerived)
     }
 
     // TODO: Consider generating custom Kotlin data classes to work around these limitations of tuples

@@ -19,4 +19,9 @@ struct S {
     static func factory2() -> S {
         return .init(p1: 1)
     }
+
+    init(p1: Int) {
+        self.p1 = p1
+        self.p2 = "foo"
+    }
 }

@@ -123,7 +123,7 @@ public class KotlinTranslator {
         case .importDeclaration:
             return [KotlinImportDeclaration(statement: statement as! ImportDeclaration)]
         case .initDeclaration:
-            break
+            return [KotlinFunctionDeclaration.translate(statement: statement as! FunctionDeclaration, translator: self)]
         case .protocolDeclaration:
             return [KotlinInterfaceDeclaration.translate(statement: statement as! TypeDeclaration, translator: self)]
         case .structDeclaration:

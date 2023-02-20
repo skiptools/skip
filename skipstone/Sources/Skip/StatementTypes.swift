@@ -81,7 +81,7 @@ enum StatementType: CaseIterable {
         case .importDeclaration:
             return ImportDeclaration.self
         case .initDeclaration:
-            return nil
+            return FunctionDeclaration.self
         case .protocolDeclaration:
             return TypeDeclaration.self
         case .structDeclaration:
@@ -205,6 +205,7 @@ class ExtensionDeclaration: TypeDeclaration {
 /// `func f() { ... }`
 class FunctionDeclaration: Statement {
     let name: String
+    let isOptionalInit: Bool
     private(set) var returnType: TypeSignature
     private(set) var parameters: [Parameter<Expression>]
     let isAsync: Bool
@@ -212,9 +213,13 @@ class FunctionDeclaration: Statement {
     let attributes: Attributes
     private(set) var modifiers: Modifiers
     let body: CodeBlock<Statement>?
+    var isInit: Bool {
+        return name == "init"
+    }
 
-    init(name: String, returnType: TypeSignature = .void, parameters: [Parameter<Expression>], isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes? = nil, modifiers: Modifiers? = nil, body: CodeBlock<Statement>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(type: StatementType, name: String, isOptionalInit: Bool = false, returnType: TypeSignature = .void, parameters: [Parameter<Expression>], isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes? = nil, modifiers: Modifiers? = nil, body: CodeBlock<Statement>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.name = name
+        self.isOptionalInit = isOptionalInit
         self.returnType = returnType
         self.parameters = parameters
         self.isAsync = isAsync
@@ -222,13 +227,20 @@ class FunctionDeclaration: Statement {
         self.attributes = attributes ?? Attributes()
         self.modifiers = modifiers ?? Modifiers()
         self.body = body
-        super.init(type: .functionDeclaration, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+        super.init(type: type, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
     override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
-        guard syntax.kind == .functionDecl, let functionDecl = syntax.as(FunctionDeclSyntax.self) else {
+        if syntax.kind == .functionDecl, let functionDecl = syntax.as(FunctionDeclSyntax.self) {
+            return [decodeFunctionDeclaration(functionDecl, extras: extras, in: syntaxTree)]
+        } else if syntax.kind == .initializerDecl, let initializerDecl = syntax.as(InitializerDeclSyntax.self) {
+            return [decodeInitializerDeclaration(initializerDecl, extras: extras, in: syntaxTree)]
+        } else {
             return nil
         }
+    }
+
+    private static func decodeFunctionDeclaration(_ functionDecl: FunctionDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> FunctionDeclaration {
         let name = functionDecl.identifier.text
         let (returnType, parameters, messages) = functionDecl.signature.typeSignatures(in: syntaxTree)
         let isAsync = functionDecl.signature.asyncOrReasyncKeyword?.text == "async" || functionDecl.signature.throwsOrRethrowsKeyword?.text == "async"
@@ -239,9 +251,25 @@ class FunctionDeclaration: Statement {
         if let bodySyntax = functionDecl.body {
             body = CodeBlock(statements: StatementDecoder.decode(syntaxListContainer: bodySyntax, in: syntaxTree))
         }
-        let statement = FunctionDeclaration(name: name, returnType: returnType, parameters: parameters, isAsync: isAsync, isThrows: isThrows, attributes: attributes, modifiers: modifiers, body: body, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
+        let statement = FunctionDeclaration(type: .functionDeclaration, name: name, returnType: returnType, parameters: parameters, isAsync: isAsync, isThrows: isThrows, attributes: attributes, modifiers: modifiers, body: body, syntax: functionDecl, sourceFile: syntaxTree.source.file, sourceRange: functionDecl.range(in: syntaxTree.source), extras: extras)
         statement.messages = messages
-        return [statement]
+        return statement
+    }
+
+    private static func decodeInitializerDeclaration(_ initializerDecl: InitializerDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> FunctionDeclaration {
+        let isOptionalInit = initializerDecl.optionalMark != nil
+        let (_, parameters, messages) = initializerDecl.signature.typeSignatures(in: syntaxTree)
+        let isAsync = initializerDecl.signature.asyncOrReasyncKeyword?.text == "async" || initializerDecl.signature.throwsOrRethrowsKeyword?.text == "async"
+        let isThrows = initializerDecl.signature.asyncOrReasyncKeyword?.text == "throws" || initializerDecl.signature.throwsOrRethrowsKeyword?.text == "throws"
+        let attributes = Attributes.for(syntax: initializerDecl.attributes)
+        let modifiers = Modifiers.for(syntax: initializerDecl.modifiers)
+        var body: CodeBlock<Statement>? = nil
+        if let bodySyntax = initializerDecl.body {
+            body = CodeBlock(statements: StatementDecoder.decode(syntaxListContainer: bodySyntax, in: syntaxTree))
+        }
+        let statement = FunctionDeclaration(type: .initDeclaration, name: "init", isOptionalInit: isOptionalInit, returnType: .void, parameters: parameters, isAsync: isAsync, isThrows: isThrows, attributes: attributes, modifiers: modifiers, body: body, syntax: initializerDecl, sourceFile: syntaxTree.source.file, sourceRange: initializerDecl.range(in: syntaxTree.source), extras: extras)
+        statement.messages = messages
+        return statement
     }
 
     override func resolveAttributes() {

@@ -14,6 +14,11 @@ public class KotlinCodebaseInfo {
         syntaxTree.statements.forEach { gather(from: $0) }
     }
 
+    /// Finalize information after gathering is complete.
+    func finalize() {
+        mergeExtensionInfo()
+    }
+
     /// Any issues encountered during information gathering.
     func messages(for sourceFile: Source.File) -> [Message] {
         return []
@@ -61,9 +66,16 @@ public class KotlinCodebaseInfo {
     }
 
     private func addTypeInfo(for typeDeclaration: TypeDeclaration, mayBeMutableValueType: Bool?) {
+        let info = TypeInfo(declarationType: typeDeclaration.type, mayBeMutableValueType: mayBeMutableValueType, isPrivate: typeDeclaration.modifiers.visibility == .private, sourceFile: typeDeclaration.sourceFile)
+        //~~~
+
         var infos = typeInfo[typeDeclaration.qualifiedName, default: []]
-        infos.append(TypeInfo(declarationType: typeDeclaration.type, mayBeMutableValueType: mayBeMutableValueType, isPrivate: typeDeclaration.modifiers.visibility == .private, sourceFile: typeDeclaration.sourceFile))
+        infos.append(info)
         typeInfo[typeDeclaration.qualifiedName] = infos
+    }
+
+    private func mergeExtensionInfo() {
+
     }
 
     /// Create a context that can access the given imported modules.
@@ -103,6 +115,11 @@ public class KotlinCodebaseInfo {
             return nil
         }
 
+        /// The signatures of all constructors of the given type.
+        func constructorSignatures(of qualifiedName: String) -> [TypeSignature] {
+            //~~~
+        }
+
         /// Whether a function with the given signature is implementing an inherited protocol function of the given type.
         func isProtocolMember(declaration: FunctionDeclaration, in typeDeclaration: TypeDeclaration) -> Bool {
             // TODO: Needs to check all protocol conformances of the given type, including protocols of protocols, etc
@@ -132,6 +149,7 @@ private struct TypeInfo {
     let mayBeMutableValueType: Bool?
     let isPrivate: Bool
     let sourceFile: Source.File?
+    var constructorSignatures: [TypeSignature] = []
 }
 
 private struct ExtensionInfo {
