@@ -1,6 +1,6 @@
 /// Contextual information used in type inference.
 struct TypeInferenceContext {
-    let symbols: Symbols.Context?
+    private let symbols: Symbols.Context?
     private var typePath: [TypeDeclaration] = []
     private var functionPath: [FunctionDeclaration] = []
     private var localIdentifierTypes: [String: TypeSignature] = [:]

@@ -1,11 +1,9 @@
 import Foundation
 import SymbolKit
 
-/// Provides information about code symbols.
+/// Provides information about code symbols using`SymbolKit`.
 ///
-/// Currently an abstraction over `SymbolKit`.
-///
-/// The build artifacts required to extract symbol information are not always present for build plugins or command line tools, so all symbol
+/// - Note: The build artifacts required to extract symbol information are not always present for build plugins or command line tools, so all symbol
 /// info is optional for operations other than final transpilation.
 public class Symbols {
     /// The current module name.
@@ -33,7 +31,7 @@ public class Symbols {
 
     /// A context for accessing symbol information.
     struct Context {
-        private let symbols: Symbols
+        let symbols: Symbols
         private let importedModuleNames: Set<String>
         private let sourceFile: Source.File?
 
@@ -45,43 +43,57 @@ public class Symbols {
             self.sourceFile = sourceFile
         }
 
-        /// Whether the given name maps to a symbol that is known to be a mutable value type.
+        /// The symbol for the given unique identifier.
+        func lookup(identifier: String) -> Symbol? {
+            return symbols.symbolsByIdentifier[identifier]
+        }
+
+        /// The symbols for the given name.
         ///
-        /// - Returns: true if a symbol exists for a mutable value type, false if only immutable type symbols exist, and nil if no type symbol exists.
-        func isMutableValueType(qualifiedName: String) -> Bool? {
-            guard let candidates = symbols.symbolsByName[qualifiedName] else {
-                return nil
-            }
-            var hasType = false
-            for candidate in ranked(candidates) {
-                guard let kind = candidate.kind else {
-                    continue
+        /// - Warning: This function does not take symbol visibility into account. See `ranked`.
+        func lookup(name: String) -> [Symbol] {
+            return symbols.symbolsByName[name, default: []]
+        }
+
+        /// Score, sort, and filter the given symbols.
+        ///
+        /// - Returns: The symbols with a score > 0 in order from highest to lowest score.
+        func ranked(_ symbols: [Symbol]) -> [Symbol] {
+            return zip(symbols, symbols.map { rankScore(of: $0) })
+                .filter { $0.1 > 0 } // score > 0
+                .sorted { $0.1 > $1.1 } // sort on score
+                .map(\.0) // return symbol
+        }
+
+        /// Score, sort, and filter the given object based on their symbols.
+        func ranked<T>(_ objects: [T], keyPath: KeyPath<T, Symbol>) -> [T] {
+            return zip(objects, objects.map { rankScore(of: $0[keyPath: keyPath]) })
+                .filter { $0.1 > 0 } // score > 0
+                .sorted { $0.1 > $1.1 } // sort on score
+                .map(\.0) // return object
+        }
+
+        /// Score a symbol based on its visibility in this context.
+        ///
+        /// A score of 0 indicates that the symbol is not visible.
+        func rankScore(of symbol: Symbol) -> Int {
+            var score = 0
+            if symbol.moduleName == symbols.moduleName {
+                // Favor a symbol in this module
+                score += 2
+                // Favor a symbol in this file
+                if let symbolURL = symbol.sourceURL, let sourcePath = sourceFile?.path, symbolURL.path.hasSuffix(sourcePath) {
+                    score += 1
                 }
-                switch kind {
-                case .class:
-                    hasType = true
-                case .enum:
-                    hasType = true
-                case .struct:
-                    if isMutableStruct(candidate) {
-                        return true
-                    }
-                    hasType = true
-                case .protocol:
-                    if !isAnyObjectRestrictedProtocol(candidate) {
-                        return true
-                    }
-                    hasType = true
-                default:
-                    break
-                }
+            } else if importedModuleNames.contains(symbol.moduleName) {
+                score += 1
             }
-            return hasType ? false : nil
+            return score
         }
 
         /// Return the type of the given identifier.
         func type(of identifier: String) -> TypeSignature {
-            let candidates = symbols.symbolsByName[identifier, default: []].filter { $0.kind == .var }
+            let candidates = lookup(name: identifier).filter { $0.kind == .var }
             return ranked(candidates).first?.typeSignature(symbols: symbols) ?? .none
         }
 
@@ -130,7 +142,7 @@ public class Symbols {
 
         /// Return the signatures of the possible functions being called with the given arguments.
         func functionSignature(of name: String, arguments: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
-            let symbolsWithName = symbols.symbolsByName[name, default: []]
+            let symbolsWithName = lookup(name: name)
             let funcs = symbolsWithName.filter { $0.kind == .func }
             let funcsCandidates = funcs.compactMap { matchFunction($0, arguments: arguments) }
 
@@ -142,7 +154,7 @@ public class Symbols {
                     guard relationship.kind == .memberOf && relationship.isInverse else {
                         continue
                     }
-                    guard let member = symbols.symbolsByIdentifier[relationship.targetIdentifier ?? ""], member.kind == .`init` else {
+                    guard let member = lookup(identifier: relationship.targetIdentifier ?? ""), member.kind == .`init` else {
                         continue
                     }
                     guard let (symbol, signature) = matchFunction(member, arguments: arguments), case .function(let argumentTypes, _) = signature else {
@@ -152,7 +164,7 @@ public class Symbols {
                     initsCandidates.append((symbol, .function(argumentTypes, typeSignature)))
                 }
             }
-            return ranked(funcsCandidates + initsCandidates).map(\.signature)
+            return ranked(funcsCandidates + initsCandidates, keyPath: \.0).map(\.signature)
         }
 
         /// Return the signatures of the possible subscripts being called with the given arguments.
@@ -174,7 +186,7 @@ public class Symbols {
         }
 
         private func type(of member: String, in typeName: String) -> TypeSignature {
-            let candidates = ranked(symbols.symbolsByName[typeName] ?? [])
+            let candidates = ranked(lookup(name: typeName))
             for candidate in candidates {
                 let type = type(of: member, in: candidate)
                 if type != .none {
@@ -188,12 +200,12 @@ public class Symbols {
             for relationship in candidate.relationships {
                 switch relationship.kind {
                 case .memberOf:
-                    guard relationship.isInverse, let memberSymbol = symbols.symbolsByIdentifier[relationship.targetIdentifier ?? ""], memberSymbol.name == member else {
+                    guard relationship.isInverse, let memberSymbol = lookup(identifier: relationship.targetIdentifier ?? ""), memberSymbol.name == member else {
                         break
                     }
                     return memberSymbol.typeSignature(symbols: symbols)
                 case .inheritsFrom:
-                    guard !relationship.isInverse, let inheritsFrom = symbols.symbolsByIdentifier[relationship.targetIdentifier ?? ""] else {
+                    guard !relationship.isInverse, let inheritsFrom = lookup(identifier: relationship.targetIdentifier ?? "") else {
                         break
                     }
                     let type = type(of: member, in: inheritsFrom)
@@ -207,48 +219,8 @@ public class Symbols {
             return .none
         }
 
-        private func isMutableStruct(_ symbol: Symbol) -> Bool {
-            for relationship in symbol.relationships {
-                guard relationship.kind == .memberOf && relationship.isInverse else {
-                    continue
-                }
-                guard let member = symbols.symbolsByIdentifier[relationship.targetIdentifier ?? ""], let memberKind = member.kind else {
-                    // Assume any unknown member might be mutating
-                    return true
-                }
-                switch memberKind {
-                case .property:
-                    if member.isVariableReadWrite {
-                        return true
-                    }
-                case .method:
-                    if member.isFunctionMutating {
-                        return true
-                    }
-                default:
-                    break
-                }
-            }
-            return false
-        }
-
-        private func isAnyObjectRestrictedProtocol(_ symbol: Symbol) -> Bool {
-            if symbol.isAnyObjectRestricted {
-                return true
-            }
-            for relationship in symbol.relationships {
-                guard relationship.kind == .conformsTo, !relationship.isInverse, let conformsTo = symbols.symbolsByIdentifier[relationship.targetIdentifier ?? ""] else {
-                    continue
-                }
-                if isAnyObjectRestrictedProtocol(conformsTo) {
-                    return true
-                }
-            }
-            return false
-        }
-
         private func functionSignature(of name: String, in typeName: String, arguments: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
-            let candidates = ranked(symbols.symbolsByName[typeName] ?? [])
+            let candidates = ranked(lookup(name: typeName))
             var functions: [(symbol: Symbol, signature: TypeSignature)] = []
             for candidate in candidates {
                 for function in functionSignature(of: name, in: candidate, arguments: arguments) {
@@ -257,7 +229,7 @@ public class Symbols {
                     }
                 }
             }
-            return ranked(functions).map(\.signature)
+            return ranked(functions, keyPath: \.0).map(\.signature)
         }
 
         private func functionSignature(of name: String, in candidate: Symbol, arguments: [LabeledValue<TypeSignature>]) -> [(symbol: Symbol, signature: TypeSignature)] {
@@ -265,14 +237,14 @@ public class Symbols {
             for relationship in candidate.relationships {
                 switch relationship.kind {
                 case .memberOf:
-                    guard relationship.isInverse, let member = symbols.symbolsByIdentifier[relationship.targetIdentifier ?? ""], member.name == name else {
+                    guard relationship.isInverse, let member = lookup(identifier: relationship.targetIdentifier ?? ""), member.name == name else {
                         break
                     }
                     if let function = matchFunction(member, arguments: arguments) {
                         functions.append(function)
                     }
                 case .inheritsFrom:
-                    guard !relationship.isInverse, let inheritsFrom = symbols.symbolsByIdentifier[relationship.targetIdentifier ?? ""] else {
+                    guard !relationship.isInverse, let inheritsFrom = lookup(identifier: relationship.targetIdentifier ?? "") else {
                         break
                     }
                     functions += functionSignature(of: name, in: inheritsFrom, arguments: arguments)
@@ -336,35 +308,6 @@ public class Symbols {
                 }
             }
             return nil
-        }
-
-        private func ranked(_ symbols: [Symbol]) -> [Symbol] {
-            return zip(symbols, symbols.map { rankScore(of: $0) })
-                .filter { $0.1 > 0 } // score > 0
-                .sorted { $0.1 < $1.1 } // sort on score
-                .map(\.0) // return symbol
-        }
-
-        private func ranked(_ functions: [(symbol: Symbol, signature: TypeSignature)]) -> [(symbol: Symbol, signature: TypeSignature)] {
-            return zip(functions, functions.map { rankScore(of: $0.symbol) })
-                .filter { $0.1 > 0 }  // score > 0
-                .sorted { $0.1 < $1.1 } // sort on score
-                .map(\.0) // return function
-        }
-
-        private func rankScore(of symbol: Symbol) -> Int {
-            var score = 0
-            if symbol.moduleName == symbols.moduleName {
-                // Favor a symbol in this module
-                score += 2
-                // Favor a symbol in this file
-                if let symbolURL = symbol.sourceURL, let sourcePath = sourceFile?.path, symbolURL.path.hasSuffix(sourcePath) {
-                    score += 1
-                }
-            } else if importedModuleNames.contains(symbol.moduleName) {
-                score += 1
-            }
-            return score
         }
 
         private func candidateTypeNames(for type: TypeSignature) -> [String] {
@@ -439,18 +382,19 @@ public class Symbols {
     }
 }
 
-private struct Symbol {
+/// A code symbol.
+struct Symbol {
     let symbol: UnifiedSymbolGraph.Symbol
     let name: String
     let moduleName: String
     let sourceURL: URL?
-    var relationships: [Relationship] = []
+    fileprivate(set) var relationships: [Relationship] = []
 
     private let selector: UnifiedSymbolGraph.Selector
     private let mixins: [String: Mixin]
     private let declarationFragments: SymbolGraph.Symbol.DeclarationFragments
 
-    init?(symbol: UnifiedSymbolGraph.Symbol, moduleName: String) {
+    fileprivate init?(symbol: UnifiedSymbolGraph.Symbol, moduleName: String) {
         guard let selector = symbol.names.keys.first(where: { $0.interfaceLanguage == "swift" }) else {
             return nil
         }
@@ -535,13 +479,13 @@ private struct Symbol {
         }
     }
 
-    var isAnyObjectRestricted: Bool {
+    func isInDeclaredInheritanceList(typeName: String) -> Bool {
         // We get a fragment like ': AnyObject'
         for fragment in declarationFragments.declarationFragments {
             guard fragment.spelling.contains(":") else {
                 continue
             }
-            return fragment.spelling.split(whereSeparator: { $0.isWhitespace || $0 == "," || $0 == ":" }).contains("AnyObject")
+            return fragment.spelling.split(whereSeparator: { $0.isWhitespace || $0 == "," || $0 == ":" }).map({ String($0) }).contains(typeName)
         }
         return false
     }

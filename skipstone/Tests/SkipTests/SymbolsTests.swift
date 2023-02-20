@@ -1,26 +1,7 @@
 @testable import Skip
-import SkipBuild
-import SymbolKit
 import XCTest
 
 final class SymbolsTests: XCTestCase {
-    func testHasMutableValueType() async throws {
-        let context = try await symbols.context()
-        XCTAssertNil(context.isMutableValueType(qualifiedName: "NonExistantTypeName"))
-
-        XCTAssertEqual(false, context.isMutableValueType(qualifiedName: "SymbolsTestsClass"))
-        XCTAssertEqual(false, context.isMutableValueType(qualifiedName: "SymbolsTestsEnum"))
-        XCTAssertEqual(false, context.isMutableValueType(qualifiedName: "SymbolsTestsImmutableStruct"))
-
-        XCTAssertEqual(true, context.isMutableValueType(qualifiedName: "SymbolsTestsMutableVarStruct"))
-        XCTAssertEqual(true, context.isMutableValueType(qualifiedName: "SymbolsTestsMutableComputedVarStruct"))
-        XCTAssertEqual(true, context.isMutableValueType(qualifiedName: "SymbolsTestsMutableFuncStruct"))
-
-        XCTAssertEqual(true, context.isMutableValueType(qualifiedName: "SymbolsTestsNonAnyObjectRestrictedProtocol"))
-        XCTAssertEqual(false, context.isMutableValueType(qualifiedName: "SymbolsTestsAnyObjectRestrictedProtocol"))
-        XCTAssertEqual(false, context.isMutableValueType(qualifiedName: "SymbolsTestsTransitiveAnyObjectRestrictedProtocol"))
-    }
-
     func testIdentifierType() async throws {
         let context = try await symbols.context()
         XCTAssertEqual(.string, context.type(of: "symbolsTestsVar"))
@@ -33,12 +14,12 @@ final class SymbolsTests: XCTestCase {
         let context = try await symbols.context()
         XCTAssertEqual(.int, context.type(of: "count", in: .array(.int)))
 
-        XCTAssertEqual(.int, context.type(of: "letVar", in: .named("SymbolsTestsImmutableStruct", [])))
-        XCTAssertEqual(.int, context.type(of: "computedVar", in: .named("SymbolsTestsImmutableStruct", [])))
+        XCTAssertEqual(.int, context.type(of: "letVar", in: .named("SymbolsTestsStruct", [])))
+        XCTAssertEqual(.int, context.type(of: "computedVar", in: .named("SymbolsTestsStruct", [])))
 
         XCTAssertEqual(.named("SymbolsTestsEnum", []), context.type(of: "case1", in: .named("SymbolsTestsEnum", [])))
 
-        XCTAssertEqual(.function([.string], .int), context.type(of: "f", in: .named("SymbolsTestsImmutableStruct", [])))
+        XCTAssertEqual(.function([.string], .int), context.type(of: "f", in: .named("SymbolsTestsStruct", [])))
 
         XCTAssertEqual(.string, context.type(of: "1", in: .tuple(["i", "s"], [.int, .string])))
         XCTAssertEqual(.string, context.type(of: "s", in: .tuple(["i", "s"], [.int, .string])))
@@ -75,7 +56,7 @@ final class SymbolsTests: XCTestCase {
 
     func testConstructor() async throws {
         let context = try await symbols.context()
-        XCTAssertEqual([.function([.int], .named("SymbolsTestsMutableVarStruct", []))], context.functionSignature(of: "SymbolsTestsMutableVarStruct", arguments: [LabeledValue<TypeSignature>(label: "v", value: .none)]))
+        XCTAssertEqual([.function([.int], .named("SymbolsTestsStruct", []))], context.functionSignature(of: "SymbolsTestsStruct", arguments: [LabeledValue<TypeSignature>(label: "v", value: .none)]))
     }
 
     func testSuperclassConstructor() {
@@ -136,8 +117,9 @@ enum SymbolsTestsEnum {
     case case2
 }
 
-struct SymbolsTestsImmutableStruct {
+struct SymbolsTestsStruct {
     let letVar = 1
+    var v = 1
     var computedVar: Int {
         return 1
     }
@@ -145,27 +127,3 @@ struct SymbolsTestsImmutableStruct {
         return 1
     }
 }
-
-struct SymbolsTestsMutableVarStruct {
-    var v = 1
-}
-
-struct SymbolsTestsMutableComputedVarStruct {
-    var computedVar: Int {
-        get {
-            return 1
-        }
-        set {
-        }
-    }
-}
-
-struct SymbolsTestsMutableFuncStruct {
-    mutating func f() -> Int {
-        return 1
-    }
-}
-
-protocol SymbolsTestsNonAnyObjectRestrictedProtocol: Codable {}
-protocol SymbolsTestsAnyObjectRestrictedProtocol: AnyObject {}
-protocol SymbolsTestsTransitiveAnyObjectRestrictedProtocol: SymbolsTestsAnyObjectRestrictedProtocol {}

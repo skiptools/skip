@@ -14,11 +14,6 @@ public class KotlinCodebaseInfo {
         syntaxTree.statements.forEach { gather(from: $0) }
     }
 
-    /// Finalize information after gathering is complete.
-    func finalize() {
-        mergeExtensionInfo()
-    }
-
     /// Any issues encountered during information gathering.
     func messages(for sourceFile: Source.File) -> [Message] {
         return []
@@ -67,15 +62,9 @@ public class KotlinCodebaseInfo {
 
     private func addTypeInfo(for typeDeclaration: TypeDeclaration, mayBeMutableValueType: Bool?) {
         let info = TypeInfo(declarationType: typeDeclaration.type, mayBeMutableValueType: mayBeMutableValueType, isPrivate: typeDeclaration.modifiers.visibility == .private, sourceFile: typeDeclaration.sourceFile)
-        //~~~
-
         var infos = typeInfo[typeDeclaration.qualifiedName, default: []]
         infos.append(info)
         typeInfo[typeDeclaration.qualifiedName] = infos
-    }
-
-    private func mergeExtensionInfo() {
-
     }
 
     /// Create a context that can access the given imported modules.
@@ -85,7 +74,7 @@ public class KotlinCodebaseInfo {
 
     /// A context for accessing codebase information.
     struct Context {
-        let symbols: Symbols.Context?
+        private let symbols: Symbols.Context?
         private let codebaseInfo: KotlinCodebaseInfo
         private let sourceFile: Source.File?
 
@@ -118,6 +107,7 @@ public class KotlinCodebaseInfo {
         /// The signatures of all constructors of the given type.
         func constructorSignatures(of qualifiedName: String) -> [TypeSignature] {
             //~~~
+            return []
         }
 
         /// Whether a function with the given signature is implementing an inherited protocol function of the given type.
@@ -149,10 +139,85 @@ private struct TypeInfo {
     let mayBeMutableValueType: Bool?
     let isPrivate: Bool
     let sourceFile: Source.File?
-    var constructorSignatures: [TypeSignature] = []
 }
 
 private struct ExtensionInfo {
     let declaration: ExtensionDeclaration
     let sourceFile: Source.File?
+}
+
+// Internal for testing
+
+extension Symbols.Context {
+    /// Whether the given name maps to a symbol that is known to be a mutable value type.
+    ///
+    /// - Returns: true if a symbol exists for a mutable value type, false if only immutable type symbols exist, and nil if no type symbol exists.
+    func isMutableValueType(qualifiedName: String) -> Bool? {
+        let candidates = lookup(name: qualifiedName)
+        var hasType = false
+        for candidate in ranked(candidates) {
+            guard let kind = candidate.kind else {
+                continue
+            }
+            switch kind {
+            case .class:
+                hasType = true
+            case .enum:
+                hasType = true
+            case .struct:
+                if isMutableStruct(candidate) {
+                    return true
+                }
+                hasType = true
+            case .protocol:
+                if !isAnyObjectRestrictedProtocol(candidate) {
+                    return true
+                }
+                hasType = true
+            default:
+                break
+            }
+        }
+        return hasType ? false : nil
+    }
+
+    private func isMutableStruct(_ symbol: Symbol) -> Bool {
+        for relationship in symbol.relationships {
+            guard relationship.kind == .memberOf && relationship.isInverse else {
+                continue
+            }
+            guard let member = lookup(identifier: relationship.targetIdentifier ?? ""), let memberKind = member.kind else {
+                // Assume any unknown member might be mutating
+                return true
+            }
+            switch memberKind {
+            case .property:
+                if member.isVariableReadWrite {
+                    return true
+                }
+            case .method:
+                if member.isFunctionMutating {
+                    return true
+                }
+            default:
+                break
+            }
+        }
+        return false
+    }
+
+    private func isAnyObjectRestrictedProtocol(_ symbol: Symbol) -> Bool {
+        if symbol.isInDeclaredInheritanceList(typeName: "AnyObject") {
+            return true
+        }
+        for relationship in symbol.relationships {
+            guard relationship.kind == .conformsTo, !relationship.isInverse, let conformsTo = lookup(identifier: relationship.targetIdentifier ?? "") else {
+                continue
+            }
+            if isAnyObjectRestrictedProtocol(conformsTo) {
+                return true
+            }
+        }
+        return false
+    }
 }
