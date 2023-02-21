@@ -1,8 +1,8 @@
 @testable import Skip
 import XCTest
 
-final class BaseTypeTests: XCTestCase {
-    func testBaseTypeConversions() async throws {
+final class BuiltinTypeTests: XCTestCase {
+    func testBuiltinTypeConversions() async throws {
         try await check(swift: """
         var a: Any
         var ao: AnyObject

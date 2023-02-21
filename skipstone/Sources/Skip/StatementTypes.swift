@@ -213,9 +213,6 @@ class FunctionDeclaration: Statement {
     let attributes: Attributes
     private(set) var modifiers: Modifiers
     let body: CodeBlock<Statement>?
-    var isInit: Bool {
-        return name == "init"
-    }
 
     init(type: StatementType, name: String, isOptionalInit: Bool = false, returnType: TypeSignature = .void, parameters: [Parameter<Expression>], isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes? = nil, modifiers: Modifiers? = nil, body: CodeBlock<Statement>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.name = name
@@ -353,6 +350,9 @@ class TypeDeclaration: Statement {
         return _qualifiedName ?? name
     }
     private var _qualifiedName: String?
+    var signature: TypeSignature {
+        return TypeSignature.for(name: qualifiedName, genericTypes: [])
+    }
 
     init(type: StatementType, name: String, qualifiedName: String? = nil, inherits: [TypeSignature] = [], attributes: Attributes? = nil, modifiers: Modifiers? = nil, members: [Statement] = [], syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.name = name

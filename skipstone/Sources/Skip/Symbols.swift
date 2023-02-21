@@ -92,13 +92,13 @@ public class Symbols {
         }
 
         /// Return the type of the given identifier.
-        func type(of identifier: String) -> TypeSignature {
+        func identifierSignature(of identifier: String) -> TypeSignature {
             let candidates = lookup(name: identifier).filter { $0.kind == .var }
             return ranked(candidates).first?.typeSignature(symbols: symbols) ?? .none
         }
 
         /// Return the type of the given member.
-        func type(of member: String, in type: TypeSignature) -> TypeSignature {
+        func identifierSignature(of member: String, in type: TypeSignature) -> TypeSignature {
             if case .tuple(let labels, let types) = type {
                 for (index, label) in labels.enumerated() {
                     if member == label || member == "\(index)" {
@@ -110,7 +110,7 @@ public class Symbols {
 
             let typeNames = candidateTypeNames(for: type)
             for typeName in typeNames {
-                let type = self.type(of: member, in: typeName)
+                let type = identifierSignature(of: member, in: typeName)
                 if type != .none {
                     return type
                 }
@@ -185,10 +185,10 @@ public class Symbols {
             return []
         }
 
-        private func type(of member: String, in typeName: String) -> TypeSignature {
+        private func identifierSignature(of member: String, in typeName: String) -> TypeSignature {
             let candidates = ranked(lookup(name: typeName))
             for candidate in candidates {
-                let type = type(of: member, in: candidate)
+                let type = identifierSignature(of: member, in: candidate)
                 if type != .none {
                     return type
                 }
@@ -196,7 +196,7 @@ public class Symbols {
             return .none
         }
 
-        private func type(of member: String, in candidate: Symbol) -> TypeSignature {
+        private func identifierSignature(of member: String, in candidate: Symbol) -> TypeSignature {
             for relationship in candidate.relationships {
                 switch relationship.kind {
                 case .memberOf:
@@ -208,7 +208,7 @@ public class Symbols {
                     guard !relationship.isInverse, let inheritsFrom = lookup(identifier: relationship.targetIdentifier ?? "") else {
                         break
                     }
-                    let type = type(of: member, in: inheritsFrom)
+                    let type = identifierSignature(of: member, in: inheritsFrom)
                     if type != .none {
                         return type
                     }

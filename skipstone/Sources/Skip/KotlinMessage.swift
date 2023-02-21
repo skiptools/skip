@@ -17,8 +17,8 @@ extension Message {
         return Message(severity: .error, message: "Kotlin does not support composed types. Consider creating a single type that conforms to these types", sourceDerived: sourceDerived)
     }
 
-    static func kotlinConstructorDelegateFirstStatement(_ sourceDerived: SourceDerived) -> Message {
-        return Message(severity: .error, message: "Kotlin requires that a call to another constructor is the first statement in the code block", sourceDerived: sourceDerived)
+    static func kotlinConstructorSingleDelegatingStatement(_ sourceDerived: SourceDerived) -> Message {
+        return Message(severity: .error, message: "A Kotlin constructor can only include a single call to another 'this' or 'super' constructor", sourceDerived: sourceDerived)
     }
 
     static func kotlinConstructorNullReturn(_ sourceDerived: SourceDerived) -> Message {

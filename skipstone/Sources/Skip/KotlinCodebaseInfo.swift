@@ -65,44 +65,6 @@ public class KotlinCodebaseInfo {
         }
     }
 
-    private func addTypeInfo(for typeDeclaration: TypeDeclaration, mayBeMutableValueType: Bool?) {
-        var info = TypeInfo(declarationType: typeDeclaration.type, firstInherits: typeDeclaration.inherits.first?.description, mayBeMutableValueType: mayBeMutableValueType, isPrivate: typeDeclaration.modifiers.visibility == .private, sourceFile: typeDeclaration.sourceFile)
-        if typeDeclaration.type != .protocolDeclaration {
-            info.constructorParameters = constructorParameters(in: typeDeclaration.members)
-        }
-        var infos = typeInfo[typeDeclaration.qualifiedName, default: []]
-        infos.append(info)
-        typeInfo[typeDeclaration.qualifiedName] = infos
-    }
-
-    private func mergeExtensionInfo() {
-        for typeInfoEntry in typeInfo {
-            typeInfo[typeInfoEntry.key] = typeInfoEntry.value.map {
-                var typeInfo = $0
-                extensionInfo[typeInfoEntry.key, default: []]
-                    .forEach {
-                        if !typeInfo.isPrivate || $0.sourceFile == typeInfo.sourceFile {
-                            typeInfo.constructorParameters += constructorParameters(in: $0.declaration.members)
-                        }
-                    }
-                return typeInfo
-            }
-        }
-    }
-
-    private func constructorParameters(in members: [Statement]) -> [[ConstructorParameter]] {
-        var constructorParameters: [[ConstructorParameter]] = []
-        for member in members {
-            guard let constructor = member as? FunctionDeclaration, constructor.isInit && constructor.modifiers.visibility != .private else {
-                continue
-            }
-            constructorParameters.append(constructor.parameters.map { parameter in
-                ConstructorParameter(label: parameter.externalLabel, type: parameter.declaredType, isVariadic: parameter.isVariadic, defaultValue: parameter.defaultValue)
-            })
-        }
-        return constructorParameters
-    }
-
     /// Create a context that can access the given imported modules.
     func context(importedModuleNames: [String] = [], sourceFile: Source.File? = nil) -> Context {
         return Context(codebaseInfo: self, symbols: symbols?.context(importedModuleNames: importedModuleNames, sourceFile: sourceFile), sourceFile: sourceFile)
@@ -130,11 +92,31 @@ public class KotlinCodebaseInfo {
             }
         }
 
-        /// Whether the given qualified type name is a class, struct, etc *within this module*.
-        func declarationType(of qualifiedName: String) -> StatementType? {
+        /// Whether the given qualified type name is a class, struct, etc, optionally limiting results to this module.
+        func declarationType(of qualifiedName: String, mustBeInModule: Bool) -> StatementType? {
             for info in codebaseInfo.typeInfo[qualifiedName, default: []] {
                 if !info.isPrivate || info.sourceFile == sourceFile {
                     return info.declarationType
+                }
+            }
+            guard !mustBeInModule, let symbols else {
+                return nil
+            }
+            for candidate in symbols.ranked(symbols.lookup(name: qualifiedName)) {
+                guard let kind = candidate.kind else {
+                    continue
+                }
+                switch kind {
+                case .class:
+                    return .classDeclaration
+                case .enum:
+                    return .enumDeclaration
+                case .struct:
+                    return .structDeclaration
+                case .protocol:
+                    return .protocolDeclaration
+                default:
+                    continue
                 }
             }
             return nil
@@ -182,6 +164,44 @@ public class KotlinCodebaseInfo {
             }
             return symbols?.isMutableValueType(qualifiedName: qualifiedName) != false
         }
+    }
+
+    private func addTypeInfo(for typeDeclaration: TypeDeclaration, mayBeMutableValueType: Bool?) {
+        var info = TypeInfo(declarationType: typeDeclaration.type, firstInherits: typeDeclaration.inherits.first?.description, mayBeMutableValueType: mayBeMutableValueType, isPrivate: typeDeclaration.modifiers.visibility == .private, sourceFile: typeDeclaration.sourceFile)
+        if typeDeclaration.type != .protocolDeclaration {
+            info.constructorParameters = constructorParameters(in: typeDeclaration.members)
+        }
+        var infos = typeInfo[typeDeclaration.qualifiedName, default: []]
+        infos.append(info)
+        typeInfo[typeDeclaration.qualifiedName] = infos
+    }
+
+    private func mergeExtensionInfo() {
+        for typeInfoEntry in typeInfo {
+            typeInfo[typeInfoEntry.key] = typeInfoEntry.value.map {
+                var typeInfo = $0
+                extensionInfo[typeInfoEntry.key, default: []]
+                    .forEach {
+                        if !typeInfo.isPrivate || $0.sourceFile == typeInfo.sourceFile {
+                            typeInfo.constructorParameters += constructorParameters(in: $0.declaration.members)
+                        }
+                    }
+                return typeInfo
+            }
+        }
+    }
+
+    private func constructorParameters(in members: [Statement]) -> [[ConstructorParameter]] {
+        var constructorParameters: [[ConstructorParameter]] = []
+        for member in members {
+            guard let constructor = member as? FunctionDeclaration, constructor.type == .initDeclaration && constructor.modifiers.visibility != .private else {
+                continue
+            }
+            constructorParameters.append(constructor.parameters.map { parameter in
+                ConstructorParameter(label: parameter.externalLabel, type: parameter.declaredType, isVariadic: parameter.isVariadic, defaultValue: parameter.defaultValue)
+            })
+        }
+        return constructorParameters
     }
 
     /// Constructor parameter with translatable default value.

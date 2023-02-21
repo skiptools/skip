@@ -109,10 +109,14 @@ class BinaryOperator: Expression {
     }
 
     override class func decodeSequenceOperator(syntax: SyntaxProtocol, sequence: SyntaxProtocol, elements: [ExprSyntax], index: Int, in syntaxTree: SyntaxTree) throws -> Expression? {
-        guard syntax.kind == .binaryOperatorExpr, let binaryOperatorExpr = syntax.as(BinaryOperatorExprSyntax.self) else {
+        let op: Operator
+        if syntax.kind == .binaryOperatorExpr, let binaryOperatorExpr = syntax.as(BinaryOperatorExprSyntax.self) {
+            op = Operator.with(symbol: binaryOperatorExpr.operatorToken.text)
+        } else if syntax.kind == .assignmentExpr, let assignmentExpr = syntax.as(AssignmentExprSyntax.self) {
+            op = Operator.with(symbol: assignmentExpr.assignToken.text)
+        } else {
             return nil
         }
-        let op = Operator.with(symbol: binaryOperatorExpr.operatorToken.text)
         let lhs = try ExpressionDecoder.decodeSequence(sequence: sequence, elements: Array(elements[..<index]), in: syntaxTree)
         let rhs = try ExpressionDecoder.decodeSequence(sequence: sequence, elements: Array(elements[(index + 1)...]), in: syntaxTree)
         return BinaryOperator(op: op, lhs: lhs, rhs: rhs, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
@@ -399,7 +403,7 @@ class FunctionCall: Expression {
     }
 }
 
-/// `x`
+/// `x`, also `this` or `super`
 class Identifier: Expression {
     let name: String
 
@@ -409,10 +413,14 @@ class Identifier: Expression {
     }
 
     override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
-        guard syntax.kind == .identifierExpr, let identifierExpr = syntax.as(IdentifierExprSyntax.self) else {
+        let name: String
+        if syntax.kind == .identifierExpr, let identifierExpr = syntax.as(IdentifierExprSyntax.self) {
+            name = identifierExpr.identifier.text
+        } else if syntax.kind == .superRefExpr {
+            name = "super"
+        } else {
             return nil
         }
-        let name = identifierExpr.identifier.text
         return Identifier(name: name, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 

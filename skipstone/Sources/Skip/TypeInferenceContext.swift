@@ -71,23 +71,23 @@ struct TypeInferenceContext {
                 }
             }
         }
-        if name == "self" {
+        if name == "self" || name == "super" {
             guard let typeDeclaration = typePath.last else {
                 return .none
             }
-            return .named(typeDeclaration.qualifiedName, [])
+            return name == "self" ? typeDeclaration.signature : typeDeclaration.inherits.first ?? .none
         }
         guard let symbols else {
             return .none
         }
 
         for typeDeclaration in typePath.reversed() {
-            let symbolType = symbols.type(of: name, in: .named(typeDeclaration.qualifiedName, []))
+            let symbolType = symbols.identifierSignature(of: name, in: .named(typeDeclaration.qualifiedName, []))
             if symbolType != .none {
                 return symbolType
             }
         }
-        return symbols.type(of: name)
+        return symbols.identifierSignature(of: name)
     }
 
     /// Return the type of the given member.
@@ -95,7 +95,7 @@ struct TypeInferenceContext {
         guard let symbols else {
             return .none
         }
-        return symbols.type(of: name, in: type)
+        return symbols.identifierSignature(of: name, in: type)
     }
 
     /// Return the signatures of the functions matching the given parameters.

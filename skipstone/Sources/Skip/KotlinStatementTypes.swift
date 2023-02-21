@@ -124,16 +124,13 @@ class KotlinClassDeclaration: KotlinStatement {
                 output.append("data ")
             }
             output.append("class ").append(name)
-
-            // TODO: Default constructor call
-
             if !inherits.isEmpty {
                 output.append(": ")
                 var inherits = inherits
                 if let superclassCall {
                     output.append(superclassCall)
-                    if inherits.count > 1 {
-                        inherits = Array(inherits.dropFirst())
+                    inherits = Array(inherits.dropFirst())
+                    if !inherits.isEmpty {
                         output.append(", ")
                     }
                 }
@@ -168,7 +165,7 @@ struct KotlinExtensionDeclaration {
         // If the extension is on a type outside this module or is on a protocol, use Kotlin extension
         // functions. Otherwise do not translate the extension - instead we'll move its members into
         // our declaration of its extended type
-        let declarationType = translator.codebaseInfo?.declarationType(of: statement.extends.description)
+        let declarationType = translator.codebaseInfo?.declarationType(of: statement.extends.description, mustBeInModule: true)
         guard declarationType == nil || declarationType == .protocolDeclaration else {
             return []
         }
@@ -208,9 +205,6 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var modifiers = Modifiers()
     var body: CodeBlock<KotlinStatement>?
     var delegatingConstructorCall: KotlinExpression?
-    var isConstructor: Bool {
-        return name == "constructor"
-    }
 
     // KotlinMemberDeclaration
     var extends: TypeSignature?
@@ -237,27 +231,33 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         kstatement.returnType.appendKotlinMessages(to: kstatement)
         kstatement.parameters.forEach { $0.declaredType.appendKotlinMessages(to: kstatement) }
 
-        if statement.isOptionalInit {
-            kstatement.messages.append(.kotlinConstructorNullReturn(statement))
-        }
+        // Warnings and fixups
         if let owningTypeDeclaration = statement.owningTypeDeclaration, owningTypeDeclaration === statement.parent, owningTypeDeclaration.type == .protocolDeclaration {
-            if statement.isInit {
+            if statement.type == .initDeclaration {
                 kstatement.messages.append(.kotlinProtocolConstructor(statement))
             } else if statement.modifiers.isStatic {
                 kstatement.messages.append(.kotlinProtocolStaticFunction(statement))
             }
         }
+        if statement.type == .initDeclaration {
+            kstatement.isOpen = false
+            kstatement.modifiers.isOverride = false // Kotlin does not override constructors
+            if statement.isOptionalInit {
+                kstatement.messages.append(.kotlinConstructorNullReturn(statement))
+            }
+        }
+
         return kstatement
     }
 
     init(name: String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
         self.name = name
-        super.init(type: .functionDeclaration, sourceFile: sourceFile, sourceRange: sourceRange)
+        super.init(type: name == "constructor" ? .constructorDeclaration : .functionDeclaration, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
     private init(statement: FunctionDeclaration) {
-        self.name = statement.isInit ? "constructor" : statement.name
-        super.init(type: statement.isInit ? .constructorDeclaration : .functionDeclaration, statement: statement)
+        self.name = statement.type == .initDeclaration ? "constructor" : statement.name
+        super.init(type: statement.type == .initDeclaration ? .constructorDeclaration : .functionDeclaration, statement: statement)
     }
 
     override var children: [KotlinSyntaxNode] {
@@ -276,12 +276,12 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if let declaration = extras?.declaration {
             output.append(declaration)
         } else {
-            output.append(modifiers.kotlinMemberString(isOpen: isOpen && !isConstructor)).append(" ")
+            output.append(modifiers.kotlinMemberString(isOpen: isOpen)).append(" ")
             if isAsync {
                 output.append("suspend ")
             }
 
-            if !isConstructor {
+            if type != .constructorDeclaration {
                 output.append("fun ")
             }
             if let extends {
@@ -307,7 +307,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 }
             }
             output.append(")")
-            if !isConstructor {
+            if type != .constructorDeclaration {
                 output.append(": ").append(returnType.or(.void).kotlin)
             } else if let delegatingConstructorCall {
                 output.append(": ").append(delegatingConstructorCall, indentation: indentation)
@@ -512,7 +512,8 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             output.append(declaration)
         } else {
             if isProperty || isGlobal {
-                output.append(modifiers.kotlinMemberString(isOpen: isOpen)).append(" ")
+                // We can't override stored properties in Swift, so only need to mark open if computed
+                output.append(modifiers.kotlinMemberString(isOpen: isOpen && getter != nil)).append(" ")
                 if case .unwrappedOptional = declaredType {
                     output.append("lateinit ")
                 }

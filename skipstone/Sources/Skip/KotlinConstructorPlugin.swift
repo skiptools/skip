@@ -14,9 +14,22 @@ class KotlinConstructorPlugin: KotlinTranslatorPlugin {
     private func visit(_ statement: KotlinStatement, translator: KotlinTranslator) -> KotlinVisitResult {
         switch statement.type {
         case .classDeclaration:
-            addSuperclassConstructors(to: statement as! KotlinClassDeclaration, translator: translator)
+            let classDeclaration = statement as! KotlinClassDeclaration
+            let constructors = classDeclaration.members.filter { $0.type == .constructorDeclaration }
+            var mayNeedSuperclassCall = false
+            if constructors.isEmpty {
+                mayNeedSuperclassCall = !addSuperclassConstructors(to: classDeclaration, translator: translator)
+            } else {
+                for constructor in constructors {
+                    if !fixupConstructor(constructor as! KotlinFunctionDeclaration) {
+                        mayNeedSuperclassCall = true
+                    }
+                }
+            }
+            if mayNeedSuperclassCall {
+                addSuperclassCall(to: classDeclaration)
+            }
         case .constructorDeclaration:
-            fixupConstructor(statement as! KotlinFunctionDeclaration)
             return .skip
         case .variableDeclaration:
             return .skip
@@ -28,13 +41,15 @@ class KotlinConstructorPlugin: KotlinTranslatorPlugin {
         return .recurse(nil)
     }
 
-    private func addSuperclassConstructors(to classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) {
-        guard !classDeclaration.members.contains(where: { $0.type == .constructorDeclaration }) else {
-            return
+    private func addSuperclassConstructors(to classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) -> Bool {
+        let inheritedConstructorParameters = codebaseInfo.constructorParameters(of: classDeclaration.qualifiedName)
+        guard !inheritedConstructorParameters.isEmpty else {
+            return false
         }
-        for constructorParameters in codebaseInfo.constructorParameters(of: classDeclaration.qualifiedName) {
+        for constructorParameters in inheritedConstructorParameters {
             addInheritedConstructor(parameters: constructorParameters, to: classDeclaration, translator: translator)
         }
+        return true
     }
 
     private func addInheritedConstructor(parameters: [KotlinCodebaseInfo.ConstructorParameter], to classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) {
@@ -53,6 +68,7 @@ class KotlinConstructorPlugin: KotlinTranslatorPlugin {
             }
             return Parameter(externalLabel: label, declaredType: parameter.type, isVariadic: parameter.isVariadic, defaultValue: kdefaultValue)
         }
+        superCall += ")"
         constructor.delegatingConstructorCall = KotlinRawExpression(sourceCode: superCall)
 
         constructor.modifiers = classDeclaration.modifiers
@@ -63,9 +79,12 @@ class KotlinConstructorPlugin: KotlinTranslatorPlugin {
         constructor.assignParentReferences()
     }
 
-    private func fixupConstructor(_ constructor: KotlinFunctionDeclaration) {
+    private func fixupConstructor(_ constructor: KotlinFunctionDeclaration) -> Bool {
+        guard constructor.delegatingConstructorCall == nil else {
+            return true
+        }
         guard var body = constructor.body else {
-            return
+            return false
         }
 
         // Find any call to self or super init and move it to the Kotlin delegating constructor call
@@ -73,16 +92,15 @@ class KotlinConstructorPlugin: KotlinTranslatorPlugin {
             guard let delegatingCall = delegatingConstructorCall(for: statement) else {
                 continue
             }
-            if index == 0 {
-                body.statements.removeFirst()
-                constructor.body = body
-                constructor.delegatingConstructorCall = delegatingCall
-                break
-            } else {
-                statement.messages.append(.kotlinConstructorDelegateFirstStatement(statement))
+            if constructor.delegatingConstructorCall != nil {
+                statement.messages.append(.kotlinConstructorSingleDelegatingStatement(statement))
                 break
             }
+            body.statements.remove(at: index)
+            constructor.body = body
+            constructor.delegatingConstructorCall = delegatingCall
         }
+        return constructor.delegatingConstructorCall != nil
     }
 
     private func delegatingConstructorCall(for statement: KotlinStatement) -> KotlinExpression? {
@@ -100,11 +118,18 @@ class KotlinConstructorPlugin: KotlinTranslatorPlugin {
         }
         switch memberAccess.baseType {
         case .this:
-            return memberAccess
+            return functionCall
         case .super:
-            return memberAccess
+            return functionCall
         default:
             return nil
+        }
+    }
+
+    private func addSuperclassCall(to classDeclaration: KotlinClassDeclaration) {
+        // If we have a superclass, we must instantiate it
+        if let inherits = classDeclaration.inherits.first, codebaseInfo.declarationType(of: inherits.description, mustBeInModule: false) == .classDeclaration {
+            classDeclaration.superclassCall = "\(inherits.description)()"
         }
     }
 }

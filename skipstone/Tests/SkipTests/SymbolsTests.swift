@@ -4,25 +4,25 @@ import XCTest
 final class SymbolsTests: XCTestCase {
     func testIdentifierType() async throws {
         let context = try await symbols.context()
-        XCTAssertEqual(.string, context.type(of: "symbolsTestsVar"))
-        XCTAssertEqual(.array(.int), context.type(of: "symbolsTestsArrayVar"))
-        XCTAssertEqual(.dictionary(.string, .int), context.type(of: "symbolsTestsDictionaryVar"))
-        XCTAssertEqual(.named("SymbolsTestsClass", []), context.type(of: "symbolsTestsNamedVar"))
+        XCTAssertEqual(.string, context.identifierSignature(of: "symbolsTestsVar"))
+        XCTAssertEqual(.array(.int), context.identifierSignature(of: "symbolsTestsArrayVar"))
+        XCTAssertEqual(.dictionary(.string, .int), context.identifierSignature(of: "symbolsTestsDictionaryVar"))
+        XCTAssertEqual(.named("SymbolsTestsClass", []), context.identifierSignature(of: "symbolsTestsNamedVar"))
     }
 
     func testMemberType() async throws {
         let context = try await symbols.context()
-        XCTAssertEqual(.int, context.type(of: "count", in: .array(.int)))
+        XCTAssertEqual(.int, context.identifierSignature(of: "count", in: .array(.int)))
 
-        XCTAssertEqual(.int, context.type(of: "letVar", in: .named("SymbolsTestsStruct", [])))
-        XCTAssertEqual(.int, context.type(of: "computedVar", in: .named("SymbolsTestsStruct", [])))
+        XCTAssertEqual(.int, context.identifierSignature(of: "letVar", in: .named("SymbolsTestsStruct", [])))
+        XCTAssertEqual(.int, context.identifierSignature(of: "computedVar", in: .named("SymbolsTestsStruct", [])))
 
-        XCTAssertEqual(.named("SymbolsTestsEnum", []), context.type(of: "case1", in: .named("SymbolsTestsEnum", [])))
+        XCTAssertEqual(.named("SymbolsTestsEnum", []), context.identifierSignature(of: "case1", in: .named("SymbolsTestsEnum", [])))
 
-        XCTAssertEqual(.function([.init(label: "p", type: .string)], .int), context.type(of: "f", in: .named("SymbolsTestsStruct", [])))
+        XCTAssertEqual(.function([.init(label: "p", type: .string)], .int), context.identifierSignature(of: "f", in: .named("SymbolsTestsStruct", [])))
 
-        XCTAssertEqual(.string, context.type(of: "1", in: .tuple(["i", "s"], [.int, .string])))
-        XCTAssertEqual(.string, context.type(of: "s", in: .tuple(["i", "s"], [.int, .string])))
+        XCTAssertEqual(.string, context.identifierSignature(of: "1", in: .tuple(["i", "s"], [.int, .string])))
+        XCTAssertEqual(.string, context.identifierSignature(of: "s", in: .tuple(["i", "s"], [.int, .string])))
     }
 
     func testSubscript() async throws {
