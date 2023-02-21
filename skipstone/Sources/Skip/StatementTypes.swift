@@ -273,8 +273,12 @@ class FunctionDeclaration: Statement {
         returnType = returnType.qualified(in: self)
         parameters = parameters.map { $0.qualifiedType(in: self) }
         // Functions in protocols or extensions inherit the visibility of the protocol or extension
-        if modifiers.visibility == .default, let owningTypeDeclaration = parent as? TypeDeclaration, (owningTypeDeclaration.type == .protocolDeclaration || owningTypeDeclaration.type == .extensionDeclaration) {
-            modifiers.visibility = owningTypeDeclaration.modifiers.visibility
+        if modifiers.visibility == .default {
+            if let owningTypeDeclaration = parent as? TypeDeclaration, (owningTypeDeclaration.type == .protocolDeclaration || owningTypeDeclaration.type == .extensionDeclaration) {
+                modifiers.visibility = owningTypeDeclaration.modifiers.visibility
+            } else {
+                modifiers.visibility = .internal
+            }
         }
     }
 
@@ -339,12 +343,12 @@ class ImportDeclaration: Statement {
 }
 
 // TODO: Generics
-/// `class/struct/enum Type { ... }`
+/// `class/struct/enum/protocol Type { ... }`
 class TypeDeclaration: Statement {
     let name: String
     private(set) var inherits: [TypeSignature]
     let attributes: Attributes
-    let modifiers: Modifiers
+    private(set) var modifiers: Modifiers
     let members: [Statement]
     var qualifiedName: String {
         return _qualifiedName ?? name
@@ -426,6 +430,9 @@ class TypeDeclaration: Statement {
             _qualifiedName = qualifyDeclaredTypeName(name)
         }
         inherits = inherits.map { $0.qualified(in: self) }
+        if modifiers.visibility == .default {
+            modifiers.visibility = .internal
+        }
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
@@ -583,8 +590,12 @@ class VariableDeclaration: Statement {
     override func resolveAttributes() {
         declaredType = declaredType.qualified(in: self)
         // Variables in protocols or extensions inherit the visibility of the protocol or extension
-        if modifiers.visibility == .default, let owningTypeDeclaration = parent as? TypeDeclaration, (owningTypeDeclaration.type == .protocolDeclaration || owningTypeDeclaration.type == .extensionDeclaration) {
-            modifiers.visibility = owningTypeDeclaration.modifiers.visibility
+        if modifiers.visibility == .default {
+            if let owningTypeDeclaration = parent as? TypeDeclaration, (owningTypeDeclaration.type == .protocolDeclaration || owningTypeDeclaration.type == .extensionDeclaration) {
+                modifiers.visibility = owningTypeDeclaration.modifiers.visibility
+            } else {
+                modifiers.visibility = .internal
+            }
         }
     }
 

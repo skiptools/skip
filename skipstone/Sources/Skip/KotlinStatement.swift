@@ -1,7 +1,7 @@
 /// A node in the Kotlin syntax tree.
 class KotlinStatement: KotlinSyntaxNode {
     let type: KotlinStatementType
-    let extras: StatementExtras?
+    var extras: StatementExtras?
 
     init(type: KotlinStatementType, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.type = type

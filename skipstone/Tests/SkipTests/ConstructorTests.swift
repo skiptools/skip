@@ -86,6 +86,7 @@ final class ConstructorTests: XCTestCase {
         }
 
         internal open class B: A {
+
             internal constructor(): super() {
             }
 
@@ -125,13 +126,25 @@ final class ConstructorTests: XCTestCase {
             let i: Int
             let s: String
 
-            init(i: Int, s: String) {
+            init(_ i: Int, s: String) {
                 self.i = i
                 self.s = s
             }
 
-            convenience init(both: Int) {
-                self.init(i: both, s: "\\(both)")
+            convenience init(_ both: Int) {
+                self.init(both, s: "\\(both)")
+            }
+        }
+
+        class B: A {
+        }
+
+        class C: A {
+            let d: Double
+
+            init(d: Double, i: Int, s: String {
+                self.d = d
+                super.init(i, s: s)
             }
         }
         """, kotlin: """
@@ -144,7 +157,125 @@ final class ConstructorTests: XCTestCase {
                 this.s = s
             }
 
-            internal constructor(both: Int): this(i = both, s = "${both}") {
+            internal constructor(both: Int): this(both, s = "${both}") {
+            }
+
+            companion object {
+            }
+        }
+
+        internal open class B: A {
+
+            internal constructor(_p0_: Int, s: String): super(_p0_, s) {
+            }
+
+            internal constructor(_p0_: Int): super(_p0_) {
+            }
+
+            companion object {
+            }
+        }
+
+        internal open class C: A {
+            internal val d: Double
+
+            internal constructor(d: Double, i: Int, s: String): super(i, s = s) {
+                this.d = d
+            }
+
+            companion object {
+            }
+        }
+        """)
+    }
+
+    func testStructMemberwiseConstructors() async throws {
+        try await check(swift: """
+        struct A {
+        }
+
+        struct B {
+            var i: Int
+
+            init(i: Int) {
+                self.i = i
+            }
+        }
+
+        struct C {
+            let i = 100
+            var s: String {
+                return "100"
+            }
+        }
+
+        struct D {
+            let letVar = 100
+            var computedVar: Int {
+                return 100
+            }
+            var i = 100
+            var s: String
+        }
+
+        struct E {
+            var i = 100
+            private var s: String
+        }
+        """, kotlin: """
+        internal class A {
+
+            companion object {
+            }
+        }
+
+        internal class B {
+            internal var i: Int
+
+            internal constructor(i: Int) {
+                this.i = i
+            }
+
+            companion object {
+            }
+        }
+
+        internal class C {
+            internal val i = 100
+            internal val s: String
+                get() {
+                    return "100"
+                }
+
+            companion object {
+            }
+        }
+
+        internal class D {
+            internal val letVar = 100
+            internal val computedVar: Int
+                get() {
+                    return 100
+                }
+            internal var i = 100
+            internal var s: String
+
+            internal constructor(i: Int = 100, s: String) {
+                this.i = i
+                this.s = s
+            }
+
+            companion object {
+            }
+        }
+
+        internal class E {
+            internal var i = 100
+            private var s: String
+
+            private constructor(i: Int = 100, s: String) {
+                this.i = i
+                this.s = s
             }
 
             companion object {

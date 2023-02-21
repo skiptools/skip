@@ -62,14 +62,13 @@ class KotlinClassDeclaration: KotlinStatement {
     var inherits: [TypeSignature] = []
     var superclassCall: String?
     var modifiers = Modifiers()
-    var isDataClass = false
+    var declarationType: StatementType
     var members: [KotlinStatement] = []
 
     static func translate(statement: TypeDeclaration, translator: KotlinTranslator) -> KotlinClassDeclaration {
         let kstatement = KotlinClassDeclaration(statement: statement)
         kstatement.inherits = statement.inherits
         kstatement.modifiers = statement.modifiers
-        kstatement.isDataClass = Self.isDataClass(typeDeclaration: statement)
         var members = statement.members.flatMap { translator.translateStatement($0) }
         // Move extensions of this type into the type itself rather than use Kotlin extension functions.
         // Kotlin extension functions act like static functions, which can lead to different behavior
@@ -87,6 +86,7 @@ class KotlinClassDeclaration: KotlinStatement {
     private init(statement: TypeDeclaration) {
         self.name = statement.name
         self.qualifiedName = statement.qualifiedName
+        self.declarationType = statement.type
         super.init(type: .classDeclaration, statement: statement)
     }
 
@@ -104,24 +104,21 @@ class KotlinClassDeclaration: KotlinStatement {
                 fallthrough
             case .internal:
                 output.append("internal ")
-                if !isDataClass && !modifiers.isFinal {
+                if declarationType == .classDeclaration && !modifiers.isFinal {
                     output.append("open ")
                 }
             case .open:
-                output.append(isDataClass ? "public " : "public open ")
+                output.append(declarationType == .classDeclaration ? "public open " : "public ")
             case .public:
                 output.append("public ")
-                if !isDataClass && !modifiers.isFinal {
+                if declarationType == .classDeclaration && !modifiers.isFinal {
                     output.append("open ")
                 }
             case .private:
                 output.append("private ")
-                if !isDataClass && !modifiers.isFinal {
+                if declarationType == .classDeclaration && !modifiers.isFinal {
                     output.append("open ")
                 }
-            }
-            if isDataClass {
-                output.append("data ")
             }
             output.append("class ").append(name)
             if !inherits.isEmpty {
@@ -149,14 +146,6 @@ class KotlinClassDeclaration: KotlinStatement {
         output.append(memberIndentation).append("}\n")
 
         output.append(indentation).append("}\n")
-    }
-
-    private static func isDataClass(typeDeclaration: TypeDeclaration) -> Bool {
-        guard typeDeclaration.type == .structDeclaration else {
-            return false
-        }
-        // TODO: Must have at least one stored property
-        return true
     }
 }
 
@@ -423,6 +412,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var isOpen = false
     var modifiers = Modifiers()
     var value: KotlinExpression?
+    var valueType: TypeSignature = .none
     var getter: Accessor<KotlinStatement>?
     var setter: Accessor<KotlinStatement>?
     var willSet: Accessor<KotlinStatement>?
@@ -454,6 +444,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         }
         if let value = statement.value {
             kstatement.value = translator.translateExpression(value).valueReference()
+            kstatement.valueType = value.inferredType
         }
 
         kstatement.isReadOnly = statement.isLet || (statement.getter != nil && statement.setter == nil)

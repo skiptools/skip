@@ -185,12 +185,12 @@ enum StringLiteralSegment<E> {
 /// Member and type modifiers.
 struct Modifiers: PrettyPrintable {
     /// Visibility modifier.
-    enum Visibility {
-        case `default`
-        case `open`
-        case `public`
-        case `internal`
+    enum Visibility: Equatable, Comparable {
         case `private`
+        case `default`
+        case `internal`
+        case `public`
+        case `open`
     }
 
     var visibility: Visibility

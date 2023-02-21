@@ -80,6 +80,13 @@ class KotlinBinaryOperator: KotlinExpression {
         return kexpression
     }
 
+    init(op: Operator, lhs: KotlinExpression, rhs: KotlinExpression, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        self.op = op
+        self.lhs = lhs
+        self.rhs = rhs
+        super.init(type: .binaryOperator, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
     private init(expression: BinaryOperator, lhs: KotlinExpression, rhs: KotlinExpression) {
         self.op = expression.op
         self.lhs = lhs
@@ -247,6 +254,11 @@ class KotlinIdentifier: KotlinExpression {
         let kexpression = KotlinIdentifier(expression: expression)
         kexpression.mayBeSharedMutableValue = expression.inferredType.kotlinMayBeSharedMutableValue(codebaseInfo: translator.codebaseInfo)
         return kexpression
+    }
+
+    init(name: String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        self.name = name
+        super.init(type: .identifier, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
     private init(expression: Identifier) {

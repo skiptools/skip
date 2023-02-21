@@ -19,6 +19,9 @@ struct StatementExtras {
     let leadingTrivia: [String]
     let trailingTrivia: [String]
 
+    /// Extras consisting of a single leading new line, as is commonly used to separate type and function declarations.
+    static let singleNewline = StatementExtras(directives: [], leadingTrivia: ["\n"], trailingTrivia: [])
+
     /// Decode the trivia on the given syntax to parse extras.
     static func decode(syntax: SyntaxProtocol) -> StatementExtras? {
         let trailingTriviaString = processTrailingTrivia(syntax: syntax)

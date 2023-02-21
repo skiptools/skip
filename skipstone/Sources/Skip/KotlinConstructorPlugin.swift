@@ -18,7 +18,11 @@ class KotlinConstructorPlugin: KotlinTranslatorPlugin {
             let constructors = classDeclaration.members.filter { $0.type == .constructorDeclaration }
             var mayNeedSuperclassCall = false
             if constructors.isEmpty {
-                mayNeedSuperclassCall = !addSuperclassConstructors(to: classDeclaration, translator: translator)
+                if classDeclaration.declarationType == .structDeclaration {
+                    addMemberwiseConstructor(to: classDeclaration)
+                } else {
+                    mayNeedSuperclassCall = !addInheritedConstructors(to: classDeclaration, translator: translator)
+                }
             } else {
                 for constructor in constructors {
                     if !fixupConstructor(constructor as! KotlinFunctionDeclaration) {
@@ -41,7 +45,54 @@ class KotlinConstructorPlugin: KotlinTranslatorPlugin {
         return .recurse(nil)
     }
 
-    private func addSuperclassConstructors(to classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) -> Bool {
+    private func addMemberwiseConstructor(to classDeclaration: KotlinClassDeclaration) {
+        var minimumVisibility = classDeclaration.modifiers.visibility
+        let variableDeclarations = classDeclaration.members.compactMap { (member: KotlinStatement) -> KotlinVariableDeclaration? in
+            guard let variableDeclaration = member as? KotlinVariableDeclaration, !variableDeclaration.isLet, variableDeclaration.getter == nil else {
+                return nil
+            }
+            if variableDeclaration.modifiers.visibility < minimumVisibility {
+                minimumVisibility = variableDeclaration.modifiers.visibility
+            }
+            return variableDeclaration
+        }
+        guard !variableDeclarations.isEmpty else {
+            return
+        }
+
+        let constructor = KotlinFunctionDeclaration(name: "constructor")
+        constructor.parameters = variableDeclarations.map { variableDeclaration in
+            let label = variableDeclaration.name
+            let type = variableDeclaration.declaredType.or(variableDeclaration.valueType)
+            return Parameter(externalLabel: label, declaredType: type, isVariadic: false, defaultValue: variableDeclaration.value)
+        }
+        constructor.modifiers = classDeclaration.modifiers
+        // Swift generated constructors take on the minimimum visibility of the members being initialized
+        constructor.modifiers.visibility = minimumVisibility
+        constructor.extras = .singleNewline
+
+        let bodyStatements = variableDeclarations.map { variableDeclaration in
+            let selfIdentifier = KotlinIdentifier(name: "self")
+            let memberAccess = KotlinMemberAccess(base: selfIdentifier, member: variableDeclaration.name)
+            let paramIdentifier = KotlinIdentifier(name: variableDeclaration.name)
+            let assignmentOperator = KotlinBinaryOperator(op: Operator(symbol: "=", associativity: .right, precedence: .assignment), lhs: memberAccess, rhs: paramIdentifier)
+            let statement = KotlinExpressionStatement(type: .expression)
+            statement.expression = assignmentOperator
+            return statement
+        }
+        constructor.body = CodeBlock<KotlinStatement>(statements: bodyStatements)
+
+        classDeclaration.members.append(constructor)
+        constructor.parent = classDeclaration
+        // We're intentionally not calling assignParentReferences on the constructor itself, because we may
+        // be sharing parameter default value expressions with variable value expressions. Call on our statements directly
+        for bodyStatement in bodyStatements {
+            bodyStatement.parent = constructor
+            bodyStatement.assignParentReferences()
+        }
+    }
+
+    private func addInheritedConstructors(to classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) -> Bool {
         let inheritedConstructorParameters = codebaseInfo.constructorParameters(of: classDeclaration.qualifiedName)
         guard !inheritedConstructorParameters.isEmpty else {
             return false
@@ -72,6 +123,7 @@ class KotlinConstructorPlugin: KotlinTranslatorPlugin {
         constructor.delegatingConstructorCall = KotlinRawExpression(sourceCode: superCall)
 
         constructor.modifiers = classDeclaration.modifiers
+        constructor.extras = .singleNewline
         constructor.body = CodeBlock<KotlinStatement>(statements: [])
 
         classDeclaration.members.append(constructor)

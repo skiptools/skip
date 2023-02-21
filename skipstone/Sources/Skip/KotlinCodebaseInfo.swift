@@ -122,7 +122,7 @@ public class KotlinCodebaseInfo {
             return nil
         }
 
-        /// The signatures of all constructors of the given type, including inherited constructors.
+        /// The signatures of all visible constructors of the given type, including inherited constructors.
         func constructorParameters(of qualifiedName: String) -> [[ConstructorParameter]] {
             for info in codebaseInfo.typeInfo[qualifiedName, default: []] {
                 if !info.isPrivate || info.sourceFile == sourceFile {
@@ -266,7 +266,7 @@ extension Symbols.Context {
     func constructorSignatures(qualifiedName: String) -> [TypeSignature] {
         let candidates = ranked(lookup(name: qualifiedName))
         for candidate in candidates {
-            guard let kind = candidate.kind else {
+            guard let kind = candidate.kind, candidate.visibility != .private else {
                 continue
             }
             switch kind {
