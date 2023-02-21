@@ -14,6 +14,11 @@ public class KotlinCodebaseInfo {
         syntaxTree.statements.forEach { gather(from: $0) }
     }
 
+    /// Finalize codebase info after gathering is complete.
+    func finalize() {
+        mergeExtensionInfo()
+    }
+
     /// Any issues encountered during information gathering.
     func messages(for sourceFile: Source.File) -> [Message] {
         return []
@@ -61,10 +66,41 @@ public class KotlinCodebaseInfo {
     }
 
     private func addTypeInfo(for typeDeclaration: TypeDeclaration, mayBeMutableValueType: Bool?) {
-        let info = TypeInfo(declarationType: typeDeclaration.type, mayBeMutableValueType: mayBeMutableValueType, isPrivate: typeDeclaration.modifiers.visibility == .private, sourceFile: typeDeclaration.sourceFile)
+        var info = TypeInfo(declarationType: typeDeclaration.type, firstInherits: typeDeclaration.inherits.first?.description, mayBeMutableValueType: mayBeMutableValueType, isPrivate: typeDeclaration.modifiers.visibility == .private, sourceFile: typeDeclaration.sourceFile)
+        if typeDeclaration.type != .protocolDeclaration {
+            info.constructorParameters = constructorParameters(in: typeDeclaration.members)
+        }
         var infos = typeInfo[typeDeclaration.qualifiedName, default: []]
         infos.append(info)
         typeInfo[typeDeclaration.qualifiedName] = infos
+    }
+
+    private func mergeExtensionInfo() {
+        for typeInfoEntry in typeInfo {
+            typeInfo[typeInfoEntry.key] = typeInfoEntry.value.map {
+                var typeInfo = $0
+                extensionInfo[typeInfoEntry.key, default: []]
+                    .forEach {
+                        if !typeInfo.isPrivate || $0.sourceFile == typeInfo.sourceFile {
+                            typeInfo.constructorParameters += constructorParameters(in: $0.declaration.members)
+                        }
+                    }
+                return typeInfo
+            }
+        }
+    }
+
+    private func constructorParameters(in members: [Statement]) -> [[ConstructorParameter]] {
+        var constructorParameters: [[ConstructorParameter]] = []
+        for member in members {
+            guard let constructor = member as? FunctionDeclaration, constructor.isInit && constructor.modifiers.visibility != .private else {
+                continue
+            }
+            constructorParameters.append(constructor.parameters.map { parameter in
+                ConstructorParameter(label: parameter.externalLabel, type: parameter.declaredType, isVariadic: parameter.isVariadic, defaultValue: parameter.defaultValue)
+            })
+        }
+        return constructorParameters
     }
 
     /// Create a context that can access the given imported modules.
@@ -104,10 +140,25 @@ public class KotlinCodebaseInfo {
             return nil
         }
 
-        /// The signatures of all constructors of the given type.
+        /// The signatures of all constructors of the given type, including inherited constructors.
         func constructorParameters(of qualifiedName: String) -> [[ConstructorParameter]] {
-            //~~~
-            return []
+            for info in codebaseInfo.typeInfo[qualifiedName, default: []] {
+                if !info.isPrivate || info.sourceFile == sourceFile {
+                    if info.constructorParameters.isEmpty, let firstInherits = info.firstInherits {
+                        return constructorParameters(of: firstInherits)
+                    } else {
+                        return info.constructorParameters
+                    }
+                }
+            }
+            // If this is not a type within this module, fall back to using symbols. Note that symbols will be
+            // missing any parameter default value expressions
+            guard let symbols else {
+                return []
+            }
+            return symbols.constructorSignatures(qualifiedName: qualifiedName).map {
+                return $0.parameters.map { ConstructorParameter(label: $0.label, type: $0.type, isVariadic: $0.isVariadic, defaultValue: nil) }
+            }
         }
 
         /// Whether a function with the given signature is implementing an inherited protocol function of the given type.
@@ -133,19 +184,22 @@ public class KotlinCodebaseInfo {
         }
     }
 
+    /// Constructor parameter with translatable default value.
     struct ConstructorParameter {
-        let label: String
+        let label: String?
         let type: TypeSignature
         let isVariadic: Bool
-        let defaultValue: KotlinExpression?
+        let defaultValue: Expression?
     }
 }
 
 private struct TypeInfo {
     let declarationType: StatementType
+    let firstInherits: String?
     let mayBeMutableValueType: Bool?
     let isPrivate: Bool
     let sourceFile: Source.File?
+    var constructorParameters: [[KotlinCodebaseInfo.ConstructorParameter]] = []
 }
 
 private struct ExtensionInfo {
@@ -186,6 +240,50 @@ extension Symbols.Context {
             }
         }
         return hasType ? false : nil
+    }
+
+    /// Return the type signatures of all constructors for the given type name, including inherited constructors.
+    func constructorSignatures(qualifiedName: String) -> [TypeSignature] {
+        let candidates = ranked(lookup(name: qualifiedName))
+        for candidate in candidates {
+            guard let kind = candidate.kind else {
+                continue
+            }
+            switch kind {
+            case .class:
+                fallthrough
+            case .enum:
+                fallthrough
+            case .struct:
+                return constructorSignatures(candidate)
+            default:
+                break
+            }
+        }
+        return []
+    }
+
+    private func constructorSignatures(_ symbol: Symbol) -> [TypeSignature] {
+        //~~~
+        var signatures: [TypeSignature] = []
+        var inheritsFrom: Symbol? = nil
+        for relationship in symbol.relationships {
+            if relationship.kind == .inheritsFrom && !relationship.isInverse {
+                inheritsFrom = lookup(identifier: relationship.targetIdentifier ?? "")
+                continue
+            }
+            guard relationship.kind == .memberOf && relationship.isInverse else {
+                continue
+            }
+            guard let member = lookup(identifier: relationship.targetIdentifier ?? ""), let memberKind = member.kind, case .`init` = memberKind else {
+                continue
+            }
+            signatures.append(member.functionSignature(symbols: symbols))
+        }
+        if signatures.isEmpty, let inheritsFrom {
+            return constructorSignatures(inheritsFrom)
+        }
+        return signatures
     }
 
     private func isMutableStruct(_ symbol: Symbol) -> Bool {

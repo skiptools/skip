@@ -28,6 +28,7 @@ public struct Transpiler {
             for try await syntaxTree in group {
                 codebaseInfo.gather(from: syntaxTree)
             }
+            codebaseInfo.finalize()
         }
         try await withThrowingTaskGroup(of: Transpilation.self) { group in
             for sourceFile in sourceFiles {

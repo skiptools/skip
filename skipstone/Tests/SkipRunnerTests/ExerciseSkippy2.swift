@@ -20,8 +20,8 @@ struct S {
         return .init(p1: 1)
     }
 
-    init(p1: Int) {
-        self.p1 = p1
-        self.p2 = "foo"
-    }
+//    init(p1: Int) {
+//        self.p1 = p1
+//        self.p2 = "foo"
+//    }
 }

@@ -62,10 +62,10 @@ extension ClosureSignatureSyntax {
         let parameters: [Parameter<Void>]
         switch input {
         case .simpleInput(let syntax):
-            parameters = syntax.map { Parameter<Void>(externalName: $0.name.text) }
+            parameters = syntax.map { Parameter<Void>(externalLabel: $0.name.text) }
         case .input(let syntax):
             parameters = syntax.parameters(in: syntaxTree, messages: &messages).map {
-                return Parameter<Void>(externalName: $0.externalName, declaredType: $0.declaredType, isVariadic: $0.isVariadic)
+                return Parameter<Void>(externalLabel: $0.externalLabel, declaredType: $0.declaredType, isVariadic: $0.isVariadic)
             }
         case .none:
             parameters = []
@@ -101,7 +101,7 @@ extension ParameterClauseSyntax {
             if let defaultArgument = parameterSyntax.defaultArgument {
                 defaultValue = ExpressionDecoder.decode(syntax: defaultArgument.value, in: syntaxTree)
             }
-            return Parameter<Expression>(externalName: parameterSyntax.firstName?.text ?? "", internalName: parameterSyntax.secondName?.text, declaredType: type, isVariadic: isVariadic, defaultValue: defaultValue)
+            return Parameter<Expression>(externalLabel: parameterSyntax.firstName?.text, internalLabel: parameterSyntax.secondName?.text, declaredType: type, isVariadic: isVariadic, defaultValue: defaultValue)
         }
     }
 }

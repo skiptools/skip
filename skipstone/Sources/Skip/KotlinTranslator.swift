@@ -49,7 +49,7 @@ public class KotlinTranslator {
         self.packageName = codebaseInfo.packageName
 
         let translatedSyntaxTree = translateSyntaxTree()
-        translatedSyntaxTree.statements.forEach { assignParent(nil, to: $0) }
+        translatedSyntaxTree.statements.forEach { $0.assignParentReferences() }
 
         let kotlinSyntaxTree = applyPlugins(to: translatedSyntaxTree, codebaseInfo: codebaseInfoContext)
         let messages = codebaseInfo.messages(for: syntaxTree.source.file) + kotlinSyntaxTree.messages
@@ -189,20 +189,15 @@ public class KotlinTranslator {
 //        return KotlinRawExpression(expression: rawExpression)
     }
 
-    private func assignParent(_ parent: KotlinSyntaxNode?, to node: KotlinSyntaxNode) {
-        node.parent = parent
-        node.children.forEach { assignParent(node, to: $0) }
-    }
-
     private func applyPlugins(to syntaxTree: KotlinSyntaxTree, codebaseInfo: KotlinCodebaseInfo.Context) -> KotlinSyntaxTree {
         let plugins: [KotlinTranslatorPlugin] = [KotlinConstructorPlugin(codebaseInfo: codebaseInfo), KotlinSwiftUIPlugin(codebaseInfo: codebaseInfo)]
         var appliedSyntaxTree = syntaxTree
-        plugins.forEach { appliedSyntaxTree = $0.apply(to: syntaxTree) }
+        plugins.forEach { appliedSyntaxTree = $0.apply(to: syntaxTree, translator: self) }
         return appliedSyntaxTree
     }
 }
 
 /// A plugin used to translate a specific facet of the original code.
 protocol KotlinTranslatorPlugin {
-    func apply(to syntaxTree: KotlinSyntaxTree) -> KotlinSyntaxTree
+    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> KotlinSyntaxTree
 }

@@ -124,18 +124,18 @@ struct Operator: Equatable {
 
 /// A function parameter.
 struct Parameter<E>: Hashable {
-    var externalName: String
-    var internalName: String {
-        return _internalName ?? externalName
+    var externalLabel: String?
+    var internalLabel: String {
+        return _internalLabel ?? externalLabel ?? ""
     }
-    private let _internalName: String?
+    private let _internalLabel: String?
     var declaredType: TypeSignature
     var isVariadic: Bool
     var defaultValue: E?
 
-    init(externalName: String, internalName: String? = nil, declaredType: TypeSignature = .none, isVariadic: Bool = false, defaultValue: E? = nil) {
-        self.externalName = externalName
-        _internalName = internalName
+    init(externalLabel: String?, internalLabel: String? = nil, declaredType: TypeSignature = .none, isVariadic: Bool = false, defaultValue: E? = nil) {
+        self.externalLabel = externalLabel == "" || externalLabel == "_" ? nil : externalLabel
+        _internalLabel = internalLabel
         self.declaredType = declaredType
         self.isVariadic = isVariadic
         self.defaultValue = defaultValue
@@ -143,8 +143,8 @@ struct Parameter<E>: Hashable {
 
     var prettyPrintTree: PrettyPrintTree {
         var children: [PrettyPrintTree] = []
-        if let internalName = _internalName {
-            children.append(PrettyPrintTree(root: internalName))
+        if let internalLabel = _internalLabel {
+            children.append(PrettyPrintTree(root: internalLabel))
         }
         if declaredType != .none {
             var typeDescription = declaredType.description
@@ -156,7 +156,7 @@ struct Parameter<E>: Hashable {
         if let defaultValue = defaultValue as? PrettyPrintable {
             children.append(defaultValue.prettyPrintTree)
         }
-        return PrettyPrintTree(root: externalName.isEmpty ? "_" : externalName, children: children)
+        return PrettyPrintTree(root: externalLabel ?? "_", children: children)
     }
 
     func qualifiedType(in node: SyntaxNode) -> Parameter<E> {
@@ -166,11 +166,11 @@ struct Parameter<E>: Hashable {
     }
 
     static func ==(lhs: Parameter<E>, rhs: Parameter<E>) -> Bool {
-        return lhs.externalName == rhs.externalName && lhs.declaredType == rhs.declaredType && lhs.isVariadic == rhs.isVariadic
+        return lhs.externalLabel == rhs.externalLabel && lhs.declaredType == rhs.declaredType && lhs.isVariadic == rhs.isVariadic
     }
 
     func hash(into hasher: inout Hasher) {
-        hasher.combine(externalName)
+        hasher.combine(externalLabel)
         hasher.combine(declaredType)
         hasher.combine(isVariadic)
     }

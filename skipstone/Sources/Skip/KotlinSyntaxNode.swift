@@ -32,11 +32,11 @@ class KotlinSyntaxNode: SourceDerived, OutputNode {
         return []
     }
 
-    /// Fixup parent references below this node after editing the node graph.
-    final func fixupParentReferences() {
+    /// Assign parent references below this node.
+    final func assignParentReferences() {
         for child in children {
             child.parent = self
-            child.fixupParentReferences()
+            child.assignParentReferences()
         }
     }
 

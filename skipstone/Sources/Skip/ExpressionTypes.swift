@@ -250,7 +250,10 @@ class Closure: Expression {
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
-        functionType = .function(parameters.map(\.declaredType), .none).or(expecting)
+        let parameterSignatures = parameters.map { parameter in
+            TypeSignature.Parameter(label: parameter.externalLabel, type: parameter.declaredType, isVariadic: parameter.isVariadic, hasDefaultValue: parameter.defaultValue != nil )
+        }
+        functionType = .function(parameterSignatures, .none).or(expecting)
         return context
     }
 
@@ -376,7 +379,7 @@ class FunctionCall: Expression {
             let function = candidateFunctions.first { $0.returnType == expecting } ?? candidateFunctions[0]
             // Re-infer arguments now that we know the parameter types
             for (index, argument) in arguments.enumerated() {
-                argument.value.inferTypes(context: context, expecting: function.parameterTypes[index])
+                argument.value.inferTypes(context: context, expecting: function.parameters[index].type)
             }
             returnType = function.returnType.or(expecting)
         } else {
@@ -654,7 +657,7 @@ class Subscript: Expression {
             let function = candidateFunctions.first { $0.returnType == expecting } ?? candidateFunctions[0]
             // Re-infer arguments now that we know the parameter types
             for (index, argument) in arguments.enumerated() {
-                argument.value.inferTypes(context: context, expecting: function.parameterTypes[index])
+                argument.value.inferTypes(context: context, expecting: function.parameters[index].type)
             }
             returnType = function.returnType.or(expecting)
         } else {

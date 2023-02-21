@@ -20,8 +20,8 @@ extension TypeSignature {
             return "Double"
         case .float:
             return "Float"
-        case .function(let paramTypes, let returnType):
-            return "(\(paramTypes.map { $0.kotlin }.joined(separator: ", "))) -> \(returnType.kotlin)"
+        case .function(let parameters, let returnType):
+            return "(\(parameters.map { $0.kotlin }.joined(separator: ", "))) -> \(returnType.kotlin)"
         case .int:
             return "Int"
         case .int8:
@@ -100,8 +100,8 @@ extension TypeSignature {
             break
         case .float:
             break
-        case .function(let parameterTypes, let returnType):
-            parameterTypes.forEach { $0.appendKotlinMessages(to: node) }
+        case .function(let parameters, let returnType):
+            parameters.forEach { $0.type.appendKotlinMessages(to: node) }
             returnType.appendKotlinMessages(to: node)
         case .int:
             break
@@ -220,5 +220,12 @@ extension TypeSignature {
         case .void:
             return false
         }
+    }
+}
+
+extension TypeSignature.Parameter {
+    /// Kotlin description of this parameter.
+    var kotlin: String {
+        return type.kotlin
     }
 }

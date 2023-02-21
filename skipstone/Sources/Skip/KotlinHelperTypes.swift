@@ -134,6 +134,6 @@ extension Parameter where E: Expression {
         if let defaultValue {
             kdefaultValue = translator.translateExpression(defaultValue)
         }
-        return Parameter<KotlinExpression>(externalName: externalName, internalName: internalName, declaredType: declaredType, isVariadic: isVariadic, defaultValue: kdefaultValue)
+        return Parameter<KotlinExpression>(externalLabel: externalLabel, internalLabel: internalLabel, declaredType: declaredType, isVariadic: isVariadic, defaultValue: kdefaultValue)
     }
 }

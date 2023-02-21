@@ -17,6 +17,10 @@ extension Message {
         return Message(severity: .error, message: "Kotlin does not support composed types. Consider creating a single type that conforms to these types", sourceDerived: sourceDerived)
     }
 
+    static func kotlinConstructorDelegateFirstStatement(_ sourceDerived: SourceDerived) -> Message {
+        return Message(severity: .error, message: "Kotlin requires that a call to another constructor is the first statement in the code block", sourceDerived: sourceDerived)
+    }
+
     static func kotlinConstructorNullReturn(_ sourceDerived: SourceDerived) -> Message {
         return Message(severity: .error, message: "Kotlin does not support constructors that return nil. Consider creating a factory function", sourceDerived: sourceDerived)
     }
@@ -28,6 +32,10 @@ extension Message {
 
     static func kotlinExtensionAddProtocolsToOutsideType(_ sourceDerived: SourceDerived) -> Message {
         return Message(severity: .error, message: "Cannot use an extension to add additional protocols to a Kotlin type defined outside of this module", sourceDerived: sourceDerived)
+    }
+
+    static func kotlinExtensionAddConstructorsToOutsideType(_ sourceDerived: SourceDerived) -> Message {
+        return Message(severity: .error, message: "Cannot use an extension to add additional constructors to a Kotlin type defined outside of this module", sourceDerived: sourceDerived)
     }
 
     static func kotlinExtensionUnsupportedMember(_ sourceDerived: SourceDerived) -> Message {

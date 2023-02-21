@@ -179,6 +179,7 @@ class KotlinFunctionCall: KotlinExpression {
     var function: KotlinExpression
     var arguments: [LabeledValue<KotlinExpression>] = []
     var mayBeSharedMutableValueType = false
+    var useTrailingClosureFormatting = true
 
     static func translate(expression: FunctionCall, translator: KotlinTranslator) -> KotlinFunctionCall {
         let kfunction = translator.translateExpression(expression.function)
@@ -212,7 +213,7 @@ class KotlinFunctionCall: KotlinExpression {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
-        let hasTrailingClosure = arguments.last?.value.type == .closure
+        let hasTrailingClosure = useTrailingClosureFormatting && arguments.last?.value.type == .closure
         let lastParenthesizedIndex = hasTrailingClosure ? arguments.count - 2 : arguments.count - 1
         output.append(function, indentation: indentation)
         if !hasTrailingClosure || arguments.count > 1 {
@@ -295,6 +296,29 @@ class KotlinMemberAccess: KotlinExpression {
         super.init(type: .memberAccess, expression: expression)
     }
 
+    enum BaseType {
+        case unknown
+        case `this`
+        case `super`
+        case type(TypeSignature)
+    }
+
+    var baseType: BaseType {
+        if base == nil {
+            return inferredType == .none ? .unknown : .type(inferredType)
+        } else if let identifier = base as? KotlinIdentifier {
+            if identifier.name == "self" {
+                return .this
+            } else if identifier.name == "super" {
+                return .super
+            } else {
+                return .type(.named(identifier.name, []))
+            }
+        } else {
+            return .unknown
+        }
+    }
+
     override func mayBeSharedMutableValueExpression(orType: Bool) -> Bool {
         return mayBeSharedMutableValue
     }
@@ -310,14 +334,23 @@ class KotlinMemberAccess: KotlinExpression {
             } else {
                 output.append(base, indentation: indentation)
             }
-            if useMultlineFormatting {
-                output.append("\n").append(indentation.inc())
+            if member != "init" {
+                if useMultlineFormatting {
+                    output.append("\n").append(indentation.inc())
+                }
+                output.append(".").append(member)
             }
-            output.append(".")
         } else if inferredType != .none {
-            output.append(inferredType).append(".")
+            output.append(inferredType)
+            if member != "init" {
+                if useMultlineFormatting {
+                    output.append("\n").append(indentation.inc())
+                }
+                output.append(".").append(member)
+            }
+        } else {
+            output.append(member)
         }
-        output.append(member)
     }
 }
 

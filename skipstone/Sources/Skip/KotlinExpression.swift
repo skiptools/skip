@@ -42,6 +42,11 @@ class KotlinExpression: KotlinSyntaxNode {
 class KotlinRawExpression: KotlinExpression {
     let sourceCode: String
 
+    init(sourceCode: String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        self.sourceCode = sourceCode
+        super.init(type: .raw, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
     init(expression: RawExpression) {
         self.sourceCode = expression.sourceCode
         super.init(type: .raw, expression: expression)

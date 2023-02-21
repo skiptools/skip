@@ -66,7 +66,7 @@ struct TypeInferenceContext {
         // Next check function parameters
         for functionDeclaration in functionPath.reversed() {
             for parameter in functionDeclaration.parameters {
-                if parameter.internalName == name {
+                if parameter.internalLabel == name {
                     return parameter.declaredType
                 }
             }

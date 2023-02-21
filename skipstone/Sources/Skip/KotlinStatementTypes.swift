@@ -188,6 +188,10 @@ struct KotlinExtensionDeclaration {
                 kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionUnsupportedMember(member)))
                 continue
             }
+            guard member.type != .constructorDeclaration else {
+                kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionAddConstructorsToOutsideType(member)))
+                continue
+            }
             memberDeclaration.extends = statement.extends
             kotlinStatements.append(member)
         }
@@ -203,7 +207,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var isOpen = false
     var modifiers = Modifiers()
     var body: CodeBlock<KotlinStatement>?
-    var delegatingConstructorCall: String?
+    var delegatingConstructorCall: KotlinExpression?
     var isConstructor: Bool {
         return name == "constructor"
     }
@@ -257,7 +261,14 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
 
     override var children: [KotlinSyntaxNode] {
-        return parameters.compactMap { $0.defaultValue } + (body?.statements ?? [])
+        var children: [KotlinSyntaxNode] = parameters.compactMap { $0.defaultValue }
+        if let delegatingConstructorCall {
+            children.append(delegatingConstructorCall)
+        }
+        if let body {
+            children += body.statements
+        }
+        return children
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
@@ -284,8 +295,8 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 if parameter.isVariadic {
                     output.append("varargs ")
                 }
-                let name = parameter.externalName.isEmpty ? parameter.internalName : parameter.externalName
-                output.append(name)
+                let label = parameter.externalLabel ?? parameter.internalLabel
+                output.append(label)
                 output.append(": ")
                 output.append(parameter.declaredType.or(.any).kotlin)
                 if let defaultValue = parameter.defaultValue {
@@ -297,18 +308,22 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             }
             output.append(")")
             if !isConstructor {
-                output.append(": \(returnType.or(.void).kotlin)")
+                output.append(": ").append(returnType.or(.void).kotlin)
+            } else if let delegatingConstructorCall {
+                output.append(": ").append(delegatingConstructorCall, indentation: indentation)
             }
         }
         if let body {
             output.append(" {\n")
-            let bodyIndentation = indentation.inc()
-            for parameter in parameters {
-                if parameter.internalName != parameter.externalName {
-                    output.append(bodyIndentation).append("val \(parameter.internalName) = \(parameter.externalName)\n")
+            if !body.statements.isEmpty {
+                let bodyIndentation = indentation.inc()
+                for parameter in parameters {
+                    if let externalLabel = parameter.externalLabel, parameter.internalLabel != parameter.externalLabel {
+                        output.append(bodyIndentation).append("val \(parameter.internalLabel) = \(externalLabel)\n")
+                    }
                 }
+                output.append(body.statements, indentation: bodyIndentation)
             }
-            output.append(body.statements, indentation: bodyIndentation)
             output.append(indentation).append("}\n")
         } else {
             output.append("\n")

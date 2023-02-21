@@ -8,7 +8,7 @@ class KotlinSwiftUIPlugin: KotlinTranslatorPlugin {
         self.codebaseInfo = codebaseInfo
     }
 
-    func apply(to syntaxTree: KotlinSyntaxTree) -> KotlinSyntaxTree {
+    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> KotlinSyntaxTree {
         // Does this file need translation?
         var needsTranslation = false
         for importDeclaration in syntaxTree.statements.compactMap({ $0 as? KotlinImportDeclaration }) {
@@ -52,7 +52,7 @@ class KotlinSwiftUIPlugin: KotlinTranslatorPlugin {
         view.members[memberIndex] = bodyMethod
 
         bodyMethod.parent = view
-        bodyMethod.fixupParentReferences()
+        bodyMethod.assignParentReferences()
     }
 
     private func translateFunctionCall(_ functionCall: KotlinFunctionCall) {
@@ -83,7 +83,7 @@ class KotlinSwiftUIPlugin: KotlinTranslatorPlugin {
         arrayStatement.expression = arrayLiteral
 
         arrayStatement.parent = codeBlock.statements.first?.parent
-        arrayStatement.fixupParentReferences()
+        arrayStatement.assignParentReferences()
         return CodeBlock(statements: [arrayStatement])
     }
 

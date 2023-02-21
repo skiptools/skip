@@ -170,9 +170,9 @@ public class Symbols {
         /// Return the signatures of the possible subscripts being called with the given arguments.
         func subscriptSignature(in type: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
             if case .array(let elementType) = type, arguments.count == 1 {
-                return [.function([.int], elementType)]
+                return [.function([TypeSignature.Parameter(type: .int)], elementType)]
             } else if case .dictionary(let keyType, let valueType) = type, arguments.count == 1 {
-                return [.function([keyType], valueType)]
+                return [.function([TypeSignature.Parameter(type: keyType)], valueType)]
             }
 
             let typeNames = candidateTypeNames(for: type)
@@ -256,19 +256,22 @@ public class Symbols {
         }
 
         private func matchFunction(_ symbol: Symbol, arguments: [LabeledValue<TypeSignature>]) -> (symbol: Symbol, signature: TypeSignature)? {
-            let (parameters, returnType) = symbol.functionSignature(symbols: symbols)
+            let typeSignature = symbol.functionSignature(symbols: symbols)
+            guard case .function(let parameters, let returnType) = typeSignature else {
+                return nil
+            }
             guard parameters.count >= arguments.count else {
                 return nil
             }
 
             // Match each argument to a parameter
-            var matchingParameterTypes: [TypeSignature] = []
+            var matchingParameters: [TypeSignature.Parameter] = []
             var parameterIndex = 0
             for argument in arguments {
                 guard let matchingIndex = matchArgument(argument, to: parameters, startIndex: parameterIndex) else {
                     return nil
                 }
-                matchingParameterTypes.append(parameters[matchingIndex].type.or(argument.value))
+                matchingParameters.append(parameters[matchingIndex].or(argument.value))
                 parameterIndex = matchingIndex + 1
             }
             // Make sure there are no more required parameters
@@ -277,7 +280,7 @@ public class Symbols {
                     return nil
                 }
             }
-            return (symbol, .function(matchingParameterTypes, returnType))
+            return (symbol, .function(matchingParameters, returnType))
         }
 
         private func matchFunction(_ signature: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> TypeSignature {
@@ -287,7 +290,7 @@ public class Symbols {
             return signature
         }
 
-        private func matchArgument(_ argument: LabeledValue<TypeSignature>, to parameters: [Symbol.Parameter], startIndex: Int) -> Int? {
+        private func matchArgument(_ argument: LabeledValue<TypeSignature>, to parameters: [TypeSignature.Parameter], startIndex: Int) -> Int? {
             for (index, parameter) in parameters[startIndex...].enumerated() {
                 if let label = argument.label {
                     // If there is a label, then it either has to match or we have to be able to skip this parameter
@@ -298,7 +301,7 @@ public class Symbols {
                     }
                 } else {
                     // If there is no label, then either this parameter has to have no label or it has to be a trailing closure
-                    if parameter.label == "_" && parameter.type.isCompatible(with: argument.value) {
+                    if parameter.label == nil && parameter.type.isCompatible(with: argument.value) {
                         return startIndex + index
                     } else if case .function = parameter.type, parameter.type.isCompatible(with: argument.value) {
                         return startIndex + index
@@ -463,8 +466,7 @@ struct Symbol {
         case .method:
             fallthrough
         case .func:
-            let (pts, rt) = functionSignature(symbols: symbols)
-            return .function(pts.map { $0.type }, rt)
+            return functionSignature(symbols: symbols)
         case .property:
             fallthrough
         case .var:
@@ -506,9 +508,9 @@ struct Symbol {
         return typeSignature(for: string, specialFragments: specialFragments, symbols: symbols)
     }
 
-    func functionSignature(symbols: Symbols) -> ([Parameter], TypeSignature) {
+    func functionSignature(symbols: Symbols) -> TypeSignature {
         guard let typeIndex = declarationFragments.declarationFragments.firstIndex(where: { $0.spelling.hasPrefix("(") }) else {
-            return ([], .none)
+            return .function([], .none)
         }
         let (string, specialFragments) = processFragments(Array(declarationFragments.declarationFragments[typeIndex...]))
         return functionSignature(for: string, specialFragments: specialFragments, symbols: symbols)
@@ -530,11 +532,11 @@ struct Symbol {
         return (string, specialFragments)
     }
 
-    private func functionSignature(for string: String, specialFragments: [Int: SymbolGraph.Symbol.DeclarationFragments.Fragment], symbols: Symbols) -> ([Parameter], TypeSignature) {
+    private func functionSignature(for string: String, specialFragments: [Int: SymbolGraph.Symbol.DeclarationFragments.Fragment], symbols: Symbols) -> TypeSignature {
         let s = Array(string)
         var i = 0
-        var parameters: [Parameter] = []
-        var parameter: Parameter? = nil
+        var parameters: [TypeSignature.Parameter] = []
+        var parameter: TypeSignature.Parameter? = nil
         var returnType: TypeSignature = .void
         var skippingDefaultValue = false
         var defaultValueParenthesesDepth = 0
@@ -549,7 +551,7 @@ struct Symbol {
                     }
                     skippingDefaultValue = false
                     // Each parameter starts with an externalParameter fragment for its label
-                    parameter = Parameter(label: fragment.spelling, hasDefaultValue: false, type: .none)
+                    parameter = TypeSignature.Parameter(label: fragment.spelling == "_" ? nil : fragment.spelling, type: .none, hasDefaultValue: false)
                     fallthrough
                 case .internalParameter:
                     // Skip over the fragment and check for a declared type
@@ -589,6 +591,13 @@ struct Symbol {
                 }
                 parameter?.hasDefaultValue = true
                 skippingDefaultValue = true
+            case ".":
+                if inString || skippingDefaultValue {
+                    break
+                }
+                if i + 2 < s.count && s[i + 1] == "." && s[i + 2] == "." {
+                    parameter?.isVariadic = true
+                }
             case "(":
                 if inString {
                     break
@@ -621,7 +630,7 @@ struct Symbol {
             }
             i += 1
         }
-        return (parameters, returnType)
+        return .function(parameters, returnType)
     }
 
     private func typeSignature(for string: String, specialFragments: [Int: SymbolGraph.Symbol.DeclarationFragments.Fragment], symbols: Symbols) -> TypeSignature {
@@ -741,7 +750,7 @@ struct Symbol {
             }
         } else if inParentheses {
             if let returnType {
-                type = .function(types, returnType)
+                type = .function(types.map { TypeSignature.Parameter(type: $0) }, returnType)
                 if isOptional {
                     type = .optional(type!)
                 }
@@ -778,12 +787,6 @@ struct Symbol {
         let targetIdentifier: String?
         let targetSwiftType: String?
         let isInverse: Bool
-    }
-
-    struct Parameter {
-        var label: String
-        var hasDefaultValue: Bool
-        var type: TypeSignature
     }
 }
 

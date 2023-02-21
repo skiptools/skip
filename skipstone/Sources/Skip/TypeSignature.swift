@@ -11,7 +11,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
     case dictionary(TypeSignature, TypeSignature)
     case double
     case float
-    case function([TypeSignature], TypeSignature)
+    case function([Parameter], TypeSignature)
     case int
     case int8
     case int16
@@ -44,10 +44,10 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
     }
 
     /// The parameter types of this function.
-    var parameterTypes: [TypeSignature] {
+    var parameters: [Parameter] {
         switch self {
-        case .function(let parameterTypes, _):
-            return parameterTypes
+        case .function(let parameters, _):
+            return parameters
         default:
             return []
         }
@@ -76,16 +76,16 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
                 let resolvedValueType = valueType.or(valueType2)
                 return .dictionary(resolvedKeyType, resolvedValueType)
             }
-        case .function(let parameterTypes, let returnType):
-            if case .function(let parameterTypes2, let returnType2) = typeSignature {
-                // We may use an empty parameter types array to represent .none
-                var resolvedParameterTypes: [TypeSignature] = parameterTypes
-                if parameterTypes.isEmpty {
-                    resolvedParameterTypes = parameterTypes2
-                } else if parameterTypes.count == parameterTypes2.count {
-                    resolvedParameterTypes = zip(parameterTypes, parameterTypes2).map { $0.0.or($0.1) }
+        case .function(let parameters, let returnType):
+            if case .function(let parameters2, let returnType2) = typeSignature {
+                // We may use an empty parameters array to represent .none
+                var resolvedParameters: [Parameter] = parameters
+                if parameters.isEmpty {
+                    resolvedParameters = parameters2
+                } else if parameters.count == parameters2.count {
+                    resolvedParameters = zip(parameters, parameters2).map { $0.0.or($0.1.type) }
                 }
-                return .function(resolvedParameterTypes, returnType.or(returnType2))
+                return .function(resolvedParameters, returnType.or(returnType2))
             }
         case .none:
             return typeSignature
@@ -332,12 +332,19 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
             guard let functionType = syntax.as(FunctionTypeSyntax.self) else {
                 return .none
             }
-            let argumentTypes = functionType.arguments.map { self.for(syntax: $0.type) }
+            var parameters: [Parameter] = []
+            for argumentSyntax in functionType.arguments {
+                let label = argumentSyntax.name?.text
+                let type = self.for(syntax: argumentSyntax.type)
+                let isVariadic = argumentSyntax.ellipsis != nil
+                let hasDefaultValue = argumentSyntax.initializer != nil
+                parameters.append(Parameter(label: label, type: type, isVariadic: isVariadic, hasDefaultValue: hasDefaultValue))
+            }
             let returnType = self.for(syntax: functionType.returnType)
-            guard !argumentTypes.contains(.none) && returnType != .none else {
+            guard !parameters.contains(where: { $0.type == .none }) && returnType != .none else {
                 return .none
             }
-            return .function(argumentTypes, returnType)
+            return .function(parameters, returnType)
         case .memberTypeIdentifier:
             guard let memberType = syntax.as(MemberTypeIdentifierSyntax.self) else {
                 return .none
@@ -483,8 +490,9 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
             return self
         case .float:
             return self
-        case .function(let parameterTypes, let returnType):
-            return .function(parameterTypes.map { $0.qualified(in: node) }, returnType.qualified(in: node))
+        case .function(let parameters, let returnType):
+            let qualifiedParameters = parameters.map { Parameter(label: $0.label, type: $0.type.qualified(in: node), isVariadic: $0.isVariadic, hasDefaultValue: $0.hasDefaultValue) }
+            return .function(qualifiedParameters, returnType.qualified(in: node))
         case .int:
             return self
         case .int8:
@@ -615,6 +623,32 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
             }
         case .void:
             return "Void"
+        }
+    }
+
+    /// A parameter in a function signature.
+    struct Parameter: CustomStringConvertible, Hashable {
+        var label: String?
+        var type: TypeSignature
+        var isVariadic = false
+        var hasDefaultValue = false
+
+        func or(_ typeSignature: TypeSignature) -> Parameter {
+            var parameter = self
+            parameter.type = parameter.type.or(typeSignature)
+            return parameter
+        }
+
+        var description: String {
+            var description = ""
+            if let label {
+                description += "\(label): "
+            }
+            description += type.description
+            if isVariadic {
+                description += "..."
+            }
+            return description
         }
     }
 }
