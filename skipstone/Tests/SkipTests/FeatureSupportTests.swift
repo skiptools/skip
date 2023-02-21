@@ -11,7 +11,7 @@ final class FeatureSupportTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal data class Foo {
+        internal class Foo {
             public fun doSomething(a: String = "abc"): String {
                 return a
             }
@@ -31,7 +31,7 @@ final class FeatureSupportTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal data class Foo {
+        internal class Foo {
             public fun doSomething(): String? {
                 return null
             }
@@ -51,7 +51,7 @@ final class FeatureSupportTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal data class Foo {
+        internal class Foo {
             public fun doSomething(): String? {
                 return null
             }

@@ -29,7 +29,7 @@ final class TriviaTests: XCTestCase {
 
         // Class comment
         // Spanning two lines
-        internal data class S {
+        internal class S {
             internal var s: String // EOL comment
 
             internal var i: Int
@@ -37,12 +37,17 @@ final class TriviaTests: XCTestCase {
                 // Copy
                 var copy = this.valref()
                 // Double
-                copy.s = s + s
+                copy.s = (s + s).valref()
                 return copy.valref()
             }
 
             // Func comment
             internal fun f2(): Unit {
+            }
+
+            internal constructor(s: String, i: Int) {
+                this.s = s
+                this.i = i
             }
 
             companion object {

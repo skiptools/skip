@@ -7,7 +7,7 @@ final class TypeDeclarationTests: XCTestCase {
         struct Foo {
         }
         """, kotlin: """
-        internal data class Foo {
+        internal class Foo {
 
             companion object {
             }
