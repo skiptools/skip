@@ -2,7 +2,7 @@
 struct TypeInferenceContext {
     private let symbols: Symbols.Context?
     private var typePath: [TypeDeclaration] = []
-    private var functionPath: [FunctionDeclaration] = []
+    private var parametersPath: [[String: TypeSignature]] = [] // Each entry is map of available parameters
     private var localIdentifierTypes: [String: TypeSignature] = [:]
 
     /// Create a top-level context for type inference.
@@ -38,8 +38,22 @@ struct TypeInferenceContext {
     /// Return a context for evaluating the code of the given function.
     func pushing(_ functionDeclaration: FunctionDeclaration) -> TypeInferenceContext {
         var context = self
-        context.functionPath.append(functionDeclaration)
+        let parameterDictionary = functionDeclaration.parameters.reduce(into: [String: TypeSignature]()) { result, parameter in
+            result[parameter.internalLabel] = parameter.declaredType
+        }
+        context.parametersPath.append(parameterDictionary)
         context.expectedReturn = functionDeclaration.returnType
+        return context
+    }
+
+    /// Return a context for evaluating the code of the given closure.
+    func pushing(_ closure: Closure) -> TypeInferenceContext {
+        var context = self
+        let parameterDictionary = closure.parameters.reduce(into: [String: TypeSignature]()) { result, parameter in
+            result[parameter.internalLabel] = parameter.declaredType
+        }
+        context.parametersPath.append(parameterDictionary)
+        context.expectedReturn = closure.returnType
         return context
     }
 
@@ -63,12 +77,10 @@ struct TypeInferenceContext {
         if let identifierType = localIdentifierTypes[name] {
             return identifierType
         }
-        // Next check function parameters
-        for functionDeclaration in functionPath.reversed() {
-            for parameter in functionDeclaration.parameters {
-                if parameter.internalLabel == name {
-                    return parameter.declaredType
-                }
+        // Next check function / closure parameters
+        for parameterDictionary in parametersPath.reversed() {
+            if let parameterType = parameterDictionary[name] {
+                return parameterType
             }
         }
         if name == "self" || name == "super" {

@@ -137,19 +137,72 @@ class KotlinBooleanLiteral: KotlinExpression {
 class KotlinClosure: KotlinExpression {
     var returnType: TypeSignature = .none
     var parameters: [Parameter<Void>] = []
+    var implicitParameterLabels: [String] = []
+    var isAnonymousFunction = false
     var body: CodeBlock<KotlinStatement>
     var returnLabel: String? = nil
 
     static func translate(expression: Closure, translator: KotlinTranslator) -> KotlinClosure {
-        let (kstatements, didLabel) = expression.body.statements.flatMap { translator.translateStatement($0) }.withExpectedReturn(.labelIfPresent("_r_"))
+        // If there is an explicit return type we'll use an anonymous function rather than a closure,
+        // as Kotlin closures cannot declare a return type
+        let isAnonymousFunction = expression.returnType != .none
+        var kstatements = expression.body.statements.flatMap { translator.translateStatement($0) }
+        var implicitParameterLabels: [String] = []
+        var returnLabel: String? = nil
+        if isAnonymousFunction {
+            if expression.returnType != .void {
+                // A function that returns a value requires an explicit return
+                (kstatements, _) = kstatements.withExpectedReturn(.yes)
+            }
+        } else {
+            // Closures require a label for any explicit return, or it will return from the other scope
+            let (labeledStatements, didLabel) = kstatements.withExpectedReturn(.labelIfPresent("ll"))
+            if didLabel {
+                kstatements = labeledStatements
+                returnLabel = "ll"
+            }
+            if expression.parameters.isEmpty {
+                implicitParameterLabels = handleImplicitParameters(in: kstatements, inferredType: expression.inferredType)
+            }
+        }
         let body = CodeBlock(statements: kstatements)
         let kexpression = KotlinClosure(expression: expression, body: body)
         kexpression.returnType = expression.returnType
         kexpression.parameters = expression.parameters
-        if didLabel {
-            kexpression.returnLabel = "_r_"
-        }
+        kexpression.isAnonymousFunction = isAnonymousFunction
+        kexpression.implicitParameterLabels = implicitParameterLabels
+        kexpression.returnLabel = returnLabel
         return kexpression
+    }
+
+    private static func handleImplicitParameters(in kstatements: [KotlinStatement], inferredType: TypeSignature) -> [String] {
+        // Find the highest $n identifier used in the closure
+        var highestParameter = -1
+        kstatements.forEach {
+            $0.visit { node in
+                if node is KotlinClosure {
+                    return .skip
+                } else if let identifier = node as? KotlinIdentifier {
+                    if let index = identifier.name.implicitClosureParameterIndex {
+                        highestParameter = max(highestParameter, index)
+                    }
+                    return .skip
+                } else {
+                    return .recurse(nil)
+                }
+            }
+        }
+
+        // The closure might have more parameters than were used
+        if case .function(let parameters, _) = inferredType {
+            highestParameter = max(highestParameter, parameters.count - 1)
+        }
+
+        // $0 can use the special 'it' built-in, so no need to return it
+        guard highestParameter > 0 else {
+            return []
+        }
+        return (0...highestParameter).map { KotlinIdentifier.translateName("$\($0)") }
     }
 
     private init(expression: Closure, body: CodeBlock<KotlinStatement>) {
@@ -162,11 +215,42 @@ class KotlinClosure: KotlinExpression {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
-        // TODO: Parameters, $0, $1 etc substitutions
-        if let returnLabel {
-            output.append(returnLabel).append("@")
+        if isAnonymousFunction {
+            output.append("fun(")
+            for (index, parameter) in parameters.enumerated() {
+                output.append(parameter.internalLabel).append(": ").append(parameter.declaredType)
+                if index < parameters.count - 1 {
+                    output.append(", ")
+                }
+            }
+            output.append("): ").append(returnType).append(" {\n")
+        } else {
+            if let returnLabel {
+                output.append(returnLabel).append("@")
+            }
+            output.append("{")
+            if parameters.isEmpty && implicitParameterLabels.isEmpty {
+                output.append("\n")
+            } else {
+                // We never have both explicit and implicit parameters
+                for (index, parameter) in parameters.enumerated() {
+                    if index == 0 {
+                        output.append(" ")
+                    }
+                    output.append(parameter.internalLabel)
+                    if parameter.declaredType != .none {
+                        output.append(": ").append(parameter.declaredType)
+                    }
+                    if index < parameters.count - 1 {
+                        output.append(", ")
+                    }
+                }
+                if !implicitParameterLabels.isEmpty {
+                    output.append(" ").append(implicitParameterLabels.joined(separator: ", "))
+                }
+                output.append(" ->\n")
+            }
         }
-        output.append("{\n")
         output.append(body.statements, indentation: indentation.inc())
         output.append(indentation).append("}")
     }
@@ -220,7 +304,7 @@ class KotlinFunctionCall: KotlinExpression {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
-        let hasTrailingClosure = useTrailingClosureFormatting && arguments.last?.value.type == .closure
+        let hasTrailingClosure = useTrailingClosureFormatting && arguments.last?.value.type == .closure && (arguments.last?.value as? KotlinClosure)?.isAnonymousFunction == false
         let lastParenthesizedIndex = hasTrailingClosure ? arguments.count - 2 : arguments.count - 1
         output.append(function, indentation: indentation)
         if !hasTrailingClosure || arguments.count > 1 {
@@ -256,6 +340,13 @@ class KotlinIdentifier: KotlinExpression {
         return kexpression
     }
 
+    static func translateName(_ name: String) -> String {
+        guard let implicitParameterIndex = name.implicitClosureParameterIndex else {
+            return name
+        }
+        return implicitParameterIndex == 0 ? "it" : "it\(implicitParameterIndex)"
+    }
+
     init(name: String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
         self.name = name
         super.init(type: .identifier, sourceFile: sourceFile, sourceRange: sourceRange)
@@ -274,7 +365,7 @@ class KotlinIdentifier: KotlinExpression {
         if name == "self" {
             output.append("this")
         } else {
-            output.append(name)
+            output.append(Self.translateName(name))
         }
     }
 }
@@ -512,7 +603,7 @@ class KotlinTry: KotlinExpression {
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
         if isOptional {
-            output.append("try { ").append(trying, indentation: indentation).append(" } catch (_e_: Exception) { null }")
+            output.append("try { ").append(trying, indentation: indentation).append(" } catch (_: Exception) { null }")
         } else {
             output.append(trying, indentation: indentation)
         }

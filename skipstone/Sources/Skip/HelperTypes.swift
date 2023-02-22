@@ -126,7 +126,7 @@ struct Operator: Equatable {
 struct Parameter<E>: Hashable {
     var externalLabel: String?
     var internalLabel: String {
-        return _internalLabel ?? externalLabel ?? ""
+        return _internalLabel ?? externalLabel ?? "_"
     }
     private let _internalLabel: String?
     var declaredType: TypeSignature
@@ -317,5 +317,15 @@ struct Attribute {
     static func `for`(syntax: AttributeSyntax) -> Attribute? {
         let signature = TypeSignature.for(syntax: syntax.attributeName)
         return signature == .none ? nil : Attribute(signature: signature)
+    }
+}
+
+extension String {
+    /// If this is an implicit closure parameter - `$0`, `$1`, etc - return its index.
+    var implicitClosureParameterIndex: Int? {
+        if hasPrefix("$"), count > 1, let index = Int(String(self[index(after: startIndex)...])) {
+            return index
+        }
+        return nil
     }
 }

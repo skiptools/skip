@@ -257,7 +257,11 @@ class Closure: Expression {
         let parameterSignatures = parameters.map { parameter in
             TypeSignature.Parameter(label: parameter.externalLabel, type: parameter.declaredType, isVariadic: parameter.isVariadic, hasDefaultValue: parameter.defaultValue != nil )
         }
-        functionType = .function(parameterSignatures, .none).or(expecting)
+        functionType = .function(parameterSignatures, returnType).or(expecting)
+
+        var bodyContext = context.pushing(self)
+        body.statements.forEach { bodyContext = $0.inferTypes(context: bodyContext, expecting: .none) }
+
         return context
     }
 

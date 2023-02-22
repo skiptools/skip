@@ -107,7 +107,7 @@ class KotlinConstructorPlugin: KotlinTranslatorPlugin {
         let constructor = KotlinFunctionDeclaration(name: "constructor")
         var superCall = "super("
         constructor.parameters = parameters.enumerated().map { (index, parameter) in
-            let label = parameter.label ?? "_p\(index)_"
+            let label = parameter.label ?? "p\(index)"
             if index > 0 {
                 superCall += ", "
             }

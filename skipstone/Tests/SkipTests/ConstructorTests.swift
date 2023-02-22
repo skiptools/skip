@@ -166,10 +166,10 @@ final class ConstructorTests: XCTestCase {
 
         internal open class B: A {
 
-            internal constructor(_p0_: Int, s: String): super(_p0_, s) {
+            internal constructor(p0: Int, s: String): super(p0, s) {
             }
 
-            internal constructor(_p0_: Int): super(_p0_) {
+            internal constructor(p0: Int): super(p0) {
             }
 
             companion object {

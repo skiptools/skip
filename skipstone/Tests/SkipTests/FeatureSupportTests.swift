@@ -81,10 +81,12 @@ final class FeatureSupportTests: XCTestCase {
     }
 
     func testClosureNamedArg() async throws {
-        try await check(expectFailure: true, swift: """
+        try await check(swift: """
         [1,2,3].map({ x in x + x })
         """, kotlin: """
-        arrayOf(1, 2, 3).map({ x -> x + x })
+        arrayOf(1, 2, 3).map { x ->
+            x + x
+        }
         """)
     }
 
