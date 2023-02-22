@@ -297,7 +297,10 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             }
             output.append(")")
             if type != .constructorDeclaration {
-                output.append(": ").append(returnType.or(.void).kotlin)
+                let returnType = returnType.or(.void)
+                if returnType != .void {
+                    output.append(": ").append(returnType.kotlin)
+                }
             } else if let delegatingConstructorCall {
                 output.append(": ").append(delegatingConstructorCall, indentation: indentation)
             }

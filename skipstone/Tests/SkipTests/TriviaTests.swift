@@ -42,7 +42,7 @@ final class TriviaTests: XCTestCase {
             }
 
             // Func comment
-            internal fun f2(): Unit {
+            internal fun f2() {
             }
 
             internal constructor(s: String, i: Int) {
