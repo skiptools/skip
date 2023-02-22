@@ -308,14 +308,15 @@ class KotlinMemberAccess: KotlinExpression {
         super.init(type: .memberAccess, expression: expression)
     }
 
-    enum BaseType {
+    enum BaseKind {
         case unknown
         case `this`
         case `super`
+        case identifier(String)
         case type(TypeSignature)
     }
 
-    var baseType: BaseType {
+    var baseKind: BaseKind {
         if base == nil {
             return inferredType == .none ? .unknown : .type(inferredType)
         } else if let identifier = base as? KotlinIdentifier {
@@ -324,7 +325,7 @@ class KotlinMemberAccess: KotlinExpression {
             } else if identifier.name == "super" {
                 return .super
             } else {
-                return .type(.named(identifier.name, []))
+                return .identifier(identifier.name)
             }
         } else {
             return .unknown

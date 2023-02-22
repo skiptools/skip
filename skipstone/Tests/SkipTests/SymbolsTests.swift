@@ -25,6 +25,12 @@ final class SymbolsTests: XCTestCase {
         XCTAssertEqual(.string, context.identifierSignature(of: "s", in: .tuple(["i", "s"], [.int, .string])))
     }
 
+    func testMemberNestedType() async throws {
+        let context = try await symbols.context()
+        XCTAssertEqual(.int, context.identifierSignature(of: "n", in: .named("SymbolsTestsClass.NestedClass", [])))
+        XCTAssertEqual(.int, context.identifierSignature(of: "n", in: .member(.named("SymbolsTestsClass", []), .named("NestedClass", []))))
+    }
+
     func testSubscript() async throws {
         let context = try await symbols.context()
         XCTAssertEqual([.function([.init(type: .int)], .int)], context.subscriptSignature(in: .array(.int), arguments: [LabeledValue<TypeSignature>(label: nil, value: .int)]))
@@ -109,6 +115,10 @@ class SymbolsTestsClass: SymbolsTestsBaseClass {
 
     func trailingClosureF3(_ p1: [Int: String]? = [1: "1"], tc1: () -> [Int]) -> (SymbolsTestsEnum) -> Int {
         return { _ in 0 }
+    }
+
+    class NestedClass {
+        var n = 1
     }
 }
 

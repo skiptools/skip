@@ -28,7 +28,7 @@ class KotlinSwiftUIPlugin: KotlinTranslatorPlugin {
         return syntaxTree
     }
 
-    private func visit(_ node: KotlinSyntaxNode) -> KotlinVisitResult {
+    private func visit(_ node: KotlinSyntaxNode) -> VisitResult<KotlinSyntaxNode> {
         if let variableDeclaration = node as? KotlinVariableDeclaration {
             translateVariableDeclaration(variableDeclaration)
         } else if let functionCall = node as? KotlinFunctionCall {

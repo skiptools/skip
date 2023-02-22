@@ -194,9 +194,14 @@ extension TypeSignature {
             return true
         case .optional(let type):
             return type.kotlinMayBeSharedMutableValue(codebaseInfo: codebaseInfo)
-        case .member:
-            // TODO
-            return true
+        case .member(let base, let type):
+            guard case .named(let name, _) = type else {
+                return type.kotlinMayBeSharedMutableValue(codebaseInfo: codebaseInfo)
+            }
+            guard let codebaseInfo else {
+                return true
+            }
+            return codebaseInfo.mayBeMutableValueType(qualifiedName: "\(base).\(name)")
         case .metaType:
             return false
         case .set:

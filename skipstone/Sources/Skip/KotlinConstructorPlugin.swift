@@ -11,7 +11,7 @@ class KotlinConstructorPlugin: KotlinTranslatorPlugin {
         return syntaxTree
     }
 
-    private func visit(_ statement: KotlinStatement, translator: KotlinTranslator) -> KotlinVisitResult {
+    private func visit(_ statement: KotlinStatement, translator: KotlinTranslator) -> VisitResult<KotlinStatement> {
         switch statement.type {
         case .classDeclaration:
             let classDeclaration = statement as! KotlinClassDeclaration
@@ -168,7 +168,7 @@ class KotlinConstructorPlugin: KotlinTranslatorPlugin {
         guard memberAccess.member == "init" else {
             return nil
         }
-        switch memberAccess.baseType {
+        switch memberAccess.baseKind {
         case .this:
             return functionCall
         case .super:

@@ -31,6 +31,21 @@ class SyntaxNode: SourceDerived, PrettyPrintable {
         return .none
     }
 
+    /// Visit this node and its children depth first, performing the given action.
+    ///
+    /// - Parameters:
+    ///   - Parameter perform: The action to perform.
+    func visit(perform: (SyntaxNode) -> VisitResult<SyntaxNode>) {
+        if case .recurse(let onLeave) = perform(self) {
+            for child in children {
+                child.visit(perform: perform)
+            }
+            if let onLeave {
+                onLeave(self)
+            }
+        }
+    }
+
     weak var parent: SyntaxNode?
     var children: [SyntaxNode] {
         return []

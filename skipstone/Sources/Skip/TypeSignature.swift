@@ -48,6 +48,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
         switch self {
         case .function(let parameters, _):
             return parameters
+        case .member(_, let type):
+            return type.parameters
         default:
             return []
         }
@@ -58,6 +60,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
         switch self {
         case .function(_, let returnType):
             return returnType
+        case .member(_, let type):
+            return type.returnType
         default:
             return .none
         }
@@ -86,6 +90,12 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
                     resolvedParameters = zip(parameters, parameters2).map { $0.0.or($0.1.type) }
                 }
                 return .function(resolvedParameters, returnType.or(returnType2))
+            }
+        case .member(let base, let type):
+            if case .member(let base2, let type2) = typeSignature {
+                if base == base2 {
+                    return .member(base, type.or(type2))
+                }
             }
         case .none:
             return typeSignature
@@ -243,6 +253,10 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
         case .function:
             if case .function = type {
                 return true
+            }
+        case .member(let base, let type):
+            if case .member(let base2, let type2) = type {
+                return base == base2 && type.isCompatible(with: type2)
             }
         case .named(let name, _):
             if case .named(let name2, _) = type {
@@ -465,7 +479,13 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
         case "Void":
             return genericTypes.isEmpty ? .void : .named(name, genericTypes)
         default:
-            return .named(name, genericTypes)
+            if let lastSeparator = name.lastIndex(of: "."), lastSeparator != name.index(before: name.endIndex) {
+                let base = self.for(name: String(name[..<lastSeparator]), genericTypes: [])
+                let named: TypeSignature = .named(String(name[name.index(after: lastSeparator)...]), genericTypes)
+                return .member(base, named)
+            } else {
+                return .named(name, genericTypes)
+            }
         }
     }
 
@@ -504,11 +524,19 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
         case .int64:
             return self
         case .member(let baseType, let type):
-            return .member(baseType.qualified(in: node), type)
+            let base = baseType.qualified(in: node)
+            if case .named(let name, let generics) = type {
+                let generics = generics.map { $0.qualified(in: node) }
+                return .member(base, .named(name, generics))
+            } else {
+                return .member(base, type)
+            }
         case .metaType(let type):
             return .metaType(type.qualified(in: node))
         case .named(let name, let generics):
-            return .named(node.qualifyReferencedTypeName(name), generics.map { $0.qualified(in: node) })
+            let qualifiedName = node.qualifyReferencedTypeName(name)
+            let generics = generics.map { $0.qualified(in: node) }
+            return Self.for(name: qualifiedName, genericTypes: generics)
         case .none:
             return self
         case .optional(let type):
@@ -569,7 +597,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
         case .int64:
             return "Int64"
         case .member(let baseType, let type):
-            return "\(baseType.description).\(type)"
+            return "\(baseType.description).\(type.description)"
         case .metaType(let baseType):
             switch baseType {
             case .function:

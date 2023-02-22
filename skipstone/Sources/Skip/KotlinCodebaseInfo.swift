@@ -11,7 +11,7 @@ public class KotlinCodebaseInfo {
 
     /// Gather codebase-level information from the given syntax tree.
     func gather(from syntaxTree: SyntaxTree) {
-        syntaxTree.statements.forEach { gather(from: $0) }
+        syntaxTree.statements.forEach { $0.visitStatements(perform: self.visit) }
     }
 
     /// Finalize codebase info after gathering is complete.
@@ -27,7 +27,7 @@ public class KotlinCodebaseInfo {
     fileprivate var typeInfo: [String: [TypeInfo]] = [:]
     fileprivate var extensionInfo: [String: [ExtensionInfo]] = [:]
 
-    private func gather(from statement: Statement) {
+    private func visit(statement: Statement) -> VisitResult<Statement> {
         switch statement.type {
         case .classDeclaration:
             addTypeInfo(for: statement as! TypeDeclaration, mayBeMutableValueType: false)
@@ -40,6 +40,7 @@ public class KotlinCodebaseInfo {
             // check its symbols later
             let mayBeMutableValueType: Bool? = typeDeclaration.inherits.contains(.anyObject) ? false : typeDeclaration.inherits.isEmpty ? true : nil
             addTypeInfo(for: typeDeclaration, mayBeMutableValueType: mayBeMutableValueType)
+            return .skip
         case .structDeclaration:
             let typeDeclaration = statement as! TypeDeclaration
             let mayBeMutableValueType = typeDeclaration.members.contains { member in
@@ -61,8 +62,9 @@ public class KotlinCodebaseInfo {
             infos.append(ExtensionInfo(declaration: declaration, sourceFile: statement.sourceFile))
             extensionInfo[key] = infos
         default:
-            break
+            return .skip
         }
+        return .recurse(nil)
     }
 
     /// Create a context that can access the given imported modules.
@@ -284,7 +286,6 @@ extension Symbols.Context {
     }
 
     private func constructorSignatures(_ symbol: Symbol) -> [TypeSignature] {
-        //~~~
         var signatures: [TypeSignature] = []
         var inheritsFrom: Symbol? = nil
         for relationship in symbol.relationships {

@@ -16,7 +16,7 @@ class KotlinSyntaxNode: SourceDerived, OutputNode {
     ///
     /// - Parameters:
     ///   - Parameter perform: The action to perform.
-    func visit(perform: (KotlinSyntaxNode) -> KotlinVisitResult) {
+    func visit(perform: (KotlinSyntaxNode) -> VisitResult<KotlinSyntaxNode>) {
         if case .recurse(let onLeave) = perform(self) {
             for child in children {
                 child.visit(perform: perform)
@@ -61,11 +61,4 @@ class KotlinSyntaxNode: SourceDerived, OutputNode {
 
     func append(to output: OutputGenerator, indentation: Indentation) {
     }
-}
-
-enum KotlinVisitResult {
-    /// Skip the content of this node.
-    case skip
-    /// Recurse into the content of this node, optionally invoking the given block when leaving this node's content.
-    case recurse(((KotlinSyntaxNode) -> Void)?)
 }

@@ -18,6 +18,23 @@ class Statement: SyntaxNode {
         return nil
     }
 
+    /// Visit this statement and its children depth first, performing the given action.
+    ///
+    /// - Parameters:
+    ///   - Parameter perform: The action to perform.
+    func visitStatements(perform: (Statement) -> VisitResult<Statement>) {
+        if case .recurse(let onLeave) = perform(self) {
+            for child in children {
+                if let statement = child as? Statement {
+                    statement.visitStatements(perform: perform)
+                }
+            }
+            if let onLeave {
+                onLeave(self)
+            }
+        }
+    }
+
     final override var subtreeMessages: [Message] {
         let messages: [Message] = extras?.suppressMessages == true ? [] : messages
         return messages + children.flatMap { $0.subtreeMessages }

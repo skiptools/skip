@@ -82,7 +82,7 @@ struct TypeInferenceContext {
         }
 
         for typeDeclaration in typePath.reversed() {
-            let symbolType = symbols.identifierSignature(of: name, in: .named(typeDeclaration.qualifiedName, []))
+            let symbolType = symbols.identifierSignature(of: name, in: typeDeclaration.signature)
             if symbolType != .none {
                 return symbolType
             }
@@ -114,7 +114,7 @@ struct TypeInferenceContext {
 
         // Not a known member function. Check functions that can be invoked without a target type
         for typeDeclaration in typePath.reversed() {
-            let results = symbols.functionSignature(of: name, in: .named(typeDeclaration.qualifiedName, []), arguments: parameters)
+            let results = symbols.functionSignature(of: name, in: typeDeclaration.signature, arguments: parameters)
             if !results.isEmpty {
                 return results
             }

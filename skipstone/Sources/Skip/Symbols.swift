@@ -52,7 +52,28 @@ public class Symbols {
         ///
         /// - Warning: This function does not take symbol visibility into account. See `ranked`.
         func lookup(name: String) -> [Symbol] {
-            return symbols.symbolsByName[name, default: []]
+            let path = name.split(separator: ".").map { String($0) }
+            guard !path.isEmpty else {
+                return []
+            }
+            var candidates = symbols.symbolsByName[path[0], default: []]
+            for i in 1..<path.count {
+                guard !candidates.isEmpty else {
+                    return []
+                }
+                candidates = candidates.flatMap { symbol in
+                    return symbol.relationships.compactMap { relationship in
+                        guard relationship.kind == .memberOf && relationship.isInverse else {
+                            return nil
+                        }
+                        guard let targetSymbol = lookup(identifier: relationship.targetIdentifier ?? "") else {
+                            return nil
+                        }
+                        return targetSymbol.name == path[i] ? targetSymbol : nil
+                    }
+                }
+            }
+            return candidates
         }
 
         /// Score, sort, and filter the given symbols.
@@ -323,8 +344,10 @@ public class Symbols {
                 return ["Dictionary"]
             case .function:
                 return []
-            case .member:
-                return []
+            case .member(let base, let type):
+                let typeNames = candidateTypeNames(for: type)
+                let baseName = base.description
+                return typeNames.map { "\(baseName).\($0)" }
             case .named(let name, _):
                 return [name]
             case .none:
@@ -765,6 +788,8 @@ struct Symbol {
         } else if !types.isEmpty {
             if case .named(let name, _) = types[0] {
                 type = .named(name, genericTypes)
+            } else if case .member(let base, let lastType) = types[0], case .named(let name, _) = lastType {
+                type = .member(base, .named(name, genericTypes))
             } else {
                 type = types[0]
             }

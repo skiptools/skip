@@ -20,7 +20,7 @@ class KotlinStatement: KotlinSyntaxNode {
     ///
     /// - Parameters:
     ///   - Parameter perform: The action to perform.
-    func visitStatements(perform: (KotlinStatement) -> KotlinVisitResult) {
+    func visitStatements(perform: (KotlinStatement) -> VisitResult<KotlinStatement>) {
         if case .recurse(let onLeave) = perform(self) {
             for child in children {
                 if let statement = child as? KotlinStatement {
