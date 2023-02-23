@@ -6,11 +6,12 @@ enum ExpressionType: CaseIterable {
     case binaryOperator
     case booleanLiteral
     case closure
-    case nilLiteral
     case functionCall
     case identifier
     case memberAccess
+    case nilLiteral
     case numericLiteral
+    case optionalBinding
     case stringLiteral
     case `subscript`
     case `try`
@@ -29,16 +30,18 @@ enum ExpressionType: CaseIterable {
             return BooleanLiteral.self
         case .closure:
             return Closure.self
-        case .nilLiteral:
-            return NilLiteral.self
         case .functionCall:
             return FunctionCall.self
         case .identifier:
             return Identifier.self
         case .memberAccess:
             return MemberAccess.self
+        case .nilLiteral:
+            return NilLiteral.self
         case .numericLiteral:
             return NumericLiteral.self
+        case .optionalBinding:
+            return OptionalBinding.self
         case .stringLiteral:
             return StringLiteral.self
         case .subscript:
@@ -293,31 +296,6 @@ class Closure: Expression {
     }
 }
 
-/// `nil`
-class NilLiteral: Expression {
-    init(syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
-        super.init(type: .nilLiteral, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
-    }
-
-    override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) -> Expression? {
-        guard syntax.kind == .nilLiteralExpr, let _ = syntax.as(NilLiteralExprSyntax.self) else {
-            return nil
-        }
-        return NilLiteral(syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
-    }
-
-    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
-        resultType = resultType.or(expecting)
-        return context
-    }
-
-    private var resultType: TypeSignature = .optional(.none)
-
-    override var inferredType: TypeSignature {
-        return resultType
-    }
-}
-
 /// `function(...)`
 class FunctionCall: Expression {
     let function: Expression
@@ -508,6 +486,31 @@ class MemberAccess: Expression {
     }
 }
 
+/// `nil`
+class NilLiteral: Expression {
+    init(syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        super.init(type: .nilLiteral, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) -> Expression? {
+        guard syntax.kind == .nilLiteralExpr, let _ = syntax.as(NilLiteralExprSyntax.self) else {
+            return nil
+        }
+        return NilLiteral(syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        resultType = resultType.or(expecting)
+        return context
+    }
+
+    private var resultType: TypeSignature = .optional(.none)
+
+    override var inferredType: TypeSignature {
+        return resultType
+    }
+}
+
 /// `1, 1.0`
 class NumericLiteral: Expression {
     let literal: String
@@ -540,6 +543,92 @@ class NumericLiteral: Expression {
 
     override var prettyPrintAttributes: [PrettyPrintTree] {
         return [PrettyPrintTree(root: literal)]
+    }
+}
+
+/// `[if/guard] let x = optional`
+class OptionalBinding: Expression {
+    let name: String
+    private(set) var declaredType: TypeSignature
+    let isLet: Bool
+    let value: Expression?
+    var variableType: TypeSignature {
+        var variableType = declaredType
+        if variableType == .none {
+            variableType = value?.inferredType ?? .none
+            // Flow will only continue when the value is non-optional
+            if case .optional(let type) = variableType {
+                variableType = type
+            }
+        }
+        return variableType
+    }
+
+    init(name: String, declaredType: TypeSignature = .none, isLet: Bool, value: Expression? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        self.name = name
+        self.declaredType = declaredType
+        self.isLet = isLet
+        self.value = value
+        super.init(type: .optionalBinding, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
+        guard syntax.kind == .optionalBindingCondition, let optionalBindingExpr = syntax.as(OptionalBindingConditionSyntax.self) else {
+            return nil
+        }
+
+        let isLet = optionalBindingExpr.letOrVarKeyword.text == "let"
+        var declaredType: TypeSignature = .none
+        if let typeSyntax = optionalBindingExpr.typeAnnotation?.type {
+            declaredType = TypeSignature.for(syntax: typeSyntax)
+        }
+        var value: Expression? = nil
+        if let valueSyntax = optionalBindingExpr.initializer?.value {
+            value = ExpressionDecoder.decode(syntax: valueSyntax, in: syntaxTree)
+        }
+
+        // TODO: Support patterns other than a simple identifier
+        let patternSyntax = optionalBindingExpr.pattern
+        switch patternSyntax.kind {
+        case .expressionPattern:
+            throw Message.unsupportedSyntax(patternSyntax, source: syntaxTree.source)
+        case .identifierPattern:
+            let name = patternSyntax.as(IdentifierPatternSyntax.self)!.identifier.text
+            return OptionalBinding(name: name, declaredType: declaredType, isLet: isLet, value: value, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+        case .isTypePattern:
+            throw Message.unsupportedSyntax(patternSyntax, source: syntaxTree.source)
+        case .missingPattern:
+            throw Message.unsupportedSyntax(patternSyntax, source: syntaxTree.source)
+        case .tuplePattern:
+            throw Message.unsupportedSyntax(patternSyntax, source: syntaxTree.source)
+        case .valueBindingPattern:
+            throw Message.unsupportedSyntax(patternSyntax, source: syntaxTree.source)
+        case .wildcardPattern:
+            throw Message.unsupportedSyntax(patternSyntax, source: syntaxTree.source)
+        default:
+            throw Message.unsupportedSyntax(patternSyntax, source: syntaxTree.source)
+        }
+    }
+
+    override func resolveAttributes() {
+        declaredType = declaredType.qualified(in: self)
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        value?.inferTypes(context: context, expecting: declaredType == .none ? .none : .optional(declaredType))
+        return context.addingIdentifier(name, type: variableType)
+    }
+
+    override var children: [SyntaxNode] {
+        return value != nil ? [value!] : []
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        var attrs = [PrettyPrintTree(root: name)]
+        if declaredType != .none {
+            attrs.append(PrettyPrintTree(root: declaredType.description))
+        }
+        return attrs
     }
 }
 

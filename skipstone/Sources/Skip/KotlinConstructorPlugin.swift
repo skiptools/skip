@@ -63,7 +63,7 @@ class KotlinConstructorPlugin: KotlinTranslatorPlugin {
         let constructor = KotlinFunctionDeclaration(name: "constructor")
         constructor.parameters = variableDeclarations.map { variableDeclaration in
             let label = variableDeclaration.name
-            let type = variableDeclaration.declaredType.or(variableDeclaration.valueType)
+            let type = variableDeclaration.variableType
             return Parameter(externalLabel: label, declaredType: type, isVariadic: false, defaultValue: variableDeclaration.value)
         }
         constructor.modifiers = classDeclaration.modifiers

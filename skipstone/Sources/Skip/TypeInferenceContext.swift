@@ -2,7 +2,7 @@
 struct TypeInferenceContext {
     private let symbols: Symbols.Context?
     private var typePath: [TypeDeclaration] = []
-    private var parametersPath: [[String: TypeSignature]] = [] // Each entry is map of available parameters
+    private var blockPath: [[String: TypeSignature]] = [] // Each entry is map of additional identifier bindings
     private var localIdentifierTypes: [String: TypeSignature] = [:]
 
     /// Create a top-level context for type inference.
@@ -41,7 +41,7 @@ struct TypeInferenceContext {
         let parameterDictionary = functionDeclaration.parameters.reduce(into: [String: TypeSignature]()) { result, parameter in
             result[parameter.internalLabel] = parameter.declaredType
         }
-        context.parametersPath.append(parameterDictionary)
+        context.blockPath.append(parameterDictionary)
         context.expectedReturn = functionDeclaration.returnType
         return context
     }
@@ -52,8 +52,18 @@ struct TypeInferenceContext {
         let parameterDictionary = closure.parameters.reduce(into: [String: TypeSignature]()) { result, parameter in
             result[parameter.internalLabel] = parameter.declaredType
         }
-        context.parametersPath.append(parameterDictionary)
+        context.blockPath.append(parameterDictionary)
         context.expectedReturn = closure.returnType
+        return context
+    }
+
+    /// Return a context for evaluating code within a block with the given additional identiifers.
+    func pushingBlock(identifiers: [String: TypeSignature]) -> TypeInferenceContext {
+        guard !identifiers.isEmpty else {
+            return self
+        }
+        var context = self
+        context.blockPath.append(identifiers)
         return context
     }
 
@@ -77,10 +87,10 @@ struct TypeInferenceContext {
         if let identifierType = localIdentifierTypes[name] {
             return identifierType
         }
-        // Next check function / closure parameters
-        for parameterDictionary in parametersPath.reversed() {
-            if let parameterType = parameterDictionary[name] {
-                return parameterType
+        // Next check function / closure / block bindings
+        for identifierDictionary in blockPath.reversed() {
+            if let identifierType = identifierDictionary[name] {
+                return identifierType
             }
         }
         if name == "self" || name == "super" {

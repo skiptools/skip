@@ -79,13 +79,9 @@ public class KotlinTranslator {
 
     func translateStatement(_ statement: Statement) -> [KotlinStatement] {
         switch statement.type {
-        case .assignment:
-            break
         case .break:
             break
         case .catch:
-            break
-        case .comment:
             break
         case .continue:
             break
@@ -93,11 +89,11 @@ public class KotlinTranslator {
             break
         case .do:
             break
-        case .error:
-            break
         case .expression:
             return [KotlinExpressionStatement.translate(statement: statement as! ExpressionStatement, translator: self)]
         case .for:
+            break
+        case .guard:
             break
         case .if:
             break
@@ -164,6 +160,8 @@ public class KotlinTranslator {
             return KotlinFunctionCall.translate(expression: expression as! FunctionCall, translator: self)
         case .identifier:
             return KotlinIdentifier.translate(expression: expression as! Identifier, translator: self)
+        case .optionalBinding:
+            break
         case .memberAccess:
             return KotlinMemberAccess.translate(expression: expression as! MemberAccess, translator: self)
         case .numericLiteral:
@@ -179,14 +177,14 @@ public class KotlinTranslator {
         }
 
         // Fall back to a raw translation and associated warning
-//        let message = Message.kotlinUntranslatable(expression: expression)
-//        let rawExpression: RawExpression
-//        if let syntax = expression.syntax {
-//            rawExpression = RawExpression(syntax: syntax, message: message, in: syntaxTree)
-//        } else {
-//            rawExpression = RawExpression(sourceCode: "?", message: message, range: expression.range, in: syntaxTree)
-//        }
-//        return KotlinRawExpression(expression: rawExpression)
+        let message = Message.kotlinUntranslatable(expression)
+        let rawExpression: RawExpression
+        if let syntax = expression.syntax {
+            rawExpression = RawExpression(syntax: syntax, message: message, in: syntaxTree)
+        } else {
+            rawExpression = RawExpression(sourceCode: "?", message: message, range: expression.sourceRange, in: syntaxTree)
+        }
+        return KotlinRawExpression(expression: rawExpression)
     }
 
     private func applyPlugins(to syntaxTree: KotlinSyntaxTree, codebaseInfo: KotlinCodebaseInfo.Context) -> KotlinSyntaxTree {

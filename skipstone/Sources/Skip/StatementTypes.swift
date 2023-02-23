@@ -2,15 +2,13 @@ import SwiftSyntax
 
 /// Supported Swift statement types.
 enum StatementType: CaseIterable {
-    case assignment
     case `break`
     case `catch`
-    case comment
     case `continue`
     case `defer`
     case `do`
-    case error
     case `for`
+    case `guard`
     case `if`
     case ifDefined
     case `return`
@@ -39,13 +37,9 @@ enum StatementType: CaseIterable {
     /// The Swift data type that represents this statement type.
     var representingType: Statement.Type? {
         switch self {
-        case .assignment:
-            return nil
         case .break:
             return nil
         case .catch:
-            return nil
-        case .comment:
             return nil
         case .continue:
             return nil
@@ -53,12 +47,12 @@ enum StatementType: CaseIterable {
             return nil
         case .do:
             return nil
-        case .error:
-            return nil
         case .for:
             return nil
+        case .guard:
+            return Guard.self
         case .if:
-            return nil
+            return If.self
         case .ifDefined:
             return IfDefined.self
         case .return:
@@ -98,6 +92,113 @@ enum StatementType: CaseIterable {
         case .raw:
             return RawStatement.self
         }
+    }
+}
+
+/// `guard ...`
+class Guard: Statement {
+    let conditions: [Expression]
+    let body: CodeBlock<Statement>
+
+    init(conditions: [Expression], body: CodeBlock<Statement>, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.conditions = conditions
+        self.body = body
+        super.init(type: .guard, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+        guard syntax.kind == .guardStmt, let guardStmnt = syntax.as(GuardStmtSyntax.self) else {
+            return nil
+        }
+        
+        let conditions = guardStmnt.conditions.compactMap { ExpressionDecoder.decode(syntax:$0, in: syntaxTree) }
+        let statements = StatementDecoder.decode(syntaxListContainer: guardStmnt.body, in: syntaxTree)
+        let body = CodeBlock<Statement>(statements: statements)
+        return [Guard(conditions: conditions, body: body, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        var conditionsContext = context
+        conditions.forEach { conditionsContext = $0.inferTypes(context: conditionsContext, expecting: .bool) }
+        let optionalBindings = conditions.reduce(into: [String: TypeSignature]()) { result, condition in
+            if let optionalBinding = condition as? OptionalBinding {
+                result[optionalBinding.name] = optionalBinding.variableType
+            }
+        }
+        var bodyContext = context.pushingBlock(identifiers: optionalBindings)
+        body.statements.forEach { bodyContext = $0.inferTypes(context: bodyContext, expecting: .none) }
+        return context
+    }
+
+    override var children: [SyntaxNode] {
+        return conditions + body.statements
+    }
+}
+
+/// `if ...`
+class If: Statement {
+    let conditions: [Expression]
+    let body: CodeBlock<Statement>
+    let elseBody: CodeBlock<Statement>?
+    var elseif: If? {
+        guard let elseBody, elseBody.statements.count == 1 else {
+            return nil
+        }
+        return elseBody.statements.first as? If
+    }
+
+    init(conditions: [Expression], body: CodeBlock<Statement>, elseBody: CodeBlock<Statement>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.conditions = conditions
+        self.body = body
+        self.elseBody = elseBody
+        super.init(type: .if, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+        guard syntax.kind == .ifStmt, let ifStmnt = syntax.as(IfStmtSyntax.self) else {
+            return nil
+        }
+
+        let conditions = ifStmnt.conditions.compactMap { ExpressionDecoder.decode(syntax:$0, in: syntaxTree) }
+        let statements = StatementDecoder.decode(syntaxListContainer: ifStmnt.body, in: syntaxTree)
+        let body = CodeBlock<Statement>(statements: statements)
+        var elseBody: CodeBlock<Statement>? = nil
+        if let elseSyntax = ifStmnt.elseBody {
+            let statements: [Statement]
+            switch elseSyntax {
+            case .ifStmt(let syntax):
+                statements = StatementDecoder.decode(syntax: syntax, in: syntaxTree)
+            case .codeBlock(let syntax):
+                statements = StatementDecoder.decode(syntaxListContainer: syntax, in: syntaxTree)
+            }
+            elseBody = CodeBlock<Statement>(statements: statements)
+        }
+        return [If(conditions: conditions, body: body, elseBody: elseBody, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        var conditionsContext = context
+        conditions.forEach { conditionsContext = $0.inferTypes(context: conditionsContext, expecting: .bool) }
+        let optionalBindings = conditions.reduce(into: [String: TypeSignature]()) { result, condition in
+            if let optionalBinding = condition as? OptionalBinding {
+                result[optionalBinding.name] = optionalBinding.variableType
+            }
+        }
+        var bodyContext = context.pushingBlock(identifiers: optionalBindings)
+        body.statements.forEach { bodyContext = $0.inferTypes(context: bodyContext, expecting: .none) }
+        if let elseBody {
+            var elseContext = context
+            elseBody.statements.forEach { elseContext = $0.inferTypes(context: elseContext, expecting: .none) }
+        }
+        return context
+    }
+
+    override var children: [SyntaxNode] {
+        var children = conditions + body.statements
+        if let elseBody {
+            children += elseBody.statements
+        }
+        return children
     }
 }
 
@@ -475,6 +576,9 @@ class VariableDeclaration: Statement {
     let setter: Accessor<Statement>?
     let willSet: Accessor<Statement>?
     let didSet: Accessor<Statement>?
+    var variableType: TypeSignature {
+        return declaredType.or(value?.inferredType ?? .none)
+    }
 
     init(name: String, declaredType: TypeSignature = .none, isLet: Bool = false, isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes? = nil, modifiers: Modifiers? = nil, value: Expression?, getter: Accessor<Statement>? = nil, setter: Accessor<Statement>? = nil, willSet: Accessor<Statement>? = nil, didSet: Accessor<Statement>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.name = name
@@ -601,28 +705,28 @@ class VariableDeclaration: Statement {
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
         value?.inferTypes(context: context, expecting: declaredType)
-        let inferredType = declaredType.or(value?.inferredType ?? .none)
+        let variableType = variableType
         if let statements = getter?.body?.statements {
-            var bodyContext = context.expectingReturn(inferredType)
+            var bodyContext = context.expectingReturn(variableType)
             statements.forEach { bodyContext = $0.inferTypes(context: bodyContext, expecting: .none) }
         }
         if let statements = setter?.body?.statements {
-            var bodyContext = context.addingIdentifier(setter?.parameterName ?? "newValue", type: inferredType)
+            var bodyContext = context.addingIdentifier(setter?.parameterName ?? "newValue", type: variableType)
             statements.forEach { bodyContext = $0.inferTypes(context: bodyContext, expecting: .none) }
         }
         if let statements = willSet?.body?.statements {
-            var bodyContext = context.addingIdentifier(willSet?.parameterName ?? "newValue", type: inferredType)
+            var bodyContext = context.addingIdentifier(willSet?.parameterName ?? "newValue", type: variableType)
             statements.forEach { bodyContext = $0.inferTypes(context: bodyContext, expecting: .none) }
         }
         if let statements = didSet?.body?.statements {
-            var bodyContext = context.addingIdentifier(didSet?.parameterName ?? "oldValue", type: inferredType)
+            var bodyContext = context.addingIdentifier(didSet?.parameterName ?? "oldValue", type: variableType)
             statements.forEach { bodyContext = $0.inferTypes(context: bodyContext, expecting: .none) }
         }
         if parent == nil || parent is TypeDeclaration {
             return context
         } else {
             // Local variable in code block
-            return context.addingIdentifier(name, type: inferredType)
+            return context.addingIdentifier(name, type: variableType)
         }
     }
 

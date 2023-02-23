@@ -415,11 +415,11 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var isOpen = false
     var modifiers = Modifiers()
     var value: KotlinExpression?
-    var valueType: TypeSignature = .none
     var getter: Accessor<KotlinStatement>?
     var setter: Accessor<KotlinStatement>?
     var willSet: Accessor<KotlinStatement>?
     var didSet: Accessor<KotlinStatement>?
+    var variableType: TypeSignature = .none
     var mayBeSharedMutableValue = false
     var isReadOnly = false
     var onUpdate: String?
@@ -447,8 +447,8 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         }
         if let value = statement.value {
             kstatement.value = translator.translateExpression(value).valueReference()
-            kstatement.valueType = value.inferredType
         }
+        kstatement.variableType = statement.variableType
 
         kstatement.isReadOnly = statement.isLet || (statement.getter != nil && statement.setter == nil)
         if kstatement.declaredType != .none {
