@@ -127,7 +127,7 @@ final class ClosureTests: XCTestCase {
         call { $0 + $1 + $2 }
         """, kotlin: """
         call { it, it1, it2 ->
-            (it + it1) + it2
+            it + it1 + it2
         }
         """)
     }

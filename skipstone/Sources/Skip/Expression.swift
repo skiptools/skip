@@ -30,7 +30,7 @@ struct ExpressionDecoder {
     static func decodeIfExpression(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) -> Expression? {
         do {
             if syntax.kind == .sequenceExpr, let sequenceExpr = syntax.as(SequenceExprSyntax.self) {
-                return try decodeSequence(sequence: syntax, elements: Array(sequenceExpr.elements), in: syntaxTree)
+                return try decodeSequence(syntax, elements: Array(sequenceExpr.elements), in: syntaxTree)
             }
             for expressionType in ExpressionType.allCases {
                 if let representingType = expressionType.representingType, let expression = try representingType.decode(syntax: syntax, in: syntaxTree) {
@@ -50,7 +50,7 @@ struct ExpressionDecoder {
         return expression
     }
 
-    static func decodeSequence(sequence: SyntaxProtocol, elements: [ExprSyntax], in syntaxTree: SyntaxTree) throws -> Expression {
+    static func decodeSequence(_ sequence: SyntaxProtocol, elements: [ExprSyntax], in syntaxTree: SyntaxTree) throws -> Expression {
         guard !elements.isEmpty else {
             throw Message.unsupportedSyntax(sequence, source: syntaxTree.source)
         }
@@ -67,6 +67,22 @@ struct ExpressionDecoder {
             }
         }
         throw Message.unsupportedSyntax(sequence, source: syntaxTree.source)
+    }
+
+    static func decodeCondition(_ condition: ConditionElementSyntax, in syntaxTree: SyntaxTree) throws -> Expression {
+        // TODO: Support these conditions
+        switch condition.condition {
+        case .availability(let syntax):
+            throw Message.unsupportedSyntax(syntax, source: syntaxTree.source)
+        case .expression(let syntax):
+            return decode(syntax: syntax, in: syntaxTree)
+        case .hasSymbol(let syntax):
+            throw Message.unsupportedSyntax(syntax, source: syntaxTree.source)
+        case .matchingPattern(let syntax):
+            throw Message.unsupportedSyntax(syntax, source: syntaxTree.source)
+        case .optionalBinding(let syntax):
+            return decode(syntax: syntax, in: syntaxTree)
+        }
     }
 
     /// Return the index of the lowest precedence operator expression in the given list. This allows us to segment the list and recurse on each segment, forming an

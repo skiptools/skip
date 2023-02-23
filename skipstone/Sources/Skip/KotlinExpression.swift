@@ -37,6 +37,15 @@ class KotlinExpression: KotlinSyntaxNode {
     var isCompoundExpression: Bool {
         return false
     }
+
+    /// Create a new expression that is the logical negation of this one.
+    func logicalNegated() -> KotlinExpression {
+        var target: KotlinExpression = self
+        if target.isCompoundExpression {
+            target = KotlinParenthesized(content: target)
+        }
+        return KotlinPrefixOperator(operatorSymbol: "!", target: target)
+    }
 }
 
 class KotlinRawExpression: KotlinExpression {

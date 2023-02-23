@@ -88,7 +88,7 @@ extension Array where Element: KotlinStatement {
 
 extension CodeBlock where S: Statement {
     /// Translate to an equivalent Kotlin code block.
-    func translate(translator: KotlinTranslator, expectedReturn: ExpectedReturn) -> CodeBlock<KotlinStatement> {
+    func translate(translator: KotlinTranslator, expectedReturn: ExpectedReturn = .no) -> CodeBlock<KotlinStatement> {
         var kstatements = statements.flatMap { translator.translateStatement($0) }
         switch expectedReturn {
         case .no:

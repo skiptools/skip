@@ -80,6 +80,7 @@ struct Operator: Equatable {
         Operator(symbol: "==", associativity: .none, precedence: .comparison),
         Operator(symbol: "!=", associativity: .none, precedence: .comparison),
         Operator(symbol: "===", associativity: .none, precedence: .comparison),
+        Operator(symbol: "!==", associativity: .none, precedence: .comparison),
         Operator(symbol: "~=", associativity: .none, precedence: .comparison),
         Operator(symbol: ".==", associativity: .none, precedence: .comparison),
         Operator(symbol: ".!=", associativity: .none, precedence: .comparison),

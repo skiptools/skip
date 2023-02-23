@@ -75,7 +75,7 @@ class KotlinConstructorPlugin: KotlinTranslatorPlugin {
             let selfIdentifier = KotlinIdentifier(name: "self")
             let memberAccess = KotlinMemberAccess(base: selfIdentifier, member: variableDeclaration.name)
             let paramIdentifier = KotlinIdentifier(name: variableDeclaration.name)
-            let assignmentOperator = KotlinBinaryOperator(op: Operator(symbol: "=", associativity: .right, precedence: .assignment), lhs: memberAccess, rhs: paramIdentifier)
+            let assignmentOperator = KotlinBinaryOperator(op: .with(symbol: "="), lhs: memberAccess, rhs: paramIdentifier)
             let statement = KotlinExpressionStatement(type: .expression)
             statement.expression = assignmentOperator
             return statement

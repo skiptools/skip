@@ -12,16 +12,9 @@ struct S {
     var p1: Int
     var p2: String?
 
-    static func factory() -> S {
-        return S(p1: 1)
+    func f() {
+        if (p1 < 0 || p1 > 1) && p1 < 100 {
+            print("yes")
+        }
     }
-
-    static func factory2() -> S {
-        return .init(p1: 1)
-    }
-
-//    init(p1: Int) {
-//        self.p1 = p1
-//        self.p2 = "foo"
-//    }
 }

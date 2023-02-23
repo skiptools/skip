@@ -94,9 +94,9 @@ public class KotlinTranslator {
         case .for:
             break
         case .guard:
-            break
+            return [KotlinIf.translate(statement: statement as! Guard, translator: self)]
         case .if:
-            break
+            return [KotlinIf.translate(statement: statement as! If, translator: self)]
         case .ifDefined:
             // This should never happen, as we never make the IfDefined statement part of the syntax tree
             return []
@@ -154,18 +154,22 @@ public class KotlinTranslator {
             return KotlinBooleanLiteral(expression: expression as! BooleanLiteral)
         case .closure:
             return KotlinClosure.translate(expression: expression as! Closure, translator: self)
-        case .nilLiteral:
-            return KotlinNullLiteral(expression: expression as! NilLiteral)
         case .functionCall:
             return KotlinFunctionCall.translate(expression: expression as! FunctionCall, translator: self)
         case .identifier:
             return KotlinIdentifier.translate(expression: expression as! Identifier, translator: self)
-        case .optionalBinding:
-            break
         case .memberAccess:
             return KotlinMemberAccess.translate(expression: expression as! MemberAccess, translator: self)
+        case .nilLiteral:
+            return KotlinNullLiteral(expression: expression as! NilLiteral)
         case .numericLiteral:
             return KotlinNumericLiteral(expression: expression as! NumericLiteral)
+        case .optionalBinding:
+            break
+        case .parenthesized:
+            return KotlinParenthesized.translate(expression: expression as! Parenthesized, translator: self)
+        case .prefixOperator:
+            return KotlinPrefixOperator.translate(expression: expression as! PrefixOperator, translator: self)
         case .stringLiteral:
             return KotlinStringLiteral.translate(expression: expression as! StringLiteral, translator: self)
         case .subscript:

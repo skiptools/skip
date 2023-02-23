@@ -4,11 +4,13 @@ enum KotlinExpressionType {
     case binaryOperator
     case booleanLiteral
     case closure
-    case nullLiteral
     case functionCall
     case identifier
     case memberAccess
+    case nullLiteral
     case numericLiteral
+    case parenthesized
+    case prefixOperator
     case stringLiteral
     case `subscript`
     case `try`
@@ -94,6 +96,36 @@ class KotlinBinaryOperator: KotlinExpression {
         super.init(type: .binaryOperator, expression: expression)
     }
 
+    override func logicalNegated() -> KotlinExpression {
+        var negated: KotlinBinaryOperator
+        switch op.symbol {
+        case "&&":
+            negated = KotlinBinaryOperator(op: Operator.with(symbol: "||"), lhs: lhs.logicalNegated(), rhs: rhs.logicalNegated(), sourceFile: sourceFile, sourceRange: sourceRange)
+        case "||":
+            negated =  KotlinBinaryOperator(op: Operator.with(symbol: "&&"), lhs: lhs.logicalNegated(), rhs: rhs.logicalNegated(), sourceFile: sourceFile, sourceRange: sourceRange)
+        case "<":
+            negated =  KotlinBinaryOperator(op: Operator.with(symbol: ">="), lhs: lhs, rhs: rhs, sourceFile: sourceFile, sourceRange: sourceRange)
+        case "<=":
+            negated =  KotlinBinaryOperator(op: Operator.with(symbol: ">"), lhs: lhs, rhs: rhs, sourceFile: sourceFile, sourceRange: sourceRange)
+        case ">":
+            negated =  KotlinBinaryOperator(op: Operator.with(symbol: "<="), lhs: lhs, rhs: rhs, sourceFile: sourceFile, sourceRange: sourceRange)
+        case ">=":
+            negated =  KotlinBinaryOperator(op: Operator.with(symbol: "<"), lhs: lhs, rhs: rhs, sourceFile: sourceFile, sourceRange: sourceRange)
+        case "==":
+            negated =  KotlinBinaryOperator(op: Operator.with(symbol: "!="), lhs: lhs, rhs: rhs, sourceFile: sourceFile, sourceRange: sourceRange)
+        case "!=":
+            negated =  KotlinBinaryOperator(op: Operator.with(symbol: "=="), lhs: lhs, rhs: rhs, sourceFile: sourceFile, sourceRange: sourceRange)
+        case "===":
+            negated =  KotlinBinaryOperator(op: Operator.with(symbol: "!=="), lhs: lhs, rhs: rhs, sourceFile: sourceFile, sourceRange: sourceRange)
+        case "!==":
+            negated =  KotlinBinaryOperator(op: Operator.with(symbol: "==="), lhs: lhs, rhs: rhs, sourceFile: sourceFile, sourceRange: sourceRange)
+        default:
+            return super.logicalNegated()
+        }
+        negated.mayBeSharedMutableValue = mayBeSharedMutableValue
+        return negated
+    }
+
     override func mayBeSharedMutableValueExpression(orType: Bool) -> Bool {
         return mayBeSharedMutableValue
     }
@@ -107,17 +139,7 @@ class KotlinBinaryOperator: KotlinExpression {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
-        if lhs.isCompoundExpression {
-            output.append("(").append(lhs, indentation: indentation).append(")")
-        } else {
-            output.append(lhs, indentation: indentation)
-        }
-        output.append(" \(op.symbol) ")
-        if rhs.isCompoundExpression {
-            output.append("(").append(rhs, indentation: indentation).append(")")
-        } else {
-            output.append(rhs, indentation: indentation)
-        }
+        output.append(lhs, indentation: indentation).append(" \(op.symbol) ").append(rhs, indentation: indentation)
     }
 }
 
@@ -253,16 +275,6 @@ class KotlinClosure: KotlinExpression {
         }
         output.append(body.statements, indentation: indentation.inc())
         output.append(indentation).append("}")
-    }
-}
-
-class KotlinNullLiteral: KotlinExpression {
-    init(expression: NilLiteral) {
-        super.init(type: .nullLiteral, expression: expression)
-    }
-
-    override func append(to output: OutputGenerator, indentation: Indentation) {
-        output.append("null")
     }
 }
 
@@ -433,11 +445,7 @@ class KotlinMemberAccess: KotlinExpression {
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
         if let base {
-            if base.isCompoundExpression {
-                output.append("(").append(base, indentation: indentation).append(")")
-            } else {
-                output.append(base, indentation: indentation)
-            }
+            output.append(base, indentation: indentation)
             if member != "init" {
                 if useMultlineFormatting {
                     output.append("\n").append(indentation.inc())
@@ -458,6 +466,16 @@ class KotlinMemberAccess: KotlinExpression {
     }
 }
 
+class KotlinNullLiteral: KotlinExpression {
+    init(expression: NilLiteral) {
+        super.init(type: .nullLiteral, expression: expression)
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        output.append("null")
+    }
+}
+
 class KotlinNumericLiteral: KotlinExpression {
     var literal: String
     var isFloatingPoint: Bool
@@ -470,6 +488,91 @@ class KotlinNumericLiteral: KotlinExpression {
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
         output.append(literal.replacingOccurrences(of: "_", with: ""))
+    }
+}
+
+class KotlinParenthesized: KotlinExpression {
+    var content: KotlinExpression
+
+    static func translate(expression: Parenthesized, translator: KotlinTranslator) -> KotlinParenthesized {
+        let kcontent = translator.translateExpression(expression.content)
+        return KotlinParenthesized(expression: expression, content: kcontent)
+    }
+
+    init(content: KotlinExpression, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        self.content = content
+        super.init(type: .parenthesized, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    private init(expression: Parenthesized, content: KotlinExpression) {
+        self.content = content
+        super.init(type: .parenthesized, expression: expression)
+    }
+
+    override func logicalNegated() -> KotlinExpression {
+        return KotlinParenthesized(content: content.logicalNegated(), sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    override func mayBeSharedMutableValueExpression(orType: Bool) -> Bool {
+        return content.mayBeSharedMutableValueExpression(orType: orType)
+    }
+
+    override var isCompoundExpression: Bool {
+        return false
+    }
+
+    override var children: [KotlinSyntaxNode] {
+        return [content]
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        output.append("(").append(content, indentation: indentation).append(")")
+    }
+}
+
+class KotlinPrefixOperator: KotlinExpression {
+    var operatorSymbol: String
+    var target: KotlinExpression
+
+    static func translate(expression: PrefixOperator, translator: KotlinTranslator) -> KotlinPrefixOperator {
+        let ktarget = translator.translateExpression(expression.target)
+        return KotlinPrefixOperator(expression: expression, target: ktarget)
+    }
+
+    init(operatorSymbol: String, target: KotlinExpression, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        self.operatorSymbol = operatorSymbol
+        self.target = target
+        super.init(type: .prefixOperator, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    private init(expression: PrefixOperator, target: KotlinExpression) {
+        self.operatorSymbol = expression.operatorSymbol
+        self.target = target
+        super.init(type: .prefixOperator, expression: expression)
+    }
+
+    override func logicalNegated() -> KotlinExpression {
+        if operatorSymbol == "!" {
+            return target
+        } else {
+            return super.logicalNegated()
+        }
+    }
+
+    override func mayBeSharedMutableValueExpression(orType: Bool) -> Bool {
+        return target.mayBeSharedMutableValueExpression(orType: orType)
+    }
+
+    override var isCompoundExpression: Bool {
+        return true
+    }
+
+    override var children: [KotlinSyntaxNode] {
+        return [target]
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        output.append(operatorSymbol).append(target, indentation: indentation)
     }
 }
 
@@ -558,12 +661,7 @@ class KotlinSubscript: KotlinExpression {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
-        if base.isCompoundExpression {
-            output.append("(").append(base, indentation: indentation).append(")")
-        } else {
-            output.append(base, indentation: indentation)
-        }
-        output.append("[")
+        output.append(base, indentation: indentation).append("[")
         for (index, argument) in arguments.enumerated() {
             if let label = argument.label {
                 output.append(label).append(" = ")

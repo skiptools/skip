@@ -111,7 +111,7 @@ class Guard: Statement {
             return nil
         }
         
-        let conditions = guardStmnt.conditions.compactMap { ExpressionDecoder.decode(syntax:$0, in: syntaxTree) }
+        let conditions = try guardStmnt.conditions.map { try ExpressionDecoder.decodeCondition($0, in: syntaxTree) }
         let statements = StatementDecoder.decode(syntaxListContainer: guardStmnt.body, in: syntaxTree)
         let body = CodeBlock<Statement>(statements: statements)
         return [Guard(conditions: conditions, body: body, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
@@ -140,12 +140,6 @@ class If: Statement {
     let conditions: [Expression]
     let body: CodeBlock<Statement>
     let elseBody: CodeBlock<Statement>?
-    var elseif: If? {
-        guard let elseBody, elseBody.statements.count == 1 else {
-            return nil
-        }
-        return elseBody.statements.first as? If
-    }
 
     init(conditions: [Expression], body: CodeBlock<Statement>, elseBody: CodeBlock<Statement>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.conditions = conditions
@@ -159,7 +153,7 @@ class If: Statement {
             return nil
         }
 
-        let conditions = ifStmnt.conditions.compactMap { ExpressionDecoder.decode(syntax:$0, in: syntaxTree) }
+        let conditions = try ifStmnt.conditions.map { try ExpressionDecoder.decodeCondition($0, in: syntaxTree) }
         let statements = StatementDecoder.decode(syntaxListContainer: ifStmnt.body, in: syntaxTree)
         let body = CodeBlock<Statement>(statements: statements)
         var elseBody: CodeBlock<Statement>? = nil
@@ -722,7 +716,7 @@ class VariableDeclaration: Statement {
             var bodyContext = context.addingIdentifier(didSet?.parameterName ?? "oldValue", type: variableType)
             statements.forEach { bodyContext = $0.inferTypes(context: bodyContext, expecting: .none) }
         }
-        if parent == nil || parent is TypeDeclaration {
+        if parent is TypeDeclaration {
             return context
         } else {
             // Local variable in code block

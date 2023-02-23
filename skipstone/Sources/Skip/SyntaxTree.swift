@@ -23,8 +23,8 @@ public class SyntaxTree: PrettyPrintable {
             resolveQueue += node.children
         }
 
-        let context = TypeInferenceContext(symbols: symbols, sourceFile: source.file, statements: statements)
-        statements.forEach { $0.inferTypes(context: context, expecting: .none) }
+        var context = TypeInferenceContext(symbols: symbols, sourceFile: source.file, statements: statements)
+        statements.forEach { context = $0.inferTypes(context: context, expecting: .none) }
     }
 
     public var prettyPrintTree: PrettyPrintTree {
@@ -35,4 +35,3 @@ public class SyntaxTree: PrettyPrintable {
         return statements.flatMap { $0.subtreeMessages }
     }
 }
-

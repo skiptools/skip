@@ -12,9 +12,11 @@ enum ExpressionType: CaseIterable {
     case nilLiteral
     case numericLiteral
     case optionalBinding
+    case parenthesized
     case stringLiteral
     case `subscript`
     case `try`
+    case prefixOperator
 
     /// An expression representing raw Swift code.
     case raw
@@ -42,6 +44,10 @@ enum ExpressionType: CaseIterable {
             return NumericLiteral.self
         case .optionalBinding:
             return OptionalBinding.self
+        case .parenthesized:
+            return Parenthesized.self
+        case .prefixOperator:
+            return PrefixOperator.self
         case .stringLiteral:
             return StringLiteral.self
         case .subscript:
@@ -104,7 +110,7 @@ class BinaryOperator: Expression {
     let lhs: Expression
     let rhs: Expression
 
-    init(op: Operator, lhs: Expression, rhs: Expression, syntax: SyntaxProtocol?, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(op: Operator, lhs: Expression, rhs: Expression, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
         self.op = op
         self.lhs = lhs
         self.rhs = rhs
@@ -120,8 +126,8 @@ class BinaryOperator: Expression {
         } else {
             return nil
         }
-        let lhs = try ExpressionDecoder.decodeSequence(sequence: sequence, elements: Array(elements[..<index]), in: syntaxTree)
-        let rhs = try ExpressionDecoder.decodeSequence(sequence: sequence, elements: Array(elements[(index + 1)...]), in: syntaxTree)
+        let lhs = try ExpressionDecoder.decodeSequence(sequence, elements: Array(elements[..<index]), in: syntaxTree)
+        let rhs = try ExpressionDecoder.decodeSequence(sequence, elements: Array(elements[(index + 1)...]), in: syntaxTree)
         return BinaryOperator(op: op, lhs: lhs, rhs: rhs, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
@@ -552,23 +558,14 @@ class OptionalBinding: Expression {
     private(set) var declaredType: TypeSignature
     let isLet: Bool
     let value: Expression?
-    var variableType: TypeSignature {
-        var variableType = declaredType
-        if variableType == .none {
-            variableType = value?.inferredType ?? .none
-            // Flow will only continue when the value is non-optional
-            if case .optional(let type) = variableType {
-                variableType = type
-            }
-        }
-        return variableType
-    }
+    private(set) var variableType: TypeSignature = .none
 
     init(name: String, declaredType: TypeSignature = .none, isLet: Bool, value: Expression? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
         self.name = name
         self.declaredType = declaredType
         self.isLet = isLet
         self.value = value
+        self.variableType = declaredType
         super.init(type: .optionalBinding, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
@@ -616,6 +613,18 @@ class OptionalBinding: Expression {
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
         value?.inferTypes(context: context, expecting: declaredType == .none ? .none : .optional(declaredType))
+        variableType = declaredType
+        if variableType == .none {
+            if let value {
+                variableType = value.inferredType
+            } else {
+                variableType = context.identifier(name)
+            }
+        }
+        // Flow will only continue when the value is non-optional
+        if case .optional(let type) = variableType {
+            variableType = type
+        }
         return context.addingIdentifier(name, type: variableType)
     }
 
@@ -629,6 +638,77 @@ class OptionalBinding: Expression {
             attrs.append(PrettyPrintTree(root: declaredType.description))
         }
         return attrs
+    }
+}
+
+/// `(...)`
+class Parenthesized: Expression {
+    let content: Expression
+
+    init(content: Expression, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        self.content = content
+        super.init(type: .parenthesized, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
+        guard syntax.kind == .tupleExpr, let tupleExpr = syntax.as(TupleExprSyntax.self), tupleExpr.elementList.count == 1, let exprSyntax = tupleExpr.elementList.first?.expression else {
+            return nil
+        }
+        let content = ExpressionDecoder.decode(syntax: exprSyntax, in: syntaxTree)
+        return Parenthesized(content: content, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        content.inferTypes(context: context, expecting: expecting)
+        return context
+    }
+
+    override var inferredType: TypeSignature {
+        return content.inferredType
+    }
+
+    override var children: [SyntaxNode] {
+        return [content]
+    }
+}
+
+/// `!x`
+class PrefixOperator: Expression {
+    let operatorSymbol: String
+    let target: Expression
+
+    init(operatorSymbol: String, target: Expression, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        self.operatorSymbol = operatorSymbol
+        self.target = target
+        super.init(type: .prefixOperator, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
+        guard syntax.kind == .prefixOperatorExpr, let prefixOperatorExpr = syntax.as(PrefixOperatorExprSyntax.self) else {
+            return nil
+        }
+        let target = ExpressionDecoder.decode(syntax: prefixOperatorExpr.postfixExpression, in: syntaxTree)
+        guard let operatorSymbol = prefixOperatorExpr.operatorToken?.text else {
+            return target
+        }
+        return PrefixOperator(operatorSymbol: operatorSymbol, target: target, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        target.inferTypes(context: context, expecting: expecting)
+        return context
+    }
+
+    override var inferredType: TypeSignature {
+        return target.inferredType
+    }
+
+    override var children: [SyntaxNode] {
+        return [target]
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        return [PrettyPrintTree(root: operatorSymbol)]
     }
 }
 
