@@ -23,7 +23,11 @@ public struct SkipBundle : RawRepresentable {
 
 #if !SKIP
 
-extension SkipBundle {
+extension PlatformBundle {
+    /// The location of a bundle to use for looking up localized strings, such as the main bundle, or a bundle at a specific file URL.
+    public var location: LocalizedStringResource.BundleDescription {
+        .atURL(bundleURL)
+    }
 }
 
 #else
@@ -31,6 +35,11 @@ extension SkipBundle {
 // SKIP XXX INSERT: public operator fun SkipBundle.Companion.invoke(contentsOf: URL): SkipBundle { return SkipBundle(TODO) }
 
 extension SkipBundle {
+    /// Returns the description for this bundle, which in the case of Java, is the bundle itself
+    public var location: SkipBundle? {
+        return self
+    }
+
     // FIXME: this probably won't return what we expect, since the resources may live in another classloader
     public var resourceURL: SkipURL? {
         get {

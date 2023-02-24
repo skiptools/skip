@@ -61,13 +61,25 @@ final class BundleTests: XCTestCase {
 
         XCTAssertNotEqual(enlproj, frlproj, "localized resources lookup should return different paths")
 
+        var loc = LocalizedStringResource("Hello", bundle: Bundle.module.location)
+        //XCTAssertEqual("bonjour", NSLocalizedString("Hello", bundle: fr, comment: ""))
+
         #if !SKIP // TODO
+
+        XCTAssertEqual("Hi", String(localized: loc))
+        loc.locale = Locale(identifier: "fr")
+        XCTAssertEqual("bonjour", String(localized: loc))
+        loc.locale = Locale(identifier: "UNKNOWN")
+        XCTAssertEqual("Hi", String(localized: loc))
+
+
         XCTAssertEqual("Hello", NSLocalizedString("Hello", comment: ""))
         XCTAssertEqual("Hi", NSLocalizedString("Hello", bundle: Bundle.module, comment: ""))
         XCTAssertEqual("Hi", NSLocalizedString("Hello", bundle: Bundle.module, comment: ""))
         XCTAssertEqual("Hi", String(localized: "Hello", bundle: Bundle.module, locale: Locale(identifier: "en"), comment: "greetings"))
 
         let fr = try XCTUnwrap(Bundle(path: XCTUnwrap(Bundle.module.path(forResource: "fr", ofType: "lproj"))))
+        XCTAssertEqual("bonjour", NSLocalizedString("Hello", bundle: fr, comment: ""))
         XCTAssertEqual("bonjour", String(localized: "Hello", bundle: fr, comment: "greetings"))
 
         XCTAssertEqual("Hi", String(localized: LocalizedStringResource("Hello", bundle: .atURL(Bundle.module.bundleURL))))
@@ -78,8 +90,6 @@ final class BundleTests: XCTestCase {
 
         XCTAssertEqual("bonjour", String(localized: LocalizedStringResource("Hello", table: "Localizable", locale: Locale(identifier: "fr"), bundle: .atURL(Bundle.module.bundleURL), comment: nil)))
         XCTAssertEqual("bonjour", String(localized: LocalizedStringResource("Hello", locale: Locale(identifier: "fr"), bundle: .atURL(Bundle.module.bundleURL), comment: nil)))
-        XCTAssertEqual("bonjour", String(localized: LocalizedStringResource("Hello", locale: Locale(identifier: "fr"), bundle: .atURL(Bundle.module.bundleURL))))
-
         #endif
     }
 }
