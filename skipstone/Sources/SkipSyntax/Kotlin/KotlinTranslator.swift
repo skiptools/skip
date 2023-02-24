@@ -97,8 +97,6 @@ public class KotlinTranslator {
             break
         case .guard:
             return [KotlinIf.translate(statement: statement as! Guard, translator: self)]
-        case .if:
-            return [KotlinIf.translate(statement: statement as! If, translator: self)]
         case .ifDefined:
             // This should never happen, as we never make the IfDefined statement part of the syntax tree
             return []
@@ -160,6 +158,8 @@ public class KotlinTranslator {
             return KotlinFunctionCall.translate(expression: expression as! FunctionCall, translator: self)
         case .identifier:
             return KotlinIdentifier.translate(expression: expression as! Identifier, translator: self)
+        case .if:
+            return KotlinIf.translate(expression: expression as! If, translator: self)
         case .memberAccess:
             return KotlinMemberAccess.translate(expression: expression as! MemberAccess, translator: self)
         case .nilLiteral:

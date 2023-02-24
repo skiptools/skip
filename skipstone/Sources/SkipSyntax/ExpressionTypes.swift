@@ -8,6 +8,7 @@ enum ExpressionType: CaseIterable {
     case closure
     case functionCall
     case identifier
+    case `if`
     case memberAccess
     case nilLiteral
     case numericLiteral
@@ -36,6 +37,8 @@ enum ExpressionType: CaseIterable {
             return FunctionCall.self
         case .identifier:
             return Identifier.self
+        case .if:
+            return If.self
         case .memberAccess:
             return MemberAccess.self
         case .nilLiteral:
@@ -253,8 +256,8 @@ class Closure: Expression {
             return nil
         }
         let (returnType, parameters, messages) = closureExpr.signature?.typeSignatures(in: syntaxTree) ?? (.none, [], [])
-        let isAsync = closureExpr.signature?.effectSpecifiers?.asyncSpecifier?.text == "async" || closureExpr.signature?.effectSpecifiers?.throwsSpecifier?.text == "async"
-        let isThrows = closureExpr.signature?.effectSpecifiers?.asyncSpecifier?.text == "throws" || closureExpr.signature?.effectSpecifiers?.throwsSpecifier?.text == "throws"
+        let isAsync = closureExpr.signature?.effectSpecifiers?.asyncSpecifier != nil
+        let isThrows = closureExpr.signature?.effectSpecifiers?.throwsSpecifier != nil
         let statements = StatementDecoder.decode(syntaxList: closureExpr.statements, in: syntaxTree)
         let body = CodeBlock(statements: statements)
         let expression = Closure(returnType: returnType, parameters: parameters, isAsync: isAsync, isThrows: isThrows, body: body, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
@@ -424,6 +427,67 @@ class Identifier: Expression {
 
     override var prettyPrintAttributes: [PrettyPrintTree] {
         return [PrettyPrintTree(root: name)]
+    }
+}
+
+/// `if ...`
+class If: Expression {
+    let conditions: [Expression]
+    let body: CodeBlock
+    let elseBody: CodeBlock?
+
+    init(conditions: [Expression], body: CodeBlock, elseBody: CodeBlock? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        self.conditions = conditions
+        self.body = body
+        self.elseBody = elseBody
+        super.init(type: .if, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
+        guard syntax.kind == .ifExpr, let ifExpr = syntax.as(IfExprSyntax.self) else {
+            return nil
+        }
+
+        let conditions = try ifExpr.conditions.map { try ExpressionDecoder.decodeCondition($0, in: syntaxTree) }
+        let statements = StatementDecoder.decode(syntaxListContainer: ifExpr.body, in: syntaxTree)
+        let body = CodeBlock(statements: statements)
+        var elseBody: CodeBlock? = nil
+        if let elseSyntax = ifExpr.elseBody {
+            let statements: [Statement]
+            switch elseSyntax {
+            case .ifExpr(let syntax):
+                statements = StatementDecoder.decode(syntax: syntax, in: syntaxTree)
+            case .codeBlock(let syntax):
+                statements = StatementDecoder.decode(syntaxListContainer: syntax, in: syntaxTree)
+            }
+            elseBody = CodeBlock(statements: statements)
+        }
+        return If(conditions: conditions, body: body, elseBody: elseBody, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        var conditionsContext = context
+        conditions.forEach { conditionsContext = $0.inferTypes(context: conditionsContext, expecting: .bool) }
+        let optionalBindings = conditions.reduce(into: [String: TypeSignature]()) { result, condition in
+            if let optionalBinding = condition as? OptionalBinding {
+                result[optionalBinding.name] = optionalBinding.variableType
+            }
+        }
+        let bodyContext = context.pushingBlock(identifiers: optionalBindings)
+        let _ = body.inferTypes(context: bodyContext, expecting: .none)
+        if let elseBody {
+            let _ = elseBody.inferTypes(context: context, expecting: .none)
+        }
+        return context
+    }
+
+    override var children: [SyntaxNode] {
+        var children: [SyntaxNode] = conditions
+        children.append(body)
+        if let elseBody {
+            children.append(elseBody)
+        }
+        return children
     }
 }
 

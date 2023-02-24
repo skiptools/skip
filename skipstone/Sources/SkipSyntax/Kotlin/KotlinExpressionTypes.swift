@@ -6,6 +6,7 @@ enum KotlinExpressionType {
     case closure
     case functionCall
     case identifier
+    case `if`
     case memberAccess
     case nullLiteral
     case numericLiteral
@@ -373,6 +374,163 @@ class KotlinIdentifier: KotlinExpression {
             output.append("this")
         } else {
             output.append(Self.translateName(name))
+        }
+    }
+}
+
+class KotlinIf: KotlinExpression {
+    var optionalBindingVariables: [OptionalBindingVariable] = []
+    var conditions: [KotlinExpression]
+    var isGuard = false
+    var body: KotlinCodeBlock
+    var elseBody: KotlinCodeBlock?
+
+    struct OptionalBindingVariable {
+        var name: String
+        var declaredType: TypeSignature?
+        var value: KotlinExpression
+        var isLet: Bool
+    }
+
+    /// The entire `if/else if/else if/...` chain.
+    ///
+    /// The last element may have an `else`.
+    var chain: [KotlinIf] {
+        var chain = [self]
+        while let elseif = chain.last?.elseif {
+            chain.append(elseif)
+        }
+        return chain
+    }
+
+    private var elseif: KotlinIf? {
+        guard let elseBody, elseBody.statements.count == 1, let expressionStatement = elseBody.statements.first as? KotlinExpressionStatement else {
+            return nil
+        }
+        return expressionStatement.expression as? KotlinIf
+    }
+
+    static func translate(expression: If, translator: KotlinTranslator) -> KotlinIf {
+        let (optionalBindingVariables, conditions) = extractOptionalBindingVariables(from: expression.conditions, logicalNegated: false, translator: translator)
+        let kconditions = conditions.compactMap { translator.translateExpression($0) }
+        let kbody = KotlinCodeBlock.translate(statement: expression.body, translator: translator)
+        let kexpression = KotlinIf(expression: expression, conditions: kconditions, body: kbody)
+        kexpression.optionalBindingVariables = optionalBindingVariables
+        if let elseBody = expression.elseBody {
+            kexpression.elseBody = KotlinCodeBlock.translate(statement: elseBody, translator: translator)
+        }
+        return kexpression
+    }
+
+    static func translate(statement: Guard, translator: KotlinTranslator) -> KotlinExpressionStatement {
+        let (optionalBindingVariables, conditions) = extractOptionalBindingVariables(from: statement.conditions, logicalNegated: true, translator: translator)
+        let kconditions = conditions.compactMap { translator.translateExpression($0).logicalNegated() }
+        let kbody = KotlinCodeBlock.translate(statement: statement.body, translator: translator)
+        let kexpression = KotlinIf(conditions: kconditions, body: kbody, sourceFile: statement.sourceFile, sourceRange: statement.sourceRange)
+        kexpression.optionalBindingVariables = optionalBindingVariables
+        kexpression.isGuard = true
+
+        let kstatement = KotlinExpressionStatement(type: .expression)
+        kstatement.expression = kexpression
+        return kstatement
+    }
+
+    private static func extractOptionalBindingVariables(from conditions: [Expression], logicalNegated: Bool, translator: KotlinTranslator) -> ([OptionalBindingVariable], [Expression]) {
+        var optionalBindingVariables: [OptionalBindingVariable] = []
+        var updatedConditions: [Expression] = []
+        for condition in conditions {
+            // Extract any 'let x = y' to a separate variable and update the condition to 'x != nil'
+            if let optionalBinding = condition as? OptionalBinding {
+                let optionalBindingValue: KotlinExpression
+                if let value = optionalBinding.value {
+                    optionalBindingValue = translator.translateExpression(value)
+                } else {
+                    let identifier = KotlinIdentifier(name: optionalBinding.name)
+                    identifier.mayBeSharedMutableValue = optionalBinding.variableType.kotlinMayBeSharedMutableValue(codebaseInfo: translator.codebaseInfo)
+                    optionalBindingValue = identifier
+                }
+                let optionalBindingVariable = OptionalBindingVariable(name: optionalBinding.name, declaredType: optionalBinding.declaredType, value: optionalBindingValue.valueReference(), isLet: optionalBinding.isLet)
+                optionalBindingVariables.append(optionalBindingVariable)
+                let updatedCondition = BinaryOperator(op: logicalNegated ? .with(symbol: "==") : .with(symbol: "!="), lhs: Identifier(name: optionalBinding.name), rhs: NilLiteral())
+                updatedConditions.append(updatedCondition)
+            } else {
+                updatedConditions.append(condition)
+            }
+        }
+        return (optionalBindingVariables, updatedConditions)
+    }
+
+    init(conditions: [KotlinExpression], body: KotlinCodeBlock, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        self.conditions = conditions
+        self.body = body
+        super.init(type: .if, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    private init(expression: Expression, conditions: [KotlinExpression], body: KotlinCodeBlock) {
+        self.conditions = conditions
+        self.body = body
+        super.init(type: .if, expression: expression)
+    }
+
+    override var children: [KotlinSyntaxNode] {
+        var children: [KotlinSyntaxNode] = conditions
+        children.append(body)
+        if let elseBody {
+            children.append(elseBody)
+        }
+        return children
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        let ifChain = chain
+        let optionalBindingVariables = ifChain.flatMap { $0.optionalBindingVariables }
+        for optionalBindingVariable in optionalBindingVariables {
+            output.append(indentation).append(optionalBindingVariable.isLet ? "val " : "var ").append(optionalBindingVariable.name)
+            output.append(" = ").append(optionalBindingVariable.value, indentation: indentation).append("\n")
+        }
+        for (index, statement) in chain.enumerated() {
+            if index == 0 {
+                output.append("if (")
+            } else {
+                output.append(indentation).append("} else if (")
+            }
+            statement.appendConditions(to: output, indentation: indentation)
+            output.append(") {\n")
+
+            let bodyIndentation = indentation.inc()
+            output.append(statement.body, indentation: bodyIndentation)
+
+            if index == chain.count - 1 {
+                if let elseBody = statement.elseBody {
+                    output.append(indentation).append("} else {\n")
+                    output.append(elseBody, indentation: bodyIndentation)
+                }
+                output.append(indentation).append("}\n")
+            }
+        }
+    }
+
+    private func appendConditions(to output: OutputGenerator, indentation: Indentation) {
+        guard conditions.count > 1 else {
+            if let condition = conditions.first {
+                condition.append(to: output, indentation: indentation)
+            }
+            return
+        }
+
+        for (index, condition) in conditions.enumerated() {
+            // Special case the common !x compound expression to avoid unnecessary parentheses
+            let isCompound = condition.isCompoundExpression && !(condition is KotlinPrefixOperator && (condition as! KotlinPrefixOperator).operatorSymbol == "!")
+            if isCompound {
+                output.append("(")
+            }
+            output.append(condition, indentation: indentation)
+            if isCompound {
+                output.append(")")
+            }
+            if index < conditions.count - 1 {
+                output.append(" ").append(isGuard ? "||" : "&&").append(" ")
+            }
         }
     }
 }

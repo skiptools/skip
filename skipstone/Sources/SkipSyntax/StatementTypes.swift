@@ -9,7 +9,6 @@ enum StatementType: CaseIterable {
     case `do`
     case `for`
     case `guard`
-    case `if`
     case ifDefined
     case `return`
     case `switch`
@@ -52,8 +51,6 @@ enum StatementType: CaseIterable {
             return nil
         case .guard:
             return Guard.self
-        case .if:
-            return If.self
         case .ifDefined:
             return IfDefined.self
         case .return:
@@ -153,76 +150,6 @@ class Guard: Statement {
 
     override var children: [SyntaxNode] {
         return conditions + [body]
-    }
-}
-
-/// `if ...`
-class If: Statement {
-    let conditions: [Expression]
-    let body: CodeBlock
-    let elseBody: CodeBlock?
-
-    init(conditions: [Expression], body: CodeBlock, elseBody: CodeBlock? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
-        self.conditions = conditions
-        self.body = body
-        self.elseBody = elseBody
-        super.init(type: .if, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
-    }
-
-    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
-        let ifStmnt: IfExprSyntax
-        if syntax.kind == .ifExpr, let ifExprSyntax = syntax.as(IfExprSyntax.self) {
-            ifStmnt = ifExprSyntax
-        } else {
-            guard syntax.kind == .expressionStmt, let stmntSyntax = syntax.as(ExpressionStmtSyntax.self) else {
-                return nil
-            }
-            guard stmntSyntax.expression.kind == .ifExpr, let ifExprSyntax = stmntSyntax.expression.as(IfExprSyntax.self) else {
-                return nil
-            }
-            ifStmnt = ifExprSyntax
-        }
-
-        let conditions = try ifStmnt.conditions.map { try ExpressionDecoder.decodeCondition($0, in: syntaxTree) }
-        let statements = StatementDecoder.decode(syntaxListContainer: ifStmnt.body, in: syntaxTree)
-        let body = CodeBlock(statements: statements)
-        var elseBody: CodeBlock? = nil
-        if let elseSyntax = ifStmnt.elseBody {
-            let statements: [Statement]
-            switch elseSyntax {
-            case .ifExpr(let syntax):
-                statements = StatementDecoder.decode(syntax: syntax, in: syntaxTree)
-            case .codeBlock(let syntax):
-                statements = StatementDecoder.decode(syntaxListContainer: syntax, in: syntaxTree)
-            }
-            elseBody = CodeBlock(statements: statements)
-        }
-        return [If(conditions: conditions, body: body, elseBody: elseBody, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
-    }
-
-    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
-        var conditionsContext = context
-        conditions.forEach { conditionsContext = $0.inferTypes(context: conditionsContext, expecting: .bool) }
-        let optionalBindings = conditions.reduce(into: [String: TypeSignature]()) { result, condition in
-            if let optionalBinding = condition as? OptionalBinding {
-                result[optionalBinding.name] = optionalBinding.variableType
-            }
-        }
-        let bodyContext = context.pushingBlock(identifiers: optionalBindings)
-        let _ = body.inferTypes(context: bodyContext, expecting: .none)
-        if let elseBody {
-            let _ = elseBody.inferTypes(context: context, expecting: .none)
-        }
-        return context
-    }
-
-    override var children: [SyntaxNode] {
-        var children: [SyntaxNode] = conditions
-        children.append(body)
-        if let elseBody {
-            children.append(elseBody)
-        }
-        return children
     }
 }
 
@@ -365,8 +292,8 @@ class FunctionDeclaration: Statement {
     private static func decodeFunctionDeclaration(_ functionDecl: FunctionDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> FunctionDeclaration {
         let name = functionDecl.identifier.text
         let (returnType, parameters, messages) = functionDecl.signature.typeSignatures(in: syntaxTree)
-        let isAsync = functionDecl.signature.effectSpecifiers?.asyncSpecifier?.text == "async" || functionDecl.signature.effectSpecifiers?.throwsSpecifier?.text == "async"
-        let isThrows = functionDecl.signature.effectSpecifiers?.asyncSpecifier?.text == "throws" || functionDecl.signature.effectSpecifiers?.throwsSpecifier?.text == "throws"
+        let isAsync = functionDecl.signature.effectSpecifiers?.asyncSpecifier != nil
+        let isThrows = functionDecl.signature.effectSpecifiers?.throwsSpecifier != nil
         let attributes = Attributes.for(syntax: functionDecl.attributes)
         let modifiers = Modifiers.for(syntax: functionDecl.modifiers)
         var body: CodeBlock? = nil
@@ -381,8 +308,8 @@ class FunctionDeclaration: Statement {
     private static func decodeInitializerDeclaration(_ initializerDecl: InitializerDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> FunctionDeclaration {
         let isOptionalInit = initializerDecl.optionalMark != nil
         let (_, parameters, messages) = initializerDecl.signature.typeSignatures(in: syntaxTree)
-        let isAsync = initializerDecl.signature.effectSpecifiers?.asyncSpecifier?.text == "async" || initializerDecl.signature.effectSpecifiers?.throwsSpecifier?.text == "async"
-        let isThrows = initializerDecl.signature.effectSpecifiers?.asyncSpecifier?.text == "throws" || initializerDecl.signature.effectSpecifiers?.throwsSpecifier?.text == "throws"
+        let isAsync = initializerDecl.signature.effectSpecifiers?.asyncSpecifier != nil
+        let isThrows = initializerDecl.signature.effectSpecifiers?.throwsSpecifier != nil
         let attributes = Attributes.for(syntax: initializerDecl.attributes)
         let modifiers = Modifiers.for(syntax: initializerDecl.modifiers)
         var body: CodeBlock? = nil
@@ -662,11 +589,11 @@ class VariableDeclaration: Statement {
             switch accessor {
             case .accessors(let accessorListSyntax):
                 for accessorSyntax in accessorListSyntax.accessors {
-                    if accessorSyntax.effectSpecifiers?.throwsSpecifier?.text == "throws" || accessorSyntax.effectSpecifiers?.asyncSpecifier?.text == "throws" {
-                        isThrows = true
-                    }
-                    if accessorSyntax.effectSpecifiers?.throwsSpecifier?.text == "async" || accessorSyntax.effectSpecifiers?.asyncSpecifier?.text == "async" {
+                    if accessorSyntax.effectSpecifiers?.asyncSpecifier != nil {
                         isAsync = true
+                    }
+                    if accessorSyntax.effectSpecifiers?.throwsSpecifier != nil {
+                        isThrows = true
                     }
                     var body: CodeBlock? = nil
                     if let bodySyntax = accessorSyntax.body {

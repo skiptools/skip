@@ -93,10 +93,14 @@ class ExpressionStatement: Statement {
     }
 
     override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
-        guard let expression = ExpressionDecoder.decodeIfExpression(syntax: syntax, in: syntaxTree) else {
+        if syntax.kind == .expressionStmt, let expressionStmnt = syntax.as(ExpressionStmtSyntax.self) {
+            let expression = ExpressionDecoder.decode(syntax: expressionStmnt.expression, in: syntaxTree)
+            return [ExpressionStatement(expression: expression, syntax: expressionStmnt.expression, sourceFile: syntaxTree.source.file, sourceRange: expressionStmnt.expression.range(in: syntaxTree.source), extras: extras)]
+        } else if let expression = ExpressionDecoder.decodeIfExpression(syntax: syntax, in: syntaxTree) {
+            return [ExpressionStatement(expression: expression, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
+        } else {
             return nil
         }
-        return [ExpressionStatement(expression: expression, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
