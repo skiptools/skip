@@ -2,21 +2,30 @@
 public class KotlinCodebaseInfo {
     /// The package being generated.
     public let packageName: String?
+    /// Plugins being applied to the translation.
+    private(set) var plugins: [KotlinPlugin] = []
     private let symbols: Symbols?
 
     public init(packageName: String? = nil, symbols: Symbols? = nil) {
         self.packageName = packageName
         self.symbols = symbols
+        self.plugins = [
+            KotlinConstructorPlugin(),
+            KotlinOptionalBindingsPlugin(),
+            KotlinSwiftUIPlugin()
+        ]
     }
 
     /// Gather codebase-level information from the given syntax tree.
     func gather(from syntaxTree: SyntaxTree) {
         syntaxTree.root.visitStatements(perform: self.visit)
+        plugins.forEach { $0.gather(from: syntaxTree) }
     }
 
     /// Finalize codebase info after gathering is complete.
-    func finalize() {
+    func didGather() {
         mergeExtensionInfo()
+        plugins.forEach { $0.didGather() }
     }
 
     /// Any issues encountered during information gathering.

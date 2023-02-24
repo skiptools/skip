@@ -4,20 +4,18 @@
 /// This may shadow an existing variable for the remainder of the block (in fact it certainly will when we use the same name as the optional identifier), when the
 /// new variable should only apply to its owning if body. Additionally, multiple `if` or `else if` blocks may declare the same optional binding, which causes
 /// us to create multiple var declarations with the same identifier.
-class KotlinOptionalBindingsPlugin: KotlinTranslatorPlugin {
+class KotlinOptionalBindingsPlugin: KotlinPlugin {
+    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
+        let visitor = Visitor()
+        syntaxTree.root.visit(perform: visitor.visit)
+    }
+}
+
+private class Visitor {
     var bindingCount = 0
     var remappedIdentifierStack: [[String: String]] = []
 
-    init() {
-    }
-
-    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
-        bindingCount = 0
-        remappedIdentifierStack = [[:]]
-        syntaxTree.root.visit(perform: { visit($0) })
-    }
-
-    private func visit(_ node: KotlinSyntaxNode) -> VisitResult<KotlinSyntaxNode> {
+    func visit(_ node: KotlinSyntaxNode) -> VisitResult<KotlinSyntaxNode> {
 //        if let statement = node as? KotlinStatement {
 //            switch statement.type {
 //            case .if:

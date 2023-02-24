@@ -1,11 +1,5 @@
-/// Migrate SwiftUI constructors to Kotlin constructors.
-class KotlinConstructorPlugin: KotlinTranslatorPlugin {
-    private let codebaseInfo: KotlinCodebaseInfo.Context
-
-    init(codebaseInfo: KotlinCodebaseInfo.Context) {
-        self.codebaseInfo = codebaseInfo
-    }
-
+/// Migrate Swift constructors to Kotlin constructors.
+class KotlinConstructorPlugin: KotlinPlugin {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
         syntaxTree.root.visitStatements(perform: { visit($0, translator: translator) })
     }
@@ -30,7 +24,7 @@ class KotlinConstructorPlugin: KotlinTranslatorPlugin {
                 }
             }
             if mayNeedSuperclassCall {
-                addSuperclassCall(to: classDeclaration)
+                addSuperclassCall(to: classDeclaration, translator: translator)
             }
         case .constructorDeclaration:
             return .skip
@@ -90,7 +84,7 @@ class KotlinConstructorPlugin: KotlinTranslatorPlugin {
     }
 
     private func addInheritedConstructors(to classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) -> Bool {
-        let inheritedConstructorParameters = codebaseInfo.constructorParameters(of: classDeclaration.qualifiedName)
+        let inheritedConstructorParameters = translator.codebaseInfo?.constructorParameters(of: classDeclaration.qualifiedName) ?? []
         guard !inheritedConstructorParameters.isEmpty else {
             return false
         }
@@ -174,9 +168,9 @@ class KotlinConstructorPlugin: KotlinTranslatorPlugin {
         }
     }
 
-    private func addSuperclassCall(to classDeclaration: KotlinClassDeclaration) {
+    private func addSuperclassCall(to classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) {
         // If we have a superclass, we must instantiate it
-        if let inherits = classDeclaration.inherits.first, codebaseInfo.declarationType(of: inherits.description, mustBeInModule: false) == .classDeclaration {
+        if let inherits = classDeclaration.inherits.first, translator.codebaseInfo?.declarationType(of: inherits.description, mustBeInModule: false) == .classDeclaration {
             classDeclaration.superclassCall = "\(inherits.description)()"
         }
     }
