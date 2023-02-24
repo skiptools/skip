@@ -76,8 +76,6 @@ struct ExpressionDecoder {
             throw Message.unsupportedSyntax(syntax, source: syntaxTree.source)
         case .expression(let syntax):
             return decode(syntax: syntax, in: syntaxTree)
-        case .hasSymbol(let syntax):
-            throw Message.unsupportedSyntax(syntax, source: syntaxTree.source)
         case .matchingPattern(let syntax):
             throw Message.unsupportedSyntax(syntax, source: syntaxTree.source)
         case .optionalBinding(let syntax):

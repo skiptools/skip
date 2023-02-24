@@ -170,8 +170,17 @@ class If: Statement {
     }
 
     override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
-        guard syntax.kind == .ifStmt, let ifStmnt = syntax.as(IfStmtSyntax.self) else {
-            return nil
+        let ifStmnt: IfExprSyntax
+        if syntax.kind == .ifExpr, let ifExprSyntax = syntax.as(IfExprSyntax.self) {
+            ifStmnt = ifExprSyntax
+        } else {
+            guard syntax.kind == .expressionStmt, let stmntSyntax = syntax.as(ExpressionStmtSyntax.self) else {
+                return nil
+            }
+            guard stmntSyntax.expression.kind == .ifExpr, let ifExprSyntax = stmntSyntax.expression.as(IfExprSyntax.self) else {
+                return nil
+            }
+            ifStmnt = ifExprSyntax
         }
 
         let conditions = try ifStmnt.conditions.map { try ExpressionDecoder.decodeCondition($0, in: syntaxTree) }
@@ -181,7 +190,7 @@ class If: Statement {
         if let elseSyntax = ifStmnt.elseBody {
             let statements: [Statement]
             switch elseSyntax {
-            case .ifStmt(let syntax):
+            case .ifExpr(let syntax):
                 statements = StatementDecoder.decode(syntax: syntax, in: syntaxTree)
             case .codeBlock(let syntax):
                 statements = StatementDecoder.decode(syntaxListContainer: syntax, in: syntaxTree)
@@ -356,8 +365,8 @@ class FunctionDeclaration: Statement {
     private static func decodeFunctionDeclaration(_ functionDecl: FunctionDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> FunctionDeclaration {
         let name = functionDecl.identifier.text
         let (returnType, parameters, messages) = functionDecl.signature.typeSignatures(in: syntaxTree)
-        let isAsync = functionDecl.signature.asyncOrReasyncKeyword?.text == "async" || functionDecl.signature.throwsOrRethrowsKeyword?.text == "async"
-        let isThrows = functionDecl.signature.asyncOrReasyncKeyword?.text == "throws" || functionDecl.signature.throwsOrRethrowsKeyword?.text == "throws"
+        let isAsync = functionDecl.signature.effectSpecifiers?.asyncSpecifier?.text == "async" || functionDecl.signature.effectSpecifiers?.throwsSpecifier?.text == "async"
+        let isThrows = functionDecl.signature.effectSpecifiers?.asyncSpecifier?.text == "throws" || functionDecl.signature.effectSpecifiers?.throwsSpecifier?.text == "throws"
         let attributes = Attributes.for(syntax: functionDecl.attributes)
         let modifiers = Modifiers.for(syntax: functionDecl.modifiers)
         var body: CodeBlock? = nil
@@ -372,8 +381,8 @@ class FunctionDeclaration: Statement {
     private static func decodeInitializerDeclaration(_ initializerDecl: InitializerDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> FunctionDeclaration {
         let isOptionalInit = initializerDecl.optionalMark != nil
         let (_, parameters, messages) = initializerDecl.signature.typeSignatures(in: syntaxTree)
-        let isAsync = initializerDecl.signature.asyncOrReasyncKeyword?.text == "async" || initializerDecl.signature.throwsOrRethrowsKeyword?.text == "async"
-        let isThrows = initializerDecl.signature.asyncOrReasyncKeyword?.text == "throws" || initializerDecl.signature.throwsOrRethrowsKeyword?.text == "throws"
+        let isAsync = initializerDecl.signature.effectSpecifiers?.asyncSpecifier?.text == "async" || initializerDecl.signature.effectSpecifiers?.throwsSpecifier?.text == "async"
+        let isThrows = initializerDecl.signature.effectSpecifiers?.asyncSpecifier?.text == "throws" || initializerDecl.signature.effectSpecifiers?.throwsSpecifier?.text == "throws"
         let attributes = Attributes.for(syntax: initializerDecl.attributes)
         let modifiers = Modifiers.for(syntax: initializerDecl.modifiers)
         var body: CodeBlock? = nil
@@ -620,7 +629,7 @@ class VariableDeclaration: Statement {
             return nil
         }
 
-        let isLet = variableDecl.letOrVarKeyword.text == "let"
+        let isLet = variableDecl.bindingKeyword.text == "let"
         let attributes = Attributes.for(syntax: variableDecl.attributes)
         let modifiers = Modifiers.for(syntax: variableDecl.modifiers)
         var statements: [Statement] = []
@@ -653,10 +662,10 @@ class VariableDeclaration: Statement {
             switch accessor {
             case .accessors(let accessorListSyntax):
                 for accessorSyntax in accessorListSyntax.accessors {
-                    if accessorSyntax.throwsKeyword?.text == "throws" || accessorSyntax.asyncKeyword?.text == "throws" {
+                    if accessorSyntax.effectSpecifiers?.throwsSpecifier?.text == "throws" || accessorSyntax.effectSpecifiers?.asyncSpecifier?.text == "throws" {
                         isThrows = true
                     }
-                    if accessorSyntax.throwsKeyword?.text == "async" || accessorSyntax.asyncKeyword?.text == "async" {
+                    if accessorSyntax.effectSpecifiers?.throwsSpecifier?.text == "async" || accessorSyntax.effectSpecifiers?.asyncSpecifier?.text == "async" {
                         isAsync = true
                     }
                     var body: CodeBlock? = nil
