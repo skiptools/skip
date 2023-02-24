@@ -1,4 +1,4 @@
-@testable import Skip
+@testable import SkipSyntax
 import XCTest
 
 final class KotlinCodebaseInfoTests: XCTestCase {

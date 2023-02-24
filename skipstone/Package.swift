@@ -11,7 +11,7 @@ let package = Package(
         .iOS(.v16),
     ],
     products: [
-        .library(name: "Skip", targets: ["Skip"]),
+        .library(name: "SkipSyntax", targets: ["SkipSyntax"]),
         .library(name: "SkipBuild", targets: ["SkipBuild"]),
         .library(name: "SkipUnit", targets: ["SkipUnit"]),
         .library(name: "SkipKotlin", targets: ["SkipKotlin"]),
@@ -26,12 +26,12 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-docc-symbolkit.git", branch: "main"),
     ],
     targets: [
-        .target(name: "Skip", dependencies: [
+        .target(name: "SkipSyntax", dependencies: [
             .product(name: "SwiftSyntax", package: "swift-syntax"),
             .product(name: "SwiftSyntaxParser", package: "swift-syntax"),
             .product(name: "SymbolKit", package: "swift-docc-symbolkit"),
         ]),
-        .target(name: "SkipBuild", dependencies: ["Skip"]),
+        .target(name: "SkipBuild", dependencies: ["SkipSyntax"]),
         .target(name: "SkipUnit", dependencies: ["SkipBuild"]),
         .target(name: "SkipKotlin", dependencies: []),
         .target(name: "SkipFoundation", dependencies: [], resources: [.process("Resources")]),
@@ -39,7 +39,7 @@ let package = Package(
         .target(name: "SkipDemoLib", dependencies: ["SkipFoundation"], resources: [.process("Resources")]),
         .target(name: "SkipDemoApp", dependencies: ["SkipDemoLib", "SkipUI"], resources: [.process("Resources")]),
 
-        .testTarget(name: "SkipTests", dependencies: ["Skip", "SkipKotlin", "SkipBuild"]),
+        .testTarget(name: "SkipSyntaxTests", dependencies: ["SkipSyntax", "SkipKotlin", "SkipBuild"]),
         .testTarget(name: "SkipRunnerTests", dependencies: [], plugins: ["Skippy"]),
         .testTarget(name: "SkipBuildTests", dependencies: ["SkipBuild"]),
         .testTarget(name: "SkipUnitTests", dependencies: ["SkipUnit"]),

@@ -1,5 +1,5 @@
 import Foundation
-import Skip
+import SkipSyntax
 import SwiftParser
 import SwiftSyntax
 

@@ -1,5 +1,5 @@
-@testable import Skip
 import SkipBuild
+@testable import SkipSyntax
 import SymbolKit
 import XCTest
 
@@ -15,11 +15,11 @@ extension XCTestCase {
             for entry in try await symbolCache.symbols(for: "SkipKotlin", accessLevel: "public") {
                 collector.mergeSymbolGraph(entry.value, at: entry.key)
             }
-            for entry in try await symbolCache.symbols(for: "SkipTests", accessLevel: "private") {
+            for entry in try await symbolCache.symbols(for: "SkipSyntaxTests", accessLevel: "private") {
                 collector.mergeSymbolGraph(entry.value, at: entry.key)
             }
             let (unifiedGraphs, _) = collector.finishLoading()
-            let symbols = Symbols(moduleName: "SkipTests", graphs: unifiedGraphs)
+            let symbols = Symbols(moduleName: "SkipSyntaxTests", graphs: unifiedGraphs)
             Self.symbols = symbols
             return symbols
         }

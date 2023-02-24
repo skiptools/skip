@@ -1,6 +1,6 @@
 @_exported import SkipBuild
 @_exported import XCTest
-import Skip
+import SkipSyntax
 import os.log
 
 fileprivate let logger = Logger(subsystem: "skip", category: "unit")
