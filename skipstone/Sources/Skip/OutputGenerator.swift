@@ -1,17 +1,17 @@
 /// Generate output from a graph of nodes.
 class OutputGenerator {
-    private let roots: [OutputNode]
+    private let root: OutputNode
     private var content = ""
     private typealias MapEntryOffsets = (sourceFile: Source.File, sourceRange: Source.Range?, offset: Int, length: Int)
     private var mapEntryOffsets: [MapEntryOffsets] = []
 
-    /// Supply root nodes.
-    init(roots: [OutputNode]) {
-        self.roots = roots
+    /// Supply node.
+    init(root: OutputNode) {
+        self.root = root
     }
 
     public func generateOutput(file: Source.File) -> (output: Source, map: OutputMap) {
-        roots.forEach { append($0, indentation: .zero) }
+        append(root, indentation: .zero)
         let output = Source(file: file, content: content)
         let ret = (output, OutputMap(entries: mapEntryOffsets.map { outputMapEntry(for: $0, in: output) }))
         content = ""
@@ -67,11 +67,6 @@ class OutputGenerator {
 protocol OutputNode {
     var sourceFile: Source.File? { get }
     var sourceRange: Source.Range? { get }
-
-    /// Whether this node type's requested indentation should establish the current indentation level.
-    ///
-    /// - Seealso: ``OutputGenerator/indentationLevel``
-    var setsIndentationLevel: Bool { get }
 
     /// Any leading trivia before the output. Trivia is not part of the ranges.
     func leadingTrivia(indentation: Indentation) -> String

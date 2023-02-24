@@ -161,34 +161,31 @@ class KotlinClosure: KotlinExpression {
     var parameters: [Parameter<Void>] = []
     var implicitParameterLabels: [String] = []
     var isAnonymousFunction = false
-    var body: CodeBlock<KotlinStatement>
+    var body: KotlinCodeBlockStatement
     var returnLabel: String? = nil
 
     static func translate(expression: Closure, translator: KotlinTranslator) -> KotlinClosure {
         // If there is an explicit return type we'll use an anonymous function rather than a closure,
         // as Kotlin closures cannot declare a return type
+        let kbody = KotlinCodeBlockStatement.translate(statement: expression.body, translator: translator)
         let isAnonymousFunction = expression.returnType != .none
-        var kstatements = expression.body.statements.flatMap { translator.translateStatement($0) }
         var implicitParameterLabels: [String] = []
         var returnLabel: String? = nil
         if isAnonymousFunction {
             if expression.returnType != .void {
                 // A function that returns a value requires an explicit return
-                (kstatements, _) = kstatements.withExpectedReturn(.yes)
+                kbody.updateWithExpectedReturn(.yes)
             }
         } else {
             // Closures require a label for any explicit return, or it will return from the other scope
-            let (labeledStatements, didLabel) = kstatements.withExpectedReturn(.labelIfPresent("ll"))
-            if didLabel {
-                kstatements = labeledStatements
+            if kbody.updateWithExpectedReturn(.labelIfPresent("ll")) {
                 returnLabel = "ll"
             }
             if expression.parameters.isEmpty {
-                implicitParameterLabels = handleImplicitParameters(in: kstatements, inferredType: expression.inferredType)
+                implicitParameterLabels = handleImplicitParameters(in: kbody, inferredType: expression.inferredType)
             }
         }
-        let body = CodeBlock(statements: kstatements)
-        let kexpression = KotlinClosure(expression: expression, body: body)
+        let kexpression = KotlinClosure(expression: expression, body: kbody)
         kexpression.returnType = expression.returnType
         kexpression.parameters = expression.parameters
         kexpression.isAnonymousFunction = isAnonymousFunction
@@ -197,21 +194,19 @@ class KotlinClosure: KotlinExpression {
         return kexpression
     }
 
-    private static func handleImplicitParameters(in kstatements: [KotlinStatement], inferredType: TypeSignature) -> [String] {
+    private static func handleImplicitParameters(in body: KotlinCodeBlockStatement, inferredType: TypeSignature) -> [String] {
         // Find the highest $n identifier used in the closure
         var highestParameter = -1
-        kstatements.forEach {
-            $0.visit { node in
-                if node is KotlinClosure {
-                    return .skip
-                } else if let identifier = node as? KotlinIdentifier {
-                    if let index = identifier.name.implicitClosureParameterIndex {
-                        highestParameter = max(highestParameter, index)
-                    }
-                    return .skip
-                } else {
-                    return .recurse(nil)
+        body.visit { node in
+            if node is KotlinClosure {
+                return .skip
+            } else if let identifier = node as? KotlinIdentifier {
+                if let index = identifier.name.implicitClosureParameterIndex {
+                    highestParameter = max(highestParameter, index)
                 }
+                return .skip
+            } else {
+                return .recurse(nil)
             }
         }
 
@@ -227,13 +222,13 @@ class KotlinClosure: KotlinExpression {
         return (0...highestParameter).map { KotlinIdentifier.translateName("$\($0)") }
     }
 
-    private init(expression: Closure, body: CodeBlock<KotlinStatement>) {
+    private init(expression: Closure, body: KotlinCodeBlockStatement) {
         self.body = body
         super.init(type: .closure, expression: expression)
     }
 
     override var children: [KotlinSyntaxNode] {
-        return body.statements
+        return [body]
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
@@ -273,7 +268,7 @@ class KotlinClosure: KotlinExpression {
                 output.append(" ->\n")
             }
         }
-        output.append(body.statements, indentation: indentation.inc())
+        output.append(body, indentation: indentation.inc())
         output.append(indentation).append("}")
     }
 }

@@ -20,6 +20,7 @@ class KotlinStatement: KotlinSyntaxNode {
     ///
     /// - Parameters:
     ///   - Parameter perform: The action to perform.
+    /// - Warning: This method does not traverse through `Expressions` to find additional statements (e.g. in closures).
     func visitStatements(perform: (KotlinStatement) -> VisitResult<KotlinStatement>) {
         if case .recurse(let onLeave) = perform(self) {
             for child in children {
@@ -46,6 +47,86 @@ class KotlinStatement: KotlinSyntaxNode {
 protocol KotlinMemberDeclaration: AnyObject {
     var extends: TypeSignature? { get set }
     var isStatic: Bool { get }
+}
+
+class KotlinCodeBlockStatement: KotlinStatement {
+    var statements: [KotlinStatement]
+
+    static func translate(statement: CodeBlockStatement, translator: KotlinTranslator) -> KotlinCodeBlockStatement {
+        let kstatements = statement.statements.flatMap { translator.translateStatement($0) }
+        return KotlinCodeBlockStatement(statements: kstatements)
+    }
+
+    init(statements: [KotlinStatement] = []) {
+        self.statements = statements
+        super.init(type: .codeBlock)
+    }
+
+    /// Perform any necessary updates to the return statements in this block.
+    ///
+    /// - Returns: Whether any return statements were found.
+    @discardableResult func updateWithExpectedReturn(_ expectedReturn: ExpectedReturn) -> Bool {
+        var label: String?
+        var valref = false
+        var returnRequired = false
+        var onUpdate: String? = nil
+        switch expectedReturn {
+        case .no:
+            // Don't shortcut and return here because we need to return whether any return statements were found
+            break
+        case .yes:
+            returnRequired = true
+        case .labelIfPresent(let l):
+            label = l
+        case .valueReference(let update):
+            onUpdate = update
+            valref = true
+            returnRequired = true
+        }
+
+        var didFindReturn = false
+        visitStatements { statement in
+            switch statement.type {
+            case .functionDeclaration:
+                // Skip embedded functions that may have their own returns
+                return .skip
+            case .return:
+                let returnStatement = statement as! KotlinReturn
+                didFindReturn = true
+                if let label {
+                    returnStatement.label = label
+                }
+                if valref {
+                    returnStatement.expression = returnStatement.expression?.valueReference(onUpdate: onUpdate)
+                }
+                return .skip
+            default:
+                break
+            }
+            return .recurse(nil)
+        }
+        if didFindReturn {
+            return true
+        }
+
+        // If this was an implicit return, replace it with an explicit one if a return is required
+        guard returnRequired, statements.count == 1, statements[0].type == .expression, var expression = (statements[0] as! KotlinExpressionStatement).expression else {
+            return false
+        }
+        if valref {
+            expression = expression.valueReference(onUpdate: onUpdate)
+        }
+        statements = [KotlinReturn(expression: expression)]
+        return true
+    }
+
+    override var children: [KotlinSyntaxNode] {
+        return statements
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        output.append(statements, indentation: indentation)
+    }
 }
 
 class KotlinExpressionStatement: KotlinStatement {

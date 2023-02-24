@@ -11,11 +11,10 @@ class KotlinOptionalBindingsPlugin: KotlinTranslatorPlugin {
     init() {
     }
 
-    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> KotlinSyntaxTree {
+    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
         bindingCount = 0
         remappedIdentifierStack = [[:]]
-        syntaxTree.statements.forEach { $0.visit(perform: { visit($0) }) }
-        return syntaxTree
+        syntaxTree.root.visit(perform: { visit($0) })
     }
 
     private func visit(_ node: KotlinSyntaxNode) -> VisitResult<KotlinSyntaxNode> {

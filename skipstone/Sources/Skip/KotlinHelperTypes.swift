@@ -10,94 +10,15 @@ enum ExpectedReturn {
     case valueReference(String?)
 }
 
-extension Accessor where S: Statement {
+extension Accessor where B: CodeBlockStatement {
     /// Translate to an equivalent Kotlin accessor.
-    func translate(translator: KotlinTranslator, expectedReturn: ExpectedReturn) -> Accessor<KotlinStatement> {
+    func translate(translator: KotlinTranslator, expectedReturn: ExpectedReturn) -> Accessor<KotlinCodeBlockStatement> {
         if let body {
-            return Accessor<KotlinStatement>(parameterName: parameterName, body: body.translate(translator: translator, expectedReturn: expectedReturn))
+            let kbody = KotlinCodeBlockStatement.translate(statement: body, translator: translator)
+            kbody.updateWithExpectedReturn(expectedReturn)
+            return Accessor<KotlinCodeBlockStatement>(parameterName: parameterName, body: kbody)
         }
-        return Accessor<KotlinStatement>(parameterName: parameterName)
-    }
-}
-
-extension Array where Element: KotlinStatement {
-    /// Perform any necessary updates to the return statements in this block.
-    ///
-    /// - Returns: The updated statements and whether any return statements were found.
-    func withExpectedReturn(_ expectedReturn: ExpectedReturn) -> ([KotlinStatement], Bool) {
-        var label: String?
-        var valref = false
-        var returnRequired = false
-        var onUpdate: String? = nil
-        switch expectedReturn {
-        case .no:
-            // Don't shortcut and return here because we need to return whether any return statements were found
-            break
-        case .yes:
-            returnRequired = true
-        case .labelIfPresent(let l):
-            label = l
-        case .valueReference(let update):
-            onUpdate = update
-            valref = true
-            returnRequired = true
-        }
-
-        var didFindReturn = false
-        forEach {
-            $0.visitStatements { statement in
-                switch statement.type {
-                case .expression:
-                    // Skip closures that may have their own returns
-                    if (statement as! KotlinExpressionStatement).expression is KotlinClosure {
-                        return .skip
-                    }
-                case .functionDeclaration:
-                    // Skip embedded functions that may have their own returns
-                    return .skip
-                case .return:
-                    let returnStatement = statement as! KotlinReturn
-                    didFindReturn = true
-                    if let label {
-                        returnStatement.label = label
-                    }
-                    if valref {
-                        returnStatement.expression = returnStatement.expression?.valueReference(onUpdate: onUpdate)
-                    }
-                    return .skip
-                default:
-                    break
-                }
-                return .recurse(nil)
-            }
-        }
-        if didFindReturn {
-            return (self, true)
-        }
-
-        // If this was an implicit return, replace it with an explicit one if a return is required
-        guard returnRequired, count == 1, self[0].type == .expression, var expression = (self[0] as! KotlinExpressionStatement).expression else {
-            return (self, false)
-        }
-        if valref {
-            expression = expression.valueReference(onUpdate: onUpdate)
-        }
-        return ([KotlinReturn(expression: expression)], true)
-    }
-}
-
-extension CodeBlock where S: Statement {
-    /// Translate to an equivalent Kotlin code block.
-    func translate(translator: KotlinTranslator, expectedReturn: ExpectedReturn = .no) -> CodeBlock<KotlinStatement> {
-        var kstatements = statements.flatMap { translator.translateStatement($0) }
-        switch expectedReturn {
-        case .no:
-            break
-        default:
-            let (statementsWithReturn, _) = kstatements.withExpectedReturn(expectedReturn)
-            kstatements = statementsWithReturn
-        }
-        return CodeBlock<KotlinStatement>(statements: kstatements)
+        return Accessor<KotlinCodeBlockStatement>(parameterName: parameterName)
     }
 }
 
@@ -127,7 +48,7 @@ extension Modifiers {
     }
 }
 
-extension Parameter where E: Expression {
+extension Parameter where V: Expression {
     /// Translate to an equivalent Kotlin parameter.
     func translate(translator: KotlinTranslator) -> Parameter<KotlinExpression> {
         var kdefaultValue: KotlinExpression? = nil

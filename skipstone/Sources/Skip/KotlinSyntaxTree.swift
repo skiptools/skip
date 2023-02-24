@@ -1,14 +1,14 @@
 /// Representation of the Kotlin syntax tree.
 public class KotlinSyntaxTree {
     let sourceFile: Source.File
-    let statements: [KotlinStatement]
+    let root: KotlinCodeBlockStatement
 
-    init(sourceFile: Source.File, statements: [KotlinStatement]) {
+    init(sourceFile: Source.File, root: KotlinCodeBlockStatement) {
         self.sourceFile = sourceFile
-        self.statements = statements
+        self.root = root
     }
 
     public var messages: [Message] {
-        return statements.flatMap { $0.subtreeMessages }
+        return root.subtreeMessages
     }
 }

@@ -6,9 +6,8 @@ class KotlinConstructorPlugin: KotlinTranslatorPlugin {
         self.codebaseInfo = codebaseInfo
     }
 
-    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> KotlinSyntaxTree {
-        syntaxTree.statements.forEach { $0.visitStatements(perform: { visit($0, translator: translator) }) }
-        return syntaxTree
+    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
+        syntaxTree.root.visitStatements(perform: { visit($0, translator: translator) })
     }
 
     private func visit(_ statement: KotlinStatement, translator: KotlinTranslator) -> VisitResult<KotlinStatement> {
@@ -80,16 +79,14 @@ class KotlinConstructorPlugin: KotlinTranslatorPlugin {
             statement.expression = assignmentOperator
             return statement
         }
-        constructor.body = CodeBlock<KotlinStatement>(statements: bodyStatements)
+        constructor.body = KotlinCodeBlockStatement(statements: bodyStatements)
 
         classDeclaration.members.append(constructor)
         constructor.parent = classDeclaration
         // We're intentionally not calling assignParentReferences on the constructor itself, because we may
-        // be sharing parameter default value expressions with variable value expressions. Call on our statements directly
-        for bodyStatement in bodyStatements {
-            bodyStatement.parent = constructor
-            bodyStatement.assignParentReferences()
-        }
+        // be sharing parameter default value expressions with variable value expressions. Call on our body directly
+        constructor.body?.parent = constructor
+        constructor.body?.assignParentReferences()
     }
 
     private func addInheritedConstructors(to classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) -> Bool {
@@ -124,7 +121,7 @@ class KotlinConstructorPlugin: KotlinTranslatorPlugin {
 
         constructor.modifiers = classDeclaration.modifiers
         constructor.extras = .singleNewline
-        constructor.body = CodeBlock<KotlinStatement>(statements: [])
+        constructor.body = KotlinCodeBlockStatement(statements: [])
 
         classDeclaration.members.append(constructor)
         constructor.parent = classDeclaration
@@ -135,7 +132,7 @@ class KotlinConstructorPlugin: KotlinTranslatorPlugin {
         guard constructor.delegatingConstructorCall == nil else {
             return true
         }
-        guard var body = constructor.body else {
+        guard let body = constructor.body else {
             return false
         }
 
@@ -149,7 +146,6 @@ class KotlinConstructorPlugin: KotlinTranslatorPlugin {
                 break
             }
             body.statements.remove(at: index)
-            constructor.body = body
             constructor.delegatingConstructorCall = delegatingCall
         }
         return constructor.delegatingConstructorCall != nil

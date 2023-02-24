@@ -6,16 +6,16 @@ public class SyntaxTree: PrettyPrintable {
     let source: Source
     let syntax: SourceFileSyntax
     let preprocessorSymbols: Set<String>
-    var statements: [Statement] = []
+    private(set) var root: CodeBlockStatement = CodeBlockStatement(statements: [])
 
     public init(source: Source, preprocessorSymbols: Set<String> = [], symbols: Symbols? = nil) {
         self.source = source
         self.preprocessorSymbols = preprocessorSymbols
         self.syntax = Parser.parse(source: source.content)
-        self.statements = StatementDecoder.decode(syntaxListContainer: syntax, in: self)
+        self.root = CodeBlockStatement(statements: StatementDecoder.decode(syntaxListContainer: syntax, in: self))
 
         // Resolve nodes breadth first so that a child can use information from its parent's siblings
-        var resolveQueue: [SyntaxNode] = statements
+        var resolveQueue: [SyntaxNode] = [root]
         while !resolveQueue.isEmpty {
             let node = resolveQueue.removeFirst()
             node.resolveAttributes()
@@ -23,15 +23,15 @@ public class SyntaxTree: PrettyPrintable {
             resolveQueue += node.children
         }
 
-        var context = TypeInferenceContext(symbols: symbols, sourceFile: source.file, statements: statements)
-        statements.forEach { context = $0.inferTypes(context: context, expecting: .none) }
+        let context = TypeInferenceContext(symbols: symbols, sourceFile: source.file, statements: root.statements)
+        let _ = root.inferTypes(context: context, expecting: .none)
     }
 
     public var prettyPrintTree: PrettyPrintTree {
-        return PrettyPrintTree(root: source.file.name, children: statements.map { $0.prettyPrintTree })
+        return PrettyPrintTree(root: source.file.name, children: [root.prettyPrintTree])
     }
 
     public var messages: [Message] {
-        return statements.flatMap { $0.subtreeMessages }
+        return root.subtreeMessages
     }
 }

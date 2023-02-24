@@ -12,9 +12,9 @@ enum KotlinStatementType {
     case interfaceDeclaration
     case variableDeclaration
 
-    /// A statement representing raw Kotlin code.
+    // Special statements
+    case codeBlock
     case raw
-    /// A statement that only exists to add a message to the syntax tree.
     case message
 }
 
@@ -22,8 +22,8 @@ class KotlinIf: KotlinStatement {
     var optionalBindingVariables: [OptionalBindingVariable] = []
     var conditions: [KotlinExpression]
     var isGuard = false
-    var body: CodeBlock<KotlinStatement>
-    var elseBody: CodeBlock<KotlinStatement>?
+    var body: KotlinCodeBlockStatement
+    var elseBody: KotlinCodeBlockStatement?
 
     struct OptionalBindingVariable {
         var name: String
@@ -53,18 +53,20 @@ class KotlinIf: KotlinStatement {
     static func translate(statement: If, translator: KotlinTranslator) -> KotlinIf {
         let (optionalBindingVariables, conditions) = extractOptionalBindingVariables(from: statement.conditions, logicalNegated: false, translator: translator)
         let kconditions = conditions.compactMap { translator.translateExpression($0) }
-        let body = statement.body.translate(translator: translator)
-        let kstatement = KotlinIf(statement: statement, conditions: kconditions, body: body)
+        let kbody = KotlinCodeBlockStatement.translate(statement: statement.body, translator: translator)
+        let kstatement = KotlinIf(statement: statement, conditions: kconditions, body: kbody)
         kstatement.optionalBindingVariables = optionalBindingVariables
-        kstatement.elseBody = statement.elseBody?.translate(translator: translator)
+        if let elseBody = statement.elseBody {
+            kstatement.elseBody = KotlinCodeBlockStatement.translate(statement: elseBody, translator: translator)
+        }
         return kstatement
     }
 
     static func translate(statement: Guard, translator: KotlinTranslator) -> KotlinIf {
         let (optionalBindingVariables, conditions) = extractOptionalBindingVariables(from: statement.conditions, logicalNegated: true, translator: translator)
         let kconditions = conditions.compactMap { translator.translateExpression($0).logicalNegated() }
-        let body = statement.body.translate(translator: translator)
-        let kstatement = KotlinIf(statement: statement, conditions: kconditions, body: body)
+        let kbody = KotlinCodeBlockStatement.translate(statement: statement.body, translator: translator)
+        let kstatement = KotlinIf(statement: statement, conditions: kconditions, body: kbody)
         kstatement.optionalBindingVariables = optionalBindingVariables
         kstatement.isGuard = true
         return kstatement
@@ -95,16 +97,17 @@ class KotlinIf: KotlinStatement {
         return (optionalBindingVariables, updatedConditions)
     }
 
-    private init(statement: Statement, conditions: [KotlinExpression], body: CodeBlock<KotlinStatement>) {
+    private init(statement: Statement, conditions: [KotlinExpression], body: KotlinCodeBlockStatement) {
         self.conditions = conditions
         self.body = body
         super.init(type: .if, statement: statement)
     }
 
     override var children: [KotlinSyntaxNode] {
-        var children = conditions + body.statements
+        var children: [KotlinSyntaxNode] = conditions
+        children.append(body)
         if let elseBody {
-            children += elseBody.statements
+            children.append(elseBody)
         }
         return children
     }
@@ -126,12 +129,12 @@ class KotlinIf: KotlinStatement {
             output.append(") {\n")
 
             let bodyIndentation = indentation.inc()
-            output.append(statement.body.statements, indentation: bodyIndentation)
+            output.append(statement.body, indentation: bodyIndentation)
 
             if index == chain.count - 1 {
                 if let elseBody = statement.elseBody {
                     output.append(indentation).append("} else {\n")
-                    output.append(elseBody.statements, indentation: bodyIndentation)
+                    output.append(elseBody, indentation: bodyIndentation)
                 }
                 output.append(indentation).append("}\n")
             }
@@ -337,7 +340,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var isAsync = false
     var isOpen = false
     var modifiers = Modifiers()
-    var body: CodeBlock<KotlinStatement>?
+    var body: KotlinCodeBlockStatement?
     var delegatingConstructorCall: KotlinExpression?
 
     // KotlinMemberDeclaration
@@ -359,8 +362,8 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             }
         }
         if let body = statement.body {
-            let expectedReturn: ExpectedReturn = statement.returnType == .void ? .no : .valueReference(nil)
-            kstatement.body = body.translate(translator: translator, expectedReturn: expectedReturn)
+            kstatement.body = KotlinCodeBlockStatement.translate(statement: body, translator: translator)
+            kstatement.body?.updateWithExpectedReturn(statement.returnType == .void ? .no : .valueReference(nil))
         }
         kstatement.returnType.appendKotlinMessages(to: kstatement)
         kstatement.parameters.forEach { $0.declaredType.appendKotlinMessages(to: kstatement) }
@@ -400,7 +403,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             children.append(delegatingConstructorCall)
         }
         if let body {
-            children += body.statements
+            children.append(body)
         }
         return children
     }
@@ -459,7 +462,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                         output.append(bodyIndentation).append("val \(parameter.internalLabel) = \(externalLabel)\n")
                     }
                 }
-                output.append(body.statements, indentation: bodyIndentation)
+                output.append(body, indentation: bodyIndentation)
             }
             output.append(indentation).append("}\n")
         } else {
@@ -560,10 +563,10 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var isOpen = false
     var modifiers = Modifiers()
     var value: KotlinExpression?
-    var getter: Accessor<KotlinStatement>?
-    var setter: Accessor<KotlinStatement>?
-    var willSet: Accessor<KotlinStatement>?
-    var didSet: Accessor<KotlinStatement>?
+    var getter: Accessor<KotlinCodeBlockStatement>?
+    var setter: Accessor<KotlinCodeBlockStatement>?
+    var willSet: Accessor<KotlinCodeBlockStatement>?
+    var didSet: Accessor<KotlinCodeBlockStatement>?
     var variableType: TypeSignature = .none
     var mayBeSharedMutableValue = false
     var isReadOnly = false
@@ -587,7 +590,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             if kstatement.isProperty && translator.codebaseInfo?.isProtocolMember(declaration: statement, in: owningTypeDeclaration) == true {
                 kstatement.modifiers.isOverride = true
             }
-        } else if statement.parent == nil {
+        } else if statement.parent?.parent == nil {
             kstatement.isGlobal = true
         }
         if let value = statement.value {
@@ -630,17 +633,17 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if let value {
             children.append(value)
         }
-        if let statements = getter?.body?.statements {
-            children += statements
+        if let body = getter?.body {
+            children.append(body)
         }
-        if let statements = setter?.body?.statements {
-            children += statements
+        if let body = setter?.body {
+            children.append(body)
         }
-        if let statements = willSet?.body?.statements {
-            children += statements
+        if let body = willSet?.body {
+            children.append(body)
         }
-        if let statements = didSet?.body?.statements {
-            children += statements
+        if let body = didSet?.body {
+            children.append(body)
         }
         return children
     }
@@ -679,10 +682,10 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             output.append("\n")
         }
 
-        if let getterStatements = getter?.body?.statements {
+        if let getterBody = getter?.body {
             let getterIndentation = indentation.inc()
             output.append(getterIndentation).append("get() {\n")
-            output.append(getterStatements, indentation: getterIndentation.inc())
+            output.append(getterBody, indentation: getterIndentation.inc())
             output.append(getterIndentation).append("}\n")
         } else if mayBeSharedMutableValue && (isProperty || isGlobal) {
             let getterIndentation = indentation.inc()
@@ -699,25 +702,25 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             } else {
                 output.append(setterIndentation).append("set(newValue) {\n")
             }
-            if let willSetStatements = willSet?.body?.statements {
+            if let willSetBody = willSet?.body {
                 if let parameterName = willSet?.parameterName, parameterName != "newValue" {
                     output.append(setterBodyIndentation).append("val \(parameterName) = newValue\n")
                 }
-                output.append(willSetStatements, indentation: setterBodyIndentation)
+                output.append(willSetBody, indentation: setterBodyIndentation)
             }
-            if let setterStatements = setter?.body?.statements {
+            if let setterBody = setter?.body {
                 if let parameterName = setter?.parameterName, parameterName != "newValue" && parameterName != willSet?.parameterName {
                     output.append(setterBodyIndentation).append("val \(parameterName) = newValue\n")
                 }
-                output.append(setterStatements, indentation: setterBodyIndentation)
+                output.append(setterBody, indentation: setterBodyIndentation)
             } else {
-                if didSet?.body?.statements != nil {
+                if didSet?.body != nil {
                     output.append(setterBodyIndentation).append("val oldValue = field\n")
                 }
                 output.append(setterBodyIndentation).append("field = newValue\n")
             }
-            if let didSetStatements = didSet?.body?.statements {
-                output.append(didSetStatements, indentation: setterBodyIndentation)
+            if let didSetBody = didSet?.body {
+                output.append(didSetBody, indentation: setterBodyIndentation)
             }
             output.append(setterIndentation).append("}\n")
         } else if !isReadOnly && mayBeSharedMutableValue && (isProperty || isGlobal) {

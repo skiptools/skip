@@ -8,10 +8,10 @@ class KotlinSwiftUIPlugin: KotlinTranslatorPlugin {
         self.codebaseInfo = codebaseInfo
     }
 
-    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> KotlinSyntaxTree {
+    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
         // Does this file need translation?
         var needsTranslation = false
-        for importDeclaration in syntaxTree.statements.compactMap({ $0 as? KotlinImportDeclaration }) {
+        for importDeclaration in syntaxTree.root.statements.compactMap({ $0 as? KotlinImportDeclaration }) {
             // Update SwiftUI imports to SkipUI
             if importDeclaration.modulePath.first == "SwiftUI" {
                 needsTranslation = true
@@ -20,12 +20,9 @@ class KotlinSwiftUIPlugin: KotlinTranslatorPlugin {
                 needsTranslation = true
             }
         }
-        guard needsTranslation else {
-            return syntaxTree
+        if needsTranslation {
+            syntaxTree.root.visit(perform: self.visit)
         }
-
-        syntaxTree.statements.forEach { $0.visit(perform: self.visit) }
-        return syntaxTree
     }
 
     private func visit(_ node: KotlinSyntaxNode) -> VisitResult<KotlinSyntaxNode> {
@@ -57,14 +54,15 @@ class KotlinSwiftUIPlugin: KotlinTranslatorPlugin {
 
     private func translateFunctionCall(_ functionCall: KotlinFunctionCall) {
         for viewBuilder in viewBuilderParameters(in: functionCall) {
-            viewBuilder.body = translateViewBuilder(viewBuilder.body)
+            translateViewBuilder(viewBuilder.body)
+            viewBuilder.body.assignParentReferences()
         }
     }
 
-    private func translateViewBuilder(_ codeBlock: CodeBlock<KotlinStatement>) -> CodeBlock<KotlinStatement> {
-        let statements = codeBlock.statements.map { translateViewBuilderStatement($0) }
-        guard statements.count > 1, !hasExplicitReturn(statements) else {
-            return CodeBlock(statements: statements)
+    private func translateViewBuilder(_ codeBlock: KotlinCodeBlockStatement) {
+        codeBlock.statements = codeBlock.statements.map { translateViewBuilderStatement($0) }
+        guard codeBlock.statements.count > 1, !hasExplicitReturn(codeBlock) else {
+            return
         }
         // Wrap multi-statement view builders in an array
         var elements: [KotlinExpression] = []
@@ -81,10 +79,7 @@ class KotlinSwiftUIPlugin: KotlinTranslatorPlugin {
         arrayLiteral.useMultilineFormatting = true
         let arrayStatement = KotlinExpressionStatement()
         arrayStatement.expression = arrayLiteral
-
-        arrayStatement.parent = codeBlock.statements.first?.parent
-        arrayStatement.assignParentReferences()
-        return CodeBlock(statements: [arrayStatement])
+        codeBlock.statements = [arrayStatement]
     }
 
     private func translateViewBuilderStatement(_ statement: KotlinStatement) -> KotlinStatement {
@@ -112,8 +107,7 @@ class KotlinSwiftUIPlugin: KotlinTranslatorPlugin {
         return []//functionCall.arguments.compactMap { $0.value as? KotlinClosure }
     }
 
-    private func hasExplicitReturn(_ statements: [KotlinStatement]) -> Bool {
-        let (_, hasReturn) = statements.withExpectedReturn(.no)
-        return hasReturn
+    private func hasExplicitReturn(_ codeBlock: KotlinCodeBlockStatement) -> Bool {
+        return codeBlock.updateWithExpectedReturn(.no)
     }
 }

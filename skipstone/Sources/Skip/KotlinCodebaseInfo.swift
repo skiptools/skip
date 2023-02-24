@@ -11,7 +11,7 @@ public class KotlinCodebaseInfo {
 
     /// Gather codebase-level information from the given syntax tree.
     func gather(from syntaxTree: SyntaxTree) {
-        syntaxTree.statements.forEach { $0.visitStatements(perform: self.visit) }
+        syntaxTree.root.visitStatements(perform: self.visit)
     }
 
     /// Finalize codebase info after gathering is complete.
@@ -61,6 +61,9 @@ public class KotlinCodebaseInfo {
             var infos = extensionInfo[key, default: []]
             infos.append(ExtensionInfo(declaration: declaration, sourceFile: statement.sourceFile))
             extensionInfo[key] = infos
+
+        case .codeBlock:
+            break // Don't skip root code block
         default:
             return .skip
         }

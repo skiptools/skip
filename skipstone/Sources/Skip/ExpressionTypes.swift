@@ -237,9 +237,9 @@ class Closure: Expression {
     private(set) var parameters: [Parameter<Void>]
     let isAsync: Bool
     let isThrows: Bool
-    let body: CodeBlock<Statement>
+    let body: CodeBlockStatement
 
-    init(returnType: TypeSignature = .none, parameters: [Parameter<Void>], isAsync: Bool = false, isThrows: Bool = false, body: CodeBlock<Statement> = CodeBlock<Statement>(statements: []), syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(returnType: TypeSignature = .none, parameters: [Parameter<Void>], isAsync: Bool = false, isThrows: Bool = false, body: CodeBlockStatement, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
         self.returnType = returnType
         self.parameters = parameters
         self.isAsync = isAsync
@@ -256,7 +256,7 @@ class Closure: Expression {
         let isAsync = closureExpr.signature?.asyncKeyword?.text == "async" || closureExpr.signature?.throwsTok?.text == "async"
         let isThrows = closureExpr.signature?.asyncKeyword?.text == "throws" || closureExpr.signature?.throwsTok?.text == "throws"
         let statements = StatementDecoder.decode(syntaxList: closureExpr.statements, in: syntaxTree)
-        let body = CodeBlock<Statement>(statements: statements)
+        let body = CodeBlockStatement(statements: statements)
         let expression = Closure(returnType: returnType, parameters: parameters, isAsync: isAsync, isThrows: isThrows, body: body, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
         expression.messages = messages
         return expression
@@ -268,9 +268,8 @@ class Closure: Expression {
         }
         functionType = .function(parameterSignatures, returnType).or(expecting)
 
-        var bodyContext = context.pushing(self)
-        body.statements.forEach { bodyContext = $0.inferTypes(context: bodyContext, expecting: .none) }
-
+        let bodyContext = context.pushing(self)
+        let _ = body.inferTypes(context: bodyContext, expecting: .none)
         return context
     }
 
@@ -281,7 +280,7 @@ class Closure: Expression {
     }
 
     override var children: [SyntaxNode] {
-        return body.statements
+        return [body]
     }
 
     override var prettyPrintAttributes: [PrettyPrintTree] {

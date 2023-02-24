@@ -38,7 +38,7 @@ public class KotlinTranslator {
 
     /// Translate and transpile to source code.
     public func transpile(codebaseInfo: KotlinCodebaseInfo) -> Transpilation {
-        let importedModuleNames: [String] = syntaxTree.statements.compactMap { statement in
+        let importedModuleNames: [String] = syntaxTree.root.statements.compactMap { statement in
             guard statement.type == .importDeclaration, let importDeclaration = statement as? ImportDeclaration else {
                 return nil
             }
@@ -48,13 +48,13 @@ public class KotlinTranslator {
         self.codebaseInfo = codebaseInfoContext
         self.packageName = codebaseInfo.packageName
 
-        let translatedSyntaxTree = translateSyntaxTree()
-        translatedSyntaxTree.statements.forEach { $0.assignParentReferences() }
-
-        let kotlinSyntaxTree = applyPlugins(to: translatedSyntaxTree, codebaseInfo: codebaseInfoContext)
+        let kotlinSyntaxTree = translateSyntaxTree()
+        kotlinSyntaxTree.root.assignParentReferences()
+        applyPlugins(to: kotlinSyntaxTree, codebaseInfo: codebaseInfoContext)
+        
         let messages = codebaseInfo.messages(for: syntaxTree.source.file) + kotlinSyntaxTree.messages
         let outputFile = syntaxTree.source.file.outputFile(withExtension: "kt")
-        let outputGenerator = OutputGenerator(roots: kotlinSyntaxTree.statements)
+        let outputGenerator = OutputGenerator(root: kotlinSyntaxTree.root)
         let (output, outputMap) = outputGenerator.generateOutput(file: outputFile)
         return Transpilation(sourceFile: syntaxTree.source.file, output: output, outputMap: outputMap, messages: messages)
     }
@@ -73,8 +73,8 @@ public class KotlinTranslator {
             KotlinRawStatement(sourceCode: "import skip.kotlin.Array"), // Override kotlin.Array
             KotlinRawStatement(sourceCode: ""),
         ]
-        let translatedStatements = syntaxTree.statements.flatMap { translateStatement($0) }
-        return KotlinSyntaxTree(sourceFile: syntaxTree.source.file, statements: packageStatements + requiredImportStatements + translatedStatements)
+        let translatedStatements = syntaxTree.root.statements.flatMap { translateStatement($0) }
+        return KotlinSyntaxTree(sourceFile: syntaxTree.source.file, root: KotlinCodeBlockStatement(statements: packageStatements + requiredImportStatements + translatedStatements))
     }
 
     func translateStatement(_ statement: Statement) -> [KotlinStatement] {
@@ -83,6 +83,8 @@ public class KotlinTranslator {
             break
         case .catch:
             break
+        case .codeBlock:
+            return [KotlinCodeBlockStatement.translate(statement: statement as! CodeBlockStatement, translator: self)]
         case .continue:
             break
         case .defer:
@@ -191,15 +193,13 @@ public class KotlinTranslator {
         return KotlinRawExpression(expression: rawExpression)
     }
 
-    private func applyPlugins(to syntaxTree: KotlinSyntaxTree, codebaseInfo: KotlinCodebaseInfo.Context) -> KotlinSyntaxTree {
+    private func applyPlugins(to syntaxTree: KotlinSyntaxTree, codebaseInfo: KotlinCodebaseInfo.Context) {
         let plugins: [KotlinTranslatorPlugin] = [KotlinConstructorPlugin(codebaseInfo: codebaseInfo), KotlinSwiftUIPlugin(codebaseInfo: codebaseInfo)]
-        var appliedSyntaxTree = syntaxTree
-        plugins.forEach { appliedSyntaxTree = $0.apply(to: syntaxTree, translator: self) }
-        return appliedSyntaxTree
+        plugins.forEach { $0.apply(to: syntaxTree, translator: self) }
     }
 }
 
 /// A plugin used to translate a specific facet of the original code.
 protocol KotlinTranslatorPlugin {
-    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> KotlinSyntaxTree
+    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator)
 }

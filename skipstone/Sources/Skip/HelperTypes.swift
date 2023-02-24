@@ -1,14 +1,9 @@
 import SwiftSyntax
 
-/// A block of code.
-struct CodeBlock<S> {
-    var statements: [S]
-}
-
 /// A variable accessor.
-struct Accessor<S> {
+struct Accessor<B> {
     var parameterName: String?
-    var body: CodeBlock<S>? // Nil if the accessor has no body, as in a protocol { get set }
+    var body: B? // Nil if the accessor has no body, as in a protocol { get set }
 }
 
 /// A labeled value, as used in function call parameters.
@@ -124,7 +119,7 @@ struct Operator: Equatable {
 }
 
 /// A function parameter.
-struct Parameter<E>: Hashable {
+struct Parameter<V>: Hashable {
     var externalLabel: String?
     var internalLabel: String {
         return _internalLabel ?? externalLabel ?? "_"
@@ -132,9 +127,9 @@ struct Parameter<E>: Hashable {
     private let _internalLabel: String?
     var declaredType: TypeSignature
     var isVariadic: Bool
-    var defaultValue: E?
+    var defaultValue: V?
 
-    init(externalLabel: String?, internalLabel: String? = nil, declaredType: TypeSignature = .none, isVariadic: Bool = false, defaultValue: E? = nil) {
+    init(externalLabel: String?, internalLabel: String? = nil, declaredType: TypeSignature = .none, isVariadic: Bool = false, defaultValue: V? = nil) {
         self.externalLabel = externalLabel == "" || externalLabel == "_" ? nil : externalLabel
         _internalLabel = internalLabel
         self.declaredType = declaredType
@@ -160,13 +155,13 @@ struct Parameter<E>: Hashable {
         return PrettyPrintTree(root: externalLabel ?? "_", children: children)
     }
 
-    func qualifiedType(in node: SyntaxNode) -> Parameter<E> {
+    func qualifiedType(in node: SyntaxNode) -> Parameter<V> {
         var parameter = self
         parameter.declaredType = declaredType.qualified(in: node)
         return parameter
     }
 
-    static func ==(lhs: Parameter<E>, rhs: Parameter<E>) -> Bool {
+    static func ==(lhs: Parameter<V>, rhs: Parameter<V>) -> Bool {
         return lhs.externalLabel == rhs.externalLabel && lhs.declaredType == rhs.declaredType && lhs.isVariadic == rhs.isVariadic
     }
 

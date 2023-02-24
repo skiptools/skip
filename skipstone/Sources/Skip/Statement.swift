@@ -22,6 +22,7 @@ class Statement: SyntaxNode {
     ///
     /// - Parameters:
     ///   - Parameter perform: The action to perform.
+    /// - Warning: This method does not traverse through `Expressions` to find additional statements (e.g. in closures).
     func visitStatements(perform: (Statement) -> VisitResult<Statement>) {
         if case .recurse(let onLeave) = perform(self) {
             for child in children {
@@ -77,6 +78,26 @@ struct StatementDecoder {
 
     static func decode<List: SyntaxList>(syntaxList: List, in syntaxTree: SyntaxTree) -> [Statement] {
         return syntaxList.flatMap { decode(syntax: $0.content, in: syntaxTree) }
+    }
+}
+
+/// A synthetic statement type used to represent a code block of statements.
+class CodeBlockStatement: Statement {
+    let statements: [Statement]
+
+    init(statements: [Statement]) {
+        self.statements = statements
+        super.init(type: .codeBlock)
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        var blockContext = context
+        statements.forEach { blockContext = $0.inferTypes(context: blockContext, expecting: .none) }
+        return context
+    }
+
+    override var children: [SyntaxNode] {
+        return statements
     }
 }
 
