@@ -21,7 +21,7 @@ enum KotlinStatementType {
 class KotlinIf: KotlinStatement {
     var optionalBindingVariables: [OptionalBindingVariable] = []
     var conditions: [KotlinExpression]
-    var conditionSeparator: Operator = .with(symbol: "&&")
+    var isGuard = false
     var body: CodeBlock<KotlinStatement>
     var elseBody: CodeBlock<KotlinStatement>?
 
@@ -66,7 +66,7 @@ class KotlinIf: KotlinStatement {
         let body = statement.body.translate(translator: translator)
         let kstatement = KotlinIf(statement: statement, conditions: kconditions, body: body)
         kstatement.optionalBindingVariables = optionalBindingVariables
-        kstatement.conditionSeparator = .with(symbol: "||")
+        kstatement.isGuard = true
         return kstatement
     }
 
@@ -156,7 +156,7 @@ class KotlinIf: KotlinStatement {
                 output.append(")")
             }
             if index < conditions.count - 1 {
-                output.append(" ").append(conditionSeparator.symbol).append(" ")
+                output.append(" ").append(isGuard ? "||" : "&&").append(" ")
             }
         }
     }
