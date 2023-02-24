@@ -253,8 +253,8 @@ class Closure: Expression {
             return nil
         }
         let (returnType, parameters, messages) = closureExpr.signature?.typeSignatures(in: syntaxTree) ?? (.none, [], [])
-        let isAsync = closureExpr.signature?.asyncKeyword?.text == "async" || closureExpr.signature?.throwsTok?.text == "async"
-        let isThrows = closureExpr.signature?.asyncKeyword?.text == "throws" || closureExpr.signature?.throwsTok?.text == "throws"
+        let isAsync = closureExpr.signature?.effectSpecifiers?.asyncSpecifier?.text == "async" || closureExpr.signature?.effectSpecifiers?.throwsSpecifier?.text == "async"
+        let isThrows = closureExpr.signature?.effectSpecifiers?.asyncSpecifier?.text == "throws" || closureExpr.signature?.effectSpecifiers?.throwsSpecifier?.text == "throws"
         let statements = StatementDecoder.decode(syntaxList: closureExpr.statements, in: syntaxTree)
         let body = CodeBlock(statements: statements)
         let expression = Closure(returnType: returnType, parameters: parameters, isAsync: isAsync, isThrows: isThrows, body: body, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
@@ -573,7 +573,7 @@ class OptionalBinding: Expression {
             return nil
         }
 
-        let isLet = optionalBindingExpr.letOrVarKeyword.text == "let"
+        let isLet = optionalBindingExpr.bindingKeyword.text == "let"
         var declaredType: TypeSignature = .none
         if let typeSyntax = optionalBindingExpr.typeAnnotation?.type {
             declaredType = TypeSignature.for(syntax: typeSyntax)

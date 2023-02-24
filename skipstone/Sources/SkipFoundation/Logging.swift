@@ -4,6 +4,8 @@ import os
 public typealias Logger = os.Logger
 public typealias OSLogType = os.OSLogType
 public typealias OSLogMessage = os.OSLogMessage
+public typealias OSLog = os.OSLog
+
 #else
 
 // https://developer.android.com/reference/android/util/Log

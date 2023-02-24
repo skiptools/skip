@@ -22,7 +22,7 @@ let package = Package(
         .plugin(name: "Skippy", targets: ["Skippy"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-syntax.git", revision: "swift-DEVELOPMENT-SNAPSHOT-2023-01-19-a"),
+        .package(url: "https://github.com/apple/swift-syntax.git", branch: "main"),
         .package(url: "https://github.com/apple/swift-docc-symbolkit.git", branch: "main"),
     ],
     targets: [
