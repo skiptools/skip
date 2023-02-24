@@ -230,7 +230,8 @@ class KotlinIf: KotlinStatement {
         }
 
         for (index, condition) in conditions.enumerated() {
-            let isCompound = condition.isCompoundExpression
+            // Special case the common !x compound expression to avoid unnecessary parentheses
+            let isCompound = condition.isCompoundExpression && !(condition is KotlinPrefixOperator && (condition as! KotlinPrefixOperator).operatorSymbol == "!")
             if isCompound {
                 output.append("(")
             }

@@ -254,7 +254,7 @@ final class ConditionalTests: XCTestCase {
             return
         }
         """, kotlin: """
-        if ((!boolValue) || (i > 100)) {
+        if (!boolValue || (i > 100)) {
             return
         }
         """)
