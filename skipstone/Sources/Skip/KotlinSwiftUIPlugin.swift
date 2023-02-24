@@ -59,7 +59,7 @@ class KotlinSwiftUIPlugin: KotlinTranslatorPlugin {
         }
     }
 
-    private func translateViewBuilder(_ codeBlock: KotlinCodeBlockStatement) {
+    private func translateViewBuilder(_ codeBlock: KotlinCodeBlock) {
         codeBlock.statements = codeBlock.statements.map { translateViewBuilderStatement($0) }
         guard codeBlock.statements.count > 1, !hasExplicitReturn(codeBlock) else {
             return
@@ -107,7 +107,7 @@ class KotlinSwiftUIPlugin: KotlinTranslatorPlugin {
         return []//functionCall.arguments.compactMap { $0.value as? KotlinClosure }
     }
 
-    private func hasExplicitReturn(_ codeBlock: KotlinCodeBlockStatement) -> Bool {
+    private func hasExplicitReturn(_ codeBlock: KotlinCodeBlock) -> Bool {
         return codeBlock.updateWithExpectedReturn(.no)
     }
 }

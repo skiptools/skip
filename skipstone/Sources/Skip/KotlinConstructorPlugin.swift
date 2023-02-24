@@ -79,7 +79,7 @@ class KotlinConstructorPlugin: KotlinTranslatorPlugin {
             statement.expression = assignmentOperator
             return statement
         }
-        constructor.body = KotlinCodeBlockStatement(statements: bodyStatements)
+        constructor.body = KotlinCodeBlock(statements: bodyStatements)
 
         classDeclaration.members.append(constructor)
         constructor.parent = classDeclaration
@@ -121,7 +121,7 @@ class KotlinConstructorPlugin: KotlinTranslatorPlugin {
 
         constructor.modifiers = classDeclaration.modifiers
         constructor.extras = .singleNewline
-        constructor.body = KotlinCodeBlockStatement(statements: [])
+        constructor.body = KotlinCodeBlock(statements: [])
 
         classDeclaration.members.append(constructor)
         constructor.parent = classDeclaration

@@ -161,13 +161,13 @@ class KotlinClosure: KotlinExpression {
     var parameters: [Parameter<Void>] = []
     var implicitParameterLabels: [String] = []
     var isAnonymousFunction = false
-    var body: KotlinCodeBlockStatement
+    var body: KotlinCodeBlock
     var returnLabel: String? = nil
 
     static func translate(expression: Closure, translator: KotlinTranslator) -> KotlinClosure {
         // If there is an explicit return type we'll use an anonymous function rather than a closure,
         // as Kotlin closures cannot declare a return type
-        let kbody = KotlinCodeBlockStatement.translate(statement: expression.body, translator: translator)
+        let kbody = KotlinCodeBlock.translate(statement: expression.body, translator: translator)
         let isAnonymousFunction = expression.returnType != .none
         var implicitParameterLabels: [String] = []
         var returnLabel: String? = nil
@@ -194,7 +194,7 @@ class KotlinClosure: KotlinExpression {
         return kexpression
     }
 
-    private static func handleImplicitParameters(in body: KotlinCodeBlockStatement, inferredType: TypeSignature) -> [String] {
+    private static func handleImplicitParameters(in body: KotlinCodeBlock, inferredType: TypeSignature) -> [String] {
         // Find the highest $n identifier used in the closure
         var highestParameter = -1
         body.visit { node in
@@ -222,7 +222,7 @@ class KotlinClosure: KotlinExpression {
         return (0...highestParameter).map { KotlinIdentifier.translateName("$\($0)") }
     }
 
-    private init(expression: Closure, body: KotlinCodeBlockStatement) {
+    private init(expression: Closure, body: KotlinCodeBlock) {
         self.body = body
         super.init(type: .closure, expression: expression)
     }

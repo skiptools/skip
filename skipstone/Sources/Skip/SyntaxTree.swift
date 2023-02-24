@@ -6,13 +6,13 @@ public class SyntaxTree: PrettyPrintable {
     let source: Source
     let syntax: SourceFileSyntax
     let preprocessorSymbols: Set<String>
-    private(set) var root: CodeBlockStatement = CodeBlockStatement(statements: [])
+    private(set) var root: CodeBlock = CodeBlock(statements: [])
 
     public init(source: Source, preprocessorSymbols: Set<String> = [], symbols: Symbols? = nil) {
         self.source = source
         self.preprocessorSymbols = preprocessorSymbols
         self.syntax = Parser.parse(source: source.content)
-        self.root = CodeBlockStatement(statements: StatementDecoder.decode(syntaxListContainer: syntax, in: self))
+        self.root = CodeBlock(statements: StatementDecoder.decode(syntaxListContainer: syntax, in: self))
 
         // Resolve nodes breadth first so that a child can use information from its parent's siblings
         var resolveQueue: [SyntaxNode] = [root]

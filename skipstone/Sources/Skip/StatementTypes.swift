@@ -40,6 +40,8 @@ enum StatementType: CaseIterable {
             return nil
         case .catch:
             return nil
+        case .codeBlock:
+            return CodeBlock.self
         case .continue:
             return nil
         case .defer:
@@ -84,8 +86,6 @@ enum StatementType: CaseIterable {
         case .variableDeclaration:
             return VariableDeclaration.self
 
-        case .codeBlock:
-            return CodeBlockStatement.self
         case .expression:
             return ExpressionStatement.self
         case .message:
@@ -96,12 +96,32 @@ enum StatementType: CaseIterable {
     }
 }
 
+/// A synthetic statement type used to represent a code block of statements.
+class CodeBlock: Statement {
+    let statements: [Statement]
+
+    init(statements: [Statement]) {
+        self.statements = statements
+        super.init(type: .codeBlock)
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        var blockContext = context
+        statements.forEach { blockContext = $0.inferTypes(context: blockContext, expecting: .none) }
+        return context
+    }
+
+    override var children: [SyntaxNode] {
+        return statements
+    }
+}
+
 /// `guard ...`
 class Guard: Statement {
     let conditions: [Expression]
-    let body: CodeBlockStatement
+    let body: CodeBlock
 
-    init(conditions: [Expression], body: CodeBlockStatement, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(conditions: [Expression], body: CodeBlock, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.conditions = conditions
         self.body = body
         super.init(type: .guard, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
@@ -114,7 +134,7 @@ class Guard: Statement {
         
         let conditions = try guardStmnt.conditions.map { try ExpressionDecoder.decodeCondition($0, in: syntaxTree) }
         let statements = StatementDecoder.decode(syntaxListContainer: guardStmnt.body, in: syntaxTree)
-        let body = CodeBlockStatement(statements: statements)
+        let body = CodeBlock(statements: statements)
         return [Guard(conditions: conditions, body: body, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
     }
 
@@ -139,10 +159,10 @@ class Guard: Statement {
 /// `if ...`
 class If: Statement {
     let conditions: [Expression]
-    let body: CodeBlockStatement
-    let elseBody: CodeBlockStatement?
+    let body: CodeBlock
+    let elseBody: CodeBlock?
 
-    init(conditions: [Expression], body: CodeBlockStatement, elseBody: CodeBlockStatement? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(conditions: [Expression], body: CodeBlock, elseBody: CodeBlock? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.conditions = conditions
         self.body = body
         self.elseBody = elseBody
@@ -156,8 +176,8 @@ class If: Statement {
 
         let conditions = try ifStmnt.conditions.map { try ExpressionDecoder.decodeCondition($0, in: syntaxTree) }
         let statements = StatementDecoder.decode(syntaxListContainer: ifStmnt.body, in: syntaxTree)
-        let body = CodeBlockStatement(statements: statements)
-        var elseBody: CodeBlockStatement? = nil
+        let body = CodeBlock(statements: statements)
+        var elseBody: CodeBlock? = nil
         if let elseSyntax = ifStmnt.elseBody {
             let statements: [Statement]
             switch elseSyntax {
@@ -166,7 +186,7 @@ class If: Statement {
             case .codeBlock(let syntax):
                 statements = StatementDecoder.decode(syntaxListContainer: syntax, in: syntaxTree)
             }
-            elseBody = CodeBlockStatement(statements: statements)
+            elseBody = CodeBlock(statements: statements)
         }
         return [If(conditions: conditions, body: body, elseBody: elseBody, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
     }
@@ -308,9 +328,9 @@ class FunctionDeclaration: Statement {
     let isThrows: Bool
     let attributes: Attributes
     private(set) var modifiers: Modifiers
-    let body: CodeBlockStatement?
+    let body: CodeBlock?
 
-    init(type: StatementType, name: String, isOptionalInit: Bool = false, returnType: TypeSignature = .void, parameters: [Parameter<Expression>], isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes? = nil, modifiers: Modifiers? = nil, body: CodeBlockStatement? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(type: StatementType, name: String, isOptionalInit: Bool = false, returnType: TypeSignature = .void, parameters: [Parameter<Expression>], isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes? = nil, modifiers: Modifiers? = nil, body: CodeBlock? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.name = name
         self.isOptionalInit = isOptionalInit
         self.returnType = returnType
@@ -340,9 +360,9 @@ class FunctionDeclaration: Statement {
         let isThrows = functionDecl.signature.asyncOrReasyncKeyword?.text == "throws" || functionDecl.signature.throwsOrRethrowsKeyword?.text == "throws"
         let attributes = Attributes.for(syntax: functionDecl.attributes)
         let modifiers = Modifiers.for(syntax: functionDecl.modifiers)
-        var body: CodeBlockStatement? = nil
+        var body: CodeBlock? = nil
         if let bodySyntax = functionDecl.body {
-            body = CodeBlockStatement(statements: StatementDecoder.decode(syntaxListContainer: bodySyntax, in: syntaxTree))
+            body = CodeBlock(statements: StatementDecoder.decode(syntaxListContainer: bodySyntax, in: syntaxTree))
         }
         let statement = FunctionDeclaration(type: .functionDeclaration, name: name, returnType: returnType, parameters: parameters, isAsync: isAsync, isThrows: isThrows, attributes: attributes, modifiers: modifiers, body: body, syntax: functionDecl, sourceFile: syntaxTree.source.file, sourceRange: functionDecl.range(in: syntaxTree.source), extras: extras)
         statement.messages = messages
@@ -356,9 +376,9 @@ class FunctionDeclaration: Statement {
         let isThrows = initializerDecl.signature.asyncOrReasyncKeyword?.text == "throws" || initializerDecl.signature.throwsOrRethrowsKeyword?.text == "throws"
         let attributes = Attributes.for(syntax: initializerDecl.attributes)
         let modifiers = Modifiers.for(syntax: initializerDecl.modifiers)
-        var body: CodeBlockStatement? = nil
+        var body: CodeBlock? = nil
         if let bodySyntax = initializerDecl.body {
-            body = CodeBlockStatement(statements: StatementDecoder.decode(syntaxListContainer: bodySyntax, in: syntaxTree))
+            body = CodeBlock(statements: StatementDecoder.decode(syntaxListContainer: bodySyntax, in: syntaxTree))
         }
         let statement = FunctionDeclaration(type: .initDeclaration, name: "init", isOptionalInit: isOptionalInit, returnType: .void, parameters: parameters, isAsync: isAsync, isThrows: isThrows, attributes: attributes, modifiers: modifiers, body: body, syntax: initializerDecl, sourceFile: syntaxTree.source.file, sourceRange: initializerDecl.range(in: syntaxTree.source), extras: extras)
         statement.messages = messages
@@ -571,15 +591,15 @@ class VariableDeclaration: Statement {
     var attributes: Attributes
     private(set) var modifiers: Modifiers
     let value: Expression?
-    let getter: Accessor<CodeBlockStatement>?
-    let setter: Accessor<CodeBlockStatement>?
-    let willSet: Accessor<CodeBlockStatement>?
-    let didSet: Accessor<CodeBlockStatement>?
+    let getter: Accessor<CodeBlock>?
+    let setter: Accessor<CodeBlock>?
+    let willSet: Accessor<CodeBlock>?
+    let didSet: Accessor<CodeBlock>?
     var variableType: TypeSignature {
         return declaredType.or(value?.inferredType ?? .none)
     }
 
-    init(name: String, declaredType: TypeSignature = .none, isLet: Bool = false, isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes? = nil, modifiers: Modifiers? = nil, value: Expression?, getter: Accessor<CodeBlockStatement>? = nil, setter: Accessor<CodeBlockStatement>? = nil, willSet: Accessor<CodeBlockStatement>? = nil, didSet: Accessor<CodeBlockStatement>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(name: String, declaredType: TypeSignature = .none, isLet: Bool = false, isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes? = nil, modifiers: Modifiers? = nil, value: Expression?, getter: Accessor<CodeBlock>? = nil, setter: Accessor<CodeBlock>? = nil, willSet: Accessor<CodeBlock>? = nil, didSet: Accessor<CodeBlock>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.name = name
         self.declaredType = declaredType
         self.isLet = isLet
@@ -622,10 +642,10 @@ class VariableDeclaration: Statement {
             value = ExpressionDecoder.decode(syntax: valueSyntax, in: syntaxTree)
         }
 
-        var getter: Accessor<CodeBlockStatement>? = nil
-        var setter: Accessor<CodeBlockStatement>? = nil
-        var willSet: Accessor<CodeBlockStatement>? = nil
-        var didSet: Accessor<CodeBlockStatement>? = nil
+        var getter: Accessor<CodeBlock>? = nil
+        var setter: Accessor<CodeBlock>? = nil
+        var willSet: Accessor<CodeBlock>? = nil
+        var didSet: Accessor<CodeBlock>? = nil
         var isAsync = false
         var isThrows = false
         var messages: [Message] = []
@@ -639,10 +659,10 @@ class VariableDeclaration: Statement {
                     if accessorSyntax.throwsKeyword?.text == "async" || accessorSyntax.asyncKeyword?.text == "async" {
                         isAsync = true
                     }
-                    var body: CodeBlockStatement? = nil
+                    var body: CodeBlock? = nil
                     if let bodySyntax = accessorSyntax.body {
                         let statements = StatementDecoder.decode(syntaxListContainer: bodySyntax, in: syntaxTree)
-                        body = CodeBlockStatement(statements: statements)
+                        body = CodeBlock(statements: statements)
                     }
 
                     switch accessorSyntax.accessorKind.text {
@@ -661,7 +681,7 @@ class VariableDeclaration: Statement {
                 }
             case .getter(let codeBlockSyntax):
                 let statements = StatementDecoder.decode(syntaxListContainer: codeBlockSyntax, in: syntaxTree)
-                getter = Accessor(body: CodeBlockStatement(statements: statements))
+                getter = Accessor(body: CodeBlock(statements: statements))
             }
         }
 

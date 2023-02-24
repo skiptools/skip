@@ -1,5 +1,6 @@
 /// Types of Kotlin statements.
 enum KotlinStatementType {
+    case codeBlock
     case expression
     case `if`
     case `return`
@@ -13,17 +14,96 @@ enum KotlinStatementType {
     case variableDeclaration
 
     // Special statements
-    case codeBlock
     case raw
     case message
+}
+
+class KotlinCodeBlock: KotlinStatement {
+    var statements: [KotlinStatement]
+
+    static func translate(statement: CodeBlock, translator: KotlinTranslator) -> KotlinCodeBlock {
+        let kstatements = statement.statements.flatMap { translator.translateStatement($0) }
+        return KotlinCodeBlock(statements: kstatements)
+    }
+
+    init(statements: [KotlinStatement] = []) {
+        self.statements = statements
+        super.init(type: .codeBlock)
+    }
+
+    /// Perform any necessary updates to the return statements in this block.
+    ///
+    /// - Returns: Whether any return statements were found.
+    @discardableResult func updateWithExpectedReturn(_ expectedReturn: ExpectedReturn) -> Bool {
+        var label: String?
+        var valref = false
+        var returnRequired = false
+        var onUpdate: String? = nil
+        switch expectedReturn {
+        case .no:
+            // Don't shortcut and return here because we need to return whether any return statements were found
+            break
+        case .yes:
+            returnRequired = true
+        case .labelIfPresent(let l):
+            label = l
+        case .valueReference(let update):
+            onUpdate = update
+            valref = true
+            returnRequired = true
+        }
+
+        var didFindReturn = false
+        visitStatements { statement in
+            switch statement.type {
+            case .functionDeclaration:
+                // Skip embedded functions that may have their own returns
+                return .skip
+            case .return:
+                let returnStatement = statement as! KotlinReturn
+                didFindReturn = true
+                if let label {
+                    returnStatement.label = label
+                }
+                if valref {
+                    returnStatement.expression = returnStatement.expression?.valueReference(onUpdate: onUpdate)
+                }
+                return .skip
+            default:
+                break
+            }
+            return .recurse(nil)
+        }
+        if didFindReturn {
+            return true
+        }
+
+        // If this was an implicit return, replace it with an explicit one if a return is required
+        guard returnRequired, statements.count == 1, statements[0].type == .expression, var expression = (statements[0] as! KotlinExpressionStatement).expression else {
+            return false
+        }
+        if valref {
+            expression = expression.valueReference(onUpdate: onUpdate)
+        }
+        statements = [KotlinReturn(expression: expression)]
+        return true
+    }
+
+    override var children: [KotlinSyntaxNode] {
+        return statements
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        output.append(statements, indentation: indentation)
+    }
 }
 
 class KotlinIf: KotlinStatement {
     var optionalBindingVariables: [OptionalBindingVariable] = []
     var conditions: [KotlinExpression]
     var isGuard = false
-    var body: KotlinCodeBlockStatement
-    var elseBody: KotlinCodeBlockStatement?
+    var body: KotlinCodeBlock
+    var elseBody: KotlinCodeBlock?
 
     struct OptionalBindingVariable {
         var name: String
@@ -53,11 +133,11 @@ class KotlinIf: KotlinStatement {
     static func translate(statement: If, translator: KotlinTranslator) -> KotlinIf {
         let (optionalBindingVariables, conditions) = extractOptionalBindingVariables(from: statement.conditions, logicalNegated: false, translator: translator)
         let kconditions = conditions.compactMap { translator.translateExpression($0) }
-        let kbody = KotlinCodeBlockStatement.translate(statement: statement.body, translator: translator)
+        let kbody = KotlinCodeBlock.translate(statement: statement.body, translator: translator)
         let kstatement = KotlinIf(statement: statement, conditions: kconditions, body: kbody)
         kstatement.optionalBindingVariables = optionalBindingVariables
         if let elseBody = statement.elseBody {
-            kstatement.elseBody = KotlinCodeBlockStatement.translate(statement: elseBody, translator: translator)
+            kstatement.elseBody = KotlinCodeBlock.translate(statement: elseBody, translator: translator)
         }
         return kstatement
     }
@@ -65,7 +145,7 @@ class KotlinIf: KotlinStatement {
     static func translate(statement: Guard, translator: KotlinTranslator) -> KotlinIf {
         let (optionalBindingVariables, conditions) = extractOptionalBindingVariables(from: statement.conditions, logicalNegated: true, translator: translator)
         let kconditions = conditions.compactMap { translator.translateExpression($0).logicalNegated() }
-        let kbody = KotlinCodeBlockStatement.translate(statement: statement.body, translator: translator)
+        let kbody = KotlinCodeBlock.translate(statement: statement.body, translator: translator)
         let kstatement = KotlinIf(statement: statement, conditions: kconditions, body: kbody)
         kstatement.optionalBindingVariables = optionalBindingVariables
         kstatement.isGuard = true
@@ -97,7 +177,7 @@ class KotlinIf: KotlinStatement {
         return (optionalBindingVariables, updatedConditions)
     }
 
-    private init(statement: Statement, conditions: [KotlinExpression], body: KotlinCodeBlockStatement) {
+    private init(statement: Statement, conditions: [KotlinExpression], body: KotlinCodeBlock) {
         self.conditions = conditions
         self.body = body
         super.init(type: .if, statement: statement)
@@ -340,7 +420,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var isAsync = false
     var isOpen = false
     var modifiers = Modifiers()
-    var body: KotlinCodeBlockStatement?
+    var body: KotlinCodeBlock?
     var delegatingConstructorCall: KotlinExpression?
 
     // KotlinMemberDeclaration
@@ -362,7 +442,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             }
         }
         if let body = statement.body {
-            kstatement.body = KotlinCodeBlockStatement.translate(statement: body, translator: translator)
+            kstatement.body = KotlinCodeBlock.translate(statement: body, translator: translator)
             kstatement.body?.updateWithExpectedReturn(statement.returnType == .void ? .no : .valueReference(nil))
         }
         kstatement.returnType.appendKotlinMessages(to: kstatement)
@@ -563,10 +643,10 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var isOpen = false
     var modifiers = Modifiers()
     var value: KotlinExpression?
-    var getter: Accessor<KotlinCodeBlockStatement>?
-    var setter: Accessor<KotlinCodeBlockStatement>?
-    var willSet: Accessor<KotlinCodeBlockStatement>?
-    var didSet: Accessor<KotlinCodeBlockStatement>?
+    var getter: Accessor<KotlinCodeBlock>?
+    var setter: Accessor<KotlinCodeBlock>?
+    var willSet: Accessor<KotlinCodeBlock>?
+    var didSet: Accessor<KotlinCodeBlock>?
     var variableType: TypeSignature = .none
     var mayBeSharedMutableValue = false
     var isReadOnly = false

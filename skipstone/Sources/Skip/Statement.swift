@@ -81,26 +81,6 @@ struct StatementDecoder {
     }
 }
 
-/// A synthetic statement type used to represent a code block of statements.
-class CodeBlockStatement: Statement {
-    let statements: [Statement]
-
-    init(statements: [Statement]) {
-        self.statements = statements
-        super.init(type: .codeBlock)
-    }
-
-    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
-        var blockContext = context
-        statements.forEach { blockContext = $0.inferTypes(context: blockContext, expecting: .none) }
-        return context
-    }
-
-    override var children: [SyntaxNode] {
-        return statements
-    }
-}
-
 /// A general statement hosting an `Expression`.
 ///
 /// - Seealso: ``Expression``

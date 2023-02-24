@@ -74,7 +74,7 @@ public class KotlinTranslator {
             KotlinRawStatement(sourceCode: ""),
         ]
         let translatedStatements = syntaxTree.root.statements.flatMap { translateStatement($0) }
-        return KotlinSyntaxTree(sourceFile: syntaxTree.source.file, root: KotlinCodeBlockStatement(statements: packageStatements + requiredImportStatements + translatedStatements))
+        return KotlinSyntaxTree(sourceFile: syntaxTree.source.file, root: KotlinCodeBlock(statements: packageStatements + requiredImportStatements + translatedStatements))
     }
 
     func translateStatement(_ statement: Statement) -> [KotlinStatement] {
@@ -84,7 +84,7 @@ public class KotlinTranslator {
         case .catch:
             break
         case .codeBlock:
-            return [KotlinCodeBlockStatement.translate(statement: statement as! CodeBlockStatement, translator: self)]
+            return [KotlinCodeBlock.translate(statement: statement as! CodeBlock, translator: self)]
         case .continue:
             break
         case .defer:

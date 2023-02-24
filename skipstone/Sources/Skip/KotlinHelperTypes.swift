@@ -10,15 +10,15 @@ enum ExpectedReturn {
     case valueReference(String?)
 }
 
-extension Accessor where B: CodeBlockStatement {
+extension Accessor where B: CodeBlock {
     /// Translate to an equivalent Kotlin accessor.
-    func translate(translator: KotlinTranslator, expectedReturn: ExpectedReturn) -> Accessor<KotlinCodeBlockStatement> {
+    func translate(translator: KotlinTranslator, expectedReturn: ExpectedReturn) -> Accessor<KotlinCodeBlock> {
         if let body {
-            let kbody = KotlinCodeBlockStatement.translate(statement: body, translator: translator)
+            let kbody = KotlinCodeBlock.translate(statement: body, translator: translator)
             kbody.updateWithExpectedReturn(expectedReturn)
-            return Accessor<KotlinCodeBlockStatement>(parameterName: parameterName, body: kbody)
+            return Accessor<KotlinCodeBlock>(parameterName: parameterName, body: kbody)
         }
-        return Accessor<KotlinCodeBlockStatement>(parameterName: parameterName)
+        return Accessor<KotlinCodeBlock>(parameterName: parameterName)
     }
 }
 
