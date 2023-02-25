@@ -98,7 +98,7 @@ class KotlinConstructorPlugin: KotlinPlugin {
         let constructor = KotlinFunctionDeclaration(name: "constructor")
         var superCall = "super("
         constructor.parameters = parameters.enumerated().map { (index, parameter) in
-            let label = parameter.label ?? "p\(index)"
+            let label = parameter.label ?? "p_\(index)"
             if index > 0 {
                 superCall += ", "
             }

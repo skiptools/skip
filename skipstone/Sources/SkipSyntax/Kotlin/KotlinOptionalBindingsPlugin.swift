@@ -16,44 +16,55 @@ private class Visitor {
     var remappedIdentifierStack: [[String: String]] = []
 
     func visit(_ node: KotlinSyntaxNode) -> VisitResult<KotlinSyntaxNode> {
-//        if let statement = node as? KotlinStatement {
-//            switch statement.type {
-//            case .if:
-//                let ifstatement = statement as! KotlinIf
-//                break
-//            case .functionDeclaration:
-//                break
-//            case .variableDeclaration:
-//                let variableDeclaration = statement as! KotlinVariableDeclaration
-//                if variableDeclaration.isProperty || variableDeclaration.isGlobal {
-//                    visitCodeBlock(variableDeclaration.getter?.body)
-//                    visitCodeBlock(variableDeclaration.setter?.body)
-//                    visitCodeBlock(variableDeclaration.willSet?.body)
-//                    visitCodeBlock(variableDeclaration.didSet?.body)
-//                    if let value = variableDeclaration.value {
-//                        let _ = visit(value)
-//                    }
-//                    return .skip
-//                }
-//            default:
-//                break
-//            }
-//        } else if let expression = node as? KotlinExpression {
-//            switch expression.type {
-//            case .closure:
-//                let closure = expression as! KotlinClosure
-//                visitCodeBlock(closure.body)
-//                return .skip
-//            case .identifier:
-//                let identifier = expression as! KotlinIdentifier
-//                if let binding = binding(for: identifier.name) {
-//                    identifier.name = binding
-//                }
-//            default:
-//                break
-//            }
-//        }
-        return .recurse(nil)
+        if node is KotlinCodeBlock {
+            // When entering a code block we create a remapping context. If we encounter optional bindings,
+            // we can apply them to the current context. When we leave, we pop the context
+            remappedIdentifierStack.append([:])
+            return .recurse({ _ in self.remappedIdentifierStack.removeLast() })
+        } else if let identifier = node as? KotlinIdentifier {
+            if let binding = binding(for: identifier.name) {
+                identifier.name = binding
+            }
+            return .skip
+        } else if let kif = node as? KotlinIf, !kif.optionalBindingVariables.isEmpty {
+            var remappedIdentifiers: [String: String] = [:]
+            kif.optionalBindingVariables = kif.optionalBindingVariables.map { optionalBindingVariable in
+                // As we evaluate each binding we must allow it to access previous bindings in the conditions list
+                remappedIdentifierStack.append(remappedIdentifiers)
+                optionalBindingVariable.value.visit(perform: self.visit)
+                remappedIdentifierStack.removeLast()
+
+                let binding = newBinding(for: optionalBindingVariable.name)
+                remappedIdentifiers[optionalBindingVariable.name] = binding
+                return KotlinIf.OptionalBindingVariable(name: binding, value: optionalBindingVariable.value, isLet: optionalBindingVariable.isLet)
+            }
+            if kif.isGuard {
+                // For guards, recurse on the body without the new bindings, then apply the bindings to the conditions and current code block
+                kif.body.visit(perform: self.visit)
+                if !remappedIdentifierStack.isEmpty {
+                    remappedIdentifierStack[remappedIdentifierStack.count - 1].merge(remappedIdentifiers, uniquingKeysWith: { s, _ in s })
+                }
+                kif.conditions.forEach { $0.visit(perform: self.visit) }
+            } else {
+                // For ifs, recurse on the else without the new bindings, then apply the bindings to conditions and the if body
+                if let elseBody = kif.elseBody {
+                    elseBody.visit(perform: self.visit)
+                }
+                remappedIdentifierStack.append(remappedIdentifiers)
+                kif.conditions.forEach { $0.visit(perform: self.visit) }
+                kif.body.visit(perform: self.visit)
+                remappedIdentifierStack.removeLast()
+            }
+            return .skip
+        } else {
+            return .recurse(nil)
+        }
+    }
+
+    private func newBinding(for name: String) -> String {
+        let binding = "\(name)_\(bindingCount)"
+        bindingCount += 1
+        return binding
     }
 
     private func binding(for identifier: String) -> String? {

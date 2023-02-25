@@ -138,14 +138,14 @@ class Guard: Statement {
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
         var conditionsContext = context
         conditions.forEach { conditionsContext = $0.inferTypes(context: conditionsContext, expecting: .bool) }
-        let optionalBindings = conditions.reduce(into: [String: TypeSignature]()) { result, condition in
+        let _ = body.inferTypes(context: context, expecting: .none)
+        var retContext = context
+        for condition in conditions {
             if let optionalBinding = condition as? OptionalBinding {
-                result[optionalBinding.name] = optionalBinding.variableType
+                retContext = retContext.addingIdentifier(optionalBinding.name, type: optionalBinding.variableType)
             }
         }
-        let bodyContext = context.pushingBlock(identifiers: optionalBindings)
-        let _ = body.inferTypes(context: bodyContext, expecting: .none)
-        return context
+        return retContext
     }
 
     override var children: [SyntaxNode] {

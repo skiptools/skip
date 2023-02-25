@@ -390,6 +390,7 @@ class KotlinIf: KotlinExpression {
         var declaredType: TypeSignature?
         var value: KotlinExpression
         var isLet: Bool
+        var previousConditions: [KotlinExpression]
     }
 
     /// The entire `if/else if/else if/...` chain.
@@ -411,7 +412,7 @@ class KotlinIf: KotlinExpression {
     }
 
     static func translate(expression: If, translator: KotlinTranslator) -> KotlinIf {
-        let (optionalBindingVariables, conditions) = extractOptionalBindingVariables(from: expression.conditions, logicalNegated: false, translator: translator)
+        let (optionalBindingVariables, conditions) = extractOptionalBindingVariables(from: expression.conditions, translator: translator)
         let kconditions = conditions.compactMap { translator.translateExpression($0) }
         let kbody = KotlinCodeBlock.translate(statement: expression.body, translator: translator)
         let kexpression = KotlinIf(expression: expression, conditions: kconditions, body: kbody)
@@ -423,7 +424,7 @@ class KotlinIf: KotlinExpression {
     }
 
     static func translate(statement: Guard, translator: KotlinTranslator) -> KotlinExpressionStatement {
-        let (optionalBindingVariables, conditions) = extractOptionalBindingVariables(from: statement.conditions, logicalNegated: true, translator: translator)
+        let (optionalBindingVariables, conditions) = extractOptionalBindingVariables(from: statement.conditions, translator: translator)
         let kconditions = conditions.compactMap { translator.translateExpression($0).logicalNegated() }
         let kbody = KotlinCodeBlock.translate(statement: statement.body, translator: translator)
         let kexpression = KotlinIf(conditions: kconditions, body: kbody, sourceFile: statement.sourceFile, sourceRange: statement.sourceRange)
@@ -435,7 +436,7 @@ class KotlinIf: KotlinExpression {
         return kstatement
     }
 
-    private static func extractOptionalBindingVariables(from conditions: [Expression], logicalNegated: Bool, translator: KotlinTranslator) -> ([OptionalBindingVariable], [Expression]) {
+    private static func extractOptionalBindingVariables(from conditions: [Expression], translator: KotlinTranslator) -> ([OptionalBindingVariable], [Expression]) {
         var optionalBindingVariables: [OptionalBindingVariable] = []
         var updatedConditions: [Expression] = []
         for condition in conditions {
@@ -451,7 +452,7 @@ class KotlinIf: KotlinExpression {
                 }
                 let optionalBindingVariable = OptionalBindingVariable(name: optionalBinding.name, declaredType: optionalBinding.declaredType, value: optionalBindingValue.valueReference(), isLet: optionalBinding.isLet)
                 optionalBindingVariables.append(optionalBindingVariable)
-                let updatedCondition = BinaryOperator(op: logicalNegated ? .with(symbol: "==") : .with(symbol: "!="), lhs: Identifier(name: optionalBinding.name), rhs: NilLiteral())
+                let updatedCondition = BinaryOperator(op: .with(symbol: "!="), lhs: Identifier(name: optionalBinding.name), rhs: NilLiteral())
                 updatedConditions.append(updatedCondition)
             } else {
                 updatedConditions.append(condition)
@@ -473,7 +474,7 @@ class KotlinIf: KotlinExpression {
     }
 
     override var children: [KotlinSyntaxNode] {
-        var children: [KotlinSyntaxNode] = conditions
+        var children: [KotlinSyntaxNode] = conditions + optionalBindingVariables.compactMap { $0.value }
         children.append(body)
         if let elseBody {
             children.append(elseBody)
@@ -484,12 +485,18 @@ class KotlinIf: KotlinExpression {
     override func append(to output: OutputGenerator, indentation: Indentation) {
         let ifChain = chain
         let optionalBindingVariables = ifChain.flatMap { $0.optionalBindingVariables }
-        for optionalBindingVariable in optionalBindingVariables {
-            output.append(indentation).append(optionalBindingVariable.isLet ? "val " : "var ").append(optionalBindingVariable.name)
+        for (index, optionalBindingVariable) in optionalBindingVariables.enumerated() {
+            if index != 0 {
+                output.append(indentation)
+            }
+            output.append(optionalBindingVariable.isLet ? "val " : "var ").append(optionalBindingVariable.name)
             output.append(" = ").append(optionalBindingVariable.value, indentation: indentation).append("\n")
         }
         for (index, statement) in chain.enumerated() {
             if index == 0 {
+                if !optionalBindingVariables.isEmpty {
+                    output.append(indentation)
+                }
                 output.append("if (")
             } else {
                 output.append(indentation).append("} else if (")
@@ -505,7 +512,7 @@ class KotlinIf: KotlinExpression {
                     output.append(indentation).append("} else {\n")
                     output.append(elseBody, indentation: bodyIndentation)
                 }
-                output.append(indentation).append("}\n")
+                output.append(indentation).append("}")
             }
         }
     }
