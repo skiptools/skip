@@ -390,7 +390,6 @@ class KotlinIf: KotlinExpression {
         var declaredType: TypeSignature?
         var value: KotlinExpression
         var isLet: Bool
-        var previousConditions: [KotlinExpression]
     }
 
     /// The entire `if/else if/else if/...` chain.
@@ -484,17 +483,25 @@ class KotlinIf: KotlinExpression {
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
         let ifChain = chain
-        let optionalBindingVariables = ifChain.flatMap { $0.optionalBindingVariables }
-        for (index, optionalBindingVariable) in optionalBindingVariables.enumerated() {
-            if index != 0 {
-                output.append(indentation)
+        var hasOptionalBindingVariables = false
+        for ifLink in ifChain {
+            for (index, optionalBindingVariable) in ifLink.optionalBindingVariables.enumerated() {
+                // Because we're an expression, we don't indent our first line
+                if hasOptionalBindingVariables {
+                    output.append(indentation)
+                } else {
+                    hasOptionalBindingVariables = true
+                }
+                output.append(optionalBindingVariable.isLet ? "val " : "var ").append(optionalBindingVariable.name).append(" = ")
+                appendNullCheck(optionalBindingVariables: Array(optionalBindingVariables[0..<index]), to: output)
+                output.append(optionalBindingVariable.value, indentation: indentation).append("\n")
             }
-            output.append(optionalBindingVariable.isLet ? "val " : "var ").append(optionalBindingVariable.name)
-            output.append(" = ").append(optionalBindingVariable.value, indentation: indentation).append("\n")
         }
+
         for (index, statement) in chain.enumerated() {
             if index == 0 {
-                if !optionalBindingVariables.isEmpty {
+                // Because we're an expression, we don't indent our first line
+                if hasOptionalBindingVariables {
                     output.append(indentation)
                 }
                 output.append("if (")
@@ -515,6 +522,19 @@ class KotlinIf: KotlinExpression {
                 output.append(indentation).append("}")
             }
         }
+    }
+
+    private func appendNullCheck(optionalBindingVariables: [OptionalBindingVariable], to output: OutputGenerator) {
+        guard !optionalBindingVariables.isEmpty else {
+            return
+        }
+        // When we're declaring an optional binding var, its value may depend on previous optional bindings being non-null.
+        // Checking against previous optional bindings also prevents any side effects if our value is e.g. a function call
+        // and the condition sequence wouldn't normally reach this optional binding. Note that we can't test against all
+        // previous conditions, however, because the conditions themselves may have side effects:
+        // if doSomething() > 0, let c, let x = c.related...
+        let nullCheck = optionalBindingVariables.map { "\($0.name) == null" }.joined(separator: " || ")
+        output.append("if (\(nullCheck)) null else ")
     }
 
     private func appendConditions(to output: OutputGenerator, indentation: Indentation) {

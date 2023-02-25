@@ -183,7 +183,7 @@ final class ConditionalTests: XCTestCase {
         internal var j: String? = null
         internal var k: Int? = null
         val i_0 = i
-        val x_1 = j
+        val x_1 = if (i_0 == null) null else j
         val x_2 = k
         if ((i_0 != null) && (i_0 > 5) && (x_1 != null) && (x_1 == "x" || x_1 == "y")) {
             print(i_0)
@@ -198,15 +198,16 @@ final class ConditionalTests: XCTestCase {
     func testOptionalBindingUsingPreviousOptionalBinding() async throws {
         try await check(symbols: symbols, swift: """
         var c: ConditionalTestsClass?
-        if let x = c, let related = x.related {
-            print(related)
+        if let x = c, let related = x.related, let doublerelated = related.related {
+            print(doublerelated)
         }
         """, kotlin: """
         internal var c: ConditionalTestsClass? = null
         val x_0 = c
-        val related_1 = if (x_0 != null) x_0.related else null
-        if ((x_0 != null) && (related_1 != null)) {
-            print(related_1)
+        val related_1 = if (x_0 == null) null else x_0.related
+        val doublerelated_2 = if (x_0 == null || related_1 == null) null else related_1.related
+        if ((x_0 != null) && (related_1 != null) && (doublerelated_2 != null)) {
+            print(doublerelated_2)
         }
         """)
     }
@@ -320,7 +321,7 @@ final class ConditionalTests: XCTestCase {
         """, kotlin: """
         internal var c: ConditionalTestsClass? = null
         val c_0 = c
-        val related_1 = if (c_0 != null) c_0.related else null
+        val related_1 = if (c_0 == null) null else c_0.related
         if ((c_0 == null) || (related_1 == null)) {
             return
         }
