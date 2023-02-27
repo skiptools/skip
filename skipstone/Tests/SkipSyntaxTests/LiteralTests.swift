@@ -18,7 +18,7 @@ final class LiteralTests: XCTestCase {
         try await check(swift: """
         123_000_000
         """, kotlin: """
-        123000000
+        123_000_000
         """)
     }
 

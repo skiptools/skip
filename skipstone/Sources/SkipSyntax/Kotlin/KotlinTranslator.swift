@@ -95,7 +95,7 @@ public class KotlinTranslator {
             break
         case .expression:
             return [KotlinExpressionStatement.translate(statement: statement as! ExpressionStatement, translator: self)]
-        case .for:
+        case .forLoop:
             break
         case .guard:
             return [KotlinIf.translate(statement: statement as! Guard, translator: self)]
@@ -108,8 +108,8 @@ public class KotlinTranslator {
             break
         case .throw:
             break
-        case .while:
-            break
+        case .whileLoop:
+            return [KotlinWhileLoop.translate(statement: statement as! WhileLoop, translator: self)]
         case .classDeclaration:
             return [KotlinClassDeclaration.translate(statement: statement as! TypeDeclaration, translator: self)]
         case .enumDeclaration:
@@ -169,7 +169,7 @@ public class KotlinTranslator {
         case .numericLiteral:
             return KotlinNumericLiteral(expression: expression as! NumericLiteral)
         case .optionalBinding:
-            break
+            return KotlinOptionalBinding.translateCondition(expression: expression as! OptionalBinding, translator: self)
         case .parenthesized:
             return KotlinParenthesized.translate(expression: expression as! Parenthesized, translator: self)
         case .prefixOperator:
@@ -185,13 +185,13 @@ public class KotlinTranslator {
         }
 
         // Fall back to a raw translation and associated warning
-        let message = Message.kotlinUntranslatable(expression)
-        let rawExpression: RawExpression
-        if let syntax = expression.syntax {
-            rawExpression = RawExpression(syntax: syntax, message: message, in: syntaxTree)
-        } else {
-            rawExpression = RawExpression(sourceCode: "?", message: message, range: expression.sourceRange, in: syntaxTree)
-        }
-        return KotlinRawExpression(expression: rawExpression)
+//        let message = Message.kotlinUntranslatable(expression)
+//        let rawExpression: RawExpression
+//        if let syntax = expression.syntax {
+//            rawExpression = RawExpression(syntax: syntax, message: message, in: syntaxTree)
+//        } else {
+//            rawExpression = RawExpression(sourceCode: "?", message: message, range: expression.sourceRange, in: syntaxTree)
+//        }
+//        return KotlinRawExpression(expression: rawExpression)
     }
 }

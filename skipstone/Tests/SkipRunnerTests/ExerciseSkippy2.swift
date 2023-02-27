@@ -12,9 +12,9 @@ struct S {
     var p1: Int
     var p2: String?
 
-    func f() {
-        if (p1 < 0 || p1 > 1) && p1 < 100 {
-            print("yes")
+    func f(i: Int?) {
+        while let i, i < 5 {
+            print("ok")
         }
     }
 }

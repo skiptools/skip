@@ -392,15 +392,8 @@ class KotlinIf: KotlinExpression {
     var ifCheckVariable: String?
 
     struct ConditionSet {
-        var optionalBindingVariable: OptionalBindingVariable?
+        var optionalBindingVariable: KotlinOptionalBinding?
         var conditions: [KotlinExpression]
-    }
-
-    struct OptionalBindingVariable {
-        var name: String
-        var declaredType: TypeSignature?
-        var value: KotlinExpression
-        var isLet: Bool
     }
 
     static func translate(expression: If, translator: KotlinTranslator) -> KotlinIf {
@@ -430,7 +423,7 @@ class KotlinIf: KotlinExpression {
 
     private static func translate(conditions: [Expression], isGuard: Bool = false, translator: KotlinTranslator) -> [ConditionSet] {
         var conditionSets: [ConditionSet] = []
-        var currentOptionalBindingVariable: OptionalBindingVariable? = nil
+        var currentOptionalBindingVariable: KotlinOptionalBinding? = nil
         var currentConditions: [KotlinExpression] = []
         func appendCurrentConditionSet() {
             guard currentOptionalBindingVariable != nil || !currentConditions.isEmpty else {
@@ -452,32 +445,16 @@ class KotlinIf: KotlinExpression {
         }
 
         for condition in conditions {
-            guard let optionalBinding = condition as? OptionalBinding else {
+            let kcondition = translator.translateExpression(condition)
+            guard let optionalBinding = condition as? OptionalBinding, let optionalBindingVariable = KotlinOptionalBinding.translateVariable(expression: optionalBinding, translator: translator) else {
                 currentConditions.append(translator.translateExpression(condition))
                 continue
             }
 
-            // x != null
-            let identifier = KotlinIdentifier(name: optionalBinding.name)
-            let nullLiteral = KotlinNullLiteral()
-            let nullCheck = KotlinBinaryOperator(op: .with(symbol: "!="), lhs: identifier, rhs: nullLiteral, sourceFile: optionalBinding.sourceFile, sourceRange: optionalBinding.sourceRange)
-            guard requiresVariable(optionalBinding: optionalBinding, translator: translator) else {
-                currentConditions.append(nullCheck)
-                continue
-            }
             // Whenever we need an optional binding variable, create a new nested condition set for it
             appendCurrentConditionSet()
-
-            let optionalBindingValue: KotlinExpression
-            if let value = optionalBinding.value {
-                optionalBindingValue = translator.translateExpression(value).valueReference()
-            } else {
-                let identifier = KotlinIdentifier(name: optionalBinding.name)
-                identifier.mayBeSharedMutableValue = optionalBinding.variableType.kotlinMayBeSharedMutableValue(codebaseInfo: translator.codebaseInfo)
-                optionalBindingValue = identifier.valueReference()
-            }
-            currentOptionalBindingVariable = OptionalBindingVariable(name: optionalBinding.name, declaredType: optionalBinding.declaredType, value: optionalBindingValue, isLet: optionalBinding.isLet)
-            currentConditions.append(nullCheck)
+            currentOptionalBindingVariable = optionalBindingVariable
+            currentConditions.append(kcondition)
         }
         appendCurrentConditionSet()
         return conditionSets
@@ -611,32 +588,9 @@ class KotlinIf: KotlinExpression {
             output.append(indentation)
         }
         output.append("if (")
-        appendConditions(conditionSet.conditions, to: output, indentation: indentation)
+        let op: Operator = isGuard ? .with(symbol: "||") : .with(symbol: "&&")
+        conditionSet.conditions.appendAsLogicalConditions(to: output, op: op, indentation: indentation)
         output.append(") {\n")
-    }
-
-    private func appendConditions(_ conditions: [KotlinExpression], to output: OutputGenerator, indentation: Indentation) {
-        guard conditions.count > 1 else {
-            if let condition = conditions.first {
-                condition.append(to: output, indentation: indentation)
-            }
-            return
-        }
-
-        for (index, condition) in conditions.enumerated() {
-            // Special case the common !x compound expression to avoid unnecessary parentheses
-            let isCompound = condition.isCompoundExpression && !(condition is KotlinPrefixOperator && (condition as! KotlinPrefixOperator).operatorSymbol == "!")
-            if isCompound {
-                output.append("(")
-            }
-            output.append(condition, indentation: indentation)
-            if isCompound {
-                output.append(")")
-            }
-            if index < conditions.count - 1 {
-                output.append(" ").append(isGuard ? "||" : "&&").append(" ")
-            }
-        }
     }
 }
 
@@ -749,7 +703,55 @@ class KotlinNumericLiteral: KotlinExpression {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
-        output.append(literal.replacingOccurrences(of: "_", with: ""))
+        output.append(literal)
+    }
+}
+
+/// - Note: This type is used to translate the ``OptionalBinding`` expression, but is not itself a `KotlinExpression`.
+struct KotlinOptionalBinding {
+    var name: String
+    var declaredType: TypeSignature?
+    var value: KotlinExpression
+    var isLet: Bool
+
+    static func translateCondition(expression: OptionalBinding, translator: KotlinTranslator) -> KotlinExpression {
+        // x != null
+        let identifier = KotlinIdentifier(name: expression.name)
+        let nullLiteral = KotlinNullLiteral()
+        return KotlinBinaryOperator(op: .with(symbol: "!="), lhs: identifier, rhs: nullLiteral, sourceFile: expression.sourceFile, sourceRange: expression.sourceRange)
+    }
+
+    /// If the given optional binding requires us to declare a new Kotlin variable, return it.
+    static func translateVariable(expression: OptionalBinding, translator: KotlinTranslator) -> KotlinOptionalBinding? {
+        guard requiresVariable(expression: expression) else {
+            return nil
+        }
+
+        let kvalue: KotlinExpression
+        if let value = expression.value {
+            kvalue = translator.translateExpression(value).valueReference()
+        } else {
+            let identifier = KotlinIdentifier(name: expression.name)
+            identifier.mayBeSharedMutableValue = expression.variableType.kotlinMayBeSharedMutableValue(codebaseInfo: translator.codebaseInfo)
+            kvalue = identifier.valueReference()
+        }
+        return KotlinOptionalBinding(name: expression.name, declaredType: expression.declaredType, value: kvalue, isLet: expression.isLet)
+    }
+
+    private static func requiresVariable(expression: OptionalBinding) -> Bool {
+        // We need a new var to make the reference mutable
+        guard expression.isLet else {
+            return true
+        }
+        // 'let x' doesn't need a new var
+        guard let value = expression.value else {
+            return false
+        }
+        // We need a new var if we're binding to anything other than 'let x = x'
+        guard let identifier = value as? Identifier else {
+            return true
+        }
+        return identifier.name != expression.name
     }
 }
 

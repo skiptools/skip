@@ -3,6 +3,7 @@ enum KotlinStatementType {
     case codeBlock
     case expression
     case `return`
+    case whileLoop
 
     case classDeclaration
     case constructorDeclaration
@@ -667,5 +668,48 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             output.append(setterIndentation.inc()).append("field = newValue.valref()\n")
             output.append(setterIndentation).append("}\n")
         }
+    }
+}
+
+class KotlinWhileLoop: KotlinStatement {
+    var conditions: [KotlinExpression]
+    var body: KotlinCodeBlock
+
+    static func translate(statement: WhileLoop, translator: KotlinTranslator) -> KotlinWhileLoop {
+        let (kconditions, messages) = translate(conditions: statement.conditions, translator: translator)
+        let kbody = KotlinCodeBlock.translate(statement: statement.body, translator: translator)
+        let kstatement = KotlinWhileLoop(statement: statement, conditions: kconditions, body: kbody)
+        kstatement.messages += messages
+        return kstatement
+    }
+
+    private static func translate(conditions: [Expression], translator: KotlinTranslator) -> ([KotlinExpression], [Message]) {
+        var kconditions: [KotlinExpression] = []
+        var messages: [Message] = []
+        for condition in conditions {
+            kconditions.append(translator.translateExpression(condition))
+            if let optionalBinding = condition as? OptionalBinding, KotlinOptionalBinding.translateVariable(expression: optionalBinding, translator: translator) != nil {
+                messages.append(.kotlinLoopOptionalBinding(optionalBinding))
+            }
+        }
+        return (kconditions, messages)
+    }
+
+    private init(statement: WhileLoop, conditions: [KotlinExpression], body: KotlinCodeBlock) {
+        self.conditions = conditions
+        self.body = body
+        super.init(type: .whileLoop, statement: statement)
+    }
+
+    override var children: [KotlinSyntaxNode] {
+        return conditions + [body]
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        output.append(indentation).append("while (")
+        conditions.appendAsLogicalConditions(to: output, indentation: indentation)
+        output.append(") {\n")
+        output.append(body, indentation: indentation.inc())
+        output.append(indentation).append("}\n")
     }
 }

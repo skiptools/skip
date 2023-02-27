@@ -7,13 +7,13 @@ enum StatementType: CaseIterable {
     case `continue`
     case `defer`
     case `do`
-    case `for`
+    case forLoop
     case `guard`
     case ifDefined
     case `return`
     case `switch`
     case `throw`
-    case `while`
+    case whileLoop
 
     case classDeclaration
     case enumDeclaration
@@ -47,7 +47,7 @@ enum StatementType: CaseIterable {
             return nil
         case .do:
             return nil
-        case .for:
+        case .forLoop:
             return nil
         case .guard:
             return Guard.self
@@ -59,8 +59,8 @@ enum StatementType: CaseIterable {
             return nil
         case .throw:
             return nil
-        case .while:
-            return nil
+        case .whileLoop:
+            return WhileLoop.self
 
         case .classDeclaration:
             return TypeDeclaration.self
@@ -137,15 +137,14 @@ class Guard: Statement {
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
         var conditionsContext = context
-        conditions.forEach { conditionsContext = $0.inferTypes(context: conditionsContext, expecting: .bool) }
-        let _ = body.inferTypes(context: context, expecting: .none)
-        var retContext = context
         for condition in conditions {
+            conditionsContext = condition.inferTypes(context: conditionsContext, expecting: .bool)
             if let optionalBinding = condition as? OptionalBinding {
-                retContext = retContext.addingIdentifier(optionalBinding.name, type: optionalBinding.variableType)
+                conditionsContext = conditionsContext.addingIdentifier(optionalBinding.name, type: optionalBinding.variableType)
             }
         }
-        return retContext
+        let _ = body.inferTypes(context: context, expecting: .none)
+        return conditionsContext
     }
 
     override var children: [SyntaxNode] {
@@ -516,7 +515,7 @@ class TypeDeclaration: Statement {
     }
 }
 
-// TODO: Property wrappers?, generics, patterns (tuple deconstruction, etc)
+// TODO: Generics, patterns (tuple deconstruction, etc)
 /// `let/var v ...`
 class VariableDeclaration: Statement {
     let name: String
@@ -723,5 +722,47 @@ class VariableDeclaration: Statement {
             attrs.append(modifiers.prettyPrintTree)
         }
         return attrs
+    }
+}
+
+/// `while(conditions) { ... }`
+class WhileLoop: Statement {
+    let conditions: [Expression]
+    let body: CodeBlock
+
+    init(conditions: [Expression], body: CodeBlock, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.conditions = conditions
+        self.body = body
+        super.init(type: .whileLoop, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+        guard syntax.kind == .whileStmt, let whileStmnt = syntax.as(WhileStmtSyntax.self) else {
+            return nil
+        }
+
+        let conditions = try whileStmnt.conditions.map { try ExpressionDecoder.decodeCondition($0, in: syntaxTree) }
+        let statements = StatementDecoder.decode(syntaxListContainer: whileStmnt.body, in: syntaxTree)
+        let body = CodeBlock(statements: statements)
+        return [WhileLoop(conditions: conditions, body: body, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        var conditionsContext = context
+        var optionalBindings: [String: TypeSignature] = [:]
+        for condition in conditions {
+            conditionsContext = condition.inferTypes(context: conditionsContext, expecting: .bool)
+            if let optionalBinding = condition as? OptionalBinding {
+                conditionsContext = conditionsContext.addingIdentifier(optionalBinding.name, type: optionalBinding.variableType)
+                optionalBindings[optionalBinding.name] = optionalBinding.variableType
+            }
+        }
+        let bodyContext = context.pushingBlock(identifiers: optionalBindings)
+        let _ = body.inferTypes(context: bodyContext, expecting: .none)
+        return context
+    }
+
+    override var children: [SyntaxNode] {
+        return conditions + [body]
     }
 }

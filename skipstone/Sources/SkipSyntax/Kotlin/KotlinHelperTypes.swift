@@ -58,3 +58,30 @@ extension Parameter where V: Expression {
         return Parameter<KotlinExpression>(externalLabel: externalLabel, internalLabel: internalLabel, declaredType: declaredType, isVariadic: isVariadic, defaultValue: kdefaultValue)
     }
 }
+
+extension Array where Element == KotlinExpression {
+    /// Append this expression array as combined logical conditions, e.g. for an `if`.
+    func appendAsLogicalConditions(to output: OutputGenerator, op: Operator = .with(symbol: "&&"), indentation: Indentation) {
+        guard count > 1 else {
+            if let condition = first {
+                condition.append(to: output, indentation: indentation)
+            }
+            return
+        }
+
+        for (index, condition) in enumerated() {
+            // Special case the common !x compound expression to avoid unnecessary parentheses
+            let isCompound = condition.isCompoundExpression && !(condition is KotlinPrefixOperator && (condition as! KotlinPrefixOperator).operatorSymbol == "!")
+            if isCompound {
+                output.append("(")
+            }
+            output.append(condition, indentation: indentation)
+            if isCompound {
+                output.append(")")
+            }
+            if index < count - 1 {
+                output.append(" ").append(op.symbol).append(" ")
+            }
+        }
+    }
+}

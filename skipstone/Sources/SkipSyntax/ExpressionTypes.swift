@@ -467,10 +467,12 @@ class If: Expression {
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
         var conditionsContext = context
-        conditions.forEach { conditionsContext = $0.inferTypes(context: conditionsContext, expecting: .bool) }
-        let optionalBindings = conditions.reduce(into: [String: TypeSignature]()) { result, condition in
+        var optionalBindings: [String: TypeSignature] = [:]
+        for condition in conditions {
+            conditionsContext = condition.inferTypes(context: conditionsContext, expecting: .bool)
             if let optionalBinding = condition as? OptionalBinding {
-                result[optionalBinding.name] = optionalBinding.variableType
+                conditionsContext = conditionsContext.addingIdentifier(optionalBinding.name, type: optionalBinding.variableType)
+                optionalBindings[optionalBinding.name] = optionalBinding.variableType
             }
         }
         let bodyContext = context.pushingBlock(identifiers: optionalBindings)
