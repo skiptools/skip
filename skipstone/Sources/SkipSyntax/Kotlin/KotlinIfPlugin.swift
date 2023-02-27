@@ -9,17 +9,17 @@ class KotlinIfPlugin: KotlinPlugin {
 }
 
 private class Visitor {
-    private var remappedIdentifierStack: [[String: String]] = []
+    private var renamedIdentifiersStack: [[String: String]] = []
 
     func visit(_ node: KotlinSyntaxNode) -> VisitResult<KotlinSyntaxNode> {
         if node is KotlinCodeBlock {
-            // When entering a code block we create a remapping context. If we encounter optional bindings,
+            // When entering a code block we create a renaming context. If we encounter optional bindings,
             // we can apply them to the current context. When we leave, we pop the context
-            remappedIdentifierStack.append([:])
-            return .recurse({ _ in self.remappedIdentifierStack.removeLast() })
+            renamedIdentifiersStack.append([:])
+            return .recurse({ _ in self.renamedIdentifiersStack.removeLast() })
         } else if let identifier = node as? KotlinIdentifier {
-            if let optionalBinding = optionalBindingVariableName(for: identifier.name) {
-                identifier.name = optionalBinding
+            if let optionalBindingVariableName = optionalBindingVariableName(for: identifier.name) {
+                identifier.name = optionalBindingVariableName
             }
             return .skip
         } else if let kif = node as? KotlinIf {
@@ -30,25 +30,25 @@ private class Visitor {
                 // Visit the guard body without the new bindings
                 kif.body.visit(perform: self.visit)
                 // Visit conditions and gather bindings.
-                var remappedIdentifiers: [String: String] = [:]
+                var renamedIdentifiers: [String: String] = [:]
                 for i in 0..<kif.conditionSets.count {
                     // As we evaluate each condition set we must allow it to access previous condition set bindings
                     if let optionalBindingVariable = kif.conditionSets[i].optionalBindingVariable {
-                        remappedIdentifierStack.append(remappedIdentifiers)
+                        renamedIdentifiersStack.append(renamedIdentifiers)
                         optionalBindingVariable.value.visit(perform: self.visit)
-                        remappedIdentifierStack.removeLast()
+                        renamedIdentifiersStack.removeLast()
 
                         let name = newOptionalBindingVariableName(name: optionalBindingVariable.name)
                         kif.conditionSets[i].optionalBindingVariable?.name = name
-                        remappedIdentifiers[optionalBindingVariable.name] = name
+                        renamedIdentifiers[optionalBindingVariable.name] = name
                     }
-                    remappedIdentifierStack.append(remappedIdentifiers)
+                    renamedIdentifiersStack.append(renamedIdentifiers)
                     kif.conditionSets[i].conditions.forEach { $0.visit(perform: self.visit) }
-                    remappedIdentifierStack.removeLast()
+                    renamedIdentifiersStack.removeLast()
                 }
                 // Add bindings to current block
-                if !remappedIdentifierStack.isEmpty {
-                    remappedIdentifierStack[remappedIdentifierStack.count - 1].merge(remappedIdentifiers) { _, new in new }
+                if !renamedIdentifiersStack.isEmpty {
+                    renamedIdentifiersStack[renamedIdentifiersStack.count - 1].merge(renamedIdentifiers) { _, new in new }
                 }
                 return .skip
             } else {
@@ -60,7 +60,7 @@ private class Visitor {
     }
 
     private var ifCheckCount = 0
-    private var optionalBindingCount = 0
+    private var optionalBindingCounts: [String: Int] = [:]
 
     private func newIfCheckVariableName() -> String {
         let name = "if_\(ifCheckCount)"
@@ -69,15 +69,20 @@ private class Visitor {
     }
 
     private func newOptionalBindingVariableName(name: String) -> String {
-        let name = "\(name)_\(optionalBindingCount)"
-        optionalBindingCount += 1
-        return name
+        if var count = optionalBindingCounts[name] {
+            count += 1
+            optionalBindingCounts[name] = count
+            return "\(name)_\(count)"
+        } else {
+            optionalBindingCounts[name] = 0
+            return "\(name)_0"
+        }
     }
 
     private func optionalBindingVariableName(for identifier: String) -> String? {
-        for remappedIdentifiers in remappedIdentifierStack.reversed() {
-            if let binding = remappedIdentifiers[identifier] {
-                return binding
+        for renamedIdentifiers in renamedIdentifiersStack.reversed() {
+            if let name = renamedIdentifiers[identifier] {
+                return name
             }
         }
         return nil

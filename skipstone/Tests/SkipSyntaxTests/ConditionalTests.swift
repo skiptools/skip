@@ -533,17 +533,17 @@ final class ConditionalTests: XCTestCase {
             doSomethingWith(c)
             return
         }
-        val related_1 = c_0.related
-        if (related_1 == null) {
+        val related_0 = c_0.related
+        if (related_0 == null) {
             doSomethingWith(c)
             return
         }
-        val doublerelated_2 = related_1.related
-        if (doublerelated_2 == null) {
+        val doublerelated_0 = related_0.related
+        if (doublerelated_0 == null) {
             doSomethingWith(c)
             return
         }
-        print(doublerelated_2)
+        print(doublerelated_0)
         """)
     }
 
