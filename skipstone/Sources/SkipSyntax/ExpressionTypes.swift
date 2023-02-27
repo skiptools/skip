@@ -295,10 +295,10 @@ class Closure: Expression {
             attrs.append(PrettyPrintTree(root: "parameters", children: parameters.map { $0.prettyPrintTree }))
         }
         if isAsync {
-            attrs.append(PrettyPrintTree(root: "async"))
+            attrs.append("async")
         }
         if isThrows {
-            attrs.append(PrettyPrintTree(root: "throws"))
+            attrs.append("throws")
         }
         return attrs
     }
@@ -971,6 +971,6 @@ class Try: Expression {
     }
 
     override var prettyPrintAttributes: [PrettyPrintTree] {
-        return isOptional ? [PrettyPrintTree(root: "try?")] : []
+        return isOptional ? ["try?"] : []
     }
 }

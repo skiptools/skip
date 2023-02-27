@@ -57,4 +57,26 @@ final class LoopTests: XCTestCase {
         }
         """)
     }
+
+    func testRepeatWhileLoop() async throws {
+        try await check(swift: """
+        repeat {
+            doSomething()
+        } while isTrue()
+        """, kotlin: """
+        do {
+            doSomething()
+        } while (isTrue())
+        """)
+
+        try await check(swift: """
+        repeat {
+            doSomething()
+        } while x < 5 || (x > 100 && x < 500)
+        """, kotlin: """
+        do {
+            doSomething()
+        } while (x < 5 || (x > 100 && x < 500))
+        """)
+    }
 }

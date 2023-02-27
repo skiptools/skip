@@ -217,7 +217,73 @@ class Return: ExpressionStatement {
     }
 
     override var prettyPrintAttributes: [PrettyPrintTree] {
-        return [PrettyPrintTree(root: "return")] + super.prettyPrintAttributes
+        return ["return"] + super.prettyPrintAttributes
+    }
+}
+
+/// `while(conditions) { ... }`
+class WhileLoop: Statement {
+    let conditions: [Expression]
+    let body: CodeBlock
+    let isRepeatWhile: Bool
+
+    init(conditions: [Expression], body: CodeBlock, isRepeatWhile: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.conditions = conditions
+        self.body = body
+        self.isRepeatWhile = isRepeatWhile
+        super.init(type: .whileLoop, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+        if syntax.kind == .whileStmt, let whileStmnt = syntax.as(WhileStmtSyntax.self) {
+            return try [decodeWhile(statement: whileStmnt, extras: extras, in: syntaxTree)]
+        } else if syntax.kind == .repeatWhileStmt, let repeatWhileStmnt = syntax.as(RepeatWhileStmtSyntax.self) {
+            return [decodeRepeatWhile(statement: repeatWhileStmnt, extras: extras, in: syntaxTree)]
+        } else {
+            return nil
+        }
+    }
+
+    private static func decodeWhile(statement: WhileStmtSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> WhileLoop {
+        let conditions = try statement.conditions.map { try ExpressionDecoder.decodeCondition($0, in: syntaxTree) }
+        let statements = StatementDecoder.decode(syntaxListContainer: statement.body, in: syntaxTree)
+        let body = CodeBlock(statements: statements)
+        return WhileLoop(conditions: conditions, body: body, syntax: statement, sourceFile: syntaxTree.source.file, sourceRange: statement.range(in: syntaxTree.source), extras: extras)
+    }
+
+    private static func decodeRepeatWhile(statement: RepeatWhileStmtSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> WhileLoop {
+        let condition = ExpressionDecoder.decode(syntax: statement.condition, in: syntaxTree)
+        let statements = StatementDecoder.decode(syntaxListContainer: statement.body, in: syntaxTree)
+        let body = CodeBlock(statements: statements)
+        return WhileLoop(conditions: [condition], body: body, isRepeatWhile: true, syntax: statement, sourceFile: syntaxTree.source.file, sourceRange: statement.range(in: syntaxTree.source), extras: extras)
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        var conditionsContext = context
+        var optionalBindings: [String: TypeSignature] = [:]
+        for condition in conditions {
+            conditionsContext = condition.inferTypes(context: conditionsContext, expecting: .bool)
+            if let optionalBinding = condition as? OptionalBinding {
+                conditionsContext = conditionsContext.addingIdentifier(optionalBinding.name, type: optionalBinding.variableType)
+                optionalBindings[optionalBinding.name] = optionalBinding.variableType
+            }
+        }
+        // Condition bindings are available to body in a while loop, but not in a repeat while loop
+        if isRepeatWhile {
+            let _ = body.inferTypes(context: context, expecting: .none)
+        } else {
+            let bodyContext = context.pushingBlock(identifiers: optionalBindings)
+            let _ = body.inferTypes(context: bodyContext, expecting: .none)
+        }
+        return context
+    }
+
+    override var children: [SyntaxNode] {
+        return conditions + [body]
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        return isRepeatWhile ? ["repeat"] : []
     }
 }
 
@@ -359,10 +425,10 @@ class FunctionDeclaration: Statement {
             attrs.append(PrettyPrintTree(root: "parameters", children: parameters.map { $0.prettyPrintTree }))
         }
         if isAsync {
-            attrs.append(PrettyPrintTree(root: "async"))
+            attrs.append("async")
         }
         if isThrows {
-            attrs.append(PrettyPrintTree(root: "throws"))
+            attrs.append("throws")
         }
         if !attributes.isEmpty {
             attrs.append(attributes.prettyPrintTree)
@@ -710,10 +776,10 @@ class VariableDeclaration: Statement {
             attrs.append(PrettyPrintTree(root: declaredType.description))
         }
         if isAsync {
-            attrs.append(PrettyPrintTree(root: "async"))
+            attrs.append("async")
         }
         if isThrows {
-            attrs.append(PrettyPrintTree(root: "throws"))
+            attrs.append("throws")
         }
         if !attributes.isEmpty {
             attrs.append(attributes.prettyPrintTree)
@@ -722,47 +788,5 @@ class VariableDeclaration: Statement {
             attrs.append(modifiers.prettyPrintTree)
         }
         return attrs
-    }
-}
-
-/// `while(conditions) { ... }`
-class WhileLoop: Statement {
-    let conditions: [Expression]
-    let body: CodeBlock
-
-    init(conditions: [Expression], body: CodeBlock, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
-        self.conditions = conditions
-        self.body = body
-        super.init(type: .whileLoop, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
-    }
-
-    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
-        guard syntax.kind == .whileStmt, let whileStmnt = syntax.as(WhileStmtSyntax.self) else {
-            return nil
-        }
-
-        let conditions = try whileStmnt.conditions.map { try ExpressionDecoder.decodeCondition($0, in: syntaxTree) }
-        let statements = StatementDecoder.decode(syntaxListContainer: whileStmnt.body, in: syntaxTree)
-        let body = CodeBlock(statements: statements)
-        return [WhileLoop(conditions: conditions, body: body, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
-    }
-
-    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
-        var conditionsContext = context
-        var optionalBindings: [String: TypeSignature] = [:]
-        for condition in conditions {
-            conditionsContext = condition.inferTypes(context: conditionsContext, expecting: .bool)
-            if let optionalBinding = condition as? OptionalBinding {
-                conditionsContext = conditionsContext.addingIdentifier(optionalBinding.name, type: optionalBinding.variableType)
-                optionalBindings[optionalBinding.name] = optionalBinding.variableType
-            }
-        }
-        let bodyContext = context.pushingBlock(identifiers: optionalBindings)
-        let _ = body.inferTypes(context: bodyContext, expecting: .none)
-        return context
-    }
-
-    override var children: [SyntaxNode] {
-        return conditions + [body]
     }
 }

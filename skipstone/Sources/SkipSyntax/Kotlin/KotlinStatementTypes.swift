@@ -674,11 +674,13 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
 class KotlinWhileLoop: KotlinStatement {
     var conditions: [KotlinExpression]
     var body: KotlinCodeBlock
+    var isDoWhile = false
 
     static func translate(statement: WhileLoop, translator: KotlinTranslator) -> KotlinWhileLoop {
         let (kconditions, messages) = translate(conditions: statement.conditions, translator: translator)
         let kbody = KotlinCodeBlock.translate(statement: statement.body, translator: translator)
         let kstatement = KotlinWhileLoop(statement: statement, conditions: kconditions, body: kbody)
+        kstatement.isDoWhile = statement.isRepeatWhile
         kstatement.messages += messages
         return kstatement
     }
@@ -706,10 +708,18 @@ class KotlinWhileLoop: KotlinStatement {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
-        output.append(indentation).append("while (")
-        conditions.appendAsLogicalConditions(to: output, indentation: indentation)
-        output.append(") {\n")
-        output.append(body, indentation: indentation.inc())
-        output.append(indentation).append("}\n")
+        if isDoWhile {
+            output.append(indentation).append("do {\n")
+            output.append(body, indentation: indentation.inc())
+            output.append(indentation).append("} while (")
+            conditions.appendAsLogicalConditions(to: output, indentation: indentation)
+            output.append(")\n")
+        } else {
+            output.append(indentation).append("while (")
+            conditions.appendAsLogicalConditions(to: output, indentation: indentation)
+            output.append(") {\n")
+            output.append(body, indentation: indentation.inc())
+            output.append(indentation).append("}\n")
+        }
     }
 }
