@@ -617,7 +617,8 @@ class NumericLiteral: Expression {
     }
 }
 
-/// `[if/guard] let x = optional`
+//~~~
+/// `[if/guard/for/while] let x = optional`
 class OptionalBinding: Expression {
     let name: String
     private(set) var declaredType: TypeSignature
@@ -926,11 +927,17 @@ class Subscript: Expression {
 /// `try f()`
 class Try: Expression {
     let trying: Expression
-    let isOptional: Bool // try?
+    let kind: Kind
 
-    init(trying: Expression, isOptional: Bool = false, syntax: SyntaxProtocol?, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    enum Kind {
+        case `default`
+        case optional
+        case unwrappedOptional
+    }
+
+    init(trying: Expression, kind: Kind = .default, syntax: SyntaxProtocol?, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
         self.trying = trying
-        self.isOptional = isOptional
+        self.kind = kind
         super.init(type: .try, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
@@ -939,12 +946,12 @@ class Try: Expression {
             return nil
         }
         let expression = ExpressionDecoder.decode(syntax: tryExpr.expression, in: syntaxTree)
-        let isOptional = tryExpr.questionOrExclamationMark?.text == "?"
-        return Try(trying: expression, isOptional: isOptional, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+        let kind: Kind = tryExpr.questionOrExclamationMark?.text == "?" ? .optional : tryExpr.questionOrExclamationMark?.text == "!" ? .unwrappedOptional : .default
+        return Try(trying: expression, kind: kind, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
-        if isOptional, case .optional(let type) = expecting {
+        if kind == .optional, case .optional(let type) = expecting {
             return trying.inferTypes(context: context, expecting: type)
         } else {
             return trying.inferTypes(context: context, expecting: expecting)
@@ -953,16 +960,20 @@ class Try: Expression {
 
     override var inferredType: TypeSignature {
         let inferredType = trying.inferredType
-        guard isOptional else {
+        switch kind {
+        case .default:
             return inferredType
-        }
-        switch inferredType {
-        case .none:
-            return .none
         case .optional:
+            switch inferredType {
+            case .none:
+                return .none
+            case .optional:
+                return inferredType
+            default:
+                return .optional(inferredType)
+            }
+        case .unwrappedOptional:
             return inferredType
-        default:
-            return .optional(inferredType)
         }
     }
 
@@ -971,6 +982,6 @@ class Try: Expression {
     }
 
     override var prettyPrintAttributes: [PrettyPrintTree] {
-        return isOptional ? ["try?"] : []
+        return kind != .default ? [PrettyPrintTree(root: String(describing: kind))] : []
     }
 }

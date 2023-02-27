@@ -946,7 +946,7 @@ class KotlinTry: KotlinExpression {
     static func translate(expression: Try, translator: KotlinTranslator) -> KotlinTry {
         let ktrying = translator.translateExpression(expression.trying)
         let kexpression = KotlinTry(expression: expression, trying: ktrying)
-        kexpression.isOptional = expression.isOptional
+        kexpression.isOptional = expression.kind == .optional
         return kexpression
     }
 

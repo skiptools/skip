@@ -48,7 +48,7 @@ enum StatementType: CaseIterable {
         case .do:
             return nil
         case .forLoop:
-            return nil
+            return nil//~~~ForLoop.self
         case .guard:
             return Guard.self
         case .ifDefined:
@@ -112,6 +112,68 @@ class CodeBlock: Statement {
         return statements
     }
 }
+
+//~~~
+/// `for ... in ... { ... }`
+//class ForLoop: Statement {
+//forKeyword: TokenSyntax = .keyword(.for),
+//_ unexpectedBetweenForKeywordAndTryKeyword: UnexpectedNodesSyntax? = nil,
+//tryKeyword: TokenSyntax? = nil,
+//_ unexpectedBetweenTryKeywordAndAwaitKeyword: UnexpectedNodesSyntax? = nil,
+//awaitKeyword: TokenSyntax? = nil,
+//_ unexpectedBetweenAwaitKeywordAndCaseKeyword: UnexpectedNodesSyntax? = nil,
+//caseKeyword: TokenSyntax? = nil,
+//_ unexpectedBetweenCaseKeywordAndPattern: UnexpectedNodesSyntax? = nil,
+//pattern: P,
+//_ unexpectedBetweenPatternAndTypeAnnotation: UnexpectedNodesSyntax? = nil,
+//typeAnnotation: TypeAnnotationSyntax? = nil,
+//_ unexpectedBetweenTypeAnnotationAndInKeyword: UnexpectedNodesSyntax? = nil,
+//inKeyword: TokenSyntax = .keyword(.in),
+//_ unexpectedBetweenInKeywordAndSequenceExpr: UnexpectedNodesSyntax? = nil,
+//sequenceExpr: S,
+//_ unexpectedBetweenSequenceExprAndWhereClause: UnexpectedNodesSyntax? = nil,
+//whereClause: WhereClauseSyntax? = nil,
+//
+//    let tryKind: Try.Kind?
+//    let isAwait: Bool
+//
+//
+//    let guardExpression: Expression?
+//    let body: CodeBlock
+//
+//    init(conditions: [Expression], body: CodeBlock, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+//        self.conditions = conditions
+//        self.body = body
+//        super.init(type: .guard, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+//    }
+//
+//    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+//        guard syntax.kind == .guardStmt, let guardStmnt = syntax.as(GuardStmtSyntax.self) else {
+//            return nil
+//        }
+//
+//        let conditions = try guardStmnt.conditions.map { try ExpressionDecoder.decodeCondition($0, in: syntaxTree) }
+//        let statements = StatementDecoder.decode(syntaxListContainer: guardStmnt.body, in: syntaxTree)
+//        let body = CodeBlock(statements: statements)
+//        return [Guard(conditions: conditions, body: body, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
+//    }
+//
+//    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+//        var conditionsContext = context
+//        for condition in conditions {
+//            conditionsContext = condition.inferTypes(context: conditionsContext, expecting: .bool)
+//            if let optionalBinding = condition as? OptionalBinding {
+//                conditionsContext = conditionsContext.addingIdentifier(optionalBinding.name, type: optionalBinding.variableType)
+//            }
+//        }
+//        let _ = body.inferTypes(context: context, expecting: .none)
+//        return conditionsContext
+//    }
+//
+//    override var children: [SyntaxNode] {
+//        return conditions + [body]
+//    }
+//}
 
 /// `guard ...`
 class Guard: Statement {
