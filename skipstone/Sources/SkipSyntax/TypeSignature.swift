@@ -67,6 +67,20 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
         }
     }
 
+    /// If this is a tuple with matching element count, the decomposed tuple types.
+    func tupleTypes(count: Int) -> [TypeSignature] {
+        guard count > 0 else {
+            return []
+        }
+        guard count > 1 else {
+            return [self]
+        }
+        if case .tuple(_, let types) = self, types.count == count {
+            return types
+        }
+        return Array(repeating: self, count: count)
+    }
+
     /// Attempt to replace `.none` cases in this type signature with information from the given signature.
     func or(_ typeSignature: TypeSignature) -> TypeSignature {
         switch self {
@@ -487,6 +501,17 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
                 return .named(name, genericTypes)
             }
         }
+    }
+
+    /// Return a tuple type made up of the given types.
+    static func `for`(labels: [String?], types: [TypeSignature]) -> TypeSignature {
+        guard !types.isEmpty else {
+            return .none
+        }
+        guard types.count > 1 else {
+            return types[0]
+        }
+        return .tuple(labels, types)
     }
 
     /// Qualify local type names with any enclosing types.

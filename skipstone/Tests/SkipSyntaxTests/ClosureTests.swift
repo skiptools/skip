@@ -106,8 +106,8 @@ final class ClosureTests: XCTestCase {
             return 1
         }
         """, kotlin: """
-        call ll@{ _ ->
-            return@ll 1
+        call r_0@{ _ ->
+            return@r_0 1
         }
         """)
     }

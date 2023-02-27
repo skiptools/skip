@@ -202,7 +202,7 @@ class Guard: Statement {
         for condition in conditions {
             conditionsContext = condition.inferTypes(context: conditionsContext, expecting: .bool)
             if let optionalBinding = condition as? OptionalBinding {
-                conditionsContext = conditionsContext.addingIdentifier(optionalBinding.name, type: optionalBinding.variableType)
+                conditionsContext = conditionsContext.addingIdentifiers(optionalBinding.names, types: optionalBinding.variableTypes)
             }
         }
         let _ = body.inferTypes(context: context, expecting: .none)
@@ -326,8 +326,8 @@ class WhileLoop: Statement {
         for condition in conditions {
             conditionsContext = condition.inferTypes(context: conditionsContext, expecting: .bool)
             if let optionalBinding = condition as? OptionalBinding {
-                conditionsContext = conditionsContext.addingIdentifier(optionalBinding.name, type: optionalBinding.variableType)
-                optionalBindings[optionalBinding.name] = optionalBinding.variableType
+                conditionsContext = conditionsContext.addingIdentifiers(optionalBinding.names, types: optionalBinding.variableTypes)
+                optionalBindings.merge(zip(optionalBinding.names, optionalBinding.variableTypes)) { _, new in new }
             }
         }
         // Condition bindings are available to body in a while loop, but not in a repeat while loop
@@ -748,29 +748,10 @@ class VariableDeclaration: Statement {
             }
         }
 
-        // TODO: Support patterns other than a simple identifier
-        let patternSyntax = syntax.pattern
-        switch patternSyntax.kind {
-        case .expressionPattern:
-            throw Message.unsupportedSyntax(patternSyntax, source: syntaxTree.source)
-        case .identifierPattern:
-            let name = patternSyntax.as(IdentifierPatternSyntax.self)!.identifier.text
-            let declaration = VariableDeclaration(name: name, declaredType: declaredType, isLet: isLet, isAsync: isAsync, isThrows: isThrows, attributes: attributes, modifiers: modifiers, value: value, getter: getter, setter: setter, willSet: willSet, didSet: didSet, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
-            declaration.messages = messages
-            return declaration
-        case .isTypePattern:
-            throw Message.unsupportedSyntax(patternSyntax, source: syntaxTree.source)
-        case .missingPattern:
-            throw Message.unsupportedSyntax(patternSyntax, source: syntaxTree.source)
-        case .tuplePattern:
-            throw Message.unsupportedSyntax(patternSyntax, source: syntaxTree.source)
-        case .valueBindingPattern:
-            throw Message.unsupportedSyntax(patternSyntax, source: syntaxTree.source)
-        case .wildcardPattern:
-            throw Message.unsupportedSyntax(patternSyntax, source: syntaxTree.source)
-        default:
-            throw Message.unsupportedSyntax(patternSyntax, source: syntaxTree.source)
-        }
+        let names = try syntax.pattern.identifierNames(in: syntaxTree)
+        let declaration = VariableDeclaration(name: names[0], declaredType: declaredType, isLet: isLet, isAsync: isAsync, isThrows: isThrows, attributes: attributes, modifiers: modifiers, value: value, getter: getter, setter: setter, willSet: willSet, didSet: didSet, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
+        declaration.messages = messages
+        return declaration
     }
 
     override func resolveAttributes() {

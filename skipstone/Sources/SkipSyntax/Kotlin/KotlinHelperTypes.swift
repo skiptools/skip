@@ -84,4 +84,15 @@ extension Array where Element == KotlinExpression {
             }
         }
     }
+
+    /// Create a single logical expression out of these expressions.
+    func asLogicalExpression() -> KotlinExpression {
+        if isEmpty {
+            return KotlinBooleanLiteral(literal: false)
+        }
+        if count == 1 {
+            return self[0]
+        }
+        return KotlinBinaryOperator(op: .with(symbol: "&&"), lhs: Array(self[0..<(count - 1)]).asLogicalExpression(), rhs: self[count - 1])
+    }
 }

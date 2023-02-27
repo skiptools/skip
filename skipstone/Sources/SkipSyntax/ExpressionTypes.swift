@@ -471,8 +471,8 @@ class If: Expression {
         for condition in conditions {
             conditionsContext = condition.inferTypes(context: conditionsContext, expecting: .bool)
             if let optionalBinding = condition as? OptionalBinding {
-                conditionsContext = conditionsContext.addingIdentifier(optionalBinding.name, type: optionalBinding.variableType)
-                optionalBindings[optionalBinding.name] = optionalBinding.variableType
+                conditionsContext = conditionsContext.addingIdentifiers(optionalBinding.names, types: optionalBinding.variableTypes)
+                optionalBindings.merge(zip(optionalBinding.names, optionalBinding.variableTypes)) { _, new in new }
             }
         }
         let bodyContext = context.pushingBlock(identifiers: optionalBindings)
@@ -617,17 +617,19 @@ class NumericLiteral: Expression {
     }
 }
 
-//~~~
 /// `[if/guard/for/while] let x = optional`
 class OptionalBinding: Expression {
-    let name: String
+    let names: [String]
     private(set) var declaredType: TypeSignature
     let isLet: Bool
     let value: Expression?
-    private(set) var variableType: TypeSignature = .none
+    var variableTypes: [TypeSignature] {
+        return variableType.tupleTypes(count: names.count)
+    }
+    private var variableType: TypeSignature = .none
 
-    init(name: String, declaredType: TypeSignature = .none, isLet: Bool, value: Expression? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
-        self.name = name
+    init(names: [String], declaredType: TypeSignature = .none, isLet: Bool, value: Expression? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        self.names = names
         self.declaredType = declaredType
         self.isLet = isLet
         self.value = value
@@ -650,27 +652,8 @@ class OptionalBinding: Expression {
             value = ExpressionDecoder.decode(syntax: valueSyntax, in: syntaxTree)
         }
 
-        // TODO: Support patterns other than a simple identifier
-        let patternSyntax = optionalBindingExpr.pattern
-        switch patternSyntax.kind {
-        case .expressionPattern:
-            throw Message.unsupportedSyntax(patternSyntax, source: syntaxTree.source)
-        case .identifierPattern:
-            let name = patternSyntax.as(IdentifierPatternSyntax.self)!.identifier.text
-            return OptionalBinding(name: name, declaredType: declaredType, isLet: isLet, value: value, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
-        case .isTypePattern:
-            throw Message.unsupportedSyntax(patternSyntax, source: syntaxTree.source)
-        case .missingPattern:
-            throw Message.unsupportedSyntax(patternSyntax, source: syntaxTree.source)
-        case .tuplePattern:
-            throw Message.unsupportedSyntax(patternSyntax, source: syntaxTree.source)
-        case .valueBindingPattern:
-            throw Message.unsupportedSyntax(patternSyntax, source: syntaxTree.source)
-        case .wildcardPattern:
-            throw Message.unsupportedSyntax(patternSyntax, source: syntaxTree.source)
-        default:
-            throw Message.unsupportedSyntax(patternSyntax, source: syntaxTree.source)
-        }
+        let names = try optionalBindingExpr.pattern.identifierNames(in: syntaxTree)
+        return OptionalBinding(names: names, declaredType: declaredType, isLet: isLet, value: value, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
     override func resolveAttributes() {
@@ -684,14 +667,14 @@ class OptionalBinding: Expression {
             if let value {
                 variableType = value.inferredType
             } else {
-                variableType = context.identifier(name)
+                variableType = TypeSignature.for(labels: names, types: names.map { context.identifier($0) })
             }
         }
         // Flow will only continue when the value is non-optional
         if case .optional(let type) = variableType {
             variableType = type
         }
-        return context.addingIdentifier(name, type: variableType)
+        return context.addingIdentifiers(names, types: variableTypes)
     }
 
     override var children: [SyntaxNode] {
@@ -699,7 +682,7 @@ class OptionalBinding: Expression {
     }
 
     override var prettyPrintAttributes: [PrettyPrintTree] {
-        var attrs = [PrettyPrintTree(root: name)]
+        var attrs = [PrettyPrintTree(root: names.joined(separator: ", "))]
         if declaredType != .none {
             attrs.append(PrettyPrintTree(root: declaredType.description))
         }

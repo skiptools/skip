@@ -128,8 +128,8 @@ final class BuiltinTypeTests: XCTestCase {
         var c: CustomType?
         var u: CustomType!
         """, kotlin: """
-        internal var i: Int?
-        internal var c: CustomType?
+        internal var i: Int? = null
+        internal var c: CustomType? = null
             get() {
                 return field.valref({ c = it })
             }

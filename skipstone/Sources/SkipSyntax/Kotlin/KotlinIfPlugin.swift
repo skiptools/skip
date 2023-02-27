@@ -38,9 +38,9 @@ private class Visitor {
                         optionalBindingVariable.value.visit(perform: self.visit)
                         renamedIdentifiersStack.removeLast()
 
-                        let name = newOptionalBindingVariableName(name: optionalBindingVariable.name)
-                        kif.conditionSets[i].optionalBindingVariable?.name = name
-                        renamedIdentifiers[optionalBindingVariable.name] = name
+                        let names = optionalBindingVariable.names.map { newOptionalBindingVariableName(name: $0) }
+                        kif.conditionSets[i].optionalBindingVariable?.names = names
+                        renamedIdentifiers.merge(zip(optionalBindingVariable.names, names)) { _, new in new }
                     }
                     renamedIdentifiersStack.append(renamedIdentifiers)
                     kif.conditionSets[i].conditions.forEach { $0.visit(perform: self.visit) }

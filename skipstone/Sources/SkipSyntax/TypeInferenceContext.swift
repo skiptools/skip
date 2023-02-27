@@ -81,6 +81,15 @@ struct TypeInferenceContext {
         return context
     }
 
+    /// Return a context that includes the given identifiers.
+    func addingIdentifiers(_ names: [String], types: [TypeSignature]) -> TypeInferenceContext {
+        var context = self
+        for nameAndType in zip(names, types) {
+            context.localIdentifierTypes[nameAndType.0] = nameAndType.1
+        }
+        return context
+    }
+
     /// Return the type of the given identifier.
     func identifier(_ name: String) -> TypeSignature {
         // First check local identifiers

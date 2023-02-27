@@ -106,6 +106,40 @@ extension ParameterClauseSyntax {
     }
 }
 
+extension PatternSyntax {
+    /// Return the identifier names for this pattern declaration.
+    ///
+    /// - Returns: A single name for a simple identifier, an array of names for a decomposed tuple.
+    /// - Throws: `Message` if unable to parse this pattern.
+    func identifierNames(in syntaxTree: SyntaxTree) throws -> [String] {
+        // TODO: Support additional patterns
+        switch kind {
+        case .expressionPattern:
+            throw Message.unsupportedSyntax(self, source: syntaxTree.source)
+        case .identifierPattern:
+            guard let identifierSyntax = self.as(IdentifierPatternSyntax.self) else {
+                throw Message.unsupportedSyntax(self, source: syntaxTree.source)
+            }
+            return [identifierSyntax.identifier.text]
+        case .isTypePattern:
+            throw Message.unsupportedSyntax(self, source: syntaxTree.source)
+        case .missingPattern:
+            throw Message.unsupportedSyntax(self, source: syntaxTree.source)
+        case .tuplePattern:
+            guard let tupleSyntax = self.as(TuplePatternSyntax.self) else {
+                throw Message.unsupportedSyntax(self, source: syntaxTree.source)
+            }
+            return try tupleSyntax.elements.flatMap { try $0.pattern.identifierNames(in: syntaxTree) }
+        case .valueBindingPattern:
+            throw Message.unsupportedSyntax(self, source: syntaxTree.source)
+        case .wildcardPattern:
+            throw Message.unsupportedSyntax(self, source: syntaxTree.source)
+        default:
+            throw Message.unsupportedSyntax(self, source: syntaxTree.source)
+        }
+    }
+}
+
 private class PrettyPrintVisitor: SyntaxVisitor {
     init() {
         super.init(viewMode: .sourceAccurate)
