@@ -11,7 +11,7 @@ public class KotlinCodebaseInfo {
         self.symbols = symbols
         self.plugins = [
             KotlinConstructorPlugin(),
-            KotlinOptionalBindingsPlugin(),
+            KotlinIfPlugin(),
             KotlinSwiftUIPlugin()
         ]
     }

@@ -147,6 +147,11 @@ class KotlinBinaryOperator: KotlinExpression {
 class KotlinBooleanLiteral: KotlinExpression {
     var literal: Bool
 
+    init(literal: Bool = false, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        self.literal = literal
+        super.init(type: .booleanLiteral, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
     init(expression: BooleanLiteral) {
         self.literal = expression.literal
         super.init(type: .booleanLiteral, expression: expression)
@@ -179,8 +184,8 @@ class KotlinClosure: KotlinExpression {
             }
         } else {
             // Closures require a label for any explicit return, or it will return from the other scope
-            if kbody.updateWithExpectedReturn(.labelIfPresent("ll")) {
-                returnLabel = "ll"
+            if kbody.updateWithExpectedReturn(.labelIfPresent("r_0")) {
+                returnLabel = "r_0"
             }
             if expression.parameters.isEmpty {
                 implicitParameterLabels = handleImplicitParameters(in: kbody, inferredType: expression.inferredType)
@@ -378,12 +383,18 @@ class KotlinIdentifier: KotlinExpression {
     }
 }
 
+/// - Seealso: ``KotlinIfPlugin``
 class KotlinIf: KotlinExpression {
-    var optionalBindingVariables: [OptionalBindingVariable] = []
-    var conditions: [KotlinExpression]
+    var conditionSets: [ConditionSet]
     var isGuard = false
     var body: KotlinCodeBlock
     var elseBody: KotlinCodeBlock?
+    var ifCheckVariable: String?
+
+    struct ConditionSet {
+        var optionalBindingVariable: OptionalBindingVariable?
+        var conditions: [KotlinExpression]
+    }
 
     struct OptionalBindingVariable {
         var name: String
@@ -392,42 +403,24 @@ class KotlinIf: KotlinExpression {
         var isLet: Bool
     }
 
-    /// The entire `if/else if/else if/...` chain.
-    ///
-    /// The last element may have an `else`.
-    var chain: [KotlinIf] {
-        var chain = [self]
-        while let elseif = chain.last?.elseif {
-            chain.append(elseif)
-        }
-        return chain
-    }
-
-    private var elseif: KotlinIf? {
-        guard let elseBody, elseBody.statements.count == 1, let expressionStatement = elseBody.statements.first as? KotlinExpressionStatement else {
-            return nil
-        }
-        return expressionStatement.expression as? KotlinIf
-    }
-
     static func translate(expression: If, translator: KotlinTranslator) -> KotlinIf {
-        let (optionalBindingVariables, conditions) = extractOptionalBindingVariables(from: expression.conditions, translator: translator)
-        let kconditions = conditions.compactMap { translator.translateExpression($0) }
+        let kconditionSets = translate(conditions: expression.conditions, translator: translator)
+        // If we have to nest if conditions and we have an else part, we'll need an if check variable to execute
+        // the else part only if the nested ifs don't pass
+        let ifCheckVariable = kconditionSets.count > 1 && expression.elseBody != nil ? "ifcheck" : nil
         let kbody = KotlinCodeBlock.translate(statement: expression.body, translator: translator)
-        let kexpression = KotlinIf(expression: expression, conditions: kconditions, body: kbody)
-        kexpression.optionalBindingVariables = optionalBindingVariables
+        let kexpression = KotlinIf(expression: expression, conditionSets: kconditionSets, body: kbody)
+        kexpression.ifCheckVariable = ifCheckVariable
         if let elseBody = expression.elseBody {
             kexpression.elseBody = KotlinCodeBlock.translate(statement: elseBody, translator: translator)
         }
         return kexpression
     }
 
-    static func translate(statement: Guard, translator: KotlinTranslator) -> KotlinExpressionStatement {
-        let (optionalBindingVariables, conditions) = extractOptionalBindingVariables(from: statement.conditions, translator: translator)
-        let kconditions = conditions.compactMap { translator.translateExpression($0).logicalNegated() }
+    static func translate(statement: Guard, translator: KotlinTranslator) -> KotlinStatement {
+        let kconditionSets = translate(conditions: statement.conditions, isGuard: true, translator: translator)
         let kbody = KotlinCodeBlock.translate(statement: statement.body, translator: translator)
-        let kexpression = KotlinIf(conditions: kconditions, body: kbody, sourceFile: statement.sourceFile, sourceRange: statement.sourceRange)
-        kexpression.optionalBindingVariables = optionalBindingVariables
+        let kexpression = KotlinIf(conditionSets: kconditionSets, body: kbody, sourceFile: statement.sourceFile, sourceRange: statement.sourceRange)
         kexpression.isGuard = true
 
         let kstatement = KotlinExpressionStatement(type: .expression)
@@ -435,45 +428,97 @@ class KotlinIf: KotlinExpression {
         return kstatement
     }
 
-    private static func extractOptionalBindingVariables(from conditions: [Expression], translator: KotlinTranslator) -> ([OptionalBindingVariable], [Expression]) {
-        var optionalBindingVariables: [OptionalBindingVariable] = []
-        var updatedConditions: [Expression] = []
-        for condition in conditions {
-            // Extract any 'let x = y' to a separate variable and update the condition to 'x != nil'
-            if let optionalBinding = condition as? OptionalBinding {
-                let optionalBindingValue: KotlinExpression
-                if let value = optionalBinding.value {
-                    optionalBindingValue = translator.translateExpression(value)
-                } else {
-                    let identifier = KotlinIdentifier(name: optionalBinding.name)
-                    identifier.mayBeSharedMutableValue = optionalBinding.variableType.kotlinMayBeSharedMutableValue(codebaseInfo: translator.codebaseInfo)
-                    optionalBindingValue = identifier
-                }
-                let optionalBindingVariable = OptionalBindingVariable(name: optionalBinding.name, declaredType: optionalBinding.declaredType, value: optionalBindingValue.valueReference(), isLet: optionalBinding.isLet)
-                optionalBindingVariables.append(optionalBindingVariable)
-                let updatedCondition = BinaryOperator(op: .with(symbol: "!="), lhs: Identifier(name: optionalBinding.name), rhs: NilLiteral())
-                updatedConditions.append(updatedCondition)
-            } else {
-                updatedConditions.append(condition)
+    private static func translate(conditions: [Expression], isGuard: Bool = false, translator: KotlinTranslator) -> [ConditionSet] {
+        var conditionSets: [ConditionSet] = []
+        var currentOptionalBindingVariable: OptionalBindingVariable? = nil
+        var currentConditions: [KotlinExpression] = []
+        func appendCurrentConditionSet() {
+            guard currentOptionalBindingVariable != nil || !currentConditions.isEmpty else {
+                return
             }
+            var conditions = currentConditions
+            if isGuard {
+                conditions = conditions.map { $0.logicalNegated() }
+            } else {
+                // If there is an optional binding and we're not already scoped within a nested condition, scope with 'if true'
+                if currentOptionalBindingVariable != nil && conditionSets.isEmpty {
+                    conditionSets.append(ConditionSet(conditions: [KotlinBooleanLiteral(literal: true)]))
+                }
+            }
+            let conditionSet = ConditionSet(optionalBindingVariable: currentOptionalBindingVariable, conditions: conditions)
+            currentOptionalBindingVariable = nil
+            currentConditions = []
+            conditionSets.append(conditionSet)
         }
-        return (optionalBindingVariables, updatedConditions)
+
+        for condition in conditions {
+            guard let optionalBinding = condition as? OptionalBinding else {
+                currentConditions.append(translator.translateExpression(condition))
+                continue
+            }
+
+            // x != null
+            let identifier = KotlinIdentifier(name: optionalBinding.name)
+            let nullLiteral = KotlinNullLiteral()
+            let nullCheck = KotlinBinaryOperator(op: .with(symbol: "!="), lhs: identifier, rhs: nullLiteral, sourceFile: optionalBinding.sourceFile, sourceRange: optionalBinding.sourceRange)
+            guard requiresVariable(optionalBinding: optionalBinding, translator: translator) else {
+                currentConditions.append(nullCheck)
+                continue
+            }
+            // Whenever we need an optional binding variable, create a new nested condition set for it
+            appendCurrentConditionSet()
+
+            let optionalBindingValue: KotlinExpression
+            if let value = optionalBinding.value {
+                optionalBindingValue = translator.translateExpression(value).valueReference()
+            } else {
+                let identifier = KotlinIdentifier(name: optionalBinding.name)
+                identifier.mayBeSharedMutableValue = optionalBinding.variableType.kotlinMayBeSharedMutableValue(codebaseInfo: translator.codebaseInfo)
+                optionalBindingValue = identifier.valueReference()
+            }
+            currentOptionalBindingVariable = OptionalBindingVariable(name: optionalBinding.name, declaredType: optionalBinding.declaredType, value: optionalBindingValue, isLet: optionalBinding.isLet)
+            currentConditions.append(nullCheck)
+        }
+        appendCurrentConditionSet()
+        return conditionSets
     }
 
-    init(conditions: [KotlinExpression], body: KotlinCodeBlock, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
-        self.conditions = conditions
+    private static func requiresVariable(optionalBinding: OptionalBinding, translator: KotlinTranslator) -> Bool {
+        // We need a new var to make the reference mutable
+        guard optionalBinding.isLet else {
+            return true
+        }
+        // 'let x' doesn't need a new var
+        guard let value = optionalBinding.value else {
+            return false
+        }
+        // We need a new var if we're binding to anything other than 'let x = x'
+        guard let identifier = value as? Identifier else {
+            return true
+        }
+        return identifier.name != optionalBinding.name
+    }
+
+    init(conditionSets: [ConditionSet], body: KotlinCodeBlock, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        self.conditionSets = conditionSets
         self.body = body
         super.init(type: .if, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
-    private init(expression: Expression, conditions: [KotlinExpression], body: KotlinCodeBlock) {
-        self.conditions = conditions
+    private init(expression: Expression, conditionSets: [ConditionSet], body: KotlinCodeBlock) {
+        self.conditionSets = conditionSets
         self.body = body
         super.init(type: .if, expression: expression)
     }
 
     override var children: [KotlinSyntaxNode] {
-        var children: [KotlinSyntaxNode] = conditions + optionalBindingVariables.compactMap { $0.value }
+        var children = conditionSets.flatMap { conditionSet in
+            var children: [KotlinSyntaxNode] = conditionSet.conditions
+            if let optionalBindingValue = conditionSet.optionalBindingVariable?.value {
+                children.append(optionalBindingValue)
+            }
+            return children
+        }
         children.append(body)
         if let elseBody {
             children.append(elseBody)
@@ -482,62 +527,95 @@ class KotlinIf: KotlinExpression {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
-        let ifChain = chain
-        var hasOptionalBindingVariables = false
-        for ifLink in ifChain {
-            for (index, optionalBindingVariable) in ifLink.optionalBindingVariables.enumerated() {
-                // Because we're an expression, we don't indent our first line
-                if hasOptionalBindingVariables {
-                    output.append(indentation)
-                } else {
-                    hasOptionalBindingVariables = true
-                }
-                output.append(optionalBindingVariable.isLet ? "val " : "var ").append(optionalBindingVariable.name).append(" = ")
-                appendNullCheck(optionalBindingVariables: Array(optionalBindingVariables[0..<index]), to: output)
-                output.append(optionalBindingVariable.value, indentation: indentation).append("\n")
-            }
+        if isGuard {
+            appendGuard(to: output, indentation: indentation)
+        } else {
+            appendIf(to: output, indentation: indentation)
         }
+    }
 
-        for (index, statement) in chain.enumerated() {
-            if index == 0 {
-                // Because we're an expression, we don't indent our first line
-                if hasOptionalBindingVariables {
-                    output.append(indentation)
-                }
-                output.append("if (")
-            } else {
-                output.append(indentation).append("} else if (")
-            }
-            statement.appendConditions(to: output, indentation: indentation)
-            output.append(") {\n")
-
-            let bodyIndentation = indentation.inc()
-            output.append(statement.body, indentation: bodyIndentation)
-
-            if index == chain.count - 1 {
-                if let elseBody = statement.elseBody {
-                    output.append(indentation).append("} else {\n")
-                    output.append(elseBody, indentation: bodyIndentation)
-                }
-                output.append(indentation).append("}")
+    private func appendGuard(to output: OutputGenerator, indentation: Indentation) {
+        for (index, conditionSet) in conditionSets.enumerated() {
+            appendConditionSet(conditionSet, to: output, indentation: indentation)
+            output.append(body, indentation: indentation.inc())
+            output.append(indentation).append("}")
+            if index != conditionSets.count - 1 {
+                output.append("\n").append(indentation)
             }
         }
     }
 
-    private func appendNullCheck(optionalBindingVariables: [OptionalBindingVariable], to output: OutputGenerator) {
-        guard !optionalBindingVariables.isEmpty else {
+    private func appendIf(to output: OutputGenerator, indentation: Indentation) {
+        // If check
+        var hasOutput = false
+        if let ifCheckVariable {
+            output.append("var \(ifCheckVariable) = false\n")
+            hasOutput = true
+        }
+        // Nested conditions and their opening braces
+        var indentation = indentation
+        for conditionSet in conditionSets {
+            if (hasOutput) {
+                output.append(indentation)
+            }
+            appendConditionSet(conditionSet, to: output, indentation: indentation)
+            hasOutput = true
+            indentation = indentation.inc()
+        }
+        // Body
+        if let ifCheckVariable {
+            output.append(indentation).append(ifCheckVariable).append(" = true\n")
+        }
+        output.append(body, indentation: indentation)
+        // Closing braces
+        for i in 0..<conditionSets.count {
+            indentation = indentation.dec()
+            output.append(indentation).append("}")
+            if i != conditionSets.count - 1 {
+                output.append("\n")
+            }
+        }
+        guard let elseBody else {
             return
         }
-        // When we're declaring an optional binding var, its value may depend on previous optional bindings being non-null.
-        // Checking against previous optional bindings also prevents any side effects if our value is e.g. a function call
-        // and the condition sequence wouldn't normally reach this optional binding. Note that we can't test against all
-        // previous conditions, however, because the conditions themselves may have side effects:
-        // if doSomething() > 0, let c, let x = c.related...
-        let nullCheck = optionalBindingVariables.map { "\($0.name) == null" }.joined(separator: " || ")
-        output.append("if (\(nullCheck)) null else ")
+
+        if let ifCheckVariable {
+            output.append("\n").append(indentation).append("if (!\(ifCheckVariable)) {\n")
+            elseBody.append(to: output, indentation: indentation.inc())
+            output.append(indentation).append("}")
+        } else if let elseif {
+            output.append(" else ")
+            elseif.append(to: output, indentation: indentation)
+        } else {
+            output.append(" else {\n")
+            elseBody.append(to: output, indentation: indentation.inc())
+            output.append(indentation).append("}")
+        }
     }
 
-    private func appendConditions(to output: OutputGenerator, indentation: Indentation) {
+    private var elseif: KotlinIf? {
+        guard let elseBody, elseBody.statements.count == 1, let expressionStatement = elseBody.statements.first as? KotlinExpressionStatement else {
+            return nil
+        }
+        guard let kif = expressionStatement.expression as? KotlinIf else {
+            return nil
+        }
+        // We can't chain an else with its own if check variable
+        return kif.ifCheckVariable == nil ? kif : nil
+    }
+
+    private func appendConditionSet(_ conditionSet: ConditionSet, to output: OutputGenerator, indentation: Indentation) {
+        if let optionalBindingVariable = conditionSet.optionalBindingVariable {
+            output.append(optionalBindingVariable.isLet ? "val " : "var ").append(optionalBindingVariable.name).append(" = ")
+            output.append(optionalBindingVariable.value, indentation: indentation).append("\n")
+            output.append(indentation)
+        }
+        output.append("if (")
+        appendConditions(conditionSet.conditions, to: output, indentation: indentation)
+        output.append(") {\n")
+    }
+
+    private func appendConditions(_ conditions: [KotlinExpression], to output: OutputGenerator, indentation: Indentation) {
         guard conditions.count > 1 else {
             if let condition = conditions.first {
                 condition.append(to: output, indentation: indentation)
@@ -647,6 +725,10 @@ class KotlinMemberAccess: KotlinExpression {
 }
 
 class KotlinNullLiteral: KotlinExpression {
+    init(sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        super.init(type: .nullLiteral, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
     init(expression: NilLiteral) {
         super.init(type: .nullLiteral, expression: expression)
     }

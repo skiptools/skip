@@ -265,6 +265,7 @@ struct KotlinExtensionDeclaration {
     }
 }
 
+/// - Seealso: ``KotlinConstructorPlugin``
 class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var name: String
     var returnType: TypeSignature = .none

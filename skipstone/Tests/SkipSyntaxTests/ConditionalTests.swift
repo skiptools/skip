@@ -104,7 +104,31 @@ final class ConditionalTests: XCTestCase {
         """)
     }
 
-    func testSingleOptionalBinding() async throws {
+    func testOptionalBinding() async throws {
+        try await check(swift: """
+        var i: Int?
+        if let i {
+            print(i)
+        }
+        """, kotlin: """
+        internal var i: Int? = null
+        if (i != null) {
+            print(i)
+        }
+        """)
+
+        try await check(swift: """
+        var i: Int?
+        if let i = i {
+            print(i)
+        }
+        """, kotlin: """
+        internal var i: Int? = null
+        if (i != null) {
+            print(i)
+        }
+        """)
+
         try await check(swift: """
         var i: Int?
         if let x = i {
@@ -112,39 +136,112 @@ final class ConditionalTests: XCTestCase {
         }
         """, kotlin: """
         internal var i: Int? = null
-        val x_0 = i
-        if (x_0 != null) {
-            print(x_0)
+        if (true) {
+            val x = i
+            if (x != null) {
+                print(x)
+            }
         }
         """)
+    }
 
+    func testMutableValueOptionalBinding() async throws {
+        // Translate let into a simple null check because the value can't change
         try await check(swift: """
-        var i: Int?
-        if var x = i {
-            print(x)
+        if let i {
+            print(i)
         }
         """, kotlin: """
-        internal var i: Int? = null
-        var x_0 = i
-        if (x_0 != null) {
-            print(x_0)
+        if (i != null) {
+            print(i.valref())
         }
         """)
 
+        // Translate var into a new reference because we don't want to mutate the original value
+        try await check(swift: """
+        if var i {
+            i.mutate()
+        }
+        """, kotlin: """
+        if (true) {
+            var i = i.valref()
+            if (i != null) {
+                i.mutate()
+            }
+        }
+        """)
+    }
+
+    func testOptionalBindingElse() async throws {
         try await check(swift: """
         var i: Int?
         if let i {
             print(i)
         } else {
-            print(i == nil)
+            print("nil")
         }
         """, kotlin: """
         internal var i: Int? = null
-        val i_0 = i
-        if (i_0 != null) {
-            print(i_0)
+        if (i != null) {
+            print(i)
         } else {
-            print(i == null)
+            print("nil")
+        }
+        """)
+
+        try await check(swift: """
+        var i: Int?
+        if let x = i {
+            print(x)
+        } else {
+            print("nil")
+        }
+        """, kotlin: """
+        internal var i: Int? = null
+        var if_0 = false
+        if (true) {
+            val x = i
+            if (x != null) {
+                if_0 = true
+                print(x)
+            }
+        }
+        if (!if_0) {
+            print("nil")
+        }
+        """)
+    }
+
+    func testOptionalBindingElseIf() async throws {
+        try await check(swift: """
+        var i: Int?
+        if x > 0 {
+            print("positive")
+        } else if let i {
+            print(i)
+        } else if let x = i {
+            print(x)
+        } else {
+            print("nil")
+        }
+        """, kotlin: """
+        internal var i: Int? = null
+        if (x > 0) {
+            print("positive")
+        } else if (i != null) {
+            print(i)
+        } else {
+            var if_0 = false
+            if (true) {
+                val x = i
+                if (x != null) {
+                    if_0 = true
+                    print(x)
+                }
+            }
+            if (!if_0) {
+                print("nil")
+            }
         }
         """)
 
@@ -152,16 +249,64 @@ final class ConditionalTests: XCTestCase {
         var i: Int?
         if var i {
             print(i)
-        } else {
-            print(i == nil)
+        } else if x > 0 {
+            print("positive")
+        } else if let y = i {
+            print(y)
         }
         """, kotlin: """
         internal var i: Int? = null
-        var i_0 = i
-        if (i_0 != null) {
-            print(i_0)
+        var if_0 = false
+        if (true) {
+            var i = i
+            if (i != null) {
+                if_0 = true
+                print(i)
+            }
+        }
+        if (!if_0) {
+            if (x > 0) {
+                print("positive")
+            } else if (true) {
+                val y = i
+                if (y != null) {
+                    print(y)
+                }
+            }
+        }
+        """)
+
+        try await check(swift: """
+        var i: Int?
+        if var i {
+            print(i)
+        } else if let x = i {
+            print(x)
         } else {
-            print(i == null)
+            print("nil")
+        }
+        """, kotlin: """
+        internal var i: Int? = null
+        var if_0 = false
+        if (true) {
+            var i = i
+            if (i != null) {
+                if_0 = true
+                print(i)
+            }
+        }
+        if (!if_0) {
+            var if_1 = false
+            if (true) {
+                val x = i
+                if (x != null) {
+                    if_1 = true
+                    print(x)
+                }
+            }
+            if (!if_1) {
+                print("nil")
+            }
         }
         """)
     }
@@ -171,27 +316,34 @@ final class ConditionalTests: XCTestCase {
         var i: Int?
         var j: String?
         var k: Int?
-        if let i, i > 5, let x = j, x == "x" || x == "y" {
+        if var i, i > 5, let x = j, x == "x" || x == "y" {
             print(i)
         } else if boolValue, let x = k {
-            print(i)
             print(x)
         }
-        print(i)
         """, kotlin: """
         internal var i: Int? = null
         internal var j: String? = null
         internal var k: Int? = null
-        val i_0 = i
-        val x_1 = if (i_0 == null) null else j
-        val x_2 = k
-        if ((i_0 != null) && (i_0 > 5) && (x_1 != null) && (x_1 == "x" || x_1 == "y")) {
-            print(i_0)
-        } else if (boolValue && (x_2 != null)) {
-            print(i)
-            print(x_2)
+        var if_0 = false
+        if (true) {
+            var i = i
+            if ((i != null) && (i > 5)) {
+                val x = j
+                if ((x != null) && (x == "x" || x == "y")) {
+                    if_0 = true
+                    print(i)
+                }
+            }
         }
-        print(i)
+        if (!if_0) {
+            if (boolValue) {
+                val x = k
+                if (x != null) {
+                    print(x)
+                }
+            }
+        }
         """)
     }
 
@@ -203,24 +355,17 @@ final class ConditionalTests: XCTestCase {
         }
         """, kotlin: """
         internal var c: ConditionalTestsClass? = null
-        val x_0 = c
-        val related_1 = if (x_0 == null) null else x_0.related
-        val doublerelated_2 = if (x_0 == null || related_1 == null) null else related_1.related
-        if ((x_0 != null) && (related_1 != null) && (doublerelated_2 != null)) {
-            print(doublerelated_2)
-        }
-        """)
-    }
-
-    func testSharedMutableValueOptionalBinding() async throws {
-        try await check(symbols: symbols, swift: """
-        if let x = i {
-            print(x)
-        }
-        """, kotlin: """
-        val x_0 = i.valref()
-        if (x_0 != null) {
-            print(x_0.valref())
+        if (true) {
+            val x = c
+            if (x != null) {
+                val related = x.related
+                if (related != null) {
+                    val doublerelated = related.related
+                    if (doublerelated != null) {
+                        print(doublerelated)
+                    }
+                }
+            }
         }
         """)
     }
@@ -291,7 +436,7 @@ final class ConditionalTests: XCTestCase {
         """)
     }
 
-    func testGuardLet() async throws {
+    func testGuardOptionalBinding() async throws {
         try await check(swift: """
         var i: Int?
         guard let i else {
@@ -301,7 +446,39 @@ final class ConditionalTests: XCTestCase {
         print(i + 1)
         """, kotlin: """
         internal var i: Int? = null
-        val i_0 = i
+        if (i == null) {
+            print(i)
+            return
+        }
+        print(i + 1)
+        """)
+
+        try await check(swift: """
+        var i: Int?
+        guard let i = i else {
+            print(i)
+            return
+        }
+        print(i + 1)
+        """, kotlin: """
+        internal var i: Int? = null
+        if (i == null) {
+            print(i)
+            return
+        }
+        print(i + 1)
+        """)
+
+        try await check(swift: """
+        var i: Int?
+        guard var i = i else {
+            print(i)
+            return
+        }
+        print(i + 1)
+        """, kotlin: """
+        internal var i: Int? = null
+        var i_0 = i
         if (i_0 == null) {
             print(i)
             return
@@ -310,22 +487,93 @@ final class ConditionalTests: XCTestCase {
         """)
     }
 
-    func testGuardLetTypeInference() async throws {
-        // We should understand the binding to 'related' and that it is not a shared value type
+    func testGuardMutableValueOptionalBinding() async throws {
+        try await check(swift: """
+        guard let i else {
+            print(i)
+            return
+        }
+        print(i)
+        """, kotlin: """
+        if (i == null) {
+            print(i.valref())
+            return
+        }
+        print(i.valref())
+        """)
+
+        try await check(swift: """
+        guard let x = i else {
+            print(i)
+            return
+        }
+        print(x)
+        """, kotlin: """
+        val x_0 = i.valref()
+        if (x_0 == null) {
+            print(i.valref())
+            return
+        }
+        print(x_0.valref())
+        """)
+    }
+
+    func testGuardOptionalBindingUsingPreviousOptionalBinding() async throws {
         try await check(symbols: symbols, swift: """
         var c: ConditionalTestsClass?
-        guard let c, let related = c.related else {
+        guard var c, c > 5, let related = c.related, let doublerelated = related.related else {
+            doSomethingWith(c)
             return
         }
-        print(related)
+        print(doublerelated)
         """, kotlin: """
         internal var c: ConditionalTestsClass? = null
-        val c_0 = c
-        val related_1 = if (c_0 == null) null else c_0.related
-        if ((c_0 == null) || (related_1 == null)) {
+        var c_0 = c
+        if ((c_0 == null) || (c_0 <= 5)) {
+            doSomethingWith(c)
             return
         }
-        print(related_1)
+        val related_1 = c_0.related
+        if (related_1 == null) {
+            doSomethingWith(c)
+            return
+        }
+        val doublerelated_2 = related_1.related
+        if (doublerelated_2 == null) {
+            doSomethingWith(c)
+            return
+        }
+        print(doublerelated_2)
+        """)
+    }
+
+    func testGuardsWithSameNamedOptionalBindings() async throws {
+        try await check(swift: """
+        var i: Int?
+        guard var i else {
+            print(i)
+            return
+        }
+        print(i)
+        guard var i = x else {
+            print(i)
+            return
+        }
+        print(i)
+        """, kotlin: """
+        internal var i: Int? = null
+        var i_0 = i
+        if (i_0 == null) {
+            print(i)
+            return
+        }
+        print(i_0)
+        var i_1 = x.valref()
+        if (i_1 == null) {
+            print(i_0)
+            return
+        }
+        print(i_1.valref())
         """)
     }
 }
