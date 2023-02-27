@@ -646,7 +646,7 @@ class TypeDeclaration: Statement {
 // TODO: Generics, patterns (tuple deconstruction, etc)
 /// `let/var v ...`
 class VariableDeclaration: Statement {
-    let name: String
+    let names: [String]
     private(set) var declaredType: TypeSignature
     let isLet: Bool
     let isAsync: Bool
@@ -658,12 +658,12 @@ class VariableDeclaration: Statement {
     let setter: Accessor<CodeBlock>?
     let willSet: Accessor<CodeBlock>?
     let didSet: Accessor<CodeBlock>?
-    var variableType: TypeSignature {
-        return declaredType.or(value?.inferredType ?? .none)
+    var variableTypes: [TypeSignature] {
+        return declaredType.or(value?.inferredType ?? .none).tupleTypes(count: names.count)
     }
 
-    init(name: String, declaredType: TypeSignature = .none, isLet: Bool = false, isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes? = nil, modifiers: Modifiers? = nil, value: Expression?, getter: Accessor<CodeBlock>? = nil, setter: Accessor<CodeBlock>? = nil, willSet: Accessor<CodeBlock>? = nil, didSet: Accessor<CodeBlock>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
-        self.name = name
+    init(names: [String], declaredType: TypeSignature = .none, isLet: Bool = false, isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes? = nil, modifiers: Modifiers? = nil, value: Expression?, getter: Accessor<CodeBlock>? = nil, setter: Accessor<CodeBlock>? = nil, willSet: Accessor<CodeBlock>? = nil, didSet: Accessor<CodeBlock>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.names = names
         self.declaredType = declaredType
         self.isLet = isLet
         self.isAsync = isAsync
@@ -749,7 +749,7 @@ class VariableDeclaration: Statement {
         }
 
         let names = try syntax.pattern.identifierNames(in: syntaxTree)
-        let declaration = VariableDeclaration(name: names[0], declaredType: declaredType, isLet: isLet, isAsync: isAsync, isThrows: isThrows, attributes: attributes, modifiers: modifiers, value: value, getter: getter, setter: setter, willSet: willSet, didSet: didSet, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
+        let declaration = VariableDeclaration(names: names, declaredType: declaredType, isLet: isLet, isAsync: isAsync, isThrows: isThrows, attributes: attributes, modifiers: modifiers, value: value, getter: getter, setter: setter, willSet: willSet, didSet: didSet, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
         declaration.messages = messages
         return declaration
     }
@@ -768,28 +768,28 @@ class VariableDeclaration: Statement {
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
         value?.inferTypes(context: context, expecting: declaredType)
-        let variableType = variableType
+        let type = TypeSignature.for(labels: names, types: variableTypes)
         if let body = getter?.body {
-            let bodyContext = context.expectingReturn(variableType)
+            let bodyContext = context.expectingReturn(type)
             let _ = body.inferTypes(context: bodyContext, expecting: .none)
         }
         if let body = setter?.body {
-            let bodyContext = context.addingIdentifier(setter?.parameterName ?? "newValue", type: variableType)
+            let bodyContext = context.addingIdentifier(setter?.parameterName ?? "newValue", type: type)
             let _ = body.inferTypes(context: bodyContext, expecting: .none)
         }
         if let body = willSet?.body {
-            let bodyContext = context.addingIdentifier(willSet?.parameterName ?? "newValue", type: variableType)
+            let bodyContext = context.addingIdentifier(willSet?.parameterName ?? "newValue", type: type)
             let _ = body.inferTypes(context: bodyContext, expecting: .none)
         }
         if let body = didSet?.body {
-            let bodyContext = context.addingIdentifier(didSet?.parameterName ?? "oldValue", type: variableType)
+            let bodyContext = context.addingIdentifier(didSet?.parameterName ?? "oldValue", type: type)
             let _ = body.inferTypes(context: bodyContext, expecting: .none)
         }
         if parent is TypeDeclaration {
             return context
         } else {
             // Local variable in code block
-            return context.addingIdentifier(name, type: variableType)
+            return context.addingIdentifiers(names, types: variableTypes)
         }
     }
 
@@ -814,7 +814,7 @@ class VariableDeclaration: Statement {
     }
 
     override var prettyPrintAttributes: [PrettyPrintTree] {
-        var attrs = [PrettyPrintTree(root: name)]
+        var attrs = [PrettyPrintTree(root: names.joined(separator: ", "))]
         if declaredType != .none {
             attrs.append(PrettyPrintTree(root: declaredType.description))
         }

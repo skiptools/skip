@@ -726,7 +726,7 @@ struct KotlinOptionalBinding {
         if let value = expression.value {
             kvalue = translator.translateExpression(value).valueReference()
         } else {
-            let identifier = KotlinIdentifier(name: expression.names.first ?? "")
+            let identifier = KotlinIdentifier(name: expression.names[0])
             identifier.mayBeSharedMutableValue = expression.variableTypes.first?.kotlinMayBeSharedMutableValue(codebaseInfo: translator.codebaseInfo) ?? false
             kvalue = identifier.valueReference()
         }

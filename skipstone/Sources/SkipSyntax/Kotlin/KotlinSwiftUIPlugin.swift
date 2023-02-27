@@ -87,7 +87,7 @@ class KotlinSwiftUIPlugin: KotlinPlugin {
     }
 
     private func viewForBody(_ variableDeclaration: KotlinVariableDeclaration) -> KotlinClassDeclaration? {
-        guard variableDeclaration.name == "body" && !variableDeclaration.modifiers.isStatic && variableDeclaration.getter?.body != nil else {
+        guard variableDeclaration.names.count == 1 && variableDeclaration.names[0] == "body" && !variableDeclaration.modifiers.isStatic && variableDeclaration.getter?.body != nil else {
             return nil
         }
         guard let owningClass = variableDeclaration.parent as? KotlinClassDeclaration, isView(owningClass) else {

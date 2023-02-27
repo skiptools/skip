@@ -55,8 +55,8 @@ class KotlinConstructorPlugin: KotlinPlugin {
 
         let constructor = KotlinFunctionDeclaration(name: "constructor")
         constructor.parameters = variableDeclarations.map { variableDeclaration in
-            let label = variableDeclaration.name
-            let type = variableDeclaration.variableType
+            let label = variableDeclaration.names[0]
+            let type = variableDeclaration.variableTypes[0]
             return Parameter(externalLabel: label, declaredType: type, isVariadic: false, defaultValue: variableDeclaration.value)
         }
         constructor.modifiers = classDeclaration.modifiers
@@ -66,8 +66,8 @@ class KotlinConstructorPlugin: KotlinPlugin {
 
         let bodyStatements = variableDeclarations.map { variableDeclaration in
             let selfIdentifier = KotlinIdentifier(name: "self")
-            let memberAccess = KotlinMemberAccess(base: selfIdentifier, member: variableDeclaration.name)
-            let paramIdentifier = KotlinIdentifier(name: variableDeclaration.name)
+            let memberAccess = KotlinMemberAccess(base: selfIdentifier, member: variableDeclaration.names[0])
+            let paramIdentifier = KotlinIdentifier(name: variableDeclaration.names[0])
             let assignmentOperator = KotlinBinaryOperator(op: .with(symbol: "="), lhs: memberAccess, rhs: paramIdentifier)
             let statement = KotlinExpressionStatement(type: .expression)
             statement.expression = assignmentOperator

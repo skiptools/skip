@@ -488,7 +488,7 @@ class KotlinInterfaceDeclaration: KotlinStatement {
 }
 
 class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
-    var name: String
+    var names: [String]
     var declaredType: TypeSignature = .none
     var isLet = false
     var isAsync = false
@@ -501,7 +501,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var setter: Accessor<KotlinCodeBlock>?
     var willSet: Accessor<KotlinCodeBlock>?
     var didSet: Accessor<KotlinCodeBlock>?
-    var variableType: TypeSignature = .none
+    var variableTypes: [TypeSignature]
     var mayBeSharedMutableValue = false
     var isReadOnly = false
     var onUpdate: String?
@@ -530,7 +530,6 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if let value = statement.value {
             kstatement.value = translator.translateExpression(value).valueReference()
         }
-        kstatement.variableType = statement.variableType
 
         kstatement.isReadOnly = statement.isLet || (statement.getter != nil && statement.setter == nil)
         if kstatement.declaredType != .none {
@@ -541,7 +540,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             kstatement.mayBeSharedMutableValue = true
         }
         if kstatement.mayBeSharedMutableValue {
-            kstatement.onUpdate = kstatement.isReadOnly ? nil : kstatement.isProperty ? "{ this.\(kstatement.name) = it }" : "{ \(kstatement.name) = it }"
+            kstatement.onUpdate = kstatement.isReadOnly ? nil : kstatement.isProperty ? "{ this.\(kstatement.names[0]) = it }" : "{ \(kstatement.names[0]) = it }"
             kstatement.getter = statement.getter?.translate(translator: translator, expectedReturn: .valueReference(kstatement.onUpdate))
         } else {
             kstatement.getter = statement.getter?.translate(translator: translator, expectedReturn: .yes)
@@ -558,7 +557,8 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
 
     private init(statement: VariableDeclaration) {
-        self.name = statement.name
+        self.names = statement.names
+        self.variableTypes = statement.variableTypes
         super.init(type: .variableDeclaration, statement: statement)
     }
 
@@ -605,7 +605,13 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                     output.append("Companion.")
                 }
             }
-            output.append(name)
+            if names.count > 1 {
+                output.append("(")
+            }
+            output.append(names.joined(separator: ", "))
+            if names.count > 1 {
+                output.append(")")
+            }
 
             if declaredType != .none {
                 output.append(": ").append(declaredType.kotlin)
