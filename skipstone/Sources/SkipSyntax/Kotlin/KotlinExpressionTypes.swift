@@ -652,14 +652,20 @@ class KotlinMemberAccess: KotlinExpression {
         if let base {
             output.append(base, indentation: indentation)
             if member != "init" {
-                var memberName = member
-                if let tupleIndex = Int(member) {
-                    memberName = "component\(tupleIndex)"
-                }
                 if useMultlineFormatting {
                     output.append("\n").append(indentation.inc())
                 }
-                output.append(".").append(memberName)
+                output.append(".")
+                switch member {
+                case "0":
+                    output.append("first")
+                case "1":
+                    output.append("second")
+                case "2":
+                    output.append("third")
+                default:
+                    output.append(member)
+                }
             }
         } else if inferredType != .none {
             output.append(inferredType)

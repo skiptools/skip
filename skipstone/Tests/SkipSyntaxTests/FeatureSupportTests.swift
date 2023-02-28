@@ -97,7 +97,7 @@ final class FeatureSupportTests: XCTestCase {
         [(1, 0),(2, 0),(3, 1)].map({ $0.0 + $0.1 })
         """, kotlin: """
         arrayOf(Pair(1, 0), Pair(2, 0), Pair(3, 1)).map {
-            it.component0 + it.component1
+            it.first + it.second
         }
         """)
     }

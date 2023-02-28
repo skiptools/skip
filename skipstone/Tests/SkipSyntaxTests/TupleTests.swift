@@ -164,9 +164,9 @@ final class TupleTests: XCTestCase {
         """, kotlin: """
         {
             val t = Triple(1, "s", 0.5)
-            val i = t.component0
-            val s = t.component1
-            val d = t.component2
+            val i = t.first
+            val s = t.second
+            val d = t.third
         }
         """)
     }
@@ -180,9 +180,9 @@ final class TupleTests: XCTestCase {
         }
         """, kotlin: """
         {
-            val i = t.component0.valref()
-            val s = t.component1.valref()
-            val d = t.component2.valref()
+            val i = t.first.valref()
+            val s = t.second.valref()
+            val d = t.third.valref()
         }
         """)
     }
