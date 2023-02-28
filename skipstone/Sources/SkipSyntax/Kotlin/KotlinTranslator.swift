@@ -147,51 +147,54 @@ public class KotlinTranslator {
     }
 
     func translateExpression(_ expression: Expression) -> KotlinExpression {
-        switch expression.type {
-        case .arrayLiteral:
-            return KotlinArrayLiteral.translate(expression: expression as! ArrayLiteral, translator: self)
-        case .binaryOperator:
-            return KotlinBinaryOperator.translate(expression: expression as! BinaryOperator, translator: self)
-        case .booleanLiteral:
-            return KotlinBooleanLiteral(expression: expression as! BooleanLiteral)
-        case .closure:
-            return KotlinClosure.translate(expression: expression as! Closure, translator: self)
-        case .functionCall:
-            return KotlinFunctionCall.translate(expression: expression as! FunctionCall, translator: self)
-        case .identifier:
-            return KotlinIdentifier.translate(expression: expression as! Identifier, translator: self)
-        case .if:
-            return KotlinIf.translate(expression: expression as! If, translator: self)
-        case .memberAccess:
-            return KotlinMemberAccess.translate(expression: expression as! MemberAccess, translator: self)
-        case .nilLiteral:
-            return KotlinNullLiteral(expression: expression as! NilLiteral)
-        case .numericLiteral:
-            return KotlinNumericLiteral(expression: expression as! NumericLiteral)
-        case .optionalBinding:
-            return KotlinOptionalBinding.translateCondition(expression: expression as! OptionalBinding, translator: self)
-        case .parenthesized:
-            return KotlinParenthesized.translate(expression: expression as! Parenthesized, translator: self)
-        case .prefixOperator:
-            return KotlinPrefixOperator.translate(expression: expression as! PrefixOperator, translator: self)
-        case .stringLiteral:
-            return KotlinStringLiteral.translate(expression: expression as! StringLiteral, translator: self)
-        case .subscript:
-            return KotlinSubscript.translate(expression: expression as! Subscript, translator: self)
-        case .try:
-            return KotlinTry.translate(expression: expression as! Try, translator: self)
-        case .raw:
-            return KotlinRawExpression(expression: expression as! RawExpression)
+        do {
+            switch expression.type {
+            case .arrayLiteral:
+                return KotlinArrayLiteral.translate(expression: expression as! ArrayLiteral, translator: self)
+            case .binaryOperator:
+                return KotlinBinaryOperator.translate(expression: expression as! BinaryOperator, translator: self)
+            case .booleanLiteral:
+                return KotlinBooleanLiteral(expression: expression as! BooleanLiteral)
+            case .closure:
+                return KotlinClosure.translate(expression: expression as! Closure, translator: self)
+            case .functionCall:
+                return KotlinFunctionCall.translate(expression: expression as! FunctionCall, translator: self)
+            case .identifier:
+                return KotlinIdentifier.translate(expression: expression as! Identifier, translator: self)
+            case .if:
+                return KotlinIf.translate(expression: expression as! If, translator: self)
+            case .memberAccess:
+                return KotlinMemberAccess.translate(expression: expression as! MemberAccess, translator: self)
+            case .nilLiteral:
+                return KotlinNullLiteral(expression: expression as! NilLiteral)
+            case .numericLiteral:
+                return KotlinNumericLiteral(expression: expression as! NumericLiteral)
+            case .optionalBinding:
+                return KotlinOptionalBinding.translateCondition(expression: expression as! OptionalBinding, translator: self)
+            case .parenthesized:
+                return KotlinParenthesized.translate(expression: expression as! Parenthesized, translator: self)
+            case .prefixOperator:
+                return KotlinPrefixOperator.translate(expression: expression as! PrefixOperator, translator: self)
+            case .stringLiteral:
+                return KotlinStringLiteral.translate(expression: expression as! StringLiteral, translator: self)
+            case .subscript:
+                return KotlinSubscript.translate(expression: expression as! Subscript, translator: self)
+            case .try:
+                return KotlinTry.translate(expression: expression as! Try, translator: self)
+            case .tupleLiteral:
+                return try KotlinTupleLiteral.translate(expression: expression as! TupleLiteral, translator: self)
+            case .raw:
+                return KotlinRawExpression(expression: expression as! RawExpression)
+            }
+        } catch {
+            let message = error as? Message ?? Message.kotlinUntranslatable(expression)
+            let rawExpression: RawExpression
+            if let syntax = expression.syntax {
+                rawExpression = RawExpression(syntax: syntax, message: message, in: syntaxTree)
+            } else {
+                rawExpression = RawExpression(sourceCode: "?", message: message, range: expression.sourceRange, in: syntaxTree)
+            }
+            return KotlinRawExpression(expression: rawExpression)
         }
-
-        // Fall back to a raw translation and associated warning
-//        let message = Message.kotlinUntranslatable(expression)
-//        let rawExpression: RawExpression
-//        if let syntax = expression.syntax {
-//            rawExpression = RawExpression(syntax: syntax, message: message, in: syntaxTree)
-//        } else {
-//            rawExpression = RawExpression(sourceCode: "?", message: message, range: expression.sourceRange, in: syntaxTree)
-//        }
-//        return KotlinRawExpression(expression: rawExpression)
     }
 }

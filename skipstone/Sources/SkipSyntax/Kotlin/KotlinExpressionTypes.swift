@@ -15,6 +15,7 @@ enum KotlinExpressionType {
     case stringLiteral
     case `subscript`
     case `try`
+    case tupleLiteral
     case valueReference
 
     case raw
@@ -967,6 +968,60 @@ class KotlinTry: KotlinExpression {
             output.append("try { ").append(trying, indentation: indentation).append(" } catch (_: Exception) { null }")
         } else {
             output.append(trying, indentation: indentation)
+        }
+    }
+}
+
+class KotlinTupleLiteral: KotlinExpression {
+    var values: [KotlinExpression]
+
+    static func translate(expression: TupleLiteral, translator: KotlinTranslator) throws -> KotlinTupleLiteral {
+        guard !expression.labels.contains(where: { $0 != nil }) else {
+           throw Message.kotlinTupleLabels(expression)
+        }
+        guard expression.values.count <= 3 else {
+            throw Message.kotlinTupleArity(expression)
+        }
+        let kvalues = expression.values.map { translator.translateExpression($0) }
+        return KotlinTupleLiteral(expression: expression, values: kvalues)
+    }
+
+    init(values: [KotlinExpression], sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        self.values = values
+        super.init(type: .tupleLiteral, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    private init(expression: TupleLiteral, values: [KotlinExpression]) {
+        self.values = values
+        super.init(type: .tupleLiteral, expression: expression)
+    }
+
+    override func valueReference(onUpdate: String? = nil) -> KotlinExpression {
+        let valueReferenceValues = values.map { $0.valueReference() }
+        return KotlinTupleLiteral(values: valueReferenceValues, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    override var children: [KotlinSyntaxNode] {
+        return values
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        if values.isEmpty {
+            output.append("Unit")
+        } else {
+            if values.count == 2 {
+                output.append("Pair")
+            } else {
+                output.append("Triple")
+            }
+            output.append("(")
+            for (index, value) in values.enumerated() {
+                output.append(value, indentation: indentation)
+                if index != values.count - 1 {
+                    output.append(", ")
+                }
+            }
+            output.append(")")
         }
     }
 }

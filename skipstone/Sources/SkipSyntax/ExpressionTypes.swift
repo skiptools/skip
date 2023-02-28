@@ -17,6 +17,7 @@ enum ExpressionType: CaseIterable {
     case stringLiteral
     case `subscript`
     case `try`
+    case tupleLiteral
     case prefixOperator
 
     /// An expression representing raw Swift code.
@@ -57,6 +58,8 @@ enum ExpressionType: CaseIterable {
             return Subscript.self
         case .try:
             return Try.self
+        case .tupleLiteral:
+            return TupleLiteral.self
 
         case .raw:
             return RawExpression.self
@@ -966,5 +969,51 @@ class Try: Expression {
 
     override var prettyPrintAttributes: [PrettyPrintTree] {
         return kind != .default ? [PrettyPrintTree(root: String(describing: kind))] : []
+    }
+}
+
+/// `(x, y, z)`
+class TupleLiteral: Expression {
+    let labels: [String?]
+    let values: [Expression]
+
+    init(labels: [String?], values: [Expression], syntax: SyntaxProtocol?, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        self.labels = labels
+        self.values = values
+        super.init(type: .tupleLiteral, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
+        guard syntax.kind == .tupleExpr, let tupleExpr = syntax.as(TupleExprSyntax.self) else {
+            return nil
+        }
+        var labels: [String?] = []
+        var values: [Expression] = []
+        for element in tupleExpr.elementList {
+            labels.append(element.label?.text)
+            values.append(ExpressionDecoder.decode(syntax: element.expression, in: syntaxTree))
+        }
+        return TupleLiteral(labels: labels, values: values, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        let expectingTypes = expecting.tupleTypes(count: values.count)
+        zip(values, expectingTypes).forEach { $0.0.inferTypes(context: context, expecting: $0.1) }
+        return context
+    }
+
+    override var inferredType: TypeSignature {
+        return TypeSignature.for(labels: labels, types: values.map { $0.inferredType })
+    }
+
+    override var children: [SyntaxNode] {
+        return values
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        guard labels.contains(where: { $0 != nil }) else {
+            return []
+        }
+        return [PrettyPrintTree(root: labels.map { String(describing: $0) }.joined(separator: ", "))]
     }
 }

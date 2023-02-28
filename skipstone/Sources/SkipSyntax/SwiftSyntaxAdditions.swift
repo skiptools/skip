@@ -115,7 +115,10 @@ extension PatternSyntax {
         // TODO: Support additional patterns
         switch kind {
         case .expressionPattern:
-            throw Message.unsupportedSyntax(self, source: syntaxTree.source)
+            guard let expressionSyntax = self.as(ExpressionPatternSyntax.self) else {
+                throw Message.unsupportedSyntax(self, source: syntaxTree.source)
+            }
+            return try expressionSyntax.expression.identifierNames(in: syntaxTree)
         case .identifierPattern:
             guard let identifierSyntax = self.as(IdentifierPatternSyntax.self) else {
                 throw Message.unsupportedSyntax(self, source: syntaxTree.source)
@@ -137,6 +140,29 @@ extension PatternSyntax {
         default:
             throw Message.unsupportedSyntax(self, source: syntaxTree.source)
         }
+    }
+}
+
+extension ExprSyntaxProtocol {
+    fileprivate func identifierNames(in syntaxTree: SyntaxTree) throws -> [String] {
+        switch kind {
+        case .identifierExpr:
+            if let identifierExpr = self.as(IdentifierExprSyntax.self) {
+                return [identifierExpr.identifier.text]
+            }
+        case .tupleExpr:
+            if let tupleExpr = self.as(TupleExprSyntax.self) {
+                return try tupleExpr.elementList.flatMap { try $0.expression.identifierNames(in: syntaxTree) }
+            }
+        case .unresolvedPatternExpr:
+            // We've seen this pattern in e.g. 'if let (a, b) = optionalTuple'
+            if let patternExpr = self.as(UnresolvedPatternExprSyntax.self) {
+                return try patternExpr.pattern.identifierNames(in: syntaxTree)
+            }
+        default:
+            break
+        }
+        throw Message.unsupportedSyntax(self, source: syntaxTree.source)
     }
 }
 

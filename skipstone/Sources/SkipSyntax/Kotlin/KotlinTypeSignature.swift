@@ -208,8 +208,10 @@ extension TypeSignature {
             return true
         case .string:
             return false
-        case .tuple:
-            return false
+        case .tuple(_, let types):
+            // We consider a tuple with a shared mutable type to itself be a shared mutable type because code may
+            // use destructuring assignment to extract values without copying them, so we have to copy the whole tuple
+            return types.contains { $0.kotlinMayBeSharedMutableValue(codebaseInfo: codebaseInfo) }
         case .uint:
             return false
         case .uint8:
