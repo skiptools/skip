@@ -30,7 +30,10 @@ final class TupleTests: XCTestCase {
             return Pair(1, "s")
         }
         """)
+    }
 
+    func testReturnSharedMutableValue() async throws {
+        // Newly-constructed instances do not need valref call
         try await check(swift: """
         func f() -> (A, B) {
             return (A(), B())
@@ -38,6 +41,16 @@ final class TupleTests: XCTestCase {
         """, kotlin: """
         internal fun f(): Pair<A, B> {
             return Pair(A(), B())
+        }
+        """)
+
+        try await check(swift: """
+        func f(a: A, b: B) -> (A, B) {
+            return (a, b)
+        }
+        """, kotlin: """
+        internal fun f(a: A, b: B): Pair<A, B> {
+            return Pair(a.valref(), b.valref())
         }
         """)
     }
@@ -72,8 +85,9 @@ final class TupleTests: XCTestCase {
             print(b)
         }
         """)
+    }
 
-        // Unknown type may be mutable shared value
+    func testDestructuringSharedMutableValue() async throws {
         try await check(swift: """
         {
             let (a, b) = (x, y)
@@ -103,7 +117,7 @@ final class TupleTests: XCTestCase {
         """)
     }
 
-    func testDestructuredOptionalBinding() async throws {
+    func testDestructuringOptionalBinding() async throws {
         try await check(swift: """
         var t: (Int, String)?
         if let (i, s) = t {
@@ -120,8 +134,9 @@ final class TupleTests: XCTestCase {
             }
         }
         """)
+    }
 
-        // Unknown element types may be shared mutable values
+    func testDestructuringOptionalBindingSharedMutableValue() async throws {
         try await check(swift: """
         if let (i, s) = t {
             print(i)
@@ -134,6 +149,40 @@ final class TupleTests: XCTestCase {
                 print(i.valref())
                 print(s.valref())
             }
+        }
+        """)
+    }
+
+    func testMemberAccess() async throws {
+        try await check(swift: """
+        {
+            let t = (1, "s", 0.5)
+            let i = t.0
+            let s = t.1
+            let d = t.2
+        }
+        """, kotlin: """
+        {
+            val t = Triple(1, "s", 0.5)
+            val i = t.component0
+            val s = t.component1
+            val d = t.component2
+        }
+        """)
+    }
+
+    func testMemberAccessSharedMutableValue() async throws {
+        try await check(swift: """
+        {
+            let i = t.0
+            let s = t.1
+            let d = t.2
+        }
+        """, kotlin: """
+        {
+            val i = t.component0.valref()
+            val s = t.component1.valref()
+            val d = t.component2.valref()
         }
         """)
     }

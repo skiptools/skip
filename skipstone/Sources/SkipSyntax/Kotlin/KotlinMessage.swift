@@ -62,7 +62,8 @@ extension Message {
         return Message(severity: .error, message: "Kotlin uses Pair for 2-tuples and Triple for 3-tuples. It does not support tuples of arity > 3. Consider creating a struct instead", sourceDerived: sourceDerived)
     }
 
-    // Idea: generate custom Kotlin data classes for custom labels
+    // Idea: generate extensions on Pair and Triple for custom labels
+    // Problem: where to define extensions and how to avoid duplicate definitions
     static func kotlinTupleLabels(_ sourceDerived: SourceDerived) -> Message {
         return Message(severity: .error, message: "Kotlin uses Pair for 2-tuples and Triple for 3-tuples. It does not support custom tuple element labels. Consider creating a struct instead", sourceDerived: sourceDerived)
     }

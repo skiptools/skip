@@ -123,6 +123,13 @@ struct TypeInferenceContext {
 
     /// Return the type of the given member.
     func member(_ name: String, in type: TypeSignature) -> TypeSignature {
+        if case .tuple(let labels, let types) = type {
+            if let labelIndex = labels.firstIndex(of: name) {
+                return types[labelIndex]
+            } else if let index = Int(name) {
+                return types[index]
+            }
+        }
         guard let symbols else {
             return .none
         }
