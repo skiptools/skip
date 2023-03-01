@@ -163,4 +163,74 @@ final class LoopTests: XCTestCase {
         }
         """)
     }
+
+    func testBreak() async throws {
+        try await check(swift: """
+        for i in [1, 2, 3] {
+            if i % 2 == 0 {
+                break
+            }
+            print(i)
+        }
+        """, kotlin: """
+        for (i in arrayOf(1, 2, 3)) {
+            if (i % 2 == 0) {
+                break
+            }
+            print(i)
+        }
+        """)
+
+        try await check(swift: """
+        loop: for i in [1, 2, 3] {
+            if i % 2 == 0 {
+                break loop
+            }
+            print(i)
+        }
+        """, kotlin: """
+        loop@
+        for (i in arrayOf(1, 2, 3)) {
+            if (i % 2 == 0) {
+                break@loop
+            }
+            print(i)
+        }
+        """)
+    }
+
+    func testContinue() async throws {
+        try await check(swift: """
+        for i in [1, 2, 3] {
+            if i % 2 == 0 {
+                continue
+            }
+            print(i)
+        }
+        """, kotlin: """
+        for (i in arrayOf(1, 2, 3)) {
+            if (i % 2 == 0) {
+                continue
+            }
+            print(i)
+        }
+        """)
+
+        try await check(swift: """
+        loop: for i in [1, 2, 3] {
+            if i % 2 == 0 {
+                continue loop
+            }
+            print(i)
+        }
+        """, kotlin: """
+        loop@
+        for (i in arrayOf(1, 2, 3)) {
+            if (i % 2 == 0) {
+                continue@loop
+            }
+            print(i)
+        }
+        """)
+    }
 }

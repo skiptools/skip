@@ -82,13 +82,13 @@ public class KotlinTranslator {
     func translateStatement(_ statement: Statement) -> [KotlinStatement] {
         switch statement.type {
         case .break:
-            break
+            return [KotlinBreak(statement: statement as! Break)]
         case .catch:
             break
         case .codeBlock:
             return [KotlinCodeBlock.translate(statement: statement as! CodeBlock, translator: self)]
         case .continue:
-            break
+            return [KotlinContinue(statement: statement as! Continue)]
         case .defer:
             break
         case .do:
@@ -102,6 +102,8 @@ public class KotlinTranslator {
         case .ifDefined:
             // This should never happen, as we never make the IfDefined statement part of the syntax tree
             return []
+        case .labeled:
+            return [KotlinLabeledStatement.translate(statement: statement as! LabeledStatement, translator: self)]
         case .return:
             return [KotlinReturn.translate(statement: statement as! Return, translator: self)]
         case .switch:

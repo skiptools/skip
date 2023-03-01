@@ -1,8 +1,11 @@
 /// Types of Kotlin statements.
 enum KotlinStatementType {
+    case `break`
     case codeBlock
+    case `continue`
     case expression
     case forLoop
+    case labeledStatement
     case `return`
     case whileLoop
 
@@ -17,6 +20,23 @@ enum KotlinStatementType {
     // Special statements
     case raw
     case message
+}
+
+class KotlinBreak: KotlinStatement {
+    var label: String?
+
+    init(statement: Break) {
+        self.label = statement.label
+        super.init(type: .break, statement: statement)
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        output.append(indentation).append("break")
+        if let label {
+            output.append("@\(label)")
+        }
+        output.append("\n")
+    }
 }
 
 class KotlinCodeBlock: KotlinStatement {
@@ -106,6 +126,23 @@ class KotlinCodeBlock: KotlinStatement {
     }
 }
 
+class KotlinContinue: KotlinStatement {
+    var label: String?
+
+    init(statement: Continue) {
+        self.label = statement.label
+        super.init(type: .continue, statement: statement)
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        output.append(indentation).append("continue")
+        if let label {
+            output.append("@\(label)")
+        }
+        output.append("\n")
+    }
+}
+
 class KotlinForLoop: KotlinStatement {
     var identifierPatterns: [IdentifierPattern]
     var declaredType: TypeSignature = .none
@@ -176,6 +213,31 @@ class KotlinForLoop: KotlinStatement {
 
         output.append(body, indentation: bodyIndentation)
         output.append(indentation).append("}\n")
+    }
+}
+
+class KotlinLabeledStatement: KotlinStatement {
+    var label: String
+    var target: KotlinStatement
+
+    static func translate(statement: LabeledStatement, translator: KotlinTranslator) -> KotlinLabeledStatement {
+        let ktarget = translator.translateStatement(statement.target).first ?? KotlinMessageStatement(message: .kotlinUntranslatable(statement))
+        return KotlinLabeledStatement(statement: statement, target: ktarget)
+    }
+
+    private init(statement: LabeledStatement, target: KotlinStatement) {
+        self.label = statement.label
+        self.target = target
+        super.init(type: .labeledStatement, statement: statement)
+    }
+
+    override var children: [KotlinSyntaxNode] {
+        return [target]
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        output.append(indentation).append(label).append("@\n")
+        output.append(target, indentation: indentation)
     }
 }
 

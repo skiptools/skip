@@ -10,6 +10,7 @@ enum StatementType: CaseIterable {
     case forLoop
     case `guard`
     case ifDefined
+    case labeled
     case `return`
     case `switch`
     case `throw`
@@ -36,13 +37,13 @@ enum StatementType: CaseIterable {
     var representingType: Statement.Type? {
         switch self {
         case .break:
-            return nil
+            return Break.self
         case .catch:
             return nil
         case .codeBlock:
             return CodeBlock.self
         case .continue:
-            return nil
+            return Continue.self
         case .defer:
             return nil
         case .do:
@@ -53,6 +54,8 @@ enum StatementType: CaseIterable {
             return Guard.self
         case .ifDefined:
             return IfDefined.self
+        case .labeled:
+            return LabeledStatement.self
         case .return:
             return Return.self
         case .switch:
@@ -93,6 +96,28 @@ enum StatementType: CaseIterable {
     }
 }
 
+/// `break`
+class Break: Statement {
+    let label: String?
+
+    init(label: String? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.label = label
+        super.init(type: .break, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+        guard syntax.kind == .breakStmt, let breakStmnt = syntax.as(BreakStmtSyntax.self) else {
+            return nil
+        }
+        let label = breakStmnt.label?.text
+        return [Break(label: label, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        return label == nil ? [] : [PrettyPrintTree(root: label!)]
+    }
+}
+
 /// A synthetic statement type used to represent a code block of statements.
 class CodeBlock: Statement {
     let statements: [Statement]
@@ -110,6 +135,28 @@ class CodeBlock: Statement {
 
     override var children: [SyntaxNode] {
         return statements
+    }
+}
+
+/// `continue`
+class Continue: Statement {
+    let label: String?
+
+    init(label: String? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.label = label
+        super.init(type: .continue, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+        guard syntax.kind == .continueStmt, let continueStmnt = syntax.as(ContinueStmtSyntax.self) else {
+            return nil
+        }
+        let label = continueStmnt.label?.text
+        return [Continue(label: label, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        return label == nil ? [] : [PrettyPrintTree(root: label!)]
     }
 }
 
@@ -171,6 +218,10 @@ class ForLoop: Statement {
         }
         children.append(body)
         return children
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        return [PrettyPrintTree(root: identifierPatterns.map(\.name).joined(separator: ", "))]
     }
 }
 
@@ -251,6 +302,46 @@ class IfDefined: Statement {
         case .attributes(let syntax):
             throw Message.unsupportedSyntax(syntax, source: syntaxTree.source)
         }
+    }
+}
+
+/// `label: for/while/etc`
+class LabeledStatement: Statement {
+    let label: String
+    let target: Statement
+
+    init(label: String, target: Statement, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.label = label
+        self.target = target
+        super.init(type: .labeled, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+        guard syntax.kind == .labeledStmt, let labeledStmnt = syntax.as(LabeledStmtSyntax.self) else {
+            return nil
+        }
+
+        let label = labeledStmnt.labelName.text
+        guard let target = StatementDecoder.decode(syntax: labeledStmnt.statement, in: syntaxTree).first else {
+            throw Message.unsupportedSyntax(labeledStmnt.statement, source: syntaxTree.source)
+        }
+        return [LabeledStatement(label: label, target: target, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))]
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        return target.inferTypes(context: context, expecting: expecting)
+    }
+
+    override var inferredType: TypeSignature {
+        return target.inferredType
+    }
+
+    override var children: [SyntaxNode] {
+        return [target]
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        return [PrettyPrintTree(root: label)]
     }
 }
 
