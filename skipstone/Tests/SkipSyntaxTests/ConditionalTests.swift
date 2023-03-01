@@ -441,6 +441,37 @@ final class ConditionalTests: XCTestCase {
             }
         }
         """)
+
+        try await check(swift: """
+        func f(i: Int?) -> Int {
+            let r = {
+                if let x = i {
+                    return x
+                } else {
+                    return 0
+                }
+            }()
+            return r
+        }
+        """, kotlin: """
+        internal fun f(i: Int?): Int {
+            val r = r_0@{
+                var if_0 = false
+                if (true) {
+                    val x = i
+                    if (x != null) {
+                        if_0 = true
+                        return@r_0 x
+                    }
+                }
+                if (!if_0) {
+                    return@r_0 0
+                }
+                error("Unreachable")
+            }()
+            return r
+        }
+        """)
     }
 
     func testGuardCondition() async throws {

@@ -358,7 +358,7 @@ class KotlinIdentifier: KotlinExpression {
         guard let implicitParameterIndex = name.implicitClosureParameterIndex else {
             return name
         }
-        return implicitParameterIndex == 0 ? "it" : "it\(implicitParameterIndex)"
+        return implicitParameterIndex == 0 ? "it" : "it_\(implicitParameterIndex)"
     }
 
     init(name: String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
@@ -865,6 +865,11 @@ class KotlinStringLiteral: KotlinExpression {
         kexpression.segments = segments
         kexpression.isMultiline = expression.isMultiline
         return kexpression
+    }
+
+    init(literal: String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        super.init(type: .stringLiteral, sourceFile: sourceFile, sourceRange: sourceRange)
+        self.segments = [.string(literal)]
     }
 
     private init(expression: StringLiteral) {

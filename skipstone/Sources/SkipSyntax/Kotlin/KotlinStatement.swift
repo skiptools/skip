@@ -16,24 +16,6 @@ class KotlinStatement: KotlinSyntaxNode {
         self.messages = statement.messages
     }
 
-    /// Visit this statement and its children depth first, performing the given action.
-    ///
-    /// - Parameters:
-    ///   - Parameter perform: The action to perform.
-    /// - Warning: This method does not traverse through `Expressions` to find additional statements (e.g. in closures).
-    func visitStatements(perform: (KotlinStatement) -> VisitResult<KotlinStatement>) {
-        if case .recurse(let onLeave) = perform(self) {
-            for child in children {
-                if let statement = child as? KotlinStatement {
-                    statement.visitStatements(perform: perform)
-                }
-            }
-            if let onLeave {
-                onLeave(self)
-            }
-        }
-    }
-
     final override func leadingTrivia(indentation: Indentation) -> String {
         return extras?.leadingTrivia(indentation: indentation) ?? ""
     }

@@ -18,7 +18,7 @@ public class KotlinCodebaseInfo {
 
     /// Gather codebase-level information from the given syntax tree.
     func gather(from syntaxTree: SyntaxTree) {
-        syntaxTree.root.visitStatements(perform: self.visit)
+        syntaxTree.root.visit(perform: self.visit)
         plugins.forEach { $0.gather(from: syntaxTree) }
     }
 
@@ -36,7 +36,10 @@ public class KotlinCodebaseInfo {
     fileprivate var typeInfo: [String: [TypeInfo]] = [:]
     fileprivate var extensionInfo: [String: [ExtensionInfo]] = [:]
 
-    private func visit(statement: Statement) -> VisitResult<Statement> {
+    private func visit(node: SyntaxNode) -> VisitResult<SyntaxNode> {
+        guard let statement = node as? Statement else {
+            return .skip
+        }
         switch statement.type {
         case .classDeclaration:
             addTypeInfo(for: statement as! TypeDeclaration, mayBeMutableValueType: false)

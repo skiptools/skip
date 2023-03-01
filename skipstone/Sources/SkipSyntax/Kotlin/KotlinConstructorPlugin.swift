@@ -1,10 +1,13 @@
 /// Migrate Swift constructors to Kotlin constructors.
 class KotlinConstructorPlugin: KotlinPlugin {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
-        syntaxTree.root.visitStatements(perform: { visit($0, translator: translator) })
+        syntaxTree.root.visit { visit($0, translator: translator) }
     }
 
-    private func visit(_ statement: KotlinStatement, translator: KotlinTranslator) -> VisitResult<KotlinStatement> {
+    private func visit(_ node: KotlinSyntaxNode, translator: KotlinTranslator) -> VisitResult<KotlinSyntaxNode> {
+        guard let statement = node as? KotlinStatement else {
+            return .skip
+        }
         switch statement.type {
         case .classDeclaration:
             let classDeclaration = statement as! KotlinClassDeclaration

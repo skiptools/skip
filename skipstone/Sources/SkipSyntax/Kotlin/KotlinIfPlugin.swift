@@ -3,12 +3,15 @@
 /// - Seealso: ``KotlinIf``
 class KotlinIfPlugin: KotlinPlugin {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
-        let visitor = Visitor()
-        syntaxTree.root.visit(perform: visitor.visit)
+        let identifiersVisitor = IdentifiersVisitor()
+        syntaxTree.root.visit(perform: identifiersVisitor.visit)
+        let unreachableVisitor = UnreachableVisitor()
+        syntaxTree.root.visit(perform: unreachableVisitor.visit)
     }
 }
 
-private class Visitor {
+/// Uniquify identifiers we've added for if statements.
+private class IdentifiersVisitor {
     private var renamedIdentifiersStack: [[String: String]] = []
 
     func visit(_ node: KotlinSyntaxNode) -> VisitResult<KotlinSyntaxNode> {
@@ -86,5 +89,39 @@ private class Visitor {
             }
         }
         return nil
+    }
+}
+
+/// Add an unreachable error to functions and closures that the compiler may no longer be able to guarantee return a value
+/// due to the complexity of some of our `if` translations.
+private class UnreachableVisitor {
+    func visit(_ node: KotlinSyntaxNode) -> VisitResult<KotlinSyntaxNode> {
+        if let functionDeclaration = node as? KotlinFunctionDeclaration {
+            if let body = functionDeclaration.body {
+                addUnreachableErrorIfNeeded(to: body, returnType: functionDeclaration.returnType == .none ? .void : functionDeclaration.returnType)
+            }
+        } else if let closure = node as? KotlinClosure {
+            addUnreachableErrorIfNeeded(to: closure.body, returnType: closure.returnType == .none ? nil : closure.returnType)
+        }
+        return .recurse(nil)
+    }
+
+    private func addUnreachableErrorIfNeeded(to codeBlock: KotlinCodeBlock, returnType: TypeSignature?) {
+        guard returnType != .void else {
+            return
+        }
+        // We only need to add an error if the block ends with an 'if' that now uses an if check var
+        guard let expressionStatement = codeBlock.statements.last as? KotlinExpressionStatement, let kif = expressionStatement.expression as? KotlinIf, kif.ifCheckVariable != nil else {
+            return
+        }
+        guard returnType != nil || codeBlock.updateWithExpectedReturn(.no) else {
+            return
+        }
+
+        // error("Unreachable")
+        let errorExpression = KotlinFunctionCall(function: KotlinIdentifier(name: "error"), arguments: [LabeledValue(value: KotlinStringLiteral(literal: "Unreachable"))])
+        let errorStatement = KotlinExpressionStatement(type: .expression)
+        errorStatement.expression = errorExpression
+        codeBlock.statements.append(errorStatement)
     }
 }

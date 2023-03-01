@@ -126,8 +126,8 @@ final class ClosureTests: XCTestCase {
         try await check(swift: """
         call { $0 + $1 + $2 }
         """, kotlin: """
-        call { it, it1, it2 ->
-            it + it1 + it2
+        call { it, it_1, it_2 ->
+            it + it_1 + it_2
         }
         """)
     }

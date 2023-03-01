@@ -54,25 +54,32 @@ class KotlinCodeBlock: KotlinStatement {
         }
 
         var didFindReturn = false
-        visitStatements { statement in
-            switch statement.type {
-            case .functionDeclaration:
-                // Skip embedded functions that may have their own returns
-                return .skip
-            case .return:
-                let returnStatement = statement as! KotlinReturn
-                didFindReturn = true
-                if let label {
-                    returnStatement.label = label
+        visit { node in
+            if let statement = node as? KotlinStatement {
+                switch statement.type {
+                case .functionDeclaration:
+                    // Skip embedded functions that may have their own returns
+                    return .skip
+                case .return:
+                    let returnStatement = statement as! KotlinReturn
+                    didFindReturn = true
+                    if let label {
+                        returnStatement.label = label
+                    }
+                    if valref {
+                        returnStatement.expression = returnStatement.expression?.valueReference(onUpdate: onUpdate)
+                    }
+                    return .skip
+                default:
+                    break
                 }
-                if valref {
-                    returnStatement.expression = returnStatement.expression?.valueReference(onUpdate: onUpdate)
-                }
+                return .recurse(nil)
+            } else if node is KotlinClosure {
+                // Skip closures that may have their own returns
                 return .skip
-            default:
-                break
+            } else {
+                return .recurse(nil)
             }
-            return .recurse(nil)
         }
         if didFindReturn {
             return true
