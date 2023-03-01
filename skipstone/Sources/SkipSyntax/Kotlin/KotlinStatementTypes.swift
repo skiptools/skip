@@ -2,6 +2,7 @@
 enum KotlinStatementType {
     case codeBlock
     case expression
+    case forLoop
     case `return`
     case whileLoop
 
@@ -105,6 +106,79 @@ class KotlinCodeBlock: KotlinStatement {
     }
 }
 
+class KotlinForLoop: KotlinStatement {
+    var identifierPatterns: [IdentifierPattern]
+    var declaredType: TypeSignature = .none
+    var sequence: KotlinExpression
+    var whereGuard: KotlinExpression?
+    var body: KotlinCodeBlock
+
+    static func translate(statement: ForLoop, translator: KotlinTranslator) -> KotlinForLoop {
+        let ksequence = translator.translateExpression(statement.sequence)
+        let kbody = KotlinCodeBlock.translate(statement: statement.body, translator: translator)
+        let kstatement = KotlinForLoop(statement: statement, sequence: ksequence, body: kbody)
+        kstatement.declaredType = statement.declaredType
+        if let whereGuard = statement.whereGuard {
+            kstatement.whereGuard = translator.translateExpression(whereGuard)
+        }
+        return kstatement
+    }
+
+    private init(statement: ForLoop, sequence: KotlinExpression, body: KotlinCodeBlock) {
+        self.identifierPatterns = statement.identifierPatterns
+        self.sequence = sequence
+        self.body = body
+        super.init(type: .forLoop, statement: statement)
+    }
+
+    override var children: [KotlinSyntaxNode] {
+        var children: [KotlinSyntaxNode] = [sequence]
+        if let whereGuard {
+            children.append(whereGuard)
+        }
+        children.append(body)
+        return children
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        output.append(indentation).append("for (")
+        // Append _0 to any vars so that we can re-declare them with their original names in the loop body
+        let identifierNames = identifierPatterns.map {
+            return $0.isVar ? "\($0.name)_0" : $0.name
+        }
+        if identifierNames.count > 1 {
+            output.append("(")
+        }
+        output.append(identifierNames.joined(separator: ", "))
+        if identifierNames.count > 1 {
+            output.append(")")
+        }
+        output.append(" in ")
+        output.append(sequence.valueReference(), indentation: indentation)
+        output.append(") {\n")
+
+        // Re-declare vars
+        let bodyIndentation = indentation.inc()
+        for identifierPattern in identifierPatterns {
+            if identifierPattern.isVar {
+                output.append(bodyIndentation).append("var ").append(identifierPattern.name).append(" = ").append("\(identifierPattern.name)_0\n")
+            }
+        }
+
+        // Check where condition
+        if let whereGuard {
+            output.append(bodyIndentation).append("if (")
+            output.append(whereGuard.logicalNegated(), indentation: bodyIndentation)
+            output.append(") {\n")
+            output.append(bodyIndentation.inc()).append("continue\n")
+            output.append(bodyIndentation).append("}\n")
+        }
+
+        output.append(body, indentation: bodyIndentation)
+        output.append(indentation).append("}\n")
+    }
+}
+
 class KotlinReturn: KotlinExpressionStatement {
     var label: String? = nil
 
@@ -138,6 +212,59 @@ class KotlinReturn: KotlinExpressionStatement {
                 output.append("@\(label)")
             }
             output.append("\n")
+        }
+    }
+}
+
+class KotlinWhileLoop: KotlinStatement {
+    var conditions: [KotlinExpression]
+    var body: KotlinCodeBlock
+    var isDoWhile = false
+
+    static func translate(statement: WhileLoop, translator: KotlinTranslator) -> KotlinWhileLoop {
+        let (kconditions, messages) = translate(conditions: statement.conditions, translator: translator)
+        let kbody = KotlinCodeBlock.translate(statement: statement.body, translator: translator)
+        let kstatement = KotlinWhileLoop(statement: statement, conditions: kconditions, body: kbody)
+        kstatement.isDoWhile = statement.isRepeatWhile
+        kstatement.messages += messages
+        return kstatement
+    }
+
+    private static func translate(conditions: [Expression], translator: KotlinTranslator) -> ([KotlinExpression], [Message]) {
+        var kconditions: [KotlinExpression] = []
+        var messages: [Message] = []
+        for condition in conditions {
+            kconditions.append(translator.translateExpression(condition))
+            if let optionalBinding = condition as? OptionalBinding, KotlinOptionalBinding.translateVariable(expression: optionalBinding, translator: translator) != nil {
+                messages.append(.kotlinLoopOptionalBinding(optionalBinding))
+            }
+        }
+        return (kconditions, messages)
+    }
+
+    private init(statement: WhileLoop, conditions: [KotlinExpression], body: KotlinCodeBlock) {
+        self.conditions = conditions
+        self.body = body
+        super.init(type: .whileLoop, statement: statement)
+    }
+
+    override var children: [KotlinSyntaxNode] {
+        return conditions + [body]
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        if isDoWhile {
+            output.append(indentation).append("do {\n")
+            output.append(body, indentation: indentation.inc())
+            output.append(indentation).append("} while (")
+            conditions.appendAsLogicalConditions(to: output, indentation: indentation)
+            output.append(")\n")
+        } else {
+            output.append(indentation).append("while (")
+            conditions.appendAsLogicalConditions(to: output, indentation: indentation)
+            output.append(") {\n")
+            output.append(body, indentation: indentation.inc())
+            output.append(indentation).append("}\n")
         }
     }
 }
@@ -680,59 +807,6 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             output.append(setterIndentation).append("set(newValue) {\n")
             output.append(setterIndentation.inc()).append("field = newValue.valref()\n")
             output.append(setterIndentation).append("}\n")
-        }
-    }
-}
-
-class KotlinWhileLoop: KotlinStatement {
-    var conditions: [KotlinExpression]
-    var body: KotlinCodeBlock
-    var isDoWhile = false
-
-    static func translate(statement: WhileLoop, translator: KotlinTranslator) -> KotlinWhileLoop {
-        let (kconditions, messages) = translate(conditions: statement.conditions, translator: translator)
-        let kbody = KotlinCodeBlock.translate(statement: statement.body, translator: translator)
-        let kstatement = KotlinWhileLoop(statement: statement, conditions: kconditions, body: kbody)
-        kstatement.isDoWhile = statement.isRepeatWhile
-        kstatement.messages += messages
-        return kstatement
-    }
-
-    private static func translate(conditions: [Expression], translator: KotlinTranslator) -> ([KotlinExpression], [Message]) {
-        var kconditions: [KotlinExpression] = []
-        var messages: [Message] = []
-        for condition in conditions {
-            kconditions.append(translator.translateExpression(condition))
-            if let optionalBinding = condition as? OptionalBinding, KotlinOptionalBinding.translateVariable(expression: optionalBinding, translator: translator) != nil {
-                messages.append(.kotlinLoopOptionalBinding(optionalBinding))
-            }
-        }
-        return (kconditions, messages)
-    }
-
-    private init(statement: WhileLoop, conditions: [KotlinExpression], body: KotlinCodeBlock) {
-        self.conditions = conditions
-        self.body = body
-        super.init(type: .whileLoop, statement: statement)
-    }
-
-    override var children: [KotlinSyntaxNode] {
-        return conditions + [body]
-    }
-
-    override func append(to output: OutputGenerator, indentation: Indentation) {
-        if isDoWhile {
-            output.append(indentation).append("do {\n")
-            output.append(body, indentation: indentation.inc())
-            output.append(indentation).append("} while (")
-            conditions.appendAsLogicalConditions(to: output, indentation: indentation)
-            output.append(")\n")
-        } else {
-            output.append(indentation).append("while (")
-            conditions.appendAsLogicalConditions(to: output, indentation: indentation)
-            output.append(") {\n")
-            output.append(body, indentation: indentation.inc())
-            output.append(indentation).append("}\n")
         }
     }
 }

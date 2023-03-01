@@ -655,7 +655,7 @@ class OptionalBinding: Expression {
             value = ExpressionDecoder.decode(syntax: valueSyntax, in: syntaxTree)
         }
 
-        let names = try optionalBindingExpr.pattern.identifierNames(in: syntaxTree)
+        let names = try optionalBindingExpr.pattern.identifierPatterns(in: syntaxTree).map(\.name)
         return OptionalBinding(names: names, declaredType: declaredType, isLet: isLet, value: value, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 

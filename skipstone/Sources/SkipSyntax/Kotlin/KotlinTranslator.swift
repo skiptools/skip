@@ -96,7 +96,7 @@ public class KotlinTranslator {
         case .expression:
             return [KotlinExpressionStatement.translate(statement: statement as! ExpressionStatement, translator: self)]
         case .forLoop:
-            break
+            return [KotlinForLoop.translate(statement: statement as! ForLoop, translator: self)]
         case .guard:
             return [KotlinIf.translate(statement: statement as! Guard, translator: self)]
         case .ifDefined:

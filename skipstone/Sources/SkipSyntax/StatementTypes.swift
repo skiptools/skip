@@ -115,21 +115,21 @@ class CodeBlock: Statement {
 
 /// `for ... in ... { ... }`
 class ForLoop: Statement {
-    let names: [String]
+    let identifierPatterns: [IdentifierPattern]
     let declaredType: TypeSignature
     let isTry: Bool
     let isAwait: Bool
-    let sequenceExpression: Expression
-    let whereExpression: Expression?
+    let sequence: Expression
+    let whereGuard: Expression?
     let body: CodeBlock
 
-    init(names: [String], declaredType: TypeSignature = .none, isTry: Bool = false, isAwait: Bool = false, sequenceExpression: Expression, whereExpression: Expression? = nil, body: CodeBlock, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
-        self.names = names
+    init(identifierPatterns: [IdentifierPattern], declaredType: TypeSignature = .none, isTry: Bool = false, isAwait: Bool = false, sequence: Expression, whereGuard: Expression? = nil, body: CodeBlock, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.identifierPatterns = identifierPatterns
         self.declaredType = declaredType
         self.isTry = isTry
         self.isAwait = isAwait
-        self.sequenceExpression = sequenceExpression
-        self.whereExpression = whereExpression
+        self.sequence = sequence
+        self.whereGuard = whereGuard
         self.body = body
         super.init(type: .forLoop, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
@@ -139,36 +139,35 @@ class ForLoop: Statement {
             return nil
         }
 
-        //~~~ convert to name + binding type
-        let names = try forInStmnt.pattern.identifierNames(in: syntaxTree)
+        let identifierPatterns = try forInStmnt.pattern.identifierPatterns(in: syntaxTree)
         var declaredType: TypeSignature = .none
         if let typeSyntax = forInStmnt.typeAnnotation?.type {
             declaredType = TypeSignature.for(syntax: typeSyntax)
         }
         let isTry = forInStmnt.tryKeyword != nil
         let isAwait = forInStmnt.awaitKeyword != nil
-        let sequenceExpression = ExpressionDecoder.decode(syntax: forInStmnt.sequenceExpr, in: syntaxTree)
-        var whereExpression: Expression? = nil
+        let sequence = ExpressionDecoder.decode(syntax: forInStmnt.sequenceExpr, in: syntaxTree)
+        var whereGuard: Expression? = nil
         if let whereSyntax = forInStmnt.whereClause?.guardResult {
-            whereExpression = ExpressionDecoder.decode(syntax: whereSyntax, in: syntaxTree)
+            whereGuard = ExpressionDecoder.decode(syntax: whereSyntax, in: syntaxTree)
         }
         let statements = StatementDecoder.decode(syntaxListContainer: forInStmnt.body, in: syntaxTree)
         let body = CodeBlock(statements: statements)
-        return [ForLoop(names: names, declaredType: declaredType, isTry: isTry, isAwait: isAwait, sequenceExpression: sequenceExpression, whereExpression: whereExpression, body: body, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
+        return [ForLoop(identifierPatterns: identifierPatterns, declaredType: declaredType, isTry: isTry, isAwait: isAwait, sequence: sequence, whereGuard: whereGuard, body: body, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
-        let _ = sequenceExpression.inferTypes(context: context, expecting: declaredType == .none ? .none : .array(declaredType))
-        let bodyContext = context.addingIdentifiers(names, types: sequenceExpression.inferredType.elementType.tupleTypes(count: names.count))
-        whereExpression?.inferTypes(context: bodyContext, expecting: .bool)
+        let _ = sequence.inferTypes(context: context, expecting: declaredType == .none ? .none : .array(declaredType))
+        let bodyContext = context.addingIdentifiers(identifierPatterns.map(\.name), types: sequence.inferredType.elementType.tupleTypes(count: identifierPatterns.count))
+        whereGuard?.inferTypes(context: bodyContext, expecting: .bool)
         let _ = body.inferTypes(context: bodyContext, expecting: .none)
         return context
     }
 
     override var children: [SyntaxNode] {
-        var children: [SyntaxNode] = [sequenceExpression]
-        if let whereExpression {
-            children.append(whereExpression)
+        var children: [SyntaxNode] = [sequence]
+        if let whereGuard {
+            children.append(whereGuard)
         }
         children.append(body)
         return children
@@ -748,7 +747,7 @@ class VariableDeclaration: Statement {
             }
         }
 
-        let names = try syntax.pattern.identifierNames(in: syntaxTree)
+        let names = try syntax.pattern.identifierPatterns(in: syntaxTree).map(\.name)
         let declaration = VariableDeclaration(names: names, declaredType: declaredType, isLet: isLet, isAsync: isAsync, isThrows: isThrows, attributes: attributes, modifiers: modifiers, value: value, getter: getter, setter: setter, willSet: willSet, didSet: didSet, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
         declaration.messages = messages
         return declaration

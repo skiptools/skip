@@ -55,7 +55,7 @@ class KotlinArrayLiteral: KotlinExpression {
             if (useMultilineFormatting) {
                 output.append("\n").append(elementIndentation)
             }
-            output.append(element, indentation: elementIndentation)
+            output.append(element.valueReference(), indentation: elementIndentation)
             if index != elements.count - 1 {
                 output.append(", ")
             }

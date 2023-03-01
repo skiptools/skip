@@ -111,19 +111,19 @@ extension PatternSyntax {
     ///
     /// - Returns: A single name for a simple identifier, an array of names for a decomposed tuple.
     /// - Throws: `Message` if unable to parse this pattern.
-    func identifierNames(in syntaxTree: SyntaxTree) throws -> [String] {
+    func identifierPatterns(in syntaxTree: SyntaxTree) throws -> [IdentifierPattern] {
         // TODO: Support additional patterns
         switch kind {
         case .expressionPattern:
             guard let expressionSyntax = self.as(ExpressionPatternSyntax.self) else {
                 throw Message.unsupportedSyntax(self, source: syntaxTree.source)
             }
-            return try expressionSyntax.expression.identifierNames(in: syntaxTree)
+            return try expressionSyntax.expression.identifierPatterns(in: syntaxTree)
         case .identifierPattern:
             guard let identifierSyntax = self.as(IdentifierPatternSyntax.self) else {
                 throw Message.unsupportedSyntax(self, source: syntaxTree.source)
             }
-            return [identifierSyntax.identifier.text]
+            return [IdentifierPattern(name: identifierSyntax.identifier.text)]
         case .isTypePattern:
             throw Message.unsupportedSyntax(self, source: syntaxTree.source)
         case .missingPattern:
@@ -132,9 +132,13 @@ extension PatternSyntax {
             guard let tupleSyntax = self.as(TuplePatternSyntax.self) else {
                 throw Message.unsupportedSyntax(self, source: syntaxTree.source)
             }
-            return try tupleSyntax.elements.flatMap { try $0.pattern.identifierNames(in: syntaxTree) }
+            return try tupleSyntax.elements.flatMap { try $0.pattern.identifierPatterns(in: syntaxTree) }
         case .valueBindingPattern:
-            throw Message.unsupportedSyntax(self, source: syntaxTree.source)
+            guard let valueBindingSyntax = self.as(ValueBindingPatternSyntax.self) else {
+                throw Message.unsupportedSyntax(self, source: syntaxTree.source)
+            }
+            let isVar = valueBindingSyntax.bindingKeyword.text == "var"
+            return try valueBindingSyntax.valuePattern.identifierPatterns(in: syntaxTree).map { IdentifierPattern(name: $0.name, isVar: $0.isVar || isVar) }
         case .wildcardPattern:
             throw Message.unsupportedSyntax(self, source: syntaxTree.source)
         default:
@@ -144,20 +148,20 @@ extension PatternSyntax {
 }
 
 extension ExprSyntaxProtocol {
-    fileprivate func identifierNames(in syntaxTree: SyntaxTree) throws -> [String] {
+    fileprivate func identifierPatterns(in syntaxTree: SyntaxTree) throws -> [IdentifierPattern] {
         switch kind {
         case .identifierExpr:
             if let identifierExpr = self.as(IdentifierExprSyntax.self) {
-                return [identifierExpr.identifier.text]
+                return [IdentifierPattern(name: identifierExpr.identifier.text)]
             }
         case .tupleExpr:
             if let tupleExpr = self.as(TupleExprSyntax.self) {
-                return try tupleExpr.elementList.flatMap { try $0.expression.identifierNames(in: syntaxTree) }
+                return try tupleExpr.elementList.flatMap { try $0.expression.identifierPatterns(in: syntaxTree) }
             }
         case .unresolvedPatternExpr:
             // We've seen this pattern in e.g. 'if let (a, b) = optionalTuple'
             if let patternExpr = self.as(UnresolvedPatternExprSyntax.self) {
-                return try patternExpr.pattern.identifierNames(in: syntaxTree)
+                return try patternExpr.pattern.identifierPatterns(in: syntaxTree)
             }
         default:
             break
