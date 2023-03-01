@@ -33,11 +33,17 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
     case unwrappedOptional(TypeSignature)
     case void
 
-    /// The element type of this array.
+    /// The element type of this sequence.
     var elementType: TypeSignature {
         switch self {
         case .array(let elementType):
             return elementType
+        case .dictionary(let keyType, let valueType):
+            return .tuple([nil, nil], [keyType, valueType])
+        case .set(let elementType):
+            return elementType
+        case .string:
+            return .character
         default:
             return .none
         }

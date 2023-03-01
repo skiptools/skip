@@ -370,6 +370,79 @@ final class ConditionalTests: XCTestCase {
         """)
     }
 
+    func testAddUnreachableErrorIfReturnRequired() async throws {
+        try await check(swift: """
+        func f(i: Int?) -> Int {
+            if let x = i {
+                return x
+            } else {
+                return 0
+            }
+        }
+        """, kotlin: """
+        internal fun f(i: Int?): Int {
+            var if_0 = false
+            if (true) {
+                val x = i
+                if (x != null) {
+                    if_0 = true
+                    return x
+                }
+            }
+            if (!if_0) {
+                return 0
+            }
+            error("Unreachable")
+        }
+        """)
+
+        // No error added if there are additional statements past the 'if'
+        try await check(swift: """
+        func f(i: Int?) -> Int {
+            if let x = i {
+                return x
+            } else {
+                print("null")
+            }
+            return 0
+        }
+        """, kotlin: """
+        internal fun f(i: Int?): Int {
+            var if_0 = false
+            if (true) {
+                val x = i
+                if (x != null) {
+                    if_0 = true
+                    return x
+                }
+            }
+            if (!if_0) {
+                print("null")
+            }
+            return 0
+        }
+        """)
+
+        // No error added for 'if' that retains its 'else'
+        try await check(swift: """
+        func f(i: Int?) -> Int {
+            if let i {
+                return i
+            } else {
+                return 0
+            }
+        }
+        """, kotlin: """
+        internal fun f(i: Int?): Int {
+            if (i != null) {
+                return i
+            } else {
+                return 0
+            }
+        }
+        """)
+    }
+
     func testGuardCondition() async throws {
         try await check(swift: """
         guard i == 1 else {

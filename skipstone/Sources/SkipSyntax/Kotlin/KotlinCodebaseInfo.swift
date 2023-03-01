@@ -70,7 +70,6 @@ public class KotlinCodebaseInfo {
             var infos = extensionInfo[key, default: []]
             infos.append(ExtensionInfo(declaration: declaration, sourceFile: statement.sourceFile))
             extensionInfo[key] = infos
-
         case .codeBlock:
             break // Don't skip root code block
         default:
