@@ -455,7 +455,7 @@ final class ConditionalTests: XCTestCase {
         }
         """, kotlin: """
         internal fun f(i: Int?): Int {
-            val r = r_0@{
+            val r = r_0 r_0@{
                 var if_0 = false
                 if (true) {
                     val x = i
@@ -468,7 +468,7 @@ final class ConditionalTests: XCTestCase {
                     return@r_0 0
                 }
                 error("Unreachable")
-            }()
+            }
             return r
         }
         """)

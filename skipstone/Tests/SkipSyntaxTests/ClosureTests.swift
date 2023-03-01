@@ -112,6 +112,54 @@ final class ClosureTests: XCTestCase {
         """)
     }
 
+    func testImmediatelyExecuted() async throws {
+        try await check(swift: """
+        {
+            let x = { 1 }()
+        }
+        """, kotlin: """
+        {
+            val x = {
+                1
+            }()
+        }
+        """)
+
+        try await check(swift: """
+        {
+            let x = { (i: Int) in i }(1)
+        }
+        """, kotlin: """
+        {
+            val x = { i: Int ->
+                i
+            }(1)
+        }
+        """)
+
+        try await check(swift: """
+        {
+            let x = {
+                if $0 % 2 == 0 {
+                    return "YES"
+                } else {
+                    return "NO"
+                }
+            }(1)
+        }
+        """, kotlin: """
+        {
+            val x = r_0(1) r_0@{
+                if (it % 2 == 0) {
+                    return@r_0 "YES"
+                } else {
+                    return@r_0 "NO"
+                }
+            }
+        }
+        """)
+    }
+
     func testImplicitSingleParameter() async throws {
         try await check(swift: """
         call { $0 + 1 }

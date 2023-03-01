@@ -164,12 +164,14 @@ class KotlinBooleanLiteral: KotlinExpression {
 }
 
 class KotlinClosure: KotlinExpression {
+    static let returnLabel = "r_0"
+
     var returnType: TypeSignature = .none
     var parameters: [Parameter<Void>] = []
     var implicitParameterLabels: [String] = []
     var isAnonymousFunction = false
     var body: KotlinCodeBlock
-    var returnLabel: String? = nil
+    var hasReturnLabel = false
 
     static func translate(expression: Closure, translator: KotlinTranslator) -> KotlinClosure {
         // If there is an explicit return type we'll use an anonymous function rather than a closure,
@@ -177,7 +179,7 @@ class KotlinClosure: KotlinExpression {
         let kbody = KotlinCodeBlock.translate(statement: expression.body, translator: translator)
         let isAnonymousFunction = expression.returnType != .none
         var implicitParameterLabels: [String] = []
-        var returnLabel: String? = nil
+        var hasReturnLabel = false
         if isAnonymousFunction {
             if expression.returnType != .void {
                 // A function that returns a value requires an explicit return
@@ -185,8 +187,8 @@ class KotlinClosure: KotlinExpression {
             }
         } else {
             // Closures require a label for any explicit return, or it will return from the other scope
-            if kbody.updateWithExpectedReturn(.labelIfPresent("r_0")) {
-                returnLabel = "r_0"
+            if kbody.updateWithExpectedReturn(.labelIfPresent(returnLabel)) {
+                hasReturnLabel = true
             }
             if expression.parameters.isEmpty {
                 implicitParameterLabels = handleImplicitParameters(in: kbody, inferredType: expression.inferredType)
@@ -197,7 +199,7 @@ class KotlinClosure: KotlinExpression {
         kexpression.parameters = expression.parameters
         kexpression.isAnonymousFunction = isAnonymousFunction
         kexpression.implicitParameterLabels = implicitParameterLabels
-        kexpression.returnLabel = returnLabel
+        kexpression.hasReturnLabel = hasReturnLabel
         return kexpression
     }
 
@@ -249,8 +251,8 @@ class KotlinClosure: KotlinExpression {
             }
             output.append("): ").append(returnType).append(" {\n")
         } else {
-            if let returnLabel {
-                output.append(returnLabel).append("@")
+            if hasReturnLabel {
+                output.append(Self.returnLabel).append("@")
             }
             output.append("{")
             if parameters.isEmpty && implicitParameterLabels.isEmpty {
@@ -318,28 +320,42 @@ class KotlinFunctionCall: KotlinExpression {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
-        let hasTrailingClosure = useTrailingClosureFormatting && arguments.last?.value.type == .closure && (arguments.last?.value as? KotlinClosure)?.isAnonymousFunction == false
-        let lastParenthesizedIndex = hasTrailingClosure ? arguments.count - 2 : arguments.count - 1
-        output.append(function, indentation: indentation)
-        if !hasTrailingClosure || arguments.count > 1 {
-            output.append("(")
-        }
-        if lastParenthesizedIndex >= 0 {
-            for (index, argument) in arguments[0...lastParenthesizedIndex].enumerated() {
-                if let label = argument.label {
-                    output.append(label).append(" = ")
-                }
-                output.append(argument.value, indentation: indentation)
-                if index < lastParenthesizedIndex {
-                    output.append(", ")
-                }
+        var arguments = arguments
+        var trailingClosure: KotlinExpression? = nil
+        var forceParentheses = false
+        if let closure = function as? KotlinClosure, closure.hasReturnLabel {
+            // Kotlin does not allow return labels in immediately-executed lambdas. Convert to a call to our special closure-running functions
+            output.append(KotlinClosure.returnLabel)
+            trailingClosure = closure
+        } else {
+            output.append(function, indentation: indentation)
+            let hasTrailingClosure = useTrailingClosureFormatting && arguments.last?.value.type == .closure && (arguments.last?.value as? KotlinClosure)?.isAnonymousFunction == false
+            if hasTrailingClosure {
+                trailingClosure = arguments[arguments.count - 1].value
+                arguments = Array(arguments[0..<(arguments.count - 1)])
+            }
+            // When immediately executing a closure we must add parentheses { ... }()
+            if arguments.isEmpty && (!hasTrailingClosure || function is KotlinClosure) {
+                forceParentheses = true
             }
         }
-        if !hasTrailingClosure || arguments.count > 1 {
+        if forceParentheses || !arguments.isEmpty {
+            output.append("(")
+        }
+        for (index, argument) in arguments.enumerated() {
+            if let label = argument.label {
+                output.append(label).append(" = ")
+            }
+            output.append(argument.value, indentation: indentation)
+            if index < arguments.count - 1 {
+                output.append(", ")
+            }
+        }
+        if forceParentheses || !arguments.isEmpty {
             output.append(")")
         }
-        if hasTrailingClosure {
-            output.append(" ").append(arguments.last!.value, indentation: indentation)
+        if let trailingClosure {
+            output.append(" ").append(trailingClosure, indentation: indentation)
         }
     }
 }
