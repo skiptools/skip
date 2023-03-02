@@ -169,16 +169,20 @@ class BinaryOperator: Expression {
             doubleCheckLHS()
             resultType = .bool
         case .nilCoalescing:
-            // TODO
+            //~~~
+            lhs.inferTypes(context: context, expecting: .none)
+            rhs.inferTypes(context: context, expecting: lhs.inferredType)
+            doubleCheckLHS()
             break
         case .cast:
+            //~~~
             // TODO
             break
         case .range:
             lhs.inferTypes(context: context, expecting: .none)
             rhs.inferTypes(context: context, expecting: lhs.inferredType)
             doubleCheckLHS()
-            resultType = context.operationResult(lhs.inferredType, rhs.inferredType)
+            resultType = .array(context.operationResult(lhs.inferredType, rhs.inferredType))
         case .addition:
             fallthrough
         case .multiplication:
@@ -664,7 +668,7 @@ class OptionalBinding: Expression {
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
-        value?.inferTypes(context: context, expecting: declaredType == .none ? .none : .optional(declaredType))
+        value?.inferTypes(context: context, expecting: declaredType.asOptional(true))
         variableType = declaredType
         if variableType == .none {
             if let value {
@@ -674,9 +678,7 @@ class OptionalBinding: Expression {
             }
         }
         // Flow will only continue when the value is non-optional
-        if case .optional(let type) = variableType {
-            variableType = type
-        }
+        variableType = variableType.asOptional(false)
         return context.addingIdentifiers(names, types: variableTypes)
     }
 
@@ -950,14 +952,7 @@ class Try: Expression {
         case .default:
             return inferredType
         case .optional:
-            switch inferredType {
-            case .none:
-                return .none
-            case .optional:
-                return inferredType
-            default:
-                return .optional(inferredType)
-            }
+            return inferredType.asOptional(true)
         case .unwrappedOptional:
             return inferredType
         }

@@ -12,9 +12,9 @@ struct S {
     var p1: Int
     var p2: String?
 
-    func f(i: Int?) {
-        while let i, i < 5 {
-            print("ok")
+    func f() {
+        for i in 0..<10 {
+            print(i)
         }
     }
 }

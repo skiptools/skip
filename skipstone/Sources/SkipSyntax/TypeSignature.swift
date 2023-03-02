@@ -87,6 +87,28 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
         return Array(repeating: self, count: count)
     }
 
+    /// Convert this type to/from an optional.
+    func asOptional(_ optional: Bool) -> TypeSignature {
+        switch self {
+        case .none:
+            return .none
+        case .optional(let type):
+            if optional {
+                return self
+            } else {
+                return type
+            }
+        case .unwrappedOptional(let type):
+            if optional {
+                return .optional(type)
+            } else {
+                return type
+            }
+        default:
+            return optional ? .optional(self) : self
+        }
+    }
+
     /// Attempt to replace `.none` cases in this type signature with information from the given signature.
     func or(_ typeSignature: TypeSignature) -> TypeSignature {
         switch self {
@@ -214,12 +236,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
             return true
         }
 
-        var type = type
-        if case .optional(let wrappedType) = type {
-            type = wrappedType
-        } else if case .unwrappedOptional(let wrappedType) = type {
-            type = wrappedType
-        }
+        var type = type.asOptional(false)
         if type == self {
             return true
         }

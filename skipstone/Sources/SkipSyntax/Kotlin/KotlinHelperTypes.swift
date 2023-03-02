@@ -22,6 +22,24 @@ extension Accessor where B: CodeBlock {
     }
 }
 
+extension Operator {
+    /// Kotlin version of this operator's symbol.
+    var kotlinSymbol: String {
+        switch symbol {
+        case "??":
+            return "?:"
+        case "as!":
+            return "as"
+        case "..<":
+            return "until"
+        case "...":
+            return ".."
+        default:
+            return symbol
+        }
+    }
+}
+
 extension Modifiers {
     /// Kotlin modifier string for a member.
     func kotlinMemberString(isOpen: Bool) -> String {

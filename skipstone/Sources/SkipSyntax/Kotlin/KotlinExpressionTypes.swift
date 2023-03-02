@@ -141,7 +141,7 @@ class KotlinBinaryOperator: KotlinExpression {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
-        output.append(lhs, indentation: indentation).append(" \(op.symbol) ").append(rhs, indentation: indentation)
+        output.append(lhs, indentation: indentation).append(" \(op.kotlinSymbol) ").append(rhs, indentation: indentation)
     }
 }
 
