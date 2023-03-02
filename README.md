@@ -5,7 +5,7 @@
 Add the following line at the bottom of your `Package.swift` file:
 
 ```swift
-package.dependencies += [.package(url: "https://github.com/skiptools/skip.git", from: "0.0.31")]
+package.dependencies += [.package(url: "https://github.com/skiptools/skip.git", from: "0.0.32")]
 ```
 
 Then run:
