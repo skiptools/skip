@@ -8,10 +8,10 @@ let package = Package(
         .executable(name: "SkipCLI", targets: ["SkipCLI"]),
     ],
     targets: [
-        .plugin(name: "Skippy2", 
+        .plugin(name: "skippytool",
             capability: .buildTool(), 
             dependencies: ["skiptool"]),
-        .plugin(name: "SkipCommand2",
+        .plugin(name: "skip",
             capability: .command(
                 intent: .custom(verb: "skip", 
                 description: "Run Skip transpiler"),
@@ -27,5 +27,5 @@ let package = Package(
     ]
 )
 
-package.targets += [.binaryTarget(name: "skiptool", url: "https://github.com/skipsource/skip/releases/download/0.0.7/skiptool.artifactbundle.zip", checksum: "1bf7c10b624724b5443387f1601c62c982860d4a33d06d222bfbc78125c78514")]
+package.targets += [.binaryTarget(name: "skiptool", url: "https://github.com/skipsource/skip/releases/download/0.0.8/skiptool.artifactbundle.zip", checksum: "284ac6a00d6ea79c0a93be5e99a3aceee1e07a9c34d2165384292e1fb25798eb")]
 
