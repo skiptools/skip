@@ -5,7 +5,6 @@ let package = Package(
     name: "skip",
     products: [
         .plugin(name: "skip", targets: ["SkipCommandPlugIn"]),
-        .library(name: "skiplib", targets: ["SkipCommandPlugIn"]),
     ],
     targets: [
         .plugin(name: "SkipBuildPlugIn",
@@ -25,5 +24,5 @@ let package = Package(
     ]
 )
 
-package.targets += [.binaryTarget(name: "skiptool", url: "https://github.com/skipsource/skip/releases/download/0.0.29/skiptool.artifactbundle.zip", checksum: "6ffaf57c8ecce9755bc244e5662e99f8fc0ef9e457977a104ceab4d16abf6b95")]
+package.targets += [.binaryTarget(name: "skiptool", url: "https://github.com/skipsource/skip/releases/download/0.0.30/skiptool.artifactbundle.zip", checksum: "e2af696d833d548939b1388798de9526a84d7648c88e27a5ef60f684ee9d5cfc")]
 
