@@ -8,10 +8,10 @@ let package = Package(
         .executable(name: "SkipCLI", targets: ["SkipCLI"]),
     ],
     targets: [
-        .plugin(name: "Skippy", 
+        .plugin(name: "Skippy2", 
             capability: .buildTool(), 
-            dependencies: ["SkipRunner"]),
-        .plugin(name: "SkipCommand",
+            dependencies: ["skiptool"]),
+        .plugin(name: "SkipCommand2",
             capability: .command(
                 intent: .custom(verb: "skip", 
                 description: "Run Skip transpiler"),
@@ -19,13 +19,13 @@ let package = Package(
                     .writeToPackageDirectory(reason: "skip creates source files"),
                     //.allowNetworkConnections(scope: .all(ports: []), reason: "skip uses gradle to download dependendies from the network"), // awaiting Swift 5.9
                 ]),
-            dependencies: ["SkipRunner"]),
+            dependencies: ["skiptool"]),
         .executableTarget(name: "SkipCLI",
-            plugins: ["SkipRunner"]),
+            plugins: ["skiptool"]),
         .testTarget(name: "SkipCLITests",
             dependencies: ["SkipCLI"]),
     ]
 )
 
-package.targets += [.binaryTarget(name: "skiptool", url: "https://github.com/skipsource/skip/releases/download/0.0.4/skiptool.artifactbundle.zip", checksum: "44e4e86db14a5aa204ea829c5ef9c1396c443de2bc2dd9f517a0fe389644218e")]
+package.targets += [.binaryTarget(name: "skiptool", url: "https://github.com/skipsource/skip/releases/download/0.0.5/skiptool.artifactbundle.zip", checksum: "44e4e86db14a5aa204ea829c5ef9c1396c443de2bc2dd9f517a0fe389644218e")]
 
