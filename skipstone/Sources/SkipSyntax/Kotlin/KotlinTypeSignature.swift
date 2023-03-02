@@ -45,6 +45,15 @@ extension TypeSignature {
             return "\(name)<\(generics.map { $0.kotlin }.joined(separator: ", "))>"
         case .none:
             return description
+        case .range(let elementType):
+            switch elementType {
+            case .character:
+                return "CharRange"
+            case .int64:
+                return "LongRange"
+            default:
+                return "IntRange"
+            }
         case .set:
             return description
         case .string:
@@ -123,6 +132,8 @@ extension TypeSignature {
             break
         case .optional(let type):
             type.appendKotlinMessages(to: node)
+        case .range(let elementType):
+            elementType.appendKotlinMessages(to: node)
         case .set(let elementType):
             elementType.appendKotlinMessages(to: node)
         case .string:
@@ -203,6 +214,8 @@ extension TypeSignature {
             }
             return codebaseInfo.mayBeMutableValueType(qualifiedName: "\(base).\(name)")
         case .metaType:
+            return false
+        case .range:
             return false
         case .set:
             return true

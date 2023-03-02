@@ -16,6 +16,7 @@ enum KotlinExpressionType {
     case `subscript`
     case `try`
     case tupleLiteral
+    case typeLiteral
     case valueReference
 
     case raw
@@ -684,7 +685,7 @@ class KotlinMemberAccess: KotlinExpression {
                 }
             }
         } else if inferredType != .none {
-            output.append(inferredType)
+            output.append(inferredType.kotlin)
             if member != "init" {
                 if useMultlineFormatting {
                     output.append("\n").append(indentation.inc())
@@ -1054,6 +1055,19 @@ class KotlinTupleLiteral: KotlinExpression {
             }
             output.append(")")
         }
+    }
+}
+
+class KotlinTypeLiteral: KotlinExpression {
+    var literal: TypeSignature
+
+    init(expression: TypeLiteral) {
+        self.literal = expression.literal
+        super.init(type: .typeLiteral, expression: expression)
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        output.append(literal.kotlin)
     }
 }
 

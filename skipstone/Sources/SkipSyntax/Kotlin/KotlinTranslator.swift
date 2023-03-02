@@ -185,6 +185,8 @@ public class KotlinTranslator {
                 return KotlinTry.translate(expression: expression as! Try, translator: self)
             case .tupleLiteral:
                 return try KotlinTupleLiteral.translate(expression: expression as! TupleLiteral, translator: self)
+            case .typeLiteral:
+                return KotlinTypeLiteral(expression: expression as! TypeLiteral)
             case .raw:
                 return KotlinRawExpression(expression: expression as! RawExpression)
             }

@@ -18,6 +18,7 @@ enum ExpressionType: CaseIterable {
     case `subscript`
     case `try`
     case tupleLiteral
+    case typeLiteral
     case prefixOperator
 
     /// An expression representing raw Swift code.
@@ -60,6 +61,8 @@ enum ExpressionType: CaseIterable {
             return Try.self
         case .tupleLiteral:
             return TupleLiteral.self
+        case .typeLiteral:
+            return TypeLiteral.self
 
         case .raw:
             return RawExpression.self
@@ -124,17 +127,35 @@ class BinaryOperator: Expression {
     }
 
     override class func decodeSequenceOperator(syntax: SyntaxProtocol, sequence: SyntaxProtocol, elements: [ExprSyntax], index: Int, in syntaxTree: SyntaxTree) throws -> Expression? {
-        let op: Operator
-        if syntax.kind == .binaryOperatorExpr, let binaryOperatorExpr = syntax.as(BinaryOperatorExprSyntax.self) {
-            op = Operator.with(symbol: binaryOperatorExpr.operatorToken.text)
-        } else if syntax.kind == .assignmentExpr, let assignmentExpr = syntax.as(AssignmentExprSyntax.self) {
-            op = Operator.with(symbol: assignmentExpr.assignToken.text)
-        } else {
+        guard let op = op(for: syntax) else {
             return nil
         }
         let lhs = try ExpressionDecoder.decodeSequence(sequence, elements: Array(elements[..<index]), in: syntaxTree)
         let rhs = try ExpressionDecoder.decodeSequence(sequence, elements: Array(elements[(index + 1)...]), in: syntaxTree)
         return BinaryOperator(op: op, lhs: lhs, rhs: rhs, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+    }
+
+    private static func op(for syntax: SyntaxProtocol) -> Operator? {
+        switch syntax.kind {
+        case .assignmentExpr:
+            if let assignmentExpr = syntax.as(AssignmentExprSyntax.self) {
+                return Operator.with(symbol: assignmentExpr.assignToken.text)
+            }
+        case .binaryOperatorExpr:
+            if let binaryOperatorExpr = syntax.as(BinaryOperatorExprSyntax.self) {
+                return Operator.with(symbol: binaryOperatorExpr.operatorToken.text)
+            }
+        case .unresolvedAsExpr:
+            if let asExpr = syntax.as(UnresolvedAsExprSyntax.self) {
+                let suffix = asExpr.questionOrExclamationMark?.text ?? ""
+                return Operator.with(symbol: "as\(suffix)")
+            }
+        case .unresolvedIsExpr:
+            return Operator.with(symbol: "is")
+        default:
+            break
+        }
+        return nil
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
@@ -169,20 +190,23 @@ class BinaryOperator: Expression {
             doubleCheckLHS()
             resultType = .bool
         case .nilCoalescing:
-            //~~~
-            lhs.inferTypes(context: context, expecting: .none)
-            rhs.inferTypes(context: context, expecting: lhs.inferredType)
-            doubleCheckLHS()
-            break
+            lhs.inferTypes(context: context, expecting: expecting.asOptional(true))
+            rhs.inferTypes(context: context, expecting: lhs.inferredType.asOptional(false))
+            // Custom version of our doubleCheckLHS function above
+            if lhs.inferredType == .none && rhs.inferredType != .none {
+                lhs.inferTypes(context: context, expecting: rhs.inferredType.asOptional(true))
+            }
+            resultType = expecting.or(rhs.inferredType)
         case .cast:
-            //~~~
-            // TODO
-            break
+            let type = (rhs as? TypeLiteral)?.literal ?? expecting
+            lhs.inferTypes(context: context, expecting: type)
+            rhs.inferTypes(context: context, expecting: .none)
+            resultType = op.symbol == "is" ? .bool : type
         case .range:
-            lhs.inferTypes(context: context, expecting: .none)
+            lhs.inferTypes(context: context, expecting: expecting.elementType)
             rhs.inferTypes(context: context, expecting: lhs.inferredType)
             doubleCheckLHS()
-            resultType = .array(context.operationResult(lhs.inferredType, rhs.inferredType))
+            resultType = expecting.or(.range(lhs.inferredType))
         case .addition:
             fallthrough
         case .multiplication:
@@ -1010,5 +1034,30 @@ class TupleLiteral: Expression {
             return []
         }
         return [PrettyPrintTree(root: labels.map { String(describing: $0) }.joined(separator: ", "))]
+    }
+}
+
+/// `Int`
+class TypeLiteral: Expression {
+    let literal: TypeSignature
+
+    init(literal: TypeSignature, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        self.literal = literal
+        super.init(type: .typeLiteral, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
+        guard syntax.kind == .typeExpr, let typeExpr = syntax.as(TypeExprSyntax.self) else {
+            return nil
+        }
+        return TypeLiteral(literal: TypeSignature.for(syntax: typeExpr.type), sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+    }
+
+    override var inferredType: TypeSignature {
+        return literal
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        return [PrettyPrintTree(root: literal.description)]
     }
 }

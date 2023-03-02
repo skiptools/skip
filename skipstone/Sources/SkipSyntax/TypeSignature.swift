@@ -22,6 +22,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
     case named(String, [TypeSignature]) // A<B, C>
     case none
     case optional(TypeSignature)
+    case range(TypeSignature)
     case set(TypeSignature)
     case string
     case tuple([String?], [TypeSignature]) // (a: A, b: B)
@@ -40,6 +41,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
             return elementType
         case .dictionary(let keyType, let valueType):
             return .tuple([nil, nil], [keyType, valueType])
+        case .range(let elementType):
+            return elementType
         case .set(let elementType):
             return elementType
         case .string:
@@ -149,6 +152,10 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
                 return .optional(type)
             }
             return .optional(typeSignature)
+        case .range(.none):
+            if case .range = typeSignature {
+                return typeSignature
+            }
         case .set(.none):
             if case .set = typeSignature {
                 return typeSignature
@@ -236,7 +243,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
             return true
         }
 
-        var type = type.asOptional(false)
+        let type = type.asOptional(false)
         if type == self {
             return true
         }
@@ -248,6 +255,9 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
             return true
         case .array(let elementType):
             if case .array(let elementType2) = type {
+                return elementType.isCompatible(with: elementType2)
+            }
+            if case .range(let elementType2) = type {
                 return elementType.isCompatible(with: elementType2)
             }
             if case .set(let elementType2) = type {
@@ -303,8 +313,21 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
             return true
         case .optional(let wrappedType):
             return wrappedType.isCompatible(with: type)
+        case .range(let elementType):
+            if case .array(let elementType2) = type {
+                return elementType.isCompatible(with: elementType2)
+            }
+            if case .range(let elementType2) = type {
+                return elementType.isCompatible(with: elementType2)
+            }
+            if case .set(let elementType2) = type {
+                return elementType.isCompatible(with: elementType2)
+            }
         case .set(let elementType):
             if case .array(let elementType2) = type {
+                return elementType.isCompatible(with: elementType2)
+            }
+            if case .range(let elementType2) = type {
                 return elementType.isCompatible(with: elementType2)
             }
             if case .set(let elementType2) = type {
@@ -499,6 +522,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
             return genericTypes.isEmpty ? .int32 : .named(name, genericTypes)
         case "Int64":
             return genericTypes.isEmpty ? .int64 : .named(name, genericTypes)
+        case "Range":
+            return genericTypes.count == 1 ? .range(genericTypes[0]) : .named(name, genericTypes)
         case "Set":
             return genericTypes.count == 1 ? .set(genericTypes[0]) : .named(name, genericTypes)
         case "String":
@@ -589,6 +614,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
             return self
         case .optional(let type):
             return .optional(type.qualified(in: node))
+        case .range(let elementType):
+            return .range(elementType.qualified(in: node))
         case .set(let elementType):
             return .set(elementType.qualified(in: node))
         case .string:
@@ -667,6 +694,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
             default:
                 return "\(type.description)?"
             }
+        case .range(let type):
+            return "Range<\(type.description)>"
         case .set(let type):
             return "Set<\(type.description)>"
         case .string:
