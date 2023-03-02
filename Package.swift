@@ -26,6 +26,6 @@ let package = Package(
             dependencies: ["SkipCLI"]),
     ]
 )
-
-package.targets += [.binaryTarget(name: "SkipRunner", url: "https://github.com/skipsource/skip/releases/download/main-1677773888/skiptool.artifactbundle.zip", checksum: "7e524e0322247fecd26dd8d6ea80d158f1f740234effeda61f8fca95a317e721")]
+// YYY
+package.targets += [.binaryTarget(name: "skiptool.artifactbundle", url: "https://github.com/skipsource/skip/releases/download/0.0.2/skiptool.artifactbundle.zip", checksum: "438d9371735e723994b0a1ca45b53bd4a2508db1aacd176eabb2037642376fa8")]
 
