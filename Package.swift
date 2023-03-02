@@ -2,8 +2,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "SkipPlugIn",
-    platforms: [.macOS(.v13)],
+    name: "skip",
     products: [
         .executable(name: "SkipCLI", targets: ["SkipCLI"]),
     ],
@@ -25,5 +24,5 @@ let package = Package(
     ]
 )
 
-package.targets += [.binaryTarget(name: "skiptool", url: "https://github.com/skipsource/skip/releases/download/0.0.19/skiptool.artifactbundle.zip", checksum: "5efbd31934151b4b32d873e7088db27fe95fe32042ec7bae0752ffb670d9f245")]
+package.targets += [.binaryTarget(name: "skiptool", url: "https://github.com/skipsource/skip/releases/download/0.0.20/skiptool.artifactbundle.zip", checksum: "9109554640858244df9257b8b8926d2a02f9407d0d34cc53d858562405a86986")]
 
