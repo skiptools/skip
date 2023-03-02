@@ -396,7 +396,7 @@ final class ConditionalTests: XCTestCase {
         }
         """)
 
-        // No error added if there are additional statements past the 'if'
+        // No error added if the block ends in 'return'
         try await check(swift: """
         func f(i: Int?) -> Int {
             if let x = i {
@@ -470,6 +470,37 @@ final class ConditionalTests: XCTestCase {
                 error("Unreachable")
             }
             return r
+        }
+        """)
+
+        // No error added if no value returned
+        try await check(swift: """
+        func f(i: Int?) -> Int {
+            {
+                if let x = i {
+                    print(x)
+                } else {
+                    print(0)
+                }
+            }()
+            return 100
+        }
+        """, kotlin: """
+        internal fun f(i: Int?): Int {
+            {
+                var if_0 = false
+                if (true) {
+                    val x = i
+                    if (x != null) {
+                        if_0 = true
+                        print(x)
+                    }
+                }
+                if (!if_0) {
+                    print(0)
+                }
+            }()
+            return 100
         }
         """)
     }

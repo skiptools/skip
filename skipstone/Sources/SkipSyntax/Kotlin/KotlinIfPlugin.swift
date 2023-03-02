@@ -97,27 +97,51 @@ private class IdentifiersVisitor {
 private class UnreachableVisitor {
     func visit(_ node: KotlinSyntaxNode) -> VisitResult<KotlinSyntaxNode> {
         if let functionDeclaration = node as? KotlinFunctionDeclaration {
-            if let body = functionDeclaration.body {
-                addUnreachableErrorIfNeeded(to: body, returnType: functionDeclaration.returnType == .none ? .void : functionDeclaration.returnType)
+            // For functions a .none return type must be void, so skip it too
+            if let body = functionDeclaration.body, functionDeclaration.returnType != .none && functionDeclaration.returnType != .void {
+                addUnreachableErrorIfNeeded(to: body)
             }
         } else if let closure = node as? KotlinClosure {
-            addUnreachableErrorIfNeeded(to: closure.body, returnType: closure.returnType == .none ? nil : closure.returnType)
+            // For closures a .none return type is unknown, so only skip void
+            if closure.returnType != .void {
+                addUnreachableErrorIfNeeded(to: closure.body)
+            }
         }
         return .recurse(nil)
     }
 
-    private func addUnreachableErrorIfNeeded(to codeBlock: KotlinCodeBlock, returnType: TypeSignature?) {
-        guard returnType != .void else {
+    private func addUnreachableErrorIfNeeded(to codeBlock: KotlinCodeBlock) {
+        // We need to add an error if the block:
+        // - Does not end with a return statement
+        // - Contains an explicit return value
+        // - Has an 'if' that we've restructured to use an if condition var, which may confuse the compiler
+        guard !(codeBlock.statements.last is KotlinReturn) else {
             return
         }
-        // We only need to add an error if the block ends with an 'if' that now uses an if check var
-        guard let expressionStatement = codeBlock.statements.last as? KotlinExpressionStatement, let kif = expressionStatement.expression as? KotlinIf, kif.ifCheckVariable != nil else {
+        var hasReturnValue: Bool? = nil
+        var hasIfCheckVariable = false
+        codeBlock.visit { node in
+            if hasReturnValue == false || (hasIfCheckVariable && hasReturnValue != nil) {
+                // We can skip everything once we meet our conditions
+                return .skip
+            }
+            if node is KotlinFunctionDeclaration {
+                return .skip
+            } else if node is KotlinClosure {
+                return .skip
+            } else if hasReturnValue == nil, let kret = node as? KotlinReturn {
+                hasReturnValue = kret.expression != nil
+                return .skip
+            } else if !hasIfCheckVariable, let kif = node as? KotlinIf {
+                hasIfCheckVariable = kif.ifCheckVariable != nil
+                return .recurse(nil)
+            } else {
+                return .recurse(nil)
+            }
+        }
+        guard hasReturnValue == true && hasIfCheckVariable else {
             return
         }
-        guard returnType != nil || codeBlock.updateWithExpectedReturn(.no) else {
-            return
-        }
-
         // error("Unreachable")
         let errorExpression = KotlinFunctionCall(function: KotlinIdentifier(name: "error"), arguments: [LabeledValue(value: KotlinStringLiteral(literal: "Unreachable"))])
         let errorStatement = KotlinExpressionStatement(type: .expression)
