@@ -4,6 +4,7 @@ enum KotlinExpressionType {
     case binaryOperator
     case booleanLiteral
     case closure
+    case dictionaryLiteral
     case functionCall
     case identifier
     case `if`
@@ -56,7 +57,8 @@ class KotlinArrayLiteral: KotlinExpression {
             if (useMultilineFormatting) {
                 output.append("\n").append(elementIndentation)
             }
-            output.append(element.valueReference(), indentation: elementIndentation)
+            // No need to valref() because the array already does
+            output.append(element, indentation: elementIndentation)
             if index != elements.count - 1 {
                 output.append(", ")
             }
@@ -283,6 +285,49 @@ class KotlinClosure: KotlinExpression {
     }
 }
 
+class KotlinDictionaryLiteral: KotlinExpression {
+    var entries: [(key: KotlinExpression, value: KotlinExpression)] = []
+
+    static func translate(expression: DictionaryLiteral, translator: KotlinTranslator) -> KotlinDictionaryLiteral {
+        let kexpression = KotlinDictionaryLiteral(expression: expression)
+        kexpression.entries = expression.entries.map {
+            let keyExpression = translator.translateExpression($0.key)
+            let valueExpression = translator.translateExpression($0.value)
+            return (keyExpression, valueExpression)
+        }
+        return kexpression
+    }
+
+    private init(expression: DictionaryLiteral) {
+        super.init(type: .dictionaryLiteral, expression: expression)
+    }
+
+    override func mayBeSharedMutableValueExpression(orType: Bool) -> Bool {
+        // Dictionary literals are not shared, but if we're using this expression to determine the type, then it can be
+        return orType
+    }
+
+    override var children: [KotlinSyntaxNode] {
+        return entries.flatMap { [$0.key, $0.value] }
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        output.append("dictionaryOf(")
+        for (index, entry) in entries.enumerated() {
+            // No need to valref() because the dictionary already does
+            output.append("Pair(")
+            output.append(entry.key, indentation: indentation)
+            output.append(", ")
+            output.append(entry.value, indentation: indentation)
+            output.append(")")
+            if index != entries.count - 1 {
+                output.append(", ")
+            }
+        }
+        output.append(")")
+    }
+}
+
 class KotlinFunctionCall: KotlinExpression {
     var function: KotlinExpression
     var arguments: [LabeledValue<KotlinExpression>] = []
@@ -329,7 +374,16 @@ class KotlinFunctionCall: KotlinExpression {
             output.append(KotlinClosure.returnLabel)
             trailingClosure = closure
         } else {
-            output.append(function, indentation: indentation)
+            if let arrayLiteral = function as? KotlinArrayLiteral, arrayLiteral.elements.count == 1 {
+                // [Int]() syntax
+                output.append("Array<").append(arrayLiteral.elements[0], indentation: indentation).append(">")
+            } else if let dictionaryLiteral = function as? KotlinDictionaryLiteral, dictionaryLiteral.entries.count == 1 {
+                // [Int: String]() syntax
+                output.append("Dictionary<").append(dictionaryLiteral.entries[0].key, indentation: indentation).append(", ")
+                output.append(dictionaryLiteral.entries[0].value, indentation: indentation).append(">")
+            } else {
+                output.append(function, indentation: indentation)
+            }
             let hasTrailingClosure = useTrailingClosureFormatting && arguments.last?.value.type == .closure && (arguments.last?.value as? KotlinClosure)?.isAnonymousFunction == false
             if hasTrailingClosure {
                 trailingClosure = arguments[arguments.count - 1].value

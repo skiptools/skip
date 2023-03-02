@@ -40,7 +40,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
         case .array(let elementType):
             return elementType
         case .dictionary(let keyType, let valueType):
-            return .tuple([nil, nil], [keyType, valueType])
+            return .tuple(["key", "value"], [keyType, valueType])
         case .range(let elementType):
             return elementType
         case .set(let elementType):

@@ -16,9 +16,9 @@ class Array<T>: ValueSemantics, Iterable<T> {
         storage = ArrayStorage()
     }
 
-    constructor(list: List<T>) {
+    constructor(collection: Collection<T>) {
         storage = ArrayStorage()
-        for (element in list) {
+        for (element in collection) {
             append(element)
         }
     }

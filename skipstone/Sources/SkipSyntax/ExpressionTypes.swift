@@ -6,6 +6,7 @@ enum ExpressionType: CaseIterable {
     case binaryOperator
     case booleanLiteral
     case closure
+    case dictionaryLiteral
     case functionCall
     case identifier
     case `if`
@@ -35,6 +36,8 @@ enum ExpressionType: CaseIterable {
             return BooleanLiteral.self
         case .closure:
             return Closure.self
+        case .dictionaryLiteral:
+            return DictionaryLiteral.self
         case .functionCall:
             return FunctionCall.self
         case .identifier:
@@ -70,7 +73,7 @@ enum ExpressionType: CaseIterable {
     }
 }
 
-/// `[...]`
+/// `[a, b, c]`
 class ArrayLiteral: Expression {
     let elements: [Expression]
 
@@ -332,6 +335,61 @@ class Closure: Expression {
             attrs.append("throws")
         }
         return attrs
+    }
+}
+
+/// `[a: b, c: d]`
+class DictionaryLiteral: Expression {
+    let entries: [(key: Expression, value: Expression)]
+
+    init(entries: [(key: Expression, value: Expression)], syntax: SyntaxProtocol?, sourceFile: Source.File?, sourceRange: Source.Range? = nil) {
+        self.entries = entries
+        super.init(type: .dictionaryLiteral, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
+        guard syntax.kind == .dictionaryExpr, let dictionaryExpr = syntax.as(DictionaryExprSyntax.self) else {
+            return nil
+        }
+        var entries: [(Expression, Expression)] = []
+        if case .elements(let elements) = dictionaryExpr.content {
+            entries = elements.map {
+                let keyExpression = ExpressionDecoder.decode(syntax: $0.keyExpression, in: syntaxTree)
+                let valueExpression = ExpressionDecoder.decode(syntax: $0.valueExpression, in: syntaxTree)
+                return (keyExpression, valueExpression)
+            }
+        }
+        return DictionaryLiteral(entries: entries, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        if case .dictionary(let ktype, let vtype) = expecting, ktype != .none, vtype != .none {
+            keyType = ktype
+            valueType = vtype
+            entries.forEach {
+                $0.key.inferTypes(context: context, expecting: ktype)
+                $0.value.inferTypes(context: context, expecting: vtype)
+            }
+        } else {
+            for entry in entries {
+                entry.key.inferTypes(context: context, expecting: keyType)
+                keyType = keyType.or(entry.key.inferredType)
+                entry.value.inferTypes(context: context, expecting: valueType)
+                valueType = valueType.or(entry.value.inferredType)
+            }
+        }
+        return context
+    }
+
+    private var keyType: TypeSignature = .none
+    private var valueType: TypeSignature = .none
+
+    override var inferredType: TypeSignature {
+        return .dictionary(keyType, valueType)
+    }
+
+    override var children: [SyntaxNode] {
+        return entries.flatMap { [$0.key, $0.value] }
     }
 }
 

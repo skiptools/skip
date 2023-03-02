@@ -109,13 +109,31 @@ final class LoopTests: XCTestCase {
 
         try await check(swift: """
         {
+            let d = [1: "a", 2: "b", 3: "c"]
+            for (key, value) in d {
+                print(key)
+                print(value)
+            }
+        }
+        """, kotlin: """
+        {
+            val d = dictionaryOf(Pair(1, "a"), Pair(2, "b"), Pair(3, "c"))
+            for ((key, value) in d.valref()) {
+                print(key)
+                print(value)
+            }
+        }
+        """)
+
+        try await check(swift: """
+        {
             for i in [a, b, c] {
                 print(i.valref())
             }
         }
         """, kotlin: """
         {
-            for (i in arrayOf(a.valref(), b.valref(), c.valref())) {
+            for (i in arrayOf(a, b, c)) {
                 print(i.valref())
             }
         }

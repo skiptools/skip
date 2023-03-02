@@ -159,6 +159,8 @@ public class KotlinTranslator {
                 return KotlinBooleanLiteral(expression: expression as! BooleanLiteral)
             case .closure:
                 return KotlinClosure.translate(expression: expression as! Closure, translator: self)
+            case .dictionaryLiteral:
+                return KotlinDictionaryLiteral.translate(expression: expression as! DictionaryLiteral, translator: self)
             case .functionCall:
                 return KotlinFunctionCall.translate(expression: expression as! FunctionCall, translator: self)
             case .identifier:

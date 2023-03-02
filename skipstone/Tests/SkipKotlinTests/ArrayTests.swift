@@ -10,9 +10,8 @@ final class ArrayTests: XCTestCase {
         let emptyArray2: Array<Int> = []
         XCTAssertEqual(emptyArray2.count, 0)
 
-        // TODO: FIXME
-//        let emptyArray3 = [Int]()
-//        XCTAssertEqual(emptyArray3.count, 0)
+        let emptyArray3 = [Int]()
+        XCTAssertEqual(emptyArray3.count, 0)
 
         let emptyArray4 = Array<Int>()
         XCTAssertEqual(emptyArray4.count, 0)
@@ -128,7 +127,7 @@ final class ArrayTests: XCTestCase {
     }
 }
 
-class ArrayHolder {
+private class ArrayHolder {
     var array: [Int] = [] {
         didSet {
             arraySetCount += 1
