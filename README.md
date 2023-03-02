@@ -2,8 +2,14 @@
 
 ## Installing
 
-### [Mint](https://github.com/yonaskolb/mint)
-```
-mint install skiptools/skip
+Add the following line to your `Package.swift` file:
+
+```swift
+package.dependencies += [.package(url: "https://github.com/skiptools/skip.git", from: "0.0.24")]
 ```
 
+Then run:
+
+```shell
+swift package --disable-sandbox --allow-writing-to-package-directory skip
+```
