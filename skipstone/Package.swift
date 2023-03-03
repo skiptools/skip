@@ -5,8 +5,8 @@ let package = Package(
     name: "SkipSource",
     defaultLocalization: "en",
     platforms: [
-        .macOS(.v13),
-        .iOS(.v16),
+        .macOS(.v12),
+        .iOS(.v15),
     ],
     products: [
         .library(name: "SkipSyntax", targets: ["SkipSyntax"]),

@@ -25,6 +25,7 @@ public struct SkipBundle : RawRepresentable {
 
 extension PlatformBundle {
     /// The location of a bundle to use for looking up localized strings, such as the main bundle, or a bundle at a specific file URL.
+    @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
     public var location: LocalizedStringResource.BundleDescription {
         .atURL(bundleURL)
     }

@@ -964,7 +964,8 @@ class KotlinStringLiteral: KotlinExpression {
         for segment in segments {
             switch segment {
             case .string(let string):
-                output.append(string.replacing("$", with: "\\$"))
+                //output.append(string.replacing("$", with: "\\$")) // macOS 13+
+                output.append(string.split(separator: "$").joined(separator: "\\$"))
             case .expression(let expression):
                 if let identifier = expression as? KotlinIdentifier {
                     output.append("$").append(identifier, indentation: indentation)

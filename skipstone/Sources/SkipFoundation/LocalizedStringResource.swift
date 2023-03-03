@@ -1,5 +1,6 @@
 #if !SKIP
 import struct Foundation.LocalizedStringResource
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 public typealias LocalizedStringResource = Foundation.LocalizedStringResource
 #else
 public typealias LocalizedStringResource = SkipLocalizedStringResource

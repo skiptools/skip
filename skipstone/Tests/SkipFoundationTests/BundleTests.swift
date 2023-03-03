@@ -54,6 +54,7 @@ final class BundleTests: XCTestCase {
         XCTAssertEqual("Le \"même\" texte en anglais", dict["The \"same\" text in English"])
     }
 
+    @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
     func testLocalizedStrings() throws {
         let enlproj = try XCTUnwrap(Bundle.module.url(forResource: "Localizable", withExtension: "strings", subdirectory: nil, localization: "en"))
         let frlproj = try XCTUnwrap(Bundle.module.url(forResource: "Localizable", withExtension: "strings", subdirectory: nil, localization: "fr"))

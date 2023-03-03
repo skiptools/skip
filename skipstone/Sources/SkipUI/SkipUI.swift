@@ -20,6 +20,7 @@ public typealias VStack = SwiftUI.VStack
 
 public typealias Button = SwiftUI.Button
 
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 public typealias NavigationLink = SwiftUI.NavigationLink
 
 

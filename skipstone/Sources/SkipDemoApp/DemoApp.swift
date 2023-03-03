@@ -20,6 +20,7 @@ public let logger: Logger = Logger(subsystem: "activity", category: "DemoApp")
 //    }
 //}
 
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 public struct SkipDemoApp : App {
     public init() {
     }
@@ -90,6 +91,7 @@ struct TextView : View {
 //}
 
 
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 struct RootView : View {
     var body: some View {
         TabView {
@@ -219,6 +221,7 @@ struct RootView : View {
 //    var onObservableWillChange: () -> Unit = {}
 //}
 
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 struct ContentView : View {
     @StateObject var model = ModelObservableObject()
     @StateObject var envObject = EnvironmentObservableObject()
@@ -363,6 +366,7 @@ struct ContentView : View {
 //    var onObservableWillChange: () -> Unit = {}
 //}
 
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 struct CustomView : View {
     @StateObject var model: ModelObservableObject
     @StateObject var stateObject = StateObservableObject()
