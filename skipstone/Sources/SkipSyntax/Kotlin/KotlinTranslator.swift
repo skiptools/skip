@@ -179,6 +179,8 @@ public class KotlinTranslator {
                 return KotlinParenthesized.translate(expression: expression as! Parenthesized, translator: self)
             case .prefixOperator:
                 return KotlinPrefixOperator.translate(expression: expression as! PrefixOperator, translator: self)
+            case .postfixOptionalOperator:
+                return KotlinPostfixOptionalOperator.translate(expression: expression as! PostfixOptionalOperator, translator: self)
             case .stringLiteral:
                 return KotlinStringLiteral.translate(expression: expression as! StringLiteral, translator: self)
             case .subscript:

@@ -45,24 +45,24 @@ final class DictionaryTests: XCTestCase {
         XCTAssertEqual(dictionary["a"], 100)
     }
 
-//    func testNestedSubscriptDidSet() {
-//        let holder = DictionaryHolder()
-//        holder.dictionaryOfDictionaries["a"] = ["a": 1, "b": 2, "c": 3]
-//        XCTAssertEqual(holder.dictionaryOfDictionaries.count, 1)
-//        XCTAssertEqual(holder.dictionarySetCount, 1)
-//
-//        var dictionary = holder.dictionaryOfDictionaries
-//        dictionary["a"]!["b"] = 200
-//        XCTAssertEqual(holder.dictionaryOfDictionaries["a"], ["a": 1, "b": 2, "c": 3])
-//        XCTAssertEqual(holder.dictionaryOfDictionaries.count, 1)
-//        XCTAssertEqual(holder.dictionarySetCount, 1)
-//
-//        holder.dictionaryOfDictionaries["a"]!["b"] = 199
-//        XCTAssertEqual(holder.dictionaryOfDictionaries["a"]!["b"], 199)
-//        XCTAssertEqual(holder.dictionaryOfDictionaries.count, 1)
-//        XCTAssertEqual(holder.dictionarySetCount, 2)
-//        XCTAssertEqual(dictionary["a"]!["b"], 200)
-//    }
+    func testNestedSubscriptDidSet() {
+        let holder = DictionaryHolder()
+        holder.dictionaryOfDictionaries["a"] = ["a": 1, "b": 2, "c": 3]
+        XCTAssertEqual(holder.dictionaryOfDictionaries.count, 1)
+        XCTAssertEqual(holder.dictionarySetCount, 1)
+
+        var dictionary = holder.dictionaryOfDictionaries
+        dictionary["a"]!["b"] = 200
+        XCTAssertEqual(holder.dictionaryOfDictionaries["a"], ["a": 1, "b": 2, "c": 3])
+        XCTAssertEqual(holder.dictionaryOfDictionaries.count, 1)
+        XCTAssertEqual(holder.dictionarySetCount, 1)
+
+        holder.dictionaryOfDictionaries["a"]!["b"] = 199
+        XCTAssertEqual(holder.dictionaryOfDictionaries["a"]!["b"], 199)
+        XCTAssertEqual(holder.dictionaryOfDictionaries.count, 1)
+        XCTAssertEqual(holder.dictionarySetCount, 2)
+        XCTAssertEqual(dictionary["a"]?["b"], 200)
+    }
 
     func testDictionaryReferences() {
         var dict: [String: Int] = [:]

@@ -15,12 +15,13 @@ enum ExpressionType: CaseIterable {
     case numericLiteral
     case optionalBinding
     case parenthesized
+    case postfixOptionalOperator
+    case prefixOperator
     case stringLiteral
     case `subscript`
     case `try`
     case tupleLiteral
     case typeLiteral
-    case prefixOperator
 
     /// An expression representing raw Swift code.
     case raw
@@ -54,6 +55,8 @@ enum ExpressionType: CaseIterable {
             return OptionalBinding.self
         case .parenthesized:
             return Parenthesized.self
+        case .postfixOptionalOperator:
+            return PostfixOptionalOperator.self
         case .prefixOperator:
             return PrefixOperator.self
         case .stringLiteral:
@@ -805,6 +808,50 @@ class Parenthesized: Expression {
 
     override var children: [SyntaxNode] {
         return [content]
+    }
+}
+
+/// `x!` or `x?`
+class PostfixOptionalOperator: Expression {
+    let isForcedUnwrap: Bool
+    let target: Expression
+
+    init(isForcedUnwrap: Bool, target: Expression, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        self.isForcedUnwrap = isForcedUnwrap
+        self.target = target
+        super.init(type: .postfixOptionalOperator, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
+        let isForcedUnwrap: Bool
+        let target: Expression
+        if syntax.kind == .forcedValueExpr, let forcedValueExpr = syntax.as(ForcedValueExprSyntax.self) {
+            isForcedUnwrap = true
+            target = ExpressionDecoder.decode(syntax: forcedValueExpr.expression, in: syntaxTree)
+        } else if syntax.kind == .optionalChainingExpr, let optionalChainingExpr = syntax.as(OptionalChainingExprSyntax.self) {
+            isForcedUnwrap = false
+            target = ExpressionDecoder.decode(syntax: optionalChainingExpr.expression, in: syntaxTree)
+        } else {
+            return nil
+        }
+        return PostfixOptionalOperator(isForcedUnwrap: isForcedUnwrap, target: target, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        target.inferTypes(context: context, expecting: expecting.asOptional(true))
+        return context
+    }
+
+    override var inferredType: TypeSignature {
+        return target.inferredType.asOptional(!isForcedUnwrap)
+    }
+
+    override var children: [SyntaxNode] {
+        return [target]
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        return [isForcedUnwrap ? "!" : "?"]
     }
 }
 

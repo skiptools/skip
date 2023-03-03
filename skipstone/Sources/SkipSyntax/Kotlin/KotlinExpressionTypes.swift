@@ -12,6 +12,7 @@ enum KotlinExpressionType {
     case nullLiteral
     case numericLiteral
     case parenthesized
+    case postfixOptionalOperator
     case prefixOperator
     case stringLiteral
     case `subscript`
@@ -871,6 +872,34 @@ class KotlinParenthesized: KotlinExpression {
     }
 }
 
+class KotlinPostfixOptionalOperator: KotlinExpression {
+    var isForcedUnwrap = false
+    var target: KotlinExpression
+
+    static func translate(expression: PostfixOptionalOperator, translator: KotlinTranslator) -> KotlinPostfixOptionalOperator {
+        let ktarget = translator.translateExpression(expression.target)
+        return KotlinPostfixOptionalOperator(expression: expression, target: ktarget)
+    }
+
+    private init(expression: PostfixOptionalOperator, target: KotlinExpression) {
+        self.isForcedUnwrap = expression.isForcedUnwrap
+        self.target = target
+        super.init(type: .postfixOptionalOperator, expression: expression)
+    }
+
+    override func mayBeSharedMutableValueExpression(orType: Bool) -> Bool {
+        return target.mayBeSharedMutableValueExpression(orType: orType)
+    }
+
+    override var children: [KotlinSyntaxNode] {
+        return [target]
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        output.append(target, indentation: indentation).append(isForcedUnwrap ? "!!" : "?")
+    }
+}
+
 class KotlinPrefixOperator: KotlinExpression {
     var operatorSymbol: String
     var target: KotlinExpression
@@ -1000,7 +1029,7 @@ class KotlinSubscript: KotlinExpression {
     }
 
     override func mayBeSharedMutableValueExpression(orType: Bool) -> Bool {
-        return true
+        return mayBeSharedMutableValue
     }
 
     override var children: [KotlinSyntaxNode] {
@@ -1008,7 +1037,14 @@ class KotlinSubscript: KotlinExpression {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
-        output.append(base, indentation: indentation).append("[")
+        output.append(base, indentation: indentation)
+        // Kotlin can't optional chain a subscript, i.e. a?[0]
+        let isOptionalChain = (base as? KotlinPostfixOptionalOperator)?.isForcedUnwrap == false
+        if isOptionalChain {
+            output.append(".get(")
+        } else {
+            output.append("[")
+        }
         for (index, argument) in arguments.enumerated() {
             if let label = argument.label {
                 output.append(label).append(" = ")
@@ -1018,7 +1054,7 @@ class KotlinSubscript: KotlinExpression {
                 output.append(", ")
             }
         }
-        output.append("]")
+        output.append(isOptionalChain ? ")" : "]")
     }
 }
 

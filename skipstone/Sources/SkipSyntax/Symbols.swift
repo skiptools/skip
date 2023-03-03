@@ -120,6 +120,7 @@ public class Symbols {
 
         /// Return the type of the given member.
         func identifierSignature(of member: String, in type: TypeSignature) -> TypeSignature {
+            let type = type.asOptional(false)
             if case .tuple(let labels, let types) = type {
                 for (index, label) in labels.enumerated() {
                     if member == label || member == "\(index)" {
@@ -141,6 +142,7 @@ public class Symbols {
 
         /// Return the signatures of the possible member functions being called with the given arguments.
         func functionSignature(of name: String, in type: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
+            let type = type.asOptional(false)
             if case .tuple(let labels, let types) = type {
                 for (index, label) in labels.enumerated() {
                     if name == label || name == "\(index)" {
@@ -190,6 +192,7 @@ public class Symbols {
 
         /// Return the signatures of the possible subscripts being called with the given arguments.
         func subscriptSignature(in type: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
+            let type = type.asOptional(false)
             if case .array(let elementType) = type, arguments.count == 1 {
                 return [.function([TypeSignature.Parameter(type: .int)], elementType)]
             } else if case .dictionary(let keyType, let valueType) = type, arguments.count == 1 {
@@ -692,8 +695,12 @@ struct Symbol {
 
             switch s[i] {
             case "[":
-                inBraces = true
-                let (type, endIndex) = typeSignature(for: s, startIndex: i + 1, specialFragments: specialFragments, symbols: symbols)
+                // If we're already in braces, evaluate as a braced type. Otherwise record that we're now in braces and evaluate content
+                if !inBraces {
+                    inBraces = true
+                    i += 1
+                }
+                let (type, endIndex) = typeSignature(for: s, startIndex: i, specialFragments: specialFragments, symbols: symbols)
                 if let type {
                     types.append(type)
                 }

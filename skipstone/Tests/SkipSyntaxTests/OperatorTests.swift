@@ -89,6 +89,84 @@ final class OperatorTests: XCTestCase {
         }
         """)
     }
+
+    func testForceUnwrap() async throws {
+        try await check(symbols: symbols, swift: """
+        {
+            let host: OperatorTestsOptionalHost? = nil
+            let i = host!.i + 1
+            let b = host!.i == .myZero
+        }
+        """, kotlin: """
+        {
+            val host: OperatorTestsOptionalHost? = null
+            val i = host!!.i + 1
+            val b = host!!.i == Int.myZero
+        }
+        """)
+
+        try await check(symbols: symbols, swift: """
+        {
+            let a: [Int]? = nil
+            let b = a![0] == .myZero
+        }
+        """, kotlin: """
+        {
+            val a: Array<Int>? = null
+            val b = a!![0] == Int.myZero
+        }
+        """)
+
+        try await check(symbols: symbols, swift: """
+        {
+            let a: [OperatorTestsOptionalHost?] = []
+            let b = a[0]!.i == .myZero
+        }
+        """, kotlin: """
+        {
+            val a: Array<OperatorTestsOptionalHost?> = arrayOf()
+            val b = a[0]!!.i == Int.myZero
+        }
+        """)
+    }
+
+    func testForceOptionalChaining() async throws {
+        try await check(symbols: symbols, swift: """
+        {
+            let host: OperatorTestsOptionalHost? = nil
+            let b = host?.i == .myZero
+        }
+        """, kotlin: """
+        {
+            val host: OperatorTestsOptionalHost? = null
+            val b = host?.i == Int.myZero
+        }
+        """)
+
+        try await check(symbols: symbols, swift: """
+        {
+            let a: [Int]? = nil
+            let b = a?[0] == .myZero
+        }
+        """, kotlin: """
+        {
+            val a: Array<Int>? = null
+            val b = a?.get(0) == Int.myZero
+        }
+        """)
+
+        try await check(symbols: symbols, swift: """
+        {
+            let a: [OperatorTestsOptionalHost?] = []
+            let b = a[0]?.i == .myZero
+        }
+        """, kotlin: """
+        {
+            val a: Array<OperatorTestsOptionalHost?> = arrayOf()
+            val b = a[0]?.i == Int.myZero
+        }
+        """)
+    }
 }
 
 private extension Bool {
@@ -107,4 +185,8 @@ private extension Double {
     static var myZero: Double {
         return 0.0
     }
+}
+
+private class OperatorTestsOptionalHost {
+    var i = 0
 }

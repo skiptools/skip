@@ -123,6 +123,7 @@ struct TypeInferenceContext {
 
     /// Return the type of the given member.
     func member(_ name: String, in type: TypeSignature) -> TypeSignature {
+        let type = type.asOptional(false)
         if case .tuple(let labels, let types) = type {
             if let labelIndex = labels.firstIndex(of: name) {
                 return types[labelIndex]
@@ -146,6 +147,7 @@ struct TypeInferenceContext {
         guard let symbols else {
             return []
         }
+        let type = type?.asOptional(false)
         if let type {
             return symbols.functionSignature(of: name, in: type, arguments: parameters)
         }
@@ -170,7 +172,7 @@ struct TypeInferenceContext {
         guard let symbols else {
             return []
         }
-        return symbols.subscriptSignature(in: type, arguments: parameters)
+        return symbols.subscriptSignature(in: type.asOptional(false), arguments: parameters)
     }
 
     /// For an operation on two types, return the probable result type.

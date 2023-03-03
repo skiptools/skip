@@ -98,6 +98,24 @@ final class TypeInferenceTests: XCTestCase {
         """)
     }
 
+    func testDictionaries() async throws {
+        try await check(symbols: symbols, swift: """
+        {
+            let holder = DictionaryHolder()
+            holder.dictionaryOfDictionaries["a"] = ["a": 1, "b": 2, "c": 3]
+            let b = holder.dictionaryOfDictionaries.count == .myZero
+            let b2 = holder.dictionaryOfDictionaries["a"]!["b"] == .myZero
+        }
+        """, kotlin: """
+        {
+            val holder = DictionaryHolder()
+            holder.dictionaryOfDictionaries["a"] = dictionaryOf(Pair("a", 1), Pair("b", 2), Pair("c", 3))
+            val b = holder.dictionaryOfDictionaries.count == Int.myZero
+            val b2 = holder.dictionaryOfDictionaries["a"]!!["b"] == Int.myZero
+        }
+        """)
+    }
+
     func testInit() async throws {
         XCTExpectFailure()
         XCTFail("TODO: Test using .init to call constructors")
@@ -165,5 +183,20 @@ func typeInferenceTestsArrayReturnFunc() -> [String] {
 private extension Int {
     static var myZero: Int {
         return 0
+    }
+}
+
+private class DictionaryHolder {
+    var dictionary: [String: Int] = [:] {
+        didSet {
+            dictionarySetCount += 1
+        }
+    }
+    var dictionarySetCount = 0
+
+    var dictionaryOfDictionaries: [String: [String: Int]] = [:] {
+        didSet {
+            dictionarySetCount += 1
+        }
     }
 }
