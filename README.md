@@ -7,7 +7,7 @@ The `skip` plug-in for Swift Package Manager (SPM) 5.7+ transpiles Swift into Ko
 Add the following line at the bottom of your `Package.swift` file:
 
 ```swift
-package.dependencies += [.package(url: "https://github.com/skiptools/skip.git", from: "0.0.33")]
+package.dependencies += [.package(url: "https://github.com/skiptools/skip.git", from: "0.0.34")]
 ```
 
 Then run:
