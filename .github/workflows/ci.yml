@@ -1,0 +1,22 @@
+name: skip ci
+
+on:
+  push:
+    branches: [ main ]
+  schedule:
+    # run at 9AM & 9PM UTC
+    - cron:  '0 9,21 * * *'
+
+jobs:
+  tool:
+    runs-on: macos-latest
+    steps:
+      - name: Check Tool
+        run: |
+          mkdir /tmp/DemoLib
+          cd /tmp/DemoLib
+          swift package init
+          swift test
+          echo 'package.dependencies += [.package(url: "https://github.com/skiptools/skip.git", from: "0.0.0")]' >> Package.swift
+          swift package --disable-sandbox --allow-writing-to-package-directory skip -version
+
