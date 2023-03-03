@@ -2,6 +2,28 @@ import Foundation
 import SkipSyntax
 import SwiftParser
 import SwiftSyntax
+import ArgumentParser
+import SkipBuild
+
+/// The current versio of the tool
+public let skipVersion = "0.0.32"
+
+struct MyCommand: ParsableCommand {
+    static var configuration = CommandConfiguration(
+        commandName: "mycommand",
+        abstract: "My command-line tool",
+        subcommands: [Subcommand.self])
+
+    struct Subcommand: ParsableCommand {
+        static var configuration = CommandConfiguration(
+            commandName: "subcommand",
+            abstract: "A subcommand")
+
+        func run() throws {
+            // Do something
+        }
+    }
+}
 
 /// Command-line runner for the transpiler.
 @main public struct Runner {
@@ -25,6 +47,8 @@ import SwiftSyntax
         for argument in arguments {
             if argument == "-skippy" {
                 action = SkippyAction()
+            } else if argument == "-version" {
+                action = PrintVersionAction()
             } else if argument == "-swiftAST" {
                 action = PrintSwiftASTAction()
             } else if argument == "-skipAST" {
@@ -42,6 +66,11 @@ import SwiftSyntax
                 }
             }
         }
+
+        if action == nil && files.isEmpty {
+            print("skip \(skipVersion): no input files")
+        }
+
         return (action ?? TranspileAction(), options, files)
     }
 }
@@ -71,6 +100,31 @@ private struct TranspileAction: Action {
 
 private struct SkippyAction: Action {
     func perform(on sourceFiles: [Source.File], options: Options) async throws {
+        // running on: [SkipSyntax.Source.File(path: "/opt/src/github/skiptools/Skip/Sources/SkipFoundationKip/Kip.swift")]
+        //print("running on: \(sourceFiles)")
+
+        // the token that signfies this is a skip-source module; e.g., Sources/CrossFoundationKip/Kip.swift acts as a directive to assemble Sources/CrossFoundation/*.swift
+        let kipNameToken = "Kip"
+
+        // the presence of a "Kip.swift" file in a folder named "SomeModuleKip" means we want to transpile the "SomeModule" module
+        if let kipFile = sourceFiles.first(where: { $0.name == kipNameToken + ".swift" }),
+           let kipFolderURL = URL(fileURLWithPath: kipFile.path, isDirectory: false).deletingLastPathComponent() as URL?,
+           kipFolderURL.path.hasSuffix(kipNameToken)  {
+            let output = options.outputDirectory ?? NSTemporaryDirectory()
+
+            let moduleName = String(kipFolderURL.lastPathComponent.dropLast(kipNameToken.count))
+
+            do {
+                let baseURL = URL(fileURLWithPath: kipFile.path, isDirectory: false)
+                    .deletingLastPathComponent() // /opt/src/skipsource/Skip/Sources/SkipFoundationKip
+                    .deletingLastPathComponent() // /opt/src/skipsource/Skip/Sources
+                    .deletingLastPathComponent() // /opt/src/skipsource/Skip
+
+                // TODO: handle tests vs. sources?
+                let (root, files) = try await SkipAssembler.assemble(root: baseURL, moduleRootPath: "modules", sourceFolder: "Sources", testsFolder: nil, targets: SkipTargetSet(GradleTarget.lib(moduleName)), destRoot: "\(output)/skip/out/\(moduleName)/")
+            } catch {
+            }
+        } else {
         for sourceFile in sourceFiles {
             let source = try Source(file: sourceFile)
             let syntaxTree = SyntaxTree(source: source, preprocessorSymbols: Set(options.preprocessorSymbols))
@@ -82,6 +136,7 @@ private struct SkippyAction: Action {
                 let outputFileURL = outputFileURL(for: sourceFile, in: URL(fileURLWithPath: outputDir))
                 try "".write(to: outputFileURL, atomically: false, encoding: .utf8)
             }
+        }
         }
     }
 
@@ -114,5 +169,11 @@ private struct PrintSkipASTAction: Action {
             let syntaxTree = SyntaxTree(source: source, preprocessorSymbols: Set(options.preprocessorSymbols))
             print(syntaxTree.prettyPrintTree)
         }
+    }
+}
+
+private struct PrintVersionAction: Action {
+    func perform(on sourceFiles: [Source.File], options: Options) async throws {
+        print("skip version \(skipVersion)")
     }
 }

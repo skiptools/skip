@@ -51,10 +51,9 @@ public struct SkipAssembler {
             let failureReason: String? = "Android Studio not found; install from: https://developer.android.com/studio/"
         }
 #if canImport(Cocoa)
-        guard let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
-            throw BundleIDNotFound()
-        }
-        return appURL
+        // urlForApplication can fail in sandboxed environments, so we can fall back to just checking the hardcoded location
+        let appLocation = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) ?? URL(fileURLWithPath: "/Applications/Android Studio.app", isDirectory: true)
+        return appLocation
 #else
         // TODO: figure out how to find studio in Linux
         throw BundleIDNotFound()
@@ -245,6 +244,11 @@ public struct SkipAssembler {
                 (false, moduleKotlinSourceRoot, moduleSwiftSourceRoot, moduleKotlinSourceResourcesRoot),
                 (true, moduleKotlinTestRoot, moduleSwiftTestRoot, moduleKotlinTestResourcesRoot),
             ] {
+                if testCase == true && moduleSwiftTestRoot == nil {
+                    // only process tests if we have specified a test root
+                    continue
+                }
+
                 // the sources we have scanned, which will all be transpiled together
                 var swiftSources: Set<URL> = []
                 var kotlinSources: Set<URL> = []
@@ -293,14 +297,14 @@ public struct SkipAssembler {
 
                     let tp = Transpiler(sourceFiles: sources, packageName: packageName, symbols: symbols)
                     try await tp.transpile { transpilation in
-                        logger.trace("transpilation: \(transpilation.output.content)")
+                        //logger.trace("transpilation: \(transpilation.output.content)")
                         guard let sourceURL = sourceURLs[transpilation.sourceFile.path]?.first?.url else {
                             fatalError("missing source URL for path")
                         }
                         let destPath = URL(fileURLWithPath: sourceURL.relativePath, isDirectory: false, relativeTo: kotlinRoot)
                             .deletingPathExtension()
                             .appendingPathExtension("kt")
-                        logger.debug("transpiling: \(sourceURL.relativePath) to: \(destPath.path)")
+                        logger.debug("transpiling: \(sourceURL.relativePath) to \(sourceURL.pathRelative(to: destPath ) ?? destPath.path)")
                         try fm.createDirectory(at: destPath.deletingLastPathComponent(), withIntermediateDirectories: true)
                         let kotlin = transpilation.output.content
 
@@ -340,26 +344,100 @@ public struct SkipAssembler {
                 // link over resource files
                 try await linkSourceFiles(sources: resourceFiles, assets: true)
 
-                func synthesizeBundleModule() throws {
-                    let src = """
-                    package \(packageName)
+                if !isSkipKotlinModule { // only foundation and higher have the Bundle class
+                    func synthesizeBundleModule() throws {
+                        let src = """
+                        package \(packageName)
 
-                    import skip.foundation.*
+                        import skip.foundation.*
 
-                    public final class \(moduleName)Module {
+                        public final class \(moduleName)Module {
+                        }
+
+                        internal val SkipBundle.Companion.module: Bundle get() = Bundle(rawValue = \(moduleName)Module::class.java as Class<Any>)
+                        """
+
+                        let bundleModuleURL = URL(fileURLWithPath: "BundleModule.kt", isDirectory: false, relativeTo: kotlinRoot)
+                        try write(src, to: bundleModuleURL)
                     }
 
-                    internal val SkipBundle.Companion.module: Bundle get() = Bundle(rawValue = \(moduleName)Module::class.java as Class<Any>)
-                    """
-                    
-                    let bundleModuleURL = URL(fileURLWithPath: "BundleModule.kt", isDirectory: false, relativeTo: kotlinRoot)
-                    try write(src, to: bundleModuleURL)
-                }
-
-                if !isSkipKotlinModule { // only foundation and higher have the Bundle class
                     //if !resourceFiles.isEmpty { // always synthesize?
                     try synthesizeBundleModule()
                     //}
+                }
+
+                // when compiling test cases, always output a test helper to help converting XCTest to JUnit
+                if testCase == true {
+                    func synthesizeTestHelper() throws {
+                        let src = """
+                        package \(packageName)
+
+                        import org.junit.Test
+                        import org.junit.Assert
+
+                        // Mimics the API of XCTest for a JUnit test
+                        // Behavior difference: JUnit assert* thows an exception, but XCTAssert* just reports the failure and continues
+                        interface XCTestCase {
+                            fun XCTFail() = Assert.fail()
+
+                            fun XCTFail(msg: String) = Assert.fail(msg)
+
+                            fun <T> XCTUnwrap (ob: T?): T { Assert.assertNotNull(ob); if (ob != null) { return ob }; throw AssertionError() }
+                            fun <T> XCTUnwrap(ob: T?, msg: String): T { Assert.assertNotNull(msg, ob); if (ob != null) { return ob }; throw AssertionError() }
+
+                            fun XCTAssert(a: Boolean) = Assert.assertTrue(a as Boolean)
+                            fun XCTAssertTrue(a: Boolean) = Assert.assertTrue(a as Boolean)
+                            fun XCTAssertTrue(a: Boolean, msg: String) = Assert.assertTrue(msg, a)
+                            fun XCTAssertFalse(a: Boolean) = Assert.assertFalse(a)
+                            fun XCTAssertFalse(a: Boolean, msg: String) = Assert.assertFalse(msg, a)
+
+                            fun XCTAssertNil(a: Any?) = Assert.assertNull(a)
+                            fun XCTAssertNil(a: Any?, msg: String) = Assert.assertNull(msg, a)
+                            fun XCTAssertNotNil(a: Any?) = Assert.assertNotNull(a)
+                            fun XCTAssertNotNil(a: Any?, msg: String) = Assert.assertNotNull(msg, a)
+
+                            fun XCTAssertIdentical(a: Any?, b: Any?) = Assert.assertSame(b, a)
+                            fun XCTAssertIdentical(a: Any?, b: Any?, msg: String) = Assert.assertSame(msg, b, a)
+                            fun XCTAssertNotIdentical(a: Any?, b: Any?) = Assert.assertNotSame(b, a)
+                            fun XCTAssertNotIdentical(a: Any?, b: Any?, msg: String) = Assert.assertNotSame(msg, b, a)
+
+                            fun XCTAssertEqual(a: Any?, b: Any?) = Assert.assertEquals(b, a)
+                            fun XCTAssertEqual(a: Any?, b: Any?, msg: String) = Assert.assertEquals(msg, b, a)
+                            fun XCTAssertNotEqual(a: Any?, b: Any?) = Assert.assertNotEquals(b, a)
+                            fun XCTAssertNotEqual(a: Any?, b: Any?, msg: String) = Assert.assertNotEquals(msg, b, a)
+
+                            // additional overloads needed for XCTAssert*() which have different signatures on Linux (@autoclosures) than on Darwin platforms (direct values)
+
+                            fun XCTUnwrap(ob: () -> Any?) = { val x = ob(); Assert.assertNotNull(x); x }
+                            fun XCTUnwrap(ob: () -> Any?, msg: () -> String) = { val x = ob(); Assert.assertNotNull(msg(), x); x }
+
+                            fun XCTAssertTrue(a: () -> Boolean) = Assert.assertTrue(a())
+                            fun XCTAssertTrue(a: () -> Boolean, msg: () -> String) = Assert.assertTrue(msg(), a())
+                            fun XCTAssertFalse(a: () -> Boolean) = Assert.assertFalse(a())
+                            fun XCTAssertFalse(a: () -> Boolean, msg: () -> String) = Assert.assertFalse(msg(), a())
+
+                            fun XCTAssertNil(a: () -> Any?) = Assert.assertNull(a())
+                            fun XCTAssertNil(a: () -> Any?, msg: () -> String) = Assert.assertNull(msg(), a())
+                            fun XCTAssertNotNil(a: () -> Any?) = Assert.assertNotNull(a())
+                            fun XCTAssertNotNil(a: () -> Any?, msg: () -> String) = Assert.assertNotNull(msg(), a())
+
+                            fun XCTAssertIdentical(a: () -> Any?, b: () -> Any?) = Assert.assertSame(a(), b())
+                            fun XCTAssertIdentical(a: () -> Any?, b: () -> Any?, msg: () -> String) = Assert.assertSame(msg(), a(), b())
+                            fun XCTAssertNotIdentical(a: () -> Any?, b: () -> Any?) = Assert.assertNotSame(a(), b())
+                            fun XCTAssertNotIdentical(a: () -> Any?, b: () -> Any?, msg: () -> String) = Assert.assertNotSame(msg(), a(), b())
+
+                            fun XCTAssertEqual(a: () -> Any?, b: () -> Any?) = Assert.assertEquals(a(), b())
+                            fun XCTAssertEqual(a: () -> Any?, b: () -> Any?, msg: () -> String) = Assert.assertEquals(msg(), a(), b())
+                            fun XCTAssertNotEqual(a: () -> Any?, b: () -> Any?) = Assert.assertNotEquals(a(), b())
+                            fun XCTAssertNotEqual(a: () -> Any?, b: () -> Any?, msg: () -> String) = Assert.assertNotEquals(msg(), a(), b())
+                        }
+                        """
+
+                        let bundleModuleURL = URL(fileURLWithPath: "XCTestHelpers.kt", isDirectory: false, relativeTo: kotlinRoot)
+                        try write(src, to: bundleModuleURL)
+                    }
+
+                    try synthesizeTestHelper()
                 }
 
                 // finally, copy over the build files, overriding the generated ones
@@ -414,12 +492,6 @@ public struct SkipAssembler {
                     @org.robolectric.annotation.Config(manifest=org.robolectric.annotation.Config.NONE)
                     internal class
                     """)
-
-                    // only add the conversions to a SkipTranspilerTestCase test case subclass
-                    // this allows us to just have the conversions in a single generated file
-                    if kotlin.contains("SkipTranspilerTestCase") {
-                        kotlin += XCTestJunitConversions
-                    }
                 }
 
                 kotlin = """
@@ -591,7 +663,9 @@ public struct SkipAssembler {
             val composeUIVersion by extra { "\(composeUIVersion)" }
             val composeNavVersion by extra { "\(composeNavVersion)" }
 
+            buildDir = File(".build")
             subprojects {
+                buildDir = File(".build")
                 repositories {
                     google()
                     mavenCentral()
@@ -698,9 +772,10 @@ public struct SkipAssembler {
                     try write(gradlePropertiesContents, to: gradleWrapperProps)
 
                     // finally create the idiomatic `gradelw` root script, but one which just uses the installed Android Studio's JBR (https://github.com/JetBrains/JetBrainsRuntime) java to run gradle
+                    // we could alternatively just use this to dynamically discover alternative install: $(mdfind "kMDItemCFBundleIdentifier == '\(studioID)'" | head -n 1)
                     let gradlewContents = """
                     #!/bin/bash
-                    ${JAVA_HOME:-"$(mdfind "kMDItemCFBundleIdentifier == '\(studioID)'" | head -n 1)/Contents/jbr/Contents/Home"}/bin/java ${JAVA_OPTS} ${GRADLE_OPTS} -classpath "$(dirname "${0}")/gradle/wrapper/gradle-wrapper.jar":"${CLASSPATH}" org.gradle.wrapper.GradleWrapperMain ${@}
+                    ${JAVA_HOME:-"/Applications/Android Studio.app/Contents/jbr/Contents/Home"}/bin/java ${JAVA_OPTS} ${GRADLE_OPTS} -classpath "$(dirname "${0}")/gradle/wrapper/gradle-wrapper.jar":"${CLASSPATH}" org.gradle.wrapper.GradleWrapperMain ${@}
                     """
 
                     try write(gradlewContents, to: gradlew)
@@ -724,7 +799,8 @@ extension URL {
     /// Otherwise, it assumes SPM's standard ".build" folder relative to the working directory.
     public static var moduleBuildFolder: URL {
         // if we are running tests from Xcode, this environment variable should be set; otherwise, assume the .build folder for an SPM build
-        let xcodeBuildFolder = ProcessInfo.processInfo.environment["__XCODE_BUILT_PRODUCTS_DIR_PATHS"] // also seems to be __XPC_DYLD_LIBRARY_PATH or __XPC_DYLD_FRAMEWORK_PATH; this will be something like ~/Library/Developer/Xcode/DerivedData/MODULENAME-bsjbchzxfwcrveckielnbyhybwdr/Build/Products/Debug
+        let xcodeBuildFolder = ProcessInfo.processInfo.environment["__XCODE_BUILT_PRODUCTS_DIR_PATHS"] ?? ProcessInfo.processInfo.environment["BUILT_PRODUCTS_DIR"] // also seems to be __XPC_DYLD_LIBRARY_PATH or __XPC_DYLD_FRAMEWORK_PATH; this will be something like ~/Library/Developer/Xcode/DerivedData/MODULENAME-bsjbchzxfwcrveckielnbyhybwdr/Build/Products/Debug
+
 
 #if DEBUG
         let swiftBuildFolder = ".build/debug"
@@ -898,7 +974,7 @@ public actor System {
 
     /// Executes the given process, sending lines to `outputHandler` and waiting for a non-zero exit code.
     public static func exec(_ executableURL: URL = URL(fileURLWithPath: "/usr/bin/env", isDirectory: false), arguments: [String], environment: [String: String]? = nil, workingDirectory: URL? = nil, outputHandler: (String) async throws -> ()) async throws {
-        logger.info("exec: \(arguments.joined(separator: " "))")
+        logger.info("exec: \(executableURL.path) \(arguments.joined(separator: " "))")
         let process = System(executableURL: executableURL, arguments: arguments, environment: environment, workingDirectory: workingDirectory)
         try await process.run()
         let outLines = await process.stdout.lines
@@ -962,70 +1038,4 @@ extension Pipe {
         (String(data: try readData() ?? Data(), encoding: .utf8) ?? "").trimmingCharacters(in: trim ? .whitespacesAndNewlines : .init())
     }
 }
-
-/// The pass-through `XCTAssert*` functions that are converted to their JUnit `Assert.*` equivalents.
-private let XCTestJunitConversions = """
-
-// Mimics the API of XCTest for a JUnit test
-// Behavior difference: JUnit assert* thows an exception, but XCTAssert* just reports the failure and continues
-
-typealias SkipTranspilerTestCase = XCTestCase
-
-interface XCTestCase {
-    fun XCTFail() = Assert.fail()
-
-    fun XCTFail(msg: String) = Assert.fail(msg)
-
-    fun <T> XCTUnwrap (ob: T?): T { Assert.assertNotNull(ob); if (ob != null) { return ob }; throw AssertionError() }
-    fun <T> XCTUnwrap(ob: T?, msg: String): T { Assert.assertNotNull(msg, ob); if (ob != null) { return ob }; throw AssertionError() }
-
-    fun XCTAssert(a: Boolean) = Assert.assertTrue(a as Boolean)
-    fun XCTAssertTrue(a: Boolean) = Assert.assertTrue(a as Boolean)
-    fun XCTAssertTrue(a: Boolean, msg: String) = Assert.assertTrue(msg, a)
-    fun XCTAssertFalse(a: Boolean) = Assert.assertFalse(a)
-    fun XCTAssertFalse(a: Boolean, msg: String) = Assert.assertFalse(msg, a)
-
-    fun XCTAssertNil(a: Any?) = Assert.assertNull(a)
-    fun XCTAssertNil(a: Any?, msg: String) = Assert.assertNull(msg, a)
-    fun XCTAssertNotNil(a: Any?) = Assert.assertNotNull(a)
-    fun XCTAssertNotNil(a: Any?, msg: String) = Assert.assertNotNull(msg, a)
-
-    fun XCTAssertIdentical(a: Any?, b: Any?) = Assert.assertSame(b, a)
-    fun XCTAssertIdentical(a: Any?, b: Any?, msg: String) = Assert.assertSame(msg, b, a)
-    fun XCTAssertNotIdentical(a: Any?, b: Any?) = Assert.assertNotSame(b, a)
-    fun XCTAssertNotIdentical(a: Any?, b: Any?, msg: String) = Assert.assertNotSame(msg, b, a)
-
-    fun XCTAssertEqual(a: Any?, b: Any?) = Assert.assertEquals(b, a)
-    fun XCTAssertEqual(a: Any?, b: Any?, msg: String) = Assert.assertEquals(msg, b, a)
-    fun XCTAssertNotEqual(a: Any?, b: Any?) = Assert.assertNotEquals(b, a)
-    fun XCTAssertNotEqual(a: Any?, b: Any?, msg: String) = Assert.assertNotEquals(msg, b, a)
-
-    // additional overloads needed for XCTAssert*() which have different signatures on Linux (@autoclosures) than on Darwin platforms (direct values)
-
-    fun XCTUnwrap(ob: () -> Any?) = { val x = ob(); Assert.assertNotNull(x); x }
-    fun XCTUnwrap(ob: () -> Any?, msg: () -> String) = { val x = ob(); Assert.assertNotNull(msg(), x); x }
-
-    fun XCTAssertTrue(a: () -> Boolean) = Assert.assertTrue(a())
-    fun XCTAssertTrue(a: () -> Boolean, msg: () -> String) = Assert.assertTrue(msg(), a())
-    fun XCTAssertFalse(a: () -> Boolean) = Assert.assertFalse(a())
-    fun XCTAssertFalse(a: () -> Boolean, msg: () -> String) = Assert.assertFalse(msg(), a())
-
-    fun XCTAssertNil(a: () -> Any?) = Assert.assertNull(a())
-    fun XCTAssertNil(a: () -> Any?, msg: () -> String) = Assert.assertNull(msg(), a())
-    fun XCTAssertNotNil(a: () -> Any?) = Assert.assertNotNull(a())
-    fun XCTAssertNotNil(a: () -> Any?, msg: () -> String) = Assert.assertNotNull(msg(), a())
-
-    fun XCTAssertIdentical(a: () -> Any?, b: () -> Any?) = Assert.assertSame(a(), b())
-    fun XCTAssertIdentical(a: () -> Any?, b: () -> Any?, msg: () -> String) = Assert.assertSame(msg(), a(), b())
-    fun XCTAssertNotIdentical(a: () -> Any?, b: () -> Any?) = Assert.assertNotSame(a(), b())
-    fun XCTAssertNotIdentical(a: () -> Any?, b: () -> Any?, msg: () -> String) = Assert.assertNotSame(msg(), a(), b())
-
-    fun XCTAssertEqual(a: () -> Any?, b: () -> Any?) = Assert.assertEquals(a(), b())
-    fun XCTAssertEqual(a: () -> Any?, b: () -> Any?, msg: () -> String) = Assert.assertEquals(msg(), a(), b())
-    fun XCTAssertNotEqual(a: () -> Any?, b: () -> Any?) = Assert.assertNotEquals(a(), b())
-    fun XCTAssertNotEqual(a: () -> Any?, b: () -> Any?, msg: () -> String) = Assert.assertNotEquals(msg(), a(), b())
-}
-
-
-"""
 

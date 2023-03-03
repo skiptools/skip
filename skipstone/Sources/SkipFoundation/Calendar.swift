@@ -7,7 +7,6 @@ public typealias Calendar = SkipCalendar
 public typealias PlatformCalendar = java.util.Calendar
 #endif
 
-
 // SKIP REPLACE: @JvmInline public value class SkipCalendar(val rawValue: PlatformCalendar) { companion object { } }
 public struct SkipCalendar : RawRepresentable {
     public let rawValue: PlatformCalendar

@@ -1,6 +1,7 @@
 #if !SKIP
+import XCTest
 @testable import SkipKotlin
-import SkipUnit
+import SkipBuild
 import SymbolKit
 #endif
 
@@ -18,8 +19,6 @@ final class SkipKotlinTests: XCTestCase {
         let symbolGraph = try XCTUnwrap(symbols)
         XCTAssertEqual(1, symbolGraph.count)
         let graph = try XCTUnwrap(symbolGraph.values.first)
-
-        dump(graph)
 
         let demoStruct = try XCTUnwrap(graph.symbols["s:15SkipKotlinTests10DemoStructV"])
         XCTAssertEqual(["DemoStruct"], demoStruct.pathComponents)

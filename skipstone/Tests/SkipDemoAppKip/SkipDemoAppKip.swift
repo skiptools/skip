@@ -1,12 +1,9 @@
-#if !SKIP
 @testable import SkipFoundation
 import SkipUnit
-#endif
 
 /// This test case will perform run the transpilation tests
-final class TranspiledTests: SkipTranspilerTestCase {
-    #if !SKIP
-    public func testTranspiledTests() async throws {
+final class SkipDemoAppKip: GradleTestRunner {
+    public func testSkipDemoAppKip() async throws {
         try await transpileAndTest(targets: SkipTargetSet(.app("SkipDemoApp"), dependencies: [
             SkipTargetSet(.lib("SkipUI"), dependencies: [
                 SkipTargetSet(.lib("SkipFoundation"), dependencies: [
@@ -20,9 +17,4 @@ final class TranspiledTests: SkipTranspilerTestCase {
             ]),
         ]))
     }
-    #else
-    public func testEmptyTest() {
-        // need at least one test case or else: org.junit.runners.model.InvalidTestClassError
-    }
-    #endif
 }

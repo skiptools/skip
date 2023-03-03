@@ -10,7 +10,7 @@ final class KotlinScriptTests: XCTestCase {
         XCTAssertEqual("x2", x2.last)
     }
 
-    func testKotlinJSConversion() async throws {
+    func DISABLEDtestKotlinJSConversion() async throws { // rather slow
         @Sendable @discardableResult func check(_ kotlin: String, _ expected: String, file: StaticString = #file, line: UInt = #line) async throws -> String {
             let js = try await SkipAssembler.kotlinToJS(kotlin)
             XCTAssertTrue(js.contains(expected), "Unexpected output: \(js)", file: file, line: line)

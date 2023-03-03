@@ -7,7 +7,7 @@ fileprivate let logger = Logger(subsystem: "skip", category: "unit")
 fileprivate let gradleLogger = Logger(subsystem: "skip", category: "gradle")
 
 /// The base class for executing a transpiled test case.
-open class SkipTranspilerTestCase : XCTestCase {
+open class GradleTestRunner : XCTestCase {
     /// Whether the fork the tests from the XCTestCase
     public static var testInProcess = true
 
@@ -16,7 +16,7 @@ open class SkipTranspilerTestCase : XCTestCase {
     }
 }
 
-extension SkipTranspilerTestCase {
+extension GradleTestRunner {
     public func transpileAndTest(targets: SkipTargetSet) async throws {
 //        guard let targets = targets else {
 //            struct NoTargetsSpecifiedError : Error { }
@@ -32,17 +32,19 @@ extension SkipTranspilerTestCase {
         #if os(macOS) || os(Linux)
         // turn SomeLibTests.SomeLibTests/ into SomeLibTests/
         let testOutputBase = self.className.split(separator: ".").first ?? .init(self.className)
-        try await SkipAssembler.transpileAndTest(testCase: Self.testInProcess ? self : nil, root: srcRoot, targets: targets, destRoot: "\(SkipAssembler.kipFolderName)/\(testOutputBase)")
+        try await SkipAssembler.assembleAndExecuteGradle(testCase: Self.testInProcess ? self : nil, root: srcRoot, targets: targets, destRoot: "\(SkipAssembler.kipFolderName)/\(testOutputBase)")
         #else
-        throw XCTSkip("skipping transpileAndTest on unsupported platform")
+        throw XCTSkip("skipping assembleAndExecuteGradle on unsupported platform")
         #endif
     }
 }
 
 #if os(macOS) || os(Linux)
 extension SkipAssembler {
-    @discardableResult public static func transpileAndTest(testCase: SkipTranspilerTestCase?, root packageRoot: URL, moduleRootPath: String = "modules", sourceFolder: String = "Sources", testsFolder: String? = "Tests", targets: SkipTargetSet, destRoot: String, overwrite: Bool = true, studioID: String = androidStudioBundleID) async throws -> URL {
+    @discardableResult static func assembleAndExecuteGradle(testCase: GradleTestRunner?, root packageRoot: URL, moduleRootPath: String = "modules", sourceFolder: String = "Sources", testsFolder: String? = "Tests", targets: SkipTargetSet, destRoot: String, verbose: Bool = true, overwrite: Bool = true, studioID: String = androidStudioBundleID) async throws -> URL {
         logger.info("transpiling and testing: \(targets.target.moduleName) from: \(packageRoot.path)")
+
+        let packageSwift = try await System.parsePackageSwift(path: packageRoot)
 
         // transpile and assemble the gradle project in the given destination
         let (destRoot, paths) = try await SkipAssembler.assemble(root: packageRoot, moduleRootPath: moduleRootPath, sourceFolder: sourceFolder, testsFolder: testsFolder, targets: targets, destRoot: destRoot)
@@ -58,8 +60,6 @@ extension SkipAssembler {
             return destRoot // only fork the tests if we have specified a test case
         }
 
-        let verbose = { false }()
-
         logger.debug("exec: \(destRoot.appendingPathComponent("gradlew").path)")
         let args = [
             destRoot.appendingPathComponent("gradlew").path,
@@ -67,17 +67,35 @@ extension SkipAssembler {
             "--console", "plain",
             verbose ? "--info" : nil,
             //"--stacktrace",
-            "--rerun-tasks", // re-run tests
+            "--rerun-tasks", // force Gradle to execute all tasks ignoring up-to-date checks
             "--project-dir", destRoot.path,
             target,
         ].compactMap({ $0 })
 
-        let env = [
-            // if the gradle.properties contains `org.gradle.jvmargs`, then that need to match here otherwise a daemon will be forked regardless of the "--no-daemon" flag
+        let gradleOpts = [
+            // output to a folder that isn't contained in the project itself
+            // "-Dorg.gradle.project.buildDir=/tmp/gradle-build",
+
+            // disable the daemon. In order for this to work, the options must match *exactly* what the daemon would fork,
+            // which seems to be a combination of the settings in the build.gradle.kts (e.g., the max memory that we configure),
+            // as well as some of these openns arguments that don't seem to be documented
             // "GRADLE_OPTS": "-Xmx512m -Dorg.gradle.daemon=false", // otherwise: “To honour the JVM settings for this build a single-use Daemon process will be forked.”
+            // 2023-03-01T22:35:37.611-0500 [INFO] [org.gradle.launcher.daemon.configuration.BuildProcess] Checking if the launcher JVM can be re-used for build. To be re-used, the launcher JVM needs to match the parameters required for the build process: --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.invoke=ALL-UNNAMED --add-opens=java.prefs/java.util.prefs=ALL-UNNAMED --add-opens=java.base/java.nio.charset=ALL-UNNAMED --add-opens=java.base/java.net=ALL-UNNAMED --add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED -Xmx2g -Dfile.encoding=UTF-8 -Duser.country=US -Duser.language=en -Duser.variant
+
+            "-Dorg.gradle.daemon=false",
+            "-Xmx2g",
+            "--add-opens=java.base/java.util=ALL-UNNAMED",
+            "--add-opens=java.base/java.lang=ALL-UNNAMED",
+            "--add-opens=java.base/java.lang.invoke=ALL-UNNAMED",
+            "--add-opens=java.prefs/java.util.prefs=ALL-UNNAMED",
+            "--add-opens=java.base/java.nio.charset=ALL-UNNAMED",
+            "--add-opens=java.base/java.net=ALL-UNNAMED",
+            "--add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED",
+        ]
+        let env = [
+            "GRADLE_OPTS": gradleOpts.joined(separator: " "), // save build artifacts in TMP
             "ANDROID_HOME": ("~/Library/Android/sdk" as NSString).expandingTildeInPath, // the standard install for the SDK
-            // overrides JAVA_HOME
-            // "JAVA_HOME": "/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home",
+            // "JAVA_HOME": "/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home", // override JAVA_HOME
         ]
 
         var issues: [XCTIssue] = []
@@ -89,12 +107,9 @@ extension SkipAssembler {
                 } else if outputLine.hasPrefix("e: ") {
                     gradleLogger.error("\(outputLine)")
                     // breakpoint here to stop on build error
-                } else if outputLine.trimmingCharacters(in: .whitespaces).hasPrefix("java.lang.AssertionError ") {
+                } else if outputLine.trimmingCharacters(in: .whitespaces).hasSuffix(" FAILED") {
                     gradleLogger.error("\(outputLine)")
-                    // breakpoint here to stop on test case assertion
-                } else if outputLine.trimmingCharacters(in: .whitespaces).hasPrefix("org.junit.ComparisonFailure ") {
-                    gradleLogger.error("\(outputLine)")
-                    // breakpoint here to stop on test case comparison error
+                    // breakpoint here to stop on test case failure
                 } else {
                     gradleLogger.debug("\(outputLine)")
                 }
@@ -145,7 +160,7 @@ extension XCTestCase {
         if let kotlin = kotlin {
             let tp = Transpiler(sourceFiles: [Source.File(path: srcFile.path)])
             try await tp.transpile { transpilation in
-                logger.debug("transpilation: \(transpilation.output.content)")
+                //logger.debug("transpilation: \(transpilation.output.content)")
                 XCTAssertEqual(kotlin.trimmingCharacters(in: .whitespacesAndNewlines), transpilation.output.content.trimmingCharacters(in: .whitespacesAndNewlines), file: file, line: line)
             }
         }
