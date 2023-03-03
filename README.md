@@ -4,6 +4,16 @@ The `skip` plug-in for Swift Package Manager (SPM) 5.7+ transpiles Swift into Ko
 
 ## Quick Start
 
+Navigate to a folder containing an SPM project with a `Package.swift`,
+or create a new one by opening `Terminal.app` and running:
+
+```shell
+mkdir SomeSwiftLibrary
+cd SomeSwiftLibrary
+swift package init
+```
+
+
 Add the following line at the bottom of your `Package.swift` file:
 
 ```swift
@@ -20,7 +30,7 @@ skip -version
 The `skip` alias can be persisted for future `Terminal.app` shell sessions by running:
 
 ```shell
-echo alias skip="swift package --disable-sandbox --allow-writing-to-package-directory skip" >> ~/.zshrc
+echo 'alias skip="swift package --disable-sandbox --allow-writing-to-package-directory skip"' >> ~/.zprofile
 ```
 
 
@@ -28,7 +38,7 @@ echo alias skip="swift package --disable-sandbox --allow-writing-to-package-dire
 
 ### System requirements
 
-macOS 13+, ARM or Intel.
+macOS 13+ (ARM or Intel).
 
 ### Xcode.app
 
