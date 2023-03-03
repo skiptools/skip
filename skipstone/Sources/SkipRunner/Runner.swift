@@ -6,7 +6,7 @@ import ArgumentParser
 import SkipBuild
 
 /// The current versio of the tool
-public let skipVersion = "0.0.32"
+public let skipVersion = "0.0.33"
 
 struct MyCommand: ParsableCommand {
     static var configuration = CommandConfiguration(
