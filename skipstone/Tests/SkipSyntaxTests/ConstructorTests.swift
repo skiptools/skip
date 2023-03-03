@@ -190,7 +190,7 @@ final class ConstructorTests: XCTestCase {
     }
     
     func testStructMemberwiseConstructors() async throws {
-        try await check(expectFailure: true, swift: """
+        try await check(swift: """
         struct A {
         }
         
