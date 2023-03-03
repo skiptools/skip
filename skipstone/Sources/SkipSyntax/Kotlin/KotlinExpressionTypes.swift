@@ -14,6 +14,7 @@ enum KotlinExpressionType {
     case parenthesized
     case postfixOptionalOperator
     case prefixOperator
+    case sharedExpressionPointer
     case stringLiteral
     case `subscript`
     case `try`

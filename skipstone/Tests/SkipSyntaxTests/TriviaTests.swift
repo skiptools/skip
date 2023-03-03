@@ -8,7 +8,7 @@ final class TriviaTests: XCTestCase {
 
         // Class comment
         // Spanning two lines
-        struct S {
+        class S {
             var s: String // EOL comment
 
             var i: Int
@@ -29,25 +29,20 @@ final class TriviaTests: XCTestCase {
 
         // Class comment
         // Spanning two lines
-        internal class S {
+        internal open class S {
             internal var s: String // EOL comment
 
             internal var i: Int
-            internal fun f(): S {
+            internal open fun f(): S {
                 // Copy
-                var copy = this.valref()
+                var copy = this
                 // Double
                 copy.s = (s + s).valref()
-                return copy.valref()
+                return copy
             }
 
             // Func comment
-            internal fun f2() {
-            }
-
-            internal constructor(s: String, i: Int) {
-                this.s = s
-                this.i = i
+            internal open fun f2() {
             }
 
             companion object {

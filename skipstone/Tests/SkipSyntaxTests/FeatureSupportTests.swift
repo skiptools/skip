@@ -5,14 +5,14 @@ import XCTest
 final class FeatureSupportTests: XCTestCase {
     func testDefaultArgs() async throws {
         try await check(swift: """
-        struct Foo {
+        class Foo {
             public func doSomething(a: String = "abc") -> String {
                 return a
             }
         }
         """, kotlin: """
-        internal class Foo {
-            public fun doSomething(a: String = "abc"): String {
+        internal open class Foo {
+            open fun doSomething(a: String = "abc"): String {
                 return a
             }
 
@@ -25,14 +25,14 @@ final class FeatureSupportTests: XCTestCase {
     func testNilToNull() async throws {
         // "nil" should be translated to null
         try await check(swift: """
-        struct Foo {
+        class Foo {
             public func doSomething() -> String? {
                 nil
             }
         }
         """, kotlin: """
-        internal class Foo {
-            public fun doSomething(): String? {
+        internal open class Foo {
+            open fun doSomething(): String? {
                 return null
             }
 
@@ -45,14 +45,14 @@ final class FeatureSupportTests: XCTestCase {
     func testReturnNil() async throws {
         // "return nil" should be translated to "return null"
         try await check(expectFailure: false, swift: """
-        struct Foo {
+        class Foo {
             public func doSomething() -> String? {
                 return nil
             }
         }
         """, kotlin: """
-        internal class Foo {
-            public fun doSomething(): String? {
+        internal open class Foo {
+            open fun doSomething(): String? {
                 return null
             }
 

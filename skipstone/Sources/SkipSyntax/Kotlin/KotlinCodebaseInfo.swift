@@ -10,6 +10,7 @@ public class KotlinCodebaseInfo {
         self.packageName = packageName
         self.symbols = symbols
         self.plugins = [
+            KotlinStructPlugin(),
             KotlinConstructorPlugin(),
             KotlinIfPlugin(),
             KotlinSwiftUIPlugin()

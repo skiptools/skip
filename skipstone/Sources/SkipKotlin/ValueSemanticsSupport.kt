@@ -2,14 +2,14 @@ package skip.kotlin
 
 interface ValueSemantics {
     fun valcopy(): ValueSemantics
-    var onUpdate: ((Any) -> Unit)?
+    var valupdate: ((Any) -> Unit)?
 }
 
 @Suppress("UNCHECKED_CAST")
 fun <T> T.valref(onUpdate: ((T) -> Unit)? = null): T {
     if (this is ValueSemantics) {
         val copy = valcopy()
-        copy.onUpdate = {
+        copy.valupdate = {
             if (onUpdate != null) {
                 onUpdate(it as T)
             }

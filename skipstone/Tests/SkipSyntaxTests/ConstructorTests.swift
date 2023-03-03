@@ -260,7 +260,7 @@ final class ConstructorTests: XCTestCase {
             internal var i = 100
             internal var s: String
 
-            internal constructor(i: Int = 100, s: String) {
+            constructor(i: Int = 100, s: String) {
                 this.i = i
                 this.s = s
             }
@@ -273,7 +273,7 @@ final class ConstructorTests: XCTestCase {
             internal var i = 100
             private var s: String
 
-            private constructor(i: Int = 100, s: String) {
+            constructor(i: Int = 100, s: String) {
                 this.i = i
                 this.s = s
             }

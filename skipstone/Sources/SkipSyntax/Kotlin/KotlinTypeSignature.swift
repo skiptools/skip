@@ -32,8 +32,6 @@ extension TypeSignature {
             return "Int"
         case .int64:
             return "Long"
-        case .optional(let type):
-            return "\(type.kotlin)?"
         case .member(let baseType, let type):
             return "\(baseType.kotlin).\(type.kotlin)"
         case .metaType(let baseType):
@@ -45,6 +43,13 @@ extension TypeSignature {
             return "\(name)<\(generics.map { $0.kotlin }.joined(separator: ", "))>"
         case .none:
             return description
+        case .optional(let type):
+            switch type {
+            case .function:
+                return "(\(type.kotlin))?"
+            default:
+                return "\(type.kotlin)?"
+            }
         case .range(let elementType):
             switch elementType {
             case .character:

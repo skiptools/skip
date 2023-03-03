@@ -65,3 +65,27 @@ class KotlinRawExpression: KotlinExpression {
         output.append(sourceCode)
     }
 }
+
+/// Special expression type that points to an expression elsewhere in the syntax tree.
+///
+/// - Note: The shared expression is not included as a child, because it will already have a parent.
+class KotlinSharedExpressionPointer: KotlinExpression {
+    let shared: KotlinExpression
+
+    init(shared: KotlinExpression) {
+        self.shared = (shared as? KotlinSharedExpressionPointer)?.shared ?? shared
+        super.init(type: .sharedExpressionPointer)
+    }
+
+    override func mayBeSharedMutableValueExpression(orType: Bool) -> Bool {
+        return shared.mayBeSharedMutableValueExpression(orType: orType)
+    }
+
+    override var isCompoundExpression: Bool {
+        return shared.isCompoundExpression
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        output.append(shared, indentation: indentation)
+    }
+}

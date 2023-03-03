@@ -50,17 +50,17 @@ extension Modifiers {
         case .internal:
             string = "internal"
         case .open:
-            string = "public"
+            string = ""
         case .public:
-            string = "public"
+            string = ""
         case .private:
             string = "private"
         }
         if isOverride {
-            return "\(string) override"
+            return string.isEmpty ? "override" : "\(string) override"
         }
         if isOpen {
-            return "\(string) open"
+            return string.isEmpty ? "open" : "\(string) open"
         }
         return string
     }

@@ -38,4 +38,23 @@ final class TypeDeclarationTests: XCTestCase {
         }
         """)
     }
+
+    func testStruct() async throws {
+        try await check(swift: """
+        struct A {
+        }
+        """, kotlin: """
+        internal class A: ValueSemantics {
+
+            override var valupdate: ((Any) -> Unit)? = null
+
+            override fun valcopy(): ValueSemantics {
+                return A()
+            }
+
+            companion object {
+            }
+        }
+        """)
+    }
 }

@@ -61,7 +61,7 @@ class Dictionary<K, V>: ValueSemantics, Iterable<Pair<K, V>> {
         } else {
             storage[key] = value.valref()
         }
-        onUpdate?.invoke(this)
+        valupdate?.invoke(this)
     }
 
     // TODO: Duplicate Swift's Collection and Sequence types
@@ -85,7 +85,7 @@ class Dictionary<K, V>: ValueSemantics, Iterable<Pair<K, V>> {
         return other.storage == storage
     }
 
-    override var onUpdate: ((Any) -> Unit)? = null
+    override var valupdate: ((Any) -> Unit)? = null
 
     override fun valcopy(): ValueSemantics {
         isStorageShared = true

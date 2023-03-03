@@ -14,9 +14,7 @@ class KotlinConstructorPlugin: KotlinPlugin {
             let constructors = classDeclaration.members.filter { $0.type == .constructorDeclaration }
             var mayNeedSuperclassCall = false
             if constructors.isEmpty {
-                if classDeclaration.declarationType == .structDeclaration {
-                    addMemberwiseConstructor(to: classDeclaration)
-                } else {
+                if classDeclaration.declarationType != .structDeclaration {
                     mayNeedSuperclassCall = !addInheritedConstructors(to: classDeclaration, translator: translator)
                 }
             } else {
@@ -39,51 +37,6 @@ class KotlinConstructorPlugin: KotlinPlugin {
             break
         }
         return .recurse(nil)
-    }
-
-    private func addMemberwiseConstructor(to classDeclaration: KotlinClassDeclaration) {
-        var minimumVisibility = classDeclaration.modifiers.visibility
-        let variableDeclarations = classDeclaration.members.compactMap { (member: KotlinStatement) -> KotlinVariableDeclaration? in
-            guard let variableDeclaration = member as? KotlinVariableDeclaration, !variableDeclaration.isLet, variableDeclaration.getter == nil else {
-                return nil
-            }
-            if variableDeclaration.modifiers.visibility < minimumVisibility {
-                minimumVisibility = variableDeclaration.modifiers.visibility
-            }
-            return variableDeclaration
-        }
-        guard !variableDeclarations.isEmpty else {
-            return
-        }
-
-        let constructor = KotlinFunctionDeclaration(name: "constructor")
-        constructor.parameters = variableDeclarations.map { variableDeclaration in
-            let label = variableDeclaration.names[0]
-            let type = variableDeclaration.variableTypes[0]
-            return Parameter(externalLabel: label, declaredType: type, isVariadic: false, defaultValue: variableDeclaration.value)
-        }
-        constructor.modifiers = classDeclaration.modifiers
-        // Swift generated constructors take on the minimimum visibility of the members being initialized
-        constructor.modifiers.visibility = minimumVisibility
-        constructor.extras = .singleNewline
-
-        let bodyStatements = variableDeclarations.map { variableDeclaration in
-            let selfIdentifier = KotlinIdentifier(name: "self")
-            let memberAccess = KotlinMemberAccess(base: selfIdentifier, member: variableDeclaration.names[0])
-            let paramIdentifier = KotlinIdentifier(name: variableDeclaration.names[0])
-            let assignmentOperator = KotlinBinaryOperator(op: .with(symbol: "="), lhs: memberAccess, rhs: paramIdentifier)
-            let statement = KotlinExpressionStatement(type: .expression)
-            statement.expression = assignmentOperator
-            return statement
-        }
-        constructor.body = KotlinCodeBlock(statements: bodyStatements)
-
-        classDeclaration.members.append(constructor)
-        constructor.parent = classDeclaration
-        // We're intentionally not calling assignParentReferences on the constructor itself, because we may
-        // be sharing parameter default value expressions with variable value expressions. Call on our body directly
-        constructor.body?.parent = constructor
-        constructor.body?.assignParentReferences()
     }
 
     private func addInheritedConstructors(to classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) -> Bool {

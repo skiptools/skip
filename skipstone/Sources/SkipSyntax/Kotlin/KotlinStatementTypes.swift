@@ -421,7 +421,6 @@ class KotlinClassDeclaration: KotlinStatement {
         output.append("\n").append(memberIndentation).append("companion object {\n")
         staticMembers.forEach { output.append($0, indentation: memberIndentation.inc()) }
         output.append(memberIndentation).append("}\n")
-
         output.append(indentation).append("}\n")
     }
 }
@@ -750,6 +749,12 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             kstatement.messages.append(.kotlinAsyncProperties(kstatement))
         }
         return kstatement
+    }
+
+    init(names: [String], variableTypes: [TypeSignature], sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        self.names = names
+        self.variableTypes = variableTypes
+        super.init(type: .variableDeclaration, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
     private init(statement: VariableDeclaration) {

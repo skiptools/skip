@@ -56,13 +56,13 @@ class Array<T>: ValueSemantics, Iterable<T> {
     operator fun set(index: Int, element: T) {
         copyStorageIfNeeded()
         storage[index] = element.valref()
-        onUpdate?.invoke(this)
+        valupdate?.invoke(this)
     }
 
     fun append(element: T) {
         copyStorageIfNeeded()
         storage.add(element.valref())
-        onUpdate?.invoke(this)
+        valupdate?.invoke(this)
     }
 
     val count: Int
@@ -78,7 +78,7 @@ class Array<T>: ValueSemantics, Iterable<T> {
         return other.storage == storage
     }
 
-    override var onUpdate: ((Any) -> Unit)? = null
+    override var valupdate: ((Any) -> Unit)? = null
 
     override fun valcopy(): ValueSemantics {
         isStorageShared = true
