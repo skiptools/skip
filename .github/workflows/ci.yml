@@ -9,7 +9,9 @@ on:
 
 jobs:
   tool:
-    runs-on: macos-13
+    # needs: https://github.com/actions/runner-images/issues/6426
+    #runs-on: macos-13
+    runs-on: macos-12
     steps:
       - name: Check Tool
         run: |
