@@ -23,5 +23,5 @@ let package = Package(
     ]
 )
 
-package.targets += [.binaryTarget(name: "skiptool", url: "https://github.com/skipsource/skip/releases/download/0.0.34/skiptool.artifactbundle.zip", checksum: "82873169bb6ed36cc396fcc71f6805d3902499b583f594a150467a3f937e5620")]
+package.targets += [.binaryTarget(name: "skiptool", url: "https://github.com/skipsource/skip/releases/download/0.0.35/skiptool.artifactbundle.zip", checksum: "5cbe289b6721c556c7920df6d2c7bcdd09762d41fb2fee763c10f801cb6f6b8c")]
 
