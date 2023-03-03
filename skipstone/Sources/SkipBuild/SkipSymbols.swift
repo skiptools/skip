@@ -210,9 +210,9 @@ extension System {
             let modulePath = urlBase.appendingPathComponent(moduleName).appendingPathExtension("swiftmodule")
 
             if !FileManager.default.isReadableFile(atPath: modulePath.path) {
-                // permit missing modules; this is so SkipKotlin does not need to be a swift dependency of other packages
+                // permit missing modules; this is so SkipLib does not need to be a swift dependency of other packages
                 logger.warning("missing module at path: \(modulePath.path)")
-                if modulePath.lastPathComponent != "SkipKotlin.swiftmodule" {
+                if modulePath.lastPathComponent != "SkipLib.swiftmodule" {
                     throw CocoaError(.fileNoSuchFile, userInfo: [NSFilePathErrorKey: modulePath.path])
                 }
                 return [:]
@@ -255,10 +255,10 @@ extension System {
 #error("unsupported platform")
 #endif
         var out: [String] = []
-        //logger.trace("running: \(args.joined(separator: " "))")
+        //logger.trace("xcrun: \(args.joined(separator: " "))")
         do {
             try await exec(runcmd, arguments: args, environment: nil, workingDirectory: nil, outputHandler: { output in
-                logger.trace("xcrun> \(output)")
+                //logger.trace("xcrun> \(output)")
                 out.append(output)
             })
         } catch {

@@ -12,7 +12,7 @@ extension XCTestCase {
 
             let symbolCache = SymbolCache()
             let collector = GraphCollector(extensionGraphAssociationStrategy: .extendingGraph)
-            for entry in try await symbolCache.symbols(for: "SkipKotlin", accessLevel: "public") {
+            for entry in try await symbolCache.symbols(for: "SkipLib", accessLevel: "public") {
                 collector.mergeSymbolGraph(entry.value, at: entry.key)
             }
             for entry in try await symbolCache.symbols(for: "SkipSyntaxTests", accessLevel: "private") {
@@ -37,7 +37,7 @@ extension XCTestCase {
         try await tp.transpile { transpilation in
             //print("transpilation:", transpilation.output)
             var content = transpilation.output.content
-            let autoImportPrefix = "import skip.kotlin."
+            let autoImportPrefix = "import skip.lib."
             content = content.split(separator: "\n", omittingEmptySubsequences: false).filter({ !$0.hasPrefix(autoImportPrefix) }).joined(separator: "\n")
             if expectFailure {
                 XCTExpectFailure()

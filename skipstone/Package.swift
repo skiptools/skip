@@ -12,12 +12,14 @@ let package = Package(
         .library(name: "SkipSyntax", targets: ["SkipSyntax"]),
         .library(name: "SkipBuild", targets: ["SkipBuild"]),
         .library(name: "SkipUnit", targets: ["SkipUnit"]),
-        .library(name: "SkipKotlin", targets: ["SkipKotlin"]),
-        .library(name: "SkipFoundation", targets: ["SkipFoundation"]),
-        .library(name: "SkipUI", targets: ["SkipUI"]),
-        .library(name: "SkipDemoLib", targets: ["SkipDemoLib"]),
-        .library(name: "SkipDemoApp", targets: ["SkipDemoApp"]),
+        .library(name: "SkipLib", targets: ["SkipLib"]),
         .plugin(name: "Skippy", targets: ["Skippy"]),
+
+        .library(name: "CrossFoundation", targets: ["CrossFoundation"]),
+        .library(name: "CrossUI", targets: ["CrossUI"]),
+
+        .library(name: "SampleLib", targets: ["SampleLib"]),
+        .library(name: "SampleApp", targets: ["SampleApp"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-syntax.git", branch: "main"),
@@ -30,33 +32,10 @@ let package = Package(
             .product(name: "SwiftSyntaxParser", package: "swift-syntax"),
             .product(name: "SymbolKit", package: "swift-docc-symbolkit"),
         ]),
-        .testTarget(name: "SkipSyntaxTests", dependencies: ["SkipSyntax", "SkipKotlin", "SkipBuild"]),
+        .testTarget(name: "SkipSyntaxTests", dependencies: ["SkipSyntax", "SkipLib", "SkipBuild"]),
 
         .target(name: "SkipBuild", dependencies: ["SkipSyntax"]),
         .testTarget(name: "SkipBuildTests", dependencies: ["SkipBuild"]),
-
-        .target(name: "SkipUnit", dependencies: ["SkipBuild"]),
-        .testTarget(name: "SkipUnitTests", dependencies: ["SkipUnit"]),
-
-        .target(name: "SkipKotlin", dependencies: []),
-        .testTarget(name: "SkipKotlinTests", dependencies: ["SkipKotlin", "SkipBuild"]),
-        .testTarget(name: "SkipKotlinKip", dependencies: ["SkipKotlin", "SkipUnit"]),
-
-        .target(name: "SkipFoundation", dependencies: ["SkipKotlin"], resources: [.process("Resources")]),
-        .testTarget(name: "SkipFoundationTests", dependencies: ["SkipFoundation"], resources: [.process("Resources")]),
-        .testTarget(name: "SkipFoundationKip", dependencies: ["SkipFoundation", "SkipUnit"]),
-
-        .target(name: "SkipUI", dependencies: ["SkipFoundation"], resources: [.process("Resources")]),
-        .testTarget(name: "SkipUITests", dependencies: ["SkipUI"], resources: [.process("Resources")]),
-        .testTarget(name: "SkipUIKip", dependencies: ["SkipUI", "SkipUnit"]),
-
-        .target(name: "SkipDemoLib", dependencies: ["SkipFoundation"], resources: [.process("Resources")]),
-        .testTarget(name: "SkipDemoLibTests", dependencies: ["SkipDemoLib"], resources: [.process("Resources")]),
-        .testTarget(name: "SkipDemoLibKip", dependencies: ["SkipDemoLib", "SkipUnit"]),
-
-        .target(name: "SkipDemoApp", dependencies: ["SkipDemoLib", "SkipUI"], resources: [.process("Resources")]),
-        .testTarget(name: "SkipDemoAppTests", dependencies: ["SkipDemoApp"], resources: [.process("Resources")]),
-        .testTarget(name: "SkipDemoAppKip", dependencies: ["SkipDemoApp", "SkipUnit"]),
 
         .executableTarget(name: "SkipRunner", dependencies: ["SkipBuild", .product(name: "ArgumentParser", package: "swift-argument-parser")]),
         .testTarget(name: "SkipRunnerTests", dependencies: [], plugins: ["Skippy"]),
@@ -70,5 +49,36 @@ let package = Package(
                         .writeToPackageDirectory(reason: "This command creates kotlin source files")
                     ]),
                 dependencies: ["SkipRunner"]),
+
+
+        .target(name: "SkipUnit", dependencies: ["SkipBuild"]),
+        .testTarget(name: "SkipUnitTests", dependencies: ["SkipUnit"]),
+
+
+        .target(name: "SkipLib"),
+        .target(name: "SkipLibKotlin", dependencies: ["SkipLib"], resources: [.copy("skip.yml")]),
+        .testTarget(name: "SkipLibTests", dependencies: ["SkipLib", "SkipBuild"]),
+        .testTarget(name: "SkipLibKotlinTests", dependencies: ["SkipLibKotlin", "SkipUnit"]),
+
+        .target(name: "CrossFoundation", dependencies: ["SkipLib"], resources: [.process("Resources")]),
+        .target(name: "CrossFoundationKotlin", dependencies: ["CrossFoundation"], resources: [.copy("skip.yml")]),
+        .testTarget(name: "CrossFoundationTests", dependencies: ["CrossFoundation"], resources: [.process("Resources")]),
+        .testTarget(name: "CrossFoundationKotlinTests", dependencies: ["CrossFoundationKotlin", "SkipUnit"]),
+
+        .target(name: "CrossUI", dependencies: ["CrossFoundation"], resources: [.process("Resources")]),
+        .target(name: "CrossUIKotlin", dependencies: ["CrossUI"], resources: [.copy("skip.yml")]),
+        .testTarget(name: "CrossUITests", dependencies: ["CrossUI"], resources: [.process("Resources")]),
+        .testTarget(name: "CrossUIKotlinTests", dependencies: ["CrossUIKotlin", "SkipUnit"]),
+
+        .target(name: "SampleLib", dependencies: ["CrossFoundation"], resources: [.process("Resources")]),
+        .target(name: "SampleLibKotlin", dependencies: ["SampleLib"], resources: [.copy("skip.yml")]),
+        .testTarget(name: "SampleLibTests", dependencies: ["SampleLib"], resources: [.process("Resources")]),
+        .testTarget(name: "SampleLibKotlinTests", dependencies: ["SampleLibKotlin", "SkipUnit"]),
+
+        .target(name: "SampleApp", dependencies: ["SampleLib", "CrossUI"], resources: [.process("Resources")]),
+        .target(name: "SampleAppKotlin", dependencies: ["SampleApp"], resources: [.copy("skip.yml")]),
+        .testTarget(name: "SampleAppTests", dependencies: ["SampleApp"], resources: [.process("Resources")]),
+        .testTarget(name: "SampleAppKotlinTests", dependencies: ["SampleAppKotlin", "SkipUnit"]),
+
     ]
 )

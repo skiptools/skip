@@ -71,8 +71,8 @@ public class KotlinTranslator {
             ]
         }
         let requiredImportStatements = [
-            KotlinRawStatement(sourceCode: "import skip.kotlin.*"),
-            KotlinRawStatement(sourceCode: "import skip.kotlin.Array"), // Override kotlin.Array
+            KotlinRawStatement(sourceCode: "import skip.lib.*"),
+            KotlinRawStatement(sourceCode: "import skip.lib.Array"), // Override kotlin.Array
             KotlinRawStatement(sourceCode: ""),
         ]
         let translatedStatements = syntaxTree.root.statements.flatMap { translateStatement($0) }

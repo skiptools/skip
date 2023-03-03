@@ -1,4 +1,4 @@
-import SkipUI
+import CrossUI
 import SkipDemoApp
 
 @main

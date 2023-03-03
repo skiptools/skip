@@ -38,7 +38,7 @@ public class Symbols {
         fileprivate init(symbols: Symbols, importedModuleNames: Set<String>, sourceFile: Source.File?) {
             self.symbols = symbols
             var importedModuleNames = importedModuleNames
-            importedModuleNames.insert("SkipKotlin") // Contains our supported subset of the Swift builtin module
+            importedModuleNames.insert("SkipLib") // Contains our supported subset of the Swift builtin module
             self.importedModuleNames = importedModuleNames
             self.sourceFile = sourceFile
         }

@@ -41,10 +41,12 @@ extension GradleTestRunner {
 
 #if os(macOS) || os(Linux)
 extension SkipAssembler {
-    @discardableResult static func assembleAndExecuteGradle(testCase: GradleTestRunner?, root packageRoot: URL, moduleRootPath: String = "modules", sourceFolder: String = "Sources", testsFolder: String? = "Tests", targets: SkipTargetSet, destRoot: String, verbose: Bool = true, overwrite: Bool = true, studioID: String = androidStudioBundleID) async throws -> URL {
+    @discardableResult static func assembleAndExecuteGradle(testCase: GradleTestRunner?, root packageRoot: URL, moduleRootPath: String = "Kotlin", sourceFolder: String = "Sources", testsFolder: String? = "Tests", targets: SkipTargetSet, destRoot: String, verbose: Bool = true, overwrite: Bool = true, studioID: String = androidStudioBundleID) async throws -> URL {
         logger.info("transpiling and testing: \(targets.target.moduleName) from: \(packageRoot.path)")
 
         let packageSwift = try await System.parsePackageSwift(path: packageRoot)
+
+        let _ = packageSwift // TODO: use Package.swift to determine local module dependencies
 
         // transpile and assemble the gradle project in the given destination
         let (destRoot, paths) = try await SkipAssembler.assemble(root: packageRoot, moduleRootPath: moduleRootPath, sourceFolder: sourceFolder, testsFolder: testsFolder, targets: targets, destRoot: destRoot)
@@ -116,7 +118,7 @@ extension SkipAssembler {
 
                 try Task.checkCancellation()
 
-                // errors look like: java.lang.AssertionError at SkipFoundationTests.kt:13
+                // errors look like: java.lang.AssertionError at CrossFoundationTests.kt:13
                 let line = outputLine.trimmingCharacters(in: .whitespaces)
                 if line.hasPrefix("java.lang.AssertionError") {
                     if let fileLine = outputLine.components(separatedBy: " at ").last,

@@ -36,7 +36,12 @@ public struct SkipTargetSet {
 
 public struct SkipAssembler {
     /// The output folder name for the kotlin interop project (kip)
+    //#if DEBUG
     public static let kipFolderName = "kip"
+    //#else
+    //// the folder should go in the .build directory for release builds
+    //public static let kipFolderName = ".build/skipped"
+    //#endif
 
     /// The bundle identifier for the Android Studio.app installation
     public static let androidStudioBundleID = "com.google.android.studio"
@@ -187,7 +192,7 @@ public struct SkipAssembler {
             let moduleName = targetSet.target.moduleName
             let symbolGraphs = try await System.extractSymbols(moduleURL, moduleNames: [moduleName])
             for (url, graph) in symbolGraphs {
-                logger.debug("adding symbol graph for: \(url)")
+                logger.debug("adding symbol graph for: \(url.path)")
                 collector.mergeSymbolGraph(graph, at: url)
             }
         }
@@ -199,12 +204,14 @@ public struct SkipAssembler {
             let packageName = KotlinTranslator.packageName(forModule: moduleName)
 
             logger.info("module: \(moduleName) package: \(packageName)")
-            let isSkipKotlinModule = moduleName == "SkipKotlin" // special handling for lowest-level
+            let isSkipLibModule = moduleName == "SkipLib" // special handling for lowest-level
 
             let symbols = Symbols(moduleName: moduleName, graphs: unifiedGraphs)
 
             let moduleSwiftSourceRoot = URL(fileURLWithPath: moduleName, isDirectory: true, relativeTo: sourceRoot)
+            let moduleSwiftKotlinSourceRoot = URL(fileURLWithPath: moduleName + "Kotlin", isDirectory: true, relativeTo: sourceRoot)
             let moduleSwiftTestRoot = testRoot.flatMap({ testRoot in URL(fileURLWithPath: moduleName + "Tests", isDirectory: true, relativeTo: testRoot) })
+            let moduleSwiftKotlinTestRoot = testRoot.flatMap({ testRoot in URL(fileURLWithPath: moduleName + "KotlinTests", isDirectory: true, relativeTo: testRoot) })
 
             try Task.checkCancellation()
 
@@ -240,9 +247,9 @@ public struct SkipAssembler {
 
             logger.info("scanning: \(moduleSwiftSourceRoot.path)")
 
-            for (testCase, kotlinRoot, swiftRoot, assetsRoot) in [
-                (false, moduleKotlinSourceRoot, moduleSwiftSourceRoot, moduleKotlinSourceResourcesRoot),
-                (true, moduleKotlinTestRoot, moduleSwiftTestRoot, moduleKotlinTestResourcesRoot),
+            for (testCase, kotlinRoot, swiftRoot, swiftKotlinRoot, assetsRoot) in [
+                (false, moduleKotlinSourceRoot, moduleSwiftSourceRoot, moduleSwiftKotlinSourceRoot, moduleKotlinSourceResourcesRoot),
+                (true, moduleKotlinTestRoot, moduleSwiftTestRoot, moduleSwiftKotlinTestRoot, moduleKotlinTestResourcesRoot),
             ] {
                 if testCase == true && moduleSwiftTestRoot == nil {
                     // only process tests if we have specified a test root
@@ -267,14 +274,6 @@ public struct SkipAssembler {
 //                        bundleFiles.insert(fileURL)
                     case (_, "swift") where isDir == false:
                         swiftSources.insert(fileURL)
-                    case ("build.gradle.kts", _):
-                        buildFiles.insert(fileURL)
-                    case ("gradle.properties", _):
-                        buildFiles.insert(fileURL)
-                    case ("settings.gradle.kts", _):
-                        buildFiles.insert(fileURL)
-                    case (_, "kt") where isDir == false:
-                        kotlinSources.insert(fileURL)
                     case (_, "strings") where isDir == false:
                         // TODO: translation localized files to …/res/…
                         logger.warning("warning: unhandled strings: \(fileURL.relativePath)")
@@ -286,7 +285,27 @@ public struct SkipAssembler {
                     case (_, _) where isDir == true:
                         break // ignore unrecognized folders
                     default:
-                        logger.warning("warning: unhandled path: \(fileURL.relativePath)")
+                        logger.warning("warning: swift source unhandled path: \(fileURL.relativePath)")
+                        break
+                    }
+                }
+
+                try await swiftKotlinRoot?.walkFileURL { fileURL in
+                    logger.debug("file: \(fileURL.relativePath)")
+                    try Task.checkCancellation()
+
+                    let isDir = try fileURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory
+                    switch (fileURL.lastPathComponent, fileURL.pathExtension) {
+                    case ("build.gradle.kts", _):
+                        buildFiles.insert(fileURL)
+                    case ("gradle.properties", _):
+                        buildFiles.insert(fileURL)
+                    case ("settings.gradle.kts", _):
+                        buildFiles.insert(fileURL)
+                    case (_, "kt") where isDir == false:
+                        kotlinSources.insert(fileURL)
+                    default:
+                        logger.warning("warning: unhandled kotlin source path: \(fileURL.relativePath)")
                         break
                     }
                 }
@@ -344,12 +363,12 @@ public struct SkipAssembler {
                 // link over resource files
                 try await linkSourceFiles(sources: resourceFiles, assets: true)
 
-                if !isSkipKotlinModule { // only foundation and higher have the Bundle class
+                if !isSkipLibModule { // only foundation and higher have the Bundle class
                     func synthesizeBundleModule() throws {
                         let src = """
                         package \(packageName)
 
-                        import skip.foundation.*
+                        import cross.foundation.*
 
                         public final class \(moduleName)Module {
                         }
@@ -620,6 +639,8 @@ public struct SkipAssembler {
 
             let androidManifest = URL(fileURLWithPath: "src/main/AndroidManifest.xml", isDirectory: false, relativeTo: moduleRoot)
 
+            let appName = "SampleApp" // TODO: remove
+
             func createAndroidManifest() throws {
                 let manifestContents = """
                 <?xml version="1.0" encoding="utf-8"?>
@@ -630,7 +651,7 @@ public struct SkipAssembler {
                         android:supportsRtl="true"
                         tools:targetApi="\(targetAndroidSdk)">
                         <activity
-                            android:name=".DemoApp"
+                            android:name=".\(appName)"
                             android:exported="true">
                             <intent-filter>
                                 <action android:name="android.intent.action.MAIN" />
