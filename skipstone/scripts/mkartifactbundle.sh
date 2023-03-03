@@ -108,12 +108,7 @@ gh release -R github.com/skipsource/skip create --notes "" "${SEMVER_NEXT}" ${DI
 sleep 5
 
 # sometimes need to wait briefly for the artifact to become available
-curl --silent --location --fail --head "${ARTIFACT_URL}" 2>&1 > /dev/null || sleep 5
-curl --silent --location --fail --head "${ARTIFACT_URL}" 2>&1 > /dev/null || sleep 5
-curl --silent --location --fail --head "${ARTIFACT_URL}" 2>&1 > /dev/null || sleep 5
-curl --silent --location --fail --head "${ARTIFACT_URL}" 2>&1 > /dev/null || sleep 5
-curl --silent --location --fail --head "${ARTIFACT_URL}" 2>&1 > /dev/null || sleep 5
-
+curl --location --fail --retry 5 --retry-all-errors --retry-max-time 120 -o /dev/null "${ARTIFACT_URL}"
 
 # now jump *back* to the package and make sure we can run the command
 cd -
