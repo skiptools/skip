@@ -29,6 +29,8 @@ jobs:
           # the failure seems to not affect the swift package command, though…
           swift package --disable-sandbox --allow-writing-to-package-directory skip -version
 
-          ./.build/artifacts/skip/skiptool.artifactbundle/skiptool -version
+          # so try to run the tool directly from the cache
+          # when we are on macOS 13 or higher
+          if [ `sw_vers -productVersion | tr '.' '\n' | head -n 1 ` -ge 13 ] ; then ./.build/artifacts/skip/skiptool.artifactbundle/skiptool -version; fi
 
 
