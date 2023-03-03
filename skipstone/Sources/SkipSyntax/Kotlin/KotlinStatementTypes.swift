@@ -15,6 +15,7 @@ enum KotlinStatementType {
     case functionDeclaration
     case importDeclaration
     case interfaceDeclaration
+    case typealiasDeclaration
     case variableDeclaration
 
     // Special statements
@@ -542,11 +543,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if let declaration = extras?.declaration {
             output.append(declaration)
         } else {
-            let modifiersString = modifiers.kotlinMemberString(isOpen: isOpen)
-            output.append(modifiersString)
-            if !modifiersString.isEmpty {
-                output.append(" ")
-            }
+            output.append(modifiers.kotlinMemberString(isOpen: isOpen, suffix: " "))
             if isAsync {
                 output.append("suspend ")
             }
@@ -686,6 +683,33 @@ class KotlinInterfaceDeclaration: KotlinStatement {
     }
 }
 
+class KotlinTypealiasDeclaration: KotlinStatement, KotlinMemberDeclaration {
+    var name: String
+    var modifiers = Modifiers()
+    var aliasedType: TypeSignature
+
+    // KotlinMemberDeclaration
+    var extends: TypeSignature?
+    var isStatic: Bool {
+        return true
+    }
+
+    init(statement: TypealiasDeclaration) {
+        self.name = statement.name
+        self.modifiers = statement.modifiers
+        self.aliasedType = statement.aliasedType
+        super.init(type: .typealiasDeclaration, statement: statement)
+        if statement.owningTypeDeclaration != nil {
+            self.messages.append(.kotlinTypeAliasNested(statement))
+        }
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        output.append(indentation).append(modifiers.kotlinMemberString(isOpen: false, suffix: " "))
+        output.append("typealias ").append(name).append(" = ").append(aliasedType.kotlin).append("\n")
+    }
+}
+
 class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var names: [String]
     var declaredType: TypeSignature = .none
@@ -794,7 +818,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         } else {
             if isProperty || isGlobal {
                 // We can't override stored properties in Swift, so only need to mark open if computed
-                output.append(modifiers.kotlinMemberString(isOpen: isOpen && getter != nil)).append(" ")
+                output.append(modifiers.kotlinMemberString(isOpen: isOpen && getter != nil, suffix: " "))
                 if case .unwrappedOptional = declaredType {
                     output.append("lateinit ")
                 }

@@ -9,6 +9,7 @@ public class KotlinCodebaseInfo {
     public init(packageName: String? = nil, symbols: Symbols? = nil) {
         self.packageName = packageName
         self.symbols = symbols
+        // Idea: Track which plugins we might need when we come across relevant code during initial translation and save traversing the tree for unnecessary plugins
         self.plugins = [
             KotlinStructPlugin(),
             KotlinConstructorPlugin(),

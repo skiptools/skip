@@ -129,7 +129,7 @@ public class KotlinTranslator {
         case .structDeclaration:
             return [KotlinClassDeclaration.translate(statement: statement as! TypeDeclaration, translator: self)]
         case .typealiasDeclaration:
-            break
+            return [KotlinTypealiasDeclaration(statement: statement as! TypealiasDeclaration)]
         case .variableDeclaration:
             return [KotlinVariableDeclaration.translate(statement: statement as! VariableDeclaration, translator: self)]
         case .raw:

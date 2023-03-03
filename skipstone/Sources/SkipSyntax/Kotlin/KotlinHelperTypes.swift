@@ -42,8 +42,8 @@ extension Operator {
 
 extension Modifiers {
     /// Kotlin modifier string for a member.
-    func kotlinMemberString(isOpen: Bool) -> String {
-        let string: String
+    func kotlinMemberString(isOpen: Bool, suffix: String) -> String {
+        var string: String
         switch visibility {
         case .default:
             fallthrough
@@ -57,12 +57,12 @@ extension Modifiers {
             string = "private"
         }
         if isOverride {
-            return string.isEmpty ? "override" : "\(string) override"
+            string = string.isEmpty ? "override" : "\(string) override"
         }
         if isOpen {
-            return string.isEmpty ? "open" : "\(string) open"
+            string = string.isEmpty ? "open" : "\(string) open"
         }
-        return string
+        return string.isEmpty || suffix.isEmpty ? string : "\(string)\(suffix)"
     }
 }
 

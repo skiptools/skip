@@ -57,4 +57,17 @@ final class TypeDeclarationTests: XCTestCase {
         }
         """)
     }
+
+    func testTypealias() async throws {
+        try await check(swift: """
+        private typealias IArray = Array<Bool>
+        """, kotlin: """
+        private typealias IArray = Array<Boolean>
+        """)
+    }
+
+    func testGenerics() async throws {
+        XCTExpectFailure()
+        XCTFail("TODO: Generics in classes, structs, extensions, typealiases. Generic where clauses, etc")
+    }
 }

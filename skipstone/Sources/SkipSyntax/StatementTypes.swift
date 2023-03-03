@@ -82,7 +82,7 @@ enum StatementType: CaseIterable {
         case .structDeclaration:
             return TypeDeclaration.self
         case .typealiasDeclaration:
-            return nil
+            return TypealiasDeclaration.self
         case .variableDeclaration:
             return VariableDeclaration.self
 
@@ -447,7 +447,7 @@ class WhileLoop: Statement {
 class ExtensionDeclaration: TypeDeclaration {
     let extends: TypeSignature
 
-    init(extends: TypeSignature, inherits: [TypeSignature] = [], attributes: Attributes? = nil, modifiers: Modifiers? = nil, members: [Statement] = [], syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(extends: TypeSignature, inherits: [TypeSignature] = [], attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), members: [Statement] = [], syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.extends = extends
         super.init(type: .extensionDeclaration, name: extends.description, qualifiedName: extends.description, inherits: inherits, attributes: attributes, modifiers: modifiers, members: members, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
@@ -483,15 +483,15 @@ class FunctionDeclaration: Statement {
     private(set) var modifiers: Modifiers
     let body: CodeBlock?
 
-    init(type: StatementType, name: String, isOptionalInit: Bool = false, returnType: TypeSignature = .void, parameters: [Parameter<Expression>], isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes? = nil, modifiers: Modifiers? = nil, body: CodeBlock? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(type: StatementType, name: String, isOptionalInit: Bool = false, returnType: TypeSignature = .void, parameters: [Parameter<Expression>], isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), body: CodeBlock? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.name = name
         self.isOptionalInit = isOptionalInit
         self.returnType = returnType
         self.parameters = parameters
         self.isAsync = isAsync
         self.isThrows = isThrows
-        self.attributes = attributes ?? Attributes()
-        self.modifiers = modifiers ?? Modifiers()
+        self.attributes = attributes
+        self.modifiers = modifiers
         self.body = body
         super.init(type: type, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
@@ -616,6 +616,59 @@ class ImportDeclaration: Statement {
 }
 
 // TODO: Generics
+/// `typealias ...`
+class TypealiasDeclaration: Statement {
+    let name: String
+    private(set) var modifiers: Modifiers
+    private(set) var aliasedType: TypeSignature
+    var qualifiedName: String {
+        return _qualifiedName ?? name
+    }
+    private var _qualifiedName: String?
+
+    init(name: String, modifiers: Modifiers = Modifiers(), aliasedType: TypeSignature, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.name = name
+        self.modifiers = modifiers
+        self.aliasedType = aliasedType
+        super.init(type: .typealiasDeclaration, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
+        guard syntax.kind == .typealiasDecl, let typealiasDecl = syntax.as(TypealiasDeclSyntax.self) else {
+            return nil
+        }
+        let name = typealiasDecl.identifier.text
+        let modifiers = Modifiers.for(syntax: typealiasDecl.modifiers)
+        let aliasedType = TypeSignature.for(syntax: typealiasDecl.initializer.value)
+        return [TypealiasDeclaration(name: name, modifiers: modifiers, aliasedType: aliasedType, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
+    }
+
+    override func resolveAttributes() {
+        if _qualifiedName == nil {
+            _qualifiedName = qualifyDeclaredTypeName(name)
+        }
+        aliasedType = aliasedType.qualified(in: self)
+        // Aliases in protocols or extensions inherit the visibility of the protocol or extension
+        if modifiers.visibility == .default {
+            if let owningTypeDeclaration = parent as? TypeDeclaration, (owningTypeDeclaration.type == .protocolDeclaration || owningTypeDeclaration.type == .extensionDeclaration) {
+                modifiers.visibility = owningTypeDeclaration.modifiers.visibility
+            } else {
+                modifiers.visibility = .internal
+            }
+        }
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        var attrs = [PrettyPrintTree(root: name)]
+        if !modifiers.isEmpty {
+            attrs.append(modifiers.prettyPrintTree)
+        }
+        attrs.append(PrettyPrintTree(root: aliasedType.description))
+        return attrs
+    }
+}
+
+// TODO: Generics
 /// `class/struct/enum/protocol Type { ... }`
 class TypeDeclaration: Statement {
     let name: String
@@ -631,12 +684,12 @@ class TypeDeclaration: Statement {
         return TypeSignature.for(name: qualifiedName, genericTypes: [])
     }
 
-    init(type: StatementType, name: String, qualifiedName: String? = nil, inherits: [TypeSignature] = [], attributes: Attributes? = nil, modifiers: Modifiers? = nil, members: [Statement] = [], syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(type: StatementType, name: String, qualifiedName: String? = nil, inherits: [TypeSignature] = [], attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), members: [Statement] = [], syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.name = name
         _qualifiedName = qualifiedName
         self.inherits = inherits
-        self.attributes = attributes ?? Attributes()
-        self.modifiers = modifiers ?? Modifiers()
+        self.attributes = attributes
+        self.modifiers = modifiers
         self.members = members
         super.init(type: type, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
@@ -752,14 +805,14 @@ class VariableDeclaration: Statement {
         return declaredType.or(value?.inferredType ?? .none).tupleTypes(count: names.count)
     }
 
-    init(names: [String], declaredType: TypeSignature = .none, isLet: Bool = false, isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes? = nil, modifiers: Modifiers? = nil, value: Expression?, getter: Accessor<CodeBlock>? = nil, setter: Accessor<CodeBlock>? = nil, willSet: Accessor<CodeBlock>? = nil, didSet: Accessor<CodeBlock>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(names: [String], declaredType: TypeSignature = .none, isLet: Bool = false, isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), value: Expression?, getter: Accessor<CodeBlock>? = nil, setter: Accessor<CodeBlock>? = nil, willSet: Accessor<CodeBlock>? = nil, didSet: Accessor<CodeBlock>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.names = names
         self.declaredType = declaredType
         self.isLet = isLet
         self.isAsync = isAsync
         self.isThrows = isThrows
-        self.attributes = attributes ?? Attributes()
-        self.modifiers = modifiers ?? Modifiers()
+        self.attributes = attributes
+        self.modifiers = modifiers
         self.value = value
         self.getter = getter
         self.setter = setter
@@ -785,7 +838,7 @@ class VariableDeclaration: Statement {
         return statements
     }
 
-    private static func decode(syntax: PatternBindingSyntax, isLet: Bool, attributes: Attributes? = nil, modifiers: Modifiers?, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> Statement {
+    private static func decode(syntax: PatternBindingSyntax, isLet: Bool, attributes: Attributes, modifiers: Modifiers, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> Statement {
         var declaredType: TypeSignature = .none
         if let typeSyntax = syntax.typeAnnotation?.type {
             declaredType = TypeSignature.for(syntax: typeSyntax)
