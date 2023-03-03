@@ -1,5 +1,8 @@
 #!/bin/bash -e
 
+# cannot run unless there are currently no diffs
+git diff --exit-code
+
 CONFIG=release
 #CONFIG=debug
 
@@ -121,11 +124,10 @@ fi
 # finally, jump back and make a corresponding release in the private SwiftSource
 cd -
 
-# TODO: enable once the repo is syncd
-#git add "${RUNNER_PATH}"
-#git commit -m "Release ${SEMVER_NEXT}" "${RUNNER_PATH}"
-#git tag -s -a "${SEMVER_NEXT}" -m "Release ${SEMVER_NEXT}"
-#git push --follow-tags
+git add "${RUNNER_PATH}"
+git commit -m "Release ${SEMVER_NEXT}" "${RUNNER_PATH}"
+git tag -s -a "${SEMVER_NEXT}" -m "Release ${SEMVER_NEXT}"
+git push --follow-tags
 
 # get the new ref after we have pushed to SkipSource
 GITREF="$(git rev-parse HEAD)"
