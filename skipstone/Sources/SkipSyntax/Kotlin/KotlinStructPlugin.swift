@@ -101,7 +101,8 @@ class KotlinStructPlugin: KotlinPlugin {
         constructor.modifiers = Modifiers(visibility: .private)
         constructor.extras = .singleNewline
 
-        let bodyStatements = variableDeclarations.map { variableDeclaration in
+        var bodyStatements: [KotlinStatement] = [KotlinRawStatement(sourceCode: "val copy = copy as \(classDeclaration.name)")]
+        bodyStatements += variableDeclarations.map { variableDeclaration in
             let selfIdentifier = KotlinIdentifier(name: "self")
             let memberAccess = KotlinMemberAccess(base: selfIdentifier, member: variableDeclaration.names[0])
             let copyIdentifier = KotlinIdentifier(name: "copy")

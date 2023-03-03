@@ -542,7 +542,11 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if let declaration = extras?.declaration {
             output.append(declaration)
         } else {
-            output.append(modifiers.kotlinMemberString(isOpen: isOpen)).append(" ")
+            let modifiersString = modifiers.kotlinMemberString(isOpen: isOpen)
+            output.append(modifiersString)
+            if !modifiersString.isEmpty {
+                output.append(" ")
+            }
             if isAsync {
                 output.append("suspend ")
             }
