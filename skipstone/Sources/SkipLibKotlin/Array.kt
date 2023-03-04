@@ -8,7 +8,7 @@ fun <T> arrayOf(vararg elements: T): Array<T> {
     return array
 }
 
-class Array<T>: ValueSemantics, Iterable<T> {
+class Array<T>: MutableStruct, Iterable<T> {
     private var storage: ArrayStorage<T>
     private var isStorageShared = false
 
@@ -42,27 +42,27 @@ class Array<T>: ValueSemantics, Iterable<T> {
                 return storageIterator.hasNext()
             }
             override fun next(): T {
-                return storageIterator.next().valref()
+                return storageIterator.next().sref()
             }
         }
     }
 
     operator fun get(index: Int): T {
-        return storage[index].valref({
+        return storage[index].sref({
             set(index, it)
         })
     }
 
     operator fun set(index: Int, element: T) {
         copyStorageIfNeeded()
-        storage[index] = element.valref()
-        valupdate?.invoke(this)
+        storage[index] = element.sref()
+        supdate?.invoke(this)
     }
 
     fun append(element: T) {
         copyStorageIfNeeded()
-        storage.add(element.valref())
-        valupdate?.invoke(this)
+        storage.add(element.sref())
+        supdate?.invoke(this)
     }
 
     val count: Int
@@ -78,9 +78,9 @@ class Array<T>: ValueSemantics, Iterable<T> {
         return other.storage == storage
     }
 
-    override var valupdate: ((Any) -> Unit)? = null
+    override var supdate: ((Any) -> Unit)? = null
 
-    override fun valcopy(): ValueSemantics {
+    override fun scopy(): MutableStruct {
         isStorageShared = true
         return Array(storage = storage)
     }

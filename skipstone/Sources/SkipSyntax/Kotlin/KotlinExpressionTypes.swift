@@ -59,7 +59,7 @@ class KotlinArrayLiteral: KotlinExpression {
             if (useMultilineFormatting) {
                 output.append("\n").append(elementIndentation)
             }
-            // No need to valref() because the array already does
+            // No need to sref() because the array already does
             output.append(element, indentation: elementIndentation)
             if index != elements.count - 1 {
                 output.append(", ")
@@ -81,7 +81,7 @@ class KotlinBinaryOperator: KotlinExpression {
     static func translate(expression: BinaryOperator, translator: KotlinTranslator) -> KotlinBinaryOperator {
         let klhs = translator.translateExpression(expression.lhs)
         var krhs = translator.translateExpression(expression.rhs)
-        // We need to valref() on assigning to a local var, but members valref() on assignment already.
+        // We need to sref() on assigning to a local var, but members sref() on assignment already.
         // This won't catch implicit members, however (i.e. 'x' in place of 'self.x')
         if expression.op.precedence == .assignment && !(klhs is KotlinMemberDeclaration) {
             krhs = krhs.valueReference()
@@ -318,7 +318,7 @@ class KotlinDictionaryLiteral: KotlinExpression {
     override func append(to output: OutputGenerator, indentation: Indentation) {
         output.append("dictionaryOf(")
         for (index, entry) in entries.enumerated() {
-            // No need to valref() because the dictionary already does
+            // No need to sref() because the dictionary already does
             output.append("Pair(")
             output.append(entry.key, indentation: indentation)
             output.append(", ")
@@ -361,7 +361,7 @@ class KotlinFunctionCall: KotlinExpression {
     }
 
     override func mayBeSharedMutableValueExpression(orType: Bool) -> Bool {
-        // The result of a function call is never a shared value because we always valref() on return
+        // The result of a function call is never a shared value because we always sref() on return
         return orType && mayBeSharedMutableValueType
     }
 
@@ -1196,7 +1196,7 @@ class KotlinValueReference: KotlinExpression {
         } else {
             output.append(base, indentation: indentation)
         }
-        output.append(".valref(")
+        output.append(".sref(")
         if let onUpdate {
             output.append(onUpdate)
         }

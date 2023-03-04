@@ -39,7 +39,7 @@ final class ClosureTests: XCTestCase {
         }
         """, kotlin: """
         call { x ->
-            print(x.valref())
+            print(x.sref())
         }
         """)
 
@@ -61,7 +61,7 @@ final class ClosureTests: XCTestCase {
         }
         """, kotlin: """
         call { x, y ->
-            print(x.valref())
+            print(x.sref())
         }
         """)
 

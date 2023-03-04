@@ -223,11 +223,11 @@ final class ConstructorTests: XCTestCase {
             private var s: String
         }
         """, kotlin: """
-        internal class A: ValueSemantics {
+        internal class A: MutableStruct {
         
-            override var valupdate: ((Any) -> Unit)? = null
+            override var supdate: ((Any) -> Unit)? = null
         
-            override fun valcopy(): ValueSemantics {
+            override fun scopy(): MutableStruct {
                 return A()
             }
         
@@ -235,38 +235,38 @@ final class ConstructorTests: XCTestCase {
             }
         }
         
-        internal class B: ValueSemantics {
+        internal class B: MutableStruct {
             internal var i: Int
         
             internal constructor(i: Int) {
                 this.i = i
             }
         
-            private constructor(copy: ValueSemantics) {
+            private constructor(copy: MutableStruct) {
                 val copy = copy as B
                 this.i = copy.i
             }
         
-            override var valupdate: ((Any) -> Unit)? = null
+            override var supdate: ((Any) -> Unit)? = null
         
-            override fun valcopy(): ValueSemantics {
-                return B(this as ValueSemantics)
+            override fun scopy(): MutableStruct {
+                return B(this as MutableStruct)
             }
         
             companion object {
             }
         }
         
-        internal class C: ValueSemantics {
+        internal class C: MutableStruct {
             internal val i = 100
             internal val s: String
                 get() {
                     return "100"
                 }
         
-            override var valupdate: ((Any) -> Unit)? = null
+            override var supdate: ((Any) -> Unit)? = null
         
-            override fun valcopy(): ValueSemantics {
+            override fun scopy(): MutableStruct {
                 return C()
             }
         
@@ -274,7 +274,7 @@ final class ConstructorTests: XCTestCase {
             }
         }
         
-        internal class D: ValueSemantics {
+        internal class D: MutableStruct {
             internal val letVar = 100
             internal val computedVar: Int
                 get() {
@@ -288,9 +288,9 @@ final class ConstructorTests: XCTestCase {
                 this.s = s
             }
         
-            override var valupdate: ((Any) -> Unit)? = null
+            override var supdate: ((Any) -> Unit)? = null
         
-            override fun valcopy(): ValueSemantics {
+            override fun scopy(): MutableStruct {
                 return D(i, s)
             }
         
@@ -298,7 +298,7 @@ final class ConstructorTests: XCTestCase {
             }
         }
         
-        internal class E: ValueSemantics {
+        internal class E: MutableStruct {
             internal var i = 100
             private var s: String
         
@@ -307,9 +307,9 @@ final class ConstructorTests: XCTestCase {
                 this.s = s
             }
         
-            override var valupdate: ((Any) -> Unit)? = null
+            override var supdate: ((Any) -> Unit)? = null
         
-            override fun valcopy(): ValueSemantics {
+            override fun scopy(): MutableStruct {
                 return E(i, s)
             }
         

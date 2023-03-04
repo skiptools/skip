@@ -80,10 +80,10 @@ final class BuiltinTypeTests: XCTestCase {
         """, kotlin: """
         internal var c: CustomType
             get() {
-                return field.valref({ c = it })
+                return field.sref({ c = it })
             }
             set(newValue) {
-                field = newValue.valref()
+                field = newValue.sref()
             }
         """)
     }
@@ -97,17 +97,17 @@ final class BuiltinTypeTests: XCTestCase {
         internal var i: Int? = null
         internal var c: CustomType? = null
             get() {
-                return field.valref({ c = it })
+                return field.sref({ c = it })
             }
             set(newValue) {
-                field = newValue.valref()
+                field = newValue.sref()
             }
         internal lateinit var u: CustomType
             get() {
-                return field.valref({ u = it })
+                return field.sref({ u = it })
             }
             set(newValue) {
-                field = newValue.valref()
+                field = newValue.sref()
             }
         """)
     }

@@ -8,7 +8,7 @@ fun <K, V> dictionaryOf(vararg entries: Pair<K, V>): Dictionary<K, V> {
     return dictionary
 }
 
-class Dictionary<K, V>: ValueSemantics, Iterable<Pair<K, V>> {
+class Dictionary<K, V>: MutableStruct, Iterable<Pair<K, V>> {
     private var storage: DictionaryStorage<K, V>
     private var isStorageShared = false
 
@@ -43,13 +43,13 @@ class Dictionary<K, V>: ValueSemantics, Iterable<Pair<K, V>> {
             }
             override fun next(): Pair<K, V> {
                 val entry = storageIterator.next()
-                return Pair(entry.key.valref(), entry.value.valref())
+                return Pair(entry.key.sref(), entry.value.sref())
             }
         }
     }
 
     operator fun get(key: K): V? {
-        return storage[key]?.valref({
+        return storage[key]?.sref({
             set(key, it)
         })
     }
@@ -59,9 +59,9 @@ class Dictionary<K, V>: ValueSemantics, Iterable<Pair<K, V>> {
         if (value == null) {
             storage.remove(key)
         } else {
-            storage[key] = value.valref()
+            storage[key] = value.sref()
         }
-        valupdate?.invoke(this)
+        supdate?.invoke(this)
     }
 
     // TODO: Duplicate Swift's Collection and Sequence types
@@ -85,9 +85,9 @@ class Dictionary<K, V>: ValueSemantics, Iterable<Pair<K, V>> {
         return other.storage == storage
     }
 
-    override var valupdate: ((Any) -> Unit)? = null
+    override var supdate: ((Any) -> Unit)? = null
 
-    override fun valcopy(): ValueSemantics {
+    override fun scopy(): MutableStruct {
         isStorageShared = true
         return Dictionary(storage = storage)
     }

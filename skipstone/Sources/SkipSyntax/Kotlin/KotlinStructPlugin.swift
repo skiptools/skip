@@ -16,32 +16,32 @@ class KotlinStructPlugin: KotlinPlugin {
     }
 
     private func updateStructDeclaration(_ classDeclaration: KotlinClassDeclaration) {
-        classDeclaration.inherits.append(.named("ValueSemantics", []))
+        classDeclaration.inherits.append(.named("MutableStruct", []))
         let hasConstructors = classDeclaration.members.contains { $0.type == .constructorDeclaration }
         let variableDeclarations = initializableMembers(of: classDeclaration)
         if !hasConstructors && !variableDeclarations.isEmpty {
             addMemberwiseConstructor(to: classDeclaration, variableDeclarations: variableDeclarations)
         } else if !variableDeclarations.isEmpty {
-            addValueSemanticsCopyConstructor(to: classDeclaration, variableDeclarations: variableDeclarations)
+            addMutableStructCopyConstructor(to: classDeclaration, variableDeclarations: variableDeclarations)
         }
         // If we generated a memberwise constructor (or have no members and get a default constructor), we can use that to create a copy.
         // Otherwise we generate a copy constructor. In particular, we do not trust any user-written constructor to perform a pure copy
-        addValueSemanticsAPI(to: classDeclaration, variableDeclarations: variableDeclarations, useMemberwiseConstructor: !hasConstructors)
+        addMutableStructAPI(to: classDeclaration, variableDeclarations: variableDeclarations, useMemberwiseConstructor: !hasConstructors)
     }
 
-    private func addValueSemanticsAPI(to classDeclaration: KotlinClassDeclaration, variableDeclarations: [KotlinVariableDeclaration], useMemberwiseConstructor: Bool) {
+    private func addMutableStructAPI(to classDeclaration: KotlinClassDeclaration, variableDeclarations: [KotlinVariableDeclaration], useMemberwiseConstructor: Bool) {
         let declaredType: TypeSignature = .optional(.function([TypeSignature.Parameter(type: .any)], .void))
-        let valupdate = KotlinVariableDeclaration(names: ["valupdate"], variableTypes: [declaredType])
-        valupdate.declaredType = declaredType
-        valupdate.isProperty = true
-        valupdate.modifiers = Modifiers(visibility: .public, isOverride: true)
-        valupdate.extras = .singleNewline
-        classDeclaration.members.append(valupdate)
+        let supdate = KotlinVariableDeclaration(names: ["supdate"], variableTypes: [declaredType])
+        supdate.declaredType = declaredType
+        supdate.isProperty = true
+        supdate.modifiers = Modifiers(visibility: .public, isOverride: true)
+        supdate.extras = .singleNewline
+        classDeclaration.members.append(supdate)
 
-        let valcopy = KotlinFunctionDeclaration(name: "valcopy")
-        valcopy.returnType = .named("ValueSemantics", [])
-        valcopy.modifiers = Modifiers(visibility: .public, isOverride: true)
-        valcopy.extras = .singleNewline
+        let scopy = KotlinFunctionDeclaration(name: "scopy")
+        scopy.returnType = .named("MutableStruct", [])
+        scopy.modifiers = Modifiers(visibility: .public, isOverride: true)
+        scopy.extras = .singleNewline
 
         let constructorCall: KotlinExpression
         if useMemberwiseConstructor {
@@ -53,11 +53,11 @@ class KotlinStructPlugin: KotlinPlugin {
             }
             constructorCall = KotlinFunctionCall(function: initFunction, arguments: arguments)
         } else {
-            constructorCall = KotlinRawExpression(sourceCode: "\(classDeclaration.name)(this as ValueSemantics)")
+            constructorCall = KotlinRawExpression(sourceCode: "\(classDeclaration.name)(this as MutableStruct)")
         }
         let returnStatement = KotlinReturn(expression: constructorCall)
-        valcopy.body = KotlinCodeBlock(statements: [returnStatement])
-        classDeclaration.members.append(valcopy)
+        scopy.body = KotlinCodeBlock(statements: [returnStatement])
+        classDeclaration.members.append(scopy)
     }
 
     private func initializableMembers(of classDeclaration: KotlinClassDeclaration) -> [KotlinVariableDeclaration] {
@@ -98,10 +98,10 @@ class KotlinStructPlugin: KotlinPlugin {
         classDeclaration.members.append(constructor)
     }
 
-    private func addValueSemanticsCopyConstructor(to classDeclaration: KotlinClassDeclaration, variableDeclarations: [KotlinVariableDeclaration]) {
-        // We use a parameter of type 'ValueSemantics' to avoid conflicts with any user-defined constructor
+    private func addMutableStructCopyConstructor(to classDeclaration: KotlinClassDeclaration, variableDeclarations: [KotlinVariableDeclaration]) {
+        // We use a parameter of type 'MutableStruct' to avoid conflicts with any user-defined constructor
         let constructor = KotlinFunctionDeclaration(name: "constructor")
-        constructor.parameters = [Parameter(externalLabel: "copy", declaredType: .named("ValueSemantics", []))]
+        constructor.parameters = [Parameter(externalLabel: "copy", declaredType: .named("MutableStruct", []))]
         constructor.modifiers = Modifiers(visibility: .private)
         constructor.extras = .singleNewline
 

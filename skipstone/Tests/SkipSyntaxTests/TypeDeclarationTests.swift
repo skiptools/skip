@@ -44,11 +44,11 @@ final class TypeDeclarationTests: XCTestCase {
         struct A {
         }
         """, kotlin: """
-        internal class A: ValueSemantics {
+        internal class A: MutableStruct {
 
-            override var valupdate: ((Any) -> Unit)? = null
+            override var supdate: ((Any) -> Unit)? = null
 
-            override fun valcopy(): ValueSemantics {
+            override fun scopy(): MutableStruct {
                 return A()
             }
 

@@ -58,7 +58,7 @@ class KotlinCodeBlock: KotlinStatement {
     /// - Returns: Whether any return statements were found.
     @discardableResult func updateWithExpectedReturn(_ expectedReturn: ExpectedReturn) -> Bool {
         var label: String?
-        var valref = false
+        var sref = false
         var returnRequired = false
         var onUpdate: String? = nil
         switch expectedReturn {
@@ -71,7 +71,7 @@ class KotlinCodeBlock: KotlinStatement {
             label = l
         case .valueReference(let update):
             onUpdate = update
-            valref = true
+            sref = true
             returnRequired = true
         }
 
@@ -88,7 +88,7 @@ class KotlinCodeBlock: KotlinStatement {
                     if let label {
                         returnStatement.label = label
                     }
-                    if valref {
+                    if sref {
                         returnStatement.expression = returnStatement.expression?.valueReference(onUpdate: onUpdate)
                     }
                     return .skip
@@ -111,7 +111,7 @@ class KotlinCodeBlock: KotlinStatement {
         guard returnRequired, statements.count == 1, statements[0].type == .expression, var expression = (statements[0] as! KotlinExpressionStatement).expression else {
             return false
         }
-        if valref {
+        if sref {
             expression = expression.valueReference(onUpdate: onUpdate)
         }
         statements = [KotlinReturn(expression: expression)]
@@ -866,7 +866,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         } else if mayBeSharedMutableValue && (isProperty || isGlobal) {
             let getterIndentation = indentation.inc()
             output.append(getterIndentation).append("get() {\n")
-            output.append(getterIndentation.inc()).append("return field.valref(\(onUpdate ?? ""))\n")
+            output.append(getterIndentation.inc()).append("return field.sref(\(onUpdate ?? ""))\n")
             output.append(getterIndentation).append("}\n")
         }
         if setter?.body != nil || willSet?.body != nil || didSet?.body != nil {
@@ -874,7 +874,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             let setterBodyIndentation = setterIndentation.inc()
             output.append(setterIndentation).append("set(newValue) {\n")
             if mayBeSharedMutableValue {
-                output.append(setterBodyIndentation).append("val newValue = newValue.valref()\n")
+                output.append(setterBodyIndentation).append("val newValue = newValue.sref()\n")
             }
             if let willSetBody = willSet?.body {
 //                if isProperty {
@@ -916,7 +916,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         } else if !isReadOnly && mayBeSharedMutableValue && (isProperty || isGlobal) {
             let setterIndentation = indentation.inc()
             output.append(setterIndentation).append("set(newValue) {\n")
-            output.append(setterIndentation.inc()).append("field = newValue.valref()\n")
+            output.append(setterIndentation.inc()).append("field = newValue.sref()\n")
             output.append(setterIndentation).append("}\n")
         }
     }

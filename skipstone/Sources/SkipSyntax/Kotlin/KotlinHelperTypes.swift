@@ -6,7 +6,7 @@ enum ExpectedReturn {
     case yes
     /// If any returns are present, given them the given label.
     case labelIfPresent(String)
-    /// Call `valref` on returned values with the given `onUpdate` code.
+    /// Call `sref` on returned values with the given `onUpdate` code.
     case valueReference(String?)
 }
 

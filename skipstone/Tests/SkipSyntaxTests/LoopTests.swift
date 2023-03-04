@@ -101,7 +101,7 @@ final class LoopTests: XCTestCase {
         """, kotlin: """
         {
             val a = arrayOf(1, 2, 3)
-            for (i in a.valref()) {
+            for (i in a.sref()) {
                 print(i)
             }
         }
@@ -118,7 +118,7 @@ final class LoopTests: XCTestCase {
         """, kotlin: """
         {
             val d = dictionaryOf(Pair(1, "a"), Pair(2, "b"), Pair(3, "c"))
-            for ((key, value) in d.valref()) {
+            for ((key, value) in d.sref()) {
                 print(key)
                 print(value)
             }
@@ -128,13 +128,13 @@ final class LoopTests: XCTestCase {
         try await check(swift: """
         {
             for i in [a, b, c] {
-                print(i.valref())
+                print(i.sref())
             }
         }
         """, kotlin: """
         {
             for (i in arrayOf(a, b, c)) {
-                print(i.valref())
+                print(i.sref())
             }
         }
         """)

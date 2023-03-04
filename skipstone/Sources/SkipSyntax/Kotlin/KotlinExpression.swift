@@ -15,9 +15,9 @@ class KotlinExpression: KotlinSyntaxNode {
 
     /// Return an expression that creates a by-value copy of the result of this expression if needed to maintain proper semantics for value types.
     ///
-    /// - Seealso: `CrossFoundation.Any.valref()`
+    /// - Seealso: `CrossFoundation.Any.sref()`
     func valueReference(onUpdate: String? = nil) -> KotlinExpression {
-        // If an update block is supplied, we need to perform a valref even if the value isn't shared so
+        // If an update block is supplied, we need to perform a sref even if the value isn't shared so
         // that the update is called on any mutation
         guard mayBeSharedMutableValueExpression(orType: onUpdate != nil) else {
             return self

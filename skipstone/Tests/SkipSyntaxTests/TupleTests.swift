@@ -33,7 +33,7 @@ final class TupleTests: XCTestCase {
     }
 
     func testReturnSharedMutableValue() async throws {
-        // Newly-constructed instances do not need valref call
+        // Newly-constructed instances do not need sref call
         try await check(swift: """
         func f() -> (A, B) {
             return (A(), B())
@@ -50,7 +50,7 @@ final class TupleTests: XCTestCase {
         }
         """, kotlin: """
         internal fun f(a: A, b: B): Pair<A, B> {
-            return Pair(a.valref(), b.valref())
+            return Pair(a.sref(), b.sref())
         }
         """)
     }
@@ -96,9 +96,9 @@ final class TupleTests: XCTestCase {
         }
         """, kotlin: """
         {
-            val (a, b) = Pair(x.valref(), y.valref())
-            print(a.valref())
-            print(b.valref())
+            val (a, b) = Pair(x.sref(), y.sref())
+            print(a.sref())
+            print(b.sref())
         }
         """)
 
@@ -110,9 +110,9 @@ final class TupleTests: XCTestCase {
         }
         """, kotlin: """
         {
-            val (a, b) = t.valref()
-            print(a.valref())
-            print(b.valref())
+            val (a, b) = t.sref()
+            print(a.sref())
+            print(b.sref())
         }
         """)
     }
@@ -144,10 +144,10 @@ final class TupleTests: XCTestCase {
         }
         """, kotlin: """
         if (true) {
-            val (i, s) = t.valref()
+            val (i, s) = t.sref()
             if (i != null && s != null) {
-                print(i.valref())
-                print(s.valref())
+                print(i.sref())
+                print(s.sref())
             }
         }
         """)
@@ -180,9 +180,9 @@ final class TupleTests: XCTestCase {
         }
         """, kotlin: """
         {
-            val i = t.first.valref()
-            val s = t.second.valref()
-            val d = t.third.valref()
+            val i = t.first.sref()
+            val s = t.second.sref()
+            val d = t.third.sref()
         }
         """)
     }
