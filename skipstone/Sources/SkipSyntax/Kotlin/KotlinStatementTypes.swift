@@ -69,7 +69,7 @@ class KotlinCodeBlock: KotlinStatement {
             returnRequired = true
         case .labelIfPresent(let l):
             label = l
-        case .valueReference(let update):
+        case .sref(let update):
             onUpdate = update
             sref = true
             returnRequired = true
@@ -89,7 +89,7 @@ class KotlinCodeBlock: KotlinStatement {
                         returnStatement.label = label
                     }
                     if sref {
-                        returnStatement.expression = returnStatement.expression?.valueReference(onUpdate: onUpdate)
+                        returnStatement.expression = returnStatement.expression?.sref(onUpdate: onUpdate)
                     }
                     return .skip
                 default:
@@ -112,7 +112,7 @@ class KotlinCodeBlock: KotlinStatement {
             return false
         }
         if sref {
-            expression = expression.valueReference(onUpdate: onUpdate)
+            expression = expression.sref(onUpdate: onUpdate)
         }
         statements = [KotlinReturn(expression: expression)]
         return true
@@ -192,7 +192,7 @@ class KotlinForLoop: KotlinStatement {
             output.append(")")
         }
         output.append(" in ")
-        output.append(sequence.valueReference(), indentation: indentation)
+        output.append(sequence.sref(), indentation: indentation)
         output.append(") {\n")
 
         // Re-declare vars
@@ -493,7 +493,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         }
         if let body = statement.body {
             kstatement.body = KotlinCodeBlock.translate(statement: body, translator: translator)
-            kstatement.body?.updateWithExpectedReturn(statement.returnType == .void ? .no : .valueReference(nil))
+            kstatement.body?.updateWithExpectedReturn(statement.returnType == .void ? .no : .sref(nil))
         }
         kstatement.returnType.appendKotlinMessages(to: kstatement)
         kstatement.parameters.forEach { $0.declaredType.appendKotlinMessages(to: kstatement) }
@@ -725,7 +725,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var willSet: Accessor<KotlinCodeBlock>?
     var didSet: Accessor<KotlinCodeBlock>?
     var variableTypes: [TypeSignature]
-    var mayBeSharedMutableValue = false
+    var mayBeSharedMutableStruct = false
     var isReadOnly = false
     var onUpdate: String?
 
@@ -753,20 +753,20 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             kstatement.isGlobal = true
         }
         if let value = statement.value {
-            kstatement.value = translator.translateExpression(value).valueReference()
+            kstatement.value = translator.translateExpression(value).sref()
         }
 
         kstatement.isReadOnly = statement.isLet || (statement.getter != nil && statement.setter == nil)
         if kstatement.declaredType != .none {
-            kstatement.mayBeSharedMutableValue = kstatement.declaredType.kotlinMayBeSharedMutableValue(codebaseInfo: translator.codebaseInfo)
+            kstatement.mayBeSharedMutableStruct = kstatement.declaredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
         } else if let kvalue = kstatement.value {
-            kstatement.mayBeSharedMutableValue = kvalue.mayBeSharedMutableValueExpression(orType: true)
+            kstatement.mayBeSharedMutableStruct = kvalue.mayBeSharedMutableStructExpression(orType: true)
         } else {
-            kstatement.mayBeSharedMutableValue = true
+            kstatement.mayBeSharedMutableStruct = true
         }
-        if kstatement.mayBeSharedMutableValue {
+        if kstatement.mayBeSharedMutableStruct {
             kstatement.onUpdate = kstatement.isReadOnly ? nil : kstatement.isProperty ? "{ this.\(kstatement.names[0]) = it }" : "{ \(kstatement.names[0]) = it }"
-            kstatement.getter = statement.getter?.translate(translator: translator, expectedReturn: .valueReference(kstatement.onUpdate))
+            kstatement.getter = statement.getter?.translate(translator: translator, expectedReturn: .sref(kstatement.onUpdate))
         } else {
             kstatement.getter = statement.getter?.translate(translator: translator, expectedReturn: .yes)
         }
@@ -863,7 +863,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             output.append(getterIndentation).append("get() {\n")
             output.append(getterBody, indentation: getterIndentation.inc())
             output.append(getterIndentation).append("}\n")
-        } else if mayBeSharedMutableValue && (isProperty || isGlobal) {
+        } else if mayBeSharedMutableStruct && (isProperty || isGlobal) {
             let getterIndentation = indentation.inc()
             output.append(getterIndentation).append("get() {\n")
             output.append(getterIndentation.inc()).append("return field.sref(\(onUpdate ?? ""))\n")
@@ -873,7 +873,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             let setterIndentation = indentation.inc()
             let setterBodyIndentation = setterIndentation.inc()
             output.append(setterIndentation).append("set(newValue) {\n")
-            if mayBeSharedMutableValue {
+            if mayBeSharedMutableStruct {
                 output.append(setterBodyIndentation).append("val newValue = newValue.sref()\n")
             }
             if let willSetBody = willSet?.body {
@@ -913,7 +913,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
 //                }
             }
             output.append(setterIndentation).append("}\n")
-        } else if !isReadOnly && mayBeSharedMutableValue && (isProperty || isGlobal) {
+        } else if !isReadOnly && mayBeSharedMutableStruct && (isProperty || isGlobal) {
             let setterIndentation = indentation.inc()
             output.append(setterIndentation).append("set(newValue) {\n")
             output.append(setterIndentation.inc()).append("field = newValue.sref()\n")

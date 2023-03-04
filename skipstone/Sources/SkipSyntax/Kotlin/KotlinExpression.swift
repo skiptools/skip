@@ -13,23 +13,23 @@ class KotlinExpression: KotlinSyntaxNode {
         self.messages = expression.messages
     }
 
-    /// Return an expression that creates a by-value copy of the result of this expression if needed to maintain proper semantics for value types.
+    /// Return an expression that creates a by-value copy of the result of this expression if needed to maintain proper semantics for struct types.
     ///
     /// - Seealso: `CrossFoundation.Any.sref()`
-    func valueReference(onUpdate: String? = nil) -> KotlinExpression {
+    func sref(onUpdate: String? = nil) -> KotlinExpression {
         // If an update block is supplied, we need to perform a sref even if the value isn't shared so
         // that the update is called on any mutation
-        guard mayBeSharedMutableValueExpression(orType: onUpdate != nil) else {
+        guard mayBeSharedMutableStructExpression(orType: onUpdate != nil) else {
             return self
         }
-        return KotlinValueReference(base: self, onUpdate: onUpdate)
+        return KotlinSRef(base: self, onUpdate: onUpdate)
     }
 
-    /// Return true if this expression may evaluate to a shared mutable value type.
+    /// Return true if this expression may evaluate to a shared mutable struct type.
     ///
     /// - Parameters:
-    ///   - Parameter orType: If set, also return true if the type of this expression may be a shared mutable value. E.g. an array literal is not shared, but its type is a shared mutable type.
-    func mayBeSharedMutableValueExpression(orType: Bool) -> Bool {
+    ///   - Parameter orType: If set, also return true if the type of this expression may be a shared mutable struct. E.g. an array literal is not shared, but its type is a shared mutable struct.
+    func mayBeSharedMutableStructExpression(orType: Bool) -> Bool {
         return false
     }
 
@@ -77,8 +77,8 @@ class KotlinSharedExpressionPointer: KotlinExpression {
         super.init(type: .sharedExpressionPointer)
     }
 
-    override func mayBeSharedMutableValueExpression(orType: Bool) -> Bool {
-        return shared.mayBeSharedMutableValueExpression(orType: orType)
+    override func mayBeSharedMutableStructExpression(orType: Bool) -> Bool {
+        return shared.mayBeSharedMutableStructExpression(orType: orType)
     }
 
     override var isCompoundExpression: Bool {

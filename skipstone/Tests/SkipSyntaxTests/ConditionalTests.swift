@@ -145,7 +145,7 @@ final class ConditionalTests: XCTestCase {
         """)
     }
 
-    func testMutableValueOptionalBinding() async throws {
+    func testMutableStructOptionalBinding() async throws {
         // Translate let into a simple null check because the value can't change
         try await check(swift: """
         if let i {
@@ -622,7 +622,7 @@ final class ConditionalTests: XCTestCase {
         """)
     }
 
-    func testGuardMutableValueOptionalBinding() async throws {
+    func testGuardMutableStructOptionalBinding() async throws {
         try await check(swift: """
         guard let i else {
             print(i)

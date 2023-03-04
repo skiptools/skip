@@ -48,8 +48,8 @@ class KotlinStructPlugin: KotlinPlugin {
             let initFunction = KotlinMemberAccess(base: KotlinIdentifier(name: classDeclaration.name), member: "init")
             let arguments = variableDeclarations.map {
                 let argumentValue = KotlinIdentifier(name: $0.names[0])
-                argumentValue.mayBeSharedMutableValue = $0.mayBeSharedMutableValue
-                return LabeledValue<KotlinExpression>(value: argumentValue.valueReference())
+                argumentValue.mayBeSharedMutableStruct = $0.mayBeSharedMutableStruct
+                return LabeledValue<KotlinExpression>(value: argumentValue.sref())
             }
             constructorCall = KotlinFunctionCall(function: initFunction, arguments: arguments)
         } else {

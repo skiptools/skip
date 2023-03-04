@@ -2,21 +2,21 @@
 import XCTest
 
 final class KotlinCodebaseInfoTests: XCTestCase {
-    func testIsMutableValueType() async throws {
+    func testIsMutableStructType() async throws {
         let context = try await symbols.context()
-        XCTAssertNil(context.isMutableValueType(qualifiedName: "NonExistantTypeName"))
+        XCTAssertNil(context.isMutableStructType(qualifiedName: "NonExistantTypeName"))
 
-        XCTAssertEqual(false, context.isMutableValueType(qualifiedName: "KotlinCodebaseInfoTestsClass"))
-        XCTAssertEqual(false, context.isMutableValueType(qualifiedName: "KotlinCodebaseInfoTestsEnum"))
-        XCTAssertEqual(false, context.isMutableValueType(qualifiedName: "KotlinCodebaseInfoTestsImmutableStruct"))
+        XCTAssertEqual(false, context.isMutableStructType(qualifiedName: "KotlinCodebaseInfoTestsClass"))
+        XCTAssertEqual(false, context.isMutableStructType(qualifiedName: "KotlinCodebaseInfoTestsEnum"))
+        XCTAssertEqual(false, context.isMutableStructType(qualifiedName: "KotlinCodebaseInfoTestsImmutableStruct"))
 
-        XCTAssertEqual(true, context.isMutableValueType(qualifiedName: "KotlinCodebaseInfoTestsMutableVarStruct"))
-        XCTAssertEqual(true, context.isMutableValueType(qualifiedName: "KotlinCodebaseInfoTestsMutableComputedVarStruct"))
-        XCTAssertEqual(true, context.isMutableValueType(qualifiedName: "KotlinCodebaseInfoTestsMutableFuncStruct"))
+        XCTAssertEqual(true, context.isMutableStructType(qualifiedName: "KotlinCodebaseInfoTestsMutableVarStruct"))
+        XCTAssertEqual(true, context.isMutableStructType(qualifiedName: "KotlinCodebaseInfoTestsMutableComputedVarStruct"))
+        XCTAssertEqual(true, context.isMutableStructType(qualifiedName: "KotlinCodebaseInfoTestsMutableFuncStruct"))
 
-        XCTAssertEqual(true, context.isMutableValueType(qualifiedName: "KotlinCodebaseInfoTestsNonAnyObjectRestrictedProtocol"))
-        XCTAssertEqual(false, context.isMutableValueType(qualifiedName: "KotlinCodebaseInfoTestsAnyObjectRestrictedProtocol"))
-        XCTAssertEqual(false, context.isMutableValueType(qualifiedName: "KotlinCodebaseInfoTestsTransitiveAnyObjectRestrictedProtocol"))
+        XCTAssertEqual(true, context.isMutableStructType(qualifiedName: "KotlinCodebaseInfoTestsNonAnyObjectRestrictedProtocol"))
+        XCTAssertEqual(false, context.isMutableStructType(qualifiedName: "KotlinCodebaseInfoTestsAnyObjectRestrictedProtocol"))
+        XCTAssertEqual(false, context.isMutableStructType(qualifiedName: "KotlinCodebaseInfoTestsTransitiveAnyObjectRestrictedProtocol"))
     }
 }
 

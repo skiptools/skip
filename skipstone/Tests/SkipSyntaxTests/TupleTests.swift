@@ -32,7 +32,7 @@ final class TupleTests: XCTestCase {
         """)
     }
 
-    func testReturnSharedMutableValue() async throws {
+    func testReturnSharedMutableStruct() async throws {
         // Newly-constructed instances do not need sref call
         try await check(swift: """
         func f() -> (A, B) {
@@ -87,7 +87,7 @@ final class TupleTests: XCTestCase {
         """)
     }
 
-    func testDestructuringSharedMutableValue() async throws {
+    func testDestructuringSharedMutableStruct() async throws {
         try await check(swift: """
         {
             let (a, b) = (x, y)
@@ -136,7 +136,7 @@ final class TupleTests: XCTestCase {
         """)
     }
 
-    func testDestructuringOptionalBindingSharedMutableValue() async throws {
+    func testDestructuringOptionalBindingSharedMutableStruct() async throws {
         try await check(swift: """
         if let (i, s) = t {
             print(i)
@@ -171,7 +171,7 @@ final class TupleTests: XCTestCase {
         """)
     }
 
-    func testMemberAccessSharedMutableValue() async throws {
+    func testMemberAccessSharedMutableStruct() async throws {
         try await check(swift: """
         {
             let i = t.0

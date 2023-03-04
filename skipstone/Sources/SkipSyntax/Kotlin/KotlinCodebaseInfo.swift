@@ -44,20 +44,20 @@ public class KotlinCodebaseInfo {
         }
         switch statement.type {
         case .classDeclaration:
-            addTypeInfo(for: statement as! TypeDeclaration, mayBeMutableValueType: false)
+            addTypeInfo(for: statement as! TypeDeclaration, mayBeMutableStructType: false)
         case .enumDeclaration:
-            addTypeInfo(for: statement as! TypeDeclaration, mayBeMutableValueType: false)
+            addTypeInfo(for: statement as! TypeDeclaration, mayBeMutableStructType: false)
         case .protocolDeclaration:
             let typeDeclaration = statement as! TypeDeclaration
-            // A protocol may not be mutable value if it extends from AnyObject, may be if it extends from nothing,
+            // A protocol may not be mutable struct if it extends from AnyObject, may be if it extends from nothing,
             // and we're not sure if it extends from other protocols which may themselves extend from AnyObject. We'll
             // check its symbols later
-            let mayBeMutableValueType: Bool? = typeDeclaration.inherits.contains(.anyObject) ? false : typeDeclaration.inherits.isEmpty ? true : nil
-            addTypeInfo(for: typeDeclaration, mayBeMutableValueType: mayBeMutableValueType)
+            let mayBeMutableStructType: Bool? = typeDeclaration.inherits.contains(.anyObject) ? false : typeDeclaration.inherits.isEmpty ? true : nil
+            addTypeInfo(for: typeDeclaration, mayBeMutableStructType: mayBeMutableStructType)
             return .skip
         case .structDeclaration:
             let typeDeclaration = statement as! TypeDeclaration
-            let mayBeMutableValueType = typeDeclaration.members.contains { member in
+            let mayBeMutableStructType = typeDeclaration.members.contains { member in
                 switch member.type {
                 case .variableDeclaration:
                     let variableDeclaration = member as! VariableDeclaration
@@ -68,7 +68,7 @@ public class KotlinCodebaseInfo {
                     return false
                 }
             }
-            addTypeInfo(for: typeDeclaration, mayBeMutableValueType: mayBeMutableValueType)
+            addTypeInfo(for: typeDeclaration, mayBeMutableStructType: mayBeMutableStructType)
         case .extensionDeclaration:
             let declaration = statement as! ExtensionDeclaration
             let key = declaration.extends.description
@@ -173,19 +173,19 @@ public class KotlinCodebaseInfo {
             return false
         }
 
-        /// Whether the given qualified type name may map to a mutable value type.
-        func mayBeMutableValueType(qualifiedName: String) -> Bool {
+        /// Whether the given qualified type name may map to a mutable struct type.
+        func mayBeMutableStructType(qualifiedName: String) -> Bool {
             for info in codebaseInfo.typeInfo[qualifiedName, default: []] {
-                if !info.isPrivate || info.sourceFile == sourceFile, let mayBeMutableValueType = info.mayBeMutableValueType {
-                    return mayBeMutableValueType
+                if !info.isPrivate || info.sourceFile == sourceFile, let mayBeMutableStructType = info.mayBeMutableStructType {
+                    return mayBeMutableStructType
                 }
             }
-            return symbols?.isMutableValueType(qualifiedName: qualifiedName) != false
+            return symbols?.isMutableStructType(qualifiedName: qualifiedName) != false
         }
     }
 
-    private func addTypeInfo(for typeDeclaration: TypeDeclaration, mayBeMutableValueType: Bool?) {
-        var info = TypeInfo(declarationType: typeDeclaration.type, firstInherits: typeDeclaration.inherits.first?.description, mayBeMutableValueType: mayBeMutableValueType, isPrivate: typeDeclaration.modifiers.visibility == .private, sourceFile: typeDeclaration.sourceFile)
+    private func addTypeInfo(for typeDeclaration: TypeDeclaration, mayBeMutableStructType: Bool?) {
+        var info = TypeInfo(declarationType: typeDeclaration.type, firstInherits: typeDeclaration.inherits.first?.description, mayBeMutableStructType: mayBeMutableStructType, isPrivate: typeDeclaration.modifiers.visibility == .private, sourceFile: typeDeclaration.sourceFile)
         if typeDeclaration.type != .protocolDeclaration {
             info.constructorParameters = constructorParameters(in: typeDeclaration.members)
         }
@@ -234,7 +234,7 @@ public class KotlinCodebaseInfo {
 private struct TypeInfo {
     let declarationType: StatementType
     let firstInherits: String?
-    let mayBeMutableValueType: Bool?
+    let mayBeMutableStructType: Bool?
     let isPrivate: Bool
     let sourceFile: Source.File?
     var constructorParameters: [[KotlinCodebaseInfo.ConstructorParameter]] = []
@@ -248,10 +248,10 @@ private struct ExtensionInfo {
 // Internal for testing
 
 extension Symbols.Context {
-    /// Whether the given name maps to a symbol that is known to be a mutable value type.
+    /// Whether the given name maps to a symbol that is known to be a mutable struct type.
     ///
-    /// - Returns: true if a symbol exists for a mutable value type, false if only immutable type symbols exist, and nil if no type symbol exists.
-    func isMutableValueType(qualifiedName: String) -> Bool? {
+    /// - Returns: true if a symbol exists for a mutable struct type, false if only immutable type symbols exist, and nil if no type symbol exists.
+    func isMutableStructType(qualifiedName: String) -> Bool? {
         let candidates = lookup(name: qualifiedName)
         var hasType = false
         for candidate in ranked(candidates) {

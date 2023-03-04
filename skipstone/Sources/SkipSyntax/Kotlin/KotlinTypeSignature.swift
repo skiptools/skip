@@ -168,8 +168,8 @@ extension TypeSignature {
         }
     }
 
-    /// Whether this type might represent a shared mutable value.
-    func kotlinMayBeSharedMutableValue(codebaseInfo: KotlinCodebaseInfo.Context?) -> Bool {
+    /// Whether this type might represent a shared mutable struct.
+    func kotlinMayBeSharedMutableStruct(codebaseInfo: KotlinCodebaseInfo.Context?) -> Bool {
         switch self {
         case .any:
             return true
@@ -205,19 +205,19 @@ extension TypeSignature {
             guard let codebaseInfo else {
                 return true
             }
-            return codebaseInfo.mayBeMutableValueType(qualifiedName: name)
+            return codebaseInfo.mayBeMutableStructType(qualifiedName: name)
         case .none:
             return true
         case .optional(let type):
-            return type.kotlinMayBeSharedMutableValue(codebaseInfo: codebaseInfo)
+            return type.kotlinMayBeSharedMutableStruct(codebaseInfo: codebaseInfo)
         case .member(let base, let type):
             guard case .named(let name, _) = type else {
-                return type.kotlinMayBeSharedMutableValue(codebaseInfo: codebaseInfo)
+                return type.kotlinMayBeSharedMutableStruct(codebaseInfo: codebaseInfo)
             }
             guard let codebaseInfo else {
                 return true
             }
-            return codebaseInfo.mayBeMutableValueType(qualifiedName: "\(base).\(name)")
+            return codebaseInfo.mayBeMutableStructType(qualifiedName: "\(base).\(name)")
         case .metaType:
             return false
         case .range:
@@ -229,7 +229,7 @@ extension TypeSignature {
         case .tuple(_, let types):
             // We consider a tuple with a shared mutable type to itself be a shared mutable type because code may
             // use destructuring assignment to extract values without copying them, so we have to copy the whole tuple
-            return types.contains { $0.kotlinMayBeSharedMutableValue(codebaseInfo: codebaseInfo) }
+            return types.contains { $0.kotlinMayBeSharedMutableStruct(codebaseInfo: codebaseInfo) }
         case .uint:
             return false
         case .uint8:
@@ -241,7 +241,7 @@ extension TypeSignature {
         case .uint64:
             return false
         case .unwrappedOptional(let type):
-            return type.kotlinMayBeSharedMutableValue(codebaseInfo: codebaseInfo)
+            return type.kotlinMayBeSharedMutableStruct(codebaseInfo: codebaseInfo)
         case .void:
             return false
         }

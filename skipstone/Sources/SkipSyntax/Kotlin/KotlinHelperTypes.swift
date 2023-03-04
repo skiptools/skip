@@ -7,7 +7,7 @@ enum ExpectedReturn {
     /// If any returns are present, given them the given label.
     case labelIfPresent(String)
     /// Call `sref` on returned values with the given `onUpdate` code.
-    case valueReference(String?)
+    case sref(String?)
 }
 
 extension Accessor where B: CodeBlock {
