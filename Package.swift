@@ -6,8 +6,10 @@ let package = Package(
     products: [
         .plugin(name: "skip", targets: ["SkipCommandPlugIn"]),
         .plugin(name: "skippy", targets: ["SkipBuildPlugIn"]),
+        .library(name: "SkipUnitTestSupport", targets: ["SkipUnitTestSupport"])
     ],
     targets: [
+        .target(name: "SkipUnitTestSupport"),
         .plugin(name: "SkipCommandPlugIn",
             capability: .command(
                 intent: .custom(verb: "skip", 
@@ -23,5 +25,5 @@ let package = Package(
     ]
 )
 
-package.targets += [.binaryTarget(name: "skiptool", url: "https://github.com/skipsource/skip/releases/download/0.0.37/skiptool.artifactbundle.zip", checksum: "dd0ab25cba740708e9d283e9295d85ca843638e787e98a5b68ef4a35f4508a03")]
+package.targets += [.binaryTarget(name: "skiptool", url: "https://github.com/skiptools/skip/releases/download/0.0.38/skiptool.artifactbundle.zip", checksum: "38d2da61d3770eaa55e0619b442cbe2fef05db4bbc9057238cc48f210d1c644e")]
 

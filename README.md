@@ -17,7 +17,7 @@ swift package init
 Add the following line at the bottom of your `Package.swift` file:
 
 ```swift
-package.dependencies += [.package(url: "https://github.com/skiptools/skip.git", from: "0.0.37")]
+package.dependencies += [.package(url: "https://github.com/skiptools/skip.git", from: "0.0.38")]
 ```
 
 Then run:
@@ -33,32 +33,9 @@ The `skip` alias can be persisted for future `Terminal.app` shell sessions by ru
 echo 'alias skip="swift package --disable-sandbox --allow-writing-to-package-directory skip"' >> ~/.zprofile
 ```
 
+## System Requirements
 
-## Prerequisites
+macOS 13+ (ARM or Intel), [XCode.app](https://developer.apple.com/xcode/) and [Android Studio.app](https://developer.android.com/studio/).
 
-### System requirements
 
-macOS 13+ (ARM or Intel).
 
-### Xcode.app
-
-Download and install Xcode from [https://developer.apple.com/xcode/](https://developer.apple.com/xcode/).
-
-### Android Studio.app
-
-Either:
-
-1. Users of [homebrew](https://brew.sh) can run `brew install android-studio`
-2. Download and install directly from [https://developer.android.com/studio/](https://developer.android.com/studio/)
-
-## Transpiling
-
-```shell
-skip transpile
-```
-
-## Running Tests
-
-```shell
-skip test
-```
