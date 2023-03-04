@@ -15,22 +15,21 @@ jobs:
     steps:
       - name: Check Tool
         run: |
-          mkdir /tmp/DemoLib
-          cd /tmp/DemoLib
+          mkdir /tmp/ExampleSkipProject
+          cd /tmp/ExampleSkipProject
           swift package init
           swift test
           echo 'package.dependencies += [.package(url: "https://github.com/skiptools/skip.git", from: "0.0.0")]' >> Package.swift
 
           # fails on macOS 12 with:
           # dyld[2533]: Library not loaded: '/usr/lib/swift/libswift_StringProcessing.dylib'
-          # Referenced from: '/private/tmp/DemoLib/.build/artifacts/skip/skiptool.artifactbundle/skiptool'
+          # Referenced from: '/private/tmp/ExampleSkipProject/.build/artifacts/skip/skiptool.artifactbundle/skiptool'
           # Reason: tried: '/usr/lib/swift/libswift_StringProcessing.dylib' (no such file), '/usr/local/lib/libswift_StringProcessing.dylib' (no such file), '/usr/lib/libswift_StringProcessing.dylib' (no such file)
 
           # the failure seems to not affect the swift package command, though…
           swift package --disable-sandbox --allow-writing-to-package-directory skip -version
 
-          # so try to run the tool directly from the cache
-          # when we are on macOS 13 or higher
-          if [ `sw_vers -productVersion | tr '.' '\n' | head -n 1 ` -ge 13 ] ; then ./.build/artifacts/skip/skiptool.artifactbundle/skiptool -version; fi
+          # also try to run the tool directly from the cache
+          ./.build/artifacts/skip/skiptool.artifactbundle/skiptool -version
 
 
