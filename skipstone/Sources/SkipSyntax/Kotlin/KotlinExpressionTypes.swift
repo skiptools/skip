@@ -387,6 +387,10 @@ class KotlinFunctionCall: KotlinExpression {
                 output.append(dictionaryLiteral.entries[0].value, indentation: indentation).append(">")
             } else {
                 output.append(function, indentation: indentation)
+                // Kotlin does not support <closure>?(args); use <closure>?.invoke(args)
+                if function is KotlinPostfixOptionalOperator {
+                    output.append(".invoke")
+                }
             }
             let hasTrailingClosure = useTrailingClosureFormatting && arguments.last?.value.type == .closure && (arguments.last?.value as? KotlinClosure)?.isAnonymousFunction == false
             if hasTrailingClosure {

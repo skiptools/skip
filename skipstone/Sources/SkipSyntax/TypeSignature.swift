@@ -466,6 +466,9 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
             guard !elements.isEmpty else {
                 return .void
             }
+            guard elements.count > 1 else {
+                return elements[0].1
+            }
             guard !elements.contains(where: { $0.1 == .none }) else {
                 return .none
             }

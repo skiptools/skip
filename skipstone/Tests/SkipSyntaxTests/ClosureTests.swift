@@ -179,4 +179,18 @@ final class ClosureTests: XCTestCase {
         }
         """)
     }
+
+    func testUseInvokeForOptionalClosure() async throws {
+        try await check(swift: """
+        {
+            let c: ((String) -> Int)? = nil
+            let i = c?("s")
+        }
+        """, kotlin: """
+        {
+            val c: ((String) -> Int)? = null
+            val i = c?.invoke("s")
+        }
+        """)
+    }
 }
