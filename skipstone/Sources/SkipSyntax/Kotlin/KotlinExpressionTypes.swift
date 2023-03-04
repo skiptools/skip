@@ -171,7 +171,7 @@ class KotlinBooleanLiteral: KotlinExpression {
 }
 
 class KotlinClosure: KotlinExpression {
-    static let returnLabel = "r_0"
+    static let returnLabel = "llabel"
 
     var returnType: TypeSignature = .none
     var parameters: [Parameter<Void>] = []

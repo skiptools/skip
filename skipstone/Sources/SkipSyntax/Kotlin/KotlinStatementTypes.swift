@@ -342,6 +342,7 @@ class KotlinClassDeclaration: KotlinStatement {
     var modifiers = Modifiers()
     var declarationType: StatementType
     var members: [KotlinStatement] = []
+    var isInConstructorCheckPropertyName: String?
 
     static func translate(statement: TypeDeclaration, translator: KotlinTranslator) -> KotlinClassDeclaration {
         let kstatement = KotlinClassDeclaration(statement: statement)
@@ -419,6 +420,10 @@ class KotlinClassDeclaration: KotlinStatement {
         let nonstaticMembers = members.filter { ($0 as? KotlinMemberDeclaration)?.isStatic != true }
         nonstaticMembers.forEach { output.append($0, indentation: memberIndentation) }
 
+        if let isInConstructorCheckPropertyName {
+            output.append("\n").append(memberIndentation).append("private var \(isInConstructorCheckPropertyName) = false\n")
+        }
+
         output.append("\n").append(memberIndentation).append("companion object {\n")
         staticMembers.forEach { output.append($0, indentation: memberIndentation.inc()) }
         output.append(memberIndentation).append("}\n")
@@ -465,7 +470,7 @@ struct KotlinExtensionDeclaration {
 /// - Seealso: ``KotlinConstructorPlugin``
 class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var name: String
-    var returnType: TypeSignature = .none
+    var returnType: TypeSignature = .void
     var parameters: [Parameter<KotlinExpression>] = []
     var isAsync = false
     var isOpen = false
@@ -575,7 +580,6 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             }
             output.append(")")
             if type != .constructorDeclaration {
-                let returnType = returnType.or(.void)
                 if returnType != .void {
                     output.append(": ").append(returnType.kotlin)
                 }
@@ -586,13 +590,22 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if let body {
             output.append(" {\n")
             if !body.statements.isEmpty {
-                let bodyIndentation = indentation.inc()
+                var bodyIndentation = indentation.inc()
                 for parameter in parameters {
                     if let externalLabel = parameter.externalLabel, parameter.internalLabel != parameter.externalLabel {
                         output.append(bodyIndentation).append("val \(parameter.internalLabel) = \(externalLabel)\n")
                     }
                 }
-                output.append(body, indentation: bodyIndentation)
+                if type == .constructorDeclaration, let isInConstructorCheckPropertyName = (parent as? KotlinClassDeclaration)?.isInConstructorCheckPropertyName {
+                    output.append(bodyIndentation).append("\(isInConstructorCheckPropertyName) = true\n")
+                    output.append(bodyIndentation).append("try {\n")
+                    output.append(body, indentation: bodyIndentation.inc())
+                    output.append(bodyIndentation).append("} finally {\n")
+                    output.append(bodyIndentation.inc()).append("\(isInConstructorCheckPropertyName) = false\n")
+                    output.append(bodyIndentation).append("}\n")
+                } else {
+                    output.append(body, indentation: bodyIndentation)
+                }
             }
             output.append(indentation).append("}\n")
         } else {
@@ -735,8 +748,6 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         return modifiers.isStatic
     }
 
-//    static let inConstructorFlagName = "inconstructorflag"
-
     static func translate(statement: VariableDeclaration, translator: KotlinTranslator) -> KotlinVariableDeclaration {
         let kstatement = KotlinVariableDeclaration(statement: statement)
         kstatement.isLet = statement.isLet
@@ -870,6 +881,11 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             output.append(getterIndentation).append("}\n")
         }
         if setter?.body != nil || willSet?.body != nil || didSet?.body != nil {
+            var isInConstructorCheckPropertyName: String? = nil
+            if !modifiers.isStatic {
+                isInConstructorCheckPropertyName = (parent as? KotlinClassDeclaration)?.isInConstructorCheckPropertyName
+            }
+
             let setterIndentation = indentation.inc()
             let setterBodyIndentation = setterIndentation.inc()
             output.append(setterIndentation).append("set(newValue) {\n")
@@ -877,18 +893,18 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 output.append(setterBodyIndentation).append("val newValue = newValue.sref()\n")
             }
             if let willSetBody = willSet?.body {
-//                if isProperty {
-//                    output.append(setterBodyIndentation).append("if (!\(Self.inConstructorFlagName)) {\n")
-//                }
-//                let willSetIndentation = isProperty ? setterBodyIndentation.inc() : setterBodyIndentation
-                let willSetIndentation = setterBodyIndentation
+                var willSetIndentation = setterBodyIndentation
+                if let isInConstructorCheckPropertyName {
+                    output.append(setterBodyIndentation).append("if (!\(isInConstructorCheckPropertyName)) {\n")
+                    willSetIndentation = setterBodyIndentation.inc()
+                }
                 if let parameterName = willSet?.parameterName, parameterName != "newValue" {
                     output.append(willSetIndentation).append("val \(parameterName) = newValue\n")
                 }
                 output.append(willSetBody, indentation: willSetIndentation)
-//                if isProperty {
-//                    output.append(setterBodyIndentation).append("}\n")
-//                }
+                if isInConstructorCheckPropertyName != nil {
+                    output.append(setterBodyIndentation).append("}\n")
+                }
             }
             if let setterBody = setter?.body {
                 if let parameterName = setter?.parameterName, parameterName != "newValue" && parameterName != willSet?.parameterName {
@@ -902,15 +918,15 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 output.append(setterBodyIndentation).append("field = newValue\n")
             }
             if let didSetBody = didSet?.body {
-//                if isProperty {
-//                    output.append(setterBodyIndentation).append("if (!\(Self.inConstructorFlagName)) {\n")
-//                }
-//                let didSetIndentation = isProperty ? setterBodyIndentation.inc() : setterBodyIndentation
-                let didSetIndentation = setterBodyIndentation
+                var didSetIndentation = setterBodyIndentation
+                if let isInConstructorCheckPropertyName {
+                    output.append(setterBodyIndentation).append("if (!\(isInConstructorCheckPropertyName)) {\n")
+                    didSetIndentation = setterBodyIndentation.inc()
+                }
                 output.append(didSetBody, indentation: didSetIndentation)
-//                if isProperty {
-//                    output.append(setterBodyIndentation).append("}\n")
-//                }
+                if isInConstructorCheckPropertyName != nil {
+                    output.append(setterBodyIndentation).append("}\n")
+                }
             }
             output.append(setterIndentation).append("}\n")
         } else if !isReadOnly && mayBeSharedMutableStruct && (isProperty || isGlobal) {

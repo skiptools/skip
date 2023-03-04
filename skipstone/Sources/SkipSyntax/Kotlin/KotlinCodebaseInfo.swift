@@ -11,6 +11,7 @@ public class KotlinCodebaseInfo {
         self.symbols = symbols
         // Idea: Track which plugins we might need when we come across relevant code during initial translation and save traversing the tree for unnecessary plugins
         self.plugins = [
+            // NOTE: Keep the struct plugin first because it adds members that may need processing by subsequent plugins
             KotlinStructPlugin(),
             KotlinConstructorPlugin(),
             KotlinIfPlugin(),

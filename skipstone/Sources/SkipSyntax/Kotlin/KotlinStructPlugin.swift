@@ -16,17 +16,37 @@ class KotlinStructPlugin: KotlinPlugin {
     }
 
     private func updateStructDeclaration(_ classDeclaration: KotlinClassDeclaration) {
-        classDeclaration.inherits.append(.named("MutableStruct", []))
-        let hasConstructors = classDeclaration.members.contains { $0.type == .constructorDeclaration }
-        let variableDeclarations = initializableMembers(of: classDeclaration)
-        if !hasConstructors && !variableDeclarations.isEmpty {
-            addMemberwiseConstructor(to: classDeclaration, variableDeclarations: variableDeclarations)
-        } else if !variableDeclarations.isEmpty {
-            addMutableStructCopyConstructor(to: classDeclaration, variableDeclarations: variableDeclarations)
+        var hasConstructors = false
+        var isMutable = false
+        var initializableVariableDeclarations: [KotlinVariableDeclaration] = []
+        for member in classDeclaration.members {
+            if let variableDeclaration = member as? KotlinVariableDeclaration {
+                if !variableDeclaration.isStatic && !variableDeclaration.isReadOnly {
+                    isMutable = true
+                }
+                if !variableDeclaration.modifiers.isStatic, variableDeclaration.getter == nil, (!variableDeclaration.isLet || variableDeclaration.value == nil) {
+                    initializableVariableDeclarations.append(variableDeclaration)
+                }
+            } else if let functionDeclaration = member as? KotlinFunctionDeclaration {
+                if functionDeclaration.type == .constructorDeclaration {
+                    hasConstructors = true
+                } else if functionDeclaration.modifiers.isMutating {
+                    isMutable = true
+                }
+            }
         }
-        // If we generated a memberwise constructor (or have no members and get a default constructor), we can use that to create a copy.
-        // Otherwise we generate a copy constructor. In particular, we do not trust any user-written constructor to perform a pure copy
-        addMutableStructAPI(to: classDeclaration, variableDeclarations: variableDeclarations, useMemberwiseConstructor: !hasConstructors)
+
+        if !hasConstructors && !initializableVariableDeclarations.isEmpty {
+            addMemberwiseConstructor(to: classDeclaration, variableDeclarations: initializableVariableDeclarations)
+        } else if isMutable && !initializableVariableDeclarations.isEmpty {
+            addMutableStructCopyConstructor(to: classDeclaration, variableDeclarations: initializableVariableDeclarations)
+        }
+        if isMutable {
+            classDeclaration.inherits.append(.named("MutableStruct", []))
+            // If we generated a memberwise constructor (or have no members and get a default constructor), we can use that to create a copy.
+            // Otherwise we generate a copy constructor. In particular, we do not trust any user-written constructor to perform a pure copy
+            addMutableStructAPI(to: classDeclaration, variableDeclarations: initializableVariableDeclarations, useMemberwiseConstructor: !hasConstructors)
+        }
     }
 
     private func addMutableStructAPI(to classDeclaration: KotlinClassDeclaration, variableDeclarations: [KotlinVariableDeclaration], useMemberwiseConstructor: Bool) {
@@ -60,16 +80,6 @@ class KotlinStructPlugin: KotlinPlugin {
         classDeclaration.members.append(scopy)
     }
 
-    private func initializableMembers(of classDeclaration: KotlinClassDeclaration) -> [KotlinVariableDeclaration] {
-        return classDeclaration.members.compactMap { (member: KotlinStatement) -> KotlinVariableDeclaration? in
-            guard let variableDeclaration = member as? KotlinVariableDeclaration,
-                  !variableDeclaration.modifiers.isStatic, variableDeclaration.getter == nil, (!variableDeclaration.isLet || variableDeclaration.value == nil) else {
-                return nil
-            }
-            return variableDeclaration
-        }
-    }
-
     private func addMemberwiseConstructor(to classDeclaration: KotlinClassDeclaration, variableDeclarations: [KotlinVariableDeclaration]) {
         let constructor = KotlinFunctionDeclaration(name: "constructor")
         constructor.parameters = variableDeclarations.map { variableDeclaration in
@@ -81,19 +91,10 @@ class KotlinStructPlugin: KotlinPlugin {
         constructor.modifiers = Modifiers(visibility: .public)
         constructor.extras = .singleNewline
 
-        //~~~ Should assigning the inconstructorflag be done in thh constructor plugin?
         var bodyStatements: [KotlinStatement] = []
-//        bodyStatements.append(KotlinRawStatement(sourceCode: "\(KotlinVariableDeclaration.inConstructorFlagName) = true"))
         bodyStatements += variableDeclarations.map { variableDeclaration in
-            let selfIdentifier = KotlinIdentifier(name: "self")
-            let memberAccess = KotlinMemberAccess(base: selfIdentifier, member: variableDeclaration.names[0])
-            let paramIdentifier = KotlinIdentifier(name: variableDeclaration.names[0])
-            let assignmentOperator = KotlinBinaryOperator(op: .with(symbol: "="), lhs: memberAccess, rhs: paramIdentifier)
-            let statement = KotlinExpressionStatement(type: .expression)
-            statement.expression = assignmentOperator
-            return statement
+            return KotlinRawStatement(sourceCode: "this.\(variableDeclaration.names[0]) = \(variableDeclaration.names[0])")
         }
-//        bodyStatements.append(KotlinRawStatement(sourceCode: "\(KotlinVariableDeclaration.inConstructorFlagName) = false"))
         constructor.body = KotlinCodeBlock(statements: bodyStatements)
         classDeclaration.members.append(constructor)
     }
@@ -107,18 +108,9 @@ class KotlinStructPlugin: KotlinPlugin {
 
         var bodyStatements: [KotlinStatement] = []
         bodyStatements.append(KotlinRawStatement(sourceCode: "val copy = copy as \(classDeclaration.name)"))
-//        bodyStatements.append(KotlinRawStatement(sourceCode: "\(KotlinVariableDeclaration.inConstructorFlagName) = true"))
         bodyStatements += variableDeclarations.map { variableDeclaration in
-            let selfIdentifier = KotlinIdentifier(name: "self")
-            let memberAccess = KotlinMemberAccess(base: selfIdentifier, member: variableDeclaration.names[0])
-            let copyIdentifier = KotlinIdentifier(name: "copy")
-            let copyMemberAccess = KotlinMemberAccess(base: copyIdentifier, member: variableDeclaration.names[0])
-            let assignmentOperator = KotlinBinaryOperator(op: .with(symbol: "="), lhs: memberAccess, rhs: copyMemberAccess)
-            let statement = KotlinExpressionStatement(type: .expression)
-            statement.expression = assignmentOperator
-            return statement
+            return KotlinRawStatement(sourceCode: "this.\(variableDeclaration.names[0]) = copy.\(variableDeclaration.names[0])")
         }
-//        bodyStatements.append(KotlinRawStatement(sourceCode: "\(KotlinVariableDeclaration.inConstructorFlagName) = false"))
         constructor.body = KotlinCodeBlock(statements: bodyStatements)
         classDeclaration.members.append(constructor)
     }

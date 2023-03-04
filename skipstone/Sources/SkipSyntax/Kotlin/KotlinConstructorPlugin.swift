@@ -23,6 +23,7 @@ class KotlinConstructorPlugin: KotlinPlugin {
                         mayNeedSuperclassCall = true
                     }
                 }
+                addIsInConstructorCheckProperty(to: classDeclaration)
             }
             if mayNeedSuperclassCall {
                 addSuperclassCall(to: classDeclaration, translator: translator)
@@ -128,6 +129,19 @@ class KotlinConstructorPlugin: KotlinPlugin {
         // If we have a superclass, we must instantiate it
         if let inherits = classDeclaration.inherits.first, translator.codebaseInfo?.declarationType(of: inherits.description, mustBeInModule: false) == .classDeclaration {
             classDeclaration.superclassCall = "\(inherits.description)()"
+        }
+    }
+
+    private func addIsInConstructorCheckProperty(to classDeclaration: KotlinClassDeclaration) {
+        // We only need to add the check if there are any member vars with willSet, didSet
+        let hasSideEffectVars = classDeclaration.members.contains {
+            guard let variableDeclaration = $0 as? KotlinVariableDeclaration else {
+                return false
+            }
+            return variableDeclaration.willSet != nil || variableDeclaration.didSet != nil
+        }
+        if hasSideEffectVars {
+            classDeclaration.isInConstructorCheckPropertyName = "isconstructing"
         }
     }
 }

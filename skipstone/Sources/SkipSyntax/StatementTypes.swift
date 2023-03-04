@@ -486,7 +486,7 @@ class FunctionDeclaration: Statement {
     init(type: StatementType, name: String, isOptionalInit: Bool = false, returnType: TypeSignature = .void, parameters: [Parameter<Expression>], isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), body: CodeBlock? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.name = name
         self.isOptionalInit = isOptionalInit
-        self.returnType = returnType
+        self.returnType = returnType.or(.void)
         self.parameters = parameters
         self.isAsync = isAsync
         self.isThrows = isThrows
