@@ -81,7 +81,10 @@ class KotlinStructPlugin: KotlinPlugin {
         constructor.modifiers = Modifiers(visibility: .public)
         constructor.extras = .singleNewline
 
-        let bodyStatements = variableDeclarations.map { variableDeclaration in
+        //~~~ Should assigning the inconstructorflag be done in thh constructor plugin?
+        var bodyStatements: [KotlinStatement] = []
+//        bodyStatements.append(KotlinRawStatement(sourceCode: "\(KotlinVariableDeclaration.inConstructorFlagName) = true"))
+        bodyStatements += variableDeclarations.map { variableDeclaration in
             let selfIdentifier = KotlinIdentifier(name: "self")
             let memberAccess = KotlinMemberAccess(base: selfIdentifier, member: variableDeclaration.names[0])
             let paramIdentifier = KotlinIdentifier(name: variableDeclaration.names[0])
@@ -90,6 +93,7 @@ class KotlinStructPlugin: KotlinPlugin {
             statement.expression = assignmentOperator
             return statement
         }
+//        bodyStatements.append(KotlinRawStatement(sourceCode: "\(KotlinVariableDeclaration.inConstructorFlagName) = false"))
         constructor.body = KotlinCodeBlock(statements: bodyStatements)
         classDeclaration.members.append(constructor)
     }
@@ -101,18 +105,20 @@ class KotlinStructPlugin: KotlinPlugin {
         constructor.modifiers = Modifiers(visibility: .private)
         constructor.extras = .singleNewline
 
-        var bodyStatements: [KotlinStatement] = [KotlinRawStatement(sourceCode: "val copy = copy as \(classDeclaration.name)")]
+        var bodyStatements: [KotlinStatement] = []
+        bodyStatements.append(KotlinRawStatement(sourceCode: "val copy = copy as \(classDeclaration.name)"))
+//        bodyStatements.append(KotlinRawStatement(sourceCode: "\(KotlinVariableDeclaration.inConstructorFlagName) = true"))
         bodyStatements += variableDeclarations.map { variableDeclaration in
             let selfIdentifier = KotlinIdentifier(name: "self")
             let memberAccess = KotlinMemberAccess(base: selfIdentifier, member: variableDeclaration.names[0])
             let copyIdentifier = KotlinIdentifier(name: "copy")
             let copyMemberAccess = KotlinMemberAccess(base: copyIdentifier, member: variableDeclaration.names[0])
-            copyMemberAccess.mayBeSharedMutableValue = variableDeclaration.mayBeSharedMutableValue
-            let assignmentOperator = KotlinBinaryOperator(op: .with(symbol: "="), lhs: memberAccess, rhs: copyMemberAccess.valueReference())
+            let assignmentOperator = KotlinBinaryOperator(op: .with(symbol: "="), lhs: memberAccess, rhs: copyMemberAccess)
             let statement = KotlinExpressionStatement(type: .expression)
             statement.expression = assignmentOperator
             return statement
         }
+//        bodyStatements.append(KotlinRawStatement(sourceCode: "\(KotlinVariableDeclaration.inConstructorFlagName) = false"))
         constructor.body = KotlinCodeBlock(statements: bodyStatements)
         classDeclaration.members.append(constructor)
     }

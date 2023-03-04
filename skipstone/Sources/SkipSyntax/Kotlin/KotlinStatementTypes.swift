@@ -735,6 +735,8 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         return modifiers.isStatic
     }
 
+//    static let inConstructorFlagName = "inconstructorflag"
+
     static func translate(statement: VariableDeclaration, translator: KotlinTranslator) -> KotlinVariableDeclaration {
         let kstatement = KotlinVariableDeclaration(statement: statement)
         kstatement.isLet = statement.isLet
@@ -870,17 +872,23 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if setter?.body != nil || willSet?.body != nil || didSet?.body != nil {
             let setterIndentation = indentation.inc()
             let setterBodyIndentation = setterIndentation.inc()
+            output.append(setterIndentation).append("set(newValue) {\n")
             if mayBeSharedMutableValue {
-                output.append(setterIndentation).append("set(newGivenValue) {\n")
-                output.append(setterBodyIndentation).append("val newValue = newGivenValue.valref()\n")
-            } else {
-                output.append(setterIndentation).append("set(newValue) {\n")
+                output.append(setterBodyIndentation).append("val newValue = newValue.valref()\n")
             }
             if let willSetBody = willSet?.body {
+//                if isProperty {
+//                    output.append(setterBodyIndentation).append("if (!\(Self.inConstructorFlagName)) {\n")
+//                }
+//                let willSetIndentation = isProperty ? setterBodyIndentation.inc() : setterBodyIndentation
+                let willSetIndentation = setterBodyIndentation
                 if let parameterName = willSet?.parameterName, parameterName != "newValue" {
-                    output.append(setterBodyIndentation).append("val \(parameterName) = newValue\n")
+                    output.append(willSetIndentation).append("val \(parameterName) = newValue\n")
                 }
-                output.append(willSetBody, indentation: setterBodyIndentation)
+                output.append(willSetBody, indentation: willSetIndentation)
+//                if isProperty {
+//                    output.append(setterBodyIndentation).append("}\n")
+//                }
             }
             if let setterBody = setter?.body {
                 if let parameterName = setter?.parameterName, parameterName != "newValue" && parameterName != willSet?.parameterName {
@@ -894,7 +902,15 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 output.append(setterBodyIndentation).append("field = newValue\n")
             }
             if let didSetBody = didSet?.body {
-                output.append(didSetBody, indentation: setterBodyIndentation)
+//                if isProperty {
+//                    output.append(setterBodyIndentation).append("if (!\(Self.inConstructorFlagName)) {\n")
+//                }
+//                let didSetIndentation = isProperty ? setterBodyIndentation.inc() : setterBodyIndentation
+                let didSetIndentation = setterBodyIndentation
+                output.append(didSetBody, indentation: didSetIndentation)
+//                if isProperty {
+//                    output.append(setterBodyIndentation).append("}\n")
+//                }
             }
             output.append(setterIndentation).append("}\n")
         } else if !isReadOnly && mayBeSharedMutableValue && (isProperty || isGlobal) {

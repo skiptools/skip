@@ -81,7 +81,9 @@ class KotlinBinaryOperator: KotlinExpression {
     static func translate(expression: BinaryOperator, translator: KotlinTranslator) -> KotlinBinaryOperator {
         let klhs = translator.translateExpression(expression.lhs)
         var krhs = translator.translateExpression(expression.rhs)
-        if expression.op.precedence == .assignment {
+        // We need to valref() on assigning to a local var, but members valref() on assignment already.
+        // This won't catch implicit members, however (i.e. 'x' in place of 'self.x')
+        if expression.op.precedence == .assignment && !(klhs is KotlinMemberDeclaration) {
             krhs = krhs.valueReference()
         }
         let kexpression = KotlinBinaryOperator(expression: expression, lhs: klhs, rhs: krhs)

@@ -142,10 +142,8 @@ private class UnreachableVisitor {
         guard hasReturnValue == true && hasIfCheckVariable else {
             return
         }
-        // error("Unreachable")
-        let errorExpression = KotlinFunctionCall(function: KotlinIdentifier(name: "error"), arguments: [LabeledValue(value: KotlinStringLiteral(literal: "Unreachable"))])
-        let errorStatement = KotlinExpressionStatement(type: .expression)
-        errorStatement.expression = errorExpression
+        let errorStatement = KotlinRawStatement(sourceCode: "error(\"Unreachable\")")
+        errorStatement.parent = codeBlock
         codeBlock.statements.append(errorStatement)
     }
 }

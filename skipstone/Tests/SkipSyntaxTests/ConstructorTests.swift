@@ -318,4 +318,60 @@ final class ConstructorTests: XCTestCase {
         }
         """)
     }
+
+    func testSetterSideEffects() {
+        let base = ConstructorTestsSideEffectBase()
+        XCTAssertFalse(base.didSet1)
+        XCTAssertFalse(base.didSet2)
+
+        let sub = ConstructorTestsSideEffectSub()
+        XCTAssertTrue(sub.didSet1)
+        XCTAssertFalse(sub.didSet2)
+        XCTAssertFalse(sub.didSet3)
+        XCTAssertFalse(sub.didSet4)
+    }
+}
+
+private class ConstructorTestsSideEffectBase {
+    var i1: Int {
+        didSet {
+            didSet1 = true
+        }
+    }
+    var i2 = 200 {
+        didSet {
+            didSet2 = true
+        }
+    }
+
+    var didSet1 = false
+    var didSet2 = false
+
+    init() {
+        self.i1 = 100
+        self.i2 = 200
+    }
+}
+
+private class ConstructorTestsSideEffectSub: ConstructorTestsSideEffectBase {
+    var i3: Int {
+        didSet {
+            didSet3 = true
+        }
+    }
+    var i4 = 400 {
+        didSet {
+            didSet4 = true
+        }
+    }
+
+    var didSet3 = false
+    var didSet4 = false
+
+    override init() {
+        self.i3 = 300
+        super.init()
+        self.i4 = 400
+        self.i1 = 150
+    }
 }
