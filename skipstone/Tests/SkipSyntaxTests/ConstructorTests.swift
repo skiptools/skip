@@ -223,14 +223,8 @@ final class ConstructorTests: XCTestCase {
             private var s: String
         }
         """, kotlin: """
-        internal class A: MutableStruct {
-        
-            override var supdate: ((Any) -> Unit)? = null
-        
-            override fun scopy(): MutableStruct {
-                return A()
-            }
-        
+        internal class A {
+
             companion object {
             }
         }
@@ -257,18 +251,12 @@ final class ConstructorTests: XCTestCase {
             }
         }
         
-        internal class C: MutableStruct {
+        internal class C {
             internal val i = 100
             internal val s: String
                 get() {
                     return "100"
                 }
-        
-            override var supdate: ((Any) -> Unit)? = null
-        
-            override fun scopy(): MutableStruct {
-                return C()
-            }
         
             companion object {
             }

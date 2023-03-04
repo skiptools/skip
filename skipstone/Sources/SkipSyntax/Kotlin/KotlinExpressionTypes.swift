@@ -375,7 +375,7 @@ class KotlinFunctionCall: KotlinExpression {
         var forceParentheses = false
         if let closure = function as? KotlinClosure, closure.hasReturnLabel {
             // Kotlin does not allow return labels in immediately-executed lambdas. Convert to a call to our special closure-running functions
-            output.append(KotlinClosure.returnLabel)
+            output.append("linvoke")
             trailingClosure = closure
         } else {
             if let arrayLiteral = function as? KotlinArrayLiteral, arrayLiteral.elements.count == 1 {

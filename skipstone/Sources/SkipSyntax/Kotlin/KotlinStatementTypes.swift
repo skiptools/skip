@@ -590,7 +590,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if let body {
             output.append(" {\n")
             if !body.statements.isEmpty {
-                var bodyIndentation = indentation.inc()
+                let bodyIndentation = indentation.inc()
                 for parameter in parameters {
                     if let externalLabel = parameter.externalLabel, parameter.internalLabel != parameter.externalLabel {
                         output.append(bodyIndentation).append("val \(parameter.internalLabel) = \(externalLabel)\n")

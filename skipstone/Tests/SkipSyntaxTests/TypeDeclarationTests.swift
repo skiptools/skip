@@ -39,17 +39,55 @@ final class TypeDeclarationTests: XCTestCase {
         """)
     }
 
-    func testStruct() async throws {
+    func testImmutableStruct() async throws {
         try await check(swift: """
         struct A {
+            let i: Int
+
+            init(i: Int) {
+                self.i = i
+            }
+        }
+        """, kotlin: """
+        internal class A {
+            internal val i: Int
+
+            internal constructor(i: Int) {
+                this.i = i
+            }
+
+            companion object {
+            }
+        }
+        """)
+    }
+
+    func testMutableStruct() async throws {
+        try await check(swift: """
+        struct A {
+            internal var i: Int
+
+            init(i: Int) {
+                self.i = i
+            }
         }
         """, kotlin: """
         internal class A: MutableStruct {
+            internal var i: Int
+
+            internal constructor(i: Int) {
+                this.i = i
+            }
+
+            private constructor(copy: MutableStruct) {
+                val copy = copy as A
+                this.i = copy.i
+            }
 
             override var supdate: ((Any) -> Unit)? = null
 
             override fun scopy(): MutableStruct {
-                return A()
+                return A(this as MutableStruct)
             }
 
             companion object {
