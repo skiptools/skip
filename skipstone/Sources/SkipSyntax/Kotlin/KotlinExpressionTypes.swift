@@ -457,6 +457,8 @@ class KotlinIdentifier: KotlinExpression {
     override func append(to output: OutputGenerator, indentation: Indentation) {
         if name == "self" {
             output.append("this")
+        } else if name == "Self" {
+            output.append("Companion")
         } else {
             output.append(Self.translateName(name))
         }

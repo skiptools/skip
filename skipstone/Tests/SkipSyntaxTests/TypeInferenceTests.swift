@@ -130,6 +130,11 @@ final class TypeInferenceTests: XCTestCase {
         XCTExpectFailure()
         XCTFail("TODO: We should fall back to looking for matching symbols when we don't know the type and using TypeSignature.isCompatible to match")
     }
+
+    func testStaticVsInstanceContext() {
+        XCTExpectFailure()
+        XCTFail("TODO: Test member references in static vs instance contexts. Test duplicate static and instance members")
+    }
 }
 
 enum TypeInferenceTestsEnum {

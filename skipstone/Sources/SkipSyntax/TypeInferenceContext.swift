@@ -102,11 +102,11 @@ struct TypeInferenceContext {
                 return identifierType
             }
         }
-        if name == "self" || name == "super" {
+        if name == "self" || name == "Self" || name == "super" {
             guard let typeDeclaration = typePath.last else {
                 return .none
             }
-            return name == "self" ? typeDeclaration.signature : typeDeclaration.inherits.first ?? .none
+            return name == "self" || name == "Self" ? typeDeclaration.signature : typeDeclaration.inherits.first ?? .none
         }
         guard let symbols else {
             return .none
