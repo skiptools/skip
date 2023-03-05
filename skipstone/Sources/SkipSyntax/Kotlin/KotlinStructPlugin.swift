@@ -1,13 +1,12 @@
 /// Give struct semantics to Kotlin classes translated from Swift structs.
 class KotlinStructPlugin: KotlinPlugin {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
-        syntaxTree.root.visit(perform: visit)
+        syntaxTree.root.statements.forEach { $0.visit(perform: self.visit) }
     }
 
     private func visit(_ node: KotlinSyntaxNode) -> VisitResult<KotlinSyntaxNode> {
         guard let classDeclaration = node as? KotlinClassDeclaration else {
-            // Don't skip the root code block
-            return node is KotlinCodeBlock ? .recurse(nil) : .skip
+            return .skip
         }
         if classDeclaration.declarationType == .structDeclaration {
             updateStructDeclaration(classDeclaration)

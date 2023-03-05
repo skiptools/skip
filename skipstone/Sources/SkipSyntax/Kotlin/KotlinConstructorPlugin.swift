@@ -1,7 +1,7 @@
 /// Migrate Swift constructors to Kotlin constructors.
 class KotlinConstructorPlugin: KotlinPlugin {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
-        syntaxTree.root.visit { visit($0, translator: translator) }
+        syntaxTree.root.statements.forEach { $0.visit { visit($0, translator: translator) } }
     }
 
     private func visit(_ node: KotlinSyntaxNode, translator: KotlinTranslator) -> VisitResult<KotlinSyntaxNode> {
@@ -36,16 +36,12 @@ class KotlinConstructorPlugin: KotlinPlugin {
             if mayNeedSuperclassCall {
                 addSuperclassCall(to: classDeclaration, translator: translator)
             }
-        case .constructorDeclaration:
-            return .skip
-        case .variableDeclaration:
-            return .skip
-        case .functionDeclaration:
-            return .skip
+            return .recurse(nil)
+        case .extensionDeclaration:
+            return .recurse(nil)
         default:
-            break
+            return .skip
         }
-        return .recurse(nil)
     }
 
     private func addInheritedConstructors(to classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) -> Bool {
