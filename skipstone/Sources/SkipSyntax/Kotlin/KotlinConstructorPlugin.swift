@@ -18,12 +18,20 @@ class KotlinConstructorPlugin: KotlinPlugin {
                     mayNeedSuperclassCall = !addInheritedConstructors(to: classDeclaration, translator: translator)
                 }
             } else {
+                var hasNonEmptyConstructor = false
                 for constructor in constructors {
-                    if !fixupConstructor(constructor as! KotlinFunctionDeclaration) {
-                        mayNeedSuperclassCall = true
+                    if let constructor = constructor as? KotlinFunctionDeclaration {
+                        if !fixupConstructor(constructor) {
+                            mayNeedSuperclassCall = true
+                        }
+                        if constructor.body?.statements.isEmpty == false {
+                            hasNonEmptyConstructor = true
+                        }
                     }
                 }
-                addIsInConstructorCheckProperty(to: classDeclaration)
+                if hasNonEmptyConstructor {
+                    addIsInConstructorCheckProperty(to: classDeclaration)
+                }
             }
             if mayNeedSuperclassCall {
                 addSuperclassCall(to: classDeclaration, translator: translator)

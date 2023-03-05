@@ -318,6 +318,61 @@ final class ConstructorTests: XCTestCase {
         XCTAssertFalse(sub.didSet3)
         XCTAssertFalse(sub.didSet4)
     }
+
+    func testConstructorSkipsVariableWillDidSet() async throws {
+        try await check(swift: """
+        class A {
+            var i = 1 {
+                willSet {
+                    print(newValue)
+                }
+            }
+            var j = 2 {
+                didSet {
+                    print(j == 2)
+                }
+            }
+
+            init(i: Int, j: Int) {
+                self.i = i
+                self.j = j
+            }
+        }
+        """, kotlin: """
+        internal open class A {
+            internal var i = 1
+                set(newValue) {
+                    if (!isconstructing) {
+                        print(newValue)
+                    }
+                    field = newValue
+                }
+            internal var j = 2
+                set(newValue) {
+                    val oldValue = field
+                    field = newValue
+                    if (!isconstructing) {
+                        print(j == 2)
+                    }
+                }
+
+            internal constructor(i: Int, j: Int) {
+                isconstructing = true
+                try {
+                    this.i = i
+                    this.j = j
+                } finally {
+                    isconstructing = false
+                }
+            }
+
+            private var isconstructing = false
+
+            companion object {
+            }
+        }
+        """)
+    }
 }
 
 private class ConstructorTestsSideEffectBase {

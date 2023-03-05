@@ -878,7 +878,8 @@ class VariableDeclaration: Statement {
                         let parameterName = accessorSyntax.parameter?.name.text
                         setter = Accessor(parameterName: parameterName, body: body)
                     case "willSet":
-                        willSet = Accessor(body: body)
+                        let parameterName = accessorSyntax.parameter?.name.text
+                        willSet = Accessor(parameterName: parameterName, body: body)
                     case "didSet":
                         didSet = Accessor(body: body)
                     default:
