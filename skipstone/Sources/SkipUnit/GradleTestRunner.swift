@@ -1,7 +1,8 @@
 @_exported import SkipBuild
 @_exported import XCTest
+import TSCBasic
 import SkipSyntax
-import os.log
+import OSLog
 
 fileprivate let logger = Logger(subsystem: "skip", category: "unit")
 fileprivate let gradleLogger = Logger(subsystem: "skip", category: "gradle")
@@ -32,7 +33,7 @@ extension GradleTestRunner {
         #if os(macOS) || os(Linux)
         // turn SomeLibTests.SomeLibTests/ into SomeLibTests/
         let testOutputBase = self.className.split(separator: ".").first ?? .init(self.className)
-        try await SkipAssembler.assembleAndExecuteGradle(testCase: Self.testInProcess ? self : nil, root: srcRoot, targets: targets, destRoot: "\(SkipAssembler.kipFolderName)/\(testOutputBase)")
+        try await SkipSystem.assembleAndExecuteGradle(testCase: Self.testInProcess ? self : nil, root: srcRoot, targets: targets, destRoot: "\(SkipSystem.kipFolderName)/\(testOutputBase)")
         #else
         throw XCTSkip("skipping assembleAndExecuteGradle on unsupported platform")
         #endif
@@ -40,16 +41,18 @@ extension GradleTestRunner {
 }
 
 #if os(macOS) || os(Linux)
-extension SkipAssembler {
-    @discardableResult static func assembleAndExecuteGradle(testCase: GradleTestRunner?, root packageRoot: URL, moduleRootPath: String = "Kotlin", sourceFolder: String = "Sources", testsFolder: String? = "Tests", targets: SkipTargetSet, destRoot: String, verbose: Bool = true, overwrite: Bool = true, studioID: String = androidStudioBundleID) async throws -> URL {
+extension SkipSystem {
+    @discardableResult static func assembleAndExecuteGradle(testCase: GradleTestRunner?, root packageRoot: URL, moduleRootPath: String = "Kotlin", sourceFolder: String = "Sources", testsFolder: String? = "Tests", targets: SkipTargetSet, destRoot: String, verbose: Bool = false, overwrite: Bool = true, studioID: String = androidStudioBundleID) async throws -> URL {
         logger.info("transpiling and testing: \(targets.target.moduleName) from: \(packageRoot.path)")
 
-        let packageSwift = try await System.parsePackageSwift(path: packageRoot)
+        let packageSwift = try await SkipSystem.parsePackageSwift(path: packageRoot)
 
         let _ = packageSwift // TODO: use Package.swift to determine local module dependencies
 
         // transpile and assemble the gradle project in the given destination
-        let (destRoot, paths) = try await SkipAssembler.assemble(root: packageRoot, moduleRootPath: moduleRootPath, sourceFolder: sourceFolder, testsFolder: testsFolder, targets: targets, destRoot: destRoot)
+        let (destRoot, paths) = try await SkipSystem.assemble(root: packageRoot, moduleRootPath: moduleRootPath, sourceFolder: sourceFolder, testsFolder: testsFolder, targets: targets, destRoot: destRoot)
+
+        let workingFolder = try AbsolutePath(validating: destRoot.path)
 
         #if DEBUG
         let target = "testDebugUnitTest"
@@ -102,7 +105,7 @@ extension SkipAssembler {
 
         var issues: [XCTIssue] = []
         do {
-            try await System.exec(URL(fileURLWithPath: "/usr/bin/env", isDirectory: false), arguments: args, environment: env, workingDirectory: destRoot) { outputLine in
+            func handleOutputLine(_ outputLine: String) {
                 if outputLine.hasPrefix("w: ") {
                     gradleLogger.warning("\(outputLine)")
                     // breakpoint here to stop on build warning
@@ -116,7 +119,7 @@ extension SkipAssembler {
                     gradleLogger.debug("\(outputLine)")
                 }
 
-                try Task.checkCancellation()
+                //try Task.checkCancellation() // TODO: throwing?
 
                 // errors look like: java.lang.AssertionError at CrossFoundationTests.kt:13
                 let line = outputLine.trimmingCharacters(in: .whitespaces)
@@ -132,7 +135,25 @@ extension SkipAssembler {
                     }
                 }
             }
-        } catch let error as System.SystemProcessFailed {
+
+            var outputBuffer = Data()
+            func handleOutput(_ buffer: [UInt8]) {
+                let nl = Character("\n").asciiValue
+                for c in buffer {
+                    if c == nl {
+                        let str = String(data: outputBuffer, encoding: .utf8) ?? ""
+                        handleOutputLine(str)
+                        outputBuffer = Data()
+                    } else {
+                        outputBuffer.append(c)
+                    }
+                }
+            }
+
+            let process = Process(arguments: ["/usr/bin/env"] + args, environment: env, workingDirectory: workingFolder, outputRedirection: .stream(stdout: handleOutput, stderr: { _ in }, redirectStderr: true))
+            try process.launch()
+            try await process.waitUntilExit()
+        } catch let error as TSCBasic.Process.Error {
             // Gradle fails either due to build failures or test failures; since we're already creating issues for the test failures, we shouldn't add an additional failure
             if issues.isEmpty {
                 throw error

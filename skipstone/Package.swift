@@ -13,7 +13,7 @@ let package = Package(
         .library(name: "SkipBuild", targets: ["SkipBuild"]),
         .library(name: "SkipUnit", targets: ["SkipUnit"]),
         .library(name: "SkipLib", targets: ["SkipLib"]),
-        .plugin(name: "Skippy", targets: ["Skippy"]),
+        .plugin(name: "SkipCheck", targets: ["SkipCheck"]),
 
         .library(name: "CrossFoundation", targets: ["CrossFoundation"]),
         .library(name: "CrossUI", targets: ["CrossUI"]),
@@ -25,6 +25,8 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-syntax.git", branch: "main"),
         .package(url: "https://github.com/apple/swift-docc-symbolkit.git", branch: "main"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.0.0"),
+        .package(url: "https://github.com/apple/swift-tools-support-core.git", from: "0.5.0"),
+        .package(url: "https://github.com/marcprux/universal.git", from: "5.0.0"),
     ],
     targets: [
         .target(name: "SkipSyntax", dependencies: [
@@ -34,13 +36,18 @@ let package = Package(
         ]),
         .testTarget(name: "SkipSyntaxTests", dependencies: ["SkipSyntax", "SkipLib", "SkipBuild"]),
 
-        .target(name: "SkipBuild", dependencies: ["SkipSyntax"]),
+        .target(name: "SkipBuild", dependencies: [
+            "SkipSyntax",
+            .product(name: "Universal", package: "universal"),
+            .product(name: "ArgumentParser", package: "swift-argument-parser"),
+            .product(name: "TSCBasic", package: "swift-tools-support-core"),
+        ]),
         .testTarget(name: "SkipBuildTests", dependencies: ["SkipBuild"]),
 
-        .executableTarget(name: "SkipRunner", dependencies: ["SkipBuild", .product(name: "ArgumentParser", package: "swift-argument-parser")]),
-        .testTarget(name: "SkipRunnerTests", dependencies: [], plugins: ["Skippy"]),
+        .executableTarget(name: "SkipRunner", dependencies: ["SkipBuild"]),
+        .testTarget(name: "SkipRunnerTests", dependencies: ["SkipRunner"], plugins: ["SkipCheck"]),
 
-        .plugin(name: "Skippy",
+        .plugin(name: "SkipCheck",
                 capability: .buildTool(),
                 dependencies: ["SkipRunner"]),
         .plugin(name: "SkipCommand",

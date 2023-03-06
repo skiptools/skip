@@ -4,16 +4,16 @@ import XCTest
 
 final class SkipAssemberTests: XCTestCase {
     func testKotlinScripting() async throws {
-        let three = try await SkipAssembler.kotlinc(script: "1+2")
-        XCTAssertEqual("3", three.last)
+        let three = try await SkipSystem.kotlinc(script: "1+2")
+        XCTAssertEqual("3", three)
 
-        let x2 = try await SkipAssembler.kotlinc(script: "\"x\"+2")
-        XCTAssertEqual("x2", x2.last)
+        let x2 = try await SkipSystem.kotlinc(script: "\"x\"+2")
+        XCTAssertEqual("x2", x2)
     }
 
     func DISABLEDtestKotlinJSConversion() async throws { // rather slow
         @Sendable @discardableResult func check(_ kotlin: String, _ expected: String, file: StaticString = #file, line: UInt = #line) async throws -> String {
-            let js = try await SkipAssembler.kotlinToJS(kotlin)
+            let js = try await SkipSystem.kotlinToJS(kotlin)
             XCTAssertTrue(js.contains(expected), "Unexpected output: \(js)", file: file, line: line)
             return js
         }

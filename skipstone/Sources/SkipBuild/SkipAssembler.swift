@@ -1,7 +1,8 @@
 import Foundation
 import SkipSyntax
 import SymbolKit
-import os.log
+import TSCBasic
+import OSLog
 #if canImport(Cocoa)
 import class Cocoa.NSWorkspace
 #endif
@@ -34,7 +35,7 @@ public struct SkipTargetSet {
 
 #if os(macOS) || os(Linux)
 
-public struct SkipAssembler {
+extension SkipSystem {
     /// The output folder name for the kotlin interop project (kip)
     //#if DEBUG
     public static let kipFolderName = "kip"
@@ -67,10 +68,8 @@ public struct SkipAssembler {
 
     static var kotlinCompiler: URL {
         get throws {
-            let studioRoot = try studioRoot(bundleID: androidStudioBundleID)
             // e.g.: /Applications/Android Studio.app/Contents/plugins/Kotlin/kotlinc/bin/kotlinc
-            let kotlinc = URL(fileURLWithPath: "Contents/plugins/Kotlin/kotlinc/bin/kotlinc", isDirectory: false, relativeTo: studioRoot)
-            return kotlinc
+            URL(fileURLWithPath: "Contents/plugins/Kotlin/kotlinc/bin/kotlinc", isDirectory: false, relativeTo: try studioRoot(bundleID: androidStudioBundleID))
         }
     }
 
@@ -79,16 +78,14 @@ public struct SkipAssembler {
     ///   - studioID: the ID of the app container for the `kotlinc` command
     ///   - script: the script to execute
     /// - Returns: the string result of the script
-    public static func kotlinc(script: String) async throws -> [String] {
-        var output: [String] = []
-        try await System.exec(arguments: ["/bin/sh", kotlinCompiler.path, "-e", script], environment: nil) { line in
-            output.append(line)
-        }
-        return output
+    public static func kotlinc(script: String) async throws -> String {
+        try await Process.popen(arguments: ["/bin/sh", kotlinCompiler.path, "-e", script])
+            .utf8Output()
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// Converts the given Kotlin script to JavaScript.
-    public static func kotlinToJS(_ kotlin: String, cleanup: Bool = true) async throws -> String {
+    public static func kotlinToJS(_ kotlin: String, legacy: Bool = true, cleanup: Bool = true) async throws -> String {
         var env: [String: String] = [:]
         // activates Kotlin->JavaScript mode
         env["KOTLIN_COMPILER"] = "org.jetbrains.kotlin.cli.js.K2JSCompiler"
@@ -103,16 +100,14 @@ public struct SkipAssembler {
 
         let outputURL = URL(fileURLWithPath: "output.js", isDirectory: false, relativeTo: tmpDir)
 
-        var output: [String] = []
-        try await System.exec(arguments: ["/bin/sh",
-                                          kotlinCompiler.path,
-                                          "-Xuse-deprecated-legacy-compiler",
-                                          "-output", outputURL.path,
-                                          sourceURL.path
-                                         ], environment: env, workingDirectory: tmpDir) { line in
-            print("kotlinToJS: \(line)")
-            output.append(line)
-        }
+        let result = try await Process.popen(arguments: ["/bin/sh",
+                                                                  kotlinCompiler.path,
+                                                                  legacy ? "-Xuse-deprecated-legacy-compiler" : nil,
+                                                                  "-output", outputURL.path,
+                                                                  sourceURL.path
+                                                                 ].compactMap({ $0 }), environment: env)
+
+        let _ = result
 
         defer { if cleanup { try? FileManager.default.removeItem(at: outputURL) } }
         return try String(contentsOf: outputURL)
@@ -156,7 +151,7 @@ public struct SkipAssembler {
             if let linkFrom = linkFrom {
                 let linkURL = destURL
                 let linkPath = linkURL.pathRelative(to: linkFrom) ?? linkURL.path
-                logger.info("linking from \(linkURL.path) to \(linkPath)")
+                logger.info("linking from \(linkURL.relativePath) to \(linkPath)")
                 try? FileManager.default.createDirectory(at: linkURL.deletingLastPathComponent(), withIntermediateDirectories: true)
 
                 // only re-create the link if it is not currently pointing to the expected destination
@@ -190,7 +185,7 @@ public struct SkipAssembler {
         let collector = GraphCollector(extensionGraphAssociationStrategy: .extendingGraph)
         for targetSet in targets.deepTargetSet {
             let moduleName = targetSet.target.moduleName
-            let symbolGraphs = try await System.extractSymbols(moduleURL, moduleNames: [moduleName])
+            let symbolGraphs = try await SkipSystem.extractSymbols(moduleURL, moduleNames: [moduleName])
             for (url, graph) in symbolGraphs {
                 logger.debug("adding symbol graph for: \(url.path)")
                 collector.mergeSymbolGraph(graph, at: url)
@@ -916,137 +911,6 @@ extension URL {
     }
 
 }
-
-#if os(macOS) || os(Linux)
-extension Process {
-    /// Create a process with the given exeuctable and arguments.
-    /// - Parameters:
-    ///   - executableURL: the path to the executable
-    ///   - argument: the array of argument strings
-    public convenience init(executableURL: URL, arguments: [String], environment: [String: String]? = nil, workingDirectory: URL? = nil) {
-        self.init()
-        self.executableURL = executableURL
-        self.arguments = arguments
-        self.environment = environment
-        self.currentDirectoryURL = workingDirectory
-    }
-
-    /// Runs the process with the specified arguments, asyncronously waits for the result, and then returns the stdout and stderr.
-    public func execute() async throws -> (stdout: Pipe, stderr: Pipe) {
-        let (stdout, stderr) = (Pipe(), Pipe())
-        (self.standardOutput, self.standardError) = (stdout, stderr)
-        let cancel = { self.interrupt() }
-
-        return try await withTaskCancellationHandler {
-            return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<(Pipe, Pipe), Error>) in
-                self.terminationHandler = { task in
-                    if task.terminationStatus == 0 {
-                        continuation.resume(returning: (stdout, stderr))
-                    } else {
-                        continuation.resume(throwing: RunProcessError.nonZeroExit(task.terminationStatus, stdout, stderr))
-                    }
-                }
-
-                do {
-                    try self.run()
-                } catch {
-                    continuation.resume(throwing: RunProcessError.execError(error))
-                }
-            }
-        } onCancel: {
-            cancel()
-        }
-    }
-
-    public enum RunProcessError: Error {
-        case execError(Error)
-        case nonZeroExit(_ exitCode: Int32, _ stdout: Pipe, _ stderr: Pipe)
-    }
-}
-
-
-public actor System {
-    public var process: Process
-    private var started: Bool = false
-
-    public static let logger = Logger(subsystem: "skip", category: "system")
-
-    public init(executableURL: URL, arguments: [String], environment: [String: String]? = nil, workingDirectory: URL? = nil) {
-        let stdout = Pipe()
-        let stderr = stdout // Pipe() // FIXME: we use the same pipe for both standard out and standard err since I can't figure out how to asynchronously read from two file handles at the same time
-        let process = Process()
-        process.standardOutput = stdout
-        process.standardError = stderr
-        process.executableURL = executableURL
-        process.arguments = arguments
-        process.environment = environment
-        process.currentDirectoryURL = workingDirectory
-
-        self.process = process
-    }
-
-    public var stdout: FileHandle.AsyncBytes {
-        (process.standardOutput as! Pipe).fileHandleForReading.bytes
-    }
-
-    public var stderr: FileHandle.AsyncBytes {
-        (process.standardError as! Pipe).fileHandleForReading.bytes
-    }
-
-    /// Executes the given process, sending lines to `outputHandler` and waiting for a non-zero exit code.
-    public static func exec(_ executableURL: URL = URL(fileURLWithPath: "/usr/bin/env", isDirectory: false), arguments: [String], environment: [String: String]? = nil, workingDirectory: URL? = nil, outputHandler: (String) async throws -> ()) async throws {
-        logger.info("exec: \(executableURL.path) \(arguments.joined(separator: " "))")
-        let process = System(executableURL: executableURL, arguments: arguments, environment: environment, workingDirectory: workingDirectory)
-        try await process.run()
-        let outLines = await process.stdout.lines
-        for try await line in outLines where !Task.isCancelled {
-            try await outputHandler(line)
-        }
-        try Task.checkCancellation()
-        try await process.wait()
-    }
-
-    /// Starts the process
-    public func run() throws {
-        if !started {
-            started = true
-            try process.run()
-        }
-    }
-
-    public struct SystemProcessFailed : LocalizedError {
-        public let failureReason: String?
-        public let terminationStatus: Int32
-    }
-
-    /// Runs the process with the specified arguments, asyncronously waits for the result, and then returns the stdout and stderr.
-    @discardableResult public func wait() async throws -> Int32 {
-        let cancel = { self.process.interrupt() }
-        return try await withTaskCancellationHandler {
-            return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Int32, Error>) in
-                process.terminationHandler = { task in
-                    if task.terminationStatus != 0 {
-                        continuation.resume(throwing: SystemProcessFailed(failureReason: "Error code \(task.terminationStatus) returned.", terminationStatus: task.terminationStatus))
-                    } else {
-                        continuation.resume(returning: task.terminationStatus)
-                    }
-                }
-
-                do {
-                    if !started {
-                        started = true
-                        try process.run()
-                    }
-                } catch {
-                    continuation.resume(throwing: error)
-                }
-            }
-        } onCancel: {
-            cancel()
-        }
-    }
-}
-#endif
 
 extension Pipe {
     /// Reads all the remaining data available for the pipe.

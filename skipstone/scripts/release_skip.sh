@@ -34,7 +34,6 @@ RUNNER_PATH="Sources/SkipRunner/Runner.swift"
 sed -I '' 's;public let skipVersion = .*;public let skipVersion = "'${SEMVER_NEXT}'";g' ${RUNNER_PATH}
 
 
-
 swift build --arch arm64 --arch x86_64 --configuration ${CONFIG} --product ${PRODUCT}
 
 set -o pipefail
@@ -120,10 +119,10 @@ fi
 # finally, jump back and make a corresponding release in the private SwiftSource
 cd -
 
-git add "${RUNNER_PATH}"
-git commit -m "Release ${SEMVER_NEXT}" "${RUNNER_PATH}"
-git tag -s -a "${SEMVER_NEXT}" -m "Release ${SEMVER_NEXT}"
-git push --follow-tags
+#git add "${RUNNER_PATH}"
+#git commit -m "Release ${SEMVER_NEXT}" "${RUNNER_PATH}"
+#git tag --sign "${SEMVER_NEXT}" -m "Release ${SEMVER_NEXT}"
+#git push --follow-tags
 
 # get the new ref after we have pushed to SkipSource
 GITREF="$(git rev-parse HEAD)"

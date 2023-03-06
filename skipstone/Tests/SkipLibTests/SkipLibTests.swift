@@ -15,7 +15,7 @@ final class SkipLibTests: XCTestCase {
     #if !SKIP
     func testSkipLibSymbols() async throws {
         let testModule = "SkipLibTests"
-        let symbols = try await System.extractSymbols(URL.moduleBuildFolder, moduleNames: [testModule], accessLevel: "private")
+        let symbols = try await SkipSystem.extractSymbols(URL.moduleBuildFolder, moduleNames: [testModule], accessLevel: "private")
         let symbolGraph = try XCTUnwrap(symbols)
         XCTAssertEqual(1, symbolGraph.count)
         let graph = try XCTUnwrap(symbolGraph.values.first)

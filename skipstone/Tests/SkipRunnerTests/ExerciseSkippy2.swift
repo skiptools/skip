@@ -1,4 +1,4 @@
-/// A second file to exercise Skippy on multi-file modules.
+/// A second file to exercise SkipCheck on multi-file modules.
 
 func f2() throws -> Int? {
     return try? f3()

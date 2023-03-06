@@ -1,7 +1,8 @@
 import Foundation
 import SkipSyntax
 import SymbolKit
-import os.log
+import TSCBasic
+import OSLog
 
 fileprivate let logger = Logger(subsystem: "skip", category: "symbols")
 
@@ -23,7 +24,7 @@ public actor SymbolCache {
             return symbols
         }
 
-        let symbols = try await System.extractSymbols(moduleNames: [moduleName], accessLevel: accessLevel)
+        let symbols = try await SkipSystem.extractSymbols(moduleNames: [moduleName], accessLevel: accessLevel)
         guard !symbols.isEmpty else {
             struct NoSymbolsFoundError : Error { }
             throw NoSymbolsFoundError()
@@ -34,7 +35,9 @@ public actor SymbolCache {
 }
 
 #if os(macOS) || os(Linux)
-extension System {
+@available(*, deprecated, renamed: "SkipSystem")
+public typealias System = SkipSystem
+public struct SkipSystem {
     /// Takes the Swift file at the given URL and compiles it with the parameters for extracting symbols, and then returns the parsed symbol graph.
     ///
     /// - Parameters:
@@ -63,49 +66,36 @@ extension System {
         // first get the correct sdk and target info, a la: swiftc -module-name Source -emit-module-path . Source.swift && swift symbolgraph-extract -output-dir . -target $(swiftc -print-target-info | jq -r .target.triple) -sdk $(xcrun --show-sdk-path --sdk macosx) -minimum-access-level internal -I . -module-name Source
 
         // get the target info from the JSON emitted from `swift -print-target-info` (e.g., "arm64-apple-macosx13.0")
-        let targetInfoData = try await xcrun("swift", "-print-target-info").joined(separator: "\n").data(using: .utf8) ?? Data()
-        let targetInfo = try JSONDecoder().decode(SwiftTarget.self, from: targetInfoData)
+        let targetInfoData = try await xcrun("swift", "-print-target-info")
+        let targetInfo = try JSONDecoder().decode(SwiftTarget.self, from: Data(targetInfoData.utf8))
 
         // get the SDK path (e.g., for "xcrun --show-sdk-path --sdk macosx" it might return "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX13.1.sdk")
-        let sdKPath = try await xcrun("--show-sdk-path", "--sdk", sdk).joined(separator: "\n")
+        let sdKPath = try await xcrun("--show-sdk-path", "--sdk", sdk)
 
         let modulePath = urlBase.appendingPathExtension("swiftmodule").path
 
-        if singlePass {
-            try await xcrun("swift",
-                            "-frontend",
-                            "-module-name", moduleName,
-                            "-target", targetInfo.target.triple,
-                            "-sdk", sdKPath,
-                            "-emit-module-path", modulePath,
-                            "-emit-symbol-graph",
-                            "-emit-symbol-graph-dir", dir.path,
-                            "-symbol-graph-minimum-access-level", accessLevel,
-                            "-skip-synthesized-members",
-                            swiftFileURL.path)
-        } else {
-            try await xcrun("swift",
-                            "-frontend",
-                            "-module-name", moduleName,
-                            "-target", targetInfo.target.triple,
-                            "-sdk", sdKPath,
-                            "-emit-module-path", modulePath,
-                            swiftFileURL.path)
-            try await xcrun("swift",
-                            "symbolgraph-extract",
-                            "-module-name", moduleName,
-                            "-include-spi-symbols",
-                            "-skip-inherited-docs",
-                            "-skip-synthesized-members",
-                            //"-v", // verbose
-                            //"-pretty-print",
-                            //"-skip-synthesized-members",
-                            "-output-dir", dir.path,
-                            "-target", targetInfo.target.triple,
-                            "-sdk", sdKPath,
-                            "-minimum-access-level", accessLevel,
-                            "-I", dir.path)
-        }
+        try await xcrun("swift",
+                        "-frontend",
+                        "-module-name", moduleName,
+                        "-target", targetInfo.target.triple,
+                        "-sdk", sdKPath,
+                        "-emit-module-path", modulePath,
+                        swiftFileURL.path)
+
+        try await xcrun("swift",
+                        "symbolgraph-extract",
+                        "-module-name", moduleName,
+                        "-include-spi-symbols",
+                        "-skip-inherited-docs",
+                        "-skip-synthesized-members",
+                        //"-v", // verbose
+                        //"-pretty-print",
+                        //"-skip-synthesized-members",
+                        "-output-dir", dir.path,
+                        "-target", targetInfo.target.triple,
+                        "-sdk", sdKPath,
+                        "-minimum-access-level", accessLevel,
+                        "-I", dir.path)
 
         let symbolFile = urlBase.appendingPathExtension("symbols.json")
         let graphData = try Data(contentsOf: symbolFile)
@@ -182,7 +172,7 @@ extension System {
     /// Parses the package swift in the given folder and returns the deserialized structure from the JSON
     public static func parsePackageSwift(path: URL) async throws -> PackageSwift {
         // there's a quick with executing swift package from the test case: the first line when there is a branch is "error: 'pkgtest': Invalid branch name: 'main'" and it fails with error code 1
-        var jsonLines = try await xcrun(permitFailure: true, "swift", "package", "--package-path", path.path, "dump-package")
+        var jsonLines = try await xcrun(permitFailure: true, "swift", "package", "--package-path", path.path, "dump-package").split(separator: "\n")
         while jsonLines.first?.hasPrefix("{") == false {
             jsonLines.remove(at: 0)
         }
@@ -198,11 +188,11 @@ extension System {
         try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
 
         // get the target info from the JSON emitted from `swift -print-target-info` (e.g., "arm64-apple-macosx13.0")
-        let targetInfoData = try await xcrun("swift", "-print-target-info").joined(separator: "\n").data(using: .utf8) ?? Data()
-        let targetInfo = try JSONDecoder().decode(SwiftTarget.self, from: targetInfoData)
+        let targetInfoData = try await xcrun("swift", "-print-target-info")
+        let targetInfo = try JSONDecoder().decode(SwiftTarget.self, from: targetInfoData.data(using: .utf8)!)
 
         // get the SDK path (e.g., for "xcrun --show-sdk-path --sdk macosx" it might return "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX13.1.sdk")
-        let sdKPath = try await xcrun("--show-sdk-path", "--sdk", sdk).joined(separator: "\n")
+        let sdKPath = try await xcrun("--show-sdk-path", "--sdk", sdk)
 
         var modulePaths: [URL: SymbolGraph] = [:]
 
@@ -244,29 +234,18 @@ extension System {
         return modulePaths
     }
 
-    @discardableResult static func xcrun(permitFailure: Bool = false, _ args: String...) async throws -> [String] {
+    @discardableResult static func xcrun(permitFailure: Bool = false, _ args: String...) async throws -> String {
 #if os(macOS)
         // use xcrun, which will use whichever Swift we have set up with Xcode
-        let runcmd = URL(fileURLWithPath: "/usr/bin/xcrun", isDirectory: false)
+        let runcmd = "/usr/bin/xcrun"
 #elseif os(Linux)
         // use `env` to resolve the swift/swiftc command in the current environment
-        let runcmd = URL(fileURLWithPath: "/usr/bin/env", isDirectory: false)
+        let runcmd = "/usr/bin/env"
 #else
 #error("unsupported platform")
 #endif
-        var out: [String] = []
-        //logger.trace("xcrun: \(args.joined(separator: " "))")
-        do {
-            try await exec(runcmd, arguments: args, environment: nil, workingDirectory: nil, outputHandler: { output in
-                //logger.trace("xcrun> \(output)")
-                out.append(output)
-            })
-        } catch {
-            if !permitFailure {
-                throw error
-            }
-        }
-        return out
+        let result = try await Process.popen(arguments: [runcmd] + args)
+        return try result.utf8Output().trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 #endif

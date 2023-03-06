@@ -6,33 +6,22 @@ import ArgumentParser
 import SkipBuild
 import Universal
 import TSCBasic
+import TSCLibc
 import OSLog
 
 /// The current versio of the tool
-public let skipVersion = "0.0.40"
+public let skipVersion = "0.0.42"
 
 /// Command-line runner for the transpiler.
 @main public struct Runner {
     static func main() async throws {
-        try await mainNEW()
-    }
-
-    static func mainNEW() async throws {
         await SkipCommandExecutor.main()
-    }
-
-    static func mainOLD() async throws {
-        let arguments = CommandLine.arguments
-        if !arguments.isEmpty {
-            try await run(Array(arguments.dropFirst())) // Drop executable argument
-        }
     }
 
     /// Run the transpiler on the given arguments.
     public static func run(_ arguments: [String], out: WritableByteStream? = nil, err: WritableByteStream? = nil) async throws {
-        var cmd = try SkipCommandExecutor.parseAsRoot(arguments) as! AsyncParsableCommand
+        var cmd: ParsableCommand = try SkipCommandExecutor.parseAsRoot(arguments)
         if var cmd = cmd as? any StreamingCommand {
-            // set up error and output streams
             if let out = out {
                 cmd.output.streams.out = out
             }
@@ -40,48 +29,11 @@ public let skipVersion = "0.0.40"
                 cmd.output.streams.err = err
             }
             try await cmd.run()
-        } else {
+        } else if var cmd = cmd as? AsyncParsableCommand {
             try await cmd.run()
+        } else {
+            try cmd.run()
         }
-    }
-
-    public static func runOLD(_ arguments: [String]) async throws {
-        let (action, options, files) = try processArguments(arguments)
-        try await action.perform(on: files, options: options)
-    }
-
-    private static func processArguments(_ arguments: [String]) throws -> (Action, Options, [Source.File]) {
-        var files: [Source.File] = []
-        var action: Action?
-        var options = Options()
-        for argument in arguments {
-            if argument == "-skippy" {
-                action = SkippyAction()
-            } else if argument == "-version" {
-                action = PrintVersionAction()
-            } else if argument == "-swiftAST" {
-                action = PrintSwiftASTAction()
-            } else if argument == "-skipAST" {
-                action = PrintSkipASTAction()
-            } else if argument.hasPrefix("-D") && argument.count > 2 {
-                options.preprocessorSymbols.append(String(argument.dropFirst(2)))
-            } else if argument.hasPrefix("-O") && argument.count > 2 {
-                options.outputDirectory = String(argument.dropFirst(2))
-            } else if argument.hasPrefix("-") {
-                throw RunnerError(message: "Unrecognized option: \(argument)")
-            } else {
-                let source = Source.File(path: argument)
-                if source.isSwift {
-                    files.append(source)
-                }
-            }
-        }
-
-        if action == nil && files.isEmpty {
-            print("skip \(skipVersion): no input files")
-        }
-
-        return (action ?? TranspileAction(), options, files)
     }
 }
 
@@ -89,13 +41,13 @@ private protocol Action : AsyncParsableCommand {
     func perform(on sourceFiles: [Source.File], options: Options) async throws
 }
 
-private struct Options {
+struct Options {
     var preprocessorSymbols: [String] = []
     var outputDirectory: String?
 }
 
 private struct TranspileAction: Action {
-    public static var configuration = CommandConfiguration(commandName: "transpile", abstract: "transpile the sources")
+    public static var configuration = CommandConfiguration(commandName: "transpile", abstract: "Transpile Swift to Kotlin")
 
     @Option(name: [.long, .customShort("S")], help: ArgumentHelp("Preprocessor symbols", valueName: "file"))
     var symbols: [String] = []
@@ -127,8 +79,51 @@ private struct TranspileAction: Action {
     }
 }
 
-private struct SkippyAction: Action {
-    public static var configuration = CommandConfiguration(commandName: "skippy", abstract: "run the skippy processor")
+private struct AssembleAction: AsyncParsableCommand {
+    public static var configuration = CommandConfiguration(commandName: "assemble", abstract: "Generate Gradle build for project")
+
+    func run() async throws {
+        throw ValidationError("Not yet suppoerted")
+    }
+}
+
+private struct BuildAction: AsyncParsableCommand {
+    public static var configuration = CommandConfiguration(commandName: "build", abstract: "Build transpiled Kotlin project")
+
+    func run() async throws {
+        throw ValidationError("Not yet suppoerted")
+    }
+}
+
+private struct TestAction: AsyncParsableCommand {
+    public static var configuration = CommandConfiguration(commandName: "test", abstract: "Run transpiled JUnit tests")
+
+    func run() async throws {
+        throw ValidationError("Not yet suppoerted")
+    }
+}
+
+struct ForwardingCommand<Base: ParsableCommand, Name: RawRepresentable & CaseIterable>: ParsableCommand where Name.RawValue : StringProtocol {
+    static var configuration: CommandConfiguration {
+        var cfg = Base.configuration
+        cfg.commandName = Name.allCases.first?.rawValue.description
+        cfg.shouldDisplay = false
+        return cfg
+    }
+
+    @OptionGroup
+    var command: Base
+
+    mutating func run() throws {
+        try command.run()
+    }
+}
+
+//enum SkippyCommandName : String, CaseIterable { case skippy }
+//typealias SkippyAction = ForwardingCommand<SkipCheckAction, SkippyCommandName>
+
+struct SkipCheckAction: Action {
+    public static var configuration = CommandConfiguration(commandName: "check", abstract: "Preflight Swift transpilation")
 
     @Option(name: [.long, .customShort("S")], help: ArgumentHelp("Preprocessor symbols", valueName: "file"))
     var symbols: [String] = []
@@ -164,19 +159,19 @@ private struct SkippyAction: Action {
 
     /// Xcode requires that we create an output file in order for incremental build tools to work.
     ///
-    /// - Warning: This is duplicated in SkippyTool.
+    /// - Warning: This is duplicated in SkipCheckBuildPlugin.
     func outputFileURL(for sourceFile: Source.File, in outputDir: URL) -> URL {
         var outputFileName = sourceFile.name
         if outputFileName.hasSuffix(".swift") {
             outputFileName = String(outputFileName.dropLast(".swift".count))
         }
-        outputFileName += "_skippy.swift"
+        outputFileName += "_skipcheck.swift"
         return outputDir.appendingPathComponent(outputFileName)
     }
 }
 
 private struct PrintSwiftASTAction: Action {
-    public static var configuration = CommandConfiguration(commandName: "ast-swift", abstract: "print the swift AST")
+    public static var configuration = CommandConfiguration(commandName: "ast-swift", abstract: "Print the Swift AST")
 
     @Option(name: [.long, .customShort("S")], help: ArgumentHelp("Preprocessor symbols", valueName: "file"))
     var symbols: [String] = []
@@ -204,7 +199,7 @@ private struct PrintSwiftASTAction: Action {
 }
 
 private struct PrintSkipASTAction: Action {
-    public static var configuration = CommandConfiguration(commandName: "ast-skip", abstract: "print the skip AST")
+    public static var configuration = CommandConfiguration(commandName: "ast-skip", abstract: "Print the Skip AST")
 
     @Option(name: [.long, .customShort("S")], help: ArgumentHelp("Preprocessor symbols", valueName: "file"))
     var symbols: [String] = []
@@ -232,22 +227,19 @@ private struct PrintSkipASTAction: Action {
     }
 }
 
-private struct PrintVersionAction: Action {
-    func perform(on sourceFiles: [Source.File], options: Options) async throws {
-        print("skip version \(skipVersion)")
-    }
-}
-
-
 public struct SkipCommandExecutor : AsyncParsableCommand {
     public static let experimental = false
     public static var configuration = CommandConfiguration(commandName: "skip",
-                                                           abstract: "the skip tool",
+                                                           abstract: "Swift Kotlin Interop",
                                                            shouldDisplay: !experimental,
                                                            subcommands: [
                                                             VersionCommand.self,
-                                                            SkippyAction.self,
+                                                            //SkippyAction.self,
+                                                            SkipCheckAction.self,
                                                             TranspileAction.self,
+                                                            AssembleAction.self,
+                                                            BuildAction.self,
+                                                            TestAction.self,
                                                             PrintSwiftASTAction.self,
                                                             PrintSkipASTAction.self,
                                                            ]
@@ -271,7 +263,7 @@ public struct VersionCommand: SingleStreamingCommand {
     }
 
     public static var configuration = CommandConfiguration(commandName: "version",
-                                                           abstract: "Show the skip version",
+                                                           abstract: "Print the Skip version",
                                                            shouldDisplay: !experimental)
 
     @OptionGroup public var output: OutputOptions
@@ -286,14 +278,16 @@ public struct VersionCommand: SingleStreamingCommand {
     }
 
     public func executeCommand() -> Output {
-        Output()
+        return Output()
     }
 }
 
+extension MessageConvertible {
+    //public var attributedString: String { description }
+}
+
 extension Never : MessageConvertible {
-    public var description: String {
-        "never"
-    }
+    public var description: String { "never" }
 }
 
 extension ToolOutput : MessageConvertible {
@@ -315,6 +309,22 @@ public protocol StreamingCommand : AsyncParsableCommand {
 
     func performCommand(with continuation: AsyncThrowingStream<Output, Error>.Continuation) async throws
 }
+
+extension StreamingCommand {
+    public mutating func run() async throws {
+        output.beginCommandOutput()
+        var elements = self.startCommand().makeAsyncIterator()
+        if let first = try await elements.next() {
+            try output.writeOutput(first)
+            while let element = try await elements.next() {
+                output.writeOutputSeparator()
+                try output.writeOutput(element)
+            }
+        }
+        output.endCommandOutput()
+    }
+}
+
 
 extension StreamingCommand {
     public mutating func startCommand() -> AsyncThrowingStream<Output, Error> {
@@ -354,7 +364,6 @@ protocol SingleStreamingCommand : StreamingCommand {
 
 extension SingleStreamingCommand {
     public func performCommand(with continuation: AsyncThrowingStream<Output, Error>.Continuation) async throws {
-        //msg(.info, "skip version \(skipVersion)")
         yield(try await executeCommand())
     }
 }
@@ -362,7 +371,8 @@ extension SingleStreamingCommand {
 
 /// A type that can be output in a sequence of messages
 public protocol MessageConvertible : Encodable & CustomStringConvertible {
-
+    /// The attributed output string, used for ANSI terminals
+    // var attributedString: String { get }
 }
 
 extension StreamingCommand {
@@ -380,22 +390,7 @@ extension StreamingCommand {
             return // skip debug output unless we are running verbose
         }
 
-        self.output.streams.msg(ToolOutput(kind: kind, message: message()))
-    }
-}
-
-public extension StreamingCommand {
-    mutating func run() async throws {
-        output.beginCommandOutput()
-        var elements = self.startCommand().makeAsyncIterator()
-        if let first = try await elements.next() {
-            try output.writeOutput(first)
-            while let element = try await elements.next() {
-                output.writeOutputSeparator()
-                try output.writeOutput(element)
-            }
-        }
-        output.endCommandOutput()
+        self.output.streams.writeMessage(ToolOutput(kind: kind, message: message()))
     }
 }
 
@@ -416,6 +411,18 @@ public enum MessageKind: String, Encodable, Hashable {
 public struct ToolOutput : Encodable {
     public let kind: MessageKind?
     public let message: String
+}
+
+extension ToolOutput {
+    var color: TerminalController.Color {
+        switch self.kind {
+        case .trace: return .gray
+        case .info: return .cyan
+        case .warn: return .yellow
+        case .error: return .red
+        case .none: return .noColor
+        }
+    }
 }
 
 public typealias BufferedOutputByteStream = TSCBasic.BufferedOutputByteStream
@@ -446,8 +453,8 @@ public struct OutputOptions: ParsableArguments {
     internal var streams: OutputHandler = OutputHandler()
 
     internal final class OutputHandler : Decodable {
-        var out: WritableByteStream = TSCBasic.stdoutStream
-        var err: WritableByteStream = TSCBasic.stderrStream
+        var out: WritableByteStream = stdoutStream
+        var err: WritableByteStream = stderrStream
 
         func flush() {
             out.flush()
@@ -455,12 +462,24 @@ public struct OutputOptions: ParsableArguments {
         }
 
         /// The closure that will output a message
-        func msg(_ output: ToolOutput) {
-            err.write(output.message)
+        func writeOut(_ output: String, newline: Bool = true) {
+            //print(output, to: &out) // crashes compiler
+            out.write(output + (newline ? "\n" : ""))
+            if newline {
+                out.flush()
+            }
+        }
+
+        /// The closure that will output a message
+        func writeMessage(_ output: ToolOutput, newline: Bool = true) {
+            err.write(output.description  + (newline ? "\n" : ""))
+            if newline {
+                err.flush()
+            }
         }
 
         /// The closure that will handle writing the output type to either the stream
-        var yield: (Encodable & CustomStringConvertible) -> () = { _ in }
+        var yield: (MessageConvertible) -> () = { _ in }
 
         init() {
         }
@@ -476,7 +495,7 @@ public struct OutputOptions: ParsableArguments {
 
     /// Write the given message to the output streams buffer
     public func write(_ value: String) {
-        streams.out.write(value)
+        streams.writeOut(value)
     }
 
     /// The output that comes at the beginning of a sequence of elements; an opening bracket, for JSON arrays
@@ -494,7 +513,7 @@ public struct OutputOptions: ParsableArguments {
         if jsonArray { write(",") }
     }
 
-    func writeOutput<T: Encodable & CustomStringConvertible>(_ item: T) throws {
+    func writeOutput<T: MessageConvertible>(_ item: T) throws {
         if json || jsonCompact {
             try write(item.toJSON(outputFormatting: [.sortedKeys, .withoutEscapingSlashes, (jsonCompact ? .sortedKeys : .prettyPrinted)], dateEncodingStrategy: .iso8601).utf8String ?? "")
         } else {
