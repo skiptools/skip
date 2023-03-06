@@ -1,5 +1,6 @@
 // swift-tools-version: 5.7
 import PackageDescription
+import class Foundation.ProcessInfo
 
 let package = Package(
     name: "skip",
@@ -14,9 +15,12 @@ let package = Package(
         .plugin(name: "gradle", targets: ["SkipGradlePlugIn"]),
     ],
     dependencies: [
+        //.package(url: "https://github.com/skiptools/skip-lib.git", from: "0.0.0"),
+        //.package(url: "https://github.com/skiptools/skip-test.git", from: "0.0.0"),
         //.package(url: "https://github.com/skiptools/cross-foundation.git", from: "0.0.0"),
         //.package(url: "https://github.com/skiptools/cross-ui.git", from: "0.0.0"),
-        //.package(url: "https://github.com/skiptools/cross-test.git", from: "0.0.0"),
+        //.package(url: "https://github.com/skiptools/example-lib.git", from: "0.0.0"),
+        //.package(url: "https://github.com/skiptools/example-app.git", from: "0.0.0"),
     ],
     targets: [
         .target(name: "SkipUnitTestSupport"),
@@ -34,14 +38,15 @@ let package = Package(
         .plugin(name: "SkipPrecheckPlugIn", capability: .buildTool(), dependencies: ["skiptool"]),
         .plugin(name: "SkipTranspilePlugIn", capability: .buildTool(), dependencies: ["skiptool"]),
         .plugin(name: "SkipGradlePlugIn", capability: .buildTool(), dependencies: ["skiptool"]),
-
-        //.target(name: "SkipKit", dependencies: [
-        //    .product(name: "CrossFoundation", package: "cross-foundation"),
-        //    .product(name: "CrossUI", package: "cross-ui"),
-        //    .product(name: "CrossTest", package: "cross-test"),
-        //]),
     ]
 )
 
-package.targets += [.binaryTarget(name: "skiptool", url: "https://github.com/skiptools/skip/releases/download/0.0.44/skiptool.artifactbundle.zip", checksum: "3ab516622e50740851cf64972183562cbbcb8507543b27fef688a82634e11cbf")]
 
+if let _ = ProcessInfo.processInfo.environment["SKIP_USE_LOCAL_DEPS"] {
+    // build agains the local relative package ../SkipSource
+    package.dependencies += [.package(path: "../SkipSource")]
+    package.targets += [.binaryTarget(name: "skiptool", url: "https://github.com/skiptools/skip/releases/download/0.0.45/skiptool.artifactbundle.zip", checksum: "571b63d95fdf8b5c498f6ea54190395d5b0b9efd25b0aef17a8d53b64a6cae84")]
+} else {
+    // use the binary dependency
+    package.targets += [.binaryTarget(name: "skiptool", url: "https://github.com/skiptools/skip/releases/download/0.0.45/skiptool.artifactbundle.zip", checksum: "571b63d95fdf8b5c498f6ea54190395d5b0b9efd25b0aef17a8d53b64a6cae84")]
+}
