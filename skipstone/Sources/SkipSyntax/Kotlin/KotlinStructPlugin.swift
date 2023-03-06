@@ -11,7 +11,7 @@ class KotlinStructPlugin: KotlinPlugin {
     private func visit(_ node: KotlinSyntaxNode, codebaseInfo: KotlinCodebaseInfo.Context?) -> VisitResult<KotlinSyntaxNode> {
         if let classDeclaration = node as? KotlinClassDeclaration {
             if classDeclaration.declarationType == .structDeclaration {
-                updateStructDeclaration(classDeclaration)
+                updateStructDeclaration(classDeclaration, codebaseInfo: codebaseInfo)
             }
         } else if let variableDeclaration = node as? KotlinVariableDeclaration {
             if !variableDeclaration.isStatic, !variableDeclaration.isReadOnly, let extends = variableDeclaration.extends, codebaseInfo?.declarationType(of: extends.description, mustBeInModule: false) == .structDeclaration {
@@ -27,7 +27,7 @@ class KotlinStructPlugin: KotlinPlugin {
         return .recurse(nil)
     }
 
-    private func updateStructDeclaration(_ classDeclaration: KotlinClassDeclaration) {
+    private func updateStructDeclaration(_ classDeclaration: KotlinClassDeclaration, codebaseInfo: KotlinCodebaseInfo.Context?) {
         var hasConstructors = false
         var isMutable = false
         var initializableVariableDeclarations: [KotlinVariableDeclaration] = []
@@ -51,7 +51,7 @@ class KotlinStructPlugin: KotlinPlugin {
         }
 
         if !hasConstructors && !initializableVariableDeclarations.isEmpty {
-            addMemberwiseConstructor(to: classDeclaration, variableDeclarations: initializableVariableDeclarations)
+            addMemberwiseConstructor(to: classDeclaration, variableDeclarations: initializableVariableDeclarations, codebaseInfo: codebaseInfo)
         } else if isMutable && !initializableVariableDeclarations.isEmpty {
             addMutableStructCopyConstructor(to: classDeclaration, variableDeclarations: initializableVariableDeclarations)
         }
@@ -105,11 +105,14 @@ class KotlinStructPlugin: KotlinPlugin {
         classDeclaration.members.append(scopy)
     }
 
-    private func addMemberwiseConstructor(to classDeclaration: KotlinClassDeclaration, variableDeclarations: [KotlinVariableDeclaration]) {
+    private func addMemberwiseConstructor(to classDeclaration: KotlinClassDeclaration, variableDeclarations: [KotlinVariableDeclaration], codebaseInfo: KotlinCodebaseInfo.Context?) {
         let constructor = KotlinFunctionDeclaration(name: "constructor")
         constructor.parameters = variableDeclarations.map { variableDeclaration in
             let label = variableDeclaration.names[0]
             let type = variableDeclaration.variableTypes[0]
+            if type == .none && codebaseInfo != nil {
+                variableDeclaration.messages.append(.kotlinConstructorCannotInferPropertyType(variableDeclaration))
+            }
             let defaultValue = variableDeclaration.value.map { KotlinSharedExpressionPointer(shared: $0) }
             return Parameter(externalLabel: label, declaredType: type, isVariadic: false, defaultValue: defaultValue)
         }

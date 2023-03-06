@@ -18,6 +18,7 @@ enum KotlinExpressionType {
     case sref
     case stringLiteral
     case `subscript`
+    case ternaryOperator
     case `try`
     case tupleLiteral
     case typeLiteral
@@ -1109,6 +1110,43 @@ class KotlinSubscript: KotlinExpression {
             }
         }
         output.append(isOptionalChain ? ")" : "]")
+    }
+}
+
+class KotlinTernaryOperator: KotlinExpression {
+    var condition: KotlinExpression
+    var ifTrue: KotlinExpression
+    var ifFalse: KotlinExpression
+
+    static func translate(expression: TernaryOperator, translator: KotlinTranslator) -> KotlinTernaryOperator {
+        let condition = translator.translateExpression(expression.condition)
+        let ifTrue = translator.translateExpression(expression.ifTrue)
+        let ifFalse = translator.translateExpression(expression.ifFalse)
+        return KotlinTernaryOperator(expression: expression, condition: condition, ifTrue: ifTrue, ifFalse: ifFalse)
+    }
+
+    private init(expression: TernaryOperator, condition: KotlinExpression, ifTrue: KotlinExpression, ifFalse: KotlinExpression) {
+        self.condition = condition
+        self.ifTrue = ifTrue
+        self.ifFalse = ifFalse
+        super.init(type: .ternaryOperator, expression: expression)
+    }
+
+    override func mayBeSharedMutableStructExpression(orType: Bool) -> Bool {
+        return ifTrue.mayBeSharedMutableStructExpression(orType: orType) || ifFalse.mayBeSharedMutableStructExpression(orType: orType)
+    }
+
+    override var isCompoundExpression: Bool {
+        return true
+    }
+
+    override var children: [KotlinSyntaxNode] {
+        return [condition, ifTrue, ifFalse]
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        output.append("if (").append(condition, indentation: indentation).append(") ")
+        output.append(ifTrue, indentation: indentation).append(" else ").append(ifFalse, indentation: indentation)
     }
 }
 

@@ -19,6 +19,10 @@ extension Message {
         return Message(severity: .error, message: "Kotlin does not support composed types. Consider creating a single type that conforms to these types", sourceDerived: sourceDerived)
     }
 
+    static func kotlinConstructorCannotInferPropertyType(_ sourceDerived: SourceDerived) -> Message {
+        return Message(severity: .error, message: "Cannot infer property type. Declare the property type explicitly to generate a valid Kotlin constructor for this struct", sourceDerived: sourceDerived)
+    }
+
     static func kotlinConstructorSingleDelegatingStatement(_ sourceDerived: SourceDerived) -> Message {
         return Message(severity: .error, message: "A Kotlin constructor can only include a single call to another 'this' or 'super' constructor", sourceDerived: sourceDerived)
     }

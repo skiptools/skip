@@ -19,6 +19,7 @@ enum ExpressionType: CaseIterable {
     case prefixOperator
     case stringLiteral
     case `subscript`
+    case ternaryOperator
     case `try`
     case tupleLiteral
     case typeLiteral
@@ -63,6 +64,8 @@ enum ExpressionType: CaseIterable {
             return StringLiteral.self
         case .subscript:
             return Subscript.self
+        case .ternaryOperator:
+            return TernaryOperator.self
         case .try:
             return Try.self
         case .tupleLiteral:
@@ -178,7 +181,7 @@ class BinaryOperator: Expression {
             doubleCheckLHS()
             resultType = .void
         case .ternary:
-            // TODO
+            // Handled by TernaryOperator
             break
         case .unknown:
             lhs.inferTypes(context: context, expecting: expecting)
@@ -1038,6 +1041,52 @@ class Subscript: Expression {
 
     override var children: [SyntaxNode] {
         return [base] + arguments.map { $0.value }
+    }
+}
+
+/// `b ? x : y`
+class TernaryOperator: Expression {
+    let condition: Expression
+    let ifTrue: Expression
+    let ifFalse: Expression
+
+    init(condition: Expression, ifTrue: Expression, ifFalse: Expression, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        self.condition = condition
+        self.ifTrue = ifTrue
+        self.ifFalse = ifFalse
+        super.init(type: .ternaryOperator, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    override class func decodeSequenceOperator(syntax: SyntaxProtocol, sequence: SyntaxProtocol, elements: [ExprSyntax], index: Int, in syntaxTree: SyntaxTree) throws -> Expression? {
+        guard syntax.kind == .unresolvedTernaryExpr, let ternaryExpr = syntax.as(UnresolvedTernaryExprSyntax.self) else {
+            return nil
+        }
+        let condition = try ExpressionDecoder.decodeSequence(sequence, elements: Array(elements[..<index]), in: syntaxTree)
+        let ifTrue = ExpressionDecoder.decode(syntax: ternaryExpr.firstChoice, in: syntaxTree)
+        let ifFalse = try ExpressionDecoder.decodeSequence(sequence, elements: Array(elements[(index + 1)...]), in: syntaxTree)
+        return TernaryOperator(condition: condition, ifTrue: ifTrue, ifFalse: ifFalse, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        condition.inferTypes(context: context, expecting: .bool)
+        ifTrue.inferTypes(context: context, expecting: expecting)
+        ifFalse.inferTypes(context: context, expecting: expecting.or(ifTrue.inferredType))
+        // We attempt to evaluate ifTrue first, but maybe we were only able to figure out ifFalse
+        if ifTrue.inferredType == .none && ifFalse.inferredType != .none {
+            ifTrue.inferTypes(context: context, expecting: ifFalse.inferredType)
+        }
+        resultType = ifTrue.inferredType.or(ifFalse.inferredType)
+        return context
+    }
+
+    private var resultType: TypeSignature = .none
+
+    override var inferredType: TypeSignature {
+        return resultType
+    }
+
+    override var children: [SyntaxNode] {
+        return [condition, ifTrue, ifFalse]
     }
 }
 

@@ -167,6 +167,30 @@ final class OperatorTests: XCTestCase {
         }
         """)
     }
+
+    func testTernary() async throws {
+        try await check(symbols: symbols, swift: """
+        func f(i: Int) -> Boolean {
+            let even = i % 2 == 0 ? i : i + 1
+            return even == .myZero
+        }
+        """, kotlin: """
+        internal fun f(i: Int): Boolean {
+            val even = if (i % 2 == 0) i else i + 1
+            return even == Int.myZero
+        }
+        """)
+
+        try await check(symbols: symbols, swift: """
+        func isEven(i: Int) -> Boolean {
+            return i % 2 == 0 ? true : false
+        }
+        """, kotlin: """
+        internal fun isEven(i: Int): Boolean {
+            return if (i % 2 == 0) true else false
+        }
+        """)
+    }
 }
 
 private extension Bool {
