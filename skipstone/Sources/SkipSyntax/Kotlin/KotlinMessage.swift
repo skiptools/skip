@@ -23,9 +23,14 @@ extension Message {
         return Message(severity: .error, message: "A Kotlin constructor can only include a single call to another 'this' or 'super' constructor", sourceDerived: sourceDerived)
     }
 
-    // Idea: factory callable on companion object
+    // Idea: factory callable on companion object? Factory function with class name?
     static func kotlinConstructorNullReturn(_ sourceDerived: SourceDerived) -> Message {
         return Message(severity: .error, message: "Kotlin does not support constructors that return nil. Consider creating a factory function", sourceDerived: sourceDerived)
+    }
+
+    // Idea: factory function with class name?
+    static func kotlinExtensionAddConstructorsToOutsideType(_ sourceDerived: SourceDerived) -> Message {
+        return Message(severity: .error, message: "Cannot use an extension to add additional constructors to a Kotlin type defined outside of this module", sourceDerived: sourceDerived)
     }
 
     // TODO: Kotlin interfaces can have default implementations inline. Move inheritance and implementations into generated interface
@@ -35,10 +40,6 @@ extension Message {
 
     static func kotlinExtensionAddProtocolsToOutsideType(_ sourceDerived: SourceDerived) -> Message {
         return Message(severity: .error, message: "Cannot use an extension to add additional protocols to a Kotlin type defined outside of this module", sourceDerived: sourceDerived)
-    }
-
-    static func kotlinExtensionAddConstructorsToOutsideType(_ sourceDerived: SourceDerived) -> Message {
-        return Message(severity: .error, message: "Cannot use an extension to add additional constructors to a Kotlin type defined outside of this module", sourceDerived: sourceDerived)
     }
 
     static func kotlinExtensionUnsupportedMember(_ sourceDerived: SourceDerived) -> Message {

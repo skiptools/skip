@@ -22,13 +22,11 @@ final class ConstructorTests: XCTestCase {
         }
         """, kotlin: """
         internal open class A {
-        
             companion object {
             }
         }
         
         internal open class B: A() {
-        
             companion object {
             }
         }
@@ -224,13 +222,17 @@ final class ConstructorTests: XCTestCase {
         }
         """, kotlin: """
         internal class A {
-
             companion object {
             }
         }
         
         internal class B: MutableStruct {
             internal var i: Int
+                set(newValue) {
+                    willmutate()
+                    field = newValue
+                    didmutate()
+                }
         
             internal constructor(i: Int) {
                 this.i = i
@@ -242,7 +244,7 @@ final class ConstructorTests: XCTestCase {
             }
         
             override var supdate: ((Any) -> Unit)? = null
-        
+            override var smutatingcount = 0
             override fun scopy(): MutableStruct {
                 return B(this as MutableStruct)
             }
@@ -269,7 +271,17 @@ final class ConstructorTests: XCTestCase {
                     return 100
                 }
             internal var i = 100
+                set(newValue) {
+                    willmutate()
+                    field = newValue
+                    didmutate()
+                }
             internal var s: String
+                set(newValue) {
+                    willmutate()
+                    field = newValue
+                    didmutate()
+                }
         
             constructor(i: Int = 100, s: String) {
                 this.i = i
@@ -277,7 +289,7 @@ final class ConstructorTests: XCTestCase {
             }
         
             override var supdate: ((Any) -> Unit)? = null
-        
+            override var smutatingcount = 0
             override fun scopy(): MutableStruct {
                 return D(i, s)
             }
@@ -288,7 +300,17 @@ final class ConstructorTests: XCTestCase {
         
         internal class E: MutableStruct {
             internal var i = 100
+                set(newValue) {
+                    willmutate()
+                    field = newValue
+                    didmutate()
+                }
             private var s: String
+                set(newValue) {
+                    willmutate()
+                    field = newValue
+                    didmutate()
+                }
         
             constructor(i: Int = 100, s: String) {
                 this.i = i
@@ -296,7 +318,7 @@ final class ConstructorTests: XCTestCase {
             }
         
             override var supdate: ((Any) -> Unit)? = null
-        
+            override var smutatingcount = 0
             override fun scopy(): MutableStruct {
                 return E(i, s)
             }

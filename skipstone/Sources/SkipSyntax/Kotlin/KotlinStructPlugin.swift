@@ -1,16 +1,29 @@
 /// Give struct semantics to Kotlin classes translated from Swift structs.
+///
+/// - Seealso: `SkipLib/Struct.kt`
 class KotlinStructPlugin: KotlinPlugin {
+    private let mutationFunctionNames = ("willmutate", "didmutate")
+
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
-        syntaxTree.root.statements.forEach { $0.visit(perform: self.visit) }
+        syntaxTree.root.visit { visit($0, codebaseInfo: translator.codebaseInfo) }
     }
 
-    private func visit(_ node: KotlinSyntaxNode) -> VisitResult<KotlinSyntaxNode> {
-        guard let classDeclaration = node as? KotlinClassDeclaration else {
+    private func visit(_ node: KotlinSyntaxNode, codebaseInfo: KotlinCodebaseInfo.Context?) -> VisitResult<KotlinSyntaxNode> {
+        if let classDeclaration = node as? KotlinClassDeclaration {
+            if classDeclaration.declarationType == .structDeclaration {
+                updateStructDeclaration(classDeclaration)
+            }
+        } else if let variableDeclaration = node as? KotlinVariableDeclaration {
+            if !variableDeclaration.isStatic, !variableDeclaration.isReadOnly, let extends = variableDeclaration.extends, codebaseInfo?.declarationType(of: extends.description, mustBeInModule: false) == .structDeclaration {
+                variableDeclaration.mutationFunctionNames = mutationFunctionNames
+            }
             return .skip
+        } else if let functionDeclaration = node as? KotlinFunctionDeclaration {
+            if functionDeclaration.modifiers.isMutating, let extends = functionDeclaration.extends, codebaseInfo?.declarationType(of: extends.description, mustBeInModule: false) == .structDeclaration {
+                functionDeclaration.mutationFunctionNames = mutationFunctionNames
+            }
         }
-        if classDeclaration.declarationType == .structDeclaration {
-            updateStructDeclaration(classDeclaration)
-        }
+        // Recurse to find nested declarations
         return .recurse(nil)
     }
 
@@ -21,6 +34,7 @@ class KotlinStructPlugin: KotlinPlugin {
         for member in classDeclaration.members {
             if let variableDeclaration = member as? KotlinVariableDeclaration {
                 if !variableDeclaration.isStatic && !variableDeclaration.isReadOnly {
+                    variableDeclaration.mutationFunctionNames = mutationFunctionNames
                     isMutable = true
                 }
                 if !variableDeclaration.modifiers.isStatic, variableDeclaration.getter == nil, (!variableDeclaration.isLet || variableDeclaration.value == nil) {
@@ -30,6 +44,7 @@ class KotlinStructPlugin: KotlinPlugin {
                 if functionDeclaration.type == .constructorDeclaration {
                     hasConstructors = true
                 } else if functionDeclaration.modifiers.isMutating {
+                    functionDeclaration.mutationFunctionNames = mutationFunctionNames
                     isMutable = true
                 }
             }
@@ -49,18 +64,27 @@ class KotlinStructPlugin: KotlinPlugin {
     }
 
     private func addMutableStructAPI(to classDeclaration: KotlinClassDeclaration, variableDeclarations: [KotlinVariableDeclaration], useMemberwiseConstructor: Bool) {
-        let declaredType: TypeSignature = .optional(.function([TypeSignature.Parameter(type: .any)], .void))
-        let supdate = KotlinVariableDeclaration(names: ["supdate"], variableTypes: [declaredType])
-        supdate.declaredType = declaredType
+        let supdateType: TypeSignature = .optional(.function([TypeSignature.Parameter(type: .any)], .void))
+        let supdate = KotlinVariableDeclaration(names: ["supdate"], variableTypes: [supdateType])
+        supdate.declaredType = supdateType
         supdate.isProperty = true
         supdate.modifiers = Modifiers(visibility: .public, isOverride: true)
         supdate.extras = .singleNewline
+        supdate.parent = classDeclaration
+        supdate.assignParentReferences()
         classDeclaration.members.append(supdate)
+
+        let scount = KotlinVariableDeclaration(names: ["smutatingcount"], variableTypes: [.int])
+        scount.value = KotlinNumericLiteral(literal: "0")
+        scount.isProperty = true
+        scount.modifiers = Modifiers(visibility: .public, isOverride: true)
+        scount.parent = classDeclaration
+        scount.assignParentReferences()
+        classDeclaration.members.append(scount)
 
         let scopy = KotlinFunctionDeclaration(name: "scopy")
         scopy.returnType = .named("MutableStruct", [])
         scopy.modifiers = Modifiers(visibility: .public, isOverride: true)
-        scopy.extras = .singleNewline
 
         let constructorCall: KotlinExpression
         if useMemberwiseConstructor {
@@ -76,6 +100,8 @@ class KotlinStructPlugin: KotlinPlugin {
         }
         let returnStatement = KotlinReturn(expression: constructorCall)
         scopy.body = KotlinCodeBlock(statements: [returnStatement])
+        scopy.parent = classDeclaration
+        scopy.assignParentReferences()
         classDeclaration.members.append(scopy)
     }
 
@@ -95,6 +121,8 @@ class KotlinStructPlugin: KotlinPlugin {
             return KotlinRawStatement(sourceCode: "this.\(variableDeclaration.names[0]) = \(variableDeclaration.names[0])")
         }
         constructor.body = KotlinCodeBlock(statements: bodyStatements)
+        constructor.parent = classDeclaration
+        constructor.assignParentReferences()
         classDeclaration.members.append(constructor)
     }
 
@@ -111,6 +139,8 @@ class KotlinStructPlugin: KotlinPlugin {
             return KotlinRawStatement(sourceCode: "this.\(variableDeclaration.names[0]) = copy.\(variableDeclaration.names[0])")
         }
         constructor.body = KotlinCodeBlock(statements: bodyStatements)
+        constructor.parent = classDeclaration
+        constructor.assignParentReferences()
         classDeclaration.members.append(constructor)
     }
 }

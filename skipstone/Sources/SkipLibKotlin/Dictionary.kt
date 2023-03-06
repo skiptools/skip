@@ -56,12 +56,13 @@ class Dictionary<K, V>: MutableStruct, Iterable<Pair<K, V>> {
 
     operator fun set(key: K, value: V?) {
         copyStorageIfNeeded()
+        willmutate()
         if (value == null) {
             storage.remove(key)
         } else {
             storage[key] = value.sref()
         }
-        supdate?.invoke(this)
+        didmutate()
     }
 
     // TODO: Duplicate Swift's Collection and Sequence types
@@ -86,7 +87,7 @@ class Dictionary<K, V>: MutableStruct, Iterable<Pair<K, V>> {
     }
 
     override var supdate: ((Any) -> Unit)? = null
-
+    override var smutatingcount = 0
     override fun scopy(): MutableStruct {
         isStorageShared = true
         return Dictionary(storage = storage)

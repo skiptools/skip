@@ -1,47 +1,40 @@
 /// Migrate Swift constructors to Kotlin constructors.
 class KotlinConstructorPlugin: KotlinPlugin {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
-        syntaxTree.root.statements.forEach { $0.visit { visit($0, translator: translator) } }
+        syntaxTree.root.visit { visit($0, translator: translator) }
     }
 
     private func visit(_ node: KotlinSyntaxNode, translator: KotlinTranslator) -> VisitResult<KotlinSyntaxNode> {
-        guard let statement = node as? KotlinStatement else {
-            return .skip
+        guard let classDeclaration = node as? KotlinClassDeclaration else {
+            // Recurse to find nested declarations
+            return .recurse(nil)
         }
-        switch statement.type {
-        case .classDeclaration:
-            let classDeclaration = statement as! KotlinClassDeclaration
-            let constructors = classDeclaration.members.filter { $0.type == .constructorDeclaration }
-            var mayNeedSuperclassCall = false
-            if constructors.isEmpty {
-                if classDeclaration.declarationType != .structDeclaration {
-                    mayNeedSuperclassCall = !addInheritedConstructors(to: classDeclaration, translator: translator)
-                }
-            } else {
-                var hasNonEmptyConstructor = false
-                for constructor in constructors {
-                    if let constructor = constructor as? KotlinFunctionDeclaration {
-                        if !fixupConstructor(constructor) {
-                            mayNeedSuperclassCall = true
-                        }
-                        if constructor.body?.statements.isEmpty == false {
-                            hasNonEmptyConstructor = true
-                        }
+        let constructors = classDeclaration.members.filter { $0.type == .constructorDeclaration }
+        var mayNeedSuperclassCall = false
+        if constructors.isEmpty {
+            if classDeclaration.declarationType != .structDeclaration {
+                mayNeedSuperclassCall = !addInheritedConstructors(to: classDeclaration, translator: translator)
+            }
+        } else {
+            var hasNonEmptyConstructor = false
+            for constructor in constructors {
+                if let constructor = constructor as? KotlinFunctionDeclaration {
+                    if !fixupConstructor(constructor) {
+                        mayNeedSuperclassCall = true
+                    }
+                    if constructor.body?.statements.isEmpty == false {
+                        hasNonEmptyConstructor = true
                     }
                 }
-                if hasNonEmptyConstructor {
-                    addIsInConstructorCheckProperty(to: classDeclaration)
-                }
             }
-            if mayNeedSuperclassCall {
-                addSuperclassCall(to: classDeclaration, translator: translator)
+            if hasNonEmptyConstructor {
+                addIsConstructingProperty(to: classDeclaration)
             }
-            return .recurse(nil)
-        case .extensionDeclaration:
-            return .recurse(nil)
-        default:
-            return .skip
         }
+        if mayNeedSuperclassCall {
+            addSuperclassCall(to: classDeclaration, translator: translator)
+        }
+        return .recurse(nil)
     }
 
     private func addInheritedConstructors(to classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) -> Bool {
@@ -57,6 +50,9 @@ class KotlinConstructorPlugin: KotlinPlugin {
 
     private func addInheritedConstructor(parameters: [KotlinCodebaseInfo.ConstructorParameter], to classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) {
         let constructor = KotlinFunctionDeclaration(name: "constructor")
+        constructor.modifiers = classDeclaration.modifiers
+        constructor.extras = .singleNewline
+
         var superCall = "super("
         constructor.parameters = parameters.enumerated().map { (index, parameter) in
             let label = parameter.label ?? "p_\(index)"
@@ -74,13 +70,10 @@ class KotlinConstructorPlugin: KotlinPlugin {
         superCall += ")"
         constructor.delegatingConstructorCall = KotlinRawExpression(sourceCode: superCall)
 
-        constructor.modifiers = classDeclaration.modifiers
-        constructor.extras = .singleNewline
         constructor.body = KotlinCodeBlock(statements: [])
-
-        classDeclaration.members.append(constructor)
         constructor.parent = classDeclaration
         constructor.assignParentReferences()
+        classDeclaration.members.append(constructor)
     }
 
     private func fixupConstructor(_ constructor: KotlinFunctionDeclaration) -> Bool {
@@ -136,16 +129,16 @@ class KotlinConstructorPlugin: KotlinPlugin {
         }
     }
 
-    private func addIsInConstructorCheckProperty(to classDeclaration: KotlinClassDeclaration) {
-        // We only need to add the check if there are any member vars with willSet, didSet
-        let hasSideEffectVars = classDeclaration.members.contains {
-            guard let variableDeclaration = $0 as? KotlinVariableDeclaration else {
-                return false
+    private func addIsConstructingProperty(to classDeclaration: KotlinClassDeclaration) {
+        for member in classDeclaration.members {
+            guard let variableDeclaration = member as? KotlinVariableDeclaration else {
+                continue
             }
-            return variableDeclaration.willSet != nil || variableDeclaration.didSet != nil
-        }
-        if hasSideEffectVars {
-            classDeclaration.isInConstructorCheckPropertyName = "isconstructing"
+            // We only need to add the check if there are any member vars with willSet, didSet
+            if !variableDeclaration.modifiers.isStatic, variableDeclaration.willSet != nil || variableDeclaration.didSet != nil {
+                classDeclaration.isConstructingPropertyName = "isconstructing"
+                variableDeclaration.isConstructingPropertyName = "isconstructing"
+            }
         }
     }
 }

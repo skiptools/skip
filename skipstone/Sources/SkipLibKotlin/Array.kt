@@ -55,14 +55,16 @@ class Array<T>: MutableStruct, Iterable<T> {
 
     operator fun set(index: Int, element: T) {
         copyStorageIfNeeded()
+        willmutate()
         storage[index] = element.sref()
-        supdate?.invoke(this)
+        didmutate()
     }
 
     fun append(element: T) {
         copyStorageIfNeeded()
+        willmutate()
         storage.add(element.sref())
-        supdate?.invoke(this)
+        didmutate()
     }
 
     val count: Int
@@ -79,7 +81,7 @@ class Array<T>: MutableStruct, Iterable<T> {
     }
 
     override var supdate: ((Any) -> Unit)? = null
-
+    override var smutatingcount = 0
     override fun scopy(): MutableStruct {
         isStorageShared = true
         return Array(storage = storage)

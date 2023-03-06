@@ -342,7 +342,7 @@ class KotlinClassDeclaration: KotlinStatement {
     var modifiers = Modifiers()
     var declarationType: StatementType
     var members: [KotlinStatement] = []
-    var isInConstructorCheckPropertyName: String?
+    var isConstructingPropertyName: String?
 
     static func translate(statement: TypeDeclaration, translator: KotlinTranslator) -> KotlinClassDeclaration {
         let kstatement = KotlinClassDeclaration(statement: statement)
@@ -419,12 +419,15 @@ class KotlinClassDeclaration: KotlinStatement {
         let staticMembers = members.filter { ($0 as? KotlinMemberDeclaration)?.isStatic == true }
         let nonstaticMembers = members.filter { ($0 as? KotlinMemberDeclaration)?.isStatic != true }
         nonstaticMembers.forEach { output.append($0, indentation: memberIndentation) }
-
-        if let isInConstructorCheckPropertyName {
-            output.append("\n").append(memberIndentation).append("private var \(isInConstructorCheckPropertyName) = false\n")
+        if !nonstaticMembers.isEmpty {
+            output.append("\n")
         }
 
-        output.append("\n").append(memberIndentation).append("companion object {\n")
+        if let isConstructingPropertyName {
+            output.append(memberIndentation).append("private var \(isConstructingPropertyName) = false\n\n")
+        }
+        
+        output.append(memberIndentation).append("companion object {\n")
         staticMembers.forEach { output.append($0, indentation: memberIndentation.inc()) }
         output.append(memberIndentation).append("}\n")
         output.append(indentation).append("}\n")
@@ -477,6 +480,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var modifiers = Modifiers()
     var body: KotlinCodeBlock?
     var delegatingConstructorCall: KotlinExpression?
+    var mutationFunctionNames: (willMutate: String, didMutate: String)?
 
     // KotlinMemberDeclaration
     var extends: TypeSignature?
@@ -596,12 +600,19 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                         output.append(bodyIndentation).append("val \(parameter.internalLabel) = \(externalLabel)\n")
                     }
                 }
-                if type == .constructorDeclaration, let isInConstructorCheckPropertyName = (parent as? KotlinClassDeclaration)?.isInConstructorCheckPropertyName {
-                    output.append(bodyIndentation).append("\(isInConstructorCheckPropertyName) = true\n")
+                if type == .constructorDeclaration, let isConstructingPropertyName = (parent as? KotlinClassDeclaration)?.isConstructingPropertyName {
+                    output.append(bodyIndentation).append("\(isConstructingPropertyName) = true\n")
                     output.append(bodyIndentation).append("try {\n")
                     output.append(body, indentation: bodyIndentation.inc())
                     output.append(bodyIndentation).append("} finally {\n")
-                    output.append(bodyIndentation.inc()).append("\(isInConstructorCheckPropertyName) = false\n")
+                    output.append(bodyIndentation.inc()).append("\(isConstructingPropertyName) = false\n")
+                    output.append(bodyIndentation).append("}\n")
+                } else if let mutationFunctionNames {
+                    output.append(bodyIndentation).append("\(mutationFunctionNames.willMutate)()\n")
+                    output.append(bodyIndentation).append("try {\n")
+                    output.append(body, indentation: bodyIndentation.inc())
+                    output.append(bodyIndentation).append("} finally {\n")
+                    output.append(bodyIndentation.inc()).append("\(mutationFunctionNames.didMutate)()\n")
                     output.append(bodyIndentation).append("}\n")
                 } else {
                     output.append(body, indentation: bodyIndentation)
@@ -741,6 +752,8 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var mayBeSharedMutableStruct = false
     var isReadOnly = false
     var onUpdate: String?
+    var isConstructingPropertyName: String?
+    var mutationFunctionNames: (willMutate: String, didMutate: String)?
 
     // KotlinMemberDeclaration
     var extends: TypeSignature?
@@ -880,52 +893,69 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             output.append(getterIndentation.inc()).append("return field.sref(\(onUpdate ?? ""))\n")
             output.append(getterIndentation).append("}\n")
         }
-        if setter?.body != nil || willSet?.body != nil || didSet?.body != nil {
-            var isInConstructorCheckPropertyName: String? = nil
-            if !modifiers.isStatic {
-                isInConstructorCheckPropertyName = (parent as? KotlinClassDeclaration)?.isInConstructorCheckPropertyName
-            }
 
+        let hasCustomSet = setter?.body != nil || willSet?.body != nil || didSet?.body != nil
+        if hasCustomSet || mutationFunctionNames != nil {
             let setterIndentation = indentation.inc()
             let setterBodyIndentation = setterIndentation.inc()
             output.append(setterIndentation).append("set(newValue) {\n")
             if mayBeSharedMutableStruct {
                 output.append(setterBodyIndentation).append("val newValue = newValue.sref()\n")
             }
+            var setIndentation = setterBodyIndentation
+            if let mutationFunctionNames {
+                output.append(setterBodyIndentation).append("\(mutationFunctionNames.willMutate)()\n")
+                if hasCustomSet {
+                    output.append(setterBodyIndentation).append("try {\n")
+                    setIndentation = setIndentation.inc()
+                }
+            }
+
             if let willSetBody = willSet?.body {
-                var willSetIndentation = setterBodyIndentation
-                if let isInConstructorCheckPropertyName {
-                    output.append(setterBodyIndentation).append("if (!\(isInConstructorCheckPropertyName)) {\n")
-                    willSetIndentation = setterBodyIndentation.inc()
+                var willSetIndentation = setIndentation
+                if let isConstructingPropertyName {
+                    output.append(setIndentation).append("if (!\(isConstructingPropertyName)) {\n")
+                    willSetIndentation = willSetIndentation.inc()
                 }
                 if let parameterName = willSet?.parameterName, parameterName != "newValue" {
                     output.append(willSetIndentation).append("val \(parameterName) = newValue\n")
                 }
                 output.append(willSetBody, indentation: willSetIndentation)
-                if isInConstructorCheckPropertyName != nil {
-                    output.append(setterBodyIndentation).append("}\n")
+                if isConstructingPropertyName != nil {
+                    output.append(setIndentation).append("}\n")
                 }
             }
+
             if let setterBody = setter?.body {
                 if let parameterName = setter?.parameterName, parameterName != "newValue" && parameterName != willSet?.parameterName {
-                    output.append(setterBodyIndentation).append("val \(parameterName) = newValue\n")
+                    output.append(setIndentation).append("val \(parameterName) = newValue\n")
                 }
-                output.append(setterBody, indentation: setterBodyIndentation)
+                output.append(setterBody, indentation: setIndentation)
             } else {
                 if didSet?.body != nil {
-                    output.append(setterBodyIndentation).append("val oldValue = field\n")
+                    output.append(setIndentation).append("val oldValue = field\n")
                 }
-                output.append(setterBodyIndentation).append("field = newValue\n")
+                output.append(setIndentation).append("field = newValue\n")
             }
+
             if let didSetBody = didSet?.body {
-                var didSetIndentation = setterBodyIndentation
-                if let isInConstructorCheckPropertyName {
-                    output.append(setterBodyIndentation).append("if (!\(isInConstructorCheckPropertyName)) {\n")
-                    didSetIndentation = setterBodyIndentation.inc()
+                var didSetIndentation = setIndentation
+                if let isConstructingPropertyName {
+                    output.append(setIndentation).append("if (!\(isConstructingPropertyName)) {\n")
+                    didSetIndentation = didSetIndentation.inc()
                 }
                 output.append(didSetBody, indentation: didSetIndentation)
-                if isInConstructorCheckPropertyName != nil {
+                if isConstructingPropertyName != nil {
+                    output.append(setIndentation).append("}\n")
+                }
+            }
+            if let mutationFunctionNames {
+                if hasCustomSet {
+                    output.append(setterBodyIndentation).append("} finally {\n")
+                    output.append(setterBodyIndentation.inc()).append("\(mutationFunctionNames.didMutate)()\n")
                     output.append(setterBodyIndentation).append("}\n")
+                } else {
+                    output.append(setterBodyIndentation).append("\(mutationFunctionNames.didMutate)()\n")
                 }
             }
             output.append(setterIndentation).append("}\n")

@@ -3,6 +3,18 @@ package skip.lib
 interface MutableStruct {
     fun scopy(): MutableStruct
     var supdate: ((Any) -> Unit)?
+    var smutatingcount: Int
+
+    fun willmutate() {
+        smutatingcount += 1
+    }
+
+    fun didmutate() {
+        smutatingcount -= 1
+        if (smutatingcount <= 0) {
+            supdate?.invoke(this)
+        }
+    }
 }
 
 @Suppress("UNCHECKED_CAST")

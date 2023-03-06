@@ -780,6 +780,12 @@ class KotlinNumericLiteral: KotlinExpression {
     var literal: String
     var isFloatingPoint: Bool
 
+    init(literal: String, isFloatingPoint: Bool = false, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        self.literal = literal
+        self.isFloatingPoint = isFloatingPoint
+        super.init(type: .numericLiteral, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
     init(expression: NumericLiteral) {
         self.literal = expression.literal
         self.isFloatingPoint = expression.isFloatingPoint

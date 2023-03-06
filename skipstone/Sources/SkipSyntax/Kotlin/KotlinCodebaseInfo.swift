@@ -21,7 +21,7 @@ public class KotlinCodebaseInfo {
 
     /// Gather codebase-level information from the given syntax tree.
     func gather(from syntaxTree: SyntaxTree) {
-        syntaxTree.root.statements.forEach { $0.visit(perform: self.visit) }
+        syntaxTree.root.visit(perform: self.visit)
         plugins.forEach { $0.gather(from: syntaxTree) }
     }
 
@@ -41,13 +41,16 @@ public class KotlinCodebaseInfo {
 
     private func visit(node: SyntaxNode) -> VisitResult<SyntaxNode> {
         guard let statement = node as? Statement else {
-            return .skip
+            // Recurse to find nested declarations
+            return .recurse(nil)
         }
         switch statement.type {
         case .classDeclaration:
             addTypeInfo(for: statement as! TypeDeclaration, mayBeMutableStructType: false)
+            return .recurse(nil)
         case .enumDeclaration:
             addTypeInfo(for: statement as! TypeDeclaration, mayBeMutableStructType: false)
+            return .recurse(nil)
         case .protocolDeclaration:
             let typeDeclaration = statement as! TypeDeclaration
             // A protocol may not be mutable struct if it extends from AnyObject, may be if it extends from nothing,
@@ -77,7 +80,7 @@ public class KotlinCodebaseInfo {
             infos.append(ExtensionInfo(declaration: declaration, sourceFile: statement.sourceFile))
             extensionInfo[key] = infos
         default:
-            return .skip
+            break
         }
         return .recurse(nil)
     }

@@ -8,7 +8,6 @@ final class TypeDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal open class A {
-
             companion object {
             }
         }
@@ -26,7 +25,6 @@ final class TypeDeclarationTests: XCTestCase {
         """, kotlin: """
         internal open class A {
             internal open class B {
-
                 companion object {
                 }
             }
@@ -74,6 +72,11 @@ final class TypeDeclarationTests: XCTestCase {
         """, kotlin: """
         internal class A: MutableStruct {
             internal var i: Int
+                set(newValue) {
+                    willmutate()
+                    field = newValue
+                    didmutate()
+                }
 
             internal constructor(i: Int) {
                 this.i = i
@@ -85,7 +88,7 @@ final class TypeDeclarationTests: XCTestCase {
             }
 
             override var supdate: ((Any) -> Unit)? = null
-
+            override var smutatingcount = 0
             override fun scopy(): MutableStruct {
                 return A(this as MutableStruct)
             }
@@ -107,5 +110,15 @@ final class TypeDeclarationTests: XCTestCase {
     func testGenerics() async throws {
         XCTExpectFailure()
         XCTFail("TODO: Generics in classes, structs, extensions, typealiases. Generic where clauses, etc")
+    }
+
+    func testTypeDeclaredWithinExtension() {
+        XCTExpectFailure()
+        XCTFail("TODO: Test declaring a type within an extension. We need to move it to the original type extended type definition if in module, error if not")
+    }
+
+    func testTypeDeclaredWithinFunction() {
+        XCTExpectFailure()
+        XCTFail("TODO: Test declaring a type within a function. This includes making sure our plugins process in-function types correctly")
     }
 }
