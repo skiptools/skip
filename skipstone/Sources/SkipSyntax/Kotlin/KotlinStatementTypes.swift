@@ -359,6 +359,9 @@ class KotlinClassDeclaration: KotlinStatement {
         }
         kstatement.members = members
         kstatement.inherits.forEach { $0.appendKotlinMessages(to: kstatement) }
+        if !statement.attributes.isEmpty {
+            kstatement.messages.append(.kotlinAttributeUnsupported(statement))
+        }
         return kstatement
     }
 
@@ -522,8 +525,19 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 kstatement.messages.append(.kotlinConstructorNullReturn(statement))
             }
         }
-
+        if statement.attributes.attributes.contains(where: { !isIgnorable(attribute: $0) }) {
+            kstatement.messages.append(.kotlinAttributeUnsupported(statement))
+        }
         return kstatement
+    }
+
+    private static func isIgnorable(attribute: Attribute) -> Bool {
+        switch attribute.signature {
+        case .named(let name, _):
+            return name == "discardableResult"
+        default:
+            return false
+        }
     }
 
     init(name: String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
@@ -801,6 +815,9 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         kstatement.declaredType.appendKotlinMessages(to: kstatement)
         if statement.isAsync {
             kstatement.messages.append(.kotlinAsyncProperties(kstatement))
+        }
+        if !statement.attributes.isEmpty {
+            kstatement.messages.append(.kotlinAttributeUnsupported(statement))
         }
         return kstatement
     }

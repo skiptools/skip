@@ -2,28 +2,53 @@
 import XCTest
 
 final class ExpressionTests: XCTestCase {
-    func testTypeSelf() async throws {
+    func testSelf() async throws {
         try await check(swift: """
         class C {
-            static func sf() -> Int {
+            static func staticf() -> Int {
                 return 10
             }
         
             func f() -> Int {
-                return Self.sf()
+                return Self.staticf()
             }
         }
         """, kotlin: """
         internal open class C {
         
             internal open fun f(): Int {
-                return Companion.sf()
+                return Companion.staticf()
             }
         
             companion object {
-                internal fun sf(): Int {
+                internal fun staticf(): Int {
                     return 10
                 }
+            }
+        }
+        """)
+
+        try await check(swift: """
+        class C {
+            func instancef() -> Int {
+                return 10
+            }
+
+            func f() -> Int {
+                return self.instancef()
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal open fun instancef(): Int {
+                return 10
+            }
+
+            internal open fun f(): Int {
+                return this.instancef()
+            }
+
+            companion object {
             }
         }
         """)

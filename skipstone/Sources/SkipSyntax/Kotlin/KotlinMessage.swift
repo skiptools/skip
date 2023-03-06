@@ -14,6 +14,10 @@ extension Message {
         return Message(severity: .error, message: "Kotlin does not support async properties. Consider using a function", sourceDerived: sourceDerived)
     }
 
+    static func kotlinAttributeUnsupported(_ sourceDerived: SourceDerived) -> Message {
+        return Message(severity: .warning, message: "Kotlin does not support this Swift attribute or property wrapper", sourceDerived: sourceDerived)
+    }
+
     // Idea: auto-create combined interface for composed protocols
     static func kotlinComposedTypes(_ sourceDerived: SourceDerived) -> Message {
         return Message(severity: .error, message: "Kotlin does not support composed types. Consider creating a single type that conforms to these types", sourceDerived: sourceDerived)

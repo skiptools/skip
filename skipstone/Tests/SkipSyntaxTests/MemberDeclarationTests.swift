@@ -247,6 +247,18 @@ final class MemberDeclarationTests: XCTestCase {
         cls.sideEffectsStruct.j += 1
         XCTAssertEqual(["willSetJ", "willSetI", "didSetI", "willSetI", "didSetI", "didSetJ", "willSetOwner", "didSetOwner"], sideEffectOrdering)
     }
+
+    func testDiscardableResult() async throws {
+        try await check(swift: """
+        @discardableResult func f() -> Int {
+            return 1
+        }
+        """, kotlin: """
+        internal fun f(): Int {
+            return 1
+        }
+        """)
+    }
 }
 
 var sideEffectOrdering: [String] = []
