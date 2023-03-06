@@ -259,6 +259,30 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """)
     }
+
+//    func testInOutParameter() async throws {
+//        try await check(swift: """
+//        func f(param: inout Int) {
+//            param += 1
+//        }
+//        func f2() {
+//            var i = 0
+//            f(param: &i)
+//            print(i)
+//        }
+//        """, kotlin: """
+//        internal fun f(param: InOut<Int>) {
+//            param.value += 1
+//        }
+//        internal fun f2() {
+//            var i = 0
+//            f(param = InOut(get = { i }, set = { i = it })
+//            print(i)
+//        }
+//        """)
+//
+//        // TODO: Test passing inout param to another inout function. Test shadowing param with another let/var
+//    }
 }
 
 var sideEffectOrdering: [String] = []
