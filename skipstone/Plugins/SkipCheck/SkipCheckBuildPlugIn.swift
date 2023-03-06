@@ -10,7 +10,7 @@ import PackagePlugin
         let runner = try context.tool(named: "SkipRunner").path
         let inputPaths = sourceModuleTarget.sourceFiles(withSuffix: ".swift").map { $0.path }
         let outputDir = context.pluginWorkDirectory
-        return inputPaths.map { Command.buildCommand(displayName: "SkipCheck", executable: runner, arguments: ["check", "-O", outputDir.string, $0.string], inputFiles: [$0], outputFiles: [$0.outputPath(in: outputDir)]) }
+        return inputPaths.map { Command.buildCommand(displayName: "SkipCheck", executable: runner, arguments: ["precheck", "-O", outputDir.string, $0.string], inputFiles: [$0], outputFiles: [$0.outputPath(in: outputDir)]) }
     }
 }
 
@@ -24,7 +24,7 @@ extension SkipCheckBuildPlugin: XcodeBuildToolPlugin {
             .filter { $0.type == .source && $0.path.extension == "swift" }
             .map { $0.path }
         let outputDir = context.pluginWorkDirectory
-        return inputPaths.map { Command.buildCommand(displayName: "SkipCheck", executable: runner, arguments: ["check", "-O", outputDir.string, $0.string], inputFiles: [$0], outputFiles: [$0.outputPath(in: outputDir)]) }
+        return inputPaths.map { Command.buildCommand(displayName: "SkipCheck", executable: runner, arguments: ["precheck", "-O", outputDir.string, $0.string], inputFiles: [$0], outputFiles: [$0.outputPath(in: outputDir)]) }
     }
 }
 #endif

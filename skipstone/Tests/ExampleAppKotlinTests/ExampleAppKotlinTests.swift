@@ -2,15 +2,15 @@
 import SkipUnit
 
 /// This test case will perform run the transpilation tests
-final class SampleAppKip: GradleTestRunner {
-    public func testSampleApp() async throws {
-        try await transpileAndTest(targets: SkipTargetSet(.app("SampleApp"), dependencies: [
+final class ExampleAppKotlinTests : GradleTestRunner {
+    public func testExampleApp() async throws {
+        try await transpileAndTest(targets: SkipTargetSet(.app("ExampleApp"), dependencies: [
             SkipTargetSet(.lib("CrossUI"), dependencies: [
                 SkipTargetSet(.lib("CrossFoundation"), dependencies: [
                     SkipTargetSet(.lib("SkipLib"))
                 ])
             ]),
-            SkipTargetSet(.lib("SampleLib"), dependencies: [
+            SkipTargetSet(.lib("ExampleLib"), dependencies: [
                 SkipTargetSet(.lib("CrossFoundation"), dependencies: [
                     SkipTargetSet(.lib("SkipLib"))
                 ])

@@ -1,1 +1,17 @@
 # skip.tools per-configuration file
+cross-ui:
+    rename: XXX.swift YYY.kt
+    regex: s/FOO/BAR/g
+
+dependors:
+    handler: covertXCUnitToJUnit
+
+
+covertXCUnitToJUnit:
+    matching: Test*.swift
+    pretranspile: s/X/Y/g
+    posttranspile: s/A/B/g
+
+gradle:
+    add-depedency: junit 4.5.1
+

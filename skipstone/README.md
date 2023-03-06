@@ -127,19 +127,19 @@ let package = Package(
     products: [
         .library(name: "CrossFoundation", targets: ["CrossFoundation"]),
         .library(name: "CrossUI", targets: ["CrossUI"]),
-        .library(name: "SampleLib", targets: ["SampleLib"]),
-        .library(name: "SampleApp", targets: ["SampleApp"]),
+        .library(name: "ExampleLib", targets: ["ExampleLib"]),
+        .library(name: "ExampleApp", targets: ["ExampleApp"]),
     ],
     targets: [
         .target(name: "CrossFoundation", dependencies: []),
         .target(name: "CrossUI", dependencies: ["CrossFoundation"]),
-        .target(name: "SampleLib", dependencies: ["CrossFoundation"]),
-        .target(name: "SampleApp", dependencies: ["SampleLib", "CrossUI"]),
+        .target(name: "ExampleLib", dependencies: ["CrossFoundation"]),
+        .target(name: "ExampleApp", dependencies: ["ExampleLib", "CrossUI"]),
         
         .testTarget(name: "CrossFoundationTests", dependencies: ["CrossFoundation"]),
         .testTarget(name: "CrossUITests", dependencies: ["CrossUI"]),
-        .testTarget(name: "SampleAppTests", dependencies: ["SampleApp"]),
-        .testTarget(name: "SampleLibTests", dependencies: ["SampleLib"]),
+        .testTarget(name: "ExampleAppTests", dependencies: ["ExampleApp"]),
+        .testTarget(name: "ExampleLibTests", dependencies: ["ExampleLib"]),
     ]
 )
 ```
@@ -149,30 +149,30 @@ The following Gradle project structure will be generated.
 
 ```
 .
-├── SampleApp
+├── ExampleApp
 │   ├── build.gradle.kts
 │   └── src
 │       ├── main
 │       │   └── kotlin
-│       │       └── SampleApp
+│       │       └── ExampleApp
 │       │           ├── ContentView.kt
-│       │           └── SampleApp.kt
+│       │           └── ExampleApp.kt
 │       └── test
 │           └── kotlin
-│               └── SampleApp
-│                   └── SampleAppTests.kt
-├── SampleLib
+│               └── ExampleApp
+│                   └── ExampleAppTests.kt
+├── ExampleLib
 │   ├── build.gradle.kts
 │   └── src
 │       ├── main
 │       │   └── kotlin
-│       │       └── SampleLib
+│       │       └── ExampleLib
 │       │           ├── CellularAutomaton.kt
-│       │           └── SampleLib.kt
+│       │           └── ExampleLib.kt
 │       └── test
 │           └── kotlin
-│               └── SampleLib
-│                   └── SampleLibTests.kt
+│               └── ExampleLib
+│                   └── ExampleLibTests.kt
 ├── CrossFoundation
 │   ├── build.gradle.kts
 │   └── src
@@ -232,10 +232,10 @@ for (module in modules) {
 The individual module `build.gradle.kts` files will have dependencies that match
 the inter-module dependencies in the `Package.swift` file.
 
-For example, `SampleApp` depends on `SampleLib` and `CrossUI`,
+For example, `ExampleApp` depends on `ExampleLib` and `CrossUI`,
 both of which depend on `CrossFoundation`.
 
-`SampleLib/build.gradle.kts`'s dependecies will include just the one dependency:
+`ExampleLib/build.gradle.kts`'s dependecies will include just the one dependency:
 
 ```kotlin
 dependencies {
@@ -243,11 +243,11 @@ dependencies {
 }
 ```
 
-And `SampleApp/build.gradle.kts`'s dependecies will reference all the dependencies:
+And `ExampleApp/build.gradle.kts`'s dependecies will reference all the dependencies:
 
 ```kotlin
 dependencies {
-    implementation(project(":SampleLib"))
+    implementation(project(":ExampleLib"))
     implementation(project(":CrossFoundation"))
     implementation(project(":CrossUI"))
 }

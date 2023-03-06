@@ -634,7 +634,7 @@ extension SkipSystem {
 
             let androidManifest = URL(fileURLWithPath: "src/main/AndroidManifest.xml", isDirectory: false, relativeTo: moduleRoot)
 
-            let appName = "SampleApp" // TODO: remove
+            let appName = "ExampleApp" // TODO: remove
 
             func createAndroidManifest() throws {
                 let manifestContents = """

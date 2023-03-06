@@ -1,4 +1,4 @@
-package sample.app
+package example.app
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background

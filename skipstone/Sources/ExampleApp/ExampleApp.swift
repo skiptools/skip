@@ -1,9 +1,9 @@
 #if !SKIP
 import CrossUI
 
-public let logger: Logger = Logger(subsystem: "activity", category: "SampleApp")
+public let logger: Logger = Logger(subsystem: "activity", category: "ExampleApp")
 
-//class SampleApp : ComponentActivity() {
+//class ExampleApp : ComponentActivity() {
 //    override fun onCreate(savedInstanceState: Bundle?) {
 //        super.onCreate(savedInstanceState)
 //        setContent {
@@ -19,7 +19,7 @@ public let logger: Logger = Logger(subsystem: "activity", category: "SampleApp")
 //}
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-public struct SampleApp : App {
+public struct ExampleApp : App {
     public init() {
     }
 

@@ -1,4 +1,4 @@
-package sample.app
+package example.app
 
 import androidx.compose.runtime.Composable
 

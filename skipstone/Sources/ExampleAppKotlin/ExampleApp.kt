@@ -1,4 +1,4 @@
-package sample.app
+package example.app
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -15,9 +15,9 @@ import cross.foundation.Logger
 import cross.foundation.info
 import cross.foundation.warning
 
-public val logger: Logger = Logger(subsystem = "activity", category = "SampleApp")
+public val logger: Logger = Logger(subsystem = "activity", category = "ExampleApp")
 
-class SampleApp : ComponentActivity() {
+class ExampleApp : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
