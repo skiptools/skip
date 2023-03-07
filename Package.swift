@@ -1,6 +1,5 @@
 // swift-tools-version: 5.7
 import PackageDescription
-import class Foundation.ProcessInfo
 
 let package = Package(
     name: "skip",
@@ -15,8 +14,6 @@ let package = Package(
     products: [
         .plugin(name: "skip", targets: ["SkipCommandPlugIn"]),
         .plugin(name: "skippy", targets: ["SkipBuildPlugIn"]),
-//        .library(name: "SkipUnitTestSupport", targets: ["SkipUnitTestSupport"]),
-
         .plugin(name: "precheck", targets: ["SkipPrecheckPlugIn"]),
         .plugin(name: "transpile", targets: ["SkipTranspilePlugIn"]),
         .plugin(name: "gradle", targets: ["SkipGradlePlugIn"]),
@@ -48,12 +45,12 @@ let package = Package(
     ]
 )
 
-
-if !0.isZero { // let _ = ProcessInfo.processInfo.environment["SKIP_USE_LOCAL_DEPS"] {
-    // build agains the local relative package ../SkipSource
-    package.dependencies += [.package(path: "../SkipSource")]
-    package.targets += [.executableTarget(name: "skiptool", dependencies: [.product(name: "SkipBuild", package: "SkipSource")])]
+import class Foundation.ProcessInfo
+if let localPath = ProcessInfo.processInfo.environment["SKIPLOCAL"] {
+    // build against the local relative packages in the peer folders by running: SKIPLOCAL=.. xed Skip.xcworkspace
+    package.dependencies += [.package(path: localPath + "/SkipSource")]
+    package.targets += [.executableTarget(name: "skiptool", dependencies: [.product(name: "SkipBuild", package: "SkipSource")], path: "Sources/SkipTool")]
 } else {
-    // use the binary dependency
-    package.targets += [.binaryTarget(name: "skiptool", url: "https://github.com/skiptools/skip/releases/download/0.0.49/skiptool.artifactbundle.zip", checksum: "a160a9edc3b533c6303f5f574e3f57c4d4a29bf883a3161f2aa7a5e5a14b3151")]
+    // default to using the latest binary skiptool release
+    package.targets += [.binaryTarget(name: "skiptool", url: "https://github.com/skiptools/skip/releases/download/0.0.50/skiptool.artifactbundle.zip", checksum: "ee695d7fad7b5da3cd90bd230f4945856b1e5104fa99e5cf229781c58e613470")]
 }

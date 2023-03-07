@@ -5,9 +5,6 @@ import PackagePlugin
 @main struct SkipTranspilePlugIn: BuildToolPlugin {
     func createBuildCommands(context: PluginContext, target: Target) async throws -> [Command] {
         let tool = try context.tool(named: "skiptool")
-        let outputFolder = context.pluginWorkDirectory
-        let pkg = context.package
-
         let kotlinSuffix = "Kotlin"
         let testSuffix = "Tests"
         let isTest = target.name.hasSuffix(testSuffix)
@@ -31,11 +28,32 @@ import PackagePlugin
             struct MissingPeerTarget : LocalizedError { let errorDescription: String? }
             throw MissingPeerTarget(errorDescription: "Target «\(target.name)» should have initial dependency on «\(expectedName)»")
         }
-        
+
+        var args = ["version"]
         return [
-            .prebuildCommand(displayName: "Skip Transpile Prebuild \(target.name)", executable: tool.path, arguments: ["version"], outputFilesDirectory: outputFolder),
-            .buildCommand(displayName: "Skip Transpile Build \(target.name)", executable: tool.path, arguments: ["version"]),
+            .buildCommand(displayName: "Skip Transpile Build \(target.name)", executable: tool.path, arguments: args + []),
         ]
+    }
+}
+
+
+extension URL {
+    /// The folder where built modules will be placed.
+    ///
+    /// When running within Xcode, which will query the `__XCODE_BUILT_PRODUCTS_DIR_PATHS` environment.
+    /// Otherwise, it assumes SPM's standard ".build" folder relative to the working directory.
+    static var moduleBuildFolder: URL {
+        // if we are running tests from Xcode, this environment variable should be set; otherwise, assume the .build folder for an SPM build
+        let xcodeBuildFolder = ProcessInfo.processInfo.environment["__XCODE_BUILT_PRODUCTS_DIR_PATHS"] ?? ProcessInfo.processInfo.environment["BUILT_PRODUCTS_DIR"] // also seems to be __XPC_DYLD_LIBRARY_PATH or __XPC_DYLD_FRAMEWORK_PATH; this will be something like ~/Library/Developer/Xcode/DerivedData/MODULENAME-bsjbchzxfwcrveckielnbyhybwdr/Build/Products/Debug
+
+
+#if DEBUG
+        let swiftBuildFolder = ".build/debug"
+#else
+        let swiftBuildFolder = ".build/release"
+#endif
+
+        return URL(fileURLWithPath: xcodeBuildFolder ?? swiftBuildFolder, isDirectory: true)
     }
 }
 
