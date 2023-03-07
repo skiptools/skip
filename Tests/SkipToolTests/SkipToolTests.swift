@@ -1,7 +1,7 @@
 import XCTest
-@testable import SkipCLI
+@testable import SkipToolTests
 
-final class skipTests: XCTestCase {
+final class SkipToolTests: XCTestCase {
     func testExample() throws {
         //XCTAssertEqual(0.0, SkipSourceVersion.version)
     }

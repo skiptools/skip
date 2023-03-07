@@ -4,11 +4,18 @@ import class Foundation.ProcessInfo
 
 let package = Package(
     name: "skip",
+    defaultLocalization: "en",
+    platforms: [
+        .iOS(.v15),
+        .macOS(.v12),
+        .tvOS(.v15),
+        .watchOS(.v8),
+        .macCatalyst(.v15),
+    ],
     products: [
         .plugin(name: "skip", targets: ["SkipCommandPlugIn"]),
         .plugin(name: "skippy", targets: ["SkipBuildPlugIn"]),
-        .library(name: "SkipUnitTestSupport", targets: ["SkipUnitTestSupport"]),
-        //.library(name: "SkipKit", targets: ["SkipKit"]),
+//        .library(name: "SkipUnitTestSupport", targets: ["SkipUnitTestSupport"]),
 
         .plugin(name: "precheck", targets: ["SkipPrecheckPlugIn"]),
         .plugin(name: "transpile", targets: ["SkipTranspilePlugIn"]),
@@ -23,7 +30,7 @@ let package = Package(
         //.package(url: "https://github.com/skiptools/example-app.git", from: "0.0.0"),
     ],
     targets: [
-        .target(name: "SkipUnitTestSupport"),
+//        .target(name: "SkipUnitTestSupport"),
         .plugin(name: "SkipCommandPlugIn",
             capability: .command(
                 intent: .custom(verb: "skip", 
@@ -42,11 +49,11 @@ let package = Package(
 )
 
 
-if let _ = ProcessInfo.processInfo.environment["SKIP_USE_LOCAL_DEPS"] {
+if !0.isZero { // let _ = ProcessInfo.processInfo.environment["SKIP_USE_LOCAL_DEPS"] {
     // build agains the local relative package ../SkipSource
     package.dependencies += [.package(path: "../SkipSource")]
-    package.targets += [.binaryTarget(name: "skiptool", url: "https://github.com/skiptools/skip/releases/download/0.0.45/skiptool.artifactbundle.zip", checksum: "571b63d95fdf8b5c498f6ea54190395d5b0b9efd25b0aef17a8d53b64a6cae84")]
+    package.targets += [.binaryTarget(name: "skiptool", url: "https://github.com/skiptools/skip/releases/download/0.0.46/skiptool.artifactbundle.zip", checksum: "e3dc35746183baedc203bb4348680cc5da3bd2ded6f16dc0e0aed37dcb0de9e7")]
 } else {
     // use the binary dependency
-    package.targets += [.binaryTarget(name: "skiptool", url: "https://github.com/skiptools/skip/releases/download/0.0.45/skiptool.artifactbundle.zip", checksum: "571b63d95fdf8b5c498f6ea54190395d5b0b9efd25b0aef17a8d53b64a6cae84")]
+    package.targets += [.binaryTarget(name: "skiptool", url: "https://github.com/skiptools/skip/releases/download/0.0.46/skiptool.artifactbundle.zip", checksum: "e3dc35746183baedc203bb4348680cc5da3bd2ded6f16dc0e0aed37dcb0de9e7")]
 }

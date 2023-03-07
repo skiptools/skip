@@ -7,7 +7,7 @@ import PackagePlugin
         guard let sourceModuleTarget = target as? SourceModuleTarget else {
             return []
         }
-        let runner = try context.tool(named: "SkipRunner").path
+        let runner = try context.tool(named: "skiptool").path
         let inputPaths = sourceModuleTarget.sourceFiles(withSuffix: ".swift").map { $0.path }
         let outputDir = context.pluginWorkDirectory
         return inputPaths.map { Command.buildCommand(displayName: "skippy", executable: runner, arguments: ["-skippy", "-O\(outputDir.string)", $0.string], inputFiles: [$0], outputFiles: [$0.outputPath(in: outputDir)]) }
@@ -19,7 +19,7 @@ import XcodeProjectPlugin
 
 extension SkippyTool: XcodeBuildToolPlugin {
     func createBuildCommands(context: XcodePluginContext, target: XcodeTarget) throws -> [Command] {
-        let runner = try context.tool(named: "SkipRunner").path
+        let runner = try context.tool(named: "skiptool").path
         let inputPaths = target.inputFiles
             .filter { $0.type == .source && $0.path.extension == "swift" }
             .map { $0.path }
