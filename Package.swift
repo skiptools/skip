@@ -55,5 +55,5 @@ if !0.isZero { // let _ = ProcessInfo.processInfo.environment["SKIP_USE_LOCAL_DE
     package.targets += [.executableTarget(name: "skiptool", dependencies: [.product(name: "SkipBuild", package: "SkipSource")])]
 } else {
     // use the binary dependency
-    package.targets += [.binaryTarget(name: "skiptool", url: "https://github.com/skiptools/skip/releases/download/0.0.46/skiptool.artifactbundle.zip", checksum: "e3dc35746183baedc203bb4348680cc5da3bd2ded6f16dc0e0aed37dcb0de9e7")]
+    package.targets += [.binaryTarget(name: "skiptool", url: "https://github.com/skiptools/skip/releases/download/0.0.48/skiptool.artifactbundle.zip", checksum: "a7a295f9cd848032efff3a36365e0ab8c35eae1d4f943923a5b81b2f5e001ab4")](name: "skiptool", url: "https://github.com/skiptools/skip/releases/download/0.0.46/skiptool.artifactbundle.zip", checksum: "e3dc35746183baedc203bb4348680cc5da3bd2ded6f16dc0e0aed37dcb0de9e7")]
 }
