@@ -90,7 +90,7 @@ public class KotlinTranslator {
         case .continue:
             return [KotlinContinue(statement: statement as! Continue)]
         case .defer:
-            break
+            return [KotlinDefer.translate(statement: statement as! Defer, translator: self)]
         case .do:
             break
         case .expression:

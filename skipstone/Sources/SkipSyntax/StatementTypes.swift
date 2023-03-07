@@ -45,7 +45,7 @@ enum StatementType: CaseIterable {
         case .continue:
             return Continue.self
         case .defer:
-            return nil
+            return Defer.self
         case .do:
             return nil
         case .forLoop:
@@ -157,6 +157,33 @@ class Continue: Statement {
 
     override var prettyPrintAttributes: [PrettyPrintTree] {
         return label == nil ? [] : [PrettyPrintTree(root: label!)]
+    }
+}
+
+/// `defer { ... }`
+class Defer: Statement {
+    let body: CodeBlock
+
+    init(body: CodeBlock, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.body = body
+        super.init(type: .defer)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+        guard syntax.kind == .deferStmt, let deferStmt = syntax.as(DeferStmtSyntax.self) else {
+            return nil
+        }
+        let statements = StatementDecoder.decode(syntaxListContainer: deferStmt.body, in: syntaxTree)
+        let body = CodeBlock(statements: statements)
+        return [Defer(body: body, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        return body.inferTypes(context: context, expecting: .none)
+    }
+
+    override var children: [SyntaxNode] {
+        return [body]
     }
 }
 

@@ -3,6 +3,7 @@ enum KotlinStatementType {
     case `break`
     case codeBlock
     case `continue`
+    case `defer`
     case expression
     case forLoop
     case labeledStatement
@@ -42,10 +43,15 @@ class KotlinBreak: KotlinStatement {
 
 class KotlinCodeBlock: KotlinStatement {
     var statements: [KotlinStatement]
+    var deferCount = 0
 
     static func translate(statement: CodeBlock, translator: KotlinTranslator) -> KotlinCodeBlock {
         let kstatements = statement.statements.flatMap { translator.translateStatement($0) }
-        return KotlinCodeBlock(statements: kstatements)
+        let kcodeBlock = KotlinCodeBlock(statements: kstatements)
+        let kdefers = kstatements.compactMap { $0 as? KotlinDefer }
+        kcodeBlock.deferCount = kdefers.count
+        kdefers.forEach { $0.codeBlock = kcodeBlock }
+        return kcodeBlock
     }
 
     init(statements: [KotlinStatement] = []) {
@@ -123,7 +129,38 @@ class KotlinCodeBlock: KotlinStatement {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
-        output.append(statements, indentation: indentation)
+        var statementIndentation = indentation
+        if deferCount > 0 {
+            if deferCount == 1 {
+                output.append(indentation).append("var deferaction: (() -> Unit)? = null\n")
+            } else {
+                output.append(indentation).append("val deferactions: MutableList<() -> Unit> = mutableListOf()\n")
+            }
+            output.append(indentation).append("try {\n")
+            statementIndentation = statementIndentation.inc()
+        }
+        output.append(statements, indentation: statementIndentation)
+        if deferCount > 0 {
+            output.append(indentation).append("} finally {\n")
+            if deferCount == 1 {
+                output.append(statementIndentation).append("deferaction?.invoke()\n")
+            } else {
+                output.append(statementIndentation).append("deferactions.asReversed().forEach { it.invoke() }\n")
+            }
+            output.append(indentation).append("}\n")
+        }
+    }
+
+    func appendDefer(_ body: KotlinCodeBlock, to output: OutputGenerator, indentation: Indentation) {
+        if deferCount == 1 {
+            output.append(indentation).append("deferaction = {\n")
+            output.append(body, indentation: indentation.inc())
+            output.append(indentation).append("}\n")
+        } else {
+            output.append(indentation).append("deferactions.add {\n")
+            output.append(body, indentation: indentation.inc())
+            output.append(indentation).append("}\n")
+        }
     }
 }
 
@@ -141,6 +178,29 @@ class KotlinContinue: KotlinStatement {
             output.append("@\(label)")
         }
         output.append("\n")
+    }
+}
+
+class KotlinDefer: KotlinStatement {
+    var body: KotlinCodeBlock
+    weak var codeBlock: KotlinCodeBlock?
+
+    static func translate(statement: Defer, translator: KotlinTranslator) -> KotlinDefer {
+        let kbody = KotlinCodeBlock.translate(statement: statement.body, translator: translator)
+        return KotlinDefer(statement: statement, body: kbody)
+    }
+
+    private init(statement: Defer, body: KotlinCodeBlock) {
+        self.body = body
+        super.init(type: .defer, statement: statement)
+    }
+
+    override var children: [KotlinSyntaxNode] {
+        return [body]
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        codeBlock?.appendDefer(body, to: output, indentation: indentation)
     }
 }
 
