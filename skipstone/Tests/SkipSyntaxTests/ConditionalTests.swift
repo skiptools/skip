@@ -12,7 +12,7 @@ final class ConditionalTests: XCTestCase {
             print("yes")
         }
         """)
-
+        
         try await check(swift: """
         if !(i == 1) {
             print("yes")

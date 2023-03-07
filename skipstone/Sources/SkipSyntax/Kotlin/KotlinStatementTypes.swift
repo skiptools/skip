@@ -467,9 +467,10 @@ class KotlinClassDeclaration: KotlinStatement {
                     output.append("open ")
                 }
             case .open:
-                output.append(declarationType == .classDeclaration ? "public open " : "public ")
+                if declarationType == .classDeclaration {
+                    output.append("open ")
+                }
             case .public:
-                output.append("public ")
                 if declarationType == .classDeclaration && !modifiers.isFinal {
                     output.append("open ")
                 }
@@ -499,17 +500,18 @@ class KotlinClassDeclaration: KotlinStatement {
         let staticMembers = members.filter { ($0 as? KotlinMemberDeclaration)?.isStatic == true }
         let nonstaticMembers = members.filter { ($0 as? KotlinMemberDeclaration)?.isStatic != true }
         nonstaticMembers.forEach { output.append($0, indentation: memberIndentation) }
-        if !nonstaticMembers.isEmpty {
-            output.append("\n")
-        }
 
         if let isConstructingPropertyName {
-            output.append(memberIndentation).append("private var \(isConstructingPropertyName) = false\n\n")
+            output.append("\n")
+            output.append(memberIndentation).append("private var \(isConstructingPropertyName) = false\n")
         }
-        
-        output.append(memberIndentation).append("companion object {\n")
-        staticMembers.forEach { output.append($0, indentation: memberIndentation.inc()) }
-        output.append(memberIndentation).append("}\n")
+
+        if !staticMembers.isEmpty || modifiers.visibility == .public || modifiers.visibility == .open {
+            output.append("\n")
+            output.append(memberIndentation).append("companion object {\n")
+            staticMembers.forEach { output.append($0, indentation: memberIndentation.inc()) }
+            output.append(memberIndentation).append("}\n")
+        }
         output.append(indentation).append("}\n")
     }
 }

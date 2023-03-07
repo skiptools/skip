@@ -15,9 +15,6 @@ final class FeatureSupportTests: XCTestCase {
             open fun doSomething(a: String = "abc"): String {
                 return a
             }
-
-            companion object {
-            }
         }
         """)
     }
@@ -35,9 +32,6 @@ final class FeatureSupportTests: XCTestCase {
             open fun doSomething(): String? {
                 return null
             }
-
-            companion object {
-            }
         }
         """)
     }
@@ -54,9 +48,6 @@ final class FeatureSupportTests: XCTestCase {
         internal open class Foo {
             open fun doSomething(): String? {
                 return null
-            }
-
-            companion object {
             }
         }
         """)

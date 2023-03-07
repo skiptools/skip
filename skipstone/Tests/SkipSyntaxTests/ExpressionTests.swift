@@ -47,9 +47,6 @@ final class ExpressionTests: XCTestCase {
             internal open fun f(): Int {
                 return this.instancef()
             }
-
-            companion object {
-            }
         }
         """)
     }

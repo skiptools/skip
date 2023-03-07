@@ -44,9 +44,6 @@ final class TriviaTests: XCTestCase {
             // Func comment
             internal open fun f2() {
             }
-
-            companion object {
-            }
         }
         """)
     }

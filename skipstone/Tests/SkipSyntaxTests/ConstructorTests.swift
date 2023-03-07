@@ -22,28 +22,18 @@ final class ConstructorTests: XCTestCase {
         }
         """, kotlin: """
         internal open class A {
-            companion object {
-            }
         }
         
         internal open class B: A() {
-            companion object {
-            }
         }
         
         internal open class C: A() {
             internal constructor() {
             }
-        
-            companion object {
-            }
         }
         
         internal open class D: A {
             internal constructor(): super() {
-            }
-        
-            companion object {
             }
         }
         """)
@@ -78,41 +68,26 @@ final class ConstructorTests: XCTestCase {
         internal open class A {
             internal constructor() {
             }
-        
-            companion object {
-            }
         }
         
         internal open class B: A {
         
             internal constructor(): super() {
             }
-        
-            companion object {
-            }
         }
         
         internal open class C: A() {
             internal constructor() {
-            }
-        
-            companion object {
             }
         }
         
         internal open class D: A() {
             internal constructor(i: Int) {
             }
-        
-            companion object {
-            }
         }
         
         internal open class E: A {
             internal constructor(i: Int): super() {
-            }
-        
-            companion object {
             }
         }
         """)
@@ -157,9 +132,6 @@ final class ConstructorTests: XCTestCase {
         
             internal constructor(both: Int): this(both, s = "$both") {
             }
-        
-            companion object {
-            }
         }
         
         internal open class B: A {
@@ -169,9 +141,6 @@ final class ConstructorTests: XCTestCase {
         
             internal constructor(p_0: Int): super(p_0) {
             }
-        
-            companion object {
-            }
         }
         
         internal open class C: A {
@@ -179,9 +148,6 @@ final class ConstructorTests: XCTestCase {
         
             internal constructor(d: Double, i: Int, s: String): super(i, s = s) {
                 this.d = d
-            }
-        
-            companion object {
             }
         }
         """)
@@ -222,8 +188,6 @@ final class ConstructorTests: XCTestCase {
         }
         """, kotlin: """
         internal class A {
-            companion object {
-            }
         }
         
         internal class B: MutableStruct {
@@ -248,9 +212,6 @@ final class ConstructorTests: XCTestCase {
             override fun scopy(): MutableStruct {
                 return B(this as MutableStruct)
             }
-        
-            companion object {
-            }
         }
         
         internal class C {
@@ -259,9 +220,6 @@ final class ConstructorTests: XCTestCase {
                 get() {
                     return "100"
                 }
-        
-            companion object {
-            }
         }
         
         internal class D: MutableStruct {
@@ -293,9 +251,6 @@ final class ConstructorTests: XCTestCase {
             override fun scopy(): MutableStruct {
                 return D(i, s)
             }
-        
-            companion object {
-            }
         }
         
         internal class E: MutableStruct {
@@ -321,9 +276,6 @@ final class ConstructorTests: XCTestCase {
             override var smutatingcount = 0
             override fun scopy(): MutableStruct {
                 return E(i, s)
-            }
-        
-            companion object {
             }
         }
         """)
@@ -389,9 +341,6 @@ final class ConstructorTests: XCTestCase {
             }
 
             private var isconstructing = false
-
-            companion object {
-            }
         }
         """)
     }

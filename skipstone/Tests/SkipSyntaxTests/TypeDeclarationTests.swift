@@ -8,6 +8,17 @@ final class TypeDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal open class A {
+        }
+        """)
+    }
+
+    func testPublicClass() async throws {
+        try await check(swift: """
+        public class A {
+        }
+        """, kotlin: """
+        open class A {
+
             companion object {
             }
         }
@@ -25,14 +36,9 @@ final class TypeDeclarationTests: XCTestCase {
         """, kotlin: """
         internal open class A {
             internal open class B {
-                companion object {
-                }
             }
 
             internal var b: A.B
-
-            companion object {
-            }
         }
         """)
     }
@@ -52,9 +58,6 @@ final class TypeDeclarationTests: XCTestCase {
 
             internal constructor(i: Int) {
                 this.i = i
-            }
-
-            companion object {
             }
         }
         """)
@@ -91,9 +94,6 @@ final class TypeDeclarationTests: XCTestCase {
             override var smutatingcount = 0
             override fun scopy(): MutableStruct {
                 return A(this as MutableStruct)
-            }
-
-            companion object {
             }
         }
         """)

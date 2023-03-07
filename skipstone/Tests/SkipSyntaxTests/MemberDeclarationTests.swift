@@ -14,9 +14,6 @@ final class MemberDeclarationTests: XCTestCase {
             internal var i: Int? = null
             internal var j: Int? = null
             internal var k = 10
-
-            companion object {
-            }
         }
         """)
     }
@@ -78,9 +75,6 @@ final class MemberDeclarationTests: XCTestCase {
                 set(newValue) {
                     print(newValue)
                 }
-
-            companion object {
-            }
         }
         """)
 
@@ -106,9 +100,6 @@ final class MemberDeclarationTests: XCTestCase {
                     val value = newValue
                     print(value)
                 }
-
-            companion object {
-            }
         }
         """)
     }
@@ -140,9 +131,6 @@ final class MemberDeclarationTests: XCTestCase {
                     field = newValue
                     print(j == 2)
                 }
-
-            companion object {
-            }
         }
         """)
 
@@ -163,9 +151,6 @@ final class MemberDeclarationTests: XCTestCase {
                     print(value)
                     field = newValue
                 }
-
-            companion object {
-            }
         }
         """)
     }
@@ -229,9 +214,6 @@ final class MemberDeclarationTests: XCTestCase {
             }
 
             private var isconstructing = false
-
-            companion object {
-            }
         }
         """)
     }
