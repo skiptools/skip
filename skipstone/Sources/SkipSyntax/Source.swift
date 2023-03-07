@@ -95,6 +95,11 @@ public struct Source {
     public struct Range: Equatable, Encodable {
         public let start: Position
         public let end: Position
+
+        public init(start: Position, end: Position) {
+            self.start = start
+            self.end = end
+        }
     }
 
     /// A line and column-based position in the source, appropriate for Xcode reporting.
@@ -103,6 +108,11 @@ public struct Source {
         public let line: Int
         public let column: Int
 
+        public init(line: Int, column: Int) {
+            self.line = line
+            self.column = column
+        }
+        
         public static func < (lhs: Position, rhs: Position) -> Bool {
             return lhs.line < rhs.line || (lhs.line == rhs.line && lhs.column < rhs.column)
         }

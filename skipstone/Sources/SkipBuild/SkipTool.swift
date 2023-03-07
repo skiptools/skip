@@ -9,7 +9,7 @@ import TSCLibc
 import OSLog
 
 /// The current version of the tool
-public let skipVersion = "0.0.49"
+public let skipVersion = "0.0.50"
 
 protocol Action: AsyncParsableCommand {
     func perform(on sourceFiles: [Source.File], options: Options) async throws
@@ -191,11 +191,14 @@ struct VersionCommand: SingleStreamingCommand {
     }
 
     func executeCommand() async throws -> Output {
-        self.msg(.trace, "trace message")
-        self.msg(.info, "info message")
-        self.msg("plain message")
-        self.msg(.warning, "warning message")
-        //self.msg(.error, "error message") // causes plug-in to fail
+        self.msg(.note, "note message", sourceFile: Source.File(path: #file), sourceRange: Source.Range(start: Source.Position(line: #line, column: #column), end: Source.Position(line: #line, column: #column)))
+        self.msg(.remark, "remark message", sourceFile: Source.File(path: #file), sourceRange: Source.Range(start: Source.Position(line: #line, column: #column), end: Source.Position(line: #line, column: #column)))
+        self.msg("info message", sourceFile: Source.File(path: #file), sourceRange: Source.Range(start: Source.Position(line: #line, column: #column), end: Source.Position(line: #line, column: #column)))
+        self.msg(.warning, "warning from file \(URL(fileURLWithPath: #file).lastPathComponent)", sourceFile: Source.File(path: #file), sourceRange: Source.Range(start: Source.Position(line: #line, column: #column), end: Source.Position(line: #line, column: #column)))
+
+        //self.msg(.error, "error from file \(URL(fileURLWithPath: #file).lastPathComponent)", sourceFile: Source.File(path: #file), sourceRange: Source.Range(start: Source.Position(line: #line, column: #column), end: Source.Position(line: #line, column: #column))) // causes plug-in to fail
+
+        
         return Output()
     }
 }
@@ -605,23 +608,23 @@ extension StreamingCommand {
     }
 
     /// Output the given message to standard error
-    func msg(_ kind: Message.Kind = .info, _ message: @autoclosure () throws -> String) rethrows {
+    func msg(_ kind: Message.Kind = .note, _ message: @autoclosure () throws -> String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) rethrows {
         if outputOptions.quiet == true {
             return
         }
-        if kind == .trace && outputOptions.verbose != true {
+        if kind == .remark && outputOptions.verbose != true {
             return // skip debug output unless we are running verbose
         }
 
-        writeMessage(Message(kind: kind, message: try message()))
+        writeMessage(Message(kind: kind, message: try message(), sourceFile: sourceFile, sourceRange: sourceRange))
     }
 
 
     /// Output the given message to standard error with no type prefix
     ///
     /// This function is redundant, but works around some compiled issue with disambiguating the default initial arg with the nameless autoclosure final arg.
-    func msg(_ message: @autoclosure () throws -> String) rethrows {
-        try self.msg(.info, try message())
+    func msg(_ message: @autoclosure () throws -> String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) rethrows {
+        try self.msg(.note, try message(), sourceFile: sourceFile, sourceRange: sourceRange)
     }
 }
 

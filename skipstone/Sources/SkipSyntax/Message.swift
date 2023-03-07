@@ -3,8 +3,9 @@ import SwiftSyntax
 /// An Xcode-formatted message for the user.
 public struct Message: Error, CustomStringConvertible, Encodable {
     public enum Kind: String, Encodable, Equatable {
-        case trace
-        case info
+        /// A trace-level statement that will only be emitted in debug mode
+        case remark
+        case note
         case warning
         case error
     }
@@ -33,14 +34,14 @@ public struct Message: Error, CustomStringConvertible, Encodable {
     }
 
     public var description: String {
-        let message = "\(kind.rawValue): \(message)"
+        let messageString = "\(kind.rawValue): \(message)"
         guard let sourceFile else {
-            return message
+            return messageString
         }
         guard let sourceRange else {
-            return "\(sourceFile.path): \(message)"
+            return "\(sourceFile.path): \(messageString)"
         }
-        return "\(sourceFile.path):\(sourceRange.start.line):\(sourceRange.start.column): \(message)"
+        return "\(sourceFile.path):\(sourceRange.start.line):\(sourceRange.start.column): \(messageString)"
     }
 
     private static func messageWithSource(for message: String, in source: Source?, range: Source.Range?) -> String {

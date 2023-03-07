@@ -72,7 +72,7 @@ let package = Package(
                 dependencies: ["SkipRunner"]),
 
 
-        .target(name: "ExampleSkipPrecheck", dependencies: ["SkipCheck"], plugins: ["SkipCheck"]),
+        .target(name: "ExampleSkipPrecheck", plugins: ["SkipCheck"]),
 
         .target(name: "SkipUnit", dependencies: ["SkipBuild"]),
         .testTarget(name: "SkipUnitTests", dependencies: ["SkipUnit"]),
