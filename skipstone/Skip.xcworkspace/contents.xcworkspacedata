@@ -7,4 +7,10 @@
    <FileRef
       location = "group:../skip">
    </FileRef>
+   <FileRef
+      location = "group:../cross-sql">
+   </FileRef>
+   <FileRef
+      location = "group:../cross-bow">
+   </FileRef>
 </Workspace>

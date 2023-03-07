@@ -1,0 +1,640 @@
+import Foundation
+import SkipSyntax
+import SwiftParser
+import SwiftSyntax
+import ArgumentParser
+import Universal
+import TSCBasic
+import TSCLibc
+import OSLog
+
+/// The current version of the tool
+public let skipVersion = "0.0.45"
+
+protocol Action: AsyncParsableCommand {
+    func perform(on sourceFiles: [Source.File], options: Options) async throws
+}
+
+
+struct Options {
+    var preprocessorSymbols: [String] = []
+    var outputDirectory: String?
+}
+
+
+// MARK: Command Executor
+
+public struct SkipCommandExecutor: AsyncParsableCommand {
+    public static let experimental = false
+    public static var configuration = CommandConfiguration(commandName: "skip",
+                                                           abstract: "Swift Kotlin Interop",
+                                                           shouldDisplay: !experimental,
+                                                           subcommands: [
+                                                            VersionCommand.self,
+                                                            PrecheckAction.self,
+                                                            TranspileAction.self,
+                                                            GradleAction.self,
+                                                            PrintSwiftASTAction.self,
+                                                            PrintSkipASTAction.self,
+                                                           ]
+    )
+
+    //@OptionGroup public var output: OutputOptions
+
+    /// This is needed to handle execution of the tool from as a sandboxed command plugin
+    @Option(name: [.long], help: ArgumentHelp("List of targets to apply", valueName: "target"))
+    public var target: Array<String> = []
+
+    public init() {
+    }
+
+    /// Run the transpiler on the given arguments.
+    public static func run(_ arguments: [String], basePath: AbsolutePath = localFileSystem.currentWorkingDirectory!, out: WritableByteStream? = nil, err: WritableByteStream? = nil) async throws {
+        var cmd: ParsableCommand = try parseAsRoot(arguments)
+        if var cmd = cmd as? any StreamingCommand {
+            if let outputFile = cmd.outputOptions.output {
+                let path = try AbsolutePath(validating: outputFile, relativeTo: basePath)
+                cmd.outputOptions.streams.out = try LocalFileOutputByteStream(path)
+            } else if let out = out {
+                cmd.outputOptions.streams.out = out
+            }
+            if let err = err {
+                cmd.outputOptions.streams.err = err
+            }
+            try await cmd.run()
+        } else if var cmd = cmd as? AsyncParsableCommand {
+            try await cmd.run()
+        } else {
+            try cmd.run()
+        }
+    }
+}
+
+
+struct OutputOptions: ParsableArguments {
+    @Option(name: [.customShort("o")], help: ArgumentHelp("Send output to the given file", valueName: "path"))
+    var output: String?
+
+    @Flag(name: [.customShort("v")], help: ArgumentHelp("Whether to display verbose messages"))
+    var verbose: Bool = false
+
+    @Flag(name: [.customShort("q")], help: ArgumentHelp("Quiet mode: suppress output"))
+    var quiet: Bool = false
+
+    @Flag(name: [.customShort("J")], help: ArgumentHelp("Emit output as formatted JSON"))
+    var json: Bool = false
+
+    @Flag(name: [.customShort("j")], help: ArgumentHelp("Emit output as compact JSON"))
+    var jsonCompact: Bool = false
+
+    @Flag(name: [.customShort("M")], help: ArgumentHelp("Include messages in JSON output"))
+    var jsonMessages: Bool = false
+
+    @Flag(name: [.customShort("A")], help: ArgumentHelp("Wrap and delimit JSON output as an array"))
+    var jsonArray: Bool = false
+
+    /// A transient handler for tool output; this acts as a temporary holder of output streams
+    internal var streams: OutputHandler = OutputHandler()
+
+    internal final class OutputHandler : Decodable {
+        var out: WritableByteStream = stdoutStream
+        var err: WritableByteStream = stderrStream
+
+        func flush() {
+            out.flush()
+            err.flush()
+        }
+
+        /// The closure that will output a message
+        func writeOut(_ output: String, terminator: String = "\n") {
+            //print(output, terminator: terminator, to: &out) // crashes compiler
+            out.write(output + terminator)
+            if !terminator.isEmpty { out.flush() }
+        }
+
+        /// The closure that will output a message
+        func writeMessage(_ output: ToolOutput, terminator: String = "\n") {
+            err.write(output.description  + terminator)
+            if !terminator.isEmpty { err.flush() }
+        }
+
+        /// The closure that will handle converting and writing the output type to stream
+        var yield: (MessageConvertible) -> () = { _ in }
+
+        init() {
+        }
+
+        /// Not really decodable
+        convenience init(from decoder: Decoder) throws {
+            self.init()
+        }
+    }
+
+    init() {
+    }
+
+    /// Write the given message to the output streams buffer
+    func write(_ value: String) {
+        streams.writeOut(value)
+    }
+
+    /// The output that comes at the beginning of a sequence of elements; an opening bracket, for JSON arrays
+    func beginCommandOutput() {
+        if jsonArray { write("[") }
+    }
+
+    /// The output that comes at the end of a sequence of elements; a closing bracket, for JSON arrays
+    func endCommandOutput() {
+        if jsonArray { write("]") }
+    }
+
+    /// The output that separates elements; a comma, for JSON arrays
+    func writeOutputSeparator() {
+        if jsonArray { write(",") }
+    }
+
+    func writeOutput<T: MessageConvertible>(_ item: T) throws {
+        if json || jsonCompact {
+            try write(item.toJSON(outputFormatting: [.sortedKeys, .withoutEscapingSlashes, (jsonCompact ? .sortedKeys : .prettyPrinted)], dateEncodingStrategy: .iso8601).utf8String ?? "")
+        } else {
+            write(item.description)
+        }
+    }
+}
+
+
+// MARK: VersionCommand
+
+struct VersionCommand: SingleStreamingCommand {
+    static let experimental = false
+    struct Output : MessageConvertible {
+        var version: String = skipVersion
+        #if DEBUG
+        let debug: Bool = true
+        var description: String { "skip version \(skipVersion) (debug)" }
+        #else
+        let debug: Bool? = nil
+        var description: String { "skip version \(skipVersion)" }
+        #endif
+    }
+
+    static var configuration = CommandConfiguration(commandName: "version",
+                                                           abstract: "Print the Skip version",
+                                                           shouldDisplay: !experimental)
+
+    @OptionGroup var outputOptions: OutputOptions
+    // alternative way of setting output
+    //@OptionGroup var parentOptions: SkipCommandExecutor
+    //var output: OutputOptions {
+    //    get { parentOptions.output }
+    //    set { parentOptions.output = newValue }
+    //}
+
+    init() {
+    }
+
+    func executeCommand() async throws -> Output {
+        self.msg(.trace, "trace message")
+        self.msg(.info, "info message")
+        self.msg("plain message")
+        self.msg(.warn, "warning message")
+        self.msg(.error, "error message")
+        return Output()
+    }
+}
+
+
+// MARK: Command Phases
+
+protocol SkipPhase : AsyncParsableCommand {
+    var outputOptions: OutputOptions { get }
+}
+
+
+/// The condition under which the phase should be run
+enum PhaseGuard : String, Decodable, CaseIterable {
+    case no
+    case force
+    case onDemand = "on-demand"
+}
+
+extension PhaseGuard : ExpressibleByArgument {
+}
+
+// MARK: CheckPhase
+
+protocol CheckPhase : SkipPhase {
+    var precheckOptions: CheckPhaseOptions { get }
+}
+
+struct CheckPhaseOptions: ParsableArguments {
+    @Option(help: ArgumentHelp("Condition for check phase", valueName: "force/no"))
+    var check: PhaseGuard = .onDemand
+
+    @Option(name: [.customShort("S")], help: ArgumentHelp("Preprocessor symbols", valueName: "file"))
+    var symbols: [String] = []
+
+    @Option(name: [.customShort("O")], help: ArgumentHelp("Output directory", valueName: "dir"))
+    var directory: String? = nil
+
+    @Argument(help: ArgumentHelp("List of files to process"))
+    var files: [String]
+}
+
+extension CheckPhase {
+    var options: Options {
+        Options(preprocessorSymbols: precheckOptions.symbols, outputDirectory: precheckOptions.directory)
+    }
+
+    func performPrecheckActions() async throws -> CheckResult {
+        return CheckResult()
+    }
+}
+
+struct CheckResult {
+
+}
+
+struct PrecheckAction: Action, CheckPhase {
+    static var configuration = CommandConfiguration(commandName: "precheck", abstract: "Perform transpilation prechecks")
+
+    @OptionGroup(title: "Check Options")
+    var precheckOptions: CheckPhaseOptions
+
+    @OptionGroup(title: "Output Options")
+    var outputOptions: OutputOptions
+
+    func run() async throws {
+        try await perform(on: precheckOptions.files.map({ Source.File(path: $0) }), options: options)
+    }
+
+    func perform(on sourceFiles: [Source.File], options: Options) async throws {
+        for sourceFile in sourceFiles {
+            let source = try Source(file: sourceFile)
+            let syntaxTree = SyntaxTree(source: source, preprocessorSymbols: Set(options.preprocessorSymbols))
+            let translator = KotlinTranslator(syntaxTree: syntaxTree)
+            let kotlinTree = translator.translateSyntaxTree()
+            kotlinTree.messages.forEach { print($0) }
+
+            if let outputDir = options.outputDirectory {
+                let outputFileURL = outputFileURL(for: sourceFile, in: URL(fileURLWithPath: outputDir))
+                try "".write(to: outputFileURL, atomically: false, encoding: .utf8)
+            }
+        }
+    }
+
+    /// Xcode requires that we create an output file in order for incremental build tools to work.
+    ///
+    /// - Warning: This is duplicated in SkipCheckBuildPlugin.
+    func outputFileURL(for sourceFile: Source.File, in outputDir: URL) -> URL {
+        var outputFileName = sourceFile.name
+        if outputFileName.hasSuffix(".swift") {
+            outputFileName = String(outputFileName.dropLast(".swift".count))
+        }
+        outputFileName += "_skipcheck.swift"
+        return outputDir.appendingPathComponent(outputFileName)
+    }
+}
+
+
+// MARK: TranspilePhase
+
+protocol TranspilePhase: CheckPhase {
+    var transpileOptions: TranspilePhaseOptions { get }
+}
+
+struct TranspilePhaseOptions: ParsableArguments {
+    @Option(help: ArgumentHelp("Condition for transpile phase", valueName: "force/no"))
+    var transpile: PhaseGuard = .onDemand
+}
+
+struct TranspileResult {
+
+}
+
+extension TranspilePhase {
+    func performTranspileActions() async throws -> (check: CheckResult, transpile: TranspileResult) {
+        let checkResult = try await performPrecheckActions()
+        let transpileResult = TranspileResult()
+        return (checkResult, transpileResult)
+    }
+}
+
+struct TranspileAction: TranspilePhase {
+    static var configuration = CommandConfiguration(commandName: "transpile", abstract: "Transpile Swift to Kotlin")
+
+    @OptionGroup(title: "Check Options")
+    var precheckOptions: CheckPhaseOptions
+
+    @OptionGroup(title: "Transpile Options")
+    var transpileOptions: TranspilePhaseOptions
+
+    @OptionGroup(title: "Output Options")
+    var outputOptions: OutputOptions
+
+    func run() async throws {
+        try await perform(on: precheckOptions.files.map({ Source.File(path: $0) }), options: options)
+    }
+
+    func perform(on sourceFiles: [Source.File], options: Options) async throws {
+        var transpiler = Transpiler(sourceFiles: sourceFiles)
+        transpiler.preprocessorSymbols = Set(options.preprocessorSymbols)
+        try await transpiler.transpile { transpilation in
+            for message in transpilation.messages {
+                print(message)
+            }
+            print(transpilation.output.content)
+            print()
+        }
+    }
+}
+
+
+// MARK: GradlePhase
+
+protocol GradlePhase: TranspilePhase {
+    var gradleOptions: GradlePhaseOptions { get }
+}
+
+struct GradlePhaseOptions: ParsableArguments {
+//    @Option(help: ArgumentHelp("Condition for gradle phase", valueName: "force/no"))
+//    var gradle: PhaseGuard = .onDemand
+
+    @Option(help: ArgumentHelp("Path to Android Studio.app", valueName: "folder"))
+    var studioHome: String? = nil
+
+}
+
+struct GradleResult {
+
+}
+
+extension GradlePhase {
+    func performGradleActions() async throws -> (check: CheckResult, transpile: TranspileResult, gradle: GradleResult) {
+        let transpileResult = try await performTranspileActions()
+        let gradleResult = GradleResult()
+        return (check: transpileResult.check, transpile: transpileResult.transpile, gradle: gradleResult)
+    }
+}
+
+
+struct GradleAction: GradlePhase {
+    static var configuration = CommandConfiguration(commandName: "gradle", abstract: "Gradle build system interface")
+
+    @OptionGroup(title: "Output Options")
+    var outputOptions: OutputOptions
+
+    @OptionGroup(title: "Precheck Options")
+    var precheckOptions: CheckPhaseOptions
+
+    @OptionGroup(title: "Transpile Options")
+    var transpileOptions: TranspilePhaseOptions
+
+    @OptionGroup(title: "Gradle Options")
+    var gradleOptions: GradlePhaseOptions
+
+    func run() async throws {
+        throw ValidationError("Not yet supported")
+    }
+}
+
+
+// MARK: AST Actions
+
+
+struct PrintSwiftASTAction: Action {
+    static var configuration = CommandConfiguration(commandName: "ast-swift", abstract: "Print the Swift AST")
+
+    @Option(name: [.customShort("S")], help: ArgumentHelp("Preprocessor symbols", valueName: "file"))
+    var symbols: [String] = []
+
+    @Option(name: [.customShort("O")], help: ArgumentHelp("Output directory", valueName: "dir"))
+    var directory: String? = nil
+
+    @Argument(help: ArgumentHelp("List of files to process"))
+    var files: [String]
+
+    var options: Options {
+        Options(preprocessorSymbols: symbols, outputDirectory: directory)
+    }
+
+    func run() async throws {
+        try await perform(on: files.map({ Source.File(path: $0) }), options: options)
+    }
+
+    func perform(on sourceFiles: [Source.File], options: Options) async throws {
+        for sourceFile in sourceFiles {
+            let syntax = try Parser.parse(source: Source(file: sourceFile).content)
+            print(syntax.root.prettyPrintTree)
+        }
+    }
+}
+
+
+struct PrintSkipASTAction: Action {
+    static var configuration = CommandConfiguration(commandName: "ast-skip", abstract: "Print the Skip AST")
+
+    @Option(name: [.customShort("S")], help: ArgumentHelp("Preprocessor symbols", valueName: "file"))
+    var symbols: [String] = []
+
+    @Option(name: [.customShort("O")], help: ArgumentHelp("Output directory", valueName: "dir"))
+    var directory: String? = nil
+
+    @Argument(help: ArgumentHelp("List of files to process"))
+    var files: [String]
+
+    var options: Options {
+        Options(preprocessorSymbols: symbols, outputDirectory: directory)
+    }
+
+    func run() async throws {
+        try await perform(on: files.map({ Source.File(path: $0) }), options: options)
+    }
+
+    func perform(on sourceFiles: [Source.File], options: Options) async throws {
+        for sourceFile in sourceFiles {
+            let source = try Source(file: sourceFile)
+            let syntaxTree = SyntaxTree(source: source, preprocessorSymbols: Set(options.preprocessorSymbols))
+            print(syntaxTree.prettyPrintTree)
+        }
+    }
+}
+
+
+// MARK: Utilities
+
+
+struct ForwardingCommand<Base: ParsableCommand, Name: RawRepresentable & CaseIterable>: ParsableCommand where Name.RawValue : StringProtocol {
+    static var configuration: CommandConfiguration {
+        var cfg = Base.configuration
+        cfg.commandName = Name.allCases.first?.rawValue.description
+        cfg.shouldDisplay = false
+        return cfg
+    }
+
+    @OptionGroup
+    var command: Base
+
+    mutating func run() throws {
+        try command.run()
+    }
+}
+
+//enum SkippyCommandName : String, CaseIterable { case skippy }
+//typealias SkippyAction = ForwardingCommand<PrecheckAction, SkippyCommandName>
+
+
+// MARK: Streaming command support
+
+
+extension MessageConvertible {
+    //var attributedString: String { description }
+}
+
+extension Never: MessageConvertible {
+    public var description: String { "never" }
+}
+
+extension ToolOutput: MessageConvertible {
+    var description: String {
+        if let kind = kind {
+            return kind.name + ": " + message.description
+        } else {
+            return message.description
+        }
+    }
+}
+
+/// A command that contains options for how messages will be conveyed to the user
+protocol StreamingCommand: AsyncParsableCommand {
+    /// The structured output of this tool
+    associatedtype Output : MessageConvertible
+
+    var outputOptions: OutputOptions { get set }
+
+    func performCommand(with continuation: AsyncThrowingStream<Output, Error>.Continuation) async throws
+}
+
+extension StreamingCommand {
+    mutating func run() async throws {
+        outputOptions.beginCommandOutput()
+        var elements = self.startCommand().makeAsyncIterator()
+        if let first = try await elements.next() {
+            try outputOptions.writeOutput(first)
+            while let element = try await elements.next() {
+                outputOptions.writeOutputSeparator()
+                try outputOptions.writeOutput(element)
+            }
+        }
+        outputOptions.endCommandOutput()
+    }
+}
+
+
+extension StreamingCommand {
+    mutating func startCommand() -> AsyncThrowingStream<Output, Error> {
+        AsyncThrowingStream { (continuation: AsyncThrowingStream.Continuation) in
+            self.outputOptions.streams.yield = { continuation.yield($0 as! Output) }
+            // defer { self.output.streams.yield = { _ in } } // clears output
+            doCommand(continuation: continuation)
+        }
+    }
+
+    func doCommand(continuation: AsyncThrowingStream<Output, Error>.Continuation) {
+        Task {
+            defer {
+                self.outputOptions.streams.flush()
+            }
+            do {
+                try await performCommand(with: continuation)
+                continuation.finish()
+            } catch {
+                continuation.finish(throwing: error)
+            }
+        }
+    }
+}
+
+extension StreamingCommand {
+    func warnExperimental(_ experimental: Bool) {
+        if experimental {
+            msg(.warn, "the \(Self.configuration.commandName ?? "") command is experimental and may change in minor releases")
+        }
+    }
+}
+
+protocol SingleStreamingCommand : StreamingCommand {
+    func executeCommand() async throws -> Output
+}
+
+extension SingleStreamingCommand {
+    func performCommand(with continuation: AsyncThrowingStream<Output, Error>.Continuation) async throws {
+        yield(try await executeCommand())
+    }
+}
+
+
+/// A type that can be output in a sequence of messages
+protocol MessageConvertible: Encodable & CustomStringConvertible {
+    /// The attributed output string, used for ANSI terminals
+    // var attributedString: String { get }
+}
+
+extension StreamingCommand {
+    /// Sends the output to the hander
+    func yield(_ output: Output) {
+        self.outputOptions.streams.yield(output)
+    }
+
+    /// Output the given message to standard error
+    func msg(_ kind: MessageKind? = nil, _ message: @autoclosure () throws -> String) rethrows {
+        if outputOptions.quiet == true {
+            return
+        }
+        if kind == .trace && outputOptions.verbose != true {
+            return // skip debug output unless we are running verbose
+        }
+
+        self.outputOptions.streams.writeMessage(ToolOutput(kind: kind, message: try message()))
+    }
+
+    /// Output the given message to standard error with no type prefix
+    ///
+    /// This function is redundant, but works around some compiled issue with disambiguating the default initial arg with the nameless autoclosure final arg.
+    func msg(_ message: @autoclosure () throws -> String) rethrows {
+        try self.msg(nil, try message())
+    }
+}
+
+/// The type of message output
+enum MessageKind: String, Encodable, Hashable {
+    case trace, info, warn, error
+
+    var name: String {
+        switch self {
+        case .trace: return "TRACE"
+        case .info: return "INFO"
+        case .warn: return "WARN"
+        case .error: return "ERROR"
+        }
+    }
+}
+
+struct ToolOutput: Encodable {
+    let kind: MessageKind?
+    let message: String
+}
+
+extension ToolOutput {
+    var color: TerminalController.Color {
+        switch self.kind {
+        case .trace: return .gray
+        case .info: return .cyan
+        case .warn: return .yellow
+        case .error: return .red
+        case .none: return .noColor
+        }
+    }
+}
+
+typealias BufferedOutputByteStream = TSCBasic.BufferedOutputByteStream

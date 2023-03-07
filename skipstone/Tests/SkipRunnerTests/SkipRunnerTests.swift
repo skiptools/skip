@@ -1,7 +1,8 @@
 import XCTest
 import SkipBuild
 import SkipRunner
-import JSON
+import struct JSON.JSON
+import TSCBasic
 
 #if !SKIP
 public class SkipRunnerTests : XCTestCase {
@@ -23,7 +24,7 @@ public class SkipRunnerTests : XCTestCase {
     func tool(_ args: String...) async throws -> (out: String, err: String, json: () throws -> JSON) {
         let out = BufferedOutputByteStream()
         let err = BufferedOutputByteStream()
-        try await Runner.run(args, out: out, err: err)
+        try await SkipCommandExecutor.run(args, out: out, err: err)
         return (out.bytes.description.trimmingCharacters(in: .whitespacesAndNewlines), err.bytes.description.trimmingCharacters(in: .whitespacesAndNewlines), { try JSON.parse(out.bytes.description.utf8Data) })
     }
 

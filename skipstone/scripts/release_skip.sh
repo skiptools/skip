@@ -30,7 +30,7 @@ cd -
 echo "Creating release and tagging new skip version: ${SEMVER_NEXT}"
 
 # mark the internal version
-RUNNER_PATH="Sources/SkipRunner/Runner.swift"
+RUNNER_PATH="Sources/SkipBuild/SkipTool.swift"
 sed -I '' 's;public let skipVersion = .*;public let skipVersion = "'${SEMVER_NEXT}'";g' ${RUNNER_PATH}
 
 

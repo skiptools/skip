@@ -19,38 +19,33 @@ open class GradleTestRunner : XCTestCase {
 
 extension GradleTestRunner {
     public func transpileAndTest(targets: SkipTargetSet) async throws {
-//        guard let targets = targets else {
-//            struct NoTargetsSpecifiedError : Error { }
-//            throw NoTargetsSpecifiedError()
-//        }
-
         // locate the root package for this test case (assuming shallow test directory structure of Tests/ModuleName/TestCase.swift)
         let srcRoot = URL(fileURLWithPath: targets.sourceBase.description, isDirectory: false)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
 
-        #if os(macOS) || os(Linux)
         // turn SomeLibTests.SomeLibTests/ into SomeLibTests/
         let testOutputBase = self.className.split(separator: ".").first ?? .init(self.className)
-        try await SkipSystem.assembleAndExecuteGradle(testCase: Self.testInProcess ? self : nil, root: srcRoot, targets: targets, destRoot: "\(SkipSystem.kipFolderName)/\(testOutputBase)")
-        #else
-        throw XCTSkip("skipping assembleAndExecuteGradle on unsupported platform")
-        #endif
+        let destRoot = "\(SkipSystem.kipFolderName)/\(testOutputBase)"
+
+        // transpile and assemble the gradle project in the given destination
+        let (destRootURL, paths) = try await SkipSystem.assemble(root: srcRoot, targets: targets, destRoot: destRoot)
+
+        // create the Gradle project and execute it
+        try await SkipSystem.assembleAndExecuteGradle(testCase: Self.testInProcess ? self : nil, root: srcRoot, targets: targets, destRootURL: destRootURL, paths: paths)
     }
 }
 
 #if os(macOS) || os(Linux)
 extension SkipSystem {
-    @discardableResult static func assembleAndExecuteGradle(testCase: GradleTestRunner?, root packageRoot: URL, moduleRootPath: String = "Kotlin", sourceFolder: String = "Sources", testsFolder: String? = "Tests", targets: SkipTargetSet, destRoot: String, verbose: Bool = false, overwrite: Bool = true, studioID: String = androidStudioBundleID) async throws -> URL {
+    @discardableResult static func assembleAndExecuteGradle(testCase: GradleTestRunner?, root packageRoot: URL, targets: SkipTargetSet, destRootURL destRoot: URL, paths: [URL], verbose: Bool = false, overwrite: Bool = true, studioID: String = androidStudioBundleID) async throws -> URL {
+
         logger.info("transpiling and testing: \(targets.target.moduleName) from: \(packageRoot.path)")
 
         let packageSwift = try await SkipSystem.parsePackageSwift(path: packageRoot)
 
         let _ = packageSwift // TODO: use Package.swift to determine local module dependencies
-
-        // transpile and assemble the gradle project in the given destination
-        let (destRoot, paths) = try await SkipSystem.assemble(root: packageRoot, moduleRootPath: moduleRootPath, sourceFolder: sourceFolder, testsFolder: testsFolder, targets: targets, destRoot: destRoot)
 
         let workingFolder = try AbsolutePath(validating: destRoot.path)
 

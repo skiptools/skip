@@ -114,12 +114,12 @@ extension SkipSystem {
     }
 
     public static func assemble(root packageRoot: URL,
-                                moduleRootPath: String?,
-                                sourceFolder: String,
-                                testsFolder: String?,
                                 targets: SkipTargetSet,
                                 destRoot: String,
                                 overwrite: Bool = true,
+                                moduleRootPath: String? = "Kotlin",
+                                sourceFolder: String = "Sources",
+                                testsFolder: String? = "Tests",
                                 javaVersion: String = "11",
                                 minAndroidSdk: String = "24",
                                 targetAndroidSdk: String = "33",
@@ -457,7 +457,6 @@ extension SkipSystem {
                 // finally, copy over the build files, overriding the generated ones
                 // FIXME: this is run over the Sources/, so top-level build files won't by copied to the correct destination
                 // try await linkKotlinSourceFiles(sources: buildFiles)
-
             }
 
             struct TranslationOptions : OptionSet {
@@ -483,7 +482,7 @@ extension SkipSystem {
                 if options.contains(.testCase) {
                     // replace common XCTest assertions with their JUnit equivalent
 
-                    //replace(" try ", with: " ") // trim out `try`
+                    // replace(" try ", with: " ") // trim out `try`
 
                     // any functions prefixed with "test" will get the JUnit @Test annotation
                     replace("open fun test", with: "@Test fun test")
@@ -502,9 +501,7 @@ extension SkipSystem {
                     import kotlinx.coroutines.*
                     import kotlinx.coroutines.test.*
 
-                    @RunWith(org.robolectric.RobolectricTestRunner::class)
-                    @org.robolectric.annotation.Config(manifest=org.robolectric.annotation.Config.NONE)
-                    internal class
+                    @RunWith(org.robolectric.RobolectricTestRunner::class) @org.robolectric.annotation.Config(manifest=org.robolectric.annotation.Config.NONE) internal class
                     """)
                 }
 

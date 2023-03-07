@@ -5,8 +5,11 @@ let package = Package(
     name: "SkipSource",
     defaultLocalization: "en",
     platforms: [
-        .macOS(.v12),
         .iOS(.v15),
+        .macOS(.v12),
+        .tvOS(.v15),
+        .watchOS(.v8),
+        .macCatalyst(.v15),
     ],
     products: [
         .library(name: "SkipSyntax", targets: ["SkipSyntax"]),
@@ -59,7 +62,8 @@ let package = Package(
         .testTarget(name: "SkipBuildTests", dependencies: ["SkipBuild"]),
 
         .executableTarget(name: "SkipRunner", dependencies: ["SkipBuild"]),
-        .testTarget(name: "SkipRunnerTests", dependencies: ["SkipRunner"], plugins: ["SkipCheck"]),
+        .testTarget(name: "SkipRunnerTests", dependencies: ["SkipRunner"]),
+        .testTarget(name: "SkipRunnerCheckTests", dependencies: ["SkipRunner"], plugins: ["SkipCheck"]),
 
         .plugin(name: "SkipCheck",
                 capability: .buildTool(),
@@ -87,7 +91,7 @@ let package = Package(
         .testTarget(name: "CrossFoundationTests", dependencies: ["CrossFoundation"], resources: [.process("Resources")]),
 
         .target(name: "CrossFoundationKotlin", dependencies: ["CrossFoundation", "SkipLibKotlin"], resources: [.copy("skip.yml")]),
-        .testTarget(name: "CrossFoundationKotlinTests", dependencies: ["CrossFoundationTests", "SkipUnit"]),
+        .testTarget(name: "CrossFoundationKotlinTests", dependencies: ["CrossFoundationKotlin", "SkipUnit"]),
 
 
         .target(name: "CrossUI", dependencies: ["CrossFoundation"], resources: [.process("Resources")]),
