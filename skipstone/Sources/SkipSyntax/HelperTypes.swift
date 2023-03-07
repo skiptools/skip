@@ -127,13 +127,15 @@ struct Parameter<V>: Hashable {
     private let _internalLabel: String?
     var declaredType: TypeSignature
     var isVariadic: Bool
+    var isInOut: Bool
     var defaultValue: V?
 
-    init(externalLabel: String?, internalLabel: String? = nil, declaredType: TypeSignature = .none, isVariadic: Bool = false, defaultValue: V? = nil) {
+    init(externalLabel: String?, internalLabel: String? = nil, declaredType: TypeSignature = .none, isVariadic: Bool = false, isInOut: Bool = false, defaultValue: V? = nil) {
         self.externalLabel = externalLabel == "" || externalLabel == "_" ? nil : externalLabel
         _internalLabel = internalLabel
         self.declaredType = declaredType
         self.isVariadic = isVariadic
+        self.isInOut = isInOut
         self.defaultValue = defaultValue
     }
 
@@ -162,13 +164,14 @@ struct Parameter<V>: Hashable {
     }
 
     static func ==(lhs: Parameter<V>, rhs: Parameter<V>) -> Bool {
-        return lhs.externalLabel == rhs.externalLabel && lhs.declaredType == rhs.declaredType && lhs.isVariadic == rhs.isVariadic
+        return lhs.externalLabel == rhs.externalLabel && lhs.declaredType == rhs.declaredType && lhs.isVariadic == rhs.isVariadic && lhs.isInOut == rhs.isInOut
     }
 
     func hash(into hasher: inout Hasher) {
         hasher.combine(externalLabel)
         hasher.combine(declaredType)
         hasher.combine(isVariadic)
+        hasher.combine(isInOut)
     }
 }
 

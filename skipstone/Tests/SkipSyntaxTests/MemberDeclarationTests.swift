@@ -260,29 +260,67 @@ final class MemberDeclarationTests: XCTestCase {
         """)
     }
 
-//    func testInOutParameter() async throws {
-//        try await check(swift: """
-//        func f(param: inout Int) {
-//            param += 1
-//        }
-//        func f2() {
-//            var i = 0
-//            f(param: &i)
-//            print(i)
-//        }
-//        """, kotlin: """
-//        internal fun f(param: InOut<Int>) {
-//            param.value += 1
-//        }
-//        internal fun f2() {
-//            var i = 0
-//            f(param = InOut(get = { i }, set = { i = it })
-//            print(i)
-//        }
-//        """)
-//
-//        // TODO: Test passing inout param to another inout function. Test shadowing param with another let/var
-//    }
+    func testInOutParameter() async throws {
+        try await check(swift: """
+        func f(param: inout Int) {
+            param += 1
+        }
+        func f2() {
+            var i = 0
+            f(param: &i)
+            print(i)
+        }
+        """, kotlin: """
+        internal fun f(param: InOut<Int>) {
+            param.value += 1
+        }
+        internal fun f2() {
+            var i = 0
+            f(param = InOut({ i }, { i = it }))
+            print(i)
+        }
+        """)
+
+        // Test struct references
+        try await check(swift: """
+        func f(param s: inout Struct) -> Struct {
+            s.member = Struct()
+            var s2 = s
+            s2.member = s.member
+            return s2
+        }
+        func f2() {
+            var s = Struct()
+            let s2 = f(param: &s)
+            print(s.member == s2.member)
+        }
+        """, kotlin: """
+        internal fun f(param: InOut<Struct>): Struct {
+            val s = param
+            s.value.member = Struct()
+            var s2 = s.value.sref()
+            s2.member = s.value.member.sref()
+            return s2.sref()
+        }
+        internal fun f2() {
+            var s = Struct()
+            val s2 = f(param = InOut({ s }, { s = it }))
+            print(s.member == s2.member)
+        }
+        """)
+
+        try await check(swift: """
+        func f(param: inout Int) {
+            param += 1
+            f(param: &param)
+        }
+        """, kotlin: """
+        internal fun f(param: InOut<Int>) {
+            param.value += 1
+            f(param = InOut({ param.value }, { param.value = it }))
+        }
+        """)
+    }
 }
 
 var sideEffectOrdering: [String] = []

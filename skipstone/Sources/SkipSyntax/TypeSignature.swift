@@ -351,6 +351,19 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
         return type == .none || type == .any || type == .anyObject
     }
 
+    /// Whether the given syntax is an inout value.
+    static func isInOut(syntax: TypeSyntax) -> Bool {
+        switch syntax.kind {
+        case .attributedType:
+            guard let attributedType = syntax.as(AttributedTypeSyntax.self) else {
+                return false
+            }
+            return attributedType.specifier?.text == "inout"
+        default:
+            return false
+        }
+    }
+
     /// Create a type signature for the given syntax.
     static func `for`(syntax: TypeSyntax) -> TypeSignature {
         switch syntax.kind {

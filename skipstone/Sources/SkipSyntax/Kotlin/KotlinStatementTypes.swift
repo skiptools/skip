@@ -124,6 +124,23 @@ class KotlinCodeBlock: KotlinStatement {
         return true
     }
 
+    /// Perform any updates to handle references to the given `inout` parameter.
+    func updateWithInOutParameter(name: String) {
+        visit { node in
+            // TODO: We could attempt to identify more re-bindings of the identifier
+            if let identifier = node as? KotlinIdentifier {
+                if identifier.name == name {
+                    identifier.isInOut = true
+                }
+            } else if let variableDeclaration = node as? KotlinVariableDeclaration {
+                if variableDeclaration.names.contains(name) {
+                    variableDeclaration.messages.append(.kotlinInOutParameterAssignment(variableDeclaration))
+                }
+            }
+            return .recurse(nil)
+        }
+    }
+
     override var children: [KotlinSyntaxNode] {
         return statements
     }
@@ -566,6 +583,9 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if let body = statement.body {
             kstatement.body = KotlinCodeBlock.translate(statement: body, translator: translator)
             kstatement.body?.updateWithExpectedReturn(statement.returnType == .void ? .no : .sref(nil))
+            for parameter in kstatement.parameters where parameter.isInOut {
+                kstatement.body?.updateWithInOutParameter(name: parameter.internalLabel)
+            }
         }
         kstatement.returnType.appendKotlinMessages(to: kstatement)
         kstatement.parameters.forEach { $0.declaredType.appendKotlinMessages(to: kstatement) }
@@ -648,7 +668,13 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 let label = parameter.externalLabel ?? parameter.internalLabel
                 output.append(label)
                 output.append(": ")
+                if parameter.isInOut {
+                    output.append("InOut<")
+                }
                 output.append(parameter.declaredType.or(.any).kotlin)
+                if parameter.isInOut {
+                    output.append(">")
+                }
                 if let defaultValue = parameter.defaultValue {
                     output.append(" = ").append(defaultValue, indentation: indentation)
                 }

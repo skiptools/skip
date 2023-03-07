@@ -54,6 +54,10 @@ extension Message {
         return Message(kind: .error, message: "This declaration is not supported in a Kotlin extension", sourceDerived: sourceDerived)
     }
 
+    static func kotlinInOutParameterAssignment(_ sourceDerived: SourceDerived) -> Message {
+        return Message(kind: .warning, message: "Shadowing an inout parameter with a variable of the same name may produce incorrect Kotlin. Consider using a different variable name", sourceDerived: sourceDerived)
+    }
+
     static func kotlinLoopOptionalBinding(_ sourceDerived: SourceDerived) -> Message {
         return Message(kind: .error, message: "Kotlin does not support optional bindings in loop conditions. Consider using an if statement before or within your loop", sourceDerived: sourceDerived)
     }

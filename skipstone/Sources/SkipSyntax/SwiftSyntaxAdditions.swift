@@ -89,19 +89,21 @@ extension ParameterClauseSyntax {
     fileprivate func parameters(in syntaxTree: SyntaxTree, messages: inout [Message]) -> [Parameter<Expression>] {
         return parameterList.map { parameterSyntax in
             var type: TypeSignature = .none
+            var isInOut = false
             if let typeSyntax = parameterSyntax.type {
                 type = TypeSignature.for(syntax: typeSyntax)
                 if type == .none {
                     type = .any
                     messages.append(.unsupportedTypeSignature(typeSyntax, source: syntaxTree.source, sourceRange: typeSyntax.range(in: syntaxTree.source)))
                 }
+                isInOut = TypeSignature.isInOut(syntax: typeSyntax)
             }
             let isVariadic = parameterSyntax.ellipsis?.text == "..."
             var defaultValue: Expression? = nil
             if let defaultArgument = parameterSyntax.defaultArgument {
                 defaultValue = ExpressionDecoder.decode(syntax: defaultArgument.value, in: syntaxTree)
             }
-            return Parameter<Expression>(externalLabel: parameterSyntax.firstName?.text, internalLabel: parameterSyntax.secondName?.text, declaredType: type, isVariadic: isVariadic, defaultValue: defaultValue)
+            return Parameter<Expression>(externalLabel: parameterSyntax.firstName?.text, internalLabel: parameterSyntax.secondName?.text, declaredType: type, isVariadic: isVariadic, isInOut: isInOut, defaultValue: defaultValue)
         }
     }
 }

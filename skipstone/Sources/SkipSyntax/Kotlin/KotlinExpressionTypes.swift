@@ -8,6 +8,7 @@ enum KotlinExpressionType {
     case functionCall
     case identifier
     case `if`
+    case `inout`
     case memberAccess
     case nullLiteral
     case numericLiteral
@@ -427,6 +428,7 @@ class KotlinFunctionCall: KotlinExpression {
 class KotlinIdentifier: KotlinExpression {
     var name: String
     var mayBeSharedMutableStruct = false
+    var isInOut = false
 
     static func translate(expression: Identifier, translator: KotlinTranslator) -> KotlinIdentifier {
         let kexpression = KotlinIdentifier(expression: expression)
@@ -462,6 +464,9 @@ class KotlinIdentifier: KotlinExpression {
             output.append("Companion")
         } else {
             output.append(Self.translateName(name))
+            if isInOut {
+                output.append(".value")
+            }
         }
     }
 }
@@ -695,6 +700,29 @@ class KotlinIf: KotlinExpression {
         output.append("if (")
         conditionSet.conditions.appendAsLogicalConditions(to: output, op: .with(symbol: "||"), indentation: indentation)
         output.append(") {\n")
+    }
+}
+
+class KotlinInOut: KotlinExpression {
+    var target: KotlinExpression
+
+    static func translate(expression: InOut, translator: KotlinTranslator) -> KotlinInOut {
+        let ktarget = translator.translateExpression(expression.target)
+        return KotlinInOut(expression: expression, target: ktarget)
+    }
+
+    private init(expression: InOut, target: KotlinExpression) {
+        self.target = target
+        super.init(type: .inout, expression: expression)
+    }
+
+    override var children: [KotlinSyntaxNode] {
+        return [target]
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        output.append("InOut({ ").append(target, indentation: indentation).append(" }, { ")
+        output.append(target, indentation: indentation).append(" = it })")
     }
 }
 

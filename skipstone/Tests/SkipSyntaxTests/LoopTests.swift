@@ -251,4 +251,17 @@ final class LoopTests: XCTestCase {
         }
         """)
     }
+
+    func testForLoopMutateSequence() {
+        var a = [1, 2, 3]
+        var result: [Int] = []
+        for i in a {
+            result.append(i)
+            a.append(i)
+            if result.count > 10 {
+                break
+            }
+        }
+        XCTAssertEqual([1, 2, 3], result)
+    }
 }

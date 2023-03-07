@@ -10,6 +10,7 @@ enum ExpressionType: CaseIterable {
     case functionCall
     case identifier
     case `if`
+    case `inout`
     case memberAccess
     case nilLiteral
     case numericLiteral
@@ -46,6 +47,8 @@ enum ExpressionType: CaseIterable {
             return Identifier.self
         case .if:
             return If.self
+        case .inout:
+            return InOut.self
         case .memberAccess:
             return MemberAccess.self
         case .nilLiteral:
@@ -585,6 +588,37 @@ class If: Expression {
             children.append(elseBody)
         }
         return children
+    }
+}
+
+/// `&x`
+class InOut: Expression {
+    let target: Expression
+
+    init(target: Expression, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        self.target = target
+        super.init(type: .inout, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
+        guard syntax.kind == .inOutExpr, let inOutExpr = syntax.as(InOutExprSyntax.self) else {
+            return nil
+        }
+        let target = ExpressionDecoder.decode(syntax: inOutExpr.expression, in: syntaxTree)
+        return InOut(target: target, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        target.inferTypes(context: context, expecting: expecting)
+        return context
+    }
+
+    override var inferredType: TypeSignature {
+        return target.inferredType
+    }
+
+    override var children: [SyntaxNode] {
+        return [target]
     }
 }
 

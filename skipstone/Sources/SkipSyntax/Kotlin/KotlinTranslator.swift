@@ -167,6 +167,8 @@ public class KotlinTranslator {
                 return KotlinIdentifier.translate(expression: expression as! Identifier, translator: self)
             case .if:
                 return KotlinIf.translate(expression: expression as! If, translator: self)
+            case .inout:
+                return KotlinInOut.translate(expression: expression as! InOut, translator: self)
             case .memberAccess:
                 return KotlinMemberAccess.translate(expression: expression as! MemberAccess, translator: self)
             case .nilLiteral:
