@@ -66,7 +66,7 @@ private class IdentifiersVisitor {
     private var optionalBindingCounts: [String: Int] = [:]
 
     private func newIfCheckVariableName() -> String {
-        let name = "if_\(ifCheckCount)"
+        let name = "letexec_\(ifCheckCount)"
         ifCheckCount += 1
         return name
     }

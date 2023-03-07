@@ -481,9 +481,9 @@ class KotlinIf: KotlinExpression {
 
     static func translate(expression: If, translator: KotlinTranslator) -> KotlinIf {
         let kconditionSets = translate(conditions: expression.conditions, translator: translator)
-        // If we have to nest if conditions and we have an else part, we'll need an if check variable to execute
+        // If we have optional bindings and we have an else part, we'll need an if check variable to execute
         // the else part only if the nested ifs don't pass
-        let ifCheckVariable = kconditionSets.count > 1 && expression.elseBody != nil ? "ifcheck" : nil
+        let ifCheckVariable = kconditionSets.contains(where: { $0.optionalBindingVariable != nil }) && expression.elseBody != nil ? "letexec" : nil
         let kbody = KotlinCodeBlock.translate(statement: expression.body, translator: translator)
         let kexpression = KotlinIf(expression: expression, conditionSets: kconditionSets, body: kbody)
         kexpression.ifCheckVariable = ifCheckVariable
@@ -515,11 +515,6 @@ class KotlinIf: KotlinExpression {
             var conditions = currentConditions
             if isGuard {
                 conditions = conditions.map { $0.logicalNegated() }
-            } else {
-                // If there is an optional binding and we're not already scoped within a nested condition, scope with 'if true'
-                if currentOptionalBindingVariable != nil && conditionSets.isEmpty {
-                    conditionSets.append(ConditionSet(conditions: [KotlinBooleanLiteral(literal: true)]))
-                }
             }
             let conditionSet = ConditionSet(optionalBindingVariable: currentOptionalBindingVariable, conditions: conditions)
             currentOptionalBindingVariable = nil
@@ -528,7 +523,6 @@ class KotlinIf: KotlinExpression {
         }
 
         for condition in conditions {
-            let kcondition = translator.translateExpression(condition)
             guard let optionalBinding = condition as? OptionalBinding, let optionalBindingVariable = KotlinOptionalBinding.translateVariable(expression: optionalBinding, translator: translator) else {
                 currentConditions.append(translator.translateExpression(condition))
                 continue
@@ -537,7 +531,13 @@ class KotlinIf: KotlinExpression {
             // Whenever we need an optional binding variable, create a new nested condition set for it
             appendCurrentConditionSet()
             currentOptionalBindingVariable = optionalBindingVariable
-            currentConditions.append(kcondition)
+            if isGuard {
+                // for ifs our call to 'value?.let' filters nils; for guards we have to add nil checks
+                currentConditions.append(translator.translateExpression(condition))
+            } else {
+                // for ifs our call to 'value?.let' can't include any other conditions
+                appendCurrentConditionSet()
+            }
         }
         appendCurrentConditionSet()
         return conditionSets
@@ -580,7 +580,7 @@ class KotlinIf: KotlinExpression {
 
     private func appendGuard(to output: OutputGenerator, indentation: Indentation) {
         for (index, conditionSet) in conditionSets.enumerated() {
-            appendConditionSet(conditionSet, to: output, indentation: indentation)
+            appendGuardConditionSet(conditionSet, to: output, indentation: indentation)
             output.append(body, indentation: indentation.inc())
             output.append(indentation).append("}")
             if index != conditionSets.count - 1 {
@@ -602,9 +602,8 @@ class KotlinIf: KotlinExpression {
             if (hasOutput) {
                 output.append(indentation)
             }
-            appendConditionSet(conditionSet, to: output, indentation: indentation)
+            indentation = appendIfConditionSet(conditionSet, to: output, indentation: indentation)
             hasOutput = true
-            indentation = indentation.inc()
         }
         // Body
         if let ifCheckVariable {
@@ -644,11 +643,42 @@ class KotlinIf: KotlinExpression {
         guard let kif = expressionStatement.expression as? KotlinIf else {
             return nil
         }
-        // We can't chain an else with its own if check variable
-        return kif.ifCheckVariable == nil ? kif : nil
+        // We can't chain an else with an optional binding
+        return kif.conditionSets.contains(where: { $0.optionalBindingVariable != nil }) ? nil : kif
     }
 
-    private func appendConditionSet(_ conditionSet: ConditionSet, to output: OutputGenerator, indentation: Indentation) {
+    private func appendIfConditionSet(_ conditionSet: ConditionSet, to output: OutputGenerator, indentation: Indentation) -> Indentation {
+        var indentation = indentation
+        if let optionalBindingVariable = conditionSet.optionalBindingVariable {
+            output.append(optionalBindingVariable.value, indentation: indentation).append("?.let { ")
+            if optionalBindingVariable.names.count > 1 {
+                output.append("(")
+            }
+            output.append(optionalBindingVariable.names.joined(separator: ", "))
+            if optionalBindingVariable.names.count > 1 {
+                output.append(")")
+            }
+            output.append(" ->\n")
+            indentation = indentation.inc()
+            if !optionalBindingVariable.isLet {
+                for name in optionalBindingVariable.names {
+                    output.append(indentation).append("var \(name) = \(name)\n")
+                }
+            }
+            if !conditionSet.conditions.isEmpty {
+                output.append(indentation)
+            }
+        }
+        if !conditionSet.conditions.isEmpty {
+            output.append("if (")
+            conditionSet.conditions.appendAsLogicalConditions(to: output, op: .with(symbol: "&&"), indentation: indentation)
+            output.append(") {\n")
+            indentation = indentation.inc()
+        }
+        return indentation
+    }
+
+    private func appendGuardConditionSet(_ conditionSet: ConditionSet, to output: OutputGenerator, indentation: Indentation) {
         if let optionalBindingVariable = conditionSet.optionalBindingVariable {
             output.append(optionalBindingVariable.isLet ? "val " : "var ")
             if optionalBindingVariable.names.count > 1 {
@@ -663,8 +693,7 @@ class KotlinIf: KotlinExpression {
             output.append(indentation)
         }
         output.append("if (")
-        let op: Operator = isGuard ? .with(symbol: "||") : .with(symbol: "&&")
-        conditionSet.conditions.appendAsLogicalConditions(to: output, op: op, indentation: indentation)
+        conditionSet.conditions.appendAsLogicalConditions(to: output, op: .with(symbol: "||"), indentation: indentation)
         output.append(") {\n")
     }
 }

@@ -136,11 +136,8 @@ final class ConditionalTests: XCTestCase {
         }
         """, kotlin: """
         internal var i: Int? = null
-        if (true) {
-            val x = i
-            if (x != null) {
-                print(x)
-            }
+        i?.let { x ->
+            print(x)
         }
         """)
     }
@@ -163,11 +160,9 @@ final class ConditionalTests: XCTestCase {
             i.mutate()
         }
         """, kotlin: """
-        if (true) {
-            var i = i.sref()
-            if (i != null) {
-                i.mutate()
-            }
+        i.sref()?.let { i ->
+            var i = i
+            i.mutate()
         }
         """)
     }
@@ -198,15 +193,12 @@ final class ConditionalTests: XCTestCase {
         }
         """, kotlin: """
         internal var i: Int? = null
-        var if_0 = false
-        if (true) {
-            val x = i
-            if (x != null) {
-                if_0 = true
-                print(x)
-            }
+        var letexec_0 = false
+        i?.let { x ->
+            letexec_0 = true
+            print(x)
         }
-        if (!if_0) {
+        if (!letexec_0) {
             print("nil")
         }
         """)
@@ -231,15 +223,12 @@ final class ConditionalTests: XCTestCase {
         } else if (i != null) {
             print(i)
         } else {
-            var if_0 = false
-            if (true) {
-                val x = i
-                if (x != null) {
-                    if_0 = true
-                    print(x)
-                }
+            var letexec_0 = false
+            i?.let { x ->
+                letexec_0 = true
+                print(x)
             }
-            if (!if_0) {
+            if (!letexec_0) {
                 print("nil")
             }
         }
@@ -256,20 +245,17 @@ final class ConditionalTests: XCTestCase {
         }
         """, kotlin: """
         internal var i: Int? = null
-        var if_0 = false
-        if (true) {
+        var letexec_0 = false
+        i?.let { i ->
             var i = i
-            if (i != null) {
-                if_0 = true
-                print(i)
-            }
+            letexec_0 = true
+            print(i)
         }
-        if (!if_0) {
+        if (!letexec_0) {
             if (x > 0) {
                 print("positive")
-            } else if (true) {
-                val y = i
-                if (y != null) {
+            } else {
+                i?.let { y ->
                     print(y)
                 }
             }
@@ -287,24 +273,19 @@ final class ConditionalTests: XCTestCase {
         }
         """, kotlin: """
         internal var i: Int? = null
-        var if_0 = false
-        if (true) {
+        var letexec_0 = false
+        i?.let { i ->
             var i = i
-            if (i != null) {
-                if_0 = true
-                print(i)
-            }
+            letexec_0 = true
+            print(i)
         }
-        if (!if_0) {
-            var if_1 = false
-            if (true) {
-                val x = i
-                if (x != null) {
-                    if_1 = true
-                    print(x)
-                }
+        if (!letexec_0) {
+            var letexec_1 = false
+            i?.let { x ->
+                letexec_1 = true
+                print(x)
             }
-            if (!if_1) {
+            if (!letexec_1) {
                 print("nil")
             }
         }
@@ -325,21 +306,21 @@ final class ConditionalTests: XCTestCase {
         internal var i: Int? = null
         internal var j: String? = null
         internal var k: Int? = null
-        var if_0 = false
-        if (true) {
+        var letexec_0 = false
+        i?.let { i ->
             var i = i
-            if ((i != null) && (i > 5)) {
-                val x = j
-                if ((x != null) && (x == "x" || x == "y")) {
-                    if_0 = true
-                    print(i)
+            if (i > 5) {
+                j?.let { x ->
+                    if (x == "x" || x == "y") {
+                        letexec_0 = true
+                        print(i)
+                    }
                 }
             }
         }
-        if (!if_0) {
+        if (!letexec_0) {
             if (boolValue) {
-                val x = k
-                if (x != null) {
+                k?.let { x ->
                     print(x)
                 }
             }
@@ -355,15 +336,10 @@ final class ConditionalTests: XCTestCase {
         }
         """, kotlin: """
         internal var c: ConditionalTestsClass? = null
-        if (true) {
-            val x = c
-            if (x != null) {
-                val related = x.related
-                if (related != null) {
-                    val doublerelated = related.related
-                    if (doublerelated != null) {
-                        print(doublerelated)
-                    }
+        c?.let { x ->
+            x.related?.let { related ->
+                related.related?.let { doublerelated ->
+                    print(doublerelated)
                 }
             }
         }
@@ -381,15 +357,12 @@ final class ConditionalTests: XCTestCase {
         }
         """, kotlin: """
         internal fun f(i: Int?): Int {
-            var if_0 = false
-            if (true) {
-                val x = i
-                if (x != null) {
-                    if_0 = true
-                    return x
-                }
+            var letexec_0 = false
+            i?.let { x ->
+                letexec_0 = true
+                return x
             }
-            if (!if_0) {
+            if (!letexec_0) {
                 return 0
             }
             error("Unreachable")
@@ -408,15 +381,12 @@ final class ConditionalTests: XCTestCase {
         }
         """, kotlin: """
         internal fun f(i: Int?): Int {
-            var if_0 = false
-            if (true) {
-                val x = i
-                if (x != null) {
-                    if_0 = true
-                    return x
-                }
+            var letexec_0 = false
+            i?.let { x ->
+                letexec_0 = true
+                return x
             }
-            if (!if_0) {
+            if (!letexec_0) {
                 print("null")
             }
             return 0
@@ -456,15 +426,12 @@ final class ConditionalTests: XCTestCase {
         """, kotlin: """
         internal fun f(i: Int?): Int {
             val r = linvoke llabel@{
-                var if_0 = false
-                if (true) {
-                    val x = i
-                    if (x != null) {
-                        if_0 = true
-                        return@llabel x
-                    }
+                var letexec_0 = false
+                i?.let { x ->
+                    letexec_0 = true
+                    return@llabel x
                 }
-                if (!if_0) {
+                if (!letexec_0) {
                     return@llabel 0
                 }
                 error("Unreachable")
@@ -488,15 +455,12 @@ final class ConditionalTests: XCTestCase {
         """, kotlin: """
         internal fun f(i: Int?): Int {
             {
-                var if_0 = false
-                if (true) {
-                    val x = i
-                    if (x != null) {
-                        if_0 = true
-                        print(x)
-                    }
+                var letexec_0 = false
+                i?.let { x ->
+                    letexec_0 = true
+                    print(x)
                 }
-                if (!if_0) {
+                if (!letexec_0) {
                     print(0)
                 }
             }()

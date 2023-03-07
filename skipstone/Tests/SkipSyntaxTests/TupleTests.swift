@@ -126,12 +126,9 @@ final class TupleTests: XCTestCase {
         }
         """, kotlin: """
         internal var t: Pair<Int, String>? = null
-        if (true) {
-            val (i, s) = t
-            if (i != null && s != null) {
-                print(i)
-                print(s)
-            }
+        t?.let { (i, s) ->
+            print(i)
+            print(s)
         }
         """)
     }
@@ -143,12 +140,9 @@ final class TupleTests: XCTestCase {
             print(s)
         }
         """, kotlin: """
-        if (true) {
-            val (i, s) = t.sref()
-            if (i != null && s != null) {
-                print(i.sref())
-                print(s.sref())
-            }
+        t.sref()?.let { (i, s) ->
+            print(i.sref())
+            print(s.sref())
         }
         """)
     }
