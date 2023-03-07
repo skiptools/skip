@@ -65,7 +65,7 @@ public struct Source {
     }
 
     /// A Swift source file.
-    public struct File: Hashable {
+    public struct File: Hashable, Encodable {
         public let path: String
 
         public init(path: String) {
@@ -92,14 +92,14 @@ public struct Source {
     }
 
     /// A line and column-based range in the source, appropriate for Xcode reporting.
-    public struct Range: Equatable {
+    public struct Range: Equatable, Encodable {
         public let start: Position
         public let end: Position
     }
 
     /// A line and column-based position in the source, appropriate for Xcode reporting.
     /// Line and column numbers start with 1 rather than 0.
-    public struct Position: Equatable, Comparable {
+    public struct Position: Equatable, Comparable, Encodable {
         public let line: Int
         public let column: Int
 

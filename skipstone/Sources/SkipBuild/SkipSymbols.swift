@@ -182,7 +182,9 @@ public struct SkipSystem {
         return try decoder.decode(PackageSwift.self, from: Data(json.utf8))
     }
 
-    public static func extractSymbols(_ urlBase: URL = URL.moduleBuildFolder, moduleNames: [String], tmpDir: URL? = nil, sdk: String = "macosx", accessLevel: String = "private") async throws -> [URL: SymbolGraph] {
+    public static func extractSymbols(_ urlBase: URL? = nil, moduleNames: [String], tmpDir: URL? = nil, sdk: String = "macosx", accessLevel: String = "private") async throws -> [URL: SymbolGraph] {
+        let urlBase = urlBase ?? URL.moduleBuildFolder
+
         // fall back to using a temporary folder
         let tmpDir = tmpDir ?? URL(fileURLWithPath: UUID().uuidString, isDirectory: true, relativeTo: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true))
         try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
@@ -244,6 +246,7 @@ public struct SkipSystem {
 #else
 #error("unsupported platform")
 #endif
+
         let result = try await Process.popen(arguments: [runcmd] + args)
         return try result.utf8Output().trimmingCharacters(in: .whitespacesAndNewlines)
     }

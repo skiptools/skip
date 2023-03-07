@@ -9,7 +9,7 @@ import TSCLibc
 import OSLog
 
 /// The current version of the tool
-public let skipVersion = "0.0.45"
+public let skipVersion = "0.0.49"
 
 protocol Action: AsyncParsableCommand {
     func perform(on sourceFiles: [Source.File], options: Options) async throws
@@ -27,7 +27,7 @@ struct Options {
 public struct SkipCommandExecutor: AsyncParsableCommand {
     public static let experimental = false
     public static var configuration = CommandConfiguration(commandName: "skip",
-                                                           abstract: "Swift Kotlin Interop",
+                                                           abstract: "Skip: Swift Kotlin Interop \(skipVersion)",
                                                            shouldDisplay: !experimental,
                                                            subcommands: [
                                                             VersionCommand.self,
@@ -87,8 +87,8 @@ struct OutputOptions: ParsableArguments {
     @Flag(name: [.customShort("j")], help: ArgumentHelp("Emit output as compact JSON"))
     var jsonCompact: Bool = false
 
-    @Flag(name: [.customShort("M")], help: ArgumentHelp("Include messages in JSON output"))
-    var jsonMessages: Bool = false
+    @Flag(name: [.customShort("M")], help: ArgumentHelp("Emit messages as plain text rather than JSON"))
+    var messagePlain: Bool = false
 
     @Flag(name: [.customShort("A")], help: ArgumentHelp("Wrap and delimit JSON output as an array"))
     var jsonArray: Bool = false
@@ -105,21 +105,15 @@ struct OutputOptions: ParsableArguments {
             err.flush()
         }
 
-        /// The closure that will output a message
-        func writeOut(_ output: String, terminator: String = "\n") {
+        /// The closure that will output a message to standard out
+        func write(error: Bool = false, _ output: String, terminator: String = "\n") {
             //print(output, terminator: terminator, to: &out) // crashes compiler
-            out.write(output + terminator)
-            if !terminator.isEmpty { out.flush() }
-        }
-
-        /// The closure that will output a message
-        func writeMessage(_ output: ToolOutput, terminator: String = "\n") {
-            err.write(output.description  + terminator)
-            if !terminator.isEmpty { err.flush() }
+            (error ? err : out).write(output + terminator)
+            if !terminator.isEmpty { (error ? err : out).flush() }
         }
 
         /// The closure that will handle converting and writing the output type to stream
-        var yield: (MessageConvertible) -> () = { _ in }
+        fileprivate var yield: (Either<MessageConvertible>.Or<Message>) -> () = { _ in }
 
         init() {
         }
@@ -135,7 +129,7 @@ struct OutputOptions: ParsableArguments {
 
     /// Write the given message to the output streams buffer
     func write(_ value: String) {
-        streams.writeOut(value)
+        streams.write(error: false, value)
     }
 
     /// The output that comes at the beginning of a sequence of elements; an opening bracket, for JSON arrays
@@ -153,11 +147,14 @@ struct OutputOptions: ParsableArguments {
         if jsonArray { write(",") }
     }
 
-    func writeOutput<T: MessageConvertible>(_ item: T) throws {
-        if json || jsonCompact {
-            try write(item.toJSON(outputFormatting: [.sortedKeys, .withoutEscapingSlashes, (jsonCompact ? .sortedKeys : .prettyPrinted)], dateEncodingStrategy: .iso8601).utf8String ?? "")
+    /// Whether tool output should be emitted as JSON or not
+    var emitJSON: Bool { json || jsonCompact }
+
+    func writeOutput<T: MessageConvertible>(_ item: T, error: Bool = false) throws {
+        if emitJSON {
+            try streams.write(error: false, item.toJSON(outputFormatting: [.sortedKeys, .withoutEscapingSlashes, (jsonCompact ? .sortedKeys : .prettyPrinted)], dateEncodingStrategy: .iso8601).utf8String ?? "")
         } else {
-            write(item.description)
+            streams.write(error: error, item.description)
         }
     }
 }
@@ -197,8 +194,8 @@ struct VersionCommand: SingleStreamingCommand {
         self.msg(.trace, "trace message")
         self.msg(.info, "info message")
         self.msg("plain message")
-        self.msg(.warn, "warning message")
-        self.msg(.error, "error message")
+        self.msg(.warning, "warning message")
+        //self.msg(.error, "error message") // causes plug-in to fail
         return Output()
     }
 }
@@ -495,52 +492,59 @@ extension Never: MessageConvertible {
     public var description: String { "never" }
 }
 
-extension ToolOutput: MessageConvertible {
-    var description: String {
-        if let kind = kind {
-            return kind.name + ": " + message.description
-        } else {
-            return message.description
-        }
-    }
+extension Message: MessageConvertible {
 }
 
 /// A command that contains options for how messages will be conveyed to the user
 protocol StreamingCommand: AsyncParsableCommand {
     /// The structured output of this tool
     associatedtype Output : MessageConvertible
+    typealias OutputMessage = Either<Output>.Or<Message>
 
     var outputOptions: OutputOptions { get set }
 
-    func performCommand(with continuation: AsyncThrowingStream<Output, Error>.Continuation) async throws
+    func performCommand(with continuation: AsyncThrowingStream<OutputMessage, Error>.Continuation) async throws
 }
 
 extension StreamingCommand {
+    func writeOutput(message: OutputMessage) throws {
+        switch message {
+        case .a(let a): try outputOptions.writeOutput(a)
+        case .b(let b): try outputOptions.writeOutput(b)
+        }
+    }
+
     mutating func run() async throws {
         outputOptions.beginCommandOutput()
         var elements = self.startCommand().makeAsyncIterator()
         if let first = try await elements.next() {
-            try outputOptions.writeOutput(first)
+            try writeOutput(message: first)
             while let element = try await elements.next() {
                 outputOptions.writeOutputSeparator()
-                try outputOptions.writeOutput(element)
+                try writeOutput(message: element)
             }
         }
         outputOptions.endCommandOutput()
     }
 }
 
-
 extension StreamingCommand {
-    mutating func startCommand() -> AsyncThrowingStream<Output, Error> {
+
+    mutating func startCommand() -> AsyncThrowingStream<OutputMessage, Error> {
         AsyncThrowingStream { (continuation: AsyncThrowingStream.Continuation) in
-            self.outputOptions.streams.yield = { continuation.yield($0 as! Output) }
+            self.outputOptions.streams.yield = {
+                switch $0 {
+                case .a(let a): continuation.yield(.init(a as! Output))
+                case .b(let b): continuation.yield(.init(b))
+                }
+
+            }
             // defer { self.output.streams.yield = { _ in } } // clears output
             doCommand(continuation: continuation)
         }
     }
 
-    func doCommand(continuation: AsyncThrowingStream<Output, Error>.Continuation) {
+    func doCommand(continuation: AsyncThrowingStream<OutputMessage, Error>.Continuation) {
         Task {
             defer {
                 self.outputOptions.streams.flush()
@@ -558,7 +562,7 @@ extension StreamingCommand {
 extension StreamingCommand {
     func warnExperimental(_ experimental: Bool) {
         if experimental {
-            msg(.warn, "the \(Self.configuration.commandName ?? "") command is experimental and may change in minor releases")
+            msg(.warning, "the \(Self.configuration.commandName ?? "") command is experimental and may change in minor releases")
         }
     }
 }
@@ -568,8 +572,8 @@ protocol SingleStreamingCommand : StreamingCommand {
 }
 
 extension SingleStreamingCommand {
-    func performCommand(with continuation: AsyncThrowingStream<Output, Error>.Continuation) async throws {
-        yield(try await executeCommand())
+    func performCommand(with continuation: AsyncThrowingStream<OutputMessage, Error>.Continuation) async throws {
+        yield(output: try await executeCommand())
     }
 }
 
@@ -582,12 +586,26 @@ protocol MessageConvertible: Encodable & CustomStringConvertible {
 
 extension StreamingCommand {
     /// Sends the output to the hander
-    func yield(_ output: Output) {
-        self.outputOptions.streams.yield(output)
+    func yield(output: Output) {
+        outputOptions.streams.yield(Either.Or.a(output))
+    }
+
+    func yield(message: Message) {
+        outputOptions.streams.yield(Either.Or.b(message))
+    }
+
+    /// The closure that will output a message
+    private func writeMessage(_ output: Message, terminator: String = "\n") {
+        if !outputOptions.emitJSON || outputOptions.messagePlain {
+            let message = output.description
+            outputOptions.streams.write(error: true, message, terminator: terminator)
+        } else {
+            yield(message: output)
+        }
     }
 
     /// Output the given message to standard error
-    func msg(_ kind: MessageKind? = nil, _ message: @autoclosure () throws -> String) rethrows {
+    func msg(_ kind: Message.Kind = .info, _ message: @autoclosure () throws -> String) rethrows {
         if outputOptions.quiet == true {
             return
         }
@@ -595,45 +613,15 @@ extension StreamingCommand {
             return // skip debug output unless we are running verbose
         }
 
-        self.outputOptions.streams.writeMessage(ToolOutput(kind: kind, message: try message()))
+        writeMessage(Message(kind: kind, message: try message()))
     }
+
 
     /// Output the given message to standard error with no type prefix
     ///
     /// This function is redundant, but works around some compiled issue with disambiguating the default initial arg with the nameless autoclosure final arg.
     func msg(_ message: @autoclosure () throws -> String) rethrows {
-        try self.msg(nil, try message())
-    }
-}
-
-/// The type of message output
-enum MessageKind: String, Encodable, Hashable {
-    case trace, info, warn, error
-
-    var name: String {
-        switch self {
-        case .trace: return "TRACE"
-        case .info: return "INFO"
-        case .warn: return "WARN"
-        case .error: return "ERROR"
-        }
-    }
-}
-
-struct ToolOutput: Encodable {
-    let kind: MessageKind?
-    let message: String
-}
-
-extension ToolOutput {
-    var color: TerminalController.Color {
-        switch self.kind {
-        case .trace: return .gray
-        case .info: return .cyan
-        case .warn: return .yellow
-        case .error: return .red
-        case .none: return .noColor
-        }
+        try self.msg(.info, try message())
     }
 }
 

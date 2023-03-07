@@ -15,7 +15,10 @@ let package = Package(
         .library(name: "SkipSyntax", targets: ["SkipSyntax"]),
         .library(name: "SkipBuild", targets: ["SkipBuild"]),
         .library(name: "SkipUnit", targets: ["SkipUnit"]),
+
         .plugin(name: "SkipCheck", targets: ["SkipCheck"]),
+
+        .library(name: "ExampleSkipPrecheck", targets: ["ExampleSkipPrecheck"]),
 
         .library(name: "SkipLib", targets: ["SkipLib"]),
         .library(name: "SkipLibKotlin", targets: ["SkipLib"]),
@@ -38,12 +41,6 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-tools-support-core.git", from: "0.5.0"),
         .package(url: "https://github.com/marcprux/universal.git", from: "5.0.0"),
-
-        //.package(url: "https://github.com/skiptools/skip-lib.git", from: "0.0.0"),
-        //.package(url: "https://github.com/skiptools/cross-foundation.git", from: "0.0.0"),
-        //.package(url: "https://github.com/skiptools/cross-ui.git", from: "0.0.0"),
-        //.package(url: "https://github.com/skiptools/example-lib.git", from: "0.0.0"),
-        //.package(url: "https://github.com/skiptools/example-app.git", from: "0.0.0"),
     ],
     targets: [
         .target(name: "SkipSyntax", dependencies: [
@@ -63,7 +60,6 @@ let package = Package(
 
         .executableTarget(name: "SkipRunner", dependencies: ["SkipBuild"]),
         .testTarget(name: "SkipRunnerTests", dependencies: ["SkipRunner"]),
-        .testTarget(name: "SkipRunnerCheckTests", dependencies: ["SkipRunner"], plugins: ["SkipCheck"]),
 
         .plugin(name: "SkipCheck",
                 capability: .buildTool(),
@@ -75,6 +71,8 @@ let package = Package(
                     ]),
                 dependencies: ["SkipRunner"]),
 
+
+        .target(name: "ExampleSkipPrecheck", dependencies: ["SkipCheck"], plugins: ["SkipCheck"]),
 
         .target(name: "SkipUnit", dependencies: ["SkipBuild"]),
         .testTarget(name: "SkipUnitTests", dependencies: ["SkipUnit"]),

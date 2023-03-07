@@ -9,15 +9,15 @@ public class SkipRunnerTests : XCTestCase {
     public func testSkipRunnerCommands() async throws {
         let v = skipVersion
 
+        #if DEBUG
+        try await XCTAssertEqualX("skip version \(v) (debug)", tool("version").out)
+        try await XCTAssertEqualX(v, tool("version", "-jM").json()["version"]?.string)
+        try await XCTAssertEqualX(v, tool("version", "-JM").json()["version"]?.string)
+        #else
         try await XCTAssertEqualX("skip version \(v)", tool("version").out)
-        try await XCTAssertEqualX(["version": .string(v)], tool("version", "-j").json())
-
-        try await XCTAssertEqualX("{\"version\":\"\(v)\"}", tool("version", "-j").out)
-        try await XCTAssertEqualX(tool("version", "-J").out, """
-            {
-              "version" : "\(v)"
-            }
-            """)
+        try await XCTAssertEqualX(v, tool("version", "-jM").json()["version"]?.string)
+        try await XCTAssertEqualX(v, tool("version", "-JM").json()["version"]?.string)
+        #endif
     }
 
     /// Runs the tool with the given arguments, returning the entire output string as well as a function to parse it to `JSON`

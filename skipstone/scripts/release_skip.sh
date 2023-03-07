@@ -83,7 +83,7 @@ ARTIFACT_URL="https://github.com/skiptools/skip/releases/download/${SEMVER_NEXT}
 cd -
 
 # package.targets += [.binaryTarget(name: "${PRODUCT}", url: "${ARTIFACT_URL}", checksum: "${CHECKSUM}")]
-sed -I '' 's;package.targets += .*;package.targets += [.binaryTarget(name: "'${ARTIFACT}'", url: "'${ARTIFACT_URL}'", checksum: "'${CHECKSUM}'")];g' ${SKIPPKG}
+sed -I '' 's;package.targets += \[.binaryTarget.*;package.targets += [.binaryTarget(name: "'${ARTIFACT}'", url: "'${ARTIFACT_URL}'", checksum: "'${CHECKSUM}'")];g' ${SKIPPKG}
 
 # First make the release in the skip plugin-in
 # this aligns the 
@@ -113,7 +113,7 @@ curl --location --fail --retry 5 --retry-all-errors --retry-max-time 120 -o /dev
 # now jump *back* to the package and make sure we can run the command
 cd -
 if [ "${SKIPPKG}" != "/dev/null" ]; then        
-    swift package --disable-sandbox --allow-writing-to-package-directory skip
+    swift package --disable-sandbox --allow-writing-to-package-directory skip version
 fi
 
 # finally, jump back and make a corresponding release in the private SwiftSource

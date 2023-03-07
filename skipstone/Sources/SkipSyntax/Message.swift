@@ -1,37 +1,39 @@
 import SwiftSyntax
 
 /// An Xcode-formatted message for the user.
-public struct Message: Error, CustomStringConvertible {
-    public enum Severity {
+public struct Message: Error, CustomStringConvertible, Encodable {
+    public enum Kind: String, Encodable, Equatable {
+        case trace
+        case info
         case warning
         case error
     }
 
-    public let severity: Severity
+    public let kind: Kind
     public let message: String
     public let sourceFile: Source.File?
     public let sourceRange: Source.Range?
 
-    init(severity: Severity, message: String, source: Source? = nil, sourceRange: Source.Range? = nil) {
-        self.severity = severity
+    init(kind: Kind, message: String, source: Source? = nil, sourceRange: Source.Range? = nil) {
+        self.kind = kind
         self.message = Self.messageWithSource(for: message, in: source, range: sourceRange)
         self.sourceFile = source?.file
         self.sourceRange = sourceRange
     }
 
-    init(severity: Severity, message: String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
-        self.severity = severity
+    public init(kind: Kind, message: String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        self.kind = kind
         self.message = Self.messageWithSource(for: message, in: nil, range: sourceRange)
         self.sourceFile = sourceFile
         self.sourceRange = sourceRange
     }
 
-    init(severity: Severity, message: String, sourceDerived: SourceDerived) {
-        self = Message(severity: severity, message: message, sourceFile: sourceDerived.sourceFile, sourceRange: sourceDerived.sourceRange)
+    init(kind: Kind, message: String, sourceDerived: SourceDerived) {
+        self = Message(kind: kind, message: message, sourceFile: sourceDerived.sourceFile, sourceRange: sourceDerived.sourceRange)
     }
 
     public var description: String {
-        let message = "\(severity == .error ? "error" : "warning"): \(message)"
+        let message = "\(kind.rawValue): \(message)"
         guard let sourceFile else {
             return message
         }
@@ -73,7 +75,7 @@ extension Message {
         if range == nil, let source {
             range = syntax.range(in: source)
         }
-        return Message(severity: .error, message: "Skip does not support this Swift syntax [\(syntax.kind)]", source: source, sourceRange: range)
+        return Message(kind: .error, message: "Skip does not support this Swift syntax [\(syntax.kind)]", source: source, sourceRange: range)
     }
 
     static func unsupportedTypeSignature(_ typeSyntax: TypeSyntax, source: Source? = nil, sourceRange: Source.Range? = nil) -> Message {
@@ -81,14 +83,14 @@ extension Message {
         if range == nil, let source {
             range = typeSyntax.range(in: source)
         }
-        return Message(severity: .error, message: "Skip does not support this Swift type syntax [\(typeSyntax.kind)]", source: source, sourceRange: range)
+        return Message(kind: .error, message: "Skip does not support this Swift type syntax [\(typeSyntax.kind)]", source: source, sourceRange: range)
     }
 
     static func ambiguousFunctionCall(sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) -> Message {
-        return Message(severity: .warning, message: "Skip is unable to disambiguate this function call. Consider adding explicit types to the values supplied as arguments", sourceFile: sourceFile, sourceRange: sourceRange)
+        return Message(kind: .warning, message: "Skip is unable to disambiguate this function call. Consider adding explicit types to the values supplied as arguments", sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
     static func unknownMemberBaseType(member: String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) -> Message {
-        return Message(severity: .error, message: "Skip is unable to determine the owning type for member '\(member)'", sourceFile: sourceFile, sourceRange: sourceRange)
+        return Message(kind: .error, message: "Skip is unable to determine the owning type for member '\(member)'", sourceFile: sourceFile, sourceRange: sourceRange)
     }
 }
