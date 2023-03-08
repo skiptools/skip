@@ -81,28 +81,28 @@ let package = Package(
         .target(name: "SkipLib"),
         .testTarget(name: "SkipLibTests", dependencies: ["SkipLib", "SkipBuild"]),
 
-        .target(name: "SkipLibKotlin", dependencies: ["SkipLib"], resources: [.copy("skip.yml")]),
+        .target(name: "SkipLibKotlin", dependencies: ["SkipLib"], resources: [.copy("skip")]),
         .testTarget(name: "SkipLibKotlinTests", dependencies: ["SkipLibKotlin", "SkipUnit"]),
 
 
         .target(name: "CrossFoundation", dependencies: ["SkipLib"], resources: [.process("Resources")]),
         .testTarget(name: "CrossFoundationTests", dependencies: ["CrossFoundation"], resources: [.process("Resources")]),
 
-        .target(name: "CrossFoundationKotlin", dependencies: ["CrossFoundation", "SkipLibKotlin"], resources: [.copy("skip.yml")]),
+        .target(name: "CrossFoundationKotlin", dependencies: ["CrossFoundation", "SkipLibKotlin"], resources: [.copy("skip")]),
         .testTarget(name: "CrossFoundationKotlinTests", dependencies: ["CrossFoundationKotlin", "SkipUnit"]),
 
 
         .target(name: "CrossUI", dependencies: ["CrossFoundation"], resources: [.process("Resources")]),
         .testTarget(name: "CrossUITests", dependencies: ["CrossUI"], resources: [.process("Resources")]),
 
-        .target(name: "CrossUIKotlin", dependencies: ["CrossUI", "CrossFoundationKotlin"], resources: [.copy("skip.yml")]),
+        .target(name: "CrossUIKotlin", dependencies: ["CrossUI", "CrossFoundationKotlin"], resources: [.copy("skip")]),
         .testTarget(name: "CrossUIKotlinTests", dependencies: ["CrossUIKotlin", "SkipUnit"]),
 
 
         .target(name: "ExampleLib", dependencies: ["CrossFoundation"], resources: [.process("Resources")]),
         .testTarget(name: "ExampleLibTests", dependencies: ["ExampleLib"], resources: [.process("Resources")]),
 
-        .target(name: "ExampleLibKotlin", dependencies: ["ExampleLib", "CrossFoundationKotlin"], resources: [.copy("skip.yml")]),
+        .target(name: "ExampleLibKotlin", dependencies: ["ExampleLib", "CrossFoundationKotlin"], resources: [.copy("skip")]),
         .testTarget(name: "ExampleLibKotlinTests", dependencies: ["ExampleLibKotlin", "SkipUnit"]),
 
 
@@ -113,7 +113,7 @@ let package = Package(
 //        ], resources: [.process("Resources")]),
         .testTarget(name: "ExampleAppTests", dependencies: ["ExampleApp"], resources: [.process("Resources")]),
 
-        .target(name: "ExampleAppKotlin", dependencies: ["ExampleApp"], resources: [.copy("skip.yml")]),
+        .target(name: "ExampleAppKotlin", dependencies: ["ExampleApp"], resources: [.copy("skip")]),
         .testTarget(name: "ExampleAppKotlinTests", dependencies: ["ExampleAppKotlin", "SkipUnit"]),
     ]
 )

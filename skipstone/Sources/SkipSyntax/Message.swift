@@ -4,7 +4,7 @@ import SwiftSyntax
 public struct Message: Error, CustomStringConvertible, Encodable {
     public enum Kind: String, Encodable, Equatable {
         /// A trace-level statement that will only be emitted in debug mode
-        case remark
+        case trace
         case note
         case warning
         case error

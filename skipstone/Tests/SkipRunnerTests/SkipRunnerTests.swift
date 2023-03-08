@@ -9,25 +9,28 @@ public class SkipRunnerTests : XCTestCase {
     public func testSkipRunnerCommands() async throws {
         let v = skipVersion
 
-        #if DEBUG
-        try await XCTAssertEqualX("skip version \(v) (debug)", tool("version").out)
         try await XCTAssertEqualX(v, tool("version", "-jM").json()["version"]?.string)
         try await XCTAssertEqualX(v, tool("version", "-JM").json()["version"]?.string)
+
+        #if DEBUG
+        let debug = true
+        try await XCTAssertEqualX("skip version \(v) (debug)", tool("version").out)
 
         func endOfFirstLine(_ output: String, count: Int) throws -> String {
             let firstLine = try XCTUnwrap(output.split(separator: "\n").first)
             return String(firstLine.suffix(count))
         }
 
-        // test sending console messages to stdout
-        XCTAssertEqualX("note: info message", try endOfFirstLine(await tool("version", "-ME").out, count: "note: info message".count))
-        XCTAssertEqualX("remark: trace message", try endOfFirstLine(await tool("version", "-MEv").out, count: "remark: trace message".count)) // verbose variant starts with "remark:"
+        // test sending plain console messages to stdout; ensure that trace messages are only sent when verbose is enabled
+        XCTAssertEqualX("note: info message", try endOfFirstLine(await tool("info", "-ME").out, count: "note: info message".count))
+        XCTAssertEqualX("trace: trace message", try endOfFirstLine(await tool("info", "-MEv").out, count: "trace: trace message".count)) // verbose variant starts with "remark:"
 
         #else
+        let debug = false
         try await XCTAssertEqualX("skip version \(v)", tool("version").out)
-        try await XCTAssertEqualX(v, tool("version", "-jM").json()["version"]?.string)
-        try await XCTAssertEqualX(v, tool("version", "-JM").json()["version"]?.string)
         #endif
+
+        try await XCTAssertEqualX(debug, tool("info", "-JA").json().array?.last?["debug"]?.boolean)
     }
 
 

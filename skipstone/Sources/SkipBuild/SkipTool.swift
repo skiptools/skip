@@ -9,10 +9,10 @@ import TSCLibc
 import OSLog
 
 /// The current version of the tool
-public let skipVersion = "0.0.51"
+public let skipVersion = "0.0.52"
 
 protocol Action: AsyncParsableCommand {
-    func perform(on sourceFiles: [Source.File], options: Options) async throws
+    func perform(on sourceFiles: [Source.File], options: CheckPhaseOptions) async throws
 }
 
 
@@ -31,6 +31,7 @@ public struct SkipCommandExecutor: AsyncParsableCommand {
                                                            shouldDisplay: !experimental,
                                                            subcommands: [
                                                             VersionCommand.self,
+                                                            InfoCommand.self,
                                                             PrecheckAction.self,
                                                             TranspileAction.self,
                                                             GradleAction.self,
@@ -138,9 +139,6 @@ struct OutputOptions: ParsableArguments {
         }
     }
 
-    init() {
-    }
-
     /// Write the given message to the output streams buffer
     func write(_ value: String) {
         streams.write(error: false, output: output, value)
@@ -196,6 +194,61 @@ struct VersionCommand: SingleStreamingCommand {
     @OptionGroup(title: "Output Options")
     var outputOptions: OutputOptions
 
+    func executeCommand() async throws -> Output {
+        return Output()
+    }
+}
+
+// MARK: InfoCommand
+
+struct InfoCommand: SingleStreamingCommand {
+    static let experimental = false
+    struct Output : MessageConvertible {
+        var version: String = skipVersion
+        var hostName = pinfo.hostName
+        var arguments = pinfo.arguments
+        var operatingSystemVersion = pinfo.operatingSystemVersionString
+        var workingDirectory = fm.currentDirectoryPath
+        let cwdWritable = fm.isWritableFile(atPath: fm.currentDirectoryPath)
+        let cwdReadable = fm.isReadableFile(atPath: fm.currentDirectoryPath)
+        let cwdExecutable = fm.isExecutableFile(atPath: fm.currentDirectoryPath)
+        var home = fm.homeDirectoryForCurrentUser
+        let homeWritable = fm.isWritableFile(atPath: fm.homeDirectoryForCurrentUser.path)
+        let homeReadable = fm.isReadableFile(atPath: fm.homeDirectoryForCurrentUser.path)
+        let homeExecutable = fm.isExecutableFile(atPath: fm.homeDirectoryForCurrentUser.path)
+        let skipLocal = pinfo.environment["SKIPLOCAL"]
+        //var environment = pinfo.environment // potentially private information
+
+        private static var fm: FileManager { .default }
+        private static var pinfo: ProcessInfo { .processInfo }
+
+        #if DEBUG
+        var debug = true
+        #else
+        var debug = false
+        #endif
+
+        var description: String {
+            """
+            skip: \(version)
+            debug: \(debug)
+            os: \(operatingSystemVersion)
+            cwd: \(workingDirectory) (\(cwdReadable ? "r" : "")\(cwdWritable ? "w" : "")\(cwdExecutable ? "x" : ""))
+            home: \(home) (\(homeReadable ? "r" : "")\(homeWritable ? "w" : "")\(homeExecutable ? "x" : ""))
+            args: \(arguments)
+            SKIPLOCAL: \(skipLocal ?? "no")
+            """
+            // env: \(environment)
+        }
+    }
+
+    static var configuration = CommandConfiguration(commandName: "info",
+                                                           abstract: "Print system information",
+                                                           shouldDisplay: !experimental)
+
+    @OptionGroup(title: "Output Options")
+    var outputOptions: OutputOptions
+
     // alternative way of setting output
     //@OptionGroup var parentOptions: SkipCommandExecutor
     //var output: OutputOptions {
@@ -203,17 +256,9 @@ struct VersionCommand: SingleStreamingCommand {
     //    set { parentOptions.output = newValue }
     //}
 
-    init() {
-    }
-
     func executeCommand() async throws -> Output {
-        self.trace("trace message", sourceFile: Source.File(path: #file), sourceRange: Source.Range(start: Source.Position(line: #line, column: #column), end: Source.Position(line: #line, column: #column)))
-        self.info("info message", sourceFile: Source.File(path: #file), sourceRange: Source.Range(start: Source.Position(line: #line, column: #column), end: Source.Position(line: #line, column: #column)))
-        self.warn("warning from file \(URL(fileURLWithPath: #file).lastPathComponent)", sourceFile: Source.File(path: #file), sourceRange: Source.Range(start: Source.Position(line: #line, column: #column), end: Source.Position(line: #line, column: #column)))
-
-        self.error("error from file \(URL(fileURLWithPath: #file).lastPathComponent)", sourceFile: Source.File(path: #file), sourceRange: Source.Range(start: Source.Position(line: #line, column: #column), end: Source.Position(line: #line, column: #column))) // causes plug-in to fail
-
-        
+        trace("trace message")
+        info("info message")
         return Output()
     }
 }
@@ -257,10 +302,6 @@ struct CheckPhaseOptions: ParsableArguments {
 }
 
 extension CheckPhase {
-    var options: Options {
-        Options(preprocessorSymbols: precheckOptions.symbols, outputDirectory: precheckOptions.directory)
-    }
-
     func performPrecheckActions() async throws -> CheckResult {
         return CheckResult()
     }
@@ -280,18 +321,18 @@ struct PrecheckAction: Action, CheckPhase {
     var outputOptions: OutputOptions
 
     func run() async throws {
-        try await perform(on: precheckOptions.files.map({ Source.File(path: $0) }), options: options)
+        try await perform(on: precheckOptions.files.map({ Source.File(path: $0) }), options: precheckOptions)
     }
 
-    func perform(on sourceFiles: [Source.File], options: Options) async throws {
+    func perform(on sourceFiles: [Source.File], options: CheckPhaseOptions) async throws {
         for sourceFile in sourceFiles {
             let source = try Source(file: sourceFile)
-            let syntaxTree = SyntaxTree(source: source, preprocessorSymbols: Set(options.preprocessorSymbols))
+            let syntaxTree = SyntaxTree(source: source, preprocessorSymbols: Set(options.symbols))
             let translator = KotlinTranslator(syntaxTree: syntaxTree)
             let kotlinTree = translator.translateSyntaxTree()
             kotlinTree.messages.forEach { print($0) }
 
-            if let outputDir = options.outputDirectory {
+            if let outputDir = options.directory {
                 let outputFileURL = outputFileURL(for: sourceFile, in: URL(fileURLWithPath: outputDir))
                 try "".write(to: outputFileURL, atomically: false, encoding: .utf8)
             }
@@ -348,12 +389,12 @@ struct TranspileAction: TranspilePhase {
     var outputOptions: OutputOptions
 
     func run() async throws {
-        try await perform(on: precheckOptions.files.map({ Source.File(path: $0) }), options: options)
+        try await perform(on: precheckOptions.files.map({ Source.File(path: $0) }), options: precheckOptions)
     }
 
-    func perform(on sourceFiles: [Source.File], options: Options) async throws {
+    func perform(on sourceFiles: [Source.File], options: CheckPhaseOptions) async throws {
         var transpiler = Transpiler(sourceFiles: sourceFiles)
-        transpiler.preprocessorSymbols = Set(options.preprocessorSymbols)
+        transpiler.preprocessorSymbols = Set(options.symbols)
         try await transpiler.transpile { transpilation in
             for message in transpilation.messages {
                 print(message)
@@ -429,15 +470,14 @@ struct PrintSwiftASTAction: Action {
     @Argument(help: ArgumentHelp("List of files to process"))
     var files: [String]
 
-    var options: Options {
-        Options(preprocessorSymbols: symbols, outputDirectory: directory)
-    }
-
     func run() async throws {
-        try await perform(on: files.map({ Source.File(path: $0) }), options: options)
+        var opts = CheckPhaseOptions()
+        opts.directory = directory
+        opts.symbols = symbols
+        try await perform(on: files.map({ Source.File(path: $0) }), options: opts)
     }
 
-    func perform(on sourceFiles: [Source.File], options: Options) async throws {
+    func perform(on sourceFiles: [Source.File], options: CheckPhaseOptions) async throws {
         for sourceFile in sourceFiles {
             let syntax = try Parser.parse(source: Source(file: sourceFile).content)
             print(syntax.root.prettyPrintTree)
@@ -458,18 +498,17 @@ struct PrintSkipASTAction: Action {
     @Argument(help: ArgumentHelp("List of files to process"))
     var files: [String]
 
-    var options: Options {
-        Options(preprocessorSymbols: symbols, outputDirectory: directory)
-    }
-
     func run() async throws {
-        try await perform(on: files.map({ Source.File(path: $0) }), options: options)
+        var opts = CheckPhaseOptions()
+        opts.directory = directory
+        opts.symbols = symbols
+        try await perform(on: files.map({ Source.File(path: $0) }), options: opts)
     }
 
-    func perform(on sourceFiles: [Source.File], options: Options) async throws {
+    func perform(on sourceFiles: [Source.File], options: CheckPhaseOptions) async throws {
         for sourceFile in sourceFiles {
             let source = try Source(file: sourceFile)
-            let syntaxTree = SyntaxTree(source: source, preprocessorSymbols: Set(options.preprocessorSymbols))
+            let syntaxTree = SyntaxTree(source: source, preprocessorSymbols: Set(options.symbols))
             print(syntaxTree.prettyPrintTree)
         }
     }
@@ -619,8 +658,8 @@ extension StreamingCommand {
         }
     }
 
-    func trace(_ message: @autoclosure () throws -> String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) rethrows {
-        try msg(.remark, message(), sourceFile: sourceFile, sourceRange: sourceRange)
+    func trace(_ message: @autoclosure () throws -> String) rethrows {
+        try msg(.trace, message())
     }
 
     func info(_ message: @autoclosure () throws -> String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) rethrows {
@@ -640,7 +679,7 @@ extension StreamingCommand {
         if outputOptions.quiet == true {
             return
         }
-        if kind == .remark && outputOptions.verbose != true {
+        if kind == .trace && outputOptions.verbose != true {
             return // skip debug output unless we are running verbose
         }
 
