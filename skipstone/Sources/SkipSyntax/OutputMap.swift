@@ -1,6 +1,11 @@
 /// Map output ranges to source ranges.
-public struct OutputMap {
-    public typealias Entry = (sourceFile: Source.File, sourceRange: Source.Range?, range: Source.Range)
+public struct OutputMap : Encodable {
+    public struct Entry : Encodable {
+        let sourceFile: Source.File
+        let sourceRange: Source.Range?
+        let range: Source.Range
+    }
+
     private let entries: [Entry]
 
     /// Supply entries mapping source ranges to output ranges.

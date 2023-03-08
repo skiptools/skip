@@ -2,7 +2,7 @@ import Foundation
 import SwiftSyntax
 
 /// Swift source.
-public struct Source {
+public struct Source : Encodable {
     public let file: File
     public let content: String
 
@@ -16,15 +16,20 @@ public struct Source {
         self.content = content
         let contentLines = content.split(separator: "\n", omittingEmptySubsequences: false)
         var currentPosition = 0
-        var lines: [(Int, Substring)] = []
+        var lines: [SourceLine] = []
         for line in contentLines {
-            lines.append((currentPosition, line))
+            lines.append(SourceLine(offset: currentPosition, line: line.description))
             currentPosition += line.utf8.count + 1 // Add newline
         }
         self.lines = lines
     }
 
-    private let lines: [(offset: Int, line: Substring)]
+    struct SourceLine : Encodable {
+        let offset: Int
+        let line: String
+    }
+
+    private let lines: [SourceLine]
 
     /// Return the source line for the given line number, or nil.
     func line(at lineNumber: Int) -> String? {
@@ -52,7 +57,7 @@ public struct Source {
     private func position(of offset: Int) -> Position {
         for entry in lines.enumerated() {
             let lineNumber = entry.offset + 1
-            let (lineOffset, _) = entry.element
+            let lineOffset = entry.element.offset
 
             let nextLineOffset = lineNumber >= lines.count ? Int.max : lines[entry.offset + 1].offset
             if nextLineOffset > offset {
@@ -81,6 +86,10 @@ public struct Source {
 
         public var isSwift: Bool {
             return path.hasSuffix(".swift")
+        }
+
+        public var url: URL {
+            URL(fileURLWithPath: path, isDirectory: false)
         }
 
         public func outputFile(withExtension: String) -> File {

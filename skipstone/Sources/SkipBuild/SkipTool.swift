@@ -11,14 +11,8 @@ import OSLog
 /// The current version of the tool
 public let skipVersion = "0.0.52"
 
-protocol Action: AsyncParsableCommand {
-    func perform(on sourceFiles: [Source.File], options: CheckPhaseOptions) async throws
-}
-
-
 struct Options {
     var preprocessorSymbols: [String] = []
-    var outputDirectory: String?
 }
 
 
@@ -75,28 +69,28 @@ public struct SkipCommandExecutor: AsyncParsableCommand {
 
 
 struct OutputOptions: ParsableArguments {
-    @Option(name: [.customShort("o")], help: ArgumentHelp("Send output to the given file (stdout: -)", valueName: "path"))
+    @Option(name: [.customShort("o"), .long], help: ArgumentHelp("Send output to the given file (stdout: -)", valueName: "path"))
     var output: String?
 
-    @Flag(name: [.customShort("E")], help: ArgumentHelp("Emit messages to the output rather than stderr"))
+    @Flag(name: [.customShort("E"), .long], help: ArgumentHelp("Emit messages to the output rather than stderr"))
     var messageErrout: Bool = false
 
-    @Flag(name: [.customShort("v")], help: ArgumentHelp("Whether to display verbose messages"))
+    @Flag(name: [.customShort("v"), .long], help: ArgumentHelp("Whether to display verbose messages"))
     var verbose: Bool = false
 
-    @Flag(name: [.customShort("q")], help: ArgumentHelp("Quiet mode: suppress output"))
+    @Flag(name: [.customShort("q"), .long], help: ArgumentHelp("Quiet mode: suppress output"))
     var quiet: Bool = false
 
-    @Flag(name: [.customShort("J")], help: ArgumentHelp("Emit output as formatted JSON"))
+    @Flag(name: [.customShort("J"), .long], help: ArgumentHelp("Emit output as formatted JSON"))
     var json: Bool = false
 
-    @Flag(name: [.customShort("j")], help: ArgumentHelp("Emit output as compact JSON"))
+    @Flag(name: [.customShort("j"), .long], help: ArgumentHelp("Emit output as compact JSON"))
     var jsonCompact: Bool = false
 
-    @Flag(name: [.customShort("M")], help: ArgumentHelp("Emit messages as plain text rather than JSON"))
+    @Flag(name: [.customShort("M"), .long], help: ArgumentHelp("Emit messages as plain text rather than JSON"))
     var messagePlain: Bool = false
 
-    @Flag(name: [.customShort("A")], help: ArgumentHelp("Wrap and delimit JSON output as an array"))
+    @Flag(name: [.customShort("A"), .long], help: ArgumentHelp("Wrap and delimit JSON output as an array"))
     var jsonArray: Bool = false
 
     /// A transient handler for tool output; this acts as a temporary holder of output streams
@@ -311,7 +305,7 @@ struct CheckResult {
 
 }
 
-struct PrecheckAction: Action, CheckPhase {
+struct PrecheckAction: AsyncParsableCommand, CheckPhase {
     static var configuration = CommandConfiguration(commandName: "precheck", abstract: "Perform transpilation prechecks")
 
     @OptionGroup(title: "Check Options")
@@ -362,6 +356,19 @@ protocol TranspilePhase: CheckPhase {
 struct TranspilePhaseOptions: ParsableArguments {
     @Option(help: ArgumentHelp("Condition for transpile phase", valueName: "force/no"))
     var transpile: PhaseGuard = .onDemand
+
+    @Option(name: [.customLong("module")], help: ArgumentHelp("Module name(s) for target and dependents", valueName: "module"))
+    var moduleNames: [String] = []
+
+    @Option(help: ArgumentHelp("Path to the folder containing symbols.json", valueName: "path"))
+    var symbolFolder: String? = nil
+
+    @Option(name: [.customShort("D", allowingJoined: true)], help: ArgumentHelp("Set preprocessor variable for transpilation", valueName: "value"))
+    var preprocessorVariables: [String] = []
+
+    @Option(name: [.long], help: ArgumentHelp("Output directory", valueName: "dir"))
+    var outputFolder: String? = nil
+
 }
 
 struct TranspileResult {
@@ -376,7 +383,7 @@ extension TranspilePhase {
     }
 }
 
-struct TranspileAction: TranspilePhase {
+struct TranspileAction: TranspilePhase, StreamingCommand {
     static var configuration = CommandConfiguration(commandName: "transpile", abstract: "Transpile Swift to Kotlin")
 
     @OptionGroup(title: "Check Options")
@@ -388,19 +395,56 @@ struct TranspileAction: TranspilePhase {
     @OptionGroup(title: "Output Options")
     var outputOptions: OutputOptions
 
-    func run() async throws {
-        try await perform(on: precheckOptions.files.map({ Source.File(path: $0) }), options: precheckOptions)
+
+    struct Output : MessageConvertible {
+        let transpilation: Transpilation
+
+        var description: String {
+            "transpilation: " + transpilation.sourceFile.url.lastPathComponent + " " + byteCount(for: transpilation)
+        }
     }
 
-    func perform(on sourceFiles: [Source.File], options: CheckPhaseOptions) async throws {
-        var transpiler = Transpiler(sourceFiles: sourceFiles)
-        transpiler.preprocessorSymbols = Set(options.symbols)
+    static func byteCount(for transpilation: Transpilation) -> String {
+        ByteCountFormatter.string(fromByteCount: .init(transpilation.output.content.count), countStyle: .file)
+    }
+
+    func performCommand(with continuation: AsyncThrowingStream<OutputMessage, Error>.Continuation) async throws {
+        let sourceFiles = precheckOptions.files.map({ Source.File(path: $0) })
+        info("performing transpilation to: \(transpileOptions.outputFolder ?? "nowhere") for: \(sourceFiles.map(\.url.lastPathComponent))")
+
+        let moduleNames = transpileOptions.moduleNames
+        let symbolFolder = transpileOptions.symbolFolder.flatMap(URL.init(fileURLWithPath:))
+        let symbols: Symbols?
+        if let moduleName = moduleNames.first {
+            let symbolsGraph = try await SkipSystem.extractSymbolGraph(moduleFolder: symbolFolder, moduleNames: moduleNames, from: URL.moduleBuildFolder)
+            symbols = Symbols(moduleName: moduleName, graphs: symbolsGraph.unifiedGraphs)
+
+            info("symbols: \(symbolsGraph.unifiedGraphs.first?.value.symbols.count ?? -1)")
+        } else {
+            info("no modules specified; symbols will not be used")
+            symbols = nil
+        }
+
+        var transpiler = Transpiler(sourceFiles: sourceFiles, symbols: symbols)
+        transpiler.preprocessorSymbols = Set(precheckOptions.symbols)
         try await transpiler.transpile { transpilation in
             for message in transpilation.messages {
-                print(message)
+                continuation.yield(.init(message))
             }
-            print(transpilation.output.content)
-            print()
+            info("transpiled from: \(transpilation.sourceFile.path)", sourceFile: transpilation.sourceFile)
+
+            trace(transpilation.output.content)
+            if let outputFolder = transpileOptions.outputFolder {
+                let outputFolderURL = URL(fileURLWithPath: outputFolder, isDirectory: true)
+                try FileManager.default.createDirectory(at: outputFolderURL, withIntermediateDirectories: true)
+                let outputFileName = transpilation.sourceFile.url.deletingPathExtension().appendingPathExtension("kt").lastPathComponent
+                let outputFile = outputFolderURL.appendingPathComponent(outputFileName)
+                try transpilation.output.content.write(to: outputFile, atomically: false, encoding: .utf8)
+                info("transpiled to: \(outputFile.path) (\(Self.byteCount(for: transpilation)))", sourceFile: Source.File(path: outputFile.path))
+            }
+            let output = Output(transpilation: transpilation)
+            
+            continuation.yield(.init(output))
         }
     }
 }
@@ -458,7 +502,7 @@ struct GradleAction: GradlePhase {
 // MARK: AST Actions
 
 
-struct PrintSwiftASTAction: Action {
+struct PrintSwiftASTAction: AsyncParsableCommand {
     static var configuration = CommandConfiguration(commandName: "ast-swift", abstract: "Print the Swift AST")
 
     @Option(name: [.customShort("S")], help: ArgumentHelp("Preprocessor symbols", valueName: "file"))
@@ -485,22 +529,17 @@ struct PrintSwiftASTAction: Action {
     }
 }
 
-
-struct PrintSkipASTAction: Action {
+struct PrintSkipASTAction: AsyncParsableCommand {
     static var configuration = CommandConfiguration(commandName: "ast-skip", abstract: "Print the Skip AST")
 
     @Option(name: [.customShort("S")], help: ArgumentHelp("Preprocessor symbols", valueName: "file"))
     var symbols: [String] = []
-
-    @Option(name: [.customShort("O")], help: ArgumentHelp("Output directory", valueName: "dir"))
-    var directory: String? = nil
 
     @Argument(help: ArgumentHelp("List of files to process"))
     var files: [String]
 
     func run() async throws {
         var opts = CheckPhaseOptions()
-        opts.directory = directory
         opts.symbols = symbols
         try await perform(on: files.map({ Source.File(path: $0) }), options: opts)
     }

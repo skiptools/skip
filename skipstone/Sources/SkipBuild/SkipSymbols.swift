@@ -24,7 +24,7 @@ public actor SymbolCache {
             return symbols
         }
 
-        let symbols = try await SkipSystem.extractSymbols(moduleNames: [moduleName], accessLevel: accessLevel)
+        let symbols = try await SkipSystem.extractSymbols(moduleFolder: .moduleBuildFolder, moduleNames: [moduleName], accessLevel: accessLevel)
         guard !symbols.isEmpty else {
             struct NoSymbolsFoundError : Error { }
             throw NoSymbolsFoundError()
@@ -182,8 +182,23 @@ public struct SkipSystem {
         return try decoder.decode(PackageSwift.self, from: Data(json.utf8))
     }
 
-    public static func extractSymbols(_ urlBase: URL? = nil, moduleNames: [String], tmpDir: URL? = nil, sdk: String = "macosx", accessLevel: String = "private") async throws -> [URL: SymbolGraph] {
-        let urlBase = urlBase ?? URL.moduleBuildFolder
+    /// Extracts the symbols for all the named modules
+    public static func extractSymbolGraph(moduleFolder moduleBuildFolder: URL? = nil, moduleNames: [String], from moduleURL: URL) async throws -> (unifiedGraphs: [String: UnifiedSymbolGraph], graphSources: [String: [GraphCollector.GraphKind]]) {
+        // gather the symbols for all the targets
+        let collector = GraphCollector(extensionGraphAssociationStrategy: .extendingGraph)
+        for moduleName in moduleNames {
+            let symbolGraphs = try await SkipSystem.extractSymbols(moduleFolder: moduleBuildFolder ?? URL.moduleBuildFolder, moduleNames: [moduleName])
+            for (url, graph) in symbolGraphs {
+                logger.debug("adding symbol graph for: \(url.path)")
+                collector.mergeSymbolGraph(graph, at: url)
+            }
+        }
+        let (unifiedGraphs, graphSources) = collector.finishLoading()
+        return (unifiedGraphs, graphSources)
+    }
+
+    public static func extractSymbols(moduleFolder moduleBuildFolder: URL? = nil, moduleNames: [String], tmpDir: URL? = nil, sdk: String = "macosx", accessLevel: String = "internal") async throws -> [URL: SymbolGraph] {
+        let moduleBuildFolder = moduleBuildFolder ?? URL.moduleBuildFolder
 
         // fall back to using a temporary folder
         let tmpDir = tmpDir ?? URL(fileURLWithPath: UUID().uuidString, isDirectory: true, relativeTo: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true))
@@ -199,7 +214,7 @@ public struct SkipSystem {
         var modulePaths: [URL: SymbolGraph] = [:]
 
         for moduleName in moduleNames {
-            let modulePath = urlBase.appendingPathComponent(moduleName).appendingPathExtension("swiftmodule")
+            let modulePath = moduleBuildFolder.appendingPathComponent(moduleName).appendingPathExtension("swiftmodule")
 
             if !FileManager.default.isReadableFile(atPath: modulePath.path) {
                 // permit missing modules; this is so SkipLib does not need to be a swift dependency of other packages
@@ -224,13 +239,17 @@ public struct SkipSystem {
                                 "-sdk", sdKPath,
                                 "-minimum-access-level", accessLevel,
                                 "-F", "\(sdKPath)/../../Library/Frameworks/", // needed for XCTest imports
-                                "-I", urlBase.path)
+                                "-I", moduleBuildFolder.path)
 
-            let symbolFile = tmpDir.appendingPathComponent(moduleName).appendingPathExtension("symbols.json")
-            let graphData = try Data(contentsOf: symbolFile)
-            let graph = try JSONDecoder().decode(SymbolGraph.self, from: graphData)
-            modulePaths[modulePath] = graph
-            // TODO: scan folder for "@" modules for extension loading
+            // load the symbol file, as well as any associated extensions with @ suffixes
+            for fileURL in try FileManager.default.contentsOfDirectory(at: tmpDir, includingPropertiesForKeys: [.isDirectoryKey]) {
+                let fileName = fileURL.lastPathComponent
+                if fileName.hasPrefix(moduleName) && fileName.hasSuffix(".symbols.json") {
+                    let graphData = try Data(contentsOf: fileURL)
+                    let graph = try JSONDecoder().decode(SymbolGraph.self, from: graphData)
+                    modulePaths[fileURL] = graph
+                }
+            }
         }
 
         return modulePaths

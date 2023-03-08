@@ -59,7 +59,7 @@ class OutputGenerator {
 
     private func outputMapEntry(for offsets: MapEntryOffsets, in output: Source) -> OutputMap.Entry {
         let range = output.range(offset: offsets.offset, length: offsets.length)
-        return (sourceFile: offsets.sourceFile, sourceRange: offsets.sourceRange, range: range)
+        return OutputMap.Entry(sourceFile: offsets.sourceFile, sourceRange: offsets.sourceRange, range: range)
     }
 }
 

@@ -151,19 +151,8 @@ extension SkipSystem {
             savedPaths.append(destPath)
         }
 
-        let moduleURL = URL.moduleBuildFolder
-
-        // gather the symbols for all the targets
-        let collector = GraphCollector(extensionGraphAssociationStrategy: .extendingGraph)
-        for targetSet in targets.deepTargetSet {
-            let moduleName = targetSet.target.moduleName
-            let symbolGraphs = try await SkipSystem.extractSymbols(moduleURL, moduleNames: [moduleName])
-            for (url, graph) in symbolGraphs {
-                logger.debug("adding symbol graph for: \(url.path)")
-                collector.mergeSymbolGraph(graph, at: url)
-            }
-        }
-        let (unifiedGraphs, _) = collector.finishLoading()
+        let moduleNames = targets.deepTargetSet.map(\.target.moduleName)
+        let unifiedGraphs = try await SkipSystem.extractSymbolGraph(moduleNames: moduleNames, from: URL.moduleBuildFolder).unifiedGraphs
 
         for targetSet in targets.deepTargetSet {
             let moduleName = targetSet.target.moduleName
