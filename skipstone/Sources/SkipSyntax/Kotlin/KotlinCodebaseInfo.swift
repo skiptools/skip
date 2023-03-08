@@ -184,12 +184,27 @@ public class KotlinCodebaseInfo {
             }
             return symbols?.isMutableStructType(qualifiedName: qualifiedName) != false
         }
+
+        /// Whether the given enum type has cases with associated values.
+        func enumHasAssociatedValues(qualifiedName: String) -> Bool {
+            for info in codebaseInfo.typeInfo[qualifiedName, default: []] {
+                if !info.isPrivate || info.sourceFile == sourceFile {
+                    return info.hasAssociatedValues
+                }
+            }
+            guard let symbols else {
+                return false
+            }
+            return symbols.enumHasAssociatedValues(qualifiedName: qualifiedName) == true
+        }
     }
 
     private func addTypeInfo(for typeDeclaration: TypeDeclaration, mayBeMutableStructType: Bool?) {
         var info = TypeInfo(declarationType: typeDeclaration.type, firstInherits: typeDeclaration.inherits.first?.description, mayBeMutableStructType: mayBeMutableStructType, isPrivate: typeDeclaration.modifiers.visibility == .private, sourceFile: typeDeclaration.sourceFile)
         if typeDeclaration.type != .protocolDeclaration {
             info.constructorParameters = constructorParameters(in: typeDeclaration.members)
+        } else if typeDeclaration.type == .enumDeclaration {
+            info.hasAssociatedValues = typeDeclaration.members.contains { ($0 as? EnumCaseDeclaration)?.associatedValues.isEmpty == false }
         }
         var infos = typeInfo[typeDeclaration.qualifiedName, default: []]
         infos.append(info)
@@ -240,6 +255,7 @@ private struct TypeInfo {
     let isPrivate: Bool
     let sourceFile: Source.File?
     var constructorParameters: [[KotlinCodebaseInfo.ConstructorParameter]] = []
+    var hasAssociatedValues = false
 }
 
 private struct ExtensionInfo {
@@ -303,6 +319,30 @@ extension Symbols.Context {
         return []
     }
 
+    /// Whether the given enum has cases with associated values.
+    func enumHasAssociatedValues(qualifiedName: String) -> Bool? {
+        let candidates = lookup(name: qualifiedName)
+        var hasType = false
+        for candidate in ranked(candidates) {
+            guard let kind = candidate.kind else {
+                continue
+            }
+            switch kind {
+            case .class:
+                hasType = true
+            case .enum:
+                return hasAssociatedValues(candidate)
+            case .struct:
+                hasType = true
+            case .protocol:
+                hasType = true
+            default:
+                break
+            }
+        }
+        return hasType ? false : nil
+    }
+
     private func constructorSignatures(_ symbol: Symbol) -> [TypeSignature] {
         var signatures: [TypeSignature] = []
         var inheritsFrom: Symbol? = nil
@@ -359,6 +399,21 @@ extension Symbols.Context {
                 continue
             }
             if isAnyObjectRestrictedProtocol(conformsTo) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private func hasAssociatedValues(_ symbol: Symbol) -> Bool {
+        for relationship in symbol.relationships {
+            guard relationship.kind == .memberOf && relationship.isInverse else {
+                continue
+            }
+            guard let member = lookup(identifier: relationship.targetIdentifier ?? ""), let memberKind = member.kind, memberKind == .case else {
+                continue
+            }
+            if !member.functionSignature(symbols: symbols).parameters.isEmpty {
                 return true
             }
         }

@@ -141,6 +141,8 @@ public class Symbols {
         }
 
         /// Return the signatures of the possible member functions being called with the given arguments.
+        ///
+        /// This function also works for the creation of an enum case with associated values.
         func functionSignature(of name: String, in type: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
             let type = type.asOptional(false)
             if case .tuple(let labels, let types) = type {
@@ -155,7 +157,7 @@ public class Symbols {
 
             let typeNames = candidateTypeNames(for: type)
             for typeName in typeNames {
-                let functions = self.functionSignature(of: name, in: typeName, arguments: arguments)
+                let functions = functionSignature(of: name, in: typeName, arguments: arguments)
                 if !functions.isEmpty {
                     return functions
                 }
@@ -204,6 +206,18 @@ public class Symbols {
                 let functions = self.functionSignature(of: "subscript", in: typeName, arguments: arguments)
                 if !functions.isEmpty {
                     return functions
+                }
+            }
+            return []
+        }
+
+        /// Return the associated values of the given enum case.
+        func associatedValueSignatures(of member: String, in type: TypeSignature) -> [TypeSignature.Parameter] {
+            let type = type.asOptional(false)
+            let typeNames = candidateTypeNames(for: type)
+            for typeName in typeNames {
+                if let types = associatedValueSignatures(of: member, in: typeName) {
+                    return types
                 }
             }
             return []
@@ -264,7 +278,11 @@ public class Symbols {
                     guard relationship.isInverse, let member = lookup(identifier: relationship.targetIdentifier ?? ""), member.name == name else {
                         break
                     }
-                    if let function = matchFunction(member, arguments: arguments) {
+                    if var function = matchFunction(member, arguments: arguments) {
+                        // For enum cases, the return type is always the enum type
+                        if member.kind == .case, case .function(let parameters, _) = function.signature {
+                            function = (function.symbol, .function(parameters, candidate.typeSignature(symbols: symbols)))
+                        }
                         functions.append(function)
                     }
                 case .inheritsFrom:
@@ -277,6 +295,32 @@ public class Symbols {
                 }
             }
             return functions
+        }
+
+        private func associatedValueSignatures(of member: String, in typeName: String) -> [TypeSignature.Parameter]? {
+            let candidates = ranked(lookup(name: typeName))
+            for candidate in candidates {
+                if let types = associatedValueSignatures(of: member, in: candidate) {
+                    return types
+                }
+            }
+            return []
+        }
+
+        private func associatedValueSignatures(of member: String, in candidate: Symbol) -> [TypeSignature.Parameter]? {
+            for relationship in candidate.relationships {
+                switch relationship.kind {
+                case .memberOf:
+                    guard relationship.isInverse, let memberSymbol = lookup(identifier: relationship.targetIdentifier ?? ""), memberSymbol.name == member else {
+                        break
+                    }
+                    let functionSignature = memberSymbol.functionSignature(symbols: symbols)
+                    return functionSignature.parameters
+                default:
+                    break
+                }
+            }
+            return nil
         }
 
         private func matchFunction(_ symbol: Symbol, arguments: [LabeledValue<TypeSignature>]) -> (symbol: Symbol, signature: TypeSignature)? {
@@ -572,11 +616,11 @@ struct Symbol {
             if let fragment = specialFragments[i] {
                 switch fragment.kind {
                 case .externalParameter:
+                    // Every function parameter starts with an externalParameter, so we know we're done with the previous parameter
                     if let parameter {
                         parameters.append(parameter)
                     }
                     skippingDefaultValue = false
-                    // Each parameter starts with an externalParameter fragment for its label
                     parameter = TypeSignature.Parameter(label: fragment.spelling == "_" ? nil : fragment.spelling, type: .none, hasDefaultValue: false)
                     fallthrough
                 case .internalParameter:
@@ -592,6 +636,16 @@ struct Symbol {
                     continue outer
                 case .keyword:
                     i += fragment.spelling.count
+                    continue outer
+                case .typeIdentifier:
+                    // Every enum associated value starts with a type (or an externalParameter), so we know we're done with the previous parameter
+                    if let parameter {
+                        parameters.append(parameter)
+                    }
+                    skippingDefaultValue = false
+                    let (type, endIndex) = typeSignature(for: s, startIndex: i, specialFragments: specialFragments, symbols: symbols)
+                    i = endIndex
+                    parameter = TypeSignature.Parameter(label: nil, type: type ?? .none, hasDefaultValue: false)
                     continue outer
                 default:
                     break

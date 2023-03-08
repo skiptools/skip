@@ -17,8 +17,6 @@ final class SymbolsTests: XCTestCase {
         XCTAssertEqual(.int, context.identifierSignature(of: "letVar", in: .named("SymbolsTestsStruct", [])))
         XCTAssertEqual(.int, context.identifierSignature(of: "computedVar", in: .named("SymbolsTestsStruct", [])))
 
-        XCTAssertEqual(.named("SymbolsTestsEnum", []), context.identifierSignature(of: "case1", in: .named("SymbolsTestsEnum", [])))
-
         XCTAssertEqual(.function([.init(label: "p", type: .string)], .int), context.identifierSignature(of: "f", in: .named("SymbolsTestsStruct", [])))
 
         XCTAssertEqual(.string, context.identifierSignature(of: "1", in: .tuple(["i", "s"], [.int, .string])))
@@ -63,6 +61,23 @@ final class SymbolsTests: XCTestCase {
     func testConstructor() async throws {
         let context = try await symbols.context()
         XCTAssertEqual([.function([.init(label: "v", type: .int, hasDefaultValue: true)], .named("SymbolsTestsStruct", []))], context.functionSignature(of: "SymbolsTestsStruct", arguments: [LabeledValue<TypeSignature>(label: "v", value: .none)]))
+    }
+
+    func testEnums() async throws {
+        let context = try await symbols.context()
+        let enumSignature: TypeSignature = .named("SymbolsTestsEnum", [])
+        XCTAssertEqual(enumSignature, context.identifierSignature(of: "case1", in: enumSignature))
+        XCTAssertEqual([], context.associatedValueSignatures(of: "case1", in: enumSignature))
+
+        let enumAssociatedValueSignature: TypeSignature = .named("SymbolsTestsAssociatedValueEnum", [])
+        XCTAssertEqual(enumAssociatedValueSignature, context.identifierSignature(of: "case2", in: enumAssociatedValueSignature))
+        XCTAssertEqual([], context.associatedValueSignatures(of: "case1", in: enumAssociatedValueSignature))
+        XCTAssertEqual([.init(type: .int)], context.associatedValueSignatures(of: "case2", in: enumAssociatedValueSignature))
+        XCTAssertEqual([.init(label: "d", type: .double), .init(label: "s", type: .string)], context.associatedValueSignatures(of: "case3", in: enumAssociatedValueSignature))
+
+        XCTAssertEqual([.function([], enumAssociatedValueSignature)], context.functionSignature(of: "case1", in: enumAssociatedValueSignature, arguments: []))
+        XCTAssertEqual([.function([.init(type: .int)], enumAssociatedValueSignature)], context.functionSignature(of: "case2", in: enumAssociatedValueSignature, arguments: [LabeledValue<TypeSignature>(value: .int)]))
+        XCTAssertEqual([.function([.init(label: "d", type: .double), .init(label: "s", type: .string)], enumAssociatedValueSignature)], context.functionSignature(of: "case3", in: enumAssociatedValueSignature, arguments: [LabeledValue<TypeSignature>(label: "d", value: .double), LabeledValue<TypeSignature>(label: "s", value: .string)]))
     }
 
     func testSuperclassConstructor() {
@@ -122,9 +137,14 @@ class SymbolsTestsClass: SymbolsTestsBaseClass {
     }
 }
 
-enum SymbolsTestsEnum {
+enum SymbolsTestsEnum: Int {
     case case1
-    case case2
+    case case2 = 100
+}
+enum SymbolsTestsAssociatedValueEnum {
+    case case1
+    case case2(Int)
+    case case3(d: Double, s: String)
 }
 
 struct SymbolsTestsStruct {

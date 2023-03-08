@@ -18,14 +18,26 @@ final class KotlinCodebaseInfoTests: XCTestCase {
         XCTAssertEqual(false, context.isMutableStructType(qualifiedName: "KotlinCodebaseInfoTestsAnyObjectRestrictedProtocol"))
         XCTAssertEqual(false, context.isMutableStructType(qualifiedName: "KotlinCodebaseInfoTestsTransitiveAnyObjectRestrictedProtocol"))
     }
+
+    func testEnumHasAssociatedValues() async throws {
+        let context = try await symbols.context()
+        XCTAssertNil(context.enumHasAssociatedValues(qualifiedName: "NonExistantTypeName"))
+
+        XCTAssertEqual(false, context.enumHasAssociatedValues(qualifiedName: "KotlinCodebaseInfoTestsEnum"))
+        XCTAssertEqual(true, context.enumHasAssociatedValues(qualifiedName: "KotlinCodebaseInfoTestsEnumWithAssociatedValues"))
+    }
 }
 
 class KotlinCodebaseInfoTestsClass {
 }
 
-enum KotlinCodebaseInfoTestsEnum {
+enum KotlinCodebaseInfoTestsEnum: Int {
     case case1
-    case case2
+    case case2 = 100
+}
+enum KotlinCodebaseInfoTestsEnumWithAssociatedValues {
+    case case1
+    case case2(Int)
 }
 
 struct KotlinCodebaseInfoTestsImmutableStruct {
