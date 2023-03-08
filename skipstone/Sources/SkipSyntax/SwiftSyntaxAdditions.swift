@@ -86,6 +86,12 @@ extension ReturnClauseSyntax {
 }
 
 extension ParameterClauseSyntax {
+    func parameters(in syntaxTree: SyntaxTree) -> ([Parameter<Expression>], [Message]) {
+        var messages: [Message] = []
+        let parameters = parameters(in: syntaxTree, messages: &messages)
+        return (parameters, messages)
+    }
+
     fileprivate func parameters(in syntaxTree: SyntaxTree, messages: inout [Message]) -> [Parameter<Expression>] {
         return parameterList.map { parameterSyntax in
             var type: TypeSignature = .none

@@ -12,6 +12,7 @@ enum KotlinStatementType {
 
     case classDeclaration
     case constructorDeclaration
+    case enumCaseDeclaration
     case extensionDeclaration
     case functionDeclaration
     case importDeclaration
@@ -420,6 +421,15 @@ class KotlinClassDeclaration: KotlinStatement {
     var declarationType: StatementType
     var members: [KotlinStatement] = []
     var isConstructingPropertyName: String?
+    var isEnumWithAssociatedValues: Bool {
+        return members.contains { ($0 as? KotlinEnumCaseDeclaration)?.associatedValues.isEmpty == false }
+    }
+    var enumInheritedRawValueType: TypeSignature? {
+        guard let inherits = inherits.first else {
+            return nil
+        }
+        return inherits.isNumeric || inherits == .string ? inherits : nil
+    }
 
     static func translate(statement: TypeDeclaration, translator: KotlinTranslator) -> KotlinClassDeclaration {
         let kstatement = KotlinClassDeclaration(statement: statement)
@@ -435,11 +445,21 @@ class KotlinClassDeclaration: KotlinStatement {
             }
         }
         kstatement.members = members
+        kstatement.processEnumCaseDeclarations()
         kstatement.inherits.forEach { $0.appendKotlinMessages(to: kstatement) }
-        if !statement.attributes.isEmpty {
+        if statement.attributes.attributes.contains(where: { !isIgnorable(attribute: $0) }) {
             kstatement.messages.append(.kotlinAttributeUnsupported(statement))
         }
         return kstatement
+    }
+
+    private static func isIgnorable(attribute: Attribute) -> Bool {
+        switch attribute.signature {
+        case .named(let name, _):
+            return name == "indirect"
+        default:
+            return false
+        }
     }
 
     private init(statement: TypeDeclaration) {
@@ -480,10 +500,24 @@ class KotlinClassDeclaration: KotlinStatement {
                     output.append("open ")
                 }
             }
-            output.append("class ").append(name)
+
+            var inherits = inherits
+            if declarationType == .enumDeclaration {
+                let isEnumWithAssociatedValues = self.isEnumWithAssociatedValues
+                if isEnumWithAssociatedValues {
+                    output.append("sealed class ").append(name)
+                } else {
+                    output.append("enum class ").append(name)
+                    if let inheritedRawValueType = enumInheritedRawValueType {
+                        inherits = Array(inherits.dropFirst())
+                        output.append("(val rawValue: \(inheritedRawValueType.kotlin))")
+                    }
+                }
+            } else {
+                output.append("class ").append(name)
+            }
             if !inherits.isEmpty {
                 output.append(": ")
-                var inherits = inherits
                 if let superclassCall {
                     output.append(superclassCall)
                     inherits = Array(inherits.dropFirst())
@@ -496,9 +530,21 @@ class KotlinClassDeclaration: KotlinStatement {
         }
         output.append(" {\n")
 
+        var staticMembers: [KotlinStatement] = []
+        var enumCases: [KotlinEnumCaseDeclaration] = []
+        var nonstaticMembers: [KotlinStatement] = []
+        for member in members {
+            if (member as? KotlinMemberDeclaration)?.isStatic == true {
+                staticMembers.append(member)
+            } else if let enumCaseDeclaration = member as? KotlinEnumCaseDeclaration {
+                enumCases.append(enumCaseDeclaration)
+            } else {
+                nonstaticMembers.append(member)
+            }
+        }
+
         let memberIndentation = indentation.inc()
-        let staticMembers = members.filter { ($0 as? KotlinMemberDeclaration)?.isStatic == true }
-        let nonstaticMembers = members.filter { ($0 as? KotlinMemberDeclaration)?.isStatic != true }
+        enumCases.forEach { output.append($0, indentation: memberIndentation) }
         nonstaticMembers.forEach { output.append($0, indentation: memberIndentation) }
 
         if let isConstructingPropertyName {
@@ -506,6 +552,7 @@ class KotlinClassDeclaration: KotlinStatement {
             output.append(memberIndentation).append("private var \(isConstructingPropertyName) = false\n")
         }
 
+        // Always add a companion object to public types in case another module extends it with static members
         if !staticMembers.isEmpty || modifiers.visibility == .public || modifiers.visibility == .open {
             output.append("\n")
             output.append(memberIndentation).append("companion object {\n")
@@ -513,6 +560,109 @@ class KotlinClassDeclaration: KotlinStatement {
             output.append(memberIndentation).append("}\n")
         }
         output.append(indentation).append("}\n")
+    }
+
+    private func processEnumCaseDeclarations() {
+        guard declarationType == .enumDeclaration else {
+            return
+        }
+
+        let caseDeclarations = members.compactMap { $0 as? KotlinEnumCaseDeclaration }
+        let rawValueType = enumInheritedRawValueType
+        var lastRawValueInt = -1
+        for (index, caseDeclaration) in caseDeclarations.enumerated() {
+            if let rawValueType {
+                if rawValueType.isNumeric {
+                    if let rawValue = caseDeclaration.rawValue {
+                        if let literal = rawValue as? KotlinNumericLiteral, let literalInt = Double(literal.literal).map({ Int($0) }) {
+                            lastRawValueInt = literalInt
+                        }
+                    } else {
+                        lastRawValueInt += 1
+                        caseDeclaration.rawValue = KotlinNumericLiteral(literal: String(lastRawValueInt))
+                    }
+                } else if caseDeclaration.rawValue == nil {
+                    caseDeclaration.rawValue = KotlinStringLiteral(literal: caseDeclaration.name)
+                }
+            }
+            caseDeclaration.isLastDeclaration = index == caseDeclarations.count - 1
+        }
+    }
+}
+
+class KotlinEnumCaseDeclaration: KotlinStatement {
+    var name: String
+    var associatedValues: [Parameter<KotlinExpression>] = []
+    var rawValue: KotlinExpression?
+    var isLastDeclaration = false
+
+    static func translate(statement: EnumCaseDeclaration, translator: KotlinTranslator) -> KotlinEnumCaseDeclaration {
+        let kstatement = KotlinEnumCaseDeclaration(statement: statement)
+        kstatement.associatedValues = statement.associatedValues.map { $0.translate(translator: translator) }
+        kstatement.associatedValues.forEach { $0.declaredType.appendKotlinMessages(to: kstatement) }
+        kstatement.rawValue = statement.rawValue.map { translator.translateExpression($0) }
+        if !statement.modifiers.isEmpty {
+            kstatement.messages.append(.kotlinEnumModifierUnsupported(statement))
+        }
+        if !statement.attributes.isEmpty {
+            kstatement.messages.append(.kotlinAttributeUnsupported(statement))
+        }
+        return kstatement
+    }
+
+    private init(statement: EnumCaseDeclaration) {
+        self.name = statement.name
+        super.init(type: .enumCaseDeclaration, statement: statement)
+    }
+
+    override var children: [KotlinSyntaxNode] {
+        var children: [KotlinSyntaxNode] = associatedValues.compactMap { $0.defaultValue }
+        if let rawValue {
+            children.append(rawValue)
+        }
+        return children
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        output.append(indentation)
+        if let declaration = extras?.declaration {
+            output.append(declaration)
+        } else if let owningClassDeclaration = parent as? KotlinClassDeclaration, owningClassDeclaration.isEnumWithAssociatedValues {
+            output.append("class \(name)")
+            var propertyDeclarations: [String] = []
+            if !associatedValues.isEmpty {
+               output.append("(")
+               for (index, value) in associatedValues.enumerated() {
+                   if let label = value.externalLabel {
+                       output.append(label).append(": ")
+                       propertyDeclarations.append("val associated\(index) = \(label)")
+                   } else {
+                       output.append("val associated\(index): ")
+                   }
+                   output.append(value.declaredType.or(.any).kotlin)
+                   if let defaultValue = value.defaultValue {
+                       output.append(" = ").append(defaultValue, indentation: indentation)
+                   }
+                   if index != associatedValues.count - 1 {
+                       output.append(", ")
+                   }
+               }
+               output.append(")")
+            }
+            output.append(": \(owningClassDeclaration.name)() {\n")
+            propertyDeclarations.forEach { output.append(indentation.inc()).append($0).append("\n") }
+            output.append(indentation).append("}\n")
+        } else {
+            output.append(name)
+            if let rawValue {
+                output.append("(").append(rawValue, indentation: indentation).append(")")
+            }
+            if isLastDeclaration {
+                output.append(";\n")
+            } else {
+                output.append(",\n")
+            }
+        }
     }
 }
 
@@ -817,7 +967,7 @@ class KotlinTypealiasDeclaration: KotlinStatement, KotlinMemberDeclaration {
     // KotlinMemberDeclaration
     var extends: TypeSignature?
     var isStatic: Bool {
-        return true
+        return false
     }
 
     init(statement: TypealiasDeclaration) {

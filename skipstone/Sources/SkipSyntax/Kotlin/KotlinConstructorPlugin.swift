@@ -5,7 +5,7 @@ class KotlinConstructorPlugin: KotlinPlugin {
     }
 
     private func visit(_ node: KotlinSyntaxNode, translator: KotlinTranslator) -> VisitResult<KotlinSyntaxNode> {
-        guard let classDeclaration = node as? KotlinClassDeclaration else {
+        guard let classDeclaration = node as? KotlinClassDeclaration, classDeclaration.declarationType != .enumDeclaration else {
             // Recurse to find nested declarations
             return .recurse(nil)
         }

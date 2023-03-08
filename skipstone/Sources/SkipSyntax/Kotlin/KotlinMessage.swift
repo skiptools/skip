@@ -36,6 +36,10 @@ extension Message {
         return Message(kind: .error, message: "Kotlin does not support constructors that return nil. Consider creating a factory function", sourceDerived: sourceDerived)
     }
 
+    static func kotlinEnumModifierUnsupported(_ sourceDerived: SourceDerived) -> Message {
+        return Message(kind: .warning, message: "Kotlin enum cases do not support modifiers", sourceDerived: sourceDerived)
+    }
+
     // Idea: factory function with class name?
     static func kotlinExtensionAddConstructorsToOutsideType(_ sourceDerived: SourceDerived) -> Message {
         return Message(kind: .error, message: "Cannot use an extension to add additional constructors to a Kotlin type defined outside of this module", sourceDerived: sourceDerived)

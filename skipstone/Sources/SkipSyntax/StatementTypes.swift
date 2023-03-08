@@ -17,6 +17,7 @@ enum StatementType: CaseIterable {
     case whileLoop
 
     case classDeclaration
+    case enumCaseDeclaration
     case enumDeclaration
     case extensionDeclaration
     case functionDeclaration
@@ -67,6 +68,8 @@ enum StatementType: CaseIterable {
 
         case .classDeclaration:
             return TypeDeclaration.self
+        case .enumCaseDeclaration:
+            return EnumCaseDeclaration.self
         case .enumDeclaration:
             return TypeDeclaration.self
         case .extensionDeclaration:
@@ -468,6 +471,71 @@ class WhileLoop: Statement {
 
 
 // MARK: - Declarations
+
+/// `case x(Int)`
+class EnumCaseDeclaration: Statement {
+    let name: String
+    private(set) var associatedValues: [Parameter<Expression>]
+    let rawValue: Expression?
+    let attributes: Attributes
+    private(set) var modifiers: Modifiers
+
+    init(name: String, associatedValues: [Parameter<Expression>], rawValue: Expression? = nil, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.name = name
+        self.associatedValues = associatedValues
+        self.rawValue = rawValue
+        self.attributes = attributes
+        self.modifiers = modifiers
+        super.init(type: .enumCaseDeclaration, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
+        guard syntax.kind == .enumCaseDecl, let enumCaseDecl = syntax.as(EnumCaseDeclSyntax.self) else {
+            return nil
+        }
+        let attributes = Attributes.for(syntax: enumCaseDecl.attributes)
+        let modifiers = Modifiers.for(syntax: enumCaseDecl.modifiers)
+        return enumCaseDecl.elements.enumerated().map { (index, element) in
+            let name = element.identifier.text
+            let (associatedValues, messages) = element.associatedValue?.parameters(in: syntaxTree) ?? ([], [])
+            let rawValue = element.rawValue.map { ExpressionDecoder.decode(syntax: $0.value, in: syntaxTree) }
+            let statement = EnumCaseDeclaration(name: name, associatedValues: associatedValues, rawValue: rawValue, attributes: attributes, modifiers: modifiers, syntax: element, sourceFile: syntaxTree.source.file, sourceRange: element.range(in: syntaxTree.source), extras: index == 0 ? extras : nil)
+            statement.messages = messages
+            return statement
+        }
+    }
+
+    override func resolveAttributes() {
+        associatedValues = associatedValues.map { $0.qualifiedType(in: self) }
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        associatedValues.forEach { $0.defaultValue?.inferTypes(context: context, expecting: $0.declaredType) }
+        return context
+    }
+
+    override var children: [SyntaxNode] {
+        var children = associatedValues.compactMap { $0.defaultValue }
+        if let rawValue {
+            children.append(rawValue)
+        }
+        return children
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        var attrs = [PrettyPrintTree(root: name)]
+        if !associatedValues.isEmpty {
+            attrs.append(PrettyPrintTree(root: "associatedValues", children: associatedValues.map { $0.prettyPrintTree }))
+        }
+        if !attributes.isEmpty {
+            attrs.append(attributes.prettyPrintTree)
+        }
+        if !modifiers.isEmpty {
+            attrs.append(modifiers.prettyPrintTree)
+        }
+        return attrs
+    }
+}
 
 // TODO: Generics
 /// `extension Type { ... }`
