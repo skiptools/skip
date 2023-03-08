@@ -13,12 +13,23 @@ public class SkipRunnerTests : XCTestCase {
         try await XCTAssertEqualX("skip version \(v) (debug)", tool("version").out)
         try await XCTAssertEqualX(v, tool("version", "-jM").json()["version"]?.string)
         try await XCTAssertEqualX(v, tool("version", "-JM").json()["version"]?.string)
+
+        func endOfFirstLine(_ output: String, count: Int) throws -> String {
+            let firstLine = try XCTUnwrap(output.split(separator: "\n").first)
+            return String(firstLine.suffix(count))
+        }
+
+        // test sending console messages to stdout
+        XCTAssertEqualX("note: info message", try endOfFirstLine(await tool("version", "-ME").out, count: "note: info message".count))
+        XCTAssertEqualX("remark: trace message", try endOfFirstLine(await tool("version", "-MEv").out, count: "remark: trace message".count)) // verbose variant starts with "remark:"
+
         #else
         try await XCTAssertEqualX("skip version \(v)", tool("version").out)
         try await XCTAssertEqualX(v, tool("version", "-jM").json()["version"]?.string)
         try await XCTAssertEqualX(v, tool("version", "-JM").json()["version"]?.string)
         #endif
     }
+
 
     /// Runs the tool with the given arguments, returning the entire output string as well as a function to parse it to `JSON`
     func tool(_ args: String...) async throws -> (out: String, err: String, json: () throws -> JSON) {

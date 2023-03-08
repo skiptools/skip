@@ -113,13 +113,15 @@ extension SkipSystem {
         return try String(contentsOf: outputURL)
     }
 
-    public static func assemble(root packageRoot: URL,
+    public static func assemble(root packageRoot: AbsolutePath,
+                                sourceFS: FileSystem,
                                 targets: SkipTargetSet,
-                                destRoot: String,
+                                destRoot: AbsolutePath,
+                                destFS: FileSystem,
                                 overwrite: Bool = true,
                                 moduleRootPath: String? = "Kotlin",
-                                sourceFolder: String = "Sources",
-                                testsFolder: String? = "Tests",
+                                sourceFolderName: String = "Sources",
+                                testsFolderName: String? = "Tests",
                                 javaVersion: String = "11",
                                 minAndroidSdk: String = "24",
                                 targetAndroidSdk: String = "33",
@@ -128,55 +130,25 @@ extension SkipSystem {
                                 kotlinCompilerExtensionVersion: String = "1.4.2",
                                 composeUIVersion: String = "1.1.1",
                                 composeNavVersion: String = "2.5.3",
-                                resourcesPrefix: String = "Resources/",
-                                resourcesDestPrefix: String = "resources/",
+                                resourcesFolderName: String = "Resources",
+                                resourcesDestName: String = "resources",
                                 studioID: String = androidStudioBundleID
-    ) async throws -> (root: URL, files: [URL]) {
-        let destRoot = URL(fileURLWithPath: destRoot, isDirectory: true, relativeTo: packageRoot)
-
+    ) async throws -> (root: AbsolutePath, outputPaths: [AbsolutePath]) {
         // use the passed-in list of modules, or else default to all the sources in the folder
-        let sourceRoot = URL(fileURLWithPath: sourceFolder, isDirectory: true, relativeTo: packageRoot)
-        let testRoot = testsFolder.flatMap({ URL(fileURLWithPath: $0, isDirectory: true, relativeTo: packageRoot) })
+        let sourceRoot = packageRoot.appending(component: sourceFolderName)
+        let testRoot = testsFolderName.flatMap({ packageRoot.appending(component: $0) })
 
-        let fm = FileManager.default
-        //let isDir = { (url: URL) in try url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true }
+        try destFS.createDirectory(destRoot, recursive: true)
 
-        try fm.createDirectory(at: destRoot, withIntermediateDirectories: true)
+        var savedPaths: [AbsolutePath] = []
 
-        var savedURLs: [URL] = []
         /// Writes the given String to the specified URL, only if it has changed
-        func write(_ string: @autoclosure () throws -> String, to destURL: URL, linkFrom: URL? = nil, ifChanged: Bool = true, encoding: String.Encoding = .utf8) throws {
-            savedURLs.append(destURL)
-            // create a symbolic link if necessary
-            if let linkFrom = linkFrom {
-                let linkURL = destURL
-                let linkPath = linkURL.pathRelative(to: linkFrom) ?? linkURL.path
-                logger.info("linking from \(linkURL.relativePath) to \(linkPath)")
-                try? FileManager.default.createDirectory(at: linkURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-
-                // only re-create the link if it is not currently pointing to the expected destination
-                if (try? FileManager.default.destinationOfSymbolicLink(atPath: linkURL.path)) != linkPath {
-                    //assert(try! linkURL.deletingLastPathComponent().appendingPathComponent(linkPath, isDirectory: false).resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true, linkPath)
-
-                    try? FileManager.default.removeItem(at: linkURL)
-                    try FileManager.default.createSymbolicLink(atPath: linkURL.path, withDestinationPath: linkPath)
-                    assert(try! string() == String(contentsOf: linkURL, encoding: encoding)) // verify that the link was created successfully
-                }
-            } else {
-                let str = try string()
-                // if the size has changed, always write; otherwise, compare string contents
-                if !ifChanged // i.e., always write
-                    || (try? destURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) != str.lengthOfBytes(using: encoding) // compare sizes
-                    || (try? Data(contentsOf: destURL, options: [.alwaysMapped])) != str.data(using: encoding) { // compare contents
-                    try? FileManager.default.removeItem(at: destURL) // need to manually delete for non-writable permissions
-                    try str.write(to: destURL, atomically: true, encoding: encoding)
-
-                    // remove write attributes from the file, since it is generated
-                    var attrs = try FileManager.default.attributesOfItem(atPath: destURL.path)
-                    attrs[.posixPermissions] = 0o444 // read-only
-                    try FileManager.default.setAttributes(attrs, ofItemAtPath: destURL.path)
-                }
-            }
+        func save(_ string: @autoclosure () throws -> ByteString, to destPath: AbsolutePath) throws {
+            // make writable then un-writiable again after we save
+            try? destFS.chmod(FileMode.userWritable, path: destPath)
+            //defer { try? destFS.chmod(FileMode.userUnWritable, path: destPath) }
+            try destFS.writeIfChanged(path: destPath, bytes: string())
+            savedPaths.append(destPath)
         }
 
         let moduleURL = URL.moduleBuildFolder
@@ -203,44 +175,41 @@ extension SkipSystem {
 
             let symbols = Symbols(moduleName: moduleName, graphs: unifiedGraphs)
 
-            let moduleSwiftSourceRoot = URL(fileURLWithPath: moduleName, isDirectory: true, relativeTo: sourceRoot)
-            let moduleSwiftKotlinSourceRoot = URL(fileURLWithPath: moduleName + "Kotlin", isDirectory: true, relativeTo: sourceRoot)
-            let moduleSwiftTestRoot = testRoot.flatMap({ testRoot in URL(fileURLWithPath: moduleName + "Tests", isDirectory: true, relativeTo: testRoot) })
-            let moduleSwiftKotlinTestRoot = testRoot.flatMap({ testRoot in URL(fileURLWithPath: moduleName + "KotlinTests", isDirectory: true, relativeTo: testRoot) })
+            let moduleSwiftSourceRoot = sourceRoot.appending(component: moduleName)
+            let moduleSwiftKotlinSourceRoot = sourceRoot.appending(component: moduleName + "Kotlin")
+            let moduleSwiftTestRoot = testRoot.flatMap({ testRoot in testRoot.appending(component: moduleName + "Tests") })
+            let moduleSwiftKotlinTestRoot = testRoot.flatMap({ testRoot in testRoot.appending(component: moduleName + "KotlinTests") })
 
             try Task.checkCancellation()
 
             // only place the modules in a sub-folder if it has been specified
-            let moduleRootFolder = moduleRootPath.flatMap({ URL(fileURLWithPath: $0, isDirectory: true, relativeTo: destRoot) })
+            let moduleRootFolder = moduleRootPath.flatMap({ destRoot.appending(component: $0) })
 
-            let moduleRoot = URL(fileURLWithPath: moduleName, isDirectory: true, relativeTo: moduleRootFolder ?? destRoot)
+            let moduleRoot = (moduleRootFolder ?? destRoot).appending(component: moduleName)
 
             // translate sources: Sources/MODULE/**/*.swift -> DEST/MODULE/src/main/java/MODULE/**/*.kt
-            try fm.createDirectory(at: moduleRoot, withIntermediateDirectories: true)
+            try destFS.createDirectory(moduleRoot, recursive: true)
 
             // resources (e.g., drawable/, font/, values/)
             //let moduleResRoot = URL(fileURLWithPath: "src/main/res", isDirectory: true, relativeTo: moduleRoot)
 
             // if package path were simply the module name (e.g., "CrossLibrary") rather than the more idiomatic "com.example.package"
             // let packagePath = moduleName
-            let packagePath = packageName.split(separator: ".").joined(separator: "/")
+            let packagePath = packageName.split(separator: ".").map({ String($0) }) // e.g., ["package", "name"]
 
-            let moduleKotlinSourceRoot = URL(fileURLWithPath: "src/main/kotlin", isDirectory: true, relativeTo: moduleRoot)
-                .appendingPathComponent(packagePath, isDirectory: true)
-            let moduleKotlinSourceResourcesRoot = URL(fileURLWithPath: "src/main/resources", isDirectory: true, relativeTo: moduleRoot)
-                .appendingPathComponent(packagePath, isDirectory: true)
-//            let moduleKotlinSourceAssetsRoot = URL(fileURLWithPath: "src/main/assets", isDirectory: true, relativeTo: moduleRoot)
-//                .appendingPathComponent(packagePath, isDirectory: true)
-            let moduleKotlinTestRoot = URL(fileURLWithPath: "src/test/kotlin", isDirectory: true, relativeTo: moduleRoot)
-                .appendingPathComponent(packagePath, isDirectory: true)
-            let moduleKotlinTestResourcesRoot = URL(fileURLWithPath: "src/test/resources", isDirectory: true, relativeTo: moduleRoot)
-                .appendingPathComponent(packagePath, isDirectory: true)
-//            let moduleKotlinTestAssetsRoot = URL(fileURLWithPath: "src/test/assets", isDirectory: true, relativeTo: moduleRoot)
-//                .appendingPathComponent(packagePath, isDirectory: true)
+            let moduleKotlinSourceRoot = moduleRoot.appending(components: ["src", "main", "kotlin"])
+                .appending(components: packagePath)
+            let moduleKotlinSourceResourcesRoot = moduleRoot.appending(components: ["src", "main", "resources"])
+                .appending(components: packagePath)
+            let moduleKotlinTestRoot = moduleRoot.appending(components: ["src", "test", "kotlin"])
+                .appending(components: packagePath)
+            let moduleKotlinTestResourcesRoot = moduleRoot.appending(components: ["src", "test", "resources"])
+                .appending(components: packagePath)
 
-            try fm.createDirectory(at: moduleKotlinSourceRoot, withIntermediateDirectories: true)
+            try destFS.createDirectory(moduleKotlinSourceRoot, recursive: true)
 
-            logger.info("scanning: \(moduleSwiftSourceRoot.path)")
+            logger.info("scanning: \(moduleSwiftSourceRoot.pathString)")
+
 
             for (testCase, kotlinRoot, swiftRoot, swiftKotlinRoot, assetsRoot) in [
                 (false, moduleKotlinSourceRoot, moduleSwiftSourceRoot, moduleSwiftKotlinSourceRoot, moduleKotlinSourceResourcesRoot),
@@ -251,46 +220,52 @@ extension SkipSystem {
                     continue
                 }
 
-                // the sources we have scanned, which will all be transpiled together
-                var swiftSources: Set<URL> = []
-                var kotlinSources: Set<URL> = []
-                var buildFiles: Set<URL> = []
-                var resourceFiles: Set<URL> = []
+                guard let swiftRoot, let swiftKotlinRoot else {
+                    continue
+                }
 
-                try await swiftRoot?.walkFileURL { fileURL in
-                    logger.debug("file: \(fileURL.relativePath)")
+                let resourcesRoot = swiftRoot.appending(RelativePath(resourcesFolderName))
+
+                // the sources we have scanned, which will all be transpiled together
+                var swiftSources: Set<AbsolutePath> = []
+                var kotlinSources: Set<AbsolutePath> = []
+                var buildFiles: Set<AbsolutePath> = []
+                var resourceFiles: Set<AbsolutePath> = []
+
+                try await sourceFS.recurse(path: swiftRoot) { fileURL in
+                    logger.debug("file: \(fileURL.pathString)")
                     try Task.checkCancellation()
 
-                    let isDir = try fileURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory
-                    switch (fileURL.lastPathComponent, fileURL.pathExtension) {
-                    case (_, _) where fileURL.relativePath.hasPrefix(resourcesPrefix) && isDir == false:
+                    let isDir = sourceFS.isDirectory(fileURL)
+                    switch (fileURL.basename, fileURL.extension) {
+                    case (_, _) where fileURL.isDescendant(of: resourcesRoot) && isDir == false:
                         resourceFiles.insert(fileURL)
-//                    case (_, _) where fileURL.relativePath.hasPrefix("Bundle/"): // TODO: folder structure-retaining copy
-//                        bundleFiles.insert(fileURL)
+                    //case (_, _) where fileURL.relativePath.hasPrefix("Bundle/"): // TODO: folder structure-retaining copy
+                        //bundleFiles.insert(fileURL)
                     case (_, "swift") where isDir == false:
                         swiftSources.insert(fileURL)
                     case (_, "strings") where isDir == false:
                         // TODO: translation localized files to …/res/…
-                        logger.warning("warning: unhandled strings: \(fileURL.relativePath)")
+                        logger.warning("warning: unhandled strings: \(fileURL.pathString)")
                         break
                     case (_, "xcassets") where isDir == true:
                         // TODO: translate assets to somewhere
-                        logger.warning("warning: unhandled xcassets: \(fileURL.relativePath)")
+                        logger.warning("warning: unhandled xcassets: \(fileURL.pathString)")
                         break
                     case (_, _) where isDir == true:
                         break // ignore unrecognized folders
                     default:
-                        logger.warning("warning: swift source unhandled path: \(fileURL.relativePath)")
+                        logger.warning("warning: swift source unhandled path: \(fileURL.pathString)")
                         break
                     }
                 }
 
-                try await swiftKotlinRoot?.walkFileURL { fileURL in
-                    logger.debug("file: \(fileURL.relativePath)")
+                try await sourceFS.recurse(path: swiftKotlinRoot) { fileURL in
+                    logger.debug("file: \(fileURL.pathString)")
                     try Task.checkCancellation()
 
-                    let isDir = try fileURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory
-                    switch (fileURL.lastPathComponent, fileURL.pathExtension) {
+                    let isDir = destFS.isDirectory(fileURL)
+                    switch (fileURL.basename, fileURL.extension) {
                     case ("build.gradle.kts", _):
                         buildFiles.insert(fileURL)
                     case ("gradle.properties", _):
@@ -300,13 +275,13 @@ extension SkipSystem {
                     case (_, "kt") where isDir == false:
                         kotlinSources.insert(fileURL)
                     default:
-                        logger.warning("warning: unhandled kotlin source path: \(fileURL.relativePath)")
+                        logger.warning("warning: unhandled kotlin source path: \(fileURL.pathString)")
                         break
                     }
                 }
 
-                func transpileSources(sources: Set<URL>) async throws {
-                    let sourceURLs = Dictionary(grouping: sources.map({ (path: $0.path, url: $0) }), by: \.path)
+                func transpileSources(sources: Set<AbsolutePath>) async throws {
+                    let sourceURLs = Dictionary(grouping: sources.map({ (path: $0.pathString, url: $0) }), by: \.path)
                     let sources = sourceURLs.keys.sorted().map({ Source.File(path: $0) })
 
                     let tp = Transpiler(sourceFiles: sources, packageName: packageName, symbols: symbols)
@@ -315,11 +290,12 @@ extension SkipSystem {
                         guard let sourceURL = sourceURLs[transpilation.sourceFile.path]?.first?.url else {
                             fatalError("missing source URL for path")
                         }
-                        let destPath = URL(fileURLWithPath: sourceURL.relativePath, isDirectory: false, relativeTo: kotlinRoot)
-                            .deletingPathExtension()
-                            .appendingPathExtension("kt")
-                        logger.debug("transpiling: \(sourceURL.relativePath) to \(sourceURL.pathRelative(to: destPath ) ?? destPath.path)")
-                        try fm.createDirectory(at: destPath.deletingLastPathComponent(), withIntermediateDirectories: true)
+
+                        //let destPath = kotlinRoot.appending(component: sourceURL.relativePath).deletingPathExtension().appendingPathExtension("kt")
+                        let destPath = kotlinRoot.appending(component: sourceURL.basenameWithoutExt).appendingPathExtension("kt")
+
+                        logger.debug("transpiling: \(sourceURL.pathString) to \(destPath.pathString)")
+                        try destFS.createDirectory(destPath.parentDirectory, recursive: true)
                         let kotlin = transpilation.output.content
 
                         let processed = try postProcess(kotlin: kotlin, options: testCase ? [.testCase] : [])
@@ -327,9 +303,9 @@ extension SkipSystem {
                         // only write it out if we aren't about to overwrite it with the raw Kotlin link
                         // we perform this check so we don't touch the files unnecessarily and stymie incremental builds
                         if kotlinSources.contains(sourceURL.deletingPathExtension().appendingPathExtension("kt")) {
-                            logger.debug("skipping overridden kotlin path: \(sourceURL.relativePath)")
+                            logger.debug("skipping overridden kotlin path: \(sourceURL.pathString)")
                         } else {
-                            try write(processed, to: destPath)
+                            try save(ByteString(encodingAsUTF8: processed), to: destPath)
                         }
                     }
                 }
@@ -337,26 +313,34 @@ extension SkipSystem {
                 try await transpileSources(sources: swiftSources)
 
                 /// Copies over the raw Kotlin files from the source folder
-                func linkSourceFiles(sources: Set<URL>, assets: Bool) async throws {
-                    for sourceURL in sources {
-                        var destPath = sourceURL.relativePath
-                        if assets && destPath.hasPrefix(resourcesPrefix) {
-                            destPath = String(destPath.dropFirst(resourcesPrefix.count))
-                        }
-                        let destURL = URL(fileURLWithPath: destPath, isDirectory: false, relativeTo: assets ? assetsRoot : kotlinRoot)
-                        logger.debug("copying: \(sourceURL.relativePath) to: \(destURL.path)")
-                        // try FileManager.default.copyItem(at: sourceURL, to: destPath)
-                        // only copy when the contents have changed, to avoid triggering unnecessary gradle rebuild
-                        try write(String(contentsOf: sourceURL), to: destURL, linkFrom: sourceURL)
+                ///
+                /// - Note: any source file hierarchy in the source swift tree is flattened in the resulting Kotlin files; this is because Java/Kotlin uses the directory structure as the package name, whereas the directory hierarchy is not used for anything in Swift.
+                func linkSourceFiles(sources: Set<AbsolutePath>) async throws {
+                    for sourcePath in sources {
+                        let destURL = kotlinRoot.appending(component: sourcePath.basename)
+                        logger.debug("copying: \(sourcePath.pathString) to: \(destURL.pathString)")
+                        try save(sourceFS.readFileContents(sourcePath), to: destURL) // , linkFrom: sourcePath)
                     }
                 }
 
-
                 // copy the kotlin files after transpilation, allowing override of same-named .kt/.swift files
-                try await linkSourceFiles(sources: kotlinSources, assets: false)
+                try await linkSourceFiles(sources: kotlinSources)
+
+                /// Copies over the raw Kotlin files from the source folder.
+                ///
+                /// - Note: source files, resource files are not flattened by default
+                func linkResourceFiles(sources: Set<AbsolutePath>, flatten: Bool = false) async throws {
+                    for sourcePath in sources {
+                        let relativePath = flatten ? RelativePath(sourcePath.basename) : sourcePath.relative(to: resourcesRoot)
+
+                        let destURL = assetsRoot.appending(relativePath)
+                        logger.debug("copying resource: \(sourcePath.pathString) to: \(relativePath) in assetsRoot: \(assetsRoot.pathString)")
+                        try save(sourceFS.readFileContents(sourcePath), to: destURL) // , linkFrom: sourcePath)
+                    }
+                }
 
                 // link over resource files
-                try await linkSourceFiles(sources: resourceFiles, assets: true)
+                try await linkResourceFiles(sources: resourceFiles)
 
                 if !isSkipLibModule { // only foundation and higher have the Bundle class
                     func synthesizeBundleModule() throws {
@@ -371,8 +355,8 @@ extension SkipSystem {
                         internal val SkipBundle.Companion.module: Bundle get() = Bundle(rawValue = \(moduleName)Module::class.java as Class<Any>)
                         """
 
-                        let bundleModuleURL = URL(fileURLWithPath: "BundleModule.kt", isDirectory: false, relativeTo: kotlinRoot)
-                        try write(src, to: bundleModuleURL)
+                        let bundleModuleURL = kotlinRoot.appending(component: "BundleModule.kt")
+                        try save(ByteString(encodingAsUTF8: src), to: bundleModuleURL)
                     }
 
                     //if !resourceFiles.isEmpty { // always synthesize?
@@ -447,8 +431,8 @@ extension SkipSystem {
                         }
                         """
 
-                        let bundleModuleURL = URL(fileURLWithPath: "XCTestHelpers.kt", isDirectory: false, relativeTo: kotlinRoot)
-                        try write(src, to: bundleModuleURL)
+                        let bundleModuleURL = kotlinRoot.appending(component: "XCTestHelpers.kt")
+                        try save(ByteString(encodingAsUTF8: src), to: bundleModuleURL)
                     }
 
                     try synthesizeTestHelper()
@@ -533,7 +517,7 @@ extension SkipSystem {
                 }
 
                 // the module-level build config
-                let buildGradle = URL(fileURLWithPath: "build.gradle.kts", isDirectory: false, relativeTo: moduleRoot)
+                let buildGradle = moduleRoot.appending(component: "build.gradle.kts")
                 let buildGradleSource = """
                 group = "\(packageName)"
                 val composeUIVersion: String by rootProject.extra
@@ -623,13 +607,13 @@ extension SkipSystem {
                 }
                 """
 
-                try write(buildGradleSource, to: buildGradle)
+                try save(ByteString(encodingAsUTF8: buildGradleSource), to: buildGradle)
             }
 
             try createModuleLevelGradleBuild()
 
 
-            let androidManifest = URL(fileURLWithPath: "src/main/AndroidManifest.xml", isDirectory: false, relativeTo: moduleRoot)
+            let androidManifest = moduleRoot.appending(components: ["src", "main", "AndroidManifest.xml"])
 
             let appName = "ExampleApp" // TODO: remove
 
@@ -654,7 +638,7 @@ extension SkipSystem {
                 </manifest>
                 """
 
-                try write(manifestContents, to: androidManifest)
+                try save(ByteString(encodingAsUTF8: manifestContents), to: androidManifest)
             }
 
             if targetSet.target.isApp {
@@ -664,7 +648,7 @@ extension SkipSystem {
 
         func createTopLevelGradleBuild() throws {
             // the top-level build configurations files that will be created
-            let buildGradle = URL(fileURLWithPath: "build.gradle.kts", isDirectory: false, relativeTo: destRoot)
+            let buildGradle = destRoot.appending(component: "build.gradle.kts")
             let buildGradleSource = """
             buildscript {
                 repositories {
@@ -692,9 +676,9 @@ extension SkipSystem {
                 kotlin("plugin.serialization") version "\(kotlinVersion)" apply false
             }
             """
-            try write(buildGradleSource, to: buildGradle)
+            try save(ByteString(encodingAsUTF8: buildGradleSource), to: buildGradle)
 
-            let gradleProperties = URL(fileURLWithPath: "gradle.properties", isDirectory: false, relativeTo: destRoot)
+            let gradleProperties = destRoot.appending(component: "gradle.properties")
             let gradlePropertiesSource = """
             # Project-wide Gradle settings
             # http://www.gradle.org/docs/current/userguide/build_environment.html
@@ -703,9 +687,9 @@ extension SkipSystem {
             android.enableJetifier=true
             kotlin.code.style=official
             """
-            try write(gradlePropertiesSource, to: gradleProperties)
+            try save(ByteString(encodingAsUTF8: gradlePropertiesSource), to: gradleProperties)
 
-            let settingsGradle = URL(fileURLWithPath: "settings.gradle.kts", isDirectory: false, relativeTo: destRoot)
+            let settingsGradle = destRoot.appending(component: "settings.gradle.kts")
             var settingsGradleSource = """
             pluginManagement {
                 repositories {
@@ -741,7 +725,7 @@ extension SkipSystem {
                 }
             }
 
-            try write(settingsGradleSource, to: settingsGradle)
+            try save(ByteString(encodingAsUTF8: settingsGradleSource), to: settingsGradle)
         }
 
         try createTopLevelGradleBuild()
@@ -753,12 +737,12 @@ extension SkipSystem {
         /// Currently overridden to 7.6 because dependent Android libraries require that.
         func createGradleWrapper(gradleVersion: String? = "7.6") async throws {
             // Gradle wrapper configuration
-            let gradlew = URL(fileURLWithPath: "gradlew", isDirectory: false, relativeTo: destRoot)
-            let gradleWrapper = URL(fileURLWithPath: "gradle/wrapper", isDirectory: true, relativeTo: destRoot)
-            try fm.createDirectory(at: gradleWrapper, withIntermediateDirectories: true)
+            let gradlew = destRoot.appending(component: "gradlew")
+            let gradleWrapper = destRoot.appending(components: ["gradle", "wrapper"])
+            try destFS.createDirectory(gradleWrapper, recursive: true)
 
-            let gradleWrapperJar = URL(fileURLWithPath: "gradle-wrapper.jar", isDirectory: false, relativeTo: gradleWrapper)
-            let gradleWrapperProps = URL(fileURLWithPath: "gradle-wrapper.properties", isDirectory: false, relativeTo: gradleWrapper)
+            let gradleWrapperJar = gradleWrapper.appending(component: "gradle-wrapper.jar")
+            let gradleWrapperProps = gradleWrapper.appending(component: "gradle-wrapper.properties")
 
             // copy the gradle-wrapper over from the Studio install
             let studioRoot = try studioRoot(bundleID: androidStudioBundleID)
@@ -770,8 +754,10 @@ extension SkipSystem {
                     // if we have not specified a specific version, then use the suffix of the wrapper included at /Applications/Android Studio.app/Contents/plugins/gradle/lib/gradle-wrapper-7.4.jar
                     let currentGradleVersion = url.deletingPathExtension().lastPathComponent.dropFirst(wrapperPrefix.count).description // e.g., 7.4
                     let distributionGradleVersion = gradleVersion ?? currentGradleVersion
-                    try? fm.removeItem(at: gradleWrapperJar) // clear the destination in case it already exists
-                    try fm.copyItem(at: url, to: gradleWrapperJar)
+                    try? destFS.removeFileTree(gradleWrapperJar) // clear the destination in case it already exists
+
+                    //try destFS.copy(from: url, to: gradleWrapperJar) // TODO: this might be the wrong absolute path…
+                    try destFS.writeIfChanged(path: gradleWrapperJar, bytes: ByteString(Data(contentsOf: url)))
 
                     // now we need to create the gradle-wrapper.properties, which will be based on the version of the gradle wrapper we specified or that us included with Studio
                     let gradlePropertiesContents = """
@@ -782,7 +768,7 @@ extension SkipSystem {
                     zipStoreBase=GRADLE_USER_HOME
                     """
 
-                    try write(gradlePropertiesContents, to: gradleWrapperProps)
+                    try save(ByteString(encodingAsUTF8: gradlePropertiesContents), to: gradleWrapperProps)
 
                     // finally create the idiomatic `gradelw` root script, but one which just uses the installed Android Studio's JBR (https://github.com/JetBrains/JetBrainsRuntime) java to run gradle
                     // we could alternatively just use this to dynamically discover alternative install: $(mdfind "kMDItemCFBundleIdentifier == '\(studioID)'" | head -n 1)
@@ -791,15 +777,16 @@ extension SkipSystem {
                     ${JAVA_HOME:-"/Applications/Android Studio.app/Contents/jbr/Contents/Home"}/bin/java ${JAVA_OPTS} ${GRADLE_OPTS} -classpath "$(dirname "${0}")/gradle/wrapper/gradle-wrapper.jar":"${CLASSPATH}" org.gradle.wrapper.GradleWrapperMain ${@}
                     """
 
-                    try write(gradlewContents, to: gradlew)
-                    try? fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: gradlew.path) // make the script executable
+                    try save(ByteString(encodingAsUTF8: gradlewContents), to: gradlew)
+                    //try? fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: gradlew.path) // make the script executable
+                    try? destFS.chmod(FileMode.executable, path: gradlew)
                 }
             }
         }
 
         try await createGradleWrapper()
 
-        return (destRoot, savedURLs)
+        return (destRoot, savedPaths)
     }
 }
 
@@ -860,6 +847,61 @@ public enum GradleTarget {
         }
     }
 }
+
+extension FileSystem {
+    /// Helper method to recurse the tree and perform the given block on each file.
+    ///
+    /// Note: `Task.isCancelled` is not checked; the controlling block should check for task cancellation.
+    public func recurse(path: AbsolutePath, block: (AbsolutePath) async throws -> ()) async throws {
+        let contents = try getDirectoryContents(path)
+
+        for entry in contents {
+            let entryPath = path.appending(component: entry)
+            try await block(entryPath)
+            if isDirectory(entryPath) {
+                try await recurse(path: entryPath, block: block)
+            }
+        }
+    }
+
+    /// Output the filesystem tree of the given path.
+    public func treeASCIIRepresentation(at path: AbsolutePath = .root) throws -> String {
+        var writer: String = ""
+        print(".", to: &writer)
+        try treeASCIIRepresent(fs: self, path: path, to: &writer)
+        return writer
+    }
+
+    /// Helper method to recurse and print the tree.
+    private func treeASCIIRepresent<T: TextOutputStream>(fs: FileSystem, path: AbsolutePath, localized: Bool = false, prefix: String = "", to writer: inout T) throws {
+        let contents = try fs.getDirectoryContents(path)
+        // content order is undefined, so we sort for a consistent output
+        let entries = localized ? contents.sorted(using: .localizedStandard) : contents.sorted()
+
+        for (idx, entry) in entries.enumerated() {
+            let isLast = idx == entries.count - 1
+            let line = prefix + (isLast ? "└─ " : "├─ ") + entry
+            print(line, to: &writer)
+
+            let entryPath = path.appending(component: entry)
+            if fs.isDirectory(entryPath) {
+                let childPrefix = prefix + (isLast ?  "   " : "│  ")
+                try treeASCIIRepresent(fs: fs, path: entryPath, prefix: String(childPrefix), to: &writer)
+            }
+        }
+    }
+}
+
+extension AbsolutePath {
+    func deletingPathExtension() -> AbsolutePath {
+        parentDirectory.appending(component: basenameWithoutExt)
+    }
+
+    func appendingPathExtension(_ ext: String) -> AbsolutePath {
+        parentDirectory.appending(component: basenameWithoutExt + "." + ext)
+    }
+}
+
 
 extension URL {
     /// Asynchronously walks the resursive file tree, executing the block on each file it finds.

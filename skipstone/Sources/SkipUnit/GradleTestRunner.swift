@@ -20,26 +20,34 @@ open class GradleTestRunner : XCTestCase {
 extension GradleTestRunner {
     public func transpileAndTest(targets: SkipTargetSet) async throws {
         // locate the root package for this test case (assuming shallow test directory structure of Tests/ModuleName/TestCase.swift)
-        let srcRoot = URL(fileURLWithPath: targets.sourceBase.description, isDirectory: false)
+        let srcURL = URL(fileURLWithPath: targets.sourceBase.description, isDirectory: false)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
 
         // turn SomeLibTests.SomeLibTests/ into SomeLibTests/
-        let testOutputBase = self.className.split(separator: ".").first ?? .init(self.className)
-        let destRoot = "\(SkipSystem.kipFolderName)/\(testOutputBase)"
+        let testOutputBase = String(self.className.split(separator: ".").first ?? .init(self.className))
+
+        let sourceFS = localFileSystem
+        let sourceRoot = try AbsolutePath(validating: srcURL.path)
+
+        let destFS = sourceFS
+        let destRoot = sourceRoot.appending(components: [SkipSystem.kipFolderName, testOutputBase])
 
         // transpile and assemble the gradle project in the given destination
-        let (destRootURL, paths) = try await SkipSystem.assemble(root: srcRoot, targets: targets, destRoot: destRoot)
+        let (destRooResult, createdPaths) = try await SkipSystem.assemble(root: sourceRoot, sourceFS: sourceFS, targets: targets, destRoot: destRoot, destFS: destFS)
+
+        let destRootURL = URL(fileURLWithPath: destRooResult.pathString)
+        let paths = createdPaths.map({ URL(fileURLWithPath: $0.pathString) })
 
         // create the Gradle project and execute it
-        try await SkipSystem.assembleAndExecuteGradle(testCase: Self.testInProcess ? self : nil, root: srcRoot, targets: targets, destRootURL: destRootURL, paths: paths)
+        try await SkipSystem.assembleAndExecuteGradle(testCase: Self.testInProcess ? self : nil, root: srcURL, targets: targets, destRootURL: destRootURL, paths: paths)
     }
 }
 
 #if os(macOS) || os(Linux)
 extension SkipSystem {
-    @discardableResult static func assembleAndExecuteGradle(testCase: GradleTestRunner?, root packageRoot: URL, targets: SkipTargetSet, destRootURL destRoot: URL, paths: [URL], verbose: Bool = false, overwrite: Bool = true, studioID: String = androidStudioBundleID) async throws -> URL {
+    @discardableResult static func assembleAndExecuteGradle(testCase: GradleTestRunner?, root packageRoot: URL, targets: SkipTargetSet, destRootURL destRoot: URL, paths: [URL], verbose: Bool = true, overwrite: Bool = true, studioID: String = androidStudioBundleID) async throws -> URL {
 
         logger.info("transpiling and testing: \(targets.target.moduleName) from: \(packageRoot.path)")
 
@@ -146,13 +154,18 @@ extension SkipSystem {
             }
 
             let process = Process(arguments: ["/usr/bin/env"] + args, environment: env, workingDirectory: workingFolder, outputRedirection: .stream(stdout: handleOutput, stderr: { _ in }, redirectStderr: true))
-            try process.launch()
-            try await process.waitUntilExit()
+            let stdin = try process.launch()
+            let _ = stdin
+            let result = try await process.waitUntilExit()
+            // Throw if there was a non zero termination.
+            guard result.exitStatus == .terminated(code: 0) else {
+                throw ProcessResult.Error.nonZeroExit(result)
+            }
         } catch let error as TSCBasic.Process.Error {
             // Gradle fails either due to build failures or test failures; since we're already creating issues for the test failures, we shouldn't add an additional failure
-            if issues.isEmpty {
+            //if issues.isEmpty {
                 throw error
-            }
+            //}
         }
 
         return destRoot

@@ -1,6 +1,6 @@
 import XCTest
 @testable import SkipBuild
-
+import TSCBasic
 
 final class SkipAssemberTests: XCTestCase {
     func testKotlinScripting() async throws {
@@ -11,7 +11,52 @@ final class SkipAssemberTests: XCTestCase {
         XCTAssertEqual("x2", x2)
     }
 
-    func DISABLEDtestKotlinJSConversion() async throws { // rather slow
+    public func testFileSystem() async throws {
+        try fileSystemTest(fs: InMemoryFileSystem())
+        try fileSystemTest(fs: localFileSystem)
+    }
+
+    public func fileSystemTest<FS: FileSystem>(fs: FS) throws {
+        let tmpRoot = try AbsolutePath(validating: UUID().uuidString, relativeTo: AbsolutePath(validating: NSTemporaryDirectory()))
+
+        let baseDir = try AbsolutePath(validating: "one/two/three", relativeTo: tmpRoot)
+        try fs.createDirectory(baseDir, recursive: true)
+        let dummyFile = baseDir.appending(component: "basic.txt")
+        try fs.writeFileContents(dummyFile) { stream in
+            stream.write("Hello World")
+        }
+        let contents = try fs.readFileContents(dummyFile)
+        XCTAssertEqual("Hello World", contents)
+
+        XCTAssertEqual(try fs.treeASCIIRepresentation(at: tmpRoot), """
+        .
+        └─ one
+           └─ two
+              └─ three
+                 └─ basic.txt
+
+        """)
+
+        let reroot = RerootedFileSystemView(fs, rootedAt: baseDir)
+        try reroot.writeFileContents(AbsolutePath(validating: "/advanced.txt")) { stream in
+            stream.write("Hello Advanced")
+        }
+
+        XCTAssertEqual(try fs.treeASCIIRepresentation(at: tmpRoot), """
+        .
+        └─ one
+           └─ two
+              └─ three
+                 ├─ advanced.txt
+                 └─ basic.txt
+
+        """)
+
+
+        try fs.removeFileTree(tmpRoot)
+    }
+
+    func testKotlinJSConversion() async throws {
         @Sendable @discardableResult func check(_ kotlin: String, _ expected: String, file: StaticString = #file, line: UInt = #line) async throws -> String {
             let js = try await SkipSystem.kotlinToJS(kotlin)
             XCTAssertTrue(js.contains(expected), "Unexpected output: \(js)", file: file, line: line)
@@ -26,6 +71,10 @@ final class SkipAssemberTests: XCTestCase {
             this.age = age;
           }
         """)
+
+        // the remaining checks work, but they are slow since they involve forking the compiler for each individual check
+        return;
+
 
         try await check(#"fun someFunction(arg: Int = 1) { "returnString" }"#, """
           function someFunction(arg) {

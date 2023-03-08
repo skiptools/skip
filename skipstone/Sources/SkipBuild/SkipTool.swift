@@ -9,7 +9,7 @@ import TSCLibc
 import OSLog
 
 /// The current version of the tool
-public let skipVersion = "0.0.50"
+public let skipVersion = "0.0.51"
 
 protocol Action: AsyncParsableCommand {
     func perform(on sourceFiles: [Source.File], options: Options) async throws
@@ -36,6 +36,8 @@ public struct SkipCommandExecutor: AsyncParsableCommand {
                                                             GradleAction.self,
                                                             PrintSwiftASTAction.self,
                                                             PrintSkipASTAction.self,
+                                                            //DoctorAction.self, // TODO: check installation status, like `brew doctor` and `flutter doctor`
+                                                            //InitAction.self, // TODO: initialize module Kotlin source folders and update Package.swift with plug-in and additional Kotlin targets
                                                            ]
     )
 
@@ -72,8 +74,11 @@ public struct SkipCommandExecutor: AsyncParsableCommand {
 
 
 struct OutputOptions: ParsableArguments {
-    @Option(name: [.customShort("o")], help: ArgumentHelp("Send output to the given file", valueName: "path"))
+    @Option(name: [.customShort("o")], help: ArgumentHelp("Send output to the given file (stdout: -)", valueName: "path"))
     var output: String?
+
+    @Flag(name: [.customShort("E")], help: ArgumentHelp("Emit messages to the output rather than stderr"))
+    var messageErrout: Bool = false
 
     @Flag(name: [.customShort("v")], help: ArgumentHelp("Whether to display verbose messages"))
     var verbose: Bool = false
@@ -99,17 +104,26 @@ struct OutputOptions: ParsableArguments {
     internal final class OutputHandler : Decodable {
         var out: WritableByteStream = stdoutStream
         var err: WritableByteStream = stderrStream
+        var file: LocalFileOutputByteStream? = nil
 
-        func flush() {
-            out.flush()
-            err.flush()
+        func fileStream(for outputPath: String?) -> LocalFileOutputByteStream? {
+            guard let outputPath else { return nil }
+            if let file = file { return file }
+            do {
+                let path = try AbsolutePath(validating: outputPath)
+                self.file = try LocalFileOutputByteStream(path)
+                return self.file
+            } catch {
+                // should we re-throw? that would make any logging message become throwable
+                return nil
+            }
         }
 
         /// The closure that will output a message to standard out
-        func write(error: Bool = false, _ output: String, terminator: String = "\n") {
-            //print(output, terminator: terminator, to: &out) // crashes compiler
-            (error ? err : out).write(output + terminator)
-            if !terminator.isEmpty { (error ? err : out).flush() }
+        func write(error: Bool, output: String?, _ message: String, terminator: String = "\n") {
+            let stream = (error ? err : fileStream(for: output) ?? out)
+            stream.write(message + terminator)
+            if !terminator.isEmpty { stream.flush() }
         }
 
         /// The closure that will handle converting and writing the output type to stream
@@ -129,7 +143,7 @@ struct OutputOptions: ParsableArguments {
 
     /// Write the given message to the output streams buffer
     func write(_ value: String) {
-        streams.write(error: false, value)
+        streams.write(error: false, output: output, value)
     }
 
     /// The output that comes at the beginning of a sequence of elements; an opening bracket, for JSON arrays
@@ -150,11 +164,11 @@ struct OutputOptions: ParsableArguments {
     /// Whether tool output should be emitted as JSON or not
     var emitJSON: Bool { json || jsonCompact }
 
-    func writeOutput<T: MessageConvertible>(_ item: T, error: Bool = false) throws {
+    func writeOutput<T: MessageConvertible>(_ item: T, error: Bool) throws {
         if emitJSON {
-            try streams.write(error: false, item.toJSON(outputFormatting: [.sortedKeys, .withoutEscapingSlashes, (jsonCompact ? .sortedKeys : .prettyPrinted)], dateEncodingStrategy: .iso8601).utf8String ?? "")
+            try streams.write(error: false, output: output, item.toJSON(outputFormatting: [.sortedKeys, .withoutEscapingSlashes, (jsonCompact ? .sortedKeys : .prettyPrinted)], dateEncodingStrategy: .iso8601).utf8String ?? "")
         } else {
-            streams.write(error: error, item.description)
+            streams.write(error: messageErrout == true ? false : error, output: output, item.description)
         }
     }
 }
@@ -179,7 +193,9 @@ struct VersionCommand: SingleStreamingCommand {
                                                            abstract: "Print the Skip version",
                                                            shouldDisplay: !experimental)
 
-    @OptionGroup var outputOptions: OutputOptions
+    @OptionGroup(title: "Output Options")
+    var outputOptions: OutputOptions
+
     // alternative way of setting output
     //@OptionGroup var parentOptions: SkipCommandExecutor
     //var output: OutputOptions {
@@ -191,12 +207,11 @@ struct VersionCommand: SingleStreamingCommand {
     }
 
     func executeCommand() async throws -> Output {
-        self.msg(.note, "note message", sourceFile: Source.File(path: #file), sourceRange: Source.Range(start: Source.Position(line: #line, column: #column), end: Source.Position(line: #line, column: #column)))
-        self.msg(.remark, "remark message", sourceFile: Source.File(path: #file), sourceRange: Source.Range(start: Source.Position(line: #line, column: #column), end: Source.Position(line: #line, column: #column)))
-        self.msg("info message", sourceFile: Source.File(path: #file), sourceRange: Source.Range(start: Source.Position(line: #line, column: #column), end: Source.Position(line: #line, column: #column)))
-        self.msg(.warning, "warning from file \(URL(fileURLWithPath: #file).lastPathComponent)", sourceFile: Source.File(path: #file), sourceRange: Source.Range(start: Source.Position(line: #line, column: #column), end: Source.Position(line: #line, column: #column)))
+        self.trace("trace message", sourceFile: Source.File(path: #file), sourceRange: Source.Range(start: Source.Position(line: #line, column: #column), end: Source.Position(line: #line, column: #column)))
+        self.info("info message", sourceFile: Source.File(path: #file), sourceRange: Source.Range(start: Source.Position(line: #line, column: #column), end: Source.Position(line: #line, column: #column)))
+        self.warn("warning from file \(URL(fileURLWithPath: #file).lastPathComponent)", sourceFile: Source.File(path: #file), sourceRange: Source.Range(start: Source.Position(line: #line, column: #column), end: Source.Position(line: #line, column: #column)))
 
-        //self.msg(.error, "error from file \(URL(fileURLWithPath: #file).lastPathComponent)", sourceFile: Source.File(path: #file), sourceRange: Source.Range(start: Source.Position(line: #line, column: #column), end: Source.Position(line: #line, column: #column))) // causes plug-in to fail
+        self.error("error from file \(URL(fileURLWithPath: #file).lastPathComponent)", sourceFile: Source.File(path: #file), sourceRange: Source.Range(start: Source.Position(line: #line, column: #column), end: Source.Position(line: #line, column: #column))) // causes plug-in to fail
 
         
         return Output()
@@ -512,8 +527,8 @@ protocol StreamingCommand: AsyncParsableCommand {
 extension StreamingCommand {
     func writeOutput(message: OutputMessage) throws {
         switch message {
-        case .a(let a): try outputOptions.writeOutput(a)
-        case .b(let b): try outputOptions.writeOutput(b)
+        case .a(let a): try outputOptions.writeOutput(a as Output, error: false)
+        case .b(let b): try outputOptions.writeOutput(b as Message, error: true)
         }
     }
 
@@ -549,9 +564,6 @@ extension StreamingCommand {
 
     func doCommand(continuation: AsyncThrowingStream<OutputMessage, Error>.Continuation) {
         Task {
-            defer {
-                self.outputOptions.streams.flush()
-            }
             do {
                 try await performCommand(with: continuation)
                 continuation.finish()
@@ -598,13 +610,29 @@ extension StreamingCommand {
     }
 
     /// The closure that will output a message
-    private func writeMessage(_ output: Message, terminator: String = "\n") {
+    private func writeMessage(_ message: Message, output: String? = nil, terminator: String = "\n") {
         if !outputOptions.emitJSON || outputOptions.messagePlain {
-            let message = output.description
-            outputOptions.streams.write(error: true, message, terminator: terminator)
+            let message = message.description
+            outputOptions.streams.write(error: !outputOptions.messageErrout, output: output, message, terminator: terminator)
         } else {
-            yield(message: output)
+            yield(message: message)
         }
+    }
+
+    func trace(_ message: @autoclosure () throws -> String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) rethrows {
+        try msg(.remark, message(), sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    func info(_ message: @autoclosure () throws -> String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) rethrows {
+        try msg(.note, message(), sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    func warn(_ message: @autoclosure () throws -> String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) rethrows {
+        try msg(.warning, message(), sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    func error(_ message: @autoclosure () throws -> String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) rethrows {
+        try msg(.error, message(), sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
     /// Output the given message to standard error
