@@ -114,7 +114,7 @@ class MessageStatement: Statement {
 class RawStatement: Statement {
     let sourceCode: String
 
-    init(sourceCode: String, message: Message? = nil, syntax: SyntaxProtocol? = nil, range: Source.Range?, extras: StatementExtras? = nil, in syntaxTree: SyntaxTree? = nil) {
+    init(sourceCode: String, message: Message? = nil, syntax: SyntaxProtocol? = nil, range: Source.Range? = nil, extras: StatementExtras? = nil, in syntaxTree: SyntaxTree? = nil) {
         self.sourceCode = sourceCode
         var range = range
         if range == nil, let source = syntaxTree?.source {

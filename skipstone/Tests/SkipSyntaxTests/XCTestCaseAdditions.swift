@@ -42,7 +42,12 @@ extension XCTestCase {
             if expectFailure {
                 XCTExpectFailure()
             }
-            XCTAssertEqual(kotlin.trimmingCharacters(in: .whitespacesAndNewlines), content.trimmingCharacters(in: .whitespacesAndNewlines), file: file, line: line)
+            let messagesString = transpilation.messages.map(\.description).joined(separator: ",")
+            if !transpilation.messages.isEmpty {
+                XCTFail("Transpilation produced unexpected messages: \(messagesString)")
+            } else {
+                XCTAssertEqual(kotlin.trimmingCharacters(in: .whitespacesAndNewlines), content.trimmingCharacters(in: .whitespacesAndNewlines), messagesString, file: file, line: line)
+            }
         }
     }
 

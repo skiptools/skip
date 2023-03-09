@@ -128,7 +128,7 @@ protocol BindingExpression {
 class RawExpression: Expression {
     let sourceCode: String
 
-    init(sourceCode: String, message: Message? = nil, syntax: SyntaxProtocol? = nil, range: Source.Range?, in syntaxTree: SyntaxTree? = nil) {
+    init(sourceCode: String, message: Message? = nil, syntax: SyntaxProtocol? = nil, range: Source.Range? = nil, in syntaxTree: SyntaxTree? = nil) {
         self.sourceCode = sourceCode
         var range = range
         if range == nil, let source = syntaxTree?.source {
