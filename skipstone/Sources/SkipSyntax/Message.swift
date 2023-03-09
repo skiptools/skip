@@ -90,8 +90,4 @@ extension Message {
     static func ambiguousFunctionCall(sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) -> Message {
         return Message(kind: .warning, message: "Skip is unable to disambiguate this function call. Consider adding explicit types to the values supplied as arguments", sourceFile: sourceFile, sourceRange: sourceRange)
     }
-
-    static func unknownMemberBaseType(member: String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) -> Message {
-        return Message(kind: .error, message: "Skip is unable to determine the owning type for member '\(member)'", sourceFile: sourceFile, sourceRange: sourceRange)
-    }
 }

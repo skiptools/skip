@@ -114,10 +114,10 @@ class MessageStatement: Statement {
 class RawStatement: Statement {
     let sourceCode: String
 
-    init(sourceCode: String, syntax: SyntaxProtocol? = nil, message: Message? = nil, extras: StatementExtras? = nil, in syntaxTree: SyntaxTree? = nil) {
+    init(sourceCode: String, message: Message? = nil, syntax: SyntaxProtocol? = nil, range: Source.Range?, extras: StatementExtras? = nil, in syntaxTree: SyntaxTree? = nil) {
         self.sourceCode = sourceCode
-        var range: Source.Range? = nil
-        if let source = syntaxTree?.source {
+        var range = range
+        if range == nil, let source = syntaxTree?.source {
             range = syntax?.range(in: source)
         }
         super.init(type: .raw, syntax: syntax, sourceFile: syntaxTree?.source.file, sourceRange: range, extras: extras)

@@ -738,6 +738,8 @@ class KotlinMemberAccess: KotlinExpression {
         if let base = expression.base {
             kexpression.base = translator.translateExpression(base)
             kexpression.useMultlineFormatting = expression.useMultlineFormatting
+        } else if expression.inferredType == .none && translator.codebaseInfo != nil {
+            kexpression.messages.append(.kotlinMemberAccessUnknownBaseType(expression, member: expression.member))
         }
         kexpression.inferredType = expression.inferredType
         kexpression.mayBeSharedMutableStruct = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)

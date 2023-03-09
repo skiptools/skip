@@ -80,74 +80,77 @@ public class KotlinTranslator {
     }
 
     func translateStatement(_ statement: Statement) -> [KotlinStatement] {
-        switch statement.type {
-        case .break:
-            return [KotlinBreak(statement: statement as! Break)]
-        case .catch:
-            break
-        case .codeBlock:
-            return [KotlinCodeBlock.translate(statement: statement as! CodeBlock, translator: self)]
-        case .continue:
-            return [KotlinContinue(statement: statement as! Continue)]
-        case .defer:
-            return [KotlinDefer.translate(statement: statement as! Defer, translator: self)]
-        case .do:
-            break
-        case .expression:
-            return [KotlinExpressionStatement.translate(statement: statement as! ExpressionStatement, translator: self)]
-        case .fallthrough:
-            return [KotlinMessageStatement(message: .kotlinSwitchFallthrough(statement))]
-        case .forLoop:
-            return [KotlinForLoop.translate(statement: statement as! ForLoop, translator: self)]
-        case .guard:
-            return [KotlinIf.translate(statement: statement as! Guard, translator: self)]
-        case .ifDefined:
-            // This should never happen, as we never make the IfDefined statement part of the syntax tree
-            return []
-        case .labeled:
-            return [KotlinLabeledStatement.translate(statement: statement as! LabeledStatement, translator: self)]
-        case .return:
-            return [KotlinReturn.translate(statement: statement as! Return, translator: self)]
-        case .throw:
-            break
-        case .whileLoop:
-            return [KotlinWhileLoop.translate(statement: statement as! WhileLoop, translator: self)]
-        case .classDeclaration:
-            return [KotlinClassDeclaration.translate(statement: statement as! TypeDeclaration, translator: self)]
-        case .enumCaseDeclaration:
-            return [KotlinEnumCaseDeclaration.translate(statement: statement as! EnumCaseDeclaration, translator: self)]
-        case .enumDeclaration:
-            return [KotlinClassDeclaration.translate(statement: statement as! TypeDeclaration, translator: self)]
-        case .extensionDeclaration:
-            return KotlinExtensionDeclaration.translate(statement: statement as! ExtensionDeclaration, translator: self)
-        case .functionDeclaration:
-            return [KotlinFunctionDeclaration.translate(statement: statement as! FunctionDeclaration, translator: self)]
-        case .importDeclaration:
-            return [KotlinImportDeclaration(statement: statement as! ImportDeclaration)]
-        case .initDeclaration:
-            return [KotlinFunctionDeclaration.translate(statement: statement as! FunctionDeclaration, translator: self)]
-        case .protocolDeclaration:
-            return [KotlinInterfaceDeclaration.translate(statement: statement as! TypeDeclaration, translator: self)]
-        case .structDeclaration:
-            return [KotlinClassDeclaration.translate(statement: statement as! TypeDeclaration, translator: self)]
-        case .typealiasDeclaration:
-            return [KotlinTypealiasDeclaration(statement: statement as! TypealiasDeclaration)]
-        case .variableDeclaration:
-            return [KotlinVariableDeclaration.translate(statement: statement as! VariableDeclaration, translator: self)]
-        case .raw:
-            return [KotlinRawStatement(statement: statement as! RawStatement)]
-        case .message:
-            return [KotlinMessageStatement(statement: statement)]
+        do {
+            switch statement.type {
+            case .break:
+                return [KotlinBreak(statement: statement as! Break)]
+            case .catch:
+                break
+            case .codeBlock:
+                return [KotlinCodeBlock.translate(statement: statement as! CodeBlock, translator: self)]
+            case .continue:
+                return [KotlinContinue(statement: statement as! Continue)]
+            case .defer:
+                return [KotlinDefer.translate(statement: statement as! Defer, translator: self)]
+            case .do:
+                break
+            case .expression:
+                return [KotlinExpressionStatement.translate(statement: statement as! ExpressionStatement, translator: self)]
+            case .fallthrough:
+                return [KotlinMessageStatement(message: .kotlinSwitchFallthrough(statement))]
+            case .forLoop:
+                return [KotlinForLoop.translate(statement: statement as! ForLoop, translator: self)]
+            case .guard:
+                return [KotlinIf.translate(statement: statement as! Guard, translator: self)]
+            case .ifDefined:
+                // This should never happen, as we never make the IfDefined statement part of the syntax tree
+                return []
+            case .labeled:
+                return [KotlinLabeledStatement.translate(statement: statement as! LabeledStatement, translator: self)]
+            case .return:
+                return [KotlinReturn.translate(statement: statement as! Return, translator: self)]
+            case .throw:
+                break
+            case .whileLoop:
+                return [KotlinWhileLoop.translate(statement: statement as! WhileLoop, translator: self)]
+            case .classDeclaration:
+                return [KotlinClassDeclaration.translate(statement: statement as! TypeDeclaration, translator: self)]
+            case .enumCaseDeclaration:
+                return [KotlinEnumCaseDeclaration.translate(statement: statement as! EnumCaseDeclaration, translator: self)]
+            case .enumDeclaration:
+                return [KotlinClassDeclaration.translate(statement: statement as! TypeDeclaration, translator: self)]
+            case .extensionDeclaration:
+                return KotlinExtensionDeclaration.translate(statement: statement as! ExtensionDeclaration, translator: self)
+            case .functionDeclaration:
+                return [KotlinFunctionDeclaration.translate(statement: statement as! FunctionDeclaration, translator: self)]
+            case .importDeclaration:
+                return [KotlinImportDeclaration(statement: statement as! ImportDeclaration)]
+            case .initDeclaration:
+                return [KotlinFunctionDeclaration.translate(statement: statement as! FunctionDeclaration, translator: self)]
+            case .protocolDeclaration:
+                return [KotlinInterfaceDeclaration.translate(statement: statement as! TypeDeclaration, translator: self)]
+            case .structDeclaration:
+                return [KotlinClassDeclaration.translate(statement: statement as! TypeDeclaration, translator: self)]
+            case .typealiasDeclaration:
+                return [KotlinTypealiasDeclaration(statement: statement as! TypealiasDeclaration)]
+            case .variableDeclaration:
+                return [KotlinVariableDeclaration.translate(statement: statement as! VariableDeclaration, translator: self)]
+            case .raw:
+                return [KotlinRawStatement(statement: statement as! RawStatement)]
+            case .message:
+                return [KotlinMessageStatement(statement: statement)]
+            }
+            throw Message.kotlinUntranslatable(statement, source: syntaxTree.source)
+        } catch {
+            let message = error as? Message ?? Message.kotlinUntranslatable(statement)
+            let rawStatement: RawStatement
+            if let syntax = statement.syntax {
+                rawStatement = RawStatement(syntax: syntax, message: message, extras: statement.extras, in: syntaxTree)
+            } else {
+                rawStatement = RawStatement(sourceCode: "?", message: message, range: statement.sourceRange, extras: statement.extras, in: syntaxTree)
+            }
+            return [KotlinRawStatement(statement: rawStatement)]
         }
-
-        // Fall back to a raw translation and associated warning
-        if let syntax = statement.syntax {
-            let message = Message.kotlinUntranslatable(statement)
-            let rawStatement = RawStatement(syntax: syntax, message: message, extras: statement.extras, in: syntaxTree)
-            let krawStatement = KotlinRawStatement(statement: rawStatement)
-            return [krawStatement]
-        }
-        return [KotlinMessageStatement(message: .kotlinUntranslatable(statement))]
     }
 
     func translateExpression(_ expression: Expression) -> KotlinExpression {
@@ -157,8 +160,12 @@ public class KotlinTranslator {
                 return KotlinArrayLiteral.translate(expression: expression as! ArrayLiteral, translator: self)
             case .binaryOperator:
                 return KotlinBinaryOperator.translate(expression: expression as! BinaryOperator, translator: self)
+            case .binding:
+                break
             case .booleanLiteral:
                 return KotlinBooleanLiteral(expression: expression as! BooleanLiteral)
+            case .casePattern:
+                break//return try KotlinCasePattern(expression: expression as! CasePattern)
             case .closure:
                 return KotlinClosure.translate(expression: expression as! Closure, translator: self)
             case .dictionaryLiteral:
@@ -171,9 +178,8 @@ public class KotlinTranslator {
                 return KotlinIf.translate(expression: expression as! If, translator: self)
             case .inout:
                 return KotlinInOut.translate(expression: expression as! InOut, translator: self)
-            case .matchingPattern:
-                //~~~
-                throw Message.kotlinUntranslatable(expression, source: syntaxTree.source)
+            case .matchingCase:
+                break
             case .memberAccess:
                 return KotlinMemberAccess.translate(expression: expression as! MemberAccess, translator: self)
             case .nilLiteral:
@@ -193,11 +199,9 @@ public class KotlinTranslator {
             case .subscript:
                 return KotlinSubscript.translate(expression: expression as! Subscript, translator: self)
             case .switch:
-                //~~~
-                throw Message.kotlinUntranslatable(expression, source: syntaxTree.source)
+                break
             case .switchCase:
-                //~~~
-                throw Message.kotlinUntranslatable(expression, source: syntaxTree.source)
+                break
             case .ternaryOperator:
                 return KotlinTernaryOperator.translate(expression: expression as! TernaryOperator, translator: self)
             case .try:
@@ -209,6 +213,7 @@ public class KotlinTranslator {
             case .raw:
                 return KotlinRawExpression(expression: expression as! RawExpression)
             }
+            throw Message.kotlinUntranslatable(expression, source: syntaxTree.source)
         } catch {
             let message = error as? Message ?? Message.kotlinUntranslatable(expression)
             let rawExpression: RawExpression

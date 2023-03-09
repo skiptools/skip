@@ -69,20 +69,6 @@ struct ExpressionDecoder {
         throw Message.unsupportedSyntax(sequence, source: syntaxTree.source)
     }
 
-    static func decodeCondition(_ condition: ConditionElementSyntax, in syntaxTree: SyntaxTree) throws -> Expression {
-        // TODO: Support these conditions
-        switch condition.condition {
-        case .availability(let syntax):
-            throw Message.unsupportedSyntax(syntax, source: syntaxTree.source)
-        case .expression(let syntax):
-            return decode(syntax: syntax, in: syntaxTree)
-        case .matchingPattern(let syntax):
-            return decode(syntax: syntax, in: syntaxTree)
-        case .optionalBinding(let syntax):
-            return decode(syntax: syntax, in: syntaxTree)
-        }
-    }
-
     /// Return the index of the lowest precedence operator expression in the given list. This allows us to segment the list and recurse on each segment, forming an
     /// expression tree that will get translated in precedence order.
     private static func indexOfLowestPrecedenceOperator(in expressionSyntaxes: [ExprSyntax]) -> Int? {
@@ -132,14 +118,20 @@ struct ExpressionDecoder {
     }
 }
 
+/// An expression that creates binding variables.
+protocol BindingExpression {
+    var bindings: [String: TypeSignature] { get }
+    func bindAsVar()
+}
+
 /// Raw source code.
 class RawExpression: Expression {
     let sourceCode: String
 
     init(sourceCode: String, message: Message? = nil, syntax: SyntaxProtocol? = nil, range: Source.Range?, in syntaxTree: SyntaxTree? = nil) {
         self.sourceCode = sourceCode
-        var range: Source.Range? = nil
-        if let source = syntaxTree?.source {
+        var range = range
+        if range == nil, let source = syntaxTree?.source {
             range = syntax?.range(in: source)
         }
         super.init(type: .raw, syntax: syntax, sourceFile: syntaxTree?.source.file, sourceRange: range)

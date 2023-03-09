@@ -118,65 +118,106 @@ extension PatternSyntax {
     /// Return the identifier names for this pattern declaration.
     ///
     /// - Returns: A single name for a simple identifier, an array of names for a decomposed tuple.
-    /// - Throws: `Message` if unable to parse this pattern.
-    func identifierPatterns(in syntaxTree: SyntaxTree) throws -> [IdentifierPattern] {
+    func identifierPatterns(in syntaxTree: SyntaxTree) -> [IdentifierPattern]? {
         // TODO: Support additional patterns
         switch kind {
         case .expressionPattern:
             guard let expressionSyntax = self.as(ExpressionPatternSyntax.self) else {
-                throw Message.unsupportedSyntax(self, source: syntaxTree.source)
+                return nil
             }
-            return try expressionSyntax.expression.identifierPatterns(in: syntaxTree)
+            return expressionSyntax.expression.identifierPatterns(in: syntaxTree)
         case .identifierPattern:
             guard let identifierSyntax = self.as(IdentifierPatternSyntax.self) else {
-                throw Message.unsupportedSyntax(self, source: syntaxTree.source)
+                return nil
             }
             return [IdentifierPattern(name: identifierSyntax.identifier.text)]
         case .isTypePattern:
-            throw Message.unsupportedSyntax(self, source: syntaxTree.source)
+            return nil
         case .missingPattern:
-            throw Message.unsupportedSyntax(self, source: syntaxTree.source)
+            return nil
         case .tuplePattern:
             guard let tupleSyntax = self.as(TuplePatternSyntax.self) else {
-                throw Message.unsupportedSyntax(self, source: syntaxTree.source)
+                return nil
             }
-            return try tupleSyntax.elements.flatMap { try $0.pattern.identifierPatterns(in: syntaxTree) }
+            var identifierPatterns: [IdentifierPattern] = []
+            for element in tupleSyntax.elements {
+                guard let elementPatterns = element.pattern.identifierPatterns(in: syntaxTree) else {
+                    return nil
+                }
+                identifierPatterns += elementPatterns
+            }
+            return identifierPatterns
         case .valueBindingPattern:
             guard let valueBindingSyntax = self.as(ValueBindingPatternSyntax.self) else {
-                throw Message.unsupportedSyntax(self, source: syntaxTree.source)
+                return nil
+            }
+            guard let identifierPatterns = valueBindingSyntax.valuePattern.identifierPatterns(in: syntaxTree) else {
+                return nil
             }
             let isVar = valueBindingSyntax.bindingKeyword.text == "var"
-            return try valueBindingSyntax.valuePattern.identifierPatterns(in: syntaxTree).map { IdentifierPattern(name: $0.name, isVar: $0.isVar || isVar) }
+            return identifierPatterns.map { IdentifierPattern(name: $0.name, isVar: $0.isVar || isVar) }
         case .wildcardPattern:
             return [IdentifierPattern(name: nil)]
         default:
-            throw Message.unsupportedSyntax(self, source: syntaxTree.source)
+            return nil
         }
     }
-}
 
-extension ExprSyntaxProtocol {
-    fileprivate func identifierPatterns(in syntaxTree: SyntaxTree) throws -> [IdentifierPattern] {
+    /// Extract and decode the expression from this pattern.
+    ///
+    /// If this pattern is a pure binding, returns `Binding`.
+    func expression(in syntaxTree: SyntaxTree) -> (expression: Expression, isVar: Bool) {
         switch kind {
-        case .discardAssignmentExpr:
-            return [IdentifierPattern(name: nil)]
-        case .identifierExpr:
-            if let identifierExpr = self.as(IdentifierExprSyntax.self) {
-                return [IdentifierPattern(name: identifierExpr.identifier.text)]
+        case .expressionPattern:
+            if let expressionSyntax = self.as(ExpressionPatternSyntax.self) {
+                let expression = ExpressionDecoder.decode(syntax: expressionSyntax.expression, in: syntaxTree)
+                return (expression, false)
             }
-        case .tupleExpr:
-            if let tupleExpr = self.as(TupleExprSyntax.self) {
-                return try tupleExpr.elementList.flatMap { try $0.expression.identifierPatterns(in: syntaxTree) }
-            }
-        case .unresolvedPatternExpr:
-            // We've seen this pattern in e.g. 'if let (a, b) = optionalTuple'
-            if let patternExpr = self.as(UnresolvedPatternExprSyntax.self) {
-                return try patternExpr.pattern.identifierPatterns(in: syntaxTree)
+        case .valueBindingPattern:
+            if let valueBindingSyntax = self.as(ValueBindingPatternSyntax.self) {
+                let (expression, _) = valueBindingSyntax.valuePattern.expression(in: syntaxTree)
+                let isVar = valueBindingSyntax.bindingKeyword.text == "var"
+                return (expression, isVar)
             }
         default:
             break
         }
-        throw Message.unsupportedSyntax(self, source: syntaxTree.source)
+        let expression = ExpressionDecoder.decode(syntax: self, in: syntaxTree)
+        return (expression, false)
+    }
+}
+
+extension ExprSyntaxProtocol {
+    fileprivate func identifierPatterns(in syntaxTree: SyntaxTree) -> [IdentifierPattern]? {
+        switch kind {
+        case .discardAssignmentExpr:
+            return [IdentifierPattern(name: nil)]
+        case .identifierExpr:
+            guard let identifierExpr = self.as(IdentifierExprSyntax.self) else {
+                return nil
+            }
+            return [IdentifierPattern(name: identifierExpr.identifier.text)]
+        case .tupleExpr:
+            guard let tupleExpr = self.as(TupleExprSyntax.self) else {
+                return nil
+            }
+            var identifierPatterns: [IdentifierPattern] = []
+            for element in tupleExpr.elementList {
+                guard let elementPatterns = element.expression.identifierPatterns(in: syntaxTree) else {
+                    return nil
+                }
+                identifierPatterns += elementPatterns
+            }
+            return identifierPatterns
+        case .unresolvedPatternExpr:
+            // We've seen this pattern in e.g. 'if let (a, b) = optionalTuple'
+            guard let patternExpr = self.as(UnresolvedPatternExprSyntax.self) else {
+                return nil
+            }
+            return patternExpr.pattern.identifierPatterns(in: syntaxTree)
+        default:
+            return nil
+        }
     }
 }
 

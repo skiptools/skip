@@ -66,6 +66,10 @@ extension Message {
         return Message(kind: .error, message: "Kotlin does not support optional bindings in loop conditions. Consider using an if statement before or within your loop", sourceDerived: sourceDerived)
     }
 
+    static func kotlinMemberAccessUnknownBaseType(_ sourceDerived: SourceDerived, member: String) -> Message {
+        return Message(kind: .error, message: "Skip is unable to determine the owning type for member '\(member)'. Add the owning type (e.g. MyType.\(member))", sourceDerived: sourceDerived)
+    }
+
     static func kotlinProtocolConstructor(_ sourceDerived: SourceDerived) -> Message {
         return Message(kind: .error, message: "Kotlin does not support constructors in protocols", sourceDerived: sourceDerived)
     }

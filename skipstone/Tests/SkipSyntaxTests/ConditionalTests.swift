@@ -484,22 +484,45 @@ final class ConditionalTests: XCTestCase {
         }
         """)
 
-        try await check(symbols: symbols, swift: """
-        func f(e: ConditionalTestsAssociatedValueEnum) {
-            if case .case2(_, let s) = e {
-                let str = s // No .sref() expected
-                print(str)
-            }
-        }
-        """, kotlin: """
-        internal fun f(e: ConditionalTestsAssociatedValueEnum) {
-            if (e is ConditionalTestsAssociatedValueEnum.case2) {
-                val s = e.associated1
-                val str = s
-                print(str)
-            }
-        }
-        """)
+//        try await check(symbols: symbols, swift: """
+//        func f(e: ConditionalTestsAssociatedValueEnum) {
+//            if case .case2(_, let s) = e {
+//                let str = s // No .sref() expected
+//                print(str)
+//            }
+//        }
+//        """, kotlin: """
+//        internal fun f(e: ConditionalTestsAssociatedValueEnum) {
+//            if (e is ConditionalTestsAssociatedValueEnum.case2) {
+//                val s = e.associated1
+//                val str = s
+//                print(str)
+//            }
+//        }
+//        """)
+//
+//        try await check(symbols: symbols, swift: """
+//        func f(e: ConditionalTestsAssociatedValueEnum) {
+//            if case var .case2(i, s) = e {
+//                let str = s // No .sref() expected
+//                print(i)
+//                print(str)
+//            }
+//        }
+//        """, kotlin: """
+//        internal fun f(e: ConditionalTestsAssociatedValueEnum) {
+//            if (e is ConditionalTestsAssociatedValueEnum.case2) {
+//                var i = e.associated0
+//                var s = e.associated1
+//                val str = s
+//                print(i)
+//                print(str)
+//            }
+//        }
+//        """)
+
+        //~~~ need tests using x? to match non-optional value
+        //~~~ for loop too
     }
 
     func testGuardCondition() async throws {

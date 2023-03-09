@@ -229,8 +229,9 @@ class ForLoop: Statement {
         guard syntax.kind == .forInStmt, let forInStmnt = syntax.as(ForInStmtSyntax.self) else {
             return nil
         }
-
-        let identifierPatterns = try forInStmnt.pattern.identifierPatterns(in: syntaxTree)
+        guard let identifierPatterns = forInStmnt.pattern.identifierPatterns(in: syntaxTree) else {
+            throw Message.unsupportedSyntax(forInStmnt.pattern, source: syntaxTree.source)
+        }
         var declaredType: TypeSignature = .none
         if let typeSyntax = forInStmnt.typeAnnotation?.type {
             declaredType = TypeSignature.for(syntax: typeSyntax)
@@ -285,7 +286,7 @@ class Guard: Statement {
             return nil
         }
         
-        let conditions = try guardStmnt.conditions.map { try ExpressionDecoder.decodeCondition($0, in: syntaxTree) }
+        let conditions = guardStmnt.conditions.map { ExpressionDecoder.decode(syntax: $0.condition, in: syntaxTree) }
         let statements = StatementDecoder.decode(syntaxListContainer: guardStmnt.body, in: syntaxTree)
         let body = CodeBlock(statements: statements)
         return [Guard(conditions: conditions, body: body, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
@@ -295,8 +296,8 @@ class Guard: Statement {
         var conditionsContext = context
         for condition in conditions {
             conditionsContext = condition.inferTypes(context: conditionsContext, expecting: .bool)
-            if let optionalBinding = condition as? OptionalBinding {
-                conditionsContext = conditionsContext.addingIdentifiers(optionalBinding.bindings)
+            if let bindingExpression = condition as? BindingExpression {
+                conditionsContext = conditionsContext.addingIdentifiers(bindingExpression.bindings)
             }
         }
         let _ = body.inferTypes(context: context, expecting: .none)
@@ -441,7 +442,7 @@ class WhileLoop: Statement {
     }
 
     private static func decodeWhile(statement: WhileStmtSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> WhileLoop {
-        let conditions = try statement.conditions.map { try ExpressionDecoder.decodeCondition($0, in: syntaxTree) }
+        let conditions = statement.conditions.map { ExpressionDecoder.decode(syntax: $0.condition, in: syntaxTree) }
         let statements = StatementDecoder.decode(syntaxListContainer: statement.body, in: syntaxTree)
         let body = CodeBlock(statements: statements)
         return WhileLoop(conditions: conditions, body: body, syntax: statement, sourceFile: syntaxTree.source.file, sourceRange: statement.range(in: syntaxTree.source), extras: extras)
@@ -459,10 +460,10 @@ class WhileLoop: Statement {
         var bindings: [String: TypeSignature] = [:]
         for condition in conditions {
             conditionsContext = condition.inferTypes(context: conditionsContext, expecting: .bool)
-            if let optionalBinding = condition as? OptionalBinding {
-                let optionalBindings = optionalBinding.bindings
-                conditionsContext = conditionsContext.addingIdentifiers(optionalBindings)
-                bindings.merge(optionalBindings) { _, new in new }
+            if let bindingExpression = condition as? BindingExpression {
+                let conditionBindings = bindingExpression.bindings
+                conditionsContext = conditionsContext.addingIdentifiers(conditionBindings)
+                bindings.merge(conditionBindings) { _, new in new }
             }
         }
         // Condition bindings are available to body in a while loop, but not in a repeat while loop
@@ -1002,7 +1003,9 @@ class VariableDeclaration: Statement {
             }
         }
 
-        let names = try syntax.pattern.identifierPatterns(in: syntaxTree).map(\.name)
+        guard let names = syntax.pattern.identifierPatterns(in: syntaxTree)?.map(\.name) else {
+            throw Message.unsupportedSyntax(syntax.pattern, source: syntaxTree.source)
+        }
         let declaration = VariableDeclaration(names: names, declaredType: declaredType, isLet: isLet, isAsync: isAsync, isThrows: isThrows, attributes: attributes, modifiers: modifiers, value: value, getter: getter, setter: setter, willSet: willSet, didSet: didSet, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
         declaration.messages = messages
         return declaration
