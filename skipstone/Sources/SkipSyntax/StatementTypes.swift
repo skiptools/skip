@@ -7,12 +7,12 @@ enum StatementType: CaseIterable {
     case `continue`
     case `defer`
     case `do`
+    case `fallthrough`
     case forLoop
     case `guard`
     case ifDefined
     case labeled
     case `return`
-    case `switch`
     case `throw`
     case whileLoop
 
@@ -49,6 +49,8 @@ enum StatementType: CaseIterable {
             return Defer.self
         case .do:
             return nil
+        case .fallthrough:
+            return Fallthrough.self
         case .forLoop:
             return ForLoop.self
         case .guard:
@@ -59,8 +61,6 @@ enum StatementType: CaseIterable {
             return LabeledStatement.self
         case .return:
             return Return.self
-        case .switch:
-            return nil
         case .throw:
             return nil
         case .whileLoop:
@@ -169,7 +169,7 @@ class Defer: Statement {
 
     init(body: CodeBlock, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.body = body
-        super.init(type: .defer)
+        super.init(type: .defer, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
     override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
@@ -187,6 +187,20 @@ class Defer: Statement {
 
     override var children: [SyntaxNode] {
         return [body]
+    }
+}
+
+/// `fallthrough`
+class Fallthrough: Statement {
+    init(syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        super.init(type: .fallthrough, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+        guard syntax.kind == .fallthroughStmt else {
+            return nil
+        }
+        return [Fallthrough(syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
     }
 }
 
@@ -251,7 +265,7 @@ class ForLoop: Statement {
     }
 
     override var prettyPrintAttributes: [PrettyPrintTree] {
-        return [PrettyPrintTree(root: identifierPatterns.map(\.name).joined(separator: ", "))]
+        return [PrettyPrintTree(root: identifierPatterns.map { $0.name ?? "_" }.joined(separator: ", "))]
     }
 }
 
@@ -282,7 +296,7 @@ class Guard: Statement {
         for condition in conditions {
             conditionsContext = condition.inferTypes(context: conditionsContext, expecting: .bool)
             if let optionalBinding = condition as? OptionalBinding {
-                conditionsContext = conditionsContext.addingIdentifiers(optionalBinding.names, types: optionalBinding.variableTypes)
+                conditionsContext = conditionsContext.addingIdentifiers(optionalBinding.bindings)
             }
         }
         let _ = body.inferTypes(context: context, expecting: .none)
@@ -442,19 +456,20 @@ class WhileLoop: Statement {
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
         var conditionsContext = context
-        var optionalBindings: [String: TypeSignature] = [:]
+        var bindings: [String: TypeSignature] = [:]
         for condition in conditions {
             conditionsContext = condition.inferTypes(context: conditionsContext, expecting: .bool)
             if let optionalBinding = condition as? OptionalBinding {
-                conditionsContext = conditionsContext.addingIdentifiers(optionalBinding.names, types: optionalBinding.variableTypes)
-                optionalBindings.merge(zip(optionalBinding.names, optionalBinding.variableTypes)) { _, new in new }
+                let optionalBindings = optionalBinding.bindings
+                conditionsContext = conditionsContext.addingIdentifiers(optionalBindings)
+                bindings.merge(optionalBindings) { _, new in new }
             }
         }
         // Condition bindings are available to body in a while loop, but not in a repeat while loop
         if isRepeatWhile {
             let _ = body.inferTypes(context: context, expecting: .none)
         } else {
-            let bodyContext = context.pushingBlock(identifiers: optionalBindings)
+            let bodyContext = context.pushingBlock(identifiers: bindings)
             let _ = body.inferTypes(context: bodyContext, expecting: .none)
         }
         return context
@@ -884,7 +899,7 @@ class TypeDeclaration: Statement {
 // TODO: Generics, patterns (tuple deconstruction, etc)
 /// `let/var v ...`
 class VariableDeclaration: Statement {
-    let names: [String]
+    let names: [String?]
     private(set) var declaredType: TypeSignature
     let isLet: Bool
     let isAsync: Bool
@@ -900,7 +915,7 @@ class VariableDeclaration: Statement {
         return declaredType.or(value?.inferredType ?? .none).tupleTypes(count: names.count)
     }
 
-    init(names: [String], declaredType: TypeSignature = .none, isLet: Bool = false, isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), value: Expression?, getter: Accessor<CodeBlock>? = nil, setter: Accessor<CodeBlock>? = nil, willSet: Accessor<CodeBlock>? = nil, didSet: Accessor<CodeBlock>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(names: [String?], declaredType: TypeSignature = .none, isLet: Bool = false, isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), value: Expression?, getter: Accessor<CodeBlock>? = nil, setter: Accessor<CodeBlock>? = nil, willSet: Accessor<CodeBlock>? = nil, didSet: Accessor<CodeBlock>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.names = names
         self.declaredType = declaredType
         self.isLet = isLet
@@ -1053,7 +1068,7 @@ class VariableDeclaration: Statement {
     }
 
     override var prettyPrintAttributes: [PrettyPrintTree] {
-        var attrs = [PrettyPrintTree(root: names.joined(separator: ", "))]
+        var attrs = [PrettyPrintTree(root: names.map { $0 ?? "_" }.joined(separator: ", "))]
         if declaredType != .none {
             attrs.append(PrettyPrintTree(root: declaredType.description))
         }

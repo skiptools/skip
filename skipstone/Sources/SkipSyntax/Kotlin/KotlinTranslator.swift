@@ -95,6 +95,8 @@ public class KotlinTranslator {
             break
         case .expression:
             return [KotlinExpressionStatement.translate(statement: statement as! ExpressionStatement, translator: self)]
+        case .fallthrough:
+            return [KotlinMessageStatement(message: .kotlinSwitchFallthrough(statement))]
         case .forLoop:
             return [KotlinForLoop.translate(statement: statement as! ForLoop, translator: self)]
         case .guard:
@@ -106,8 +108,6 @@ public class KotlinTranslator {
             return [KotlinLabeledStatement.translate(statement: statement as! LabeledStatement, translator: self)]
         case .return:
             return [KotlinReturn.translate(statement: statement as! Return, translator: self)]
-        case .switch:
-            break
         case .throw:
             break
         case .whileLoop:
@@ -171,6 +171,9 @@ public class KotlinTranslator {
                 return KotlinIf.translate(expression: expression as! If, translator: self)
             case .inout:
                 return KotlinInOut.translate(expression: expression as! InOut, translator: self)
+            case .matchingPattern:
+                //~~~
+                throw Message.kotlinUntranslatable(expression, source: syntaxTree.source)
             case .memberAccess:
                 return KotlinMemberAccess.translate(expression: expression as! MemberAccess, translator: self)
             case .nilLiteral:
@@ -189,6 +192,12 @@ public class KotlinTranslator {
                 return KotlinStringLiteral.translate(expression: expression as! StringLiteral, translator: self)
             case .subscript:
                 return KotlinSubscript.translate(expression: expression as! Subscript, translator: self)
+            case .switch:
+                //~~~
+                throw Message.kotlinUntranslatable(expression, source: syntaxTree.source)
+            case .switchCase:
+                //~~~
+                throw Message.kotlinUntranslatable(expression, source: syntaxTree.source)
             case .ternaryOperator:
                 return KotlinTernaryOperator.translate(expression: expression as! TernaryOperator, translator: self)
             case .try:

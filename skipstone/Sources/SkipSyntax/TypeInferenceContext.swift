@@ -82,11 +82,20 @@ struct TypeInferenceContext {
     }
 
     /// Return a context that includes the given identifiers.
-    func addingIdentifiers(_ names: [String], types: [TypeSignature]) -> TypeInferenceContext {
+    func addingIdentifiers(_ names: [String?], types: [TypeSignature]) -> TypeInferenceContext {
         var context = self
         for nameAndType in zip(names, types) {
-            context.localIdentifierTypes[nameAndType.0] = nameAndType.1
+            if let name = nameAndType.0 {
+                context.localIdentifierTypes[name] = nameAndType.1
+            }
         }
+        return context
+    }
+
+    /// Return a context that includes the given identifiers.
+    func addingIdentifiers(_ identifiers: [String: TypeSignature]) -> TypeInferenceContext {
+        var context = self
+        context.localIdentifierTypes.merge(identifiers) { _, new in new }
         return context
     }
 

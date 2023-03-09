@@ -90,7 +90,7 @@ class KotlinStructPlugin: KotlinPlugin {
         if useMemberwiseConstructor {
             let initFunction = KotlinMemberAccess(base: KotlinIdentifier(name: classDeclaration.name), member: "init")
             let arguments = variableDeclarations.map {
-                let argumentValue = KotlinIdentifier(name: $0.names[0])
+                let argumentValue = KotlinIdentifier(name: $0.names[0] ?? "")
                 argumentValue.mayBeSharedMutableStruct = $0.mayBeSharedMutableStruct
                 return LabeledValue<KotlinExpression>(value: argumentValue.sref())
             }
@@ -121,7 +121,7 @@ class KotlinStructPlugin: KotlinPlugin {
 
         var bodyStatements: [KotlinStatement] = []
         bodyStatements += variableDeclarations.map { variableDeclaration in
-            return KotlinRawStatement(sourceCode: "this.\(variableDeclaration.names[0]) = \(variableDeclaration.names[0])")
+            return KotlinRawStatement(sourceCode: "this.\(variableDeclaration.names[0] ?? "") = \(variableDeclaration.names[0] ?? "")")
         }
         constructor.body = KotlinCodeBlock(statements: bodyStatements)
         constructor.parent = classDeclaration
@@ -139,7 +139,7 @@ class KotlinStructPlugin: KotlinPlugin {
         var bodyStatements: [KotlinStatement] = []
         bodyStatements.append(KotlinRawStatement(sourceCode: "val copy = copy as \(classDeclaration.name)"))
         bodyStatements += variableDeclarations.map { variableDeclaration in
-            return KotlinRawStatement(sourceCode: "this.\(variableDeclaration.names[0]) = copy.\(variableDeclaration.names[0])")
+            return KotlinRawStatement(sourceCode: "this.\(variableDeclaration.names[0] ?? "") = copy.\(variableDeclaration.names[0] ?? "")")
         }
         constructor.body = KotlinCodeBlock(statements: bodyStatements)
         constructor.parent = classDeclaration

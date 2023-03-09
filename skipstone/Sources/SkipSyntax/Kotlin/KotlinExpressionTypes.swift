@@ -659,14 +659,14 @@ class KotlinIf: KotlinExpression {
             if optionalBindingVariable.names.count > 1 {
                 output.append("(")
             }
-            output.append(optionalBindingVariable.names.joined(separator: ", "))
+            output.append(optionalBindingVariable.names.map { $0 ?? "_" }.joined(separator: ", "))
             if optionalBindingVariable.names.count > 1 {
                 output.append(")")
             }
             output.append(" ->\n")
             indentation = indentation.inc()
             if !optionalBindingVariable.isLet {
-                for name in optionalBindingVariable.names {
+                for case let name? in optionalBindingVariable.names {
                     output.append(indentation).append("var \(name) = \(name)\n")
                 }
             }
@@ -689,7 +689,7 @@ class KotlinIf: KotlinExpression {
             if optionalBindingVariable.names.count > 1 {
                 output.append("(")
             }
-            output.append(optionalBindingVariable.names.joined(separator: ", "))
+            output.append(optionalBindingVariable.names.map { $0 ?? "_" }.joined(separator: ", "))
             if optionalBindingVariable.names.count > 1 {
                 output.append(")")
             }
@@ -857,15 +857,18 @@ class KotlinNumericLiteral: KotlinExpression {
 
 /// - Note: This type is used to translate the ``OptionalBinding`` expression, but is not itself a `KotlinExpression`.
 struct KotlinOptionalBinding {
-    var names: [String]
+    var names: [String?]
     var declaredType: TypeSignature?
     var value: KotlinExpression
     var isLet: Bool
 
     static func translateCondition(expression: OptionalBinding, translator: KotlinTranslator) -> KotlinExpression {
-        let comparisons: [KotlinExpression] = expression.names.map {
+        let comparisons: [KotlinExpression] = expression.names.compactMap {
+            guard let name = $0 else {
+                return nil
+            }
             // x != null
-            let identifier = KotlinIdentifier(name: $0)
+            let identifier = KotlinIdentifier(name: name)
             let nullLiteral = KotlinNullLiteral()
             return KotlinBinaryOperator(op: .with(symbol: "!="), lhs: identifier, rhs: nullLiteral, sourceFile: expression.sourceFile, sourceRange: expression.sourceRange)
         }
@@ -881,10 +884,12 @@ struct KotlinOptionalBinding {
         let kvalue: KotlinExpression
         if let value = expression.value {
             kvalue = translator.translateExpression(value).sref()
-        } else {
-            let identifier = KotlinIdentifier(name: expression.names[0])
+        } else if let name = expression.names[0] {
+            let identifier = KotlinIdentifier(name: name)
             identifier.mayBeSharedMutableStruct = expression.variableTypes.first?.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo) ?? false
             kvalue = identifier.sref()
+        } else {
+            return nil
         }
         return KotlinOptionalBinding(names: expression.names, declaredType: expression.declaredType, value: kvalue, isLet: expression.isLet)
     }

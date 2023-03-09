@@ -43,7 +43,7 @@ private class IdentifiersVisitor {
 
                         let names = optionalBindingVariable.names.map { newOptionalBindingVariableName(name: $0) }
                         kif.conditionSets[i].optionalBindingVariable?.names = names
-                        renamedIdentifiers.merge(zip(optionalBindingVariable.names, names)) { _, new in new }
+                        renamedIdentifiers.merge(zip(optionalBindingVariable.names.compactMap { $0 }, names.compactMap { $0 })) { _, new in new }
                     }
                     renamedIdentifiersStack.append(renamedIdentifiers)
                     kif.conditionSets[i].conditions.forEach { $0.visit(perform: self.visit) }
@@ -71,7 +71,10 @@ private class IdentifiersVisitor {
         return name
     }
 
-    private func newOptionalBindingVariableName(name: String) -> String {
+    private func newOptionalBindingVariableName(name: String?) -> String? {
+        guard let name else {
+            return nil
+        }
         if var count = optionalBindingCounts[name] {
             count += 1
             optionalBindingCounts[name] = count

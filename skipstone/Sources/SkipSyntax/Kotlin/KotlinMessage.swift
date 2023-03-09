@@ -74,6 +74,10 @@ extension Message {
         return Message(kind: .error, message: "Kotlin does not support static functions in protocols", sourceDerived: sourceDerived)
     }
 
+    static func kotlinSwitchFallthrough(_ sourceDerived: SourceDerived) -> Message {
+        return Message(kind: .error, message: "Kotlin does not support fallthrough. Consider restructuring your switch statement", sourceDerived: sourceDerived)
+    }
+
     // Idea: generate custom Kotlin data classes for additional tuple arities
     static func kotlinTupleArity(_ sourceDerived: SourceDerived) -> Message {
         return Message(kind: .error, message: "Kotlin uses Pair for 2-tuples and Triple for 3-tuples. It does not support tuples of arity > 3. Consider creating a struct instead", sourceDerived: sourceDerived)

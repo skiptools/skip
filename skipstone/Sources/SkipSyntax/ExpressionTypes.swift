@@ -11,6 +11,7 @@ enum ExpressionType: CaseIterable {
     case identifier
     case `if`
     case `inout`
+    case matchingPattern
     case memberAccess
     case nilLiteral
     case numericLiteral
@@ -20,6 +21,8 @@ enum ExpressionType: CaseIterable {
     case prefixOperator
     case stringLiteral
     case `subscript`
+    case `switch`
+    case switchCase
     case ternaryOperator
     case `try`
     case tupleLiteral
@@ -49,6 +52,8 @@ enum ExpressionType: CaseIterable {
             return If.self
         case .inout:
             return InOut.self
+        case .matchingPattern:
+            return MatchingPattern.self
         case .memberAccess:
             return MemberAccess.self
         case .nilLiteral:
@@ -67,6 +72,10 @@ enum ExpressionType: CaseIterable {
             return StringLiteral.self
         case .subscript:
             return Subscript.self
+        case .switch:
+            return Switch.self
+        case .switchCase:
+            return SwitchCase.self
         case .ternaryOperator:
             return TernaryOperator.self
         case .try:
@@ -565,15 +574,16 @@ class If: Expression {
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
         var conditionsContext = context
-        var optionalBindings: [String: TypeSignature] = [:]
+        var bindings: [String: TypeSignature] = [:]
         for condition in conditions {
             conditionsContext = condition.inferTypes(context: conditionsContext, expecting: .bool)
             if let optionalBinding = condition as? OptionalBinding {
-                conditionsContext = conditionsContext.addingIdentifiers(optionalBinding.names, types: optionalBinding.variableTypes)
-                optionalBindings.merge(zip(optionalBinding.names, optionalBinding.variableTypes)) { _, new in new }
+                let optionalBindings = optionalBinding.bindings
+                conditionsContext = conditionsContext.addingIdentifiers(optionalBindings)
+                bindings.merge(optionalBindings) { _, new in new }
             }
         }
-        let bodyContext = context.pushingBlock(identifiers: optionalBindings)
+        let bodyContext = context.pushingBlock(identifiers: bindings)
         let _ = body.inferTypes(context: bodyContext, expecting: .none)
         if let elseBody {
             let _ = elseBody.inferTypes(context: context, expecting: .none)
@@ -619,6 +629,74 @@ class InOut: Expression {
 
     override var children: [SyntaxNode] {
         return [target]
+    }
+}
+
+/// `case .a = x`
+class MatchingPattern: Expression {
+    let names: [String?]
+    private(set) var declaredType: TypeSignature
+    let value: Expression
+    //~~~
+    var variableTypes: [TypeSignature] {
+        return variableType.tupleTypes(count: names.count)
+    }
+    private var variableType: TypeSignature = .none
+
+    init(names: [String?], declaredType: TypeSignature = .none, value: Expression, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        self.names = names
+        self.declaredType = declaredType
+        self.value = value
+        self.variableType = declaredType
+        super.init(type: .matchingPattern, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
+        guard syntax.kind == .matchingPatternCondition, let matchingPatternExpr = syntax.as(MatchingPatternConditionSyntax.self) else {
+            return nil
+        }
+
+        //~~~
+        let identifierPatterns = try matchingPatternExpr.pattern.identifierPatterns(in: syntaxTree)
+        var declaredType: TypeSignature = .none
+        if let typeSyntax = matchingPatternExpr.typeAnnotation?.type {
+            declaredType = TypeSignature.for(syntax: typeSyntax)
+        }
+        let value = ExpressionDecoder.decode(syntax: matchingPatternExpr.initializer.value, in: syntaxTree)
+
+        return MatchingPattern(names: identifierPatterns.map(\.name), declaredType: declaredType, value: value, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+    }
+
+    override func resolveAttributes() {
+        declaredType = declaredType.qualified(in: self)
+    }
+
+    //~~~
+//    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+//        value?.inferTypes(context: context, expecting: declaredType.asOptional(true))
+//        variableType = declaredType
+//        if variableType == .none {
+//            if let value {
+//                variableType = value.inferredType
+//            } else {
+//                variableType = TypeSignature.for(labels: names, types: names.map { context.identifier($0) })
+//            }
+//        }
+//        // Flow will only continue when the value is non-optional
+//        variableType = variableType.asOptional(false)
+//        return context.addingIdentifiers(names, types: variableTypes)
+//    }
+
+    override var children: [SyntaxNode] {
+        return [value]
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        var attrs = [PrettyPrintTree(root: names.map { $0 ?? "_" }.joined(separator: ", "))]
+        if declaredType != .none {
+            attrs.append(PrettyPrintTree(root: declaredType.description))
+        }
+        return attrs
     }
 }
 
@@ -748,7 +826,7 @@ class NumericLiteral: Expression {
 
 /// `[if/guard/for/while] let x = optional`
 class OptionalBinding: Expression {
-    let names: [String]
+    let names: [String?]
     private(set) var declaredType: TypeSignature
     let isLet: Bool
     let value: Expression?
@@ -756,8 +834,11 @@ class OptionalBinding: Expression {
         return variableType.tupleTypes(count: names.count)
     }
     private var variableType: TypeSignature = .none
+    var bindings: [String: TypeSignature] {
+        return Dictionary(uniqueKeysWithValues: zip(names, variableTypes).compactMap { $0.0 == nil ? nil : ($0.0!, $0.1) })
+    }
 
-    init(names: [String], declaredType: TypeSignature = .none, isLet: Bool, value: Expression? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(names: [String?], declaredType: TypeSignature = .none, isLet: Bool = true, value: Expression? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
         self.names = names
         self.declaredType = declaredType
         self.isLet = isLet
@@ -796,12 +877,12 @@ class OptionalBinding: Expression {
             if let value {
                 variableType = value.inferredType
             } else {
-                variableType = TypeSignature.for(labels: names, types: names.map { context.identifier($0) })
+                variableType = TypeSignature.for(labels: names, types: names.map { $0.map { context.identifier($0) } ?? .none })
             }
         }
         // Flow will only continue when the value is non-optional
         variableType = variableType.asOptional(false)
-        return context.addingIdentifiers(names, types: variableTypes)
+        return context.addingIdentifiers(bindings)
     }
 
     override var children: [SyntaxNode] {
@@ -809,7 +890,7 @@ class OptionalBinding: Expression {
     }
 
     override var prettyPrintAttributes: [PrettyPrintTree] {
-        var attrs = [PrettyPrintTree(root: names.joined(separator: ", "))]
+        var attrs = [PrettyPrintTree(root: names.map { $0 ?? "_" }.joined(separator: ", "))]
         if declaredType != .none {
             attrs.append(PrettyPrintTree(root: declaredType.description))
         }
@@ -1075,6 +1156,81 @@ class Subscript: Expression {
 
     override var children: [SyntaxNode] {
         return [base] + arguments.map { $0.value }
+    }
+}
+
+/// `switch x { ... }`
+class Switch: Expression {
+    let on: Expression
+    let cases: [SwitchCase]
+
+    init(on: Expression, cases: [SwitchCase], syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        self.on = on
+        self.cases = cases
+        super.init(type: .switch, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
+        guard syntax.kind == .switchExpr, let switchExpr = syntax.as(SwitchExprSyntax.self) else {
+            return nil
+        }
+        let on = ExpressionDecoder.decode(syntax: switchExpr.expression, in: syntaxTree)
+        var cases: [SwitchCase] = []
+        var messages: [Message] = []
+        //~~~
+        let expression = Switch(on: on, cases: cases, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+        expression.messages = messages
+        return expression
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        on.inferTypes(context: context, expecting: .none)
+        cases.forEach { _ = $0.inferTypes(context: context, expecting: on.inferredType) }
+        return context
+    }
+
+    override var children: [SyntaxNode] {
+        return [on] + cases
+    }
+}
+
+/// `case x:` or `default:`
+class SwitchCase: Expression {
+    let conditions: [Expression] // Empty = default
+    let whereGuard: Expression?
+    let body: CodeBlock
+
+    init(conditions: [Expression], whereGuard: Expression?, body: CodeBlock, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        self.conditions = conditions
+        self.whereGuard = whereGuard
+        self.body = body
+        super.init(type: .switchCase, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        var conditionsContext = context
+        var bindings: [String: TypeSignature] = [:]
+        for condition in conditions {
+            conditionsContext = condition.inferTypes(context: conditionsContext, expecting: expecting)
+            //~~~
+//            if let optionalBinding = condition as? OptionalBinding {
+//                conditionsContext = conditionsContext.addingIdentifiers(optionalBinding.names, types: optionalBinding.variableTypes)
+//                optionalBindings.merge(zip(optionalBinding.names, optionalBinding.variableTypes)) { _, new in new }
+//            }
+        }
+        let bodyContext = context.pushingBlock(identifiers: bindings)
+        whereGuard?.inferTypes(context: bodyContext, expecting: .bool)
+        let _ = body.inferTypes(context: bodyContext, expecting: .none)
+        return context
+    }
+
+    override var children: [SyntaxNode] {
+        var children: [SyntaxNode] = conditions
+        if let whereGuard {
+            children.append(whereGuard)
+        }
+        children.append(body)
+        return children
     }
 }
 

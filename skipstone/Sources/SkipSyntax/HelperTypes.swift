@@ -177,7 +177,7 @@ struct Parameter<V>: Hashable {
 
 /// An identifier found in pattern syntax.
 struct IdentifierPattern {
-    var name: String
+    var name: String?
     var isVar = false
 }
 

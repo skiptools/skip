@@ -260,12 +260,12 @@ class KotlinForLoop: KotlinStatement {
         output.append(indentation).append("for (")
         // Append _0 to any vars so that we can re-declare them with their original names in the loop body
         let identifierNames = identifierPatterns.map {
-            return $0.isVar ? "\($0.name)_0" : $0.name
+            return $0.name != nil && $0.isVar ? "\($0.name!)_0" : $0.name
         }
         if identifierNames.count > 1 {
             output.append("(")
         }
-        output.append(identifierNames.joined(separator: ", "))
+        output.append(identifierNames.map { $0 ?? "_" }.joined(separator: ", "))
         if identifierNames.count > 1 {
             output.append(")")
         }
@@ -276,8 +276,8 @@ class KotlinForLoop: KotlinStatement {
         // Re-declare vars
         let bodyIndentation = indentation.inc()
         for identifierPattern in identifierPatterns {
-            if identifierPattern.isVar {
-                output.append(bodyIndentation).append("var ").append(identifierPattern.name).append(" = ").append("\(identifierPattern.name)_0\n")
+            if let name = identifierPattern.name, identifierPattern.isVar {
+                output.append(bodyIndentation).append("var ").append(name).append(" = ").append("\(name)_0\n")
             }
         }
 
@@ -987,7 +987,7 @@ class KotlinTypealiasDeclaration: KotlinStatement, KotlinMemberDeclaration {
 }
 
 class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
-    var names: [String]
+    var names: [String?]
     var declaredType: TypeSignature = .none
     var isLet = false
     var isAsync = false
@@ -1041,7 +1041,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             kstatement.mayBeSharedMutableStruct = true
         }
         if kstatement.mayBeSharedMutableStruct {
-            kstatement.onUpdate = kstatement.isReadOnly ? nil : kstatement.isProperty ? "{ this.\(kstatement.names[0]) = it }" : "{ \(kstatement.names[0]) = it }"
+            kstatement.onUpdate = kstatement.isReadOnly ? nil : kstatement.isProperty ? "{ this.\(kstatement.names[0] ?? "") = it }" : "{ \(kstatement.names[0] ?? "") = it }"
             kstatement.getter = statement.getter?.translate(translator: translator, expectedReturn: .sref(kstatement.onUpdate))
         } else {
             kstatement.getter = statement.getter?.translate(translator: translator, expectedReturn: .yes)
@@ -1118,7 +1118,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             if names.count > 1 {
                 output.append("(")
             }
-            output.append(names.joined(separator: ", "))
+            output.append(names.map { $0 ?? "_" }.joined(separator: ", "))
             if names.count > 1 {
                 output.append(")")
             }

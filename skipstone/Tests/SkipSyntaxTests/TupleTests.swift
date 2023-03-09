@@ -85,6 +85,20 @@ final class TupleTests: XCTestCase {
             print(b)
         }
         """)
+
+        try await check(swift: """
+        {
+            let t = (1, 2)
+            let (a, _) = t
+            print(a)
+        }
+        """, kotlin: """
+        {
+            val t = Pair(1, 2)
+            val (a, _) = t
+            print(a)
+        }
+        """)
     }
 
     func testDestructuringSharedMutableStruct() async throws {
@@ -128,6 +142,18 @@ final class TupleTests: XCTestCase {
         internal var t: Pair<Int, String>? = null
         t?.let { (i, s) ->
             print(i)
+            print(s)
+        }
+        """)
+
+        try await check(swift: """
+        var t: (Int, String)?
+        if let (_, s) = t {
+            print(s)
+        }
+        """, kotlin: """
+        internal var t: Pair<Int, String>? = null
+        t?.let { (_, s) ->
             print(s)
         }
         """)

@@ -77,7 +77,7 @@ struct ExpressionDecoder {
         case .expression(let syntax):
             return decode(syntax: syntax, in: syntaxTree)
         case .matchingPattern(let syntax):
-            throw Message.unsupportedSyntax(syntax, source: syntaxTree.source)
+            return decode(syntax: syntax, in: syntaxTree)
         case .optionalBinding(let syntax):
             return decode(syntax: syntax, in: syntaxTree)
         }

@@ -10,7 +10,7 @@ class OutputGenerator {
         self.root = root
     }
 
-    public func generateOutput(file: Source.File) -> (output: Source, map: OutputMap) {
+    func generateOutput(file: Source.File) -> (output: Source, map: OutputMap) {
         append(root, indentation: .zero)
         let output = Source(file: file, content: content)
         let ret = (output, OutputMap(entries: mapEntryOffsets.map { outputMapEntry(for: $0, in: output) }))

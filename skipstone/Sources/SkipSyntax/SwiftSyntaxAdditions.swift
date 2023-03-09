@@ -148,7 +148,7 @@ extension PatternSyntax {
             let isVar = valueBindingSyntax.bindingKeyword.text == "var"
             return try valueBindingSyntax.valuePattern.identifierPatterns(in: syntaxTree).map { IdentifierPattern(name: $0.name, isVar: $0.isVar || isVar) }
         case .wildcardPattern:
-            throw Message.unsupportedSyntax(self, source: syntaxTree.source)
+            return [IdentifierPattern(name: nil)]
         default:
             throw Message.unsupportedSyntax(self, source: syntaxTree.source)
         }
@@ -158,6 +158,8 @@ extension PatternSyntax {
 extension ExprSyntaxProtocol {
     fileprivate func identifierPatterns(in syntaxTree: SyntaxTree) throws -> [IdentifierPattern] {
         switch kind {
+        case .discardAssignmentExpr:
+            return [IdentifierPattern(name: nil)]
         case .identifierExpr:
             if let identifierExpr = self.as(IdentifierExprSyntax.self) {
                 return [IdentifierPattern(name: identifierExpr.identifier.text)]

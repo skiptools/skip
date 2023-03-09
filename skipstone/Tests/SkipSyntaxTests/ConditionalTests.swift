@@ -469,6 +469,39 @@ final class ConditionalTests: XCTestCase {
         """)
     }
 
+    func testIfCase() async throws {
+        try await check(symbols: symbols, swift: """
+        func f(e: ConditionalTestsEnum) {
+            if case .case1 = e {
+                print("A")
+            }
+        }
+        """, kotlin: """
+        internal fun f(e: ConditionalTestsEnum) {
+            if (e == ConditionalTestsEnum.case1) {
+                print("A")
+            }
+        }
+        """)
+
+        try await check(symbols: symbols, swift: """
+        func f(e: ConditionalTestsAssociatedValueEnum) {
+            if case .case2(_, let s) = e {
+                let str = s // No .sref() expected
+                print(str)
+            }
+        }
+        """, kotlin: """
+        internal fun f(e: ConditionalTestsAssociatedValueEnum) {
+            if (e is ConditionalTestsAssociatedValueEnum.case2) {
+                val s = e.associated1
+                val str = s
+                print(str)
+            }
+        }
+        """)
+    }
+
     func testGuardCondition() async throws {
         try await check(swift: """
         guard i == 1 else {
@@ -679,4 +712,13 @@ final class ConditionalTests: XCTestCase {
 
 private class ConditionalTestsClass {
     var related: ConditionalTestsClass?
+}
+
+private enum ConditionalTestsEnum {
+    case case1
+    case case2
+}
+private enum ConditionalTestsAssociatedValueEnum {
+    case case1
+    case case2(Int, String)
 }
