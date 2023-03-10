@@ -844,8 +844,9 @@ struct KotlinCasePattern {
                 identifier.isLocalIdentifier = true
                 targetVariable = TargetVariable(identifier: identifier, value: target)
             }
+            let bindingBase = targetVariable.map { KotlinSharedExpressionPointer(shared: $0.identifier) } ?? target
             let bindingMember = label ?? "associated\(index)"
-            let bindingValue = KotlinMemberAccess(base: targetVariable?.identifier ?? target, member: bindingMember)
+            let bindingValue = KotlinMemberAccess(base: bindingBase, member: bindingMember)
             // sref() any tuple or shared mutable type
             bindingValue.mayBeSharedMutableStruct = types.count > 1 || types[0].kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
             let variable = KotlinBindingVariable(names: identifierPatterns.map(\.name), value: bindingValue.sref(), isLet: !(expression.isVar || identifierPatterns[0].isVar))

@@ -26,6 +26,11 @@ private class IdentifiersVisitor {
             }
             return .skip
         } else if let kif = node as? KotlinIf {
+            for conditionSet in kif.conditionSets {
+                if let caseTargetVariable = conditionSet.caseTargetVariable {
+                    caseTargetVariable.identifier.name = newCaseTargetVariableName()
+                }
+            }
             if kif.ifCheckVariable != nil {
                 kif.ifCheckVariable = newIfCheckVariableName()
                 return .recurse(nil)
@@ -63,11 +68,18 @@ private class IdentifiersVisitor {
     }
 
     private var ifCheckCount = 0
+    private var caseTargetCount = 0
     private var optionalBindingCounts: [String: Int] = [:]
 
     private func newIfCheckVariableName() -> String {
         let name = "letexec_\(ifCheckCount)"
         ifCheckCount += 1
+        return name
+    }
+
+    private func newCaseTargetVariableName() -> String {
+        let name = "matchtarget_\(caseTargetCount)"
+        caseTargetCount += 1
         return name
     }
 
