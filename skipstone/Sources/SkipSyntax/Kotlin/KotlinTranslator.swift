@@ -179,7 +179,7 @@ public class KotlinTranslator {
             case .inout:
                 return KotlinInOut.translate(expression: expression as! InOut, translator: self)
             case .matchingCase:
-                return KotlinMatchingCase.translate(expression: expression as! MatchingCase, translator: self)
+                break // Should be translated directly by parent expressions
             case .memberAccess:
                 return KotlinMemberAccess.translate(expression: expression as! MemberAccess, translator: self)
             case .nilLiteral:
@@ -187,7 +187,7 @@ public class KotlinTranslator {
             case .numericLiteral:
                 return KotlinNumericLiteral(expression: expression as! NumericLiteral)
             case .optionalBinding:
-                return KotlinOptionalBinding.translateCondition(expression: expression as! OptionalBinding, translator: self)
+                break // Should be translated directly by parent expressions
             case .parenthesized:
                 return KotlinParenthesized.translate(expression: expression as! Parenthesized, translator: self)
             case .prefixOperator:

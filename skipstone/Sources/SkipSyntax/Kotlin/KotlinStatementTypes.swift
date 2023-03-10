@@ -63,7 +63,7 @@ class KotlinCodeBlock: KotlinStatement {
     /// Perform any necessary updates to the return statements in this block.
     ///
     /// - Returns: Whether any return statements were found.
-    @discardableResult func updateWithExpectedReturn(_ expectedReturn: ExpectedReturn) -> Bool {
+    @discardableResult func updateWithExpectedReturn(_ expectedReturn: KotlinExpectedReturn) -> Bool {
         var label: String?
         var sref = false
         var returnRequired = false
@@ -359,39 +359,49 @@ class KotlinReturn: KotlinExpressionStatement {
 
 class KotlinWhileLoop: KotlinStatement {
     var conditions: [KotlinExpression]
-    var casePatternVariables: [KotlinCasePattern.Variable]
+    var caseBindingVariables: [KotlinBindingVariable]
     var body: KotlinCodeBlock
     var isDoWhile = false
 
     static func translate(statement: WhileLoop, translator: KotlinTranslator) -> KotlinWhileLoop {
-        let (kconditions, kvariables, messages) = translate(conditions: statement.conditions, translator: translator)
+        let (kconditions, caseBindingVariables, messages) = translate(conditions: statement.conditions, translator: translator)
         let kbody = KotlinCodeBlock.translate(statement: statement.body, translator: translator)
-        let kstatement = KotlinWhileLoop(statement: statement, conditions: kconditions, casePatternVariables: kvariables, body: kbody)
+        let kstatement = KotlinWhileLoop(statement: statement, conditions: kconditions, caseBindingVariables: caseBindingVariables, body: kbody)
         kstatement.isDoWhile = statement.isRepeatWhile
         kstatement.messages += messages
         return kstatement
     }
 
-    private static func translate(conditions: [Expression], translator: KotlinTranslator) -> ([KotlinExpression], [KotlinCasePattern.Variable], [Message]) {
+    private static func translate(conditions: [Expression], translator: KotlinTranslator) -> ([KotlinExpression], [KotlinBindingVariable], [Message]) {
         var kconditions: [KotlinExpression] = []
-        var kvariables: [KotlinCasePattern.Variable] = []
+        var caseBindingVariables: [KotlinBindingVariable] = []
         var messages: [Message] = []
         for condition in conditions {
-            kconditions.append(translator.translateExpression(condition))
             // We could copy the binding value from the condition in order to bind variables in the loop body, but this would cause
             // re-execution of the expression code, which could have side effects
-            if let optionalBinding = condition as? OptionalBinding, KotlinOptionalBinding.translateVariable(expression: optionalBinding, translator: translator) != nil {
-                messages.append(.kotlinLoopOptionalBinding(optionalBinding))
-            } else if let matchingCase = condition as? MatchingCase, let casePatternVariables = KotlinCasePattern.translateVariables(expression: matchingCase.pattern, translator: translator) {
-                kvariables += casePatternVariables
+            if let optionalBinding = condition as? OptionalBinding {
+                let (variable, optionalCondition) = KotlinOptionalBinding.translate(expression: optionalBinding, translator: translator)
+                kconditions.append(optionalCondition)
+                if variable != nil {
+                    messages.append(.kotlinLoopOptionalBinding(optionalBinding))
+                }
+            } else if let matchingCase = condition as? MatchingCase {
+                let (valueVariable, bindingVariables, caseCondition) = KotlinMatchingCase.translate(expression: matchingCase, translator: translator)
+                kconditions.append(caseCondition)
+                caseBindingVariables += bindingVariables
+                if valueVariable != nil {
+                    messages.append(.kotlinLoopCaseValue(matchingCase))
+                }
+            } else {
+                kconditions.append(translator.translateExpression(condition))
             }
         }
-        return (kconditions, kvariables, messages)
+        return (kconditions, caseBindingVariables, messages)
     }
 
-    private init(statement: WhileLoop, conditions: [KotlinExpression], casePatternVariables: [KotlinCasePattern.Variable], body: KotlinCodeBlock) {
+    private init(statement: WhileLoop, conditions: [KotlinExpression], caseBindingVariables: [KotlinBindingVariable], body: KotlinCodeBlock) {
         self.conditions = conditions
-        self.casePatternVariables = casePatternVariables
+        self.caseBindingVariables = caseBindingVariables
         self.body = body
         super.init(type: .whileLoop, statement: statement)
     }
@@ -412,8 +422,9 @@ class KotlinWhileLoop: KotlinStatement {
             conditions.appendAsLogicalConditions(to: output, indentation: indentation)
             output.append(") {\n")
             let bodyIndentation = indentation.inc()
-            for casePatternVariable in casePatternVariables {
-                casePatternVariable.append(to: output, indentation: indentation)
+            for caseBindingVariable in caseBindingVariables {
+                output.append(indentation)
+                caseBindingVariable.append(to: output, indentation: indentation)
                 output.append("\n")
             }
             output.append(body, indentation: bodyIndentation)

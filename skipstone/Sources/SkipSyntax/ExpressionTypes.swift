@@ -604,9 +604,12 @@ class FunctionCall: Expression {
 /// `x`, also `this` or `super`
 class Identifier: Expression {
     let name: String
+    /// Whether this appears to be a local variable or parameter.
+    private(set) var isLocalIdentifier: Bool
 
-    init(name: String, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(name: String, isLocalIdentifier: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
         self.name = name
+        self.isLocalIdentifier = isLocalIdentifier
         super.init(type: .identifier, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
@@ -624,6 +627,9 @@ class Identifier: Expression {
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
         identifierType = context.identifier(name).or(expecting)
+        if !isLocalIdentifier {
+            isLocalIdentifier = context.isLocalIdentifier(name)
+        }
         return context
     }
 

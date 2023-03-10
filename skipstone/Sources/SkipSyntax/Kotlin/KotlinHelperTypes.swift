@@ -1,5 +1,5 @@
 /// The type of return statement expected from a code block.
-enum ExpectedReturn {
+enum KotlinExpectedReturn {
     /// No return is expected.
     case no
     /// A return is required.
@@ -10,9 +10,29 @@ enum ExpectedReturn {
     case sref(String?)
 }
 
+/// A variable we declare to mirror a Swift binding pattern.
+struct KotlinBindingVariable {
+    var names: [String?]
+    var value: KotlinExpression
+    var isLet: Bool
+
+    /// - Note: Appends without leading indentation or trailing newline.
+    func append(to output: OutputGenerator, indentation: Indentation) {
+        output.append(isLet ? "val " : "var ")
+        if names.count > 1 {
+            output.append("(")
+        }
+        output.append(names.map { $0 ?? "_" }.joined(separator: ", "))
+        if names.count > 1 {
+            output.append(")")
+        }
+        output.append(" = ").append(value, indentation: indentation)
+    }
+}
+
 extension Accessor where B: CodeBlock {
     /// Translate to an equivalent Kotlin accessor.
-    func translate(translator: KotlinTranslator, expectedReturn: ExpectedReturn) -> Accessor<KotlinCodeBlock> {
+    func translate(translator: KotlinTranslator, expectedReturn: KotlinExpectedReturn) -> Accessor<KotlinCodeBlock> {
         if let body {
             let kbody = KotlinCodeBlock.translate(statement: body, translator: translator)
             kbody.updateWithExpectedReturn(expectedReturn)

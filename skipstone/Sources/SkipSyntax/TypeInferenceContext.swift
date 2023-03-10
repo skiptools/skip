@@ -130,6 +130,19 @@ struct TypeInferenceContext {
         return symbols.identifierSignature(of: name)
     }
 
+    /// Whether the given name maps to a local identifier or parameter.
+    func isLocalIdentifier(_ name: String) -> Bool {
+        if localIdentifierTypes.keys.contains(name) {
+            return true
+        }
+        for identifierDictionary in blockPath.reversed() {
+            if identifierDictionary.keys.contains(name) {
+                return true
+            }
+        }
+        return false
+    }
+
     /// Return the type of the given member.
     func member(_ name: String, in type: TypeSignature) -> TypeSignature {
         let type = type.asOptional(false)

@@ -62,6 +62,10 @@ extension Message {
         return Message(kind: .warning, message: "Shadowing an inout parameter with a variable of the same name may produce incorrect Kotlin. Consider using a different variable name", sourceDerived: sourceDerived)
     }
 
+    static func kotlinLoopCaseValue(_ sourceDerived: SourceDerived) -> Message {
+        return Message(kind: .error, message: "Kotlin does not support case bindings to complex expressions in loop conditions. Consider assigning the expression to a local variable before the loop - e.g. let x = ...; while case let .a(...) = x", sourceDerived: sourceDerived)
+    }
+
     static func kotlinLoopOptionalBinding(_ sourceDerived: SourceDerived) -> Message {
         return Message(kind: .error, message: "Kotlin does not support optional bindings in loop conditions. Consider using an if statement before or within your loop", sourceDerived: sourceDerived)
     }
