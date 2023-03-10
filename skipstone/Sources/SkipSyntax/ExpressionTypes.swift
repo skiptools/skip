@@ -289,10 +289,13 @@ class Binding: Expression, BindingExpression {
     }
 
     override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
-        guard let patternSyntax = syntax.as(PatternSyntax.self) else {
-            return nil
+        var identifierPatterns: [IdentifierPattern]? = nil
+        if syntax.kind == .discardAssignmentExpr || syntax.kind == .unresolvedPatternExpr, let expr = syntax.as(ExprSyntax.self) {
+            identifierPatterns = expr.identifierPatterns(in: syntaxTree)
+        } else if let patternSyntax = syntax.as(PatternSyntax.self) {
+            identifierPatterns = patternSyntax.identifierPatterns(in: syntaxTree)
         }
-        guard let identifierPatterns = patternSyntax.identifierPatterns(in: syntaxTree) else {
+        guard let identifierPatterns else {
             return nil
         }
         return Binding(identifierPatterns: identifierPatterns, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))

@@ -188,7 +188,10 @@ extension PatternSyntax {
 }
 
 extension ExprSyntaxProtocol {
-    fileprivate func identifierPatterns(in syntaxTree: SyntaxTree) -> [IdentifierPattern]? {
+    /// Return the identifier names for this pattern declaration.
+    ///
+    /// - Returns: A single name for a simple identifier, an array of names for a decomposed tuple.
+    func identifierPatterns(in syntaxTree: SyntaxTree) -> [IdentifierPattern]? {
         switch kind {
         case .discardAssignmentExpr:
             return [IdentifierPattern(name: nil)]

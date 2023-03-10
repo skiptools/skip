@@ -386,10 +386,10 @@ class KotlinWhileLoop: KotlinStatement {
                     messages.append(.kotlinLoopOptionalBinding(optionalBinding))
                 }
             } else if let matchingCase = condition as? MatchingCase {
-                let (valueVariable, bindingVariables, caseCondition) = KotlinMatchingCase.translate(expression: matchingCase, translator: translator)
+                let (targetVariable, bindingVariables, caseCondition) = KotlinMatchingCase.translate(expression: matchingCase, translator: translator)
                 kconditions.append(caseCondition)
                 caseBindingVariables += bindingVariables
-                if valueVariable != nil {
+                if targetVariable != nil {
                     messages.append(.kotlinLoopCaseValue(matchingCase))
                 }
             } else {
