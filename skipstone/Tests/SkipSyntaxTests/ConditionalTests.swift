@@ -470,7 +470,7 @@ final class ConditionalTests: XCTestCase {
     }
 
     func testIfCase() async throws {
-        try await check(expectFailure: true, symbols: symbols, swift: """
+        try await check(symbols: symbols, swift: """
         func f(e: ConditionalTestsEnum) {
             if case .case1 = e {
                 print("A")
@@ -479,6 +479,20 @@ final class ConditionalTests: XCTestCase {
         """, kotlin: """
         internal fun f(e: ConditionalTestsEnum) {
             if (e == ConditionalTestsEnum.case1) {
+                print("A")
+            }
+        }
+        """)
+
+        try await check(symbols: symbols, swift: """
+        func f(e: ConditionalTestsAssociatedValueEnum) {
+            if case .case2 = e {
+                print("A")
+            }
+        }
+        """, kotlin: """
+        internal fun f(e: ConditionalTestsAssociatedValueEnum) {
+            if (e is ConditionalTestsAssociatedValueEnum.case2) {
                 print("A")
             }
         }

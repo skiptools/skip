@@ -165,7 +165,7 @@ public class KotlinTranslator {
             case .booleanLiteral:
                 return KotlinBooleanLiteral(expression: expression as! BooleanLiteral)
             case .casePattern:
-                break//return try KotlinCasePattern(expression: expression as! CasePattern)
+                break // Should be translated directly by parent expressions
             case .closure:
                 return KotlinClosure.translate(expression: expression as! Closure, translator: self)
             case .dictionaryLiteral:
@@ -179,7 +179,7 @@ public class KotlinTranslator {
             case .inout:
                 return KotlinInOut.translate(expression: expression as! InOut, translator: self)
             case .matchingCase:
-                break
+                return KotlinMatchingCase.translate(expression: expression as! MatchingCase, translator: self)
             case .memberAccess:
                 return KotlinMemberAccess.translate(expression: expression as! MemberAccess, translator: self)
             case .nilLiteral:

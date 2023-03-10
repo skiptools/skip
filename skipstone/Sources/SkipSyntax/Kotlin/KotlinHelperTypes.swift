@@ -35,6 +35,7 @@ extension Operator {
         case "...":
             return ".."
         default:
+            // Note that we construct operators with non-Swift symbols like 'in'
             return symbol
         }
     }

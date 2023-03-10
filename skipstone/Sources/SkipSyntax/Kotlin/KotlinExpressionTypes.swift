@@ -3,12 +3,14 @@ enum KotlinExpressionType {
     case arrayLiteral
     case binaryOperator
     case booleanLiteral
+    case casePattern
     case closure
     case dictionaryLiteral
     case functionCall
     case identifier
     case `if`
     case `inout`
+    case matchingCase
     case memberAccess
     case nullLiteral
     case numericLiteral
@@ -130,6 +132,14 @@ class KotlinBinaryOperator: KotlinExpression {
             negated =  KotlinBinaryOperator(op: Operator.with(symbol: "!=="), lhs: lhs, rhs: rhs, sourceFile: sourceFile, sourceRange: sourceRange)
         case "!==":
             negated =  KotlinBinaryOperator(op: Operator.with(symbol: "==="), lhs: lhs, rhs: rhs, sourceFile: sourceFile, sourceRange: sourceRange)
+        case "in":
+            negated =  KotlinBinaryOperator(op: Operator.with(symbol: "!in"), lhs: lhs, rhs: rhs, sourceFile: sourceFile, sourceRange: sourceRange)
+        case "!in":
+            negated =  KotlinBinaryOperator(op: Operator.with(symbol: "in"), lhs: lhs, rhs: rhs, sourceFile: sourceFile, sourceRange: sourceRange)
+        case "is":
+            negated =  KotlinBinaryOperator(op: Operator.with(symbol: "!is"), lhs: lhs, rhs: rhs, sourceFile: sourceFile, sourceRange: sourceRange)
+        case "!is":
+            negated =  KotlinBinaryOperator(op: Operator.with(symbol: "is"), lhs: lhs, rhs: rhs, sourceFile: sourceFile, sourceRange: sourceRange)
         default:
             return super.logicalNegated()
         }
@@ -481,14 +491,16 @@ class KotlinIf: KotlinExpression {
 
     struct ConditionSet {
         var optionalBindingVariable: KotlinOptionalBinding?
+        var casePatternVariables: [KotlinCasePattern.Variable]?
         var conditions: [KotlinExpression]
     }
 
     static func translate(expression: If, translator: KotlinTranslator) -> KotlinIf {
         let kconditionSets = translate(conditions: expression.conditions, translator: translator)
         // If we have optional bindings and we have an else part, we'll need an if check variable to execute
-        // the else part only if the nested ifs don't pass
-        let ifCheckVariable = kconditionSets.contains(where: { $0.optionalBindingVariable != nil }) && expression.elseBody != nil ? "letexec" : nil
+        // the else part only if the '?.let' generated for the optional binding doesn't pass. Similarly, if
+        // we have multiple condition sets representing nested conditions, we'll need an if check variable
+        let ifCheckVariable = (kconditionSets.count > 1 || kconditionSets.contains(where: { $0.optionalBindingVariable != nil })) && expression.elseBody != nil ? "letexec" : nil
         let kbody = KotlinCodeBlock.translate(statement: expression.body, translator: translator)
         let kexpression = KotlinIf(expression: expression, conditionSets: kconditionSets, body: kbody)
         kexpression.ifCheckVariable = ifCheckVariable
@@ -512,6 +524,7 @@ class KotlinIf: KotlinExpression {
     private static func translate(conditions: [Expression], isGuard: Bool = false, translator: KotlinTranslator) -> [ConditionSet] {
         var conditionSets: [ConditionSet] = []
         var currentOptionalBindingVariable: KotlinOptionalBinding? = nil
+        var currentCasePatternVariables: [KotlinCasePattern.Variable]? = nil
         var currentConditions: [KotlinExpression] = []
         func appendCurrentConditionSet() {
             guard currentOptionalBindingVariable != nil || !currentConditions.isEmpty else {
@@ -521,27 +534,32 @@ class KotlinIf: KotlinExpression {
             if isGuard {
                 conditions = conditions.map { $0.logicalNegated() }
             }
-            let conditionSet = ConditionSet(optionalBindingVariable: currentOptionalBindingVariable, conditions: conditions)
+            let conditionSet = ConditionSet(optionalBindingVariable: currentOptionalBindingVariable, casePatternVariables: currentCasePatternVariables, conditions: conditions)
             currentOptionalBindingVariable = nil
+            currentCasePatternVariables = nil
             currentConditions = []
             conditionSets.append(conditionSet)
         }
 
         for condition in conditions {
-            guard let optionalBinding = condition as? OptionalBinding, let optionalBindingVariable = KotlinOptionalBinding.translateVariable(expression: optionalBinding, translator: translator) else {
-                currentConditions.append(translator.translateExpression(condition))
-                continue
-            }
-
-            // Whenever we need an optional binding variable, create a new nested condition set for it
-            appendCurrentConditionSet()
-            currentOptionalBindingVariable = optionalBindingVariable
-            if isGuard {
-                // for ifs our call to 'value?.let' filters nils; for guards we have to add nil checks
-                currentConditions.append(translator.translateExpression(condition))
-            } else {
-                // for ifs our call to 'value?.let' can't include any other conditions
+            if let optionalBinding = condition as? OptionalBinding, let optionalBindingVariable = KotlinOptionalBinding.translateVariable(expression: optionalBinding, translator: translator) {
+                // Whenever we need an optional binding variable, create a new nested condition set for it
                 appendCurrentConditionSet()
+                currentOptionalBindingVariable = optionalBindingVariable
+                if isGuard {
+                    // for ifs our call to 'value?.let' filters nils; for guards we have to add nil checks
+                    currentConditions.append(translator.translateExpression(condition))
+                } else {
+                    // for ifs our call to 'value?.let' can't include any other conditions
+                    appendCurrentConditionSet()
+                }
+            } else if let matchingCase = condition as? MatchingCase, let casePatternVariables = KotlinCasePattern.translateVariables(expression: matchingCase.pattern, translator: translator) {
+                currentCasePatternVariables = casePatternVariables
+                currentConditions.append(translator.translateExpression(condition))
+                // Whenever we need case pattern variables, we can't include any other conditions until they're declared
+                appendCurrentConditionSet()
+            } else {
+                currentConditions.append(translator.translateExpression(condition))
             }
         }
         appendCurrentConditionSet()
@@ -565,6 +583,8 @@ class KotlinIf: KotlinExpression {
             var children: [KotlinSyntaxNode] = conditionSet.conditions
             if let optionalBindingValue = conditionSet.optionalBindingVariable?.value {
                 children.append(optionalBindingValue)
+            } else if let casePatternVariables = conditionSet.casePatternVariables {
+                children += casePatternVariables.map(\.value)
             }
             return children
         }
@@ -588,6 +608,10 @@ class KotlinIf: KotlinExpression {
             appendGuardConditionSet(conditionSet, to: output, indentation: indentation)
             output.append(body, indentation: indentation.inc())
             output.append(indentation).append("}")
+            if let casePatternVariables = conditionSet.casePatternVariables {
+                output.append("\n")
+                appendCasePatternVariables(casePatternVariables, to: output, indentation: indentation)
+            }
             if index != conditionSets.count - 1 {
                 output.append("\n").append(indentation)
             }
@@ -648,8 +672,8 @@ class KotlinIf: KotlinExpression {
         guard let kif = expressionStatement.expression as? KotlinIf else {
             return nil
         }
-        // We can't chain an else with an optional binding
-        return kif.conditionSets.contains(where: { $0.optionalBindingVariable != nil }) ? nil : kif
+        // We can't chain an else with nested conditions or with an optional binding
+        return (kif.conditionSets.count > 1 || kif.conditionSets.contains(where: { $0.optionalBindingVariable != nil })) ? nil : kif
     }
 
     private func appendIfConditionSet(_ conditionSet: ConditionSet, to output: OutputGenerator, indentation: Indentation) -> Indentation {
@@ -680,6 +704,10 @@ class KotlinIf: KotlinExpression {
             output.append(") {\n")
             indentation = indentation.inc()
         }
+        if let casePatternVariables = conditionSet.casePatternVariables {
+            appendCasePatternVariables(casePatternVariables, to: output, indentation: indentation)
+            output.append("\n")
+        }
         return indentation
     }
 
@@ -700,6 +728,15 @@ class KotlinIf: KotlinExpression {
         output.append("if (")
         conditionSet.conditions.appendAsLogicalConditions(to: output, op: .with(symbol: "||"), indentation: indentation)
         output.append(") {\n")
+    }
+
+    private func appendCasePatternVariables(_ casePatternVariables: [KotlinCasePattern.Variable], to output: OutputGenerator, indentation: Indentation) {
+        for (index, variable) in casePatternVariables.enumerated() {
+            variable.append(to: output, indentation: indentation)
+            if index != casePatternVariables.count - 1 {
+                output.append("\n")
+            }
+        }
     }
 }
 
@@ -723,6 +760,94 @@ class KotlinInOut: KotlinExpression {
     override func append(to output: OutputGenerator, indentation: Indentation) {
         output.append("InOut({ ").append(target, indentation: indentation).append(" }, { ")
         output.append(target, indentation: indentation).append(" = it })")
+    }
+}
+
+/// Helper type used to translate `MatchingCase` expressions to conditions.
+///
+/// This type is not itself a `KotlinExpression`.
+struct KotlinMatchingCase {
+    static func translate(expression: MatchingCase, translator: KotlinTranslator) -> KotlinExpression {
+        let ktarget = translator.translateExpression(expression.target)
+        let inferredType = expression.declaredType.or(expression.target.inferredType)
+        return KotlinCasePattern.translateIfCondition(expression: expression.pattern, target: ktarget, inferredType: inferredType, translator: translator)
+    }
+}
+//~~~
+//class KotlinWhenCase: KotlinExpression {
+//    var pattern: KotlinCasePattern
+//    var target: KotlinExpression
+//
+//    static func translate(expression: SwitchCase, translator: KotlinTranslator) throws -> KotlinWhenCase {
+//        let pattern = try KotlinCasePattern.translate(expression: expression.pattern, translator: translator)
+//        let target = translator.translateExpression(expression.target)
+//        return KotlinMatchingCase(pattern: pattern, target: target, expression: expression)
+//    }
+//
+//    private init(pattern: KotlinCasePattern, target: KotlinExpression, expression: MatchingCase) {
+//        self.pattern = pattern
+//        self.target = target
+//        super.init(type: .matchingCase, expression: expression)
+//    }
+//
+//    var children: [KotlinSyntaxNode] {
+//        return []
+//    }
+//}
+//~~~
+struct KotlinCasePattern {
+    struct Variable {
+        var name: String
+        var value: KotlinExpression
+        var isLet: Bool
+
+        func append(to output: OutputGenerator, indentation: Indentation) {
+            output.append(indentation).append("\(isLet ? "let" : "var") \(name) = ").append(value, indentation: indentation)
+        }
+    }
+
+    static func translateIfCondition(expression: CasePattern, target: KotlinExpression, inferredType: TypeSignature, translator: KotlinTranslator) -> KotlinExpression {
+        var isAssociatedValuesEnum = false
+        if case .named(let typeName, _) = inferredType.asOptional(false) {
+            isAssociatedValuesEnum = translator.codebaseInfo?.enumHasAssociatedValues(qualifiedName: typeName) == true
+        }
+
+        var value: KotlinExpression
+        var op = Operator.with(symbol: isAssociatedValuesEnum ? "is" : "==")
+        switch expression.value.type {
+        case .binaryOperator:
+            value = translator.translateExpression(expression.value)
+            if (expression.value as! BinaryOperator).op.precedence == .range {
+                op = Operator.with(symbol: "in")
+            }
+        case .functionCall:
+            // .enum(let value)
+            let functionCall = expression.value as! FunctionCall
+            if functionCall.function.type == .memberAccess {
+                value = translator.translateExpression(functionCall.function)
+            } else {
+                value = translator.translateExpression(functionCall)
+            }
+        default:
+            value = translator.translateExpression(expression.value)
+        }
+        return KotlinBinaryOperator(op: op, lhs: target, rhs: value, sourceFile: expression.sourceFile, sourceRange: expression.sourceRange)
+    }
+
+    /// If the given pattern requires us to declare new Kotlin variables, return them.
+    static func translateVariables(expression: CasePattern, translator: KotlinTranslator) -> [Variable]? {
+        return nil
+//        let kvalue: KotlinExpression
+//        if let value = expression.value {
+//            kvalue = translator.translateExpression(value).sref()
+//        } else if let name = expression.names[0] {
+//            let identifier = KotlinIdentifier(name: name)
+//            identifier.mayBeSharedMutableStruct = expression.variableTypes.first?.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo) ?? false
+//            kvalue = identifier.sref()
+//        } else {
+//            return nil
+//        }
+//        return KotlinOptionalBinding(names: expression.names, value: kvalue, isLet: expression.isLet)
     }
 }
 
@@ -860,7 +985,6 @@ class KotlinNumericLiteral: KotlinExpression {
 /// - Note: This type is used to translate the ``OptionalBinding`` expression, but is not itself a `KotlinExpression`.
 struct KotlinOptionalBinding {
     var names: [String?]
-    var declaredType: TypeSignature?
     var value: KotlinExpression
     var isLet: Bool
 
@@ -893,7 +1017,7 @@ struct KotlinOptionalBinding {
         } else {
             return nil
         }
-        return KotlinOptionalBinding(names: expression.names, declaredType: expression.declaredType, value: kvalue, isLet: expression.isLet)
+        return KotlinOptionalBinding(names: expression.names, value: kvalue, isLet: expression.isLet)
     }
 
     private static func requiresVariable(expression: OptionalBinding) -> Bool {

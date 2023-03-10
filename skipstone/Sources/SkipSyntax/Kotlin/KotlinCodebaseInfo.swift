@@ -192,10 +192,7 @@ public class KotlinCodebaseInfo {
                     return info.hasAssociatedValues
                 }
             }
-            guard let symbols else {
-                return false
-            }
-            return symbols.enumHasAssociatedValues(qualifiedName: qualifiedName) == true
+            return symbols?.enumHasAssociatedValues(qualifiedName: qualifiedName) == true
         }
     }
 
