@@ -21,8 +21,8 @@ private class IdentifiersVisitor {
             renamedIdentifiersStack.append([:])
             return .recurse({ _ in self.renamedIdentifiersStack.removeLast() })
         } else if let identifier = node as? KotlinIdentifier {
-            if let optionalBindingVariableName = optionalBindingVariableName(for: identifier.name) {
-                identifier.name = optionalBindingVariableName
+            if let bindingVariableName = bindingVariableName(for: identifier.name) {
+                identifier.name = bindingVariableName
             }
             return .skip
         } else if let kif = node as? KotlinIf {
@@ -37,18 +37,27 @@ private class IdentifiersVisitor {
             } else if kif.isGuard {
                 // Visit the guard body without the new bindings
                 kif.body.visit(perform: self.visit)
-                // Visit conditions and gather bindings.
+                // Visit conditions and gather bindings. Reference conditionSets[i].xxx to mutate structs without manually resetting them
                 var renamedIdentifiers: [String: String] = [:]
                 for i in 0..<kif.conditionSets.count {
                     // As we evaluate each condition set we must allow it to access previous condition set bindings
-                    if let optionalBindingVariable = kif.conditionSets[i].optionalBindingVariable {
+                    if kif.conditionSets[i].optionalBindingVariable != nil || !kif.conditionSets[i].caseBindingVariables.isEmpty {
                         renamedIdentifiersStack.append(renamedIdentifiers)
-                        optionalBindingVariable.value.visit(perform: self.visit)
+                        kif.conditionSets[i].optionalBindingVariable?.value.visit(perform: self.visit)
+                        kif.conditionSets[i].caseBindingVariables.forEach { $0.value.visit(perform: self.visit) }
                         renamedIdentifiersStack.removeLast()
 
-                        let names = optionalBindingVariable.names.map { newOptionalBindingVariableName(name: $0) }
-                        kif.conditionSets[i].optionalBindingVariable?.names = names
-                        renamedIdentifiers.merge(zip(optionalBindingVariable.names.compactMap { $0 }, names.compactMap { $0 })) { _, new in new }
+                        if let optionalBindingVariable = kif.conditionSets[i].optionalBindingVariable {
+                            let names = optionalBindingVariable.names.map { newBindingVariableName(name: $0) }
+                            kif.conditionSets[i].optionalBindingVariable?.names = names
+                            renamedIdentifiers.merge(zip(optionalBindingVariable.names.compactMap { $0 }, names.compactMap { $0 })) { _, new in new }
+                        }
+                        for j in 0..<kif.conditionSets[i].caseBindingVariables.count {
+                            let caseBindingVariable = kif.conditionSets[i].caseBindingVariables[j]
+                            let names = caseBindingVariable.names.map { newBindingVariableName(name: $0) }
+                            kif.conditionSets[i].caseBindingVariables[j].names = names
+                            renamedIdentifiers.merge(zip(caseBindingVariable.names.compactMap { $0 }, names.compactMap { $0 })) { _, new in new }
+                        }
                     }
                     renamedIdentifiersStack.append(renamedIdentifiers)
                     kif.conditionSets[i].conditions.forEach { $0.visit(perform: self.visit) }
@@ -69,7 +78,7 @@ private class IdentifiersVisitor {
 
     private var ifCheckCount = 0
     private var caseTargetCount = 0
-    private var optionalBindingCounts: [String: Int] = [:]
+    private var bindingCounts: [String: Int] = [:]
 
     private func newIfCheckVariableName() -> String {
         let name = "letexec_\(ifCheckCount)"
@@ -83,21 +92,21 @@ private class IdentifiersVisitor {
         return name
     }
 
-    private func newOptionalBindingVariableName(name: String?) -> String? {
+    private func newBindingVariableName(name: String?) -> String? {
         guard let name else {
             return nil
         }
-        if var count = optionalBindingCounts[name] {
+        if var count = bindingCounts[name] {
             count += 1
-            optionalBindingCounts[name] = count
+            bindingCounts[name] = count
             return "\(name)_\(count)"
         } else {
-            optionalBindingCounts[name] = 0
+            bindingCounts[name] = 0
             return "\(name)_0"
         }
     }
 
-    private func optionalBindingVariableName(for identifier: String) -> String? {
+    private func bindingVariableName(for identifier: String) -> String? {
         for renamedIdentifiers in renamedIdentifiersStack.reversed() {
             if let name = renamedIdentifiers[identifier] {
                 return name

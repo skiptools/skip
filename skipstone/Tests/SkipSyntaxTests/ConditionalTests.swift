@@ -870,8 +870,8 @@ final class ConditionalTests: XCTestCase {
             print("no")
             return
         }
-        var s = matchtarget_0.associated1
-        print(s)
+        var s_0 = matchtarget_0.associated1
+        print(s_0)
         """)
     }
 
@@ -888,13 +888,13 @@ final class ConditionalTests: XCTestCase {
             print("no")
             return
         }
-        val i = matchtarget_0.associated0
-        val s = matchtarget_0.associated1
-        if (i <= 10) {
+        val i_0 = matchtarget_0.associated0
+        val s_0 = matchtarget_0.associated1
+        if (i_0 <= 10) {
             print("no")
             return
         }
-        print(s)
+        print(s_0)
         """)
     }
 }
