@@ -80,6 +80,21 @@ final class LoopTests: XCTestCase {
         """)
     }
 
+    func testWhileCase() async throws {
+        try await check(symbols: symbols, swift: """
+        let e: LoopTestsAssociatedValueEnum
+        while case .case2(let i, _) = e {
+            print(i)
+        }
+        """, kotlin: """
+        internal val e: LoopTestsAssociatedValueEnum
+        while (e is LoopTestsAssociatedValueEnum.case2) {
+            val i = e.associated0
+            print(i)
+        }
+        """)
+    }
+
     func testForLoop() async throws {
         try await check(swift: """
         for i in [1, 2, 3] {
@@ -264,4 +279,9 @@ final class LoopTests: XCTestCase {
         }
         XCTAssertEqual([1, 2, 3], result)
     }
+}
+
+private enum LoopTestsAssociatedValueEnum {
+    case case1
+    case case2(Int, String)
 }

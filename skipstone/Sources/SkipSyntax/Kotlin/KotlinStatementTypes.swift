@@ -423,8 +423,8 @@ class KotlinWhileLoop: KotlinStatement {
             output.append(") {\n")
             let bodyIndentation = indentation.inc()
             for caseBindingVariable in caseBindingVariables {
-                output.append(indentation)
-                caseBindingVariable.append(to: output, indentation: indentation)
+                output.append(bodyIndentation)
+                caseBindingVariable.append(to: output, indentation: bodyIndentation)
                 output.append("\n")
             }
             output.append(body, indentation: bodyIndentation)
