@@ -9,7 +9,7 @@ import TSCLibc
 import OSLog
 
 /// The current version of the tool
-public let skipVersion = "0.0.52"
+public let skipVersion = "0.0.53"
 
 struct Options {
     var preprocessorSymbols: [String] = []
@@ -400,12 +400,12 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         let transpilation: Transpilation
 
         var description: String {
-            "transpilation: " + transpilation.sourceFile.url.lastPathComponent + " " + byteCount(for: transpilation)
+            "transpilation: " + transpilation.sourceFile.url.lastPathComponent
         }
     }
 
-    static func byteCount(for transpilation: Transpilation) -> String {
-        ByteCountFormatter.string(fromByteCount: .init(transpilation.output.content.count), countStyle: .file)
+    static func byteCount(for size: Int) -> String {
+        ByteCountFormatter.string(fromByteCount: .init(size), countStyle: .file)
     }
 
     func performCommand(with continuation: AsyncThrowingStream<OutputMessage, Error>.Continuation) async throws {
@@ -418,8 +418,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         if let moduleName = moduleNames.first {
             let symbolsGraph = try await SkipSystem.extractSymbolGraph(moduleFolder: symbolFolder, moduleNames: moduleNames, from: URL.moduleBuildFolder)
             symbols = Symbols(moduleName: moduleName, graphs: symbolsGraph.unifiedGraphs)
-
-            info("symbols: \(symbolsGraph.unifiedGraphs.first?.value.symbols.count ?? -1)")
+            info("symbols: \(symbolsGraph.unifiedGraphs.keys.sorted())")
         } else {
             info("no modules specified; symbols will not be used")
             symbols = nil
@@ -431,16 +430,19 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             for message in transpilation.messages {
                 continuation.yield(.init(message))
             }
-            info("transpiled from: \(transpilation.sourceFile.path)", sourceFile: transpilation.sourceFile)
-
             trace(transpilation.output.content)
+
+            let sourceSize = (try? transpilation.sourceFile.url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+
+            info("transpiled from: \(transpilation.sourceFile.url.lastPathComponent) (\(Self.byteCount(for: sourceSize)))", sourceFile: transpilation.sourceFile)
+
             if let outputFolder = transpileOptions.outputFolder {
                 let outputFolderURL = URL(fileURLWithPath: outputFolder, isDirectory: true)
                 try FileManager.default.createDirectory(at: outputFolderURL, withIntermediateDirectories: true)
                 let outputFileName = transpilation.sourceFile.url.deletingPathExtension().appendingPathExtension("kt").lastPathComponent
                 let outputFile = outputFolderURL.appendingPathComponent(outputFileName)
                 try transpilation.output.content.write(to: outputFile, atomically: false, encoding: .utf8)
-                info("transpiled to: \(outputFile.path) (\(Self.byteCount(for: transpilation)))", sourceFile: Source.File(path: outputFile.path))
+                info("transpiled to: \(outputFile.lastPathComponent) (\(Self.byteCount(for: transpilation.output.content.utf8.count)))", sourceFile: Source.File(path: outputFile.path))
             }
             let output = Output(transpilation: transpilation)
             

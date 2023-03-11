@@ -3,14 +3,6 @@ import XCTest
 import TSCBasic
 
 final class SkipAssemberTests: XCTestCase {
-    func testKotlinScripting() async throws {
-        let three = try await SkipSystem.kotlinc(script: "1+2")
-        XCTAssertEqual("3", three)
-
-        let x2 = try await SkipSystem.kotlinc(script: "\"x\"+2")
-        XCTAssertEqual("x2", x2)
-    }
-
     public func testFileSystem() async throws {
         try fileSystemTest(fs: InMemoryFileSystem())
         try fileSystemTest(fs: localFileSystem)
@@ -56,6 +48,15 @@ final class SkipAssemberTests: XCTestCase {
         try fs.removeFileTree(tmpRoot)
     }
 
+    func testKotlinScripting() async throws {
+        let three = try await SkipSystem.kotlinc(script: "1+2")
+        XCTAssertEqual("3", three)
+
+        let x2 = try await SkipSystem.kotlinc(script: "\"x\"+2")
+        XCTAssertEqual("x2", x2)
+    }
+
+
     func testKotlinJSConversion() async throws {
         @Sendable @discardableResult func check(_ kotlin: String, _ expected: String, file: StaticString = #file, line: UInt = #line) async throws -> String {
             let js = try await SkipSystem.kotlinToJS(kotlin)
@@ -72,8 +73,8 @@ final class SkipAssemberTests: XCTestCase {
           }
         """)
 
-        // the remaining checks work, but they are slow since they involve forking the compiler for each individual check
-        return;
+//        // the remaining checks work, but they are slow since they involve forking the compiler for each individual check
+//        return;
 
 
         try await check(#"fun someFunction(arg: Int = 1) { "returnString" }"#, """

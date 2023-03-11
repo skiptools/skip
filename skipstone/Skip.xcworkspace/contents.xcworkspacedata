@@ -13,4 +13,7 @@
    <FileRef
       location = "group:../cross-bow">
    </FileRef>
+   <FileRef
+      location = "group:../../marcprux/universal">
+   </FileRef>
 </Workspace>
