@@ -1530,8 +1530,8 @@ class KotlinWhen: KotlinExpression {
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
         if let caseTargetVariable {
-            output.append(caseTargetVariable.identifier, indentation: indentation).append(" = ").append(caseTargetVariable.value, indentation: indentation).append("\n")
-            output.append(indentation)
+            caseTargetVariable.append(to: output, indentation: indentation)
+            output.append("\n").append(indentation)
         }
         var whenIndentation = indentation
         if hasBreakLabel {

@@ -111,9 +111,12 @@ class KotlinCodeBlock: KotlinStatement {
                 case .break:
                     if convertBreak, let label {
                         let breakStatement = statement as! KotlinBreak
-                        breakStatement.label = label
-                        breakStatement.asReturn = true
-                        return .skip
+                        if breakStatement.label == nil {
+                            breakStatement.label = label
+                            breakStatement.asReturn = true
+                            didFindReturn = true
+                            return .skip
+                        }
                     }
                 case .functionDeclaration:
                     // Skip embedded functions that may have their own returns
@@ -1148,7 +1151,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         output.append(indentation)
         if let declaration = extras?.declaration {
             output.append(declaration)
-        } else if names.count == 1 && names[0] == "_" {
+        } else if names.count == 1 && names[0] == nil {
             // Kotlin doesn't support assignment to wildcard
             if let value {
                 output.append(value, indentation: indentation).append("\n")
