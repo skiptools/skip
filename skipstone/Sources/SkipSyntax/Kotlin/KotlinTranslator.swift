@@ -199,9 +199,9 @@ public class KotlinTranslator {
             case .subscript:
                 return KotlinSubscript.translate(expression: expression as! Subscript, translator: self)
             case .switch:
-                break
+                return KotlinWhen.translate(expression: expression as! Switch, translator: self)
             case .switchCase:
-                break
+                break // Should be translated directly by parent expression
             case .ternaryOperator:
                 return KotlinTernaryOperator.translate(expression: expression as! TernaryOperator, translator: self)
             case .try:

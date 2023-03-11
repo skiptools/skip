@@ -14,7 +14,7 @@ public class KotlinCodebaseInfo {
             // NOTE: Keep the struct plugin first because it adds members that may need processing by subsequent plugins
             KotlinStructPlugin(),
             KotlinConstructorPlugin(),
-            KotlinIfPlugin(),
+            KotlinIfWhenPlugin(),
             KotlinSwiftUIPlugin()
         ]
     }

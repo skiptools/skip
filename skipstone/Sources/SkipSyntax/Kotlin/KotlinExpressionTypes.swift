@@ -25,6 +25,7 @@ enum KotlinExpressionType {
     case `try`
     case tupleLiteral
     case typeLiteral
+    case when
 
     case raw
 }
@@ -1461,25 +1462,106 @@ class KotlinTypeLiteral: KotlinExpression {
     }
 }
 
-//~~~
-//class KotlinWhenCase: KotlinExpression {
-//    var pattern: KotlinCasePattern
-//    var target: KotlinExpression
-//
-//    static func translate(expression: SwitchCase, translator: KotlinTranslator) throws -> KotlinWhenCase {
-//        let pattern = try KotlinCasePattern.translate(expression: expression.pattern, translator: translator)
-//        let target = translator.translateExpression(expression.target)
-//        return KotlinMatchingCase(pattern: pattern, target: target, expression: expression)
-//    }
-//
-//    private init(pattern: KotlinCasePattern, target: KotlinExpression, expression: MatchingCase) {
-//        self.pattern = pattern
-//        self.target = target
-//        super.init(type: .matchingCase, expression: expression)
-//    }
-//
-//    var children: [KotlinSyntaxNode] {
-//        return []
-//    }
-//}
-//~~~
+class KotlinWhen: KotlinExpression {
+    static let breakLabel = "wlabel"
+
+    var on: KotlinExpression
+    var cases: [Case]
+    var caseTargetVariable: KotlinCasePattern.TargetVariable?
+    var hasBreakLabel = false
+
+    struct Case {
+        var patterns: [KotlinExpression]
+        var caseBindingVariables: [KotlinBindingVariable]
+        var body: KotlinCodeBlock
+    }
+
+    static func translate(expression: Switch, translator: KotlinTranslator) -> KotlinWhen {
+        var kon = translator.translateExpression(expression.on)
+        var caseTargetVariable: KotlinCasePattern.TargetVariable? = nil
+        var cases: [Case] = []
+        var hasBreakLabel = false
+        var messages: [Message] = []
+        for switchCase in expression.cases {
+            let caseValues: [(KotlinExpression, [KotlinBindingVariable])] = switchCase.patterns.map { pattern in
+                if let whereGuard = pattern.whereGuard {
+                    messages.append(.kotlinWhenCaseWhere(whereGuard))
+                }
+                let (targetVariable, bindingVariables, condition) = KotlinCasePattern.translate(expression: pattern.pattern, target: caseTargetVariable?.identifier ?? kon, inferredType: expression.on.inferredType, translator: translator)
+                // If we find a case that requires a target variable, use it for the entire switch
+                if caseTargetVariable == nil && targetVariable != nil {
+                    caseTargetVariable = targetVariable
+                    kon = targetVariable!.identifier
+                }
+                // Change conditions of the form 'target == x' to just 'x', and the form 'target is/in/etc x' to just 'is/in/etc x'
+                var kpattern = condition
+                if let binaryOperator = condition as? KotlinBinaryOperator {
+                    if binaryOperator.op.symbol == "==" {
+                        kpattern = binaryOperator.rhs
+                    } else {
+                        kpattern = KotlinPrefixOperator(operatorSymbol: "\(binaryOperator.op.symbol) ", target: binaryOperator.rhs)
+                    }
+                }
+                return (kpattern, bindingVariables)
+            }
+            let kbody = KotlinCodeBlock.translate(statement: switchCase.body, translator: translator)
+            // Kotlin doesn't support break in when cases, so wrap the when in a closure and return to its label
+            if kbody.updateWithExpectedReturn(.labelIfBreak(breakLabel)) {
+                hasBreakLabel = true
+            }
+            cases.append(Case(patterns: caseValues.map(\.0), caseBindingVariables: caseValues.flatMap(\.1), body: kbody))
+        }
+        let kexpression = KotlinWhen(expression: expression, on: kon, cases: cases)
+        kexpression.caseTargetVariable = caseTargetVariable
+        kexpression.messages = messages
+        kexpression.hasBreakLabel = hasBreakLabel
+        return kexpression
+    }
+
+    private init(expression: Switch, on: KotlinExpression, cases: [Case]) {
+        self.on = on
+        self.cases = cases
+        super.init(type: .when, expression: expression)
+    }
+
+    override var children: [KotlinSyntaxNode] {
+        return [on] + cases.flatMap { $0.patterns + [$0.body] }
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        if let caseTargetVariable {
+            output.append(caseTargetVariable.identifier, indentation: indentation).append(" = ").append(caseTargetVariable.value, indentation: indentation).append("\n")
+            output.append(indentation)
+        }
+        var whenIndentation = indentation
+        if hasBreakLabel {
+            whenIndentation = whenIndentation.inc()
+            output.append("linvoke ").append(Self.breakLabel).append("@{\n")
+            output.append(whenIndentation)
+        }
+        output.append("when (").append(on, indentation: whenIndentation).append(") {\n")
+        let caseIndentation = whenIndentation.inc()
+        cases.forEach { append($0, to: output, indentation: caseIndentation) }
+        output.append(whenIndentation).append("}")
+        if hasBreakLabel {
+            output.append("\n").append(indentation).append("}")
+        }
+    }
+
+    private func append(_ whenCase: Case, to output: OutputGenerator, indentation: Indentation) {
+        output.append(indentation)
+        if whenCase.patterns.isEmpty {
+            output.append("else")
+        } else {
+            for (index, pattern) in whenCase.patterns.enumerated() {
+                output.append(pattern, indentation: indentation)
+                if index != whenCase.patterns.count - 1 {
+                    output.append(", ")
+                }
+            }
+        }
+        output.append(" -> {\n")
+        output.append(whenCase.body, indentation: indentation.inc())
+        output.append(indentation).append("}\n")
+    }
+}

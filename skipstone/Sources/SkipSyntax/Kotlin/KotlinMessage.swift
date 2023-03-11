@@ -105,4 +105,8 @@ extension Message {
     static func kotlinViewBuilderUnsupportedStatement(_ sourceDerived: SourceDerived) -> Message {
         return Message(kind: .error, message: "This Swift construct is not supported within a @ViewBuilder when translating to Kotlin UI", sourceDerived: sourceDerived)
     }
+
+    static func kotlinWhenCaseWhere(_ sourceDerived: SourceDerived) -> Message {
+        return Message(kind: .error, message: "Kotlin does not where conditions in case matches. Consider using an if statement within the case body", sourceDerived: sourceDerived)
+    }
 }

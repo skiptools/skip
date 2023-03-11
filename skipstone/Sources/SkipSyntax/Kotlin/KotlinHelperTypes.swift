@@ -6,6 +6,8 @@ enum KotlinExpectedReturn {
     case yes
     /// If any returns are present, given them the given label.
     case labelIfPresent(String)
+    /// Convert break statements to returns with the given label.
+    case labelIfBreak(String)
     /// Call `sref` on returned values with the given `onUpdate` code.
     case sref(String?)
 }

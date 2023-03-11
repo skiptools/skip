@@ -1,7 +1,7 @@
-/// Update variables declared in `if` and `guard` statements to prevent shadowing locals and each other.
+/// Update variables declared in `if`, `guard`, and `when` statements to prevent shadowing locals and each other.
 ///
-/// - Seealso: ``KotlinIf``
-class KotlinIfPlugin: KotlinPlugin {
+/// - Seealso: ``KotlinIf``, ``KotlinWhen``
+class KotlinIfWhenPlugin: KotlinPlugin {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
         let identifiersVisitor = IdentifiersVisitor()
         syntaxTree.root.visit(perform: identifiersVisitor.visit)
@@ -71,6 +71,11 @@ private class IdentifiersVisitor {
             } else {
                 return .recurse(nil)
             }
+        } else if let kwhen = node as? KotlinWhen {
+            if let caseTargetVariable = kwhen.caseTargetVariable {
+                caseTargetVariable.identifier.name = newCaseTargetVariableName()
+            }
+            return .recurse(nil)
         } else {
             return .recurse(nil)
         }

@@ -27,6 +27,7 @@ enum KotlinStatementType {
 
 class KotlinBreak: KotlinStatement {
     var label: String?
+    var asReturn = false
 
     init(statement: Break) {
         self.label = statement.label
@@ -34,7 +35,12 @@ class KotlinBreak: KotlinStatement {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
-        output.append(indentation).append("break")
+        output.append(indentation)
+        if asReturn {
+            output.append("return")
+        } else {
+            output.append("break")
+        }
         if let label {
             output.append("@\(label)")
         }
@@ -68,6 +74,7 @@ class KotlinCodeBlock: KotlinStatement {
         var sref = false
         var returnRequired = false
         var onUpdate: String? = nil
+        var convertBreak = false
         switch expectedReturn {
         case .no:
             // Don't shortcut and return here because we need to return whether any return statements were found
@@ -76,6 +83,9 @@ class KotlinCodeBlock: KotlinStatement {
             returnRequired = true
         case .labelIfPresent(let l):
             label = l
+        case .labelIfBreak(let l):
+            label = l
+            convertBreak = true
         case .sref(let update):
             onUpdate = update
             sref = true
@@ -86,19 +96,33 @@ class KotlinCodeBlock: KotlinStatement {
         visit { node in
             if let statement = node as? KotlinStatement {
                 switch statement.type {
+                case .return:
+                    if !convertBreak {
+                        let returnStatement = statement as! KotlinReturn
+                        didFindReturn = true
+                        if let label {
+                            returnStatement.label = label
+                        }
+                        if sref {
+                            returnStatement.expression = returnStatement.expression?.sref(onUpdate: onUpdate)
+                        }
+                        return .skip
+                    }
+                case .break:
+                    if convertBreak, let label {
+                        let breakStatement = statement as! KotlinBreak
+                        breakStatement.label = label
+                        breakStatement.asReturn = true
+                        return .skip
+                    }
                 case .functionDeclaration:
                     // Skip embedded functions that may have their own returns
                     return .skip
-                case .return:
-                    let returnStatement = statement as! KotlinReturn
-                    didFindReturn = true
-                    if let label {
-                        returnStatement.label = label
+                case .forLoop, .whileLoop:
+                    // Skip loops that may have their own breaks
+                    if convertBreak {
+                        return .skip
                     }
-                    if sref {
-                        returnStatement.expression = returnStatement.expression?.sref(onUpdate: onUpdate)
-                    }
-                    return .skip
                 default:
                     break
                 }
