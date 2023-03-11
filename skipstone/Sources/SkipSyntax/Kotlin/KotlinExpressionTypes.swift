@@ -1561,7 +1561,13 @@ class KotlinWhen: KotlinExpression {
             }
         }
         output.append(" -> {\n")
-        output.append(whenCase.body, indentation: indentation.inc())
+        let bodyIndentation = indentation.inc()
+        for caseBindingVariable in whenCase.caseBindingVariables {
+            output.append(bodyIndentation)
+            caseBindingVariable.append(to: output, indentation: bodyIndentation)
+            output.append("\n")
+        }
+        output.append(whenCase.body, indentation: bodyIndentation)
         output.append(indentation).append("}\n")
     }
 }

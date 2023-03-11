@@ -50,4 +50,16 @@ final class ExpressionTests: XCTestCase {
         }
         """)
     }
+
+    func testWildcardVariable() async throws {
+        try await check(swift: """
+        func f() -> Int {
+            let _ = f()
+        }
+        """, kotlin: """
+        internal fun f(): Int {
+            f()
+        }
+        """)
+    }
 }

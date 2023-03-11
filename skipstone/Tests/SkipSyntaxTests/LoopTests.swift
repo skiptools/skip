@@ -167,6 +167,18 @@ final class LoopTests: XCTestCase {
         """)
     }
 
+    func testForLoopWildcard() async throws {
+        try await check(swift: """
+        for _ in 1...100 {
+            doSomething()
+        }
+        """, kotlin: """
+        for (unusedbinding in 1 .. 100) {
+            doSomething()
+        }
+        """)
+    }
+
     func testForLoopVarBinding() async throws {
         try await check(swift: """
         for var i in [1, 2, 3] {
@@ -197,7 +209,7 @@ final class LoopTests: XCTestCase {
         """)
     }
 
-    func testForCase() {
+    func testForLoopCase() {
         XCTExpectFailure()
         XCTFail("TODO: Test for case loops")
     }

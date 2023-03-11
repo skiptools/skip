@@ -286,12 +286,17 @@ class KotlinForLoop: KotlinStatement {
         let identifierNames = identifierPatterns.map {
             return $0.name != nil && $0.isVar ? "\($0.name!)_0" : $0.name
         }
-        if identifierNames.count > 1 {
-            output.append("(")
-        }
-        output.append(identifierNames.map { $0 ?? "_" }.joined(separator: ", "))
-        if identifierNames.count > 1 {
-            output.append(")")
+        // Kotlin does not allow a wildcard loop var
+        if identifierNames.count == 1 && identifierNames[0] == nil {
+            output.append("unusedbinding")
+        } else {
+            if identifierNames.count > 1 {
+                output.append("(")
+            }
+            output.append(identifierNames.map { $0 ?? "_" }.joined(separator: ", "))
+            if identifierNames.count > 1 {
+                output.append(")")
+            }
         }
         output.append(" in ")
         output.append(sequence.sref(), indentation: indentation)
@@ -1143,6 +1148,11 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         output.append(indentation)
         if let declaration = extras?.declaration {
             output.append(declaration)
+        } else if names.count == 1 && names[0] == "_" {
+            // Kotlin doesn't support assignment to wildcard
+            if let value {
+                output.append(value, indentation: indentation).append("\n")
+            }
         } else {
             if isProperty || isGlobal {
                 // We can't override stored properties in Swift, so only need to mark open if computed
