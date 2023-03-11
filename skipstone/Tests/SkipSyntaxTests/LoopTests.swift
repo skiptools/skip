@@ -197,6 +197,11 @@ final class LoopTests: XCTestCase {
         """)
     }
 
+    func testForCase() {
+        XCTExpectFailure()
+        XCTFail("TODO: Test for case loops")
+    }
+
     func testBreak() async throws {
         try await check(swift: """
         for i in [1, 2, 3] {
