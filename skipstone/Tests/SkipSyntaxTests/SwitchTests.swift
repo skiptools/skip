@@ -207,9 +207,66 @@ final class SwitchTests: XCTestCase {
         """)
     }
 
-    func testIsAs() {
-        XCTExpectFailure()
-        XCTFail("TODO: is and as cast tests")
+    func testIs() async throws {
+        try await check(swift: """
+        {
+            let a: Any
+            switch a {
+            case is Int:
+                print("Int")
+            case is Double:
+                print("Double")
+            default:
+                print("default")
+            }
+        }
+        """, kotlin: """
+        {
+            val a: Any
+            when (a) {
+                is Int -> {
+                    print("Int")
+                }
+                is Double -> {
+                    print("Double")
+                }
+                else -> {
+                    print("default")
+                }
+            }
+        }
+        """)
+    }
+
+    func testAsBinding() async throws {
+//        try await check(swift: """
+//        {
+//            let a: Any
+//            switch a {
+//            case let i as Int:
+//                print(i)
+//            case let d as Double:
+//                print(d)
+//            default:
+//                print("default")
+//            }
+//        }
+//        """, kotlin: """
+//        {
+//            val a: Any
+//            when (a) {
+//                is Int -> {
+//                    print("Int")
+//                }
+//                is Double -> {
+//                    print("Double")
+//                }
+//                else -> {
+//                    print("default")
+//                }
+//            }
+//        }
+//        """)
     }
 
     func testOptionals() {

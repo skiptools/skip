@@ -1096,14 +1096,19 @@ class PrefixOperator: Expression {
     }
 
     override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
-        guard syntax.kind == .prefixOperatorExpr, let prefixOperatorExpr = syntax.as(PrefixOperatorExprSyntax.self) else {
+        if syntax.kind == .prefixOperatorExpr, let prefixOperatorExpr = syntax.as(PrefixOperatorExprSyntax.self) {
+            let target = ExpressionDecoder.decode(syntax: prefixOperatorExpr.postfixExpression, in: syntaxTree)
+            guard let operatorSymbol = prefixOperatorExpr.operatorToken?.text else {
+                return target
+            }
+            return PrefixOperator(operatorSymbol: operatorSymbol, target: target, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+        } else if syntax.kind == .isTypePattern, let isTypeExpr = syntax.as(IsTypePatternSyntax.self) {
+            let typeSignature = TypeSignature.for(syntax: isTypeExpr.type)
+            let target = TypeLiteral(literal: typeSignature, syntax: isTypeExpr.type, sourceFile: syntaxTree.source.file, sourceRange: isTypeExpr.type.range(in: syntaxTree.source))
+            return PrefixOperator(operatorSymbol: "is", target: target, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+        } else {
             return nil
         }
-        let target = ExpressionDecoder.decode(syntax: prefixOperatorExpr.postfixExpression, in: syntaxTree)
-        guard let operatorSymbol = prefixOperatorExpr.operatorToken?.text else {
-            return target
-        }
-        return PrefixOperator(operatorSymbol: operatorSymbol, target: target, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
