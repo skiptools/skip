@@ -19,7 +19,7 @@ enum ExpressionType: CaseIterable {
     case numericLiteral
     case optionalBinding
     case parenthesized
-    case postfixOptionalOperator
+    case postfixOperator
     case prefixOperator
     case stringLiteral
     case `subscript`
@@ -70,8 +70,8 @@ enum ExpressionType: CaseIterable {
             return OptionalBinding.self
         case .parenthesized:
             return Parenthesized.self
-        case .postfixOptionalOperator:
-            return PostfixOptionalOperator.self
+        case .postfixOperator:
+            return PostfixOperator.self
         case .prefixOperator:
             return PrefixOperator.self
         case .stringLiteral:
@@ -1028,30 +1028,33 @@ class Parenthesized: Expression {
     }
 }
 
-/// `x!` or `x?`
-class PostfixOptionalOperator: Expression {
-    let isForcedUnwrap: Bool
+/// `x?`, `x...`, etc
+class PostfixOperator: Expression {
+    let operatorSymbol: String
     let target: Expression
 
-    init(isForcedUnwrap: Bool, target: Expression, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
-        self.isForcedUnwrap = isForcedUnwrap
+    init(operatorSymbol: String, target: Expression, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+        self.operatorSymbol = operatorSymbol
         self.target = target
-        super.init(type: .postfixOptionalOperator, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
+        super.init(type: .postfixOperator, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
     override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
-        let isForcedUnwrap: Bool
+        let operatorSymbol: String
         let target: Expression
         if syntax.kind == .forcedValueExpr, let forcedValueExpr = syntax.as(ForcedValueExprSyntax.self) {
-            isForcedUnwrap = true
+            operatorSymbol = "!"
             target = ExpressionDecoder.decode(syntax: forcedValueExpr.expression, in: syntaxTree)
         } else if syntax.kind == .optionalChainingExpr, let optionalChainingExpr = syntax.as(OptionalChainingExprSyntax.self) {
-            isForcedUnwrap = false
+            operatorSymbol = "?"
             target = ExpressionDecoder.decode(syntax: optionalChainingExpr.expression, in: syntaxTree)
+        } else if syntax.kind == .postfixUnaryExpr, let postfixExpr = syntax.as(PostfixUnaryExprSyntax.self) {
+            operatorSymbol = postfixExpr.operatorToken.text
+            target = ExpressionDecoder.decode(syntax: postfixExpr.expression, in: syntaxTree)
         } else {
             return nil
         }
-        return PostfixOptionalOperator(isForcedUnwrap: isForcedUnwrap, target: target, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+        return PostfixOperator(operatorSymbol: operatorSymbol, target: target, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
@@ -1060,7 +1063,16 @@ class PostfixOptionalOperator: Expression {
     }
 
     override var inferredType: TypeSignature {
-        return target.inferredType.asOptional(!isForcedUnwrap)
+        switch operatorSymbol {
+        case "!":
+            return target.inferredType.asOptional(false)
+        case "?":
+            return target.inferredType.asOptional(true)
+        case "...":
+            return .range(target.inferredType)
+        default:
+            return target.inferredType
+        }
     }
 
     override var children: [SyntaxNode] {
@@ -1068,11 +1080,11 @@ class PostfixOptionalOperator: Expression {
     }
 
     override var prettyPrintAttributes: [PrettyPrintTree] {
-        return [isForcedUnwrap ? "!" : "?"]
+        return [PrettyPrintTree(root: operatorSymbol)]
     }
 }
 
-/// `!x`
+/// `!x`, `..<x`, etc
 class PrefixOperator: Expression {
     let operatorSymbol: String
     let target: Expression
@@ -1100,7 +1112,12 @@ class PrefixOperator: Expression {
     }
 
     override var inferredType: TypeSignature {
-        return target.inferredType
+        switch operatorSymbol {
+        case "..<", "...":
+            return .range(target.inferredType)
+        default:
+            return target.inferredType
+        }
     }
 
     override var children: [SyntaxNode] {

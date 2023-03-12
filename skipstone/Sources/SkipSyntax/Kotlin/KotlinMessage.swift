@@ -82,6 +82,7 @@ extension Message {
         return Message(kind: .error, message: "Kotlin does not support static functions in protocols", sourceDerived: sourceDerived)
     }
 
+    // Idea: duplicate body that we're falling through to (and the following if that too does a fallthrough, etc)
     static func kotlinSwitchFallthrough(_ sourceDerived: SourceDerived) -> Message {
         return Message(kind: .error, message: "Kotlin does not support fallthrough. Consider restructuring your switch statement", sourceDerived: sourceDerived)
     }

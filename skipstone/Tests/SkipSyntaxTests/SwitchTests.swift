@@ -169,6 +169,100 @@ final class SwitchTests: XCTestCase {
         }
         """)
     }
+
+    func testRange() async throws {
+        try await check(swift: """
+        let i = 100
+        switch i {
+        case ..<0:
+            print(-1)
+        case 0..<10:
+            print(0)
+        case 10...20:
+            print(1)
+        case 21...:
+            print(21)
+        default:
+            print("default")
+        }
+        """, kotlin: """
+        internal val i = 100
+        when (i) {
+            in Int.min until 0 -> {
+                print(-1)
+            }
+            in 0 until 10 -> {
+                print(0)
+            }
+            in 10 .. 20 -> {
+                print(1)
+            }
+            in 21 .. Int.max -> {
+                print(21)
+            }
+            else -> {
+                print("default")
+            }
+        }
+        """)
+    }
+
+    func testIsAs() {
+        XCTExpectFailure()
+        XCTFail("TODO: is and as cast tests")
+    }
+
+    func testOptionals() {
+        XCTExpectFailure()
+        XCTFail("""
+        switch i {
+        case .none:
+            print("nil")
+        case .some(1):
+            print(1)
+        default:
+            print("default")
+        }
+        """)
+        XCTFail("""
+        switch i {
+        case nil:
+            print("nil")
+        case 1?:
+            print(1)
+        default:
+            print("default")
+        }
+        """)
+    }
+
+    func testDefaultBinding() {
+        XCTExpectFailure()
+        XCTFail("""
+        switch i {
+        case 0:
+            print(0)
+        case let x:
+            print(x)
+        }
+        """)
+    }
+
+    func testPatternBinding() {
+        XCTExpectFailure()
+        XCTFail("""
+        switch t {
+        case let (0, y):
+            print(y)
+        case (let x, 0):
+            print(x)
+        case var (x, y):
+            x += 1
+            y += 1
+            print(x + y)
+        }
+        """)
+    }
 }
 
 private enum SwitchTestsEnum {

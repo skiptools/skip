@@ -15,7 +15,7 @@ enum KotlinExpressionType {
     case nullLiteral
     case numericLiteral
     case parenthesized
-    case postfixOptionalOperator
+    case postfixOperator
     case prefixOperator
     case sharedExpressionPointer
     case sref
@@ -224,7 +224,17 @@ struct KotlinCasePattern {
         switch expression.value.type {
         case .binaryOperator:
             value = translator.translateExpression(expression.value)
-            if (expression.value as! BinaryOperator).op.precedence == .range {
+            if (expression.value as? BinaryOperator)?.op.precedence == .range {
+                op = Operator.with(symbol: "in")
+            }
+        case .prefixOperator:
+            value = translator.translateExpression(expression.value)
+            if let prefixOperator = expression.value as? PrefixOperator, (prefixOperator.operatorSymbol == "..<" || prefixOperator.operatorSymbol == "...") {
+                op = Operator.with(symbol: "in")
+            }
+        case .postfixOperator:
+            value = translator.translateExpression(expression.value)
+            if let postfixOperator = expression.value as? PostfixOperator, postfixOperator.operatorSymbol == "..." {
                 op = Operator.with(symbol: "in")
             }
         case .functionCall:
@@ -476,7 +486,7 @@ class KotlinFunctionCall: KotlinExpression {
             } else {
                 output.append(function, indentation: indentation)
                 // Kotlin does not support <closure>?(args); use <closure>?.invoke(args)
-                if function is KotlinPostfixOptionalOperator {
+                if (function as? KotlinPostfixOperator)?.operatorSymbol == "?" {
                     output.append(".invoke")
                 }
             }
@@ -1096,19 +1106,22 @@ class KotlinParenthesized: KotlinExpression {
     }
 }
 
-class KotlinPostfixOptionalOperator: KotlinExpression {
-    var isForcedUnwrap = false
+class KotlinPostfixOperator: KotlinExpression {
+    var operatorSymbol: String
     var target: KotlinExpression
+    var targetType: TypeSignature = .none
 
-    static func translate(expression: PostfixOptionalOperator, translator: KotlinTranslator) -> KotlinPostfixOptionalOperator {
+    static func translate(expression: PostfixOperator, translator: KotlinTranslator) -> KotlinPostfixOperator {
         let ktarget = translator.translateExpression(expression.target)
-        return KotlinPostfixOptionalOperator(expression: expression, target: ktarget)
+        let kexpression = KotlinPostfixOperator(expression: expression, target: ktarget)
+        kexpression.targetType = expression.target.inferredType
+        return kexpression
     }
 
-    private init(expression: PostfixOptionalOperator, target: KotlinExpression) {
-        self.isForcedUnwrap = expression.isForcedUnwrap
+    private init(expression: PostfixOperator, target: KotlinExpression) {
+        self.operatorSymbol = expression.operatorSymbol
         self.target = target
-        super.init(type: .postfixOptionalOperator, expression: expression)
+        super.init(type: .postfixOperator, expression: expression)
     }
 
     override func mayBeSharedMutableStructExpression(orType: Bool) -> Bool {
@@ -1120,17 +1133,28 @@ class KotlinPostfixOptionalOperator: KotlinExpression {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
-        output.append(target, indentation: indentation).append(isForcedUnwrap ? "!!" : "?")
+        output.append(target, indentation: indentation)
+        switch operatorSymbol {
+        case "!":
+            output.append("!!")
+        case "...":
+            output.append(" .. ").append(targetType.kotlin).append(".max")
+        default:
+            output.append(operatorSymbol)
+        }
     }
 }
 
 class KotlinPrefixOperator: KotlinExpression {
     var operatorSymbol: String
     var target: KotlinExpression
+    var targetType: TypeSignature = .none
 
     static func translate(expression: PrefixOperator, translator: KotlinTranslator) -> KotlinPrefixOperator {
         let ktarget = translator.translateExpression(expression.target)
-        return KotlinPrefixOperator(expression: expression, target: ktarget)
+        let kexpression = KotlinPrefixOperator(expression: expression, target: ktarget)
+        kexpression.targetType = expression.target.inferredType
+        return kexpression
     }
 
     init(operatorSymbol: String, target: KotlinExpression, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
@@ -1166,7 +1190,21 @@ class KotlinPrefixOperator: KotlinExpression {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
-        output.append(operatorSymbol).append(target, indentation: indentation)
+        switch operatorSymbol {
+        case "as", "is":
+            // Kotlin will smart cast with 'is' test
+            output.append("is ")
+        case "in":
+            // Used as unary prefix operators in when expressions
+            output.append(operatorSymbol).append(" ")
+        case "..<":
+            output.append(targetType.kotlin).append(".min until ")
+        case "...":
+            output.append(targetType.kotlin).append(".min .. ")
+        default:
+            output.append(operatorSymbol)
+        }
+        output.append(target, indentation: indentation)
     }
 }
 
@@ -1302,7 +1340,7 @@ class KotlinSubscript: KotlinExpression {
     override func append(to output: OutputGenerator, indentation: Indentation) {
         output.append(base, indentation: indentation)
         // Kotlin can't optional chain a subscript, i.e. a?[0]
-        let isOptionalChain = (base as? KotlinPostfixOptionalOperator)?.isForcedUnwrap == false
+        let isOptionalChain = (base as? KotlinPostfixOperator)?.operatorSymbol == "?"
         if isOptionalChain {
             output.append(".get(")
         } else {
@@ -1499,7 +1537,9 @@ class KotlinWhen: KotlinExpression {
                     if binaryOperator.op.symbol == "==" {
                         kpattern = binaryOperator.rhs
                     } else {
-                        kpattern = KotlinPrefixOperator(operatorSymbol: "\(binaryOperator.op.symbol) ", target: binaryOperator.rhs)
+                        let prefixOperator = KotlinPrefixOperator(operatorSymbol: binaryOperator.op.symbol, target: binaryOperator.rhs)
+                        prefixOperator.targetType = expression.on.inferredType
+                        kpattern = prefixOperator
                     }
                 }
                 return (kpattern, bindingVariables)

@@ -48,6 +48,30 @@ final class OperatorTests: XCTestCase {
             print(b)
         }
         """)
+
+        try await check(symbols: symbols, swift: """
+        for i in ..<10 {
+            let b = i == .myZero
+            print(b)
+        }
+        """, kotlin: """
+        for (i in Int.min until 10) {
+            val b = i == Int.myZero
+            print(b)
+        }
+        """)
+
+        try await check(symbols: symbols, swift: """
+        for i in 10... {
+            let b = i == .myZero
+            print(b)
+        }
+        """, kotlin: """
+        for (i in 10 .. Int.max) {
+            val b = i == Int.myZero
+            print(b)
+        }
+        """)
     }
 
     func testCast() async throws {
