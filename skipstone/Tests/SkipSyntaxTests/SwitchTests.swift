@@ -424,25 +424,6 @@ final class SwitchTests: XCTestCase {
     }
 
     func testOptionals() async throws {
-        let i: Int? = nil
-        switch i {
-        case .none:
-            print("nil")
-        case .some(1):
-            print(1)
-        case .some(var x):
-            x += 1
-            print(x)
-        }
-
-        switch i {
-        case nil:
-            print("nil")
-        case var x?:
-            x += 1
-            print(x)
-        }
-
         try await check(swift: """
         let i: Int? = nil
         switch i {
@@ -471,7 +452,7 @@ final class SwitchTests: XCTestCase {
 
     func testOptionalBindings() {
         XCTExpectFailure()
-        
+
         XCTFail("""
         let i: Int? = nil
         switch i {
