@@ -107,7 +107,11 @@ extension Message {
         return Message(kind: .error, message: "This Swift construct is not supported within a @ViewBuilder when translating to Kotlin UI", sourceDerived: sourceDerived)
     }
 
+    static func kotlinWhenCasePartialBinding(_ sourceDerived: SourceDerived) -> Message {
+        return Message(kind: .error, message: "Kotlin does not support partial bindings in case matches. Match against a concrete value or all bindings", sourceDerived: sourceDerived)
+    }
+
     static func kotlinWhenCaseWhere(_ sourceDerived: SourceDerived) -> Message {
-        return Message(kind: .error, message: "Kotlin does not where conditions in case matches. Consider using an if statement within the case body", sourceDerived: sourceDerived)
+        return Message(kind: .error, message: "Kotlin does not support where conditions in case matches. Consider using an if statement within the case body", sourceDerived: sourceDerived)
     }
 }

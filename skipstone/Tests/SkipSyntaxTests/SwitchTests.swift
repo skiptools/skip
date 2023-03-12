@@ -239,34 +239,188 @@ final class SwitchTests: XCTestCase {
     }
 
     func testAsBinding() async throws {
-//        try await check(swift: """
-//        {
-//            let a: Any
-//            switch a {
-//            case let i as Int:
-//                print(i)
-//            case let d as Double:
-//                print(d)
-//            default:
-//                print("default")
-//            }
-//        }
-//        """, kotlin: """
-//        {
-//            val a: Any
-//            when (a) {
-//                is Int -> {
-//                    print("Int")
-//                }
-//                is Double -> {
-//                    print("Double")
-//                }
-//                else -> {
-//                    print("default")
-//                }
-//            }
-//        }
-//        """)
+        try await check(swift: """
+        {
+            let a: Any
+            switch a {
+            case let i as Int:
+                print(i)
+            case let d as Double:
+                print(d)
+            case let s as SomeStruct:
+                print(s)
+            default:
+                print("default")
+            }
+        }
+        """, kotlin: """
+        {
+            val a: Any
+            when (a) {
+                is Int -> {
+                    val i = a
+                    print(i)
+                }
+                is Double -> {
+                    val d = a
+                    print(d)
+                }
+                is SomeStruct -> {
+                    val s = a.sref()
+                    print(s.sref())
+                }
+                else -> {
+                    print("default")
+                }
+            }
+        }
+        """)
+    }
+
+    func testLetBinding() async throws {
+        try await check(swift: """
+        let i: Int
+        switch i {
+        case 0:
+            print(0)
+        case let x:
+            print(x)
+        }
+        """, kotlin: """
+        internal val i: Int
+        when (i) {
+            0 -> {
+                print(0)
+            }
+            else -> {
+                val x = i
+                print(x)
+            }
+        }
+        """)
+
+        try await check(swift: """
+        let i: Int
+        switch i {
+        case 0:
+            print(0)
+        case _:
+            print("default")
+        }
+        """, kotlin: """
+        internal val i: Int
+        when (i) {
+            0 -> {
+                print(0)
+            }
+            else -> {
+                print("default")
+            }
+        }
+        """)
+
+        try await check(swift: """
+        let t = (1, "s")
+        switch t {
+        case (0, ""):
+            print(0)
+        case let (i, s):
+            print(i)
+            print(s)
+        }
+        """, kotlin: """
+        internal val t = Pair(1, "s")
+        when (t) {
+            Pair(0, "") -> {
+                print(0)
+            }
+            else -> {
+                val i = t.first
+                val s = t.second
+                print(i)
+                print(s)
+            }
+        }
+        """)
+
+        try await check(swift: """
+        let t = (1, "s")
+        switch t {
+        case (0, ""):
+            print(0)
+        case (var i, let s):
+            i += 1
+            print(i)
+            print(s)
+        }
+        """, kotlin: """
+        internal val t = Pair(1, "s")
+        when (t) {
+            Pair(0, "") -> {
+                print(0)
+            }
+            else -> {
+                var i = t.first
+                val s = t.second
+                i += 1
+                print(i)
+                print(s)
+            }
+        }
+        """)
+
+        try await check(swift: """
+        let t = (1, "s")
+        switch t {
+        case (0, ""):
+            print(0)
+        case var (i, _):
+            i += 1
+            print(i)
+        }
+        """, kotlin: """
+        internal val t = Pair(1, "s")
+        when (t) {
+            Pair(0, "") -> {
+                print(0)
+            }
+            else -> {
+                var i = t.first
+                i += 1
+                print(i)
+            }
+        }
+        """)
+    }
+
+    func testPartialBinding() async throws {
+        // Note: we don't support this for the same reason we don't support 'where' clauses in case statements:
+        // by matching the general case and then using an 'if' in the case body, we could prevent a subsequent case
+        // that would have matched from being executed
+        try await check(expectFailure: true, swift: """
+        let t = (1, "s")
+        switch t {
+        case (0, "s"):
+            print(0)
+        case (let i, "s"):
+            print(i)
+        default:
+            print("default")
+        }
+        """, kotlin: """
+        internal val t = Pair(1, "s")
+        when (t) {
+            Pair(0, "") -> {
+                print(0)
+            }
+            else -> {
+                if (t.second = "s") {
+                    val i = t.first
+                    print(i)
+                }
+            }
+        }
+        """)
     }
 
     func testOptionals() {
@@ -289,34 +443,6 @@ final class SwitchTests: XCTestCase {
             print(1)
         default:
             print("default")
-        }
-        """)
-    }
-
-    func testDefaultBinding() {
-        XCTExpectFailure()
-        XCTFail("""
-        switch i {
-        case 0:
-            print(0)
-        case let x:
-            print(x)
-        }
-        """)
-    }
-
-    func testPatternBinding() {
-        XCTExpectFailure()
-        XCTFail("""
-        switch t {
-        case let (0, y):
-            print(y)
-        case (let x, 0):
-            print(x)
-        case var (x, y):
-            x += 1
-            y += 1
-            print(x + y)
         }
         """)
     }

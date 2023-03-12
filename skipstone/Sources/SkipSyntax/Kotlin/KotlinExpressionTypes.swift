@@ -195,11 +195,12 @@ struct KotlinCasePattern {
         }
     }
 
-    static func translate(expression: CasePattern, target: KotlinExpression, inferredType: TypeSignature, translator: KotlinTranslator) -> (targetVariable: TargetVariable?, bindingVariables: [KotlinBindingVariable], condition: KotlinExpression) {
+    static func translate(expression: CasePattern, target: KotlinExpression, inferredType: TypeSignature, translator: KotlinTranslator) -> (targetVariable: TargetVariable?, bindingVariables: [KotlinBindingVariable], condition: KotlinExpression?, messages: [Message]) {
         let enumHasAssociatedValues = enumHasAssociatedValues(signature: inferredType, translator: translator)
         var targetVariable: TargetVariable? = nil
         var bindingVariables: [KotlinBindingVariable] = []
-        func updateVariables(for identifierPatterns: [IdentifierPattern], types: [TypeSignature], at index: Int, label: String?) {
+        var messages: [Message] = []
+        func updateVariables(for identifierPatterns: [IdentifierPattern], types: [TypeSignature], member: String? = nil) {
             guard identifierPatterns.contains(where: { $0.name != nil }) else {
                 return
             }
@@ -211,43 +212,112 @@ struct KotlinCasePattern {
                 targetVariable = TargetVariable(identifier: identifier, value: target)
             }
             let bindingBase = targetVariable.map { KotlinSharedExpressionPointer(shared: $0.identifier) } ?? target
-            let bindingMember = label ?? "associated\(index)"
-            let bindingValue = KotlinMemberAccess(base: bindingBase, member: bindingMember)
+            var bindingValue: KotlinExpression
+            if let member {
+                bindingValue = KotlinMemberAccess(base: bindingBase, member: member)
+            } else {
+                bindingValue = bindingBase
+            }
             // sref() any tuple or shared mutable type
-            bindingValue.mayBeSharedMutableStruct = types.count > 1 || types[0].kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
-            let variable = KotlinBindingVariable(names: identifierPatterns.map(\.name), value: bindingValue.sref(), isLet: !(expression.isVar || identifierPatterns[0].isVar))
+            if types.count > 1 || types[0].kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo) {
+                bindingValue = bindingValue.sref()
+            }
+            let variable = KotlinBindingVariable(names: identifierPatterns.map(\.name), value: bindingValue, isLet: !(expression.isVar || identifierPatterns[0].isVar))
             bindingVariables.append(variable)
         }
 
-        var value: KotlinExpression
+        var value: KotlinExpression?
         var op = Operator.with(symbol: enumHasAssociatedValues ? "is" : "==")
         switch expression.value.type {
+        case .binding:
+            if let binding = expression.value as? Binding {
+                // case let x
+                let identifierPatterns = binding.identifierPatterns
+                let variableTypes = binding.variableTypes
+                updateVariables(for: identifierPatterns, types: variableTypes)
+                value = nil
+            } else {
+                value = translator.translateExpression(expression.value)
+            }
         case .binaryOperator:
-            value = translator.translateExpression(expression.value)
-            if (expression.value as? BinaryOperator)?.op.precedence == .range {
-                op = Operator.with(symbol: "in")
+            if let binaryOperator = expression.value as? BinaryOperator {
+                // case let x as Type
+                if binaryOperator.op.symbol == "as", let binding = binaryOperator.lhs as? Binding {
+                    op = Operator.with(symbol: "is")
+                    value = translator.translateExpression(binaryOperator.rhs)
+        
+                    let identifierPatterns = binding.identifierPatterns
+                    let variableTypes = binding.variableTypes
+                    updateVariables(for: identifierPatterns, types: variableTypes)
+                } else {
+                    if binaryOperator.op.precedence == .range {
+                        op = Operator.with(symbol: "in")
+                    }
+                    value = translator.translateExpression(expression.value)
+                }
+            } else {
+                value = translator.translateExpression(expression.value)
             }
         case .prefixOperator:
             value = translator.translateExpression(expression.value)
+            // case ..<x
             if let prefixOperator = expression.value as? PrefixOperator, (prefixOperator.operatorSymbol == "..<" || prefixOperator.operatorSymbol == "...") {
                 op = Operator.with(symbol: "in")
             }
         case .postfixOperator:
             value = translator.translateExpression(expression.value)
+            // case x...
             if let postfixOperator = expression.value as? PostfixOperator, postfixOperator.operatorSymbol == "..." {
                 op = Operator.with(symbol: "in")
             }
         case .functionCall:
-            // .enum(let value)
+            // case .enum(let value)
             if let functionCall = expression.value as? FunctionCall, functionCall.function.type == .memberAccess {
-                value = translator.translateExpression(functionCall.function)
+                var hasBindings = false
+                var hasNonBindings = false
                 for (index, argument) in functionCall.arguments.enumerated() {
                     guard let binding = argument.value as? Binding else {
+                        hasNonBindings = true
                         continue
                     }
+                    hasBindings = true
                     let identifierPatterns = binding.identifierPatterns
                     let variableTypes = binding.variableTypes
-                    updateVariables(for: identifierPatterns, types: variableTypes, at: index, label: argument.label)
+                    updateVariables(for: identifierPatterns, types: variableTypes, member: argument.label ?? "associated\(index)")
+                }
+                if hasBindings {
+                    value = translator.translateExpression(functionCall.function)
+                    if hasNonBindings {
+                        messages.append(.kotlinWhenCasePartialBinding(functionCall))
+                    }
+                } else {
+                    value = translator.translateExpression(expression.value)
+                }
+            } else {
+                value = translator.translateExpression(expression.value)
+            }
+        case .tupleLiteral:
+            // case let (x, y)
+            if let tupleLiteral = expression.value as? TupleLiteral {
+                var hasBindings = false
+                var hasNonBindings = false
+                for (index, (label, tupleValue)) in zip(tupleLiteral.labels, tupleLiteral.values).enumerated() {
+                    guard let binding = tupleValue as? Binding else {
+                        hasNonBindings = true
+                        continue
+                    }
+                    hasBindings = true
+                    let identifierPatterns = binding.identifierPatterns
+                    let variableTypes = binding.variableTypes
+                    updateVariables(for: identifierPatterns, types: variableTypes, member: label ?? KotlinTupleLiteral.member(index: index))
+                }
+                if hasBindings {
+                    value = nil
+                    if hasNonBindings {
+                        messages.append(.kotlinWhenCasePartialBinding(tupleLiteral))
+                    }
+                } else {
+                    value = translator.translateExpression(expression.value)
                 }
             } else {
                 value = translator.translateExpression(expression.value)
@@ -256,8 +326,11 @@ struct KotlinCasePattern {
             value = translator.translateExpression(expression.value)
         }
 
+        guard let value else {
+            return (targetVariable, bindingVariables, nil, messages)
+        }
         let condition = KotlinBinaryOperator(op: op, lhs: targetVariable?.identifier ?? target, rhs: value, sourceFile: expression.sourceFile, sourceRange: expression.sourceRange)
-        return (targetVariable, bindingVariables, condition)
+        return (targetVariable, bindingVariables, condition, messages)
     }
 
     private static func enumHasAssociatedValues(signature: TypeSignature, translator: KotlinTranslator) -> Bool {
@@ -878,7 +951,10 @@ struct KotlinMatchingCase {
     static func translate(expression: MatchingCase, translator: KotlinTranslator) -> (targetVariable: KotlinCasePattern.TargetVariable?, bindingVariables: [KotlinBindingVariable], condition: KotlinExpression) {
         let ktarget = translator.translateExpression(expression.target)
         let inferredType = expression.declaredType.or(expression.target.inferredType)
-        return KotlinCasePattern.translate(expression: expression.pattern, target: ktarget, inferredType: inferredType, translator: translator)
+        let (targetVariable, bindingVariables, condition, messages) = KotlinCasePattern.translate(expression: expression.pattern, target: ktarget, inferredType: inferredType, translator: translator)
+        let kcondition = condition ?? KotlinBooleanLiteral(literal: true)
+        kcondition.messages += messages
+        return (targetVariable, bindingVariables, kcondition)
     }
 }
 
@@ -953,14 +1029,9 @@ class KotlinMemberAccess: KotlinExpression {
                     output.append("\n").append(indentation.inc())
                 }
                 output.append(".")
-                switch member {
-                case "0":
-                    output.append("first")
-                case "1":
-                    output.append("second")
-                case "2":
-                    output.append("third")
-                default:
+                if let memberIndex = Int(member) {
+                    output.append(KotlinTupleLiteral.member(index: memberIndex))
+                } else {
                     output.append(member)
                 }
             }
@@ -1436,6 +1507,20 @@ class KotlinTry: KotlinExpression {
 class KotlinTupleLiteral: KotlinExpression {
     var values: [KotlinExpression]
 
+    /// Return the member name for the given tuple index.
+    static func member(index: Int) -> String {
+        switch index {
+        case 0:
+            return "first"
+        case 1:
+            return "second"
+        case 2:
+            return "third"
+        default:
+            return String(describing: index)
+        }
+    }
+
     static func translate(expression: TupleLiteral, translator: KotlinTranslator) throws -> KotlinTupleLiteral {
         guard !expression.labels.contains(where: { $0 != nil }) else {
            throw Message.kotlinTupleLabels(expression)
@@ -1521,11 +1606,12 @@ class KotlinWhen: KotlinExpression {
         var hasBreakLabel = false
         var messages: [Message] = []
         for switchCase in expression.cases {
-            let caseValues: [(KotlinExpression, [KotlinBindingVariable])] = switchCase.patterns.map { pattern in
+            let caseValues: [(KotlinExpression?, [KotlinBindingVariable])] = switchCase.patterns.map { pattern in
                 if let whereGuard = pattern.whereGuard {
                     messages.append(.kotlinWhenCaseWhere(whereGuard))
                 }
-                let (targetVariable, bindingVariables, condition) = KotlinCasePattern.translate(expression: pattern.pattern, target: caseTargetVariable?.identifier ?? kon, inferredType: expression.on.inferredType, translator: translator)
+                let (targetVariable, bindingVariables, condition, caseMessages) = KotlinCasePattern.translate(expression: pattern.pattern, target: caseTargetVariable?.identifier ?? kon, inferredType: expression.on.inferredType, translator: translator)
+                messages += caseMessages
                 // If we find a case that requires a target variable, use it for the entire switch
                 if caseTargetVariable == nil && targetVariable != nil {
                     caseTargetVariable = targetVariable
@@ -1549,7 +1635,7 @@ class KotlinWhen: KotlinExpression {
             if kbody.updateWithExpectedReturn(.labelIfBreak(breakLabel)) {
                 hasBreakLabel = true
             }
-            cases.append(Case(patterns: caseValues.map(\.0), caseBindingVariables: caseValues.flatMap(\.1), body: kbody))
+            cases.append(Case(patterns: caseValues.compactMap(\.0), caseBindingVariables: caseValues.flatMap(\.1), body: kbody))
         }
         let kexpression = KotlinWhen(expression: expression, on: kon, cases: cases)
         kexpression.caseTargetVariable = caseTargetVariable
