@@ -8,6 +8,7 @@ enum KotlinStatementType {
     case forLoop
     case labeledStatement
     case `return`
+    case `throw`
     case whileLoop
 
     case classDeclaration
@@ -396,6 +397,28 @@ class KotlinReturn: KotlinExpressionStatement {
             }
             output.append("\n")
         }
+    }
+}
+
+class KotlinThrow: KotlinStatement {
+    var error: KotlinExpression
+
+    static func translate(statement: Throw, translator: KotlinTranslator) -> KotlinThrow {
+        let kerror = translator.translateExpression(statement.error)
+        return KotlinThrow(error: kerror, statement: statement)
+    }
+
+    private init(error: KotlinExpression, statement: Throw) {
+        self.error = error
+        super.init(type: .throw, statement: statement)
+    }
+
+    override var children: [KotlinSyntaxNode] {
+        return [error]
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        output.append(indentation).append("throw ").append(error, indentation: indentation).append("\n")
     }
 }
 

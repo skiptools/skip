@@ -4,7 +4,6 @@
 // This file only exists to provide symbols for implemented API to the transpiler.
 //
 
-
 public struct Array<T> {
     public init() {
         fatalError()

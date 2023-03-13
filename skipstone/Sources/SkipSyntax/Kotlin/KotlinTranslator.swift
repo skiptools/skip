@@ -84,8 +84,6 @@ public class KotlinTranslator {
             switch statement.type {
             case .break:
                 return [KotlinBreak(statement: statement as! Break)]
-            case .catch:
-                break
             case .codeBlock:
                 return [KotlinCodeBlock.translate(statement: statement as! CodeBlock, translator: self)]
             case .continue:
@@ -110,7 +108,7 @@ public class KotlinTranslator {
             case .return:
                 return [KotlinReturn.translate(statement: statement as! Return, translator: self)]
             case .throw:
-                break
+                return [KotlinThrow.translate(statement: statement as! Throw, translator: self)]
             case .whileLoop:
                 return [KotlinWhileLoop.translate(statement: statement as! WhileLoop, translator: self)]
             case .classDeclaration:

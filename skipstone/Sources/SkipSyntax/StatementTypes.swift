@@ -3,7 +3,6 @@ import SwiftSyntax
 /// Supported Swift statement types.
 enum StatementType: CaseIterable {
     case `break`
-    case `catch`
     case `continue`
     case `defer`
     case `do`
@@ -39,8 +38,6 @@ enum StatementType: CaseIterable {
         switch self {
         case .break:
             return Break.self
-        case .catch:
-            return nil
         case .codeBlock:
             return CodeBlock.self
         case .continue:
@@ -62,7 +59,7 @@ enum StatementType: CaseIterable {
         case .return:
             return Return.self
         case .throw:
-            return nil
+            return Throw.self
         case .whileLoop:
             return WhileLoop.self
 
@@ -407,6 +404,7 @@ class LabeledStatement: Statement {
     }
 }
 
+/// `return ...`
 class Return: ExpressionStatement {
     init(expression: Expression? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         super.init(type: .return, expression: expression, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
@@ -432,6 +430,33 @@ class Return: ExpressionStatement {
 
     override var prettyPrintAttributes: [PrettyPrintTree] {
         return ["return"] + super.prettyPrintAttributes
+    }
+}
+
+/// `throw ...`
+class Throw: Statement {
+    let error: Expression
+
+    init(error: Expression, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.error = error
+        super.init(type: .throw, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+        guard syntax.kind == .throwStmt, let throwStmt = syntax.as(ThrowStmtSyntax.self) else {
+            return nil
+        }
+        let error = ExpressionDecoder.decode(syntax: throwStmt.expression, in: syntaxTree)
+        return [Throw(error: error, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        let _ = error.inferTypes(context: context, expecting: .none)
+        return context
+    }
+
+    override var children: [SyntaxNode] {
+        return [error]
     }
 }
 
@@ -501,7 +526,6 @@ class WhileLoop: Statement {
         return isRepeatWhile ? ["repeat"] : []
     }
 }
-
 
 // MARK: - Declarations
 
