@@ -189,6 +189,12 @@ struct KotlinCasePattern {
         var identifier: KotlinIdentifier
         var value: KotlinExpression
 
+        init(value: KotlinExpression) {
+            self.identifier = KotlinIdentifier(name: "matchtarget")
+            self.identifier.isLocalIdentifier = true
+            self.value = value
+        }
+
         func append(to output: OutputGenerator, indentation: Indentation) {
             output.append("val ").append(identifier, indentation: indentation)
             output.append(" = ").append(value, indentation: indentation)
@@ -207,9 +213,7 @@ struct KotlinCasePattern {
             // If we have bindings and our target is not a simple local identifier, create a new target variable so
             // that re-evaluating the target for our binding values won't cause side effects
             if targetVariable == nil, (target as? KotlinIdentifier)?.isLocalIdentifier != true {
-                let identifier = KotlinIdentifier(name: "matchtarget")
-                identifier.isLocalIdentifier = true
-                targetVariable = TargetVariable(identifier: identifier, value: target)
+                targetVariable = TargetVariable(value: target)
             }
             let bindingBase = targetVariable.map { KotlinSharedExpressionPointer(shared: $0.identifier) } ?? target
             var bindingValue: KotlinExpression
@@ -235,7 +239,12 @@ struct KotlinCasePattern {
                 let identifierPatterns = binding.identifierPatterns
                 let variableTypes = binding.variableTypes
                 updateVariables(for: identifierPatterns, types: variableTypes)
-                value = nil
+                if expression.isNonNilMatch {
+                    op = .with(symbol: "!=")
+                    value = KotlinNullLiteral()
+                } else {
+                    value = nil
+                }
             } else {
                 value = translator.translateExpression(expression.value)
             }
@@ -312,7 +321,12 @@ struct KotlinCasePattern {
                     updateVariables(for: identifierPatterns, types: variableTypes, member: label ?? KotlinTupleLiteral.member(index: index))
                 }
                 if hasBindings {
-                    value = nil
+                    if expression.isNonNilMatch {
+                        op = .with(symbol: "!=")
+                        value = KotlinNullLiteral()
+                    } else {
+                        value = nil
+                    }
                     if hasNonBindings {
                         messages.append(.kotlinWhenCasePartialBinding(tupleLiteral))
                     }
@@ -1591,6 +1605,7 @@ class KotlinWhen: KotlinExpression {
     var on: KotlinExpression
     var cases: [Case]
     var caseTargetVariable: KotlinCasePattern.TargetVariable?
+    var hasNonNilMatches = false
     var hasBreakLabel = false
 
     struct Case {
@@ -1602,6 +1617,13 @@ class KotlinWhen: KotlinExpression {
     static func translate(expression: Switch, translator: KotlinTranslator) -> KotlinWhen {
         var kon = translator.translateExpression(expression.on)
         var caseTargetVariable: KotlinCasePattern.TargetVariable? = nil
+        let hasNonNilMatches = expression.cases.contains { $0.patterns.contains { $0.pattern.isNonNilMatch } }
+        // When we have to compare the switch expression to nil we'll be executing it repeatedly, so store it in a var
+        if hasNonNilMatches && (kon as? KotlinIdentifier)?.isLocalIdentifier != true {
+            caseTargetVariable = KotlinCasePattern.TargetVariable(value: kon)
+            kon = caseTargetVariable!.identifier
+        }
+
         var cases: [Case] = []
         var hasBreakLabel = false
         var messages: [Message] = []
@@ -1613,13 +1635,14 @@ class KotlinWhen: KotlinExpression {
                 let (targetVariable, bindingVariables, condition, caseMessages) = KotlinCasePattern.translate(expression: pattern.pattern, target: caseTargetVariable?.identifier ?? kon, inferredType: expression.on.inferredType, translator: translator)
                 messages += caseMessages
                 // If we find a case that requires a target variable, use it for the entire switch
-                if caseTargetVariable == nil && targetVariable != nil {
+                if caseTargetVariable == nil, let targetVariable {
                     caseTargetVariable = targetVariable
-                    kon = targetVariable!.identifier
+                    kon = targetVariable.identifier
                 }
-                // Change conditions of the form 'target == x' to just 'x', and the form 'target is/in/etc x' to just 'is/in/etc x'
+                // Change conditions of the form 'target == x' to just 'x', and the form 'target is/in/etc x' to just 'is/in/etc x'.
+                // We only keep the binary expressions if we must compare != null, which can't be done in unary form
                 var kpattern = condition
-                if let binaryOperator = condition as? KotlinBinaryOperator {
+                if !hasNonNilMatches, let binaryOperator = condition as? KotlinBinaryOperator {
                     if binaryOperator.op.symbol == "==" {
                         kpattern = binaryOperator.rhs
                     } else {
@@ -1639,8 +1662,9 @@ class KotlinWhen: KotlinExpression {
         }
         let kexpression = KotlinWhen(expression: expression, on: kon, cases: cases)
         kexpression.caseTargetVariable = caseTargetVariable
-        kexpression.messages = messages
+        kexpression.hasNonNilMatches = hasNonNilMatches
         kexpression.hasBreakLabel = hasBreakLabel
+        kexpression.messages = messages
         return kexpression
     }
 
@@ -1665,7 +1689,11 @@ class KotlinWhen: KotlinExpression {
             output.append("linvoke ").append(Self.breakLabel).append("@{\n")
             output.append(whenIndentation)
         }
-        output.append("when (").append(on, indentation: whenIndentation).append(") {\n")
+        output.append("when")
+        if !hasNonNilMatches {
+            output.append(" (").append(on, indentation: whenIndentation).append(")")
+        }
+        output.append(" {\n")
         let caseIndentation = whenIndentation.inc()
         cases.forEach { append($0, to: output, indentation: caseIndentation) }
         output.append(whenIndentation).append("}")

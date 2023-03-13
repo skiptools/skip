@@ -62,4 +62,20 @@ final class ExpressionTests: XCTestCase {
         }
         """)
     }
+
+    func testOptionalSomeNone() async throws {
+        XCTExpectFailure()
+        XCTFail("""
+        let i: Int? = nil
+        switch i {
+        case .none:
+            print("nil")
+        case .some(1):
+            print(1)
+        case .some(var x):
+            x += 1
+            print(x)
+        }
+        """)
+    }
 }

@@ -384,6 +384,9 @@ class CasePattern: Expression, BindingExpression {
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
         let valueContext = value.inferTypes(context: context, expecting: expecting)
         valueType = value.inferredType
+        if isNonNilMatch {
+            valueType = valueType.asOptional(false)
+        }
         return valueContext
     }
 

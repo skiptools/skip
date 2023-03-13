@@ -450,23 +450,9 @@ final class SwitchTests: XCTestCase {
         """)
     }
 
-    func testOptionalBindings() {
-        XCTExpectFailure()
-
-        XCTFail("""
-        let i: Int? = nil
-        switch i {
-        case .none:
-            print("nil")
-        case .some(1):
-            print(1)
-        case .some(var x):
-            x += 1
-            print(x)
-        }
-        """)
-
-        XCTFail("""
+    func testOptionalBindings() async throws {
+        try await check(swift: """
+        var i: Int?
         switch i {
         case nil:
             print("nil")
@@ -477,6 +463,24 @@ final class SwitchTests: XCTestCase {
             print(x)
         default:
             print("default")
+        }
+        """, kotlin: """
+        internal var i: Int? = null
+        when {
+            i == null -> {
+                print("nil")
+            }
+            i == 1 -> {
+                print(1)
+            }
+            i != null -> {
+                var x = i
+                x += 1
+                print(x)
+            }
+            else -> {
+                print("default")
+            }
         }
         """)
     }

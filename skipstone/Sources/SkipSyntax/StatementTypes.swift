@@ -263,7 +263,11 @@ class ForLoop: Statement {
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
         let _ = sequence.inferTypes(context: context, expecting: declaredType == .none ? .none : .array(declaredType))
-        let bodyContext = context.addingIdentifiers(identifierPatterns.map(\.name), types: sequence.inferredType.elementType.tupleTypes(count: identifierPatterns.count))
+        var elementTypes = sequence.inferredType.elementType.tupleTypes(count: identifierPatterns.count)
+        if isNonNilMatch {
+            elementTypes = elementTypes.map { $0.asOptional(false) }
+        }
+        let bodyContext = context.addingIdentifiers(identifierPatterns.map(\.name), types: elementTypes)
         whereGuard?.inferTypes(context: bodyContext, expecting: .bool)
         let _ = body.inferTypes(context: bodyContext, expecting: .none)
         return context
