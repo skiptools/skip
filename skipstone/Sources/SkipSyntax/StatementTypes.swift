@@ -210,15 +210,17 @@ class ForLoop: Statement {
     let declaredType: TypeSignature
     let isTry: Bool
     let isAwait: Bool
+    let isNonNilMatch: Bool
     let sequence: Expression
     let whereGuard: Expression?
     let body: CodeBlock
 
-    init(identifierPatterns: [IdentifierPattern], declaredType: TypeSignature = .none, isTry: Bool = false, isAwait: Bool = false, sequence: Expression, whereGuard: Expression? = nil, body: CodeBlock, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(identifierPatterns: [IdentifierPattern], declaredType: TypeSignature = .none, isTry: Bool = false, isAwait: Bool = false, isNonNilMatch: Bool = false, sequence: Expression, whereGuard: Expression? = nil, body: CodeBlock, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.identifierPatterns = identifierPatterns
         self.declaredType = declaredType
         self.isTry = isTry
         self.isAwait = isAwait
+        self.isNonNilMatch = isNonNilMatch
         self.sequence = sequence
         self.whereGuard = whereGuard
         self.body = body
@@ -229,7 +231,18 @@ class ForLoop: Statement {
         guard syntax.kind == .forInStmt, let forInStmnt = syntax.as(ForInStmtSyntax.self) else {
             return nil
         }
-        guard let identifierPatterns = forInStmnt.pattern.identifierPatterns(in: syntaxTree) else {
+
+        let identifierPatterns: [IdentifierPattern]?
+        let isNonNilMatch: Bool
+        if forInStmnt.caseKeyword != nil {
+            let casePattern = CasePattern(syntax: forInStmnt.pattern, in: syntaxTree)
+            identifierPatterns = (casePattern.value as? Binding)?.identifierPatterns
+            isNonNilMatch = casePattern.isNonNilMatch
+        } else {
+            identifierPatterns = forInStmnt.pattern.identifierPatterns(in: syntaxTree)
+            isNonNilMatch = false
+        }
+        guard let identifierPatterns else {
             throw Message.unsupportedSyntax(forInStmnt.pattern, source: syntaxTree.source)
         }
         var declaredType: TypeSignature = .none
@@ -245,7 +258,7 @@ class ForLoop: Statement {
         }
         let statements = StatementDecoder.decode(syntaxListContainer: forInStmnt.body, in: syntaxTree)
         let body = CodeBlock(statements: statements)
-        return [ForLoop(identifierPatterns: identifierPatterns, declaredType: declaredType, isTry: isTry, isAwait: isAwait, sequence: sequence, whereGuard: whereGuard, body: body, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
+        return [ForLoop(identifierPatterns: identifierPatterns, declaredType: declaredType, isTry: isTry, isAwait: isAwait, isNonNilMatch: isNonNilMatch, sequence: sequence, whereGuard: whereGuard, body: body, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {

@@ -209,9 +209,28 @@ final class LoopTests: XCTestCase {
         """)
     }
 
-    func testForLoopCase() {
-        XCTExpectFailure()
-        XCTFail("TODO: Test for case loops")
+    func testForLoopCase() async throws {
+        try await check(swift: """
+        {
+            let a: [Int?] = [1, nil, 3]
+            for case var i? in a {
+                i += 1
+                print(i)
+            }
+        }
+        """, kotlin: """
+        {
+            val a: Array<Int?> = arrayOf(1, null, 3)
+            for (i_0 in a.sref()) {
+                var i = i_0
+                if (i == null) {
+                    continue
+                }
+                i += 1
+                print(i)
+            }
+        }
+        """)
     }
 
     func testBreak() async throws {

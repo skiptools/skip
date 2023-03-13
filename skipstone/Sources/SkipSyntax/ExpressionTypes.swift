@@ -344,6 +344,7 @@ class BooleanLiteral: Expression {
 class CasePattern: Expression, BindingExpression {
     let value: Expression
     private(set) var isVar: Bool
+    private(set) var isNonNilMatch: Bool
 
     // BindingExpression
     var bindings: [String: TypeSignature] {
@@ -365,7 +366,15 @@ class CasePattern: Expression, BindingExpression {
     }
 
     init(syntax: PatternSyntax, in syntaxTree: SyntaxTree) {
-        (value, isVar) = syntax.expression(in: syntaxTree)
+        let (value, isVar) = syntax.expression(in: syntaxTree)
+        if let postfixOperator = value as? PostfixOperator, postfixOperator.operatorSymbol == "?" {
+            self.value = postfixOperator.target
+            self.isNonNilMatch = true
+        } else {
+            self.value = value
+            self.isNonNilMatch = false
+        }
+        self.isVar = isVar
         super.init(type: .casePattern, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
         if isVar {
             bindAsVar()

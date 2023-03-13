@@ -254,6 +254,7 @@ class KotlinForLoop: KotlinStatement {
     var declaredType: TypeSignature = .none
     var sequence: KotlinExpression
     var whereGuard: KotlinExpression?
+    var isNonNilMatch = false
     var body: KotlinCodeBlock
 
     static func translate(statement: ForLoop, translator: KotlinTranslator) -> KotlinForLoop {
@@ -261,6 +262,7 @@ class KotlinForLoop: KotlinStatement {
         let kbody = KotlinCodeBlock.translate(statement: statement.body, translator: translator)
         let kstatement = KotlinForLoop(statement: statement, sequence: ksequence, body: kbody)
         kstatement.declaredType = statement.declaredType
+        kstatement.isNonNilMatch = statement.isNonNilMatch
         if let whereGuard = statement.whereGuard {
             kstatement.whereGuard = translator.translateExpression(whereGuard)
         }
@@ -308,8 +310,16 @@ class KotlinForLoop: KotlinStatement {
         // Re-declare vars
         let bodyIndentation = indentation.inc()
         for identifierPattern in identifierPatterns {
-            if let name = identifierPattern.name, identifierPattern.isVar {
+            guard let name = identifierPattern.name else {
+                continue
+            }
+            if identifierPattern.isVar {
                 output.append(bodyIndentation).append("var ").append(name).append(" = ").append("\(name)_0\n")
+            }
+            if isNonNilMatch {
+                output.append(bodyIndentation).append("if (\(name) == null) {\n")
+                output.append(bodyIndentation.inc()).append("continue\n")
+                output.append(bodyIndentation).append("}\n")
             }
         }
 
