@@ -8,7 +8,9 @@ enum KotlinStatementType {
     case forLoop
     case labeledStatement
     case `return`
+    case run
     case `throw`
+    case tryCatch
     case whileLoop
 
     case classDeclaration
@@ -52,6 +54,28 @@ class KotlinBreak: KotlinStatement {
 class KotlinCodeBlock: KotlinStatement {
     var statements: [KotlinStatement]
     var deferCount = 0
+
+    // Avoid unnecessarily nested try/catch/finally blocks by passing down catch and finally conditions
+    var syntheticFinally: String? {
+        get {
+            if let tryCatch {
+                return tryCatch.body.syntheticFinally
+            } else {
+                return _syntheticFinally
+            }
+        }
+        set {
+            if let tryCatch {
+                tryCatch.body.syntheticFinally = newValue
+            } else {
+                _syntheticFinally = newValue
+            }
+        }
+    }
+    private var _syntheticFinally: String?
+    private var tryCatch: KotlinTryCatch? {
+        return statements.count == 1 ? statements.first as? KotlinTryCatch : nil
+    }
 
     static func translate(statement: CodeBlock, translator: KotlinTranslator) -> KotlinCodeBlock {
         let kstatements = statement.statements.flatMap { translator.translateStatement($0) }
@@ -175,22 +199,25 @@ class KotlinCodeBlock: KotlinStatement {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
+        if deferCount == 1 {
+            output.append(indentation).append("var deferaction: (() -> Unit)? = null\n")
+        } else if deferCount > 0 {
+            output.append(indentation).append("val deferactions: MutableList<() -> Unit> = mutableListOf()\n")
+        }
         var statementIndentation = indentation
-        if deferCount > 0 {
-            if deferCount == 1 {
-                output.append(indentation).append("var deferaction: (() -> Unit)? = null\n")
-            } else {
-                output.append(indentation).append("val deferactions: MutableList<() -> Unit> = mutableListOf()\n")
-            }
+        if deferCount > 0 || _syntheticFinally != nil {
             output.append(indentation).append("try {\n")
             statementIndentation = statementIndentation.inc()
         }
         output.append(statements, indentation: statementIndentation)
-        if deferCount > 0 {
+        if deferCount > 0 || _syntheticFinally != nil {
             output.append(indentation).append("} finally {\n")
+            if let _syntheticFinally {
+                output.append(statementIndentation).append(_syntheticFinally).append("\n")
+            }
             if deferCount == 1 {
                 output.append(statementIndentation).append("deferaction?.invoke()\n")
-            } else {
+            } else if deferCount > 0 {
                 output.append(statementIndentation).append("deferactions.asReversed().forEach { it.invoke() }\n")
             }
             output.append(indentation).append("}\n")
@@ -400,15 +427,39 @@ class KotlinReturn: KotlinExpressionStatement {
     }
 }
 
+class KotlinRun: KotlinStatement {
+    var body: KotlinCodeBlock
+
+    static func translate(statement: Do, translator: KotlinTranslator) -> KotlinRun {
+        let kbody = KotlinCodeBlock.translate(statement: statement.body, translator: translator)
+        return KotlinRun(statement: statement, body: kbody)
+    }
+
+    private init(statement: Do, body: KotlinCodeBlock) {
+        self.body = body
+        super.init(type: .run, statement: statement)
+    }
+
+    override var children: [KotlinSyntaxNode] {
+        return [body]
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        output.append(indentation).append("run {\n")
+        output.append(body, indentation: indentation.inc())
+        output.append(indentation).append("}\n")
+    }
+}
+
 class KotlinThrow: KotlinStatement {
     var error: KotlinExpression
 
     static func translate(statement: Throw, translator: KotlinTranslator) -> KotlinThrow {
         let kerror = translator.translateExpression(statement.error)
-        return KotlinThrow(error: kerror, statement: statement)
+        return KotlinThrow(statement: statement, error: kerror)
     }
 
-    private init(error: KotlinExpression, statement: Throw) {
+    private init(statement: Throw, error: KotlinExpression) {
         self.error = error
         super.init(type: .throw, statement: statement)
     }
@@ -419,6 +470,29 @@ class KotlinThrow: KotlinStatement {
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
         output.append(indentation).append("throw ").append(error, indentation: indentation).append("\n")
+    }
+}
+
+class KotlinTryCatch: KotlinStatement {
+    var body: KotlinCodeBlock
+    // TODO: Pass catch blocks on to code block, because we also pass along finally
+
+    static func translate(statement: Do, translator: KotlinTranslator) -> KotlinTryCatch {
+        let kbody = KotlinCodeBlock.translate(statement: statement.body, translator: translator)
+        return KotlinTryCatch(statement: statement, body: kbody)
+    }
+
+    private init(statement: Do, body: KotlinCodeBlock) {
+        self.body = body
+        super.init(type: .tryCatch, statement: statement)
+    }
+
+    override var children: [KotlinSyntaxNode] {
+        return [body]
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        output.append(body, indentation: indentation)
     }
 }
 
@@ -942,21 +1016,12 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 }
                 if type == .constructorDeclaration, let isConstructingPropertyName = (parent as? KotlinClassDeclaration)?.isConstructingPropertyName {
                     output.append(bodyIndentation).append("\(isConstructingPropertyName) = true\n")
-                    output.append(bodyIndentation).append("try {\n")
-                    output.append(body, indentation: bodyIndentation.inc())
-                    output.append(bodyIndentation).append("} finally {\n")
-                    output.append(bodyIndentation.inc()).append("\(isConstructingPropertyName) = false\n")
-                    output.append(bodyIndentation).append("}\n")
+                    body.syntheticFinally = "\(isConstructingPropertyName) = false"
                 } else if let mutationFunctionNames {
                     output.append(bodyIndentation).append("\(mutationFunctionNames.willMutate)()\n")
-                    output.append(bodyIndentation).append("try {\n")
-                    output.append(body, indentation: bodyIndentation.inc())
-                    output.append(bodyIndentation).append("} finally {\n")
-                    output.append(bodyIndentation.inc()).append("\(mutationFunctionNames.didMutate)()\n")
-                    output.append(bodyIndentation).append("}\n")
-                } else {
-                    output.append(body, indentation: bodyIndentation)
+                    body.syntheticFinally = "\(mutationFunctionNames.didMutate)()"
                 }
+                output.append(body, indentation: bodyIndentation)
             }
             output.append(indentation).append("}\n")
         } else {

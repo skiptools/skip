@@ -91,7 +91,10 @@ public class KotlinTranslator {
             case .defer:
                 return [KotlinDefer.translate(statement: statement as! Defer, translator: self)]
             case .do:
-                break
+                let doStatement = statement as! Do
+                if doStatement.catches.isEmpty {
+                    return [KotlinRun.translate(statement: doStatement, translator: self)]
+                }
             case .expression:
                 return [KotlinExpressionStatement.translate(statement: statement as! ExpressionStatement, translator: self)]
             case .fallthrough:

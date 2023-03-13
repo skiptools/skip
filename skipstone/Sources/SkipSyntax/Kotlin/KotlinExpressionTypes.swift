@@ -1511,7 +1511,7 @@ class KotlinTry: KotlinExpression {
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
         if isOptional {
-            output.append("try { ").append(trying, indentation: indentation).append(" } catch (_: Exception) { null }")
+            output.append("try { ").append(trying, indentation: indentation).append(" } catch (_: Throwable) { null }")
         } else {
             output.append(trying, indentation: indentation)
         }

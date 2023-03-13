@@ -45,7 +45,7 @@ enum StatementType: CaseIterable {
         case .defer:
             return Defer.self
         case .do:
-            return nil
+            return Do.self
         case .fallthrough:
             return Fallthrough.self
         case .forLoop:
@@ -180,6 +180,34 @@ class Defer: Statement {
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
         return body.inferTypes(context: context, expecting: .none)
+    }
+
+    override var children: [SyntaxNode] {
+        return [body]
+    }
+}
+
+/// `do { ... } [catch...]`
+class Do: Statement {
+    let body: CodeBlock
+    let catches: [Catch]
+
+    struct Catch {
+    }
+
+    init(body: CodeBlock, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.body = body
+        self.catches = []
+        super.init(type: .do, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+        guard syntax.kind == .doStmt, let doStmnt = syntax.as(DoStmtSyntax.self) else {
+            return nil
+        }
+        let statements = StatementDecoder.decode(syntaxListContainer: doStmnt.body, in: syntaxTree)
+        let body = CodeBlock(statements: statements)
+        return [Do(body: body, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
     }
 
     override var children: [SyntaxNode] {
