@@ -246,6 +246,14 @@ extension TypeSignature {
             return false
         }
     }
+
+    /// Whether this type represents an enum with associated values.
+    func kotlinEnumHasAssociatedValues(codebaseInfo: KotlinCodebaseInfo.Context?) -> Bool {
+        guard case .named(let typeName, _) = asOptional(false) else {
+            return false
+        }
+        return codebaseInfo?.enumHasAssociatedValues(qualifiedName: typeName) == true
+    }
 }
 
 extension TypeSignature.Parameter {

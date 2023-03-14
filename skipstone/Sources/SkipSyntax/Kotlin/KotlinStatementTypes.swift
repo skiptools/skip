@@ -228,7 +228,6 @@ class KotlinCodeBlock: KotlinStatement {
         let hasFinally = deferCount > 0 || _syntheticFinally != nil
         for (index, kcatch) in catches.enumerated() {
             appendCatch(kcatch, to: output, indentation: indentation)
-            output.append(kcatch.body, indentation: indentation.inc())
             if !hasFinally && index == catches.count - 1 {
                 output.append(indentation).append("}\n")
             }
@@ -261,7 +260,31 @@ class KotlinCodeBlock: KotlinStatement {
     }
 
     private func appendCatch(_ kcatch: KotlinCase, to output: OutputGenerator, indentation: Indentation) {
-        //~~~
+        if kcatch.patterns.isEmpty {
+            output.append(indentation).append("} catch (error: Throwable) {\n")
+            appendCatchBody(kcatch, to: output, indentation: indentation.inc())
+        } else {
+            for pattern in kcatch.patterns {
+                output.append(indentation).append("} catch (")
+                if let binaryOperator = pattern as? KotlinBinaryOperator, binaryOperator.op.precedence == .cast {
+                    output.append(binaryOperator.lhs, indentation: indentation).append(": ").append(binaryOperator.rhs, indentation: indentation)
+                } else {
+                    // We should have already messaged about this. Output the incorrect code to break compilation
+                    output.append(pattern, indentation: indentation)
+                }
+                output.append(indentation).append(") {\n")
+                appendCatchBody(kcatch, to: output, indentation: indentation.inc())
+            }
+        }
+    }
+
+    private func appendCatchBody(_ kcatch: KotlinCase, to output: OutputGenerator, indentation: Indentation) {
+        for bindingVariable in kcatch.caseBindingVariables {
+            output.append(indentation)
+            bindingVariable.append(to: output, indentation: indentation)
+            output.append("\n")
+        }
+        output.append(kcatch.body, indentation: indentation)
     }
 }
 
@@ -487,9 +510,14 @@ class KotlinTryCatch: KotlinStatement {
         var messages: [Message] = []
         var caseTargetVariable: KotlinCaseTargetVariable? = nil
         for catchCase in statement.catches {
-            let (kcatch, catchMessages) = KotlinCase.translate(expression: catchCase, matchingOn: matchOn, inferredType: .named("Error", []), caseTargetVariable: &caseTargetVariable, translator: translator)
+            var (kcatch, catchMessages) = KotlinCase.translate(expression: catchCase, matchingOn: matchOn, enumHasAssociatedValues: true, caseTargetVariable: &caseTargetVariable, translator: translator)
+            let promotedBindingIdentifier = promotedBindingIdentifier(from: &kcatch)
             for pattern in kcatch.patterns {
-                if (pattern as? KotlinBinaryOperator)?.op.precedence != .cast {
+                if let binaryOperator = pattern as? KotlinBinaryOperator, binaryOperator.op.precedence == .cast {
+                    if let promotedBindingIdentifier {
+                        binaryOperator.lhs = KotlinIdentifier(name: promotedBindingIdentifier)
+                    }
+                } else {
                     messages.append(.kotlinCatchCaseCast(pattern))
                 }
             }
@@ -502,6 +530,19 @@ class KotlinTryCatch: KotlinStatement {
         let kexpression = KotlinTryCatch(statement: statement, body: kbody)
         kexpression.messages = messages
         return kexpression
+    }
+
+    private static func promotedBindingIdentifier(from kcatch: inout KotlinCase) -> String? {
+        // 'catch let e as Type' will generate a pattern of the form 'error is Type' and a binding 'e = error'. We can simplify
+        // to just 'e is Type', which will translate to 'catch (e: Type)'
+        guard let caseBindingVariable = kcatch.caseBindingVariables.first, caseBindingVariable.isLet, caseBindingVariable.names.count == 1 else {
+            return nil
+        }
+        guard (caseBindingVariable.value as? KotlinIdentifier)?.name == "error" else {
+            return nil
+        }
+        kcatch.caseBindingVariables = Array(kcatch.caseBindingVariables.dropFirst())
+        return caseBindingVariable.names[0]
     }
 
     private init(statement: DoCatch, body: KotlinCodeBlock) {

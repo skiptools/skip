@@ -19,7 +19,7 @@ extension Message {
     }
 
     static func kotlinCatchCaseCast(_ sourceDerived: SourceDerived) -> Message {
-        return Message(kind: .error, message: "Kotlin only supports catch clauses that use enum cases, 'error is <type>', or 'let <e> as <type>' conditions", sourceDerived: sourceDerived)
+        return Message(kind: .error, message: "Kotlin only supports catch clauses that use enum cases, 'is <type>', or 'let <e> as <type>' conditions", sourceDerived: sourceDerived)
     }
 
     // Idea: auto-create combined interface for composed protocols
