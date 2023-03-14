@@ -5,7 +5,7 @@ enum StatementType: CaseIterable {
     case `break`
     case `continue`
     case `defer`
-    case `do`
+    case doCatch
     case `fallthrough`
     case forLoop
     case `guard`
@@ -44,8 +44,8 @@ enum StatementType: CaseIterable {
             return Continue.self
         case .defer:
             return Defer.self
-        case .do:
-            return Do.self
+        case .doCatch:
+            return DoCatch.self
         case .fallthrough:
             return Fallthrough.self
         case .forLoop:
@@ -188,17 +188,14 @@ class Defer: Statement {
 }
 
 /// `do { ... } [catch...]`
-class Do: Statement {
+class DoCatch: Statement {
     let body: CodeBlock
-    let catches: [Catch]
+    let catches: [SwitchCase]
 
-    struct Catch {
-    }
-
-    init(body: CodeBlock, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(body: CodeBlock, catches: [SwitchCase], syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.body = body
-        self.catches = []
-        super.init(type: .do, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+        self.catches = catches
+        super.init(type: .doCatch, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
     override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
@@ -207,11 +204,31 @@ class Do: Statement {
         }
         let statements = StatementDecoder.decode(syntaxListContainer: doStmnt.body, in: syntaxTree)
         let body = CodeBlock(statements: statements)
-        return [Do(body: body, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
+        var catches: [SwitchCase] = []
+        var messages: [Message] = []
+        if let catchClauses = doStmnt.catchClauses {
+            for catchClause in catchClauses {
+                if let switchCase = ExpressionDecoder.decode(syntax: catchClause, in: syntaxTree) as? SwitchCase {
+                    catches.append(switchCase)
+                } else {
+                    messages.append(.unsupportedSyntax(catchClauses, source: syntaxTree.source))
+                }
+            }
+        }
+        let statement = DoCatch(body: body, catches: catches, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
+        statement.messages = messages
+        return [statement]
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        let _ = body.inferTypes(context: context, expecting: .none)
+        let errorType: TypeSignature = .named("Error", [])
+        catches.forEach { let _ = $0.inferTypes(context: context, expecting: errorType) }
+        return context
     }
 
     override var children: [SyntaxNode] {
-        return [body]
+        return [body] + catches
     }
 }
 

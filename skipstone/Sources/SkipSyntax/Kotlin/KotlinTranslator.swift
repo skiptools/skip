@@ -90,8 +90,8 @@ public class KotlinTranslator {
                 return [KotlinContinue(statement: statement as! Continue)]
             case .defer:
                 return [KotlinDefer.translate(statement: statement as! Defer, translator: self)]
-            case .do:
-                return [KotlinTryCatch.translate(statement: statement as! Do, translator: self)]
+            case .doCatch:
+                return [KotlinTryCatch.translate(statement: statement as! DoCatch, translator: self)]
             case .expression:
                 return [KotlinExpressionStatement.translate(statement: statement as! ExpressionStatement, translator: self)]
             case .fallthrough:

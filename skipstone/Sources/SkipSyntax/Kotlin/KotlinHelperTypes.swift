@@ -32,6 +32,23 @@ struct KotlinBindingVariable {
     }
 }
 
+/// A variable we decoare to hold the expression we're matching on for repeated evaluation without side effects.
+struct KotlinCaseTargetVariable {
+    var identifier: KotlinIdentifier
+    var value: KotlinExpression
+
+    init(value: KotlinExpression) {
+        self.identifier = KotlinIdentifier(name: "matchtarget")
+        self.identifier.isLocalIdentifier = true
+        self.value = value
+    }
+
+    func append(to output: OutputGenerator, indentation: Indentation) {
+        output.append("val ").append(identifier, indentation: indentation)
+        output.append(" = ").append(value, indentation: indentation)
+    }
+}
+
 extension Accessor where B: CodeBlock {
     /// Translate to an equivalent Kotlin accessor.
     func translate(translator: KotlinTranslator, expectedReturn: KotlinExpectedReturn) -> Accessor<KotlinCodeBlock> {

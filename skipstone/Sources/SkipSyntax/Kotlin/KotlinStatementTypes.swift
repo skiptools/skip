@@ -59,6 +59,9 @@ class KotlinCodeBlock: KotlinStatement {
     /// Uniquify variables used to track defer actions.
     var deferVariableSuffix = 0
 
+    /// Any catch clauses.
+    var catches: [KotlinCase] = []
+
     /// A finally statement to execute for this block.
     var syntheticFinally: String? {
         // Avoid unnecessarily nested try/catch/finally blocks by passing down catch and finally conditions
@@ -84,7 +87,7 @@ class KotlinCodeBlock: KotlinStatement {
 
     /// Whether this code block will be output as a try/catch/finally.
     var isTryCatch: Bool {
-        return deferCount > 0 || _syntheticFinally != nil //~~~ or has catch clauses
+        return deferCount > 0 || !catches.isEmpty || _syntheticFinally != nil
     }
 
     static func translate(statement: CodeBlock, translator: KotlinTranslator) -> KotlinCodeBlock {
@@ -205,7 +208,7 @@ class KotlinCodeBlock: KotlinStatement {
     }
 
     override var children: [KotlinSyntaxNode] {
-        return statements
+        return statements + catches.flatMap { $0.children }
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
@@ -219,8 +222,19 @@ class KotlinCodeBlock: KotlinStatement {
             output.append(indentation).append("try {\n")
             statementIndentation = statementIndentation.inc()
         }
+
         output.append(statements, indentation: statementIndentation)
-        if deferCount > 0 || _syntheticFinally != nil {
+
+        let hasFinally = deferCount > 0 || _syntheticFinally != nil
+        for (index, kcatch) in catches.enumerated() {
+            appendCatch(kcatch, to: output, indentation: indentation)
+            output.append(kcatch.body, indentation: indentation.inc())
+            if !hasFinally && index == catches.count - 1 {
+                output.append(indentation).append("}\n")
+            }
+        }
+
+        if hasFinally {
             output.append(indentation).append("} finally {\n")
             if let _syntheticFinally {
                 output.append(statementIndentation).append(_syntheticFinally).append("\n")
@@ -244,6 +258,10 @@ class KotlinCodeBlock: KotlinStatement {
             output.append(body, indentation: indentation.inc())
             output.append(indentation).append("}\n")
         }
+    }
+
+    private func appendCatch(_ kcatch: KotlinCase, to output: OutputGenerator, indentation: Indentation) {
+        //~~~
     }
 }
 
@@ -461,14 +479,32 @@ class KotlinThrow: KotlinStatement {
 
 class KotlinTryCatch: KotlinStatement {
     var body: KotlinCodeBlock
-    // TODO: Pass catch blocks on to code block, because we also pass along finally
 
-    static func translate(statement: Do, translator: KotlinTranslator) -> KotlinTryCatch {
+    static func translate(statement: DoCatch, translator: KotlinTranslator) -> KotlinTryCatch {
+        let matchOn = KotlinIdentifier(name: "error")
+        matchOn.isLocalIdentifier = true
+        var kcatches: [KotlinCase] = []
+        var messages: [Message] = []
+        var caseTargetVariable: KotlinCaseTargetVariable? = nil
+        for catchCase in statement.catches {
+            let (kcatch, catchMessages) = KotlinCase.translate(expression: catchCase, matchingOn: matchOn, inferredType: .named("Error", []), caseTargetVariable: &caseTargetVariable, translator: translator)
+            for pattern in kcatch.patterns {
+                if (pattern as? KotlinBinaryOperator)?.op.precedence != .cast {
+                    messages.append(.kotlinCatchCaseCast(pattern))
+                }
+            }
+            kcatches.append(kcatch)
+            messages += catchMessages
+        }
         let kbody = KotlinCodeBlock.translate(statement: statement.body, translator: translator)
-        return KotlinTryCatch(statement: statement, body: kbody)
+        kbody.catches = kcatches
+
+        let kexpression = KotlinTryCatch(statement: statement, body: kbody)
+        kexpression.messages = messages
+        return kexpression
     }
 
-    private init(statement: Do, body: KotlinCodeBlock) {
+    private init(statement: DoCatch, body: KotlinCodeBlock) {
         self.body = body
         super.init(type: .tryCatch, statement: statement)
     }

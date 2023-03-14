@@ -18,6 +18,10 @@ extension Message {
         return Message(kind: .warning, message: "Kotlin does not support this Swift attribute or property wrapper", sourceDerived: sourceDerived)
     }
 
+    static func kotlinCatchCaseCast(_ sourceDerived: SourceDerived) -> Message {
+        return Message(kind: .error, message: "Kotlin only supports catch clauses that use enum cases, 'error is <type>', or 'let <e> as <type>' conditions", sourceDerived: sourceDerived)
+    }
+
     // Idea: auto-create combined interface for composed protocols
     static func kotlinComposedTypes(_ sourceDerived: SourceDerived) -> Message {
         return Message(kind: .error, message: "Kotlin does not support composed types. Consider creating a single type that conforms to these types", sourceDerived: sourceDerived)
@@ -112,6 +116,6 @@ extension Message {
     }
 
     static func kotlinWhenCaseWhere(_ sourceDerived: SourceDerived) -> Message {
-        return Message(kind: .error, message: "Kotlin does not support where conditions in case matches. Consider using an if statement within the case body", sourceDerived: sourceDerived)
+        return Message(kind: .error, message: "Kotlin does not support where conditions in case and catch matches. Consider using an if statement within the case or catch body", sourceDerived: sourceDerived)
     }
 }

@@ -183,27 +183,41 @@ class KotlinBooleanLiteral: KotlinExpression {
     }
 }
 
-/// - Note: This type is used to translate the ``CasePattern`` expression, but is not itself a `KotlinExpression`.
-struct KotlinCasePattern {
-    struct TargetVariable {
-        var identifier: KotlinIdentifier
-        var value: KotlinExpression
+/// - Note: This type is used to translate the ``SwitchCase`` expression, but is not itself a `KotlinExpression`.
+struct KotlinCase {
+    var patterns: [KotlinExpression]
+    var caseBindingVariables: [KotlinBindingVariable]
+    var body: KotlinCodeBlock
 
-        init(value: KotlinExpression) {
-            self.identifier = KotlinIdentifier(name: "matchtarget")
-            self.identifier.isLocalIdentifier = true
-            self.value = value
-        }
+    static func translate(expression: SwitchCase, matchingOn: KotlinExpression, inferredType: TypeSignature, caseTargetVariable: inout KotlinCaseTargetVariable?, translator: KotlinTranslator) -> (KotlinCase, [Message]) {
+        var messages: [Message] = []
+        let caseValues: [(KotlinExpression?, [KotlinBindingVariable])] = expression.patterns.map { pattern in
+            if let whereGuard = pattern.whereGuard {
+                messages.append(.kotlinWhenCaseWhere(whereGuard))
+            }
+            let (targetVariable, bindingVariables, condition, caseMessages) = KotlinCasePattern.translate(expression: pattern.pattern, target: caseTargetVariable?.identifier ?? matchingOn, inferredType: inferredType, translator: translator)
+            messages += caseMessages
 
-        func append(to output: OutputGenerator, indentation: Indentation) {
-            output.append("val ").append(identifier, indentation: indentation)
-            output.append(" = ").append(value, indentation: indentation)
+            // If we find a case that requires a target variable, use it for the entire switch
+            if caseTargetVariable == nil, let targetVariable {
+                caseTargetVariable = targetVariable
+            }
+            return (condition, bindingVariables)
         }
+        let kbody = KotlinCodeBlock.translate(statement: expression.body, translator: translator)
+        return (KotlinCase(patterns: caseValues.compactMap(\.0), caseBindingVariables: caseValues.flatMap(\.1), body: kbody), messages)
     }
 
-    static func translate(expression: CasePattern, target: KotlinExpression, inferredType: TypeSignature, translator: KotlinTranslator) -> (targetVariable: TargetVariable?, bindingVariables: [KotlinBindingVariable], condition: KotlinExpression?, messages: [Message]) {
+    var children: [KotlinSyntaxNode] {
+        return patterns + caseBindingVariables.map(\.value) + [body]
+    }
+}
+
+/// - Note: This type is used to translate the ``CasePattern`` expression, but is not itself a `KotlinExpression`.
+struct KotlinCasePattern {
+    static func translate(expression: CasePattern, target: KotlinExpression, inferredType: TypeSignature, translator: KotlinTranslator) -> (targetVariable: KotlinCaseTargetVariable?, bindingVariables: [KotlinBindingVariable], condition: KotlinExpression?, messages: [Message]) {
         let enumHasAssociatedValues = enumHasAssociatedValues(signature: inferredType, translator: translator)
-        var targetVariable: TargetVariable? = nil
+        var targetVariable: KotlinCaseTargetVariable? = nil
         var bindingVariables: [KotlinBindingVariable] = []
         var messages: [Message] = []
         func updateVariables(for identifierPatterns: [IdentifierPattern], types: [TypeSignature], member: String? = nil) {
@@ -213,7 +227,7 @@ struct KotlinCasePattern {
             // If we have bindings and our target is not a simple local identifier, create a new target variable so
             // that re-evaluating the target for our binding values won't cause side effects
             if targetVariable == nil, (target as? KotlinIdentifier)?.isLocalIdentifier != true {
-                targetVariable = TargetVariable(value: target)
+                targetVariable = KotlinCaseTargetVariable(value: target)
             }
             let bindingBase = targetVariable.map { KotlinSharedExpressionPointer(shared: $0.identifier) } ?? target
             var bindingValue: KotlinExpression
@@ -666,7 +680,7 @@ class KotlinIf: KotlinExpression {
 
     struct ConditionSet {
         var optionalBindingVariable: KotlinBindingVariable?
-        var caseTargetVariable: KotlinCasePattern.TargetVariable?
+        var caseTargetVariable: KotlinCaseTargetVariable?
         var caseBindingVariables: [KotlinBindingVariable]
         var conditions: [KotlinExpression]
     }
@@ -700,7 +714,7 @@ class KotlinIf: KotlinExpression {
     private static func translate(conditions: [Expression], isGuard: Bool = false, translator: KotlinTranslator) -> [ConditionSet] {
         var conditionSets: [ConditionSet] = []
         var currentOptionalBindingVariable: KotlinBindingVariable? = nil
-        var currentCaseTargetVariable: KotlinCasePattern.TargetVariable? = nil
+        var currentCaseTargetVariable: KotlinCaseTargetVariable? = nil
         var currentCaseBindingVariables: [KotlinBindingVariable] = []
         var currentConditions: [KotlinExpression] = []
         func appendCurrentConditionSet() {
@@ -962,7 +976,7 @@ class KotlinInOut: KotlinExpression {
 
 /// - Note: This type is used to translate the ``MatchingCase`` expression, but is not itself a `KotlinExpression`.
 struct KotlinMatchingCase {
-    static func translate(expression: MatchingCase, translator: KotlinTranslator) -> (targetVariable: KotlinCasePattern.TargetVariable?, bindingVariables: [KotlinBindingVariable], condition: KotlinExpression) {
+    static func translate(expression: MatchingCase, translator: KotlinTranslator) -> (targetVariable: KotlinCaseTargetVariable?, bindingVariables: [KotlinBindingVariable], condition: KotlinExpression) {
         let ktarget = translator.translateExpression(expression.target)
         let inferredType = expression.declaredType.or(expression.target.inferredType)
         let (targetVariable, bindingVariables, condition, messages) = KotlinCasePattern.translate(expression: expression.pattern, target: ktarget, inferredType: inferredType, translator: translator)
@@ -1603,64 +1617,54 @@ class KotlinWhen: KotlinExpression {
     static let breakLabel = "wlabel"
 
     var on: KotlinExpression
-    var cases: [Case]
-    var caseTargetVariable: KotlinCasePattern.TargetVariable?
+    var cases: [KotlinCase]
+    var caseTargetVariable: KotlinCaseTargetVariable?
     var hasNonNilMatches = false
     var hasBreakLabel = false
 
-    struct Case {
-        var patterns: [KotlinExpression]
-        var caseBindingVariables: [KotlinBindingVariable]
-        var body: KotlinCodeBlock
-    }
-
     static func translate(expression: Switch, translator: KotlinTranslator) -> KotlinWhen {
         var kon = translator.translateExpression(expression.on)
-        var caseTargetVariable: KotlinCasePattern.TargetVariable? = nil
+        var caseTargetVariable: KotlinCaseTargetVariable? = nil
         let hasNonNilMatches = expression.cases.contains { $0.patterns.contains { $0.pattern.isNonNilMatch } }
         // When we have to compare the switch expression to nil we'll be executing it repeatedly, so store it in a var
         if hasNonNilMatches && (kon as? KotlinIdentifier)?.isLocalIdentifier != true {
-            caseTargetVariable = KotlinCasePattern.TargetVariable(value: kon)
-            kon = caseTargetVariable!.identifier
+            caseTargetVariable = KotlinCaseTargetVariable(value: kon)
         }
 
-        var cases: [Case] = []
-        var hasBreakLabel = false
+        var kcases: [KotlinCase] = []
         var messages: [Message] = []
         for switchCase in expression.cases {
-            let caseValues: [(KotlinExpression?, [KotlinBindingVariable])] = switchCase.patterns.map { pattern in
-                if let whereGuard = pattern.whereGuard {
-                    messages.append(.kotlinWhenCaseWhere(whereGuard))
-                }
-                let (targetVariable, bindingVariables, condition, caseMessages) = KotlinCasePattern.translate(expression: pattern.pattern, target: caseTargetVariable?.identifier ?? kon, inferredType: expression.on.inferredType, translator: translator)
-                messages += caseMessages
-                // If we find a case that requires a target variable, use it for the entire switch
-                if caseTargetVariable == nil, let targetVariable {
-                    caseTargetVariable = targetVariable
-                    kon = targetVariable.identifier
-                }
+            var (kcase, caseMessages) = KotlinCase.translate(expression: switchCase, matchingOn: kon, inferredType: expression.on.inferredType, caseTargetVariable: &caseTargetVariable, translator: translator)
+            kcase.patterns = kcase.patterns.map { pattern in
                 // Change conditions of the form 'target == x' to just 'x', and the form 'target is/in/etc x' to just 'is/in/etc x'.
                 // We only keep the binary expressions if we must compare != null, which can't be done in unary form
-                var kpattern = condition
-                if !hasNonNilMatches, let binaryOperator = condition as? KotlinBinaryOperator {
-                    if binaryOperator.op.symbol == "==" {
-                        kpattern = binaryOperator.rhs
-                    } else {
-                        let prefixOperator = KotlinPrefixOperator(operatorSymbol: binaryOperator.op.symbol, target: binaryOperator.rhs)
-                        prefixOperator.targetType = expression.on.inferredType
-                        kpattern = prefixOperator
-                    }
+                guard !hasNonNilMatches, let binaryOperator = pattern as? KotlinBinaryOperator else {
+                    return pattern
                 }
-                return (kpattern, bindingVariables)
+                if binaryOperator.op.symbol == "==" {
+                    return binaryOperator.rhs
+                } else {
+                    let prefixOperator = KotlinPrefixOperator(operatorSymbol: binaryOperator.op.symbol, target: binaryOperator.rhs)
+                    prefixOperator.targetType = expression.on.inferredType
+                    return prefixOperator
+                }
             }
-            let kbody = KotlinCodeBlock.translate(statement: switchCase.body, translator: translator)
-            // Kotlin doesn't support break in when cases, so wrap the when in a closure and return to its label
-            if kbody.updateWithExpectedReturn(.labelIfBreak(breakLabel)) {
+            kcases.append(kcase)
+            messages += caseMessages
+        }
+        // If we've created a var to match against, change the switch to use the var
+        if let caseTargetVariable {
+            kon = caseTargetVariable.identifier
+        }
+        // Kotlin doesn't support break in when cases, so wrap the when in a closure and return to its label
+        var hasBreakLabel = false
+        for kcase in kcases {
+            if kcase.body.updateWithExpectedReturn(.labelIfBreak(breakLabel)) {
                 hasBreakLabel = true
             }
-            cases.append(Case(patterns: caseValues.compactMap(\.0), caseBindingVariables: caseValues.flatMap(\.1), body: kbody))
         }
-        let kexpression = KotlinWhen(expression: expression, on: kon, cases: cases)
+
+        let kexpression = KotlinWhen(expression: expression, on: kon, cases: kcases)
         kexpression.caseTargetVariable = caseTargetVariable
         kexpression.hasNonNilMatches = hasNonNilMatches
         kexpression.hasBreakLabel = hasBreakLabel
@@ -1668,14 +1672,14 @@ class KotlinWhen: KotlinExpression {
         return kexpression
     }
 
-    private init(expression: Switch, on: KotlinExpression, cases: [Case]) {
+    private init(expression: Switch, on: KotlinExpression, cases: [KotlinCase]) {
         self.on = on
         self.cases = cases
         super.init(type: .when, expression: expression)
     }
 
     override var children: [KotlinSyntaxNode] {
-        return [on] + cases.flatMap { $0.patterns + [$0.body] }
+        return [on] + cases.flatMap { $0.children }
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
@@ -1702,7 +1706,7 @@ class KotlinWhen: KotlinExpression {
         }
     }
 
-    private func append(_ whenCase: Case, to output: OutputGenerator, indentation: Indentation) {
+    private func append(_ whenCase: KotlinCase, to output: OutputGenerator, indentation: Indentation) {
         output.append(indentation)
         if whenCase.patterns.isEmpty {
             output.append("else")

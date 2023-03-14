@@ -1333,7 +1333,7 @@ class Switch: Expression {
     }
 }
 
-/// `case x:` or `default:`
+/// `case x:` or `default:`, and also used for `catch` matching.
 class SwitchCase: Expression, BindingExpression {
     let patterns: [(pattern: CasePattern, whereGuard: Expression?)] // Empty = default
     let body: CodeBlock
@@ -1355,11 +1355,18 @@ class SwitchCase: Expression, BindingExpression {
     }
 
     override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
-        guard syntax.kind == .switchCase, let switchCaseExpr = syntax.as(SwitchCaseSyntax.self) else {
+        if syntax.kind == .switchCase, let switchCaseExpr = syntax.as(SwitchCaseSyntax.self) {
+            return decodeSwitchCase(statement: switchCaseExpr, in: syntaxTree)
+        } else if syntax.kind == .catchClause, let catchClause = syntax.as(CatchClauseSyntax.self) {
+            return decodeCatchClause(statement: catchClause, in: syntaxTree)
+        } else {
             return nil
         }
+    }
+
+    private static func decodeSwitchCase(statement: SwitchCaseSyntax, in syntaxTree: SyntaxTree) -> SwitchCase {
         let patterns: [(CasePattern, Expression?)]
-        switch switchCaseExpr.label {
+        switch statement.label {
         case .case(let syntax):
             patterns = syntax.caseItems.map { item in
                 let pattern = CasePattern(syntax: item.pattern, in: syntaxTree)
@@ -1369,10 +1376,27 @@ class SwitchCase: Expression, BindingExpression {
         case .default:
             patterns = []
             break
-
         }
-        let body = CodeBlock(statements: StatementDecoder.decode(syntaxList: switchCaseExpr.statements, in: syntaxTree))
-        return SwitchCase(patterns: patterns, body: body, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+        let body = CodeBlock(statements: StatementDecoder.decode(syntaxList: statement.statements, in: syntaxTree))
+        return SwitchCase(patterns: patterns, body: body, syntax: statement, sourceFile: syntaxTree.source.file, sourceRange: statement.range(in: syntaxTree.source))
+    }
+
+    private static func decodeCatchClause(statement: CatchClauseSyntax, in syntaxTree: SyntaxTree) -> SwitchCase {
+        let patterns: [(CasePattern, Expression?)]
+        if let catchItems = statement.catchItems {
+            patterns = catchItems.compactMap { item in
+                guard let itemPattern = item.pattern else {
+                    return nil
+                }
+                let pattern = CasePattern(syntax: itemPattern, in: syntaxTree)
+                let whereGuard = item.whereClause.map { ExpressionDecoder.decode(syntax: $0.guardResult, in: syntaxTree) }
+                return (pattern, whereGuard)
+            }
+        } else {
+            patterns = []
+        }
+        let body = CodeBlock(statements: StatementDecoder.decode(syntaxListContainer: statement.body, in: syntaxTree))
+        return SwitchCase(patterns: patterns, body: body, syntax: statement, sourceFile: syntaxTree.source.file, sourceRange: statement.range(in: syntaxTree.source))
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
