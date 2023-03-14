@@ -91,10 +91,7 @@ public class KotlinTranslator {
             case .defer:
                 return [KotlinDefer.translate(statement: statement as! Defer, translator: self)]
             case .do:
-                let doStatement = statement as! Do
-                if doStatement.catches.isEmpty {
-                    return [KotlinRun.translate(statement: doStatement, translator: self)]
-                }
+                return [KotlinTryCatch.translate(statement: statement as! Do, translator: self)]
             case .expression:
                 return [KotlinExpressionStatement.translate(statement: statement as! ExpressionStatement, translator: self)]
             case .fallthrough:
@@ -105,7 +102,7 @@ public class KotlinTranslator {
                 return [KotlinIf.translate(statement: statement as! Guard, translator: self)]
             case .ifDefined:
                 // This should never happen, as we never make the IfDefined statement part of the syntax tree
-                return []
+                break
             case .labeled:
                 return [KotlinLabeledStatement.translate(statement: statement as! LabeledStatement, translator: self)]
             case .return:

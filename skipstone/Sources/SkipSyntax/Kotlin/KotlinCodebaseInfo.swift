@@ -15,6 +15,7 @@ public class KotlinCodebaseInfo {
             KotlinStructPlugin(),
             KotlinConstructorPlugin(),
             KotlinIfWhenPlugin(),
+            KotlinDeferPlugin(),
             KotlinSwiftUIPlugin()
         ]
     }

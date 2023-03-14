@@ -189,7 +189,11 @@ public class Symbols {
                     initsCandidates.append((symbol, .function(argumentTypes, typeSignature)))
                 }
             }
-            return ranked(funcsCandidates + initsCandidates, keyPath: \.0).map(\.signature)
+            return ranked(funcsCandidates + initsCandidates, keyPath: \.0).reduce(into: [TypeSignature]()) { result, candidate in
+                if !result.contains(candidate.signature) {
+                    result.append(candidate.signature)
+                }
+            }
         }
 
         /// Return the signatures of the possible subscripts being called with the given arguments.

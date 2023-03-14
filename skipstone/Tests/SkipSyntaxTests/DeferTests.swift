@@ -11,15 +11,15 @@ final class DeferTests: XCTestCase {
         }
         """, kotlin: """
         internal fun f() {
-            var deferaction: (() -> Unit)? = null
+            var deferaction_0: (() -> Unit)? = null
             try {
                 val handle: Int = open()
-                deferaction = {
+                deferaction_0 = {
                     close(handle)
                 }
                 print(handle)
             } finally {
-                deferaction?.invoke()
+                deferaction_0?.invoke()
             }
         }
         """)
@@ -38,21 +38,21 @@ final class DeferTests: XCTestCase {
         }
         """, kotlin: """
         internal fun f() {
-            val deferactions: MutableList<() -> Unit> = mutableListOf()
+            val deferactions_0: MutableList<() -> Unit> = mutableListOf()
             try {
                 val handle1: Int = open()
-                deferactions.add {
+                deferactions_0.add {
                     close(handle1)
                 }
                 print(handle1)
                 val handle2: Int = open()
-                deferactions.add {
+                deferactions_0.add {
                     close(handle2)
                 }
                 print(handle2)
                 doSomethingWithHandles(handle1, handle2)
             } finally {
-                deferactions.asReversed().forEach { it.invoke() }
+                deferactions_0.asReversed().forEach { it.invoke() }
             }
         }
         """)
@@ -72,27 +72,27 @@ final class DeferTests: XCTestCase {
         }
         """, kotlin: """
         internal fun f() {
-            var deferaction: (() -> Unit)? = null
+            var deferaction_0: (() -> Unit)? = null
             try {
                 val handle1: Int = open()
-                deferaction = {
+                deferaction_0 = {
                     close(handle1)
                 }
                 if (needsTwoHandles) {
-                    var deferaction: (() -> Unit)? = null
+                    var deferaction_1: (() -> Unit)? = null
                     try {
                         val handle2: Int = open()
-                        deferaction = {
+                        deferaction_1 = {
                             close(handle2)
                         }
                         print(handle2)
                     } finally {
-                        deferaction?.invoke()
+                        deferaction_1?.invoke()
                     }
                 }
                 print(handle1)
             } finally {
-                deferaction?.invoke()
+                deferaction_0?.invoke()
             }
         }
         """)

@@ -53,10 +53,15 @@ class KotlinBreak: KotlinStatement {
 
 class KotlinCodeBlock: KotlinStatement {
     var statements: [KotlinStatement]
-    var deferCount = 0
 
-    // Avoid unnecessarily nested try/catch/finally blocks by passing down catch and finally conditions
+    /// The number of defer statements in this block.
+    var deferCount = 0
+    /// Uniquify variables used to track defer actions.
+    var deferVariableSuffix = 0
+
+    /// A finally statement to execute for this block.
     var syntheticFinally: String? {
+        // Avoid unnecessarily nested try/catch/finally blocks by passing down catch and finally conditions
         get {
             if let tryCatch {
                 return tryCatch.body.syntheticFinally
@@ -75,6 +80,11 @@ class KotlinCodeBlock: KotlinStatement {
     private var _syntheticFinally: String?
     private var tryCatch: KotlinTryCatch? {
         return statements.count == 1 ? statements.first as? KotlinTryCatch : nil
+    }
+
+    /// Whether this code block will be output as a try/catch/finally.
+    var isTryCatch: Bool {
+        return deferCount > 0 || _syntheticFinally != nil //~~~ or has catch clauses
     }
 
     static func translate(statement: CodeBlock, translator: KotlinTranslator) -> KotlinCodeBlock {
@@ -200,12 +210,12 @@ class KotlinCodeBlock: KotlinStatement {
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
         if deferCount == 1 {
-            output.append(indentation).append("var deferaction: (() -> Unit)? = null\n")
+            output.append(indentation).append("var deferaction_\(deferVariableSuffix): (() -> Unit)? = null\n")
         } else if deferCount > 0 {
-            output.append(indentation).append("val deferactions: MutableList<() -> Unit> = mutableListOf()\n")
+            output.append(indentation).append("val deferactions_\(deferVariableSuffix): MutableList<() -> Unit> = mutableListOf()\n")
         }
         var statementIndentation = indentation
-        if deferCount > 0 || _syntheticFinally != nil {
+        if isTryCatch {
             output.append(indentation).append("try {\n")
             statementIndentation = statementIndentation.inc()
         }
@@ -216,9 +226,9 @@ class KotlinCodeBlock: KotlinStatement {
                 output.append(statementIndentation).append(_syntheticFinally).append("\n")
             }
             if deferCount == 1 {
-                output.append(statementIndentation).append("deferaction?.invoke()\n")
+                output.append(statementIndentation).append("deferaction_\(deferVariableSuffix)?.invoke()\n")
             } else if deferCount > 0 {
-                output.append(statementIndentation).append("deferactions.asReversed().forEach { it.invoke() }\n")
+                output.append(statementIndentation).append("deferactions_\(deferVariableSuffix).asReversed().forEach { it.invoke() }\n")
             }
             output.append(indentation).append("}\n")
         }
@@ -226,11 +236,11 @@ class KotlinCodeBlock: KotlinStatement {
 
     func appendDefer(_ body: KotlinCodeBlock, to output: OutputGenerator, indentation: Indentation) {
         if deferCount == 1 {
-            output.append(indentation).append("deferaction = {\n")
+            output.append(indentation).append("deferaction_\(deferVariableSuffix) = {\n")
             output.append(body, indentation: indentation.inc())
             output.append(indentation).append("}\n")
         } else {
-            output.append(indentation).append("deferactions.add {\n")
+            output.append(indentation).append("deferactions_\(deferVariableSuffix).add {\n")
             output.append(body, indentation: indentation.inc())
             output.append(indentation).append("}\n")
         }
@@ -427,30 +437,6 @@ class KotlinReturn: KotlinExpressionStatement {
     }
 }
 
-class KotlinRun: KotlinStatement {
-    var body: KotlinCodeBlock
-
-    static func translate(statement: Do, translator: KotlinTranslator) -> KotlinRun {
-        let kbody = KotlinCodeBlock.translate(statement: statement.body, translator: translator)
-        return KotlinRun(statement: statement, body: kbody)
-    }
-
-    private init(statement: Do, body: KotlinCodeBlock) {
-        self.body = body
-        super.init(type: .run, statement: statement)
-    }
-
-    override var children: [KotlinSyntaxNode] {
-        return [body]
-    }
-
-    override func append(to output: OutputGenerator, indentation: Indentation) {
-        output.append(indentation).append("run {\n")
-        output.append(body, indentation: indentation.inc())
-        output.append(indentation).append("}\n")
-    }
-}
-
 class KotlinThrow: KotlinStatement {
     var error: KotlinExpression
 
@@ -492,7 +478,13 @@ class KotlinTryCatch: KotlinStatement {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
-        output.append(body, indentation: indentation)
+        if body.isTryCatch {
+            output.append(body, indentation: indentation)
+        } else {
+            output.append(indentation).append("run {\n")
+            output.append(body, indentation: indentation.inc())
+            output.append(indentation).append("}\n")
+        }
     }
 }
 
