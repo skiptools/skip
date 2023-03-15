@@ -679,6 +679,9 @@ class FunctionDeclaration: Statement {
     let attributes: Attributes
     private(set) var modifiers: Modifiers
     let body: CodeBlock?
+    var functionType: TypeSignature {
+        return .function(parameters.map(\.signature), returnType)
+    }
 
     init(type: StatementType, name: String, isOptionalInit: Bool = false, returnType: TypeSignature = .void, parameters: [Parameter<Expression>], isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), body: CodeBlock? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.name = name

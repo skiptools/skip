@@ -129,6 +129,9 @@ struct Parameter<V>: Hashable {
     var isVariadic: Bool
     var isInOut: Bool
     var defaultValue: V?
+    var signature: TypeSignature.Parameter {
+        return TypeSignature.Parameter(label: externalLabel, type: declaredType, isVariadic: isVariadic, hasDefaultValue: defaultValue != nil)
+    }
 
     init(externalLabel: String?, internalLabel: String? = nil, declaredType: TypeSignature = .none, isVariadic: Bool = false, isInOut: Bool = false, defaultValue: V? = nil) {
         self.externalLabel = externalLabel == "" || externalLabel == "_" ? nil : externalLabel

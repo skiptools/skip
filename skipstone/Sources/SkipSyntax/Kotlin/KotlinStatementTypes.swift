@@ -971,7 +971,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         kstatement.parameters = statement.parameters.map { $0.translate(translator: translator) }
         if let owningTypeDeclaration = statement.owningTypeDeclaration {
             kstatement.isOpen = !statement.modifiers.isFinal && statement.modifiers.visibility != .private && owningTypeDeclaration.type == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
-            if (translator.codebaseInfo?.isProtocolMember(declaration: statement, in: owningTypeDeclaration) == true) {
+            if !kstatement.modifiers.isOverride && translator.codebaseInfo?.isProtocolMember(declaration: statement, in: owningTypeDeclaration) == true {
                 kstatement.modifiers.isOverride = true
             }
         }
@@ -1256,7 +1256,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if let owningTypeDeclaration = statement.owningTypeDeclaration {
             kstatement.isProperty = statement.parent === owningTypeDeclaration
             kstatement.isOpen = kstatement.isProperty && !statement.modifiers.isFinal && statement.modifiers.visibility != .private && owningTypeDeclaration.type == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
-            if kstatement.isProperty && translator.codebaseInfo?.isProtocolMember(declaration: statement, in: owningTypeDeclaration) == true {
+            if kstatement.isProperty && !kstatement.modifiers.isOverride && translator.codebaseInfo?.isProtocolMember(declaration: statement, in: owningTypeDeclaration) == true {
                 kstatement.modifiers.isOverride = true
             }
         } else if statement.parent?.parent == nil {

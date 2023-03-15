@@ -771,5 +771,17 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
             }
             return description
         }
+
+        // Leave default values out of equality and hash values, just as Swift does not include default values in type comparisons
+
+        static func ==(lhs: Parameter, rhs: Parameter) -> Bool {
+            return lhs.label == rhs.label && lhs.type == rhs.type && lhs.isVariadic == rhs.isVariadic
+        }
+
+        func hash(into hasher: inout Hasher) {
+            hasher.combine(label)
+            hasher.combine(type)
+            hasher.combine(isVariadic)
+        }
     }
 }

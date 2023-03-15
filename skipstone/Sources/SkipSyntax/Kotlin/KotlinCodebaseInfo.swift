@@ -165,15 +165,31 @@ public class KotlinCodebaseInfo {
             }
         }
 
-        /// Whether a function with the given signature is implementing an inherited protocol function of the given type.
-        func isProtocolMember(declaration: FunctionDeclaration, in typeDeclaration: TypeDeclaration) -> Bool {
-            // TODO: Needs to check all protocol conformances of the given type, including protocols of protocols, etc
+        /// Whether a property with the given signature is implementing an inherited protocol property of the given type.
+        func isProtocolMember(declaration: VariableDeclaration, in typeDeclaration: TypeDeclaration) -> Bool {
+            guard let symbols, !declaration.names.isEmpty, let name = declaration.names[0], !typeDeclaration.inherits.isEmpty else {
+                return false
+            }
+            let startIndex = declarationType(of: typeDeclaration.inherits[0].description, mustBeInModule: false) == .protocolDeclaration ? 0 : 1
+            for protocolType in typeDeclaration.inherits[startIndex...] {
+                if symbols.isMember(name: name, type: nil, inProtocol: protocolType) == true {
+                    return true
+                }
+            }
             return false
         }
 
-        /// Whether a property with the given signature is implementing an inherited protocol property of the given type.
-        func isProtocolMember(declaration: VariableDeclaration, in typeDeclaration: TypeDeclaration) -> Bool {
-            // TODO: Needs to check all protocol conformances of the given type, including protocols of protocols, etc
+        /// Whether a function with the given signature is implementing an inherited protocol function of the given type.
+        func isProtocolMember(declaration: FunctionDeclaration, in typeDeclaration: TypeDeclaration) -> Bool {
+            guard let symbols, !typeDeclaration.inherits.isEmpty else {
+                return false
+            }
+            let startIndex = declarationType(of: typeDeclaration.inherits[0].description, mustBeInModule: false) == .protocolDeclaration ? 0 : 1
+            for protocolType in typeDeclaration.inherits[startIndex...] {
+                if symbols.isMember(name: declaration.name, type: declaration.functionType, inProtocol: protocolType) == true {
+                    return true
+                }
+            }
             return false
         }
 
@@ -297,6 +313,14 @@ private struct ExtensionInfo {
 // Internal for testing
 
 extension Symbols.Context {
+    /// Whether the given name and optional type maps to a member of the given protocol, including inherited protocols.
+    ///
+    /// - Returns: true if this is a member of the protocol, false if not, and nil if no symbol for this protocol exists.
+    func isMember(name: String, type: TypeSignature?, inProtocol: TypeSignature) -> Bool? {
+        //~~~
+        return nil
+    }
+
     /// Whether the given name maps to a symbol that is known to be a mutable struct type.
     ///
     /// - Returns: true if a symbol exists for a mutable struct type, false if only immutable type symbols exist, and nil if no type symbol exists.
