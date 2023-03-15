@@ -1,7 +1,7 @@
 @testable import SkipSyntax
 import XCTest
 
-final class DoCatchTests: XCTestCase {
+final class ErrorHandlingTests: XCTestCase {
     func testDoWithoutCatch() async throws {
         try await check(swift: """
         do {
@@ -285,6 +285,56 @@ final class DoCatchTests: XCTestCase {
             override var smutatingcount = 0
             override fun scopy(): MutableStruct {
                 return S(i)
+            }
+        }
+        """)
+    }
+
+    func testErrorClass() async throws {
+        try await check(swift: """
+        class C: Error {
+        }
+        """, kotlin: """
+        internal open class C: Throwable(), Error {
+        }
+        """)
+
+        try await check(swift: """
+        class C: Error {
+            var message = ""
+        }
+        """, kotlin: """
+        internal open class C: Throwable(), Error {
+            override var message = ""
+        }
+        """)
+    }
+
+    func testErrorEnum() async throws {
+        try await check(swift: """
+        enum E: Error {
+            case error1
+            case error2
+        }
+        """, kotlin: """
+        internal sealed class E: Throwable(), Error {
+            class error1: E() {
+            }
+            class error2: E() {
+            }
+        }
+        """)
+
+        try await check(swift: """
+        enum E: Int, Error {
+            case error1 = 2
+            case error2
+        }
+        """, kotlin: """
+        internal sealed class E(val rawValue: Int): Throwable(), Error {
+            class error1: E(2) {
+            }
+            class error2: E(3) {
             }
         }
         """)

@@ -247,12 +247,12 @@ extension TypeSignature {
         }
     }
 
-    /// Whether this type represents an enum with associated values.
-    func kotlinEnumHasAssociatedValues(codebaseInfo: KotlinCodebaseInfo.Context?) -> Bool {
+    /// Whether this type represents an enum modeled with sealed classes.
+    func kotlinIsSealedClassesEnum(codebaseInfo: KotlinCodebaseInfo.Context?) -> Bool {
         guard case .named(let typeName, _) = asOptional(false) else {
             return false
         }
-        return codebaseInfo?.enumHasAssociatedValues(qualifiedName: typeName) == true
+        return codebaseInfo?.isSealedClassesEnum(qualifiedName: typeName) == true
     }
 }
 

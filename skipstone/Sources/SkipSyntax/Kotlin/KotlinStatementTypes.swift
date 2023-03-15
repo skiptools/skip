@@ -510,7 +510,9 @@ class KotlinTryCatch: KotlinStatement {
         var messages: [Message] = []
         var caseTargetVariable: KotlinCaseTargetVariable? = nil
         for catchCase in statement.catches {
-            var (kcatch, catchMessages) = KotlinCase.translate(expression: catchCase, matchingOn: matchOn, enumHasAssociatedValues: true, caseTargetVariable: &caseTargetVariable, translator: translator)
+            // Every enum that conforms to Error is translated to sealed classes, so we pass isSealedClassesEnum: true
+            // here even without knowing the enum class and consulting symbols
+            var (kcatch, catchMessages) = KotlinCase.translate(expression: catchCase, matchingOn: matchOn, isSealedClassesEnum: true, caseTargetVariable: &caseTargetVariable, translator: translator)
             let promotedBindingIdentifier = promotedBindingIdentifier(from: &kcatch)
             for pattern in kcatch.patterns {
                 if let binaryOperator = pattern as? KotlinBinaryOperator, binaryOperator.op.precedence == .cast {
@@ -652,15 +654,21 @@ class KotlinClassDeclaration: KotlinStatement {
     var declarationType: StatementType
     var members: [KotlinStatement] = []
     var isConstructingPropertyName: String?
-    var isEnumWithAssociatedValues: Bool {
-        return members.contains { ($0 as? KotlinEnumCaseDeclaration)?.associatedValues.isEmpty == false }
-    }
     var enumInheritedRawValueType: TypeSignature? {
         guard let inherits = inherits.first else {
             return nil
         }
         return inherits.isNumeric || inherits == .string ? inherits : nil
     }
+    var isSealedClassesEnum: Bool {
+        get {
+            return _isSealedClassesEnum || members.contains { ($0 as? KotlinEnumCaseDeclaration)?.associatedValues.isEmpty == false }
+        }
+        set {
+            _isSealedClassesEnum = newValue
+        }
+    }
+    private var _isSealedClassesEnum = false
 
     static func translate(statement: TypeDeclaration, translator: KotlinTranslator) -> KotlinClassDeclaration {
         let kstatement = KotlinClassDeclaration(statement: statement)
@@ -734,15 +742,14 @@ class KotlinClassDeclaration: KotlinStatement {
 
             var inherits = inherits
             if declarationType == .enumDeclaration {
-                let isEnumWithAssociatedValues = self.isEnumWithAssociatedValues
-                if isEnumWithAssociatedValues {
+                if isSealedClassesEnum {
                     output.append("sealed class ").append(name)
                 } else {
                     output.append("enum class ").append(name)
-                    if let inheritedRawValueType = enumInheritedRawValueType {
-                        inherits = Array(inherits.dropFirst())
-                        output.append("(val rawValue: \(inheritedRawValueType.kotlin))")
-                    }
+                }
+                if let inheritedRawValueType = enumInheritedRawValueType {
+                    inherits = Array(inherits.dropFirst())
+                    output.append("(val rawValue: \(inheritedRawValueType.kotlin))")
                 }
             } else {
                 output.append("class ").append(name)
@@ -858,7 +865,7 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
         output.append(indentation)
         if let declaration = extras?.declaration {
             output.append(declaration)
-        } else if let owningClassDeclaration = parent as? KotlinClassDeclaration, owningClassDeclaration.isEnumWithAssociatedValues {
+        } else if let owningClassDeclaration = parent as? KotlinClassDeclaration, owningClassDeclaration.isSealedClassesEnum {
             output.append("class \(name)")
             var propertyDeclarations: [String] = []
             if !associatedValues.isEmpty {
@@ -880,7 +887,12 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
                }
                output.append(")")
             }
-            output.append(": \(owningClassDeclaration.name)() {\n")
+            output.append(": \(owningClassDeclaration.name)")
+            if let rawValue {
+                output.append("(").append(rawValue, indentation: indentation).append(") {\n")
+            } else {
+                output.append("() {\n")
+            }
             propertyDeclarations.forEach { output.append(indentation.inc()).append($0).append("\n") }
             output.append(indentation).append("}\n")
         } else {

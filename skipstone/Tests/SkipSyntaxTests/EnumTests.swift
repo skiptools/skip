@@ -124,4 +124,6 @@ final class EnumTests: XCTestCase {
         }
         """)
     }
+
+    // TODO: Automatic Equatable for enums without associated values converted to sealed classes... other enums too?
 }

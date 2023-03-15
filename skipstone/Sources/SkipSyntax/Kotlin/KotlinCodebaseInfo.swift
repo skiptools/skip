@@ -13,6 +13,7 @@ public class KotlinCodebaseInfo {
         self.plugins = [
             // NOTE: Keep the struct plugin first because it adds members that may need processing by subsequent plugins
             KotlinStructPlugin(),
+            KotlinErrorToThrowablePlugin(),
             KotlinConstructorPlugin(),
             KotlinIfWhenPlugin(),
             KotlinDeferPlugin(),
@@ -147,7 +148,7 @@ public class KotlinCodebaseInfo {
         func constructorParameters(of qualifiedName: String) -> [[ConstructorParameter]] {
             for info in codebaseInfo.typeInfo[qualifiedName, default: []] {
                 if !info.isPrivate || info.sourceFile == sourceFile {
-                    if info.constructorParameters.isEmpty, let firstInherits = info.firstInherits {
+                    if info.constructorParameters.isEmpty, let firstInherits = info.inherits.first?.description {
                         return constructorParameters(of: firstInherits)
                     } else {
                         return info.constructorParameters
@@ -186,19 +187,51 @@ public class KotlinCodebaseInfo {
             return symbols?.isMutableStructType(qualifiedName: qualifiedName) != false
         }
 
-        /// Whether the given enum type has cases with associated values.
-        func enumHasAssociatedValues(qualifiedName: String) -> Bool {
+        /// Whether the given type conforms to `Error` through its protocols, **not** through inheritance.
+        func conformsToError(qualifiedName: String) -> Bool {
+            guard qualifiedName != "Error" else {
+                return true
+            }
             for info in codebaseInfo.typeInfo[qualifiedName, default: []] {
                 if !info.isPrivate || info.sourceFile == sourceFile {
-                    return info.hasAssociatedValues
+                    if info.inherits.isEmpty {
+                        return false
+                    } else if info.inherits.contains(.named("Error", [])) {
+                        return true
+                    } else {
+                        break // Unknown; check symbols below
+                    }
                 }
             }
-            return symbols?.enumHasAssociatedValues(qualifiedName: qualifiedName) == true
+            return symbols?.conformsToError(qualifiedName: qualifiedName) == true
+        }
+
+        /// Whether the given enum type has cases with associated values.
+        func isSealedClassesEnum(qualifiedName: String) -> Bool {
+            for info in codebaseInfo.typeInfo[qualifiedName, default: []] {
+                if !info.isPrivate || info.sourceFile == sourceFile {
+                    if info.declarationType != .enumDeclaration {
+                        return false
+                    }
+                    return info.hasAssociatedValues || conformsToError(qualifiedName: qualifiedName)
+                }
+            }
+            guard let symbols else {
+                return false
+            }
+            switch symbols.enumHasAssociatedValues(qualifiedName: qualifiedName) {
+            case nil:
+                return false
+            case true?:
+                return true
+            case false?:
+                return symbols.conformsToError(qualifiedName: qualifiedName) == true
+            }
         }
     }
 
     private func addTypeInfo(for typeDeclaration: TypeDeclaration, mayBeMutableStructType: Bool?) {
-        var info = TypeInfo(declarationType: typeDeclaration.type, firstInherits: typeDeclaration.inherits.first?.description, mayBeMutableStructType: mayBeMutableStructType, isPrivate: typeDeclaration.modifiers.visibility == .private, sourceFile: typeDeclaration.sourceFile)
+        var info = TypeInfo(declarationType: typeDeclaration.type, inherits: typeDeclaration.inherits, mayBeMutableStructType: mayBeMutableStructType, isPrivate: typeDeclaration.modifiers.visibility == .private, sourceFile: typeDeclaration.sourceFile)
         if typeDeclaration.type != .protocolDeclaration {
             info.constructorParameters = constructorParameters(in: typeDeclaration.members)
         } else if typeDeclaration.type == .enumDeclaration {
@@ -248,7 +281,7 @@ public class KotlinCodebaseInfo {
 
 private struct TypeInfo {
     let declarationType: StatementType
-    let firstInherits: String?
+    let inherits: [TypeSignature]
     let mayBeMutableStructType: Bool?
     let isPrivate: Bool
     let sourceFile: Source.File?
@@ -285,7 +318,7 @@ extension Symbols.Context {
                 }
                 hasType = true
             case .protocol:
-                if !isAnyObjectRestrictedProtocol(candidate) {
+                if !conformsTo(candidate, typeName: "AnyObject") {
                     return true
                 }
                 hasType = true
@@ -294,6 +327,25 @@ extension Symbols.Context {
             }
         }
         return hasType ? false : nil
+    }
+
+    /// Whether the given type conforms to `Error` through its protocols, **not** through inheritance.
+    ///
+    /// - Returns: true if a symbol exists for an error type, false if the type does not conform to `Error`, and nil if no type symbol exists.
+    func conformsToError(qualifiedName: String) -> Bool? {
+        let candidates = lookup(name: qualifiedName)
+        for candidate in ranked(candidates) {
+            guard let kind = candidate.kind else {
+                continue
+            }
+            switch kind {
+            case .class, .enum, .struct, .protocol:
+                return conformsTo(candidate, typeName: "Error")
+            default:
+                break
+            }
+        }
+        return nil
     }
 
     /// Return the type signatures of all constructors for the given type name, including inherited constructors.
@@ -388,15 +440,15 @@ extension Symbols.Context {
         return false
     }
 
-    private func isAnyObjectRestrictedProtocol(_ symbol: Symbol) -> Bool {
-        if symbol.isInDeclaredInheritanceList(typeName: "AnyObject") {
+    private func conformsTo(_ candidate: Symbol, typeName: String) -> Bool {
+        if candidate.isInDeclaredInheritanceList(typeName: typeName) {
             return true
         }
-        for relationship in symbol.relationships {
-            guard relationship.kind == .conformsTo, !relationship.isInverse, let conformsTo = lookup(identifier: relationship.targetIdentifier ?? "") else {
+        for relationship in candidate.relationships {
+            guard relationship.kind == .conformsTo, !relationship.isInverse, let targetSymbol = lookup(identifier: relationship.targetIdentifier ?? "") else {
                 continue
             }
-            if isAnyObjectRestrictedProtocol(conformsTo) {
+            if conformsTo(targetSymbol, typeName: typeName) {
                 return true
             }
         }

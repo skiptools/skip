@@ -189,13 +189,13 @@ struct KotlinCase {
     var caseBindingVariables: [KotlinBindingVariable]
     var body: KotlinCodeBlock
 
-    static func translate(expression: SwitchCase, matchingOn: KotlinExpression, enumHasAssociatedValues: Bool, caseTargetVariable: inout KotlinCaseTargetVariable?, translator: KotlinTranslator) -> (KotlinCase, [Message]) {
+    static func translate(expression: SwitchCase, matchingOn: KotlinExpression, isSealedClassesEnum: Bool, caseTargetVariable: inout KotlinCaseTargetVariable?, translator: KotlinTranslator) -> (KotlinCase, [Message]) {
         var messages: [Message] = []
         let caseValues: [(KotlinExpression?, [KotlinBindingVariable])] = expression.patterns.map { pattern in
             if let whereGuard = pattern.whereGuard {
                 messages.append(.kotlinWhenCaseWhere(whereGuard))
             }
-            let (targetVariable, bindingVariables, condition, caseMessages) = KotlinCasePattern.translate(expression: pattern.pattern, target: caseTargetVariable?.identifier ?? matchingOn, enumHasAssociatedValues: enumHasAssociatedValues, translator: translator)
+            let (targetVariable, bindingVariables, condition, caseMessages) = KotlinCasePattern.translate(expression: pattern.pattern, target: caseTargetVariable?.identifier ?? matchingOn, isSealedClassesEnum: isSealedClassesEnum, translator: translator)
             messages += caseMessages
 
             // If we find a case that requires a target variable, use it for the entire switch
@@ -215,7 +215,7 @@ struct KotlinCase {
 
 /// - Note: This type is used to translate the ``CasePattern`` expression, but is not itself a `KotlinExpression`.
 struct KotlinCasePattern {
-    static func translate(expression: CasePattern, target: KotlinExpression, enumHasAssociatedValues: Bool, translator: KotlinTranslator) -> (targetVariable: KotlinCaseTargetVariable?, bindingVariables: [KotlinBindingVariable], condition: KotlinExpression?, messages: [Message]) {
+    static func translate(expression: CasePattern, target: KotlinExpression, isSealedClassesEnum: Bool, translator: KotlinTranslator) -> (targetVariable: KotlinCaseTargetVariable?, bindingVariables: [KotlinBindingVariable], condition: KotlinExpression?, messages: [Message]) {
         var targetVariable: KotlinCaseTargetVariable? = nil
         var bindingVariables: [KotlinBindingVariable] = []
         var messages: [Message] = []
@@ -244,7 +244,7 @@ struct KotlinCasePattern {
         }
 
         var value: KotlinExpression?
-        var op = Operator.with(symbol: enumHasAssociatedValues ? "is" : "==")
+        var op = Operator.with(symbol: isSealedClassesEnum ? "is" : "==")
         switch expression.value.type {
         case .binding:
             if let binding = expression.value as? Binding {
@@ -981,8 +981,8 @@ struct KotlinMatchingCase {
     static func translate(expression: MatchingCase, translator: KotlinTranslator) -> (targetVariable: KotlinCaseTargetVariable?, bindingVariables: [KotlinBindingVariable], condition: KotlinExpression) {
         let ktarget = translator.translateExpression(expression.target)
         let inferredType = expression.declaredType.or(expression.target.inferredType)
-        let enumHasAssociatedValues = inferredType.kotlinEnumHasAssociatedValues(codebaseInfo: translator.codebaseInfo)
-        let (targetVariable, bindingVariables, condition, messages) = KotlinCasePattern.translate(expression: expression.pattern, target: ktarget, enumHasAssociatedValues: enumHasAssociatedValues, translator: translator)
+        let isSealedClassesEnum = inferredType.kotlinIsSealedClassesEnum(codebaseInfo: translator.codebaseInfo)
+        let (targetVariable, bindingVariables, condition, messages) = KotlinCasePattern.translate(expression: expression.pattern, target: ktarget, isSealedClassesEnum: isSealedClassesEnum, translator: translator)
         let kcondition = condition ?? KotlinBooleanLiteral(literal: true)
         kcondition.messages += messages
         return (targetVariable, bindingVariables, kcondition)
@@ -1627,7 +1627,7 @@ class KotlinWhen: KotlinExpression {
 
     static func translate(expression: Switch, translator: KotlinTranslator) -> KotlinWhen {
         var kon = translator.translateExpression(expression.on)
-        let enumHasAssociatedValues = expression.on.inferredType.kotlinEnumHasAssociatedValues(codebaseInfo: translator.codebaseInfo)
+        let isSealedClassesEnum = expression.on.inferredType.kotlinIsSealedClassesEnum(codebaseInfo: translator.codebaseInfo)
         var caseTargetVariable: KotlinCaseTargetVariable? = nil
         let hasNonNilMatches = expression.cases.contains { $0.patterns.contains { $0.pattern.isNonNilMatch } }
         // When we have to compare the switch expression to nil we'll be executing it repeatedly, so store it in a var
@@ -1638,7 +1638,7 @@ class KotlinWhen: KotlinExpression {
         var kcases: [KotlinCase] = []
         var messages: [Message] = []
         for switchCase in expression.cases {
-            var (kcase, caseMessages) = KotlinCase.translate(expression: switchCase, matchingOn: kon, enumHasAssociatedValues: enumHasAssociatedValues, caseTargetVariable: &caseTargetVariable, translator: translator)
+            var (kcase, caseMessages) = KotlinCase.translate(expression: switchCase, matchingOn: kon, isSealedClassesEnum: isSealedClassesEnum, caseTargetVariable: &caseTargetVariable, translator: translator)
             kcase.patterns = kcase.patterns.map { pattern in
                 // Change conditions of the form 'target == x' to just 'x', and the form 'target is/in/etc x' to just 'is/in/etc x'.
                 // We only keep the binary expressions if we must compare != null, which can't be done in unary form

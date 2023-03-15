@@ -44,6 +44,10 @@ extension Message {
         return Message(kind: .warning, message: "Kotlin enum cases do not support modifiers", sourceDerived: sourceDerived)
     }
 
+    static func kotlinErrorCannotExtendClass(_ sourceDerived: SourceDerived) -> Message {
+        return Message(kind: .error, message: "An Error type cannot extend another class because it will be translated to extend Throwable in Kotlin", sourceDerived: sourceDerived)
+    }
+
     // Idea: factory function with class name?
     static func kotlinExtensionAddConstructorsToOutsideType(_ sourceDerived: SourceDerived) -> Message {
         return Message(kind: .error, message: "Cannot use an extension to add additional constructors to a Kotlin type defined outside of this module", sourceDerived: sourceDerived)
