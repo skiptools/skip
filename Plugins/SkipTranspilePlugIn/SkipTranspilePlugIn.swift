@@ -1,12 +1,26 @@
+// Copyright 2023 Skip
+//
+// This is free software: you can redistribute and/or modify it
+// under the terms of the GNU Lesser General Public License 3.0
+// as published by the Free Software Foundation https://fsf.org
 import Foundation
 import PackagePlugin
 
 /// Build plugin to do pre-work like emit warnings about incompatible Swift before transpiling with Skip.
 @main struct SkipTranspilePlugIn: BuildToolPlugin {
+    let pluginFolderName = "SkipTranspilePlugIn"
+
     func createBuildCommands(context: PluginContext, target: Target) async throws -> [Command] {
         let skiptool = try context.tool(named: "skiptool")
         let outputFolder = context.pluginWorkDirectory
         // let pkg = context.package
+
+        guard let sourceTarget = target as? SourceModuleTarget else {
+            throw TranspilePlugInError("Target «\(target.name)» was not a source module")
+        }
+
+        // look for ModuleKotlin/Sources/skip/skip.yml
+        let skipFolder = sourceTarget.directory.appending(["skip"])
 
         // the peer for the current target
         // e.g.: CrossSQLKotlin -> CrossSQL
@@ -16,14 +30,15 @@ import PackagePlugin
         let testSuffix = "Tests"
         let kotlinSuffix = "Kotlin"
         let isTest = target.name.hasSuffix(testSuffix)
-
+        let kotlinModule: String // the Kotlin module, which will be the same for both TargetName and TargetNameTests
         if isTest {
             if !target.name.hasSuffix(kotlinSuffix + testSuffix) {
                 throw TranspilePlugInError("Target «\(target.name)» must have suffix «\(kotlinSuffix + testSuffix)»")
             }
 
             // convert ModuleKotlinTests -> ModuleTests
-            let expectedName = String(target.name.dropLast(kotlinSuffix.count + testSuffix.count)) + testSuffix
+            kotlinModule = String(target.name.dropLast(kotlinSuffix.count + testSuffix.count))
+            let expectedName = kotlinModule + testSuffix
 
             // Known issue with SPM in Xcode: we cannot have a depencency from one testTarget to another, or we hit the error:
             // Enable to resolve build file: XCBCore.BuildFile (The workspace has a reference to a missing target with GUID 'PACKAGE-TARGET:CrossSQLTests')
@@ -38,7 +53,8 @@ import PackagePlugin
                 throw TranspilePlugInError("Target «\(target.name)» must have suffix «\(kotlinSuffix)»")
             }
 
-            let expectedName = String(target.name.dropLast(kotlinSuffix.count))
+            kotlinModule = String(target.name.dropLast(kotlinSuffix.count))
+            let expectedName = kotlinModule
 
             guard let primaryDependency = target.dependencies.first,
                 case .target(let dependencyTarget) = primaryDependency else {
@@ -65,32 +81,57 @@ import PackagePlugin
 
         var buildModuleArgs: [String] = [
             "--module",
-            peerTarget.name,
+            peerTarget.name + ":" + peerTarget.directory.string,
         ]
-        for targetDependent in peerTarget.dependencies {
+
+        func addModuleLinkFlag(_ target: Target) {
+            let targetName = target.name
+            if !targetName.hasSuffix(kotlinSuffix) {
+                //print("peer target had invalid name: \(targetName)")
+                return
+            }
+            let peerTargetName = targetName.dropLast(kotlinSuffix.count).description
+
+            // build up a relative link path to the related module based on the plug-in output directory structure
+            buildModuleArgs += ["--module", peerTargetName + ":" + target.directory.string]
+            // e.g. ../../CrossFoundationKotlin/SkipTranspilePlugIn/CrossFoundation
+            // FIXME: the inserted "../" is needed because LocalFileSystem.createSymbolicLink will resolve the relative path against the destinations *parent* for some reason (SPM bug?)
+            let targetLink = "../../../" + target.name + "/" + pluginFolderName + "/" + peerTargetName
+            buildModuleArgs += ["--link", peerTargetName + ":" + targetLink]
+        }
+
+        func addModuleLinkDependency(_ targetDependent: TargetDependency) {
             switch targetDependent {
             case .target(let target):
-                buildModuleArgs += [
-                    "--module",
-                    target.name,
-                ]
+                addModuleLinkFlag(target)
             case .product(let product):
                 for productTarget in product.targets {
-                    buildModuleArgs += [
-                        "--module",
-                        productTarget.name,
-                    ]
+                    addModuleLinkFlag(productTarget)
                 }
             @unknown default:
                 fatalError("unhandled target case")
             }
+
         }
+
+        for target in target.recursiveTargetDependencies {
+            if target.name.hasSuffix(kotlinSuffix) { // only link in if the module is named "*Kotlin"
+                addModuleLinkFlag(target)
+            }
+        }
+
+        let outputURL = URL(fileURLWithPath: outputFolder.string, isDirectory: true)
+        let outputBase = URL(fileURLWithPath: kotlinModule, isDirectory: true, relativeTo: outputURL)
+
+        let sourceOutputPath = URL(fileURLWithPath: isTest ? "src/test/kotlin" : "src/main/kotlin", isDirectory: true, relativeTo: outputBase)
 
         // note that commands are executed in reverse order
         return [
             .buildCommand(displayName: "Skip Transpile \(target.name)", executable: skiptool.path, arguments: [
                 "transpile",
-                "--output-folder", outputFolder.string,
+                "--output-folder", sourceOutputPath.path,
+                "--module-root", outputBase.path,
+                "--skip-folder", skipFolder.string,
                 //"-v",
                 ]
                 + buildModuleArgs
