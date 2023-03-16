@@ -1342,7 +1342,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         } else if names.count == 1 && names[0] == nil {
             // Kotlin doesn't support assignment to wildcard
             if let value {
-                output.append(value, indentation: indentation).append("\n")
+                output.append(value, indentation: indentation)
             }
         } else {
             if isProperty || isGlobal {
@@ -1382,8 +1382,8 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                     output.append(" = null")
                 }
             }
-            output.append("\n")
         }
+        output.append("\n")
 
         if let getterBody = getter?.body {
             let getterIndentation = indentation.inc()

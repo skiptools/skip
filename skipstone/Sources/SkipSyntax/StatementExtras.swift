@@ -46,15 +46,15 @@ struct StatementExtras {
             }
             let directiveString = directiveLines.joined().trimmingCharacters(in: .whitespacesAndNewlines)
             switch currentDirective {
-            case .insert(_, _):
+            case .insert:
                 let extras = StatementExtras(directives: [], leadingTrivia: triviaLines, trailingTrivia: [])
                 directives.append(.insert(directiveString, extras))
                 triviaLines.removeAll()
-            case .replace(_, _):
+            case .replace:
                 let extras = StatementExtras(directives: [], leadingTrivia: triviaLines, trailingTrivia: [])
                 directives.append(.replace(directiveString, extras))
                 triviaLines.removeAll()
-            case .declaration(_):
+            case .declaration:
                 directives.append(.declaration(directiveString))
             default:
                 break
@@ -69,7 +69,7 @@ struct StatementExtras {
             triviaString = String(triviaString.dropFirst())
         }
         while !triviaString.isEmpty {
-            // Do out own line splits so that we can differentiate whether the last line had a trailing newline.
+            // Do our own line splits so that we can differentiate whether the last line had a trailing newline.
             // We don't want to treat indentation before the statement as a trivia line
             let line: String
             let hasNewline: Bool
@@ -109,8 +109,8 @@ struct StatementExtras {
                 }
                 continue
             }
-            if directive != nil && trimmedLine.hasPrefix("//") {
-                directiveLines.append(trimmedLine.dropFirst(2) + "\n")
+            if directive != nil && trimmedLine.hasPrefix("// ") {
+                directiveLines.append(trimmedLine.dropFirst(3) + "\n")
             } else {
                 endDirective()
                 triviaLines.append(trimmedLine + "\n")
