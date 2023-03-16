@@ -313,8 +313,8 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal open class C: MemberDeclarationTestsProtocol {
-            internal override var i = 0
-            internal override open fun f() {
+            override var i = 0
+            override open fun f() {
             }
         }
         """)

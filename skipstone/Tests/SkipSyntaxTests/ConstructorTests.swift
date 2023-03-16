@@ -23,15 +23,15 @@ final class ConstructorTests: XCTestCase {
         """, kotlin: """
         internal open class A {
         }
-        
+
         internal open class B: A() {
         }
-        
-        internal open class C: A() {
-            internal constructor() {
+
+        internal open class C: A {
+            internal constructor(): super() {
             }
         }
-        
+
         internal open class D: A {
             internal constructor(): super() {
             }
@@ -69,23 +69,23 @@ final class ConstructorTests: XCTestCase {
             internal constructor() {
             }
         }
-        
+
         internal open class B: A {
-        
+
             internal constructor(): super() {
             }
         }
-        
-        internal open class C: A() {
-            internal constructor() {
+
+        internal open class C: A {
+            internal constructor(): super() {
             }
         }
-        
-        internal open class D: A() {
-            internal constructor(i: Int) {
+
+        internal open class D: A {
+            internal constructor(i: Int): super() {
             }
         }
-        
+
         internal open class E: A {
             internal constructor(i: Int): super() {
             }

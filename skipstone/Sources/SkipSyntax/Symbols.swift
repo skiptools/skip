@@ -866,10 +866,10 @@ struct Symbol {
     }
 
     enum Visibility: String, RawRepresentable {
+        case `private`
+        case `internal`
         case `public`
         case `open`
-        case `internal`
-        case `private`
     }
 
     struct Relationship {

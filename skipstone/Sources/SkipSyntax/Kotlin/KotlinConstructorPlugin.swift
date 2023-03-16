@@ -10,18 +10,18 @@ class KotlinConstructorPlugin: KotlinPlugin {
             return .recurse(nil)
         }
         let constructors = classDeclaration.members.filter { $0.type == .constructorDeclaration }
-        var mayNeedSuperclassCall = false
+        let superclass = superclass(of: classDeclaration, translator: translator)
         if constructors.isEmpty {
-            if classDeclaration.declarationType != .structDeclaration {
-                mayNeedSuperclassCall = !addInheritedConstructors(to: classDeclaration, translator: translator)
+            if classDeclaration.declarationType != .structDeclaration, !addInheritedConstructors(to: classDeclaration, translator: translator) {
+                if let superclass {
+                    classDeclaration.superclassCall = "\(superclass)()"
+                }
             }
         } else {
             var hasNonEmptyConstructor = false
             for constructor in constructors {
                 if let constructor = constructor as? KotlinFunctionDeclaration {
-                    if !fixupConstructor(constructor) {
-                        mayNeedSuperclassCall = true
-                    }
+                    fixupConstructor(constructor, isSubclass: superclass != nil)
                     if constructor.body?.statements.isEmpty == false {
                         hasNonEmptyConstructor = true
                     }
@@ -30,9 +30,6 @@ class KotlinConstructorPlugin: KotlinPlugin {
             if hasNonEmptyConstructor {
                 addIsConstructingProperty(to: classDeclaration)
             }
-        }
-        if mayNeedSuperclassCall {
-            addSuperclassCall(to: classDeclaration, translator: translator)
         }
         return .recurse(nil)
     }
@@ -76,12 +73,9 @@ class KotlinConstructorPlugin: KotlinPlugin {
         classDeclaration.members.append(constructor)
     }
 
-    private func fixupConstructor(_ constructor: KotlinFunctionDeclaration) -> Bool {
-        guard constructor.delegatingConstructorCall == nil else {
-            return true
-        }
-        guard let body = constructor.body else {
-            return false
+    private func fixupConstructor(_ constructor: KotlinFunctionDeclaration, isSubclass: Bool) {
+        guard constructor.delegatingConstructorCall == nil, let body = constructor.body else {
+            return
         }
 
         // Find any call to self or super init and move it to the Kotlin delegating constructor call
@@ -96,7 +90,9 @@ class KotlinConstructorPlugin: KotlinPlugin {
             body.statements.remove(at: index)
             constructor.delegatingConstructorCall = delegatingCall
         }
-        return constructor.delegatingConstructorCall != nil
+        if isSubclass && constructor.delegatingConstructorCall == nil {
+            constructor.delegatingConstructorCall = KotlinRawExpression(sourceCode: "super()")
+        }
     }
 
     private func delegatingConstructorCall(for statement: KotlinStatement) -> KotlinExpression? {
@@ -122,11 +118,11 @@ class KotlinConstructorPlugin: KotlinPlugin {
         }
     }
 
-    private func addSuperclassCall(to classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) {
-        // If we have a superclass, we must instantiate it
-        if let inherits = classDeclaration.inherits.first, translator.codebaseInfo?.declarationType(of: inherits.description, mustBeInModule: false) == .classDeclaration {
-            classDeclaration.superclassCall = "\(inherits.description)()"
+    private func superclass(of classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) -> String? {
+        guard let inherits = classDeclaration.inherits.first, translator.codebaseInfo?.declarationType(of: inherits.description, mustBeInModule: false) == .classDeclaration else {
+            return nil
         }
+        return inherits.description
     }
 
     private func addIsConstructingProperty(to classDeclaration: KotlinClassDeclaration) {

@@ -970,9 +970,21 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         kstatement.returnType = statement.returnType
         kstatement.parameters = statement.parameters.map { $0.translate(translator: translator) }
         if let owningTypeDeclaration = statement.owningTypeDeclaration {
-            kstatement.isOpen = !statement.modifiers.isFinal && statement.modifiers.visibility != .private && owningTypeDeclaration.type == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
-            if !kstatement.modifiers.isOverride && translator.codebaseInfo?.isProtocolMember(declaration: statement, in: owningTypeDeclaration) == true {
-                kstatement.modifiers.isOverride = true
+            if statement.type == .initDeclaration {
+                kstatement.isOpen = false
+                kstatement.modifiers.isOverride = false // Kotlin does not override constructors
+                if statement.isOptionalInit {
+                    kstatement.messages.append(.kotlinConstructorNullReturn(statement))
+                }
+            } else {
+                kstatement.isOpen = !statement.modifiers.isFinal && statement.modifiers.visibility != .private && owningTypeDeclaration.type == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
+                if !kstatement.modifiers.isOverride && translator.codebaseInfo?.isProtocolMember(declaration: statement, in: owningTypeDeclaration) == true {
+                    kstatement.modifiers.isOverride = true
+                }
+                // Kotlin does not all you to decrease visibility when overriding a member, so we simply make all overrides public to prevent errors
+                if kstatement.modifiers.isOverride {
+                    kstatement.modifiers.visibility = .public
+                }
             }
         }
         if let body = statement.body {
@@ -991,13 +1003,6 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 kstatement.messages.append(.kotlinProtocolConstructor(statement))
             } else if statement.modifiers.isStatic {
                 kstatement.messages.append(.kotlinProtocolStaticFunction(statement))
-            }
-        }
-        if statement.type == .initDeclaration {
-            kstatement.isOpen = false
-            kstatement.modifiers.isOverride = false // Kotlin does not override constructors
-            if statement.isOptionalInit {
-                kstatement.messages.append(.kotlinConstructorNullReturn(statement))
             }
         }
         if statement.attributes.attributes.contains(where: { !isIgnorable(attribute: $0) }) {
@@ -1258,6 +1263,10 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             kstatement.isOpen = kstatement.isProperty && !statement.modifiers.isFinal && statement.modifiers.visibility != .private && owningTypeDeclaration.type == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
             if kstatement.isProperty && !kstatement.modifiers.isOverride && translator.codebaseInfo?.isProtocolMember(declaration: statement, in: owningTypeDeclaration) == true {
                 kstatement.modifiers.isOverride = true
+            }
+            // Kotlin does not all you to decrease visibility when overriding a member, so we simply make all overrides public to prevent errors
+            if kstatement.modifiers.isOverride {
+                kstatement.modifiers.visibility = .public
             }
         } else if statement.parent?.parent == nil {
             kstatement.isGlobal = true
