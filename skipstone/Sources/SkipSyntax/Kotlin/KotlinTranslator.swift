@@ -1,3 +1,5 @@
+import Foundation
+
 /// Translates a Swift syntax tree to Kotlin code.
 public class KotlinTranslator {
     let syntaxTree: SyntaxTree
@@ -13,7 +15,7 @@ public class KotlinTranslator {
     ///   - moduleName: The module name to convert.
     ///   - fallbackPrefix: The package name to prefix if the module name doesn't result in a package name containing dots.
     /// - Returns: The dot-separated package name.
-    public static func packageName(forModule moduleName: String, fallbackPrefix: String? = "skipmodule") -> String {
+    public static func packageName(forModule moduleName: String, fallbackPrefix: String? = "skipmodule", trimTests: Bool = true) -> String {
         var lastLower = false
         var packageName = ""
         var hasDot = false
@@ -33,11 +35,16 @@ public class KotlinTranslator {
         if !hasDot, let fallbackPrefix = fallbackPrefix {
             packageName = fallbackPrefix + "." + packageName
         }
+
+        // the "Tests" module suffix is special: in Swift XXX and XXXTest are different modules (with a @testable import to allow the tests to access internal symbols), but in Kotlin, test cases need to be in the same package in order to be able to access the symbols
+        if trimTests && packageName.hasSuffix(".tests") {
+            packageName = String(packageName.dropLast(".tests".count))
+        }
         return packageName
     }
 
     /// Translate and transpile to source code.
-    public func transpile(codebaseInfo: KotlinCodebaseInfo) -> Transpilation {
+    public func transpile(codebaseInfo: KotlinCodebaseInfo, startTime: TimeInterval) -> Transpilation {
         let importedModuleNames: [String] = syntaxTree.root.statements.compactMap { statement in
             guard statement.type == .importDeclaration, let importDeclaration = statement as? ImportDeclaration else {
                 return nil
@@ -58,7 +65,8 @@ public class KotlinTranslator {
         let outputFile = syntaxTree.source.file.outputFile(withExtension: "kt")
         let outputGenerator = OutputGenerator(root: kotlinSyntaxTree.root)
         let (output, outputMap) = outputGenerator.generateOutput(file: outputFile)
-        return Transpilation(sourceFile: syntaxTree.source.file, output: output, outputMap: outputMap, messages: messages)
+        let endTime = CFAbsoluteTimeGetCurrent() // track the duration for logging
+        return Transpilation(sourceFile: syntaxTree.source.file, output: output, outputMap: outputMap, messages: messages, duration: endTime - startTime)
     }
 
     /// Translate syntax trees only.
@@ -70,11 +78,26 @@ public class KotlinTranslator {
                 KotlinRawStatement(sourceCode: ""),
             ]
         }
-        let requiredImportStatements = [
-            KotlinRawStatement(sourceCode: "import skip.lib.*"),
-            KotlinRawStatement(sourceCode: "import skip.lib.Array"), // Override kotlin.Array
+
+        var requiredImportStatements: [KotlinRawStatement] = [
+        ]
+
+        // manual whitelist of the packages above skip.lib: skip.core and skip.unit
+        if let packageName = packageName, !Set([
+            "skip.core",
+            "skip.unit",
+            "skip.lib",
+        ]).contains(packageName) {
+            requiredImportStatements += [
+                KotlinRawStatement(sourceCode: "import skip.lib.*"),
+                KotlinRawStatement(sourceCode: "import skip.lib.Array"), // Override kotlin.Array
+            ]
+        }
+
+        requiredImportStatements += [
             KotlinRawStatement(sourceCode: ""),
         ]
+
         let translatedStatements = syntaxTree.root.statements.flatMap { translateStatement($0) }
         return KotlinSyntaxTree(sourceFile: syntaxTree.source.file, root: KotlinCodeBlock(statements: packageStatements + requiredImportStatements + translatedStatements))
     }

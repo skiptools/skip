@@ -38,3 +38,41 @@ public struct SkipConfig : Decodable {
         public var postreplace: [String]?
     }
 }
+
+/// The target mode for generating Gradle config
+public enum GradleTarget {
+    /// An app module target
+    case app(String)
+    /// A library module target
+    case lib(String)
+
+    public var moduleName: String {
+        switch self {
+        case .app(let moduleName): return moduleName
+        case .lib(let moduleName): return moduleName
+        }
+    }
+
+    var pluginType: String {
+        switch self {
+        case .app: return "com.android.application"
+        case .lib: return "com.android.library"
+        }
+    }
+
+    var isApp: Bool {
+        switch self {
+        case .app: return true
+        case .lib: return false
+        }
+    }
+
+    var isLibrary: Bool {
+        switch self {
+        case .app: return false
+        case .lib: return true
+        }
+    }
+}
+
+

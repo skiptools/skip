@@ -152,7 +152,7 @@ extension SkipSystem {
         }
 
         let moduleNames = targets.deepTargetSet.map(\.target.moduleName)
-        let unifiedGraphs = try await SkipSystem.extractSymbolGraph(moduleNames: moduleNames, from: URL.moduleBuildFolder).unifiedGraphs
+        let unifiedGraphs = try await SkipSystem.extractSymbolGraph(moduleNames: moduleNames, from: URL.moduleBuildFolder()).unifiedGraphs
 
         for targetSet in targets.deepTargetSet {
             let moduleName = targetSet.target.moduleName
@@ -283,7 +283,7 @@ extension SkipSystem {
                         //let destPath = kotlinRoot.appending(component: sourceURL.relativePath).deletingPathExtension().appendingPathExtension("kt")
                         let destPath = kotlinRoot.appending(component: sourceURL.basenameWithoutExt).appendingPathExtension("kt")
 
-                        logger.debug("transpiling: \(sourceURL.pathString) to \(destPath.pathString)")
+                        logger.debug("transpiling \(sourceURL.pathString) to \(destPath.pathString)")
                         try destFS.createDirectory(destPath.parentDirectory, recursive: true)
                         let kotlin = transpilation.output.content
 
@@ -782,58 +782,25 @@ extension SkipSystem {
 #endif
 
 extension URL {
+    // FIXME: reduntant with SkipUnit
     /// The folder where built modules will be placed.
     ///
     /// When running within Xcode, which will query the `__XCODE_BUILT_PRODUCTS_DIR_PATHS` environment.
     /// Otherwise, it assumes SPM's standard ".build" folder relative to the working directory.
-    static var moduleBuildFolder: URL {
+    static func moduleBuildFolder(debug: Bool? = nil) -> URL {
         // if we are running tests from Xcode, this environment variable should be set; otherwise, assume the .build folder for an SPM build
         let xcodeBuildFolder = ProcessInfo.processInfo.environment["__XCODE_BUILT_PRODUCTS_DIR_PATHS"] ?? ProcessInfo.processInfo.environment["BUILT_PRODUCTS_DIR"] // also seems to be __XPC_DYLD_LIBRARY_PATH or __XPC_DYLD_FRAMEWORK_PATH; this will be something like ~/Library/Developer/Xcode/DerivedData/MODULENAME-bsjbchzxfwcrveckielnbyhybwdr/Build/Products/Debug
 
 
-#if DEBUG
-        let swiftBuildFolder = ".build/debug"
-#else
-        let swiftBuildFolder = ".build/release"
-#endif
+        // FIXME: this is based on the tool's build settings, which will always be release; need a way to determine whether the user's code is debug or release
+        #if DEBUG
+        let debug = debug ?? true
+        #else
+        let debug = debug ?? false
+        #endif
 
+        let swiftBuildFolder = ".build/" + (debug ? "debug" : "release")
         return URL(fileURLWithPath: xcodeBuildFolder ?? swiftBuildFolder, isDirectory: true)
-    }
-}
-
-/// The target mode for generating Gradle config
-public enum GradleTarget {
-    /// An app module target
-    case app(String)
-    /// A library module target
-    case lib(String)
-
-    public var moduleName: String {
-        switch self {
-        case .app(let moduleName): return moduleName
-        case .lib(let moduleName): return moduleName
-        }
-    }
-
-    var pluginType: String {
-        switch self {
-        case .app: return "com.android.application"
-        case .lib: return "com.android.library"
-        }
-    }
-
-    var isApp: Bool {
-        switch self {
-        case .app: return true
-        case .lib: return false
-        }
-    }
-
-    var isLibrary: Bool {
-        switch self {
-        case .app: return false
-        case .lib: return true
-        }
     }
 }
 

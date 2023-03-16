@@ -1,6 +1,8 @@
 @testable import SkipSyntax
 import XCTest
 
+// to update the codebase symbols for this test, manually run:
+
 final class KotlinCodebaseInfoTests: XCTestCase {
     func testIsMutableStructType() async throws {
         let context = try await symbols.context()

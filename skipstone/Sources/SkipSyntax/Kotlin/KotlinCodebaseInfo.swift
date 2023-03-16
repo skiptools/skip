@@ -8,7 +8,7 @@ public class KotlinCodebaseInfo {
     private(set) var plugins: [KotlinPlugin] = []
     private let symbols: Symbols?
 
-    public init(packageName: String? = nil, symbols: Symbols? = nil) {
+    public init(packageName: String? = nil, symbols: Symbols? = nil, plugins: [KotlinPlugin] = []) {
         self.packageName = packageName
         self.symbols = symbols
         // Idea: Track which plugins we might need when we come across relevant code during initial translation and save traversing the tree for unnecessary plugins
@@ -19,8 +19,9 @@ public class KotlinCodebaseInfo {
             KotlinConstructorPlugin(),
             KotlinIfWhenPlugin(),
             KotlinDeferPlugin(),
-            KotlinSwiftUIPlugin()
-        ]
+            KotlinSwiftUIPlugin(),
+            KotlinImportMapPlugin(), // TODO: drive this from skip.yml metadata
+        ] + plugins
     }
 
     /// Gather codebase-level information from the given syntax tree.

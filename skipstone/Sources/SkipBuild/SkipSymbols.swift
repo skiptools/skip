@@ -24,7 +24,7 @@ public actor SymbolCache {
             return symbols
         }
 
-        let symbols = try await SkipSystem.extractSymbols(moduleFolder: .moduleBuildFolder, moduleNames: [moduleName], accessLevel: accessLevel)
+        let symbols = try await SkipSystem.extractSymbols(moduleFolder: .moduleBuildFolder(), moduleNames: [moduleName], accessLevel: accessLevel)
         guard !symbols.isEmpty else {
             struct NoSymbolsFoundError : Error { }
             throw NoSymbolsFoundError()
@@ -187,7 +187,7 @@ public struct SkipSystem {
         // gather the symbols for all the targets
         let collector = GraphCollector(extensionGraphAssociationStrategy: .extendingGraph)
         for moduleName in moduleNames {
-            let symbolGraphs = try await SkipSystem.extractSymbols(moduleFolder: moduleBuildFolder ?? URL.moduleBuildFolder, moduleNames: [moduleName])
+            let symbolGraphs = try await SkipSystem.extractSymbols(moduleFolder: moduleBuildFolder ?? URL.moduleBuildFolder(), moduleNames: [moduleName])
             for (url, graph) in symbolGraphs {
                 logger.debug("adding symbol graph for: \(url.path)")
                 collector.mergeSymbolGraph(graph, at: url)
@@ -198,7 +198,7 @@ public struct SkipSystem {
     }
 
     public static func extractSymbols(moduleFolder moduleBuildFolder: URL? = nil, moduleNames: [String], tmpDir: URL? = nil, sdk: String = "macosx", accessLevel: String = "internal") async throws -> [URL: SymbolGraph] {
-        let moduleBuildFolder = moduleBuildFolder ?? URL.moduleBuildFolder
+        let moduleBuildFolder = moduleBuildFolder ?? URL.moduleBuildFolder()
 
         // fall back to using a temporary folder
         let tmpDir = tmpDir ?? URL(fileURLWithPath: UUID().uuidString, isDirectory: true, relativeTo: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true))

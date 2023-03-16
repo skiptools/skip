@@ -3,15 +3,15 @@ import SwiftSyntax
 
 /// Swift source.
 public struct Source : Encodable {
-    public let file: File
+    public let file: FilePath
     public let content: String
 
-    public init(file: File) throws {
+    public init(file: FilePath) throws {
         let content = try String(contentsOfFile: file.path)
         self = Source(file: file, content: content)
     }
 
-    public init(file: File, content: String) {
+    public init(file: FilePath, content: String) {
         self.file = file
         self.content = content
         let contentLines = content.split(separator: "\n", omittingEmptySubsequences: false)
@@ -69,8 +69,11 @@ public struct Source : Encodable {
         return Position(line: 1, column: 1)
     }
 
+    // TODO: @available(*, deprecated, renamed: "SourceFile")
+    public typealias File = FilePath
+
     /// A Swift source file.
-    public struct File: Hashable, Encodable {
+    public struct FilePath: SourceFile, Hashable, Encodable {
         public let path: String
 
         public init(path: String) {
@@ -88,15 +91,16 @@ public struct Source : Encodable {
             return path.hasSuffix(".swift")
         }
 
+        @available(*, deprecated, message: "prefer TSCBasic.AbsolutePath")
         public var url: URL {
             URL(fileURLWithPath: path, isDirectory: false)
         }
 
-        public func outputFile(withExtension: String) -> File {
+        public func outputFile(withExtension: String) -> Source.File {
             guard let dotIndex = path.lastIndex(of: ".") else {
-                return File(path: "\(path).\(withExtension)")
+                return FilePath(path: "\(path).\(withExtension)")
             }
-            return File(path: path[...dotIndex] + withExtension)
+            return FilePath(path: path[...dotIndex] + withExtension)
         }
     }
 
@@ -126,4 +130,8 @@ public struct Source : Encodable {
             return lhs.line < rhs.line || (lhs.line == rhs.line && lhs.column < rhs.column)
         }
     }
+}
+
+public protocol SourceFile {
+
 }

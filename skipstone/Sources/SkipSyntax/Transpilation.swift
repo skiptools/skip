@@ -4,4 +4,5 @@ public struct Transpilation : Encodable {
     public var output: Source
     public var outputMap = OutputMap(entries: [])
     public var messages: [Message] = []
+    public var duration: Double
 }

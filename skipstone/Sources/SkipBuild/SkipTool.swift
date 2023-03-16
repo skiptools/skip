@@ -355,13 +355,22 @@ protocol TranspilePhase: CheckPhase {
 
 struct TranspilePhaseOptions: ParsableArguments {
     @Option(help: ArgumentHelp("Condition for transpile phase", valueName: "force/no"))
-    var transpile: PhaseGuard = .onDemand
+    var transpile: PhaseGuard = .onDemand // --transpile
 
-    @Option(name: [.customLong("module")], help: ArgumentHelp("Module name(s) for target and dependents", valueName: "module"))
-    var moduleNames: [String] = []
+    @Option(name: [.customLong("module")], help: ArgumentHelp("ModuleName:SourcePath", valueName: "module"))
+    var moduleNames: [String] = [] // --module
+
+    @Option(name: [.customLong("link")], help: ArgumentHelp("ModuleName:LinkPath", valueName: "module"))
+    var linkPaths: [String] = [] // --link
 
     @Option(help: ArgumentHelp("Path to the folder containing symbols.json", valueName: "path"))
-    var symbolFolder: String? = nil
+    var symbolFolder: String? = nil // --symbol-folder
+
+    @Option(help: ArgumentHelp("Path to the folder that contains skip.yml and overrides", valueName: "path"))
+    var skipFolder: String? = nil // --skip-folder
+
+    @Option(help: ArgumentHelp("Path to the output module root folder", valueName: "path"))
+    var moduleRoot: String? = nil // --module-root
 
     @Option(name: [.customShort("D", allowingJoined: true)], help: ArgumentHelp("Set preprocessor variable for transpilation", valueName: "value"))
     var preprocessorVariables: [String] = []
@@ -400,7 +409,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         let transpilation: Transpilation
 
         var description: String {
-            "transpilation: " + transpilation.sourceFile.url.lastPathComponent
+            "transpilation successful: \(transpilation.messages.count > 0 ? transpilation.messages.count.description : "no") messages" // transpilation.sourceFile.url.lastPathComponent
         }
     }
 
@@ -408,50 +417,385 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         ByteCountFormatter.string(fromByteCount: .init(size), countStyle: .file)
     }
 
-    func performCommand(with continuation: AsyncThrowingStream<OutputMessage, Error>.Continuation) async throws {
-        let sourceFiles = precheckOptions.files.map({ Source.File(path: $0) })
-        info("performing transpilation to: \(transpileOptions.outputFolder ?? "nowhere") for: \(sourceFiles.map(\.url.lastPathComponent))")
+    var moduleNamePaths: [(module: String, path: String)] {
+        transpileOptions.moduleNames.map({
+            let parts = $0.split(separator: ":")
+            return (module: parts.first?.description ?? "", path: parts.last?.description ?? "")
+        })
+    }
 
-        let moduleNames = transpileOptions.moduleNames
-        let symbolFolder = transpileOptions.symbolFolder.flatMap(URL.init(fileURLWithPath:))
-        let symbols: Symbols?
-        if let moduleName = moduleNames.first {
-            let symbolsGraph = try await SkipSystem.extractSymbolGraph(moduleFolder: symbolFolder, moduleNames: moduleNames, from: URL.moduleBuildFolder)
-            symbols = Symbols(moduleName: moduleName, graphs: symbolsGraph.unifiedGraphs)
-            info("symbols: \(symbolsGraph.unifiedGraphs.keys.sorted())")
-        } else {
-            info("no modules specified; symbols will not be used")
-            symbols = nil
+    var linkNamePaths: [(module: String, link: String)] {
+        transpileOptions.linkPaths.map({
+            let parts = $0.split(separator: ":")
+            return (module: parts.first?.description ?? "", link: parts.last?.description ?? "")
+        })
+    }
+
+    func performCommand(with continuation: AsyncThrowingStream<OutputMessage, Error>.Continuation) async throws {
+        let sourceFiles = try precheckOptions.files.map(AbsolutePath.init(validating:))
+        info("performing transpilation to: \(transpileOptions.outputFolder ?? "nowhere") for: \(sourceFiles.map(\.pathString))")
+        info("linkPaths: \(transpileOptions.linkPaths)")
+        info("moduleNames: \(transpileOptions.moduleNames)")
+        info("skipFolder: \(transpileOptions.skipFolder ?? "none")")
+        try await self.transpile(fs: localFileSystem, sourceFiles: Set(sourceFiles), with: continuation)
+    }
+
+    private func transpile(fs: FileSystem, sourceFiles: Set<AbsolutePath>, with continuation: AsyncThrowingStream<OutputMessage, Error>.Continuation) async throws {
+        // the path that will contain the `skip.yml`
+        guard let skipFolder = transpileOptions.skipFolder else {
+            throw ValidationError("Must specify --skip-folder")
         }
 
-        var transpiler = Transpiler(sourceFiles: sourceFiles, symbols: symbols)
-        transpiler.preprocessorSymbols = Set(precheckOptions.symbols)
-        try await transpiler.transpile { transpilation in
+        let skipFolderPath = try AbsolutePath(validating: skipFolder, relativeTo: fs.currentWorkingDirectory ?? fs.tempDirectory)
+        if !fs.isDirectory(skipFolderPath) {
+            throw ValidationError("Folder specified by --skip-folder did not exist: \(skipFolderPath)")
+        }
+
+        guard let outputFolder = transpileOptions.outputFolder else {
+            throw ValidationError("Must specify --output-folder")
+        }
+
+        let outputFolderPath = try AbsolutePath(validating: outputFolder, relativeTo: fs.currentWorkingDirectory ?? fs.tempDirectory)
+        if !fs.isDirectory(outputFolderPath) {
+            // e.g.: ~Library/Developer/Xcode/DerivedData/PACKAGE-ID/SourcePackages/plugins/skip-core.output/CrossFoundationKotlinTests/SkipTranspilePlugIn/CrossFoundation/src/test/kotlin
+            //throw ValidationError("Folder specified by --output-folder did not exist: \(outputFolder)")
+            try fs.createDirectory(outputFolderPath, recursive: true)
+        }
+
+        guard let moduleRoot = transpileOptions.moduleRoot else {
+            throw ValidationError("Must specify --module-root")
+        }
+        let moduleRootPath = try AbsolutePath(validating: moduleRoot)
+        if !fs.isDirectory(moduleRootPath) {
+            throw ValidationError("Module root path did not exist at: \(moduleRootPath.pathString)")
+        }
+
+        let allModuleNames = moduleNamePaths.map(\.module)
+
+        guard let (primaryModuleName, primaryModulePath) = moduleNamePaths.first else {
+            throw ValidationError("Must specify at least one --module")
+        }
+
+        let packageName = KotlinTranslator.packageName(forModule: primaryModuleName)
+
+        let skipConfig: YAML = try loadSkipConfig() // TODO: use the config for generating the build.gradle.kts
+        let symbols: Symbols? = try await loadSymbols()
+        let overridden = try copyKotlinOverrides()
+        let overriddenSwiftFileNames = overridden.map({ $0.basenameWithoutExt + ".swift" })
+
+        // skip over any source file whose name would match a copied Kotlin file
+        let sources = sourceFiles.map(\.sourceFile).filter { sourceFile in
+            if overriddenSwiftFileNames.contains(sourceFile.name) {
+                info("skipping transpilation of overridden file \(sourceFile.path)", sourceFile: sourceFile)
+                return false
+            } else {
+                return true
+            }
+        }
+        let transpiler = Transpiler(sourceFiles: sources, packageName: packageName, symbols: symbols, preprocessorSymbols: Set(precheckOptions.symbols))
+        try await transpiler.transpile(handler: handleTranspilation)
+        let sourceModules = try linkDependentModuleSources()
+        try generateGradle(for: sourceModules, with: skipConfig)
+
+        return // everything following is a stage of the transpilation process
+
+
+        func generateGradle(for sourceModules: [String], with skipConfig: YAML) throws {
+            try generateSettingsGradle()
+            try generatePerModuleGradle()
+
+            func generateSettingsGradle() throws {
+                let settingsPath = moduleRootPath.parentDirectory.appending(component: "settings.gradle.kts")
+
+                //let gradle = GradleProject()
+                //let settingsContents = gradle.generate()
+
+                var settingsContents = """
+                rootProject.name = "\(primaryModuleName)"
+
+
+                """
+                for sourceModule in sourceModules {
+                    settingsContents += """
+                    include("\(sourceModule)")
+
+                    """
+                }
+
+                info("saving \(settingsPath)", sourceFile: settingsPath.sourceFile)
+                try fs.writeChanges(path: settingsPath, makeWritable: true, makeReadOnly: true, bytes: ByteString(encodingAsUTF8: settingsContents))
+            }
+
+            func generatePerModuleGradle(exportAPI: Bool = true) throws {
+                let buildGradle = moduleRootPath.appending(components: ["build.gradle.kts"])
+
+                var buildContents = """
+                plugins {
+                    kotlin("jvm") version "1.8.10"
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    api("org.jetbrains.kotlin:kotlin-test-junit5")
+                    implementation("org.junit.jupiter:junit-jupiter-engine:5.9.1")
+
+                    testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
+                    testImplementation("org.junit.jupiter:junit-jupiter-engine:5.9.1")
+                
+                    //api("org.apache.commons:commons-math3:3.6.1")
+                    //implementation("com.google.guava:guava:31.1-jre")
+
+                """
+
+
+                for sourceModule in sourceModules {
+                    // don't add a dependency to ourselves
+                    if primaryModuleName == sourceModule || primaryModuleName == sourceModule + "Tests" {
+                        continue
+                    }
+
+                    // - api: “dependencies appearing in the api configurations will be transitively exposed to consumers of the library, and as such will appear on the compile classpath of consumers. Dependencies found in the implementation configuration will, on the other hand, not be exposed to consumers, and therefore not leak into the consumers' compile classpath.”
+                    let dependencyType = exportAPI ? "api" : "implementation"
+                    buildContents += """
+                        \(dependencyType)(project(":\(sourceModule)"))
+
+                    """
+                }
+
+                buildContents += """
+
+                }
+
+                tasks.named<Test>("test") {
+                    useJUnitPlatform()
+                }
+
+                """
+
+                info("saving \(buildGradle)", sourceFile: buildGradle.sourceFile)
+                try fs.writeChanges(path: buildGradle, makeWritable: true, makeReadOnly: true, bytes: ByteString(encodingAsUTF8: buildContents))
+            }
+        }
+
+        func loadSkipConfig() throws -> YAML {
+            let skipConfigPath = skipFolderPath.appending(component: "skip.yml")
+            do {
+                let skipConfig = try fs.readFileContents(skipConfigPath).withData(YAML.parse(_:))
+                try info("starting transpilation with config \(skipConfigPath): \(skipConfig.prettyJSON)")
+                return skipConfig
+            } catch {
+                throw ValidationError("The skip.yml file in the --skip-folder path \(skipConfigPath) could not be loaded: \(error)")
+            }
+        }
+
+        func kotlinOutputPath(for baseSourceFileName: String) -> AbsolutePath {
+            let packagePath = RelativePath((packageName as NSString).replacingOccurrences(of: ".", with: "/"))
+            let outputFolderPackagePath = outputFolderPath.appending(packagePath)
+            let kotlinFilePath = RelativePath(baseSourceFileName)
+            let outputFilePath = outputFolderPackagePath.appending(kotlinFilePath)
+            return outputFilePath
+        }
+
+        /// Copies over the overridden .kt files from `ModuleNameKotlin/skip/*.kt` into the destination folder
+        ///
+        /// Any Kotlin files that are overridden will not be transpiled.
+        func copyKotlinOverrides() throws -> Set<AbsolutePath> {
+            var copiedFiles: Set<AbsolutePath> = []
+            for file in try fs.getDirectoryContents(skipFolderPath) {
+                if file.hasSuffix(".kt") {
+                    let sourcePath = AbsolutePath(skipFolderPath, file)
+                    info("copying overridden source: \(file)", sourceFile: sourcePath.sourceFile)
+                    let outputFilePath = kotlinOutputPath(for: file)
+                    try fs.writeChanges(path: outputFilePath, checkSize: true, bytes: fs.readFileContents(sourcePath))
+                    copiedFiles.insert(outputFilePath)
+                }
+            }
+            return copiedFiles
+        }
+
+        func loadSymbols() async throws -> Symbols {
+            let symbolFolder = transpileOptions.symbolFolder.flatMap(URL.init(fileURLWithPath:))
+            //let symbolFolderPath = try transpileOptions.symbolFolder.flatMap(AbsolutePath.init(validating:))
+
+            let symbolStart = CFAbsoluteTimeGetCurrent()
+            let symbolsGraph = try await SkipSystem.extractSymbolGraph(moduleFolder: symbolFolder, moduleNames: allModuleNames, from: URL.moduleBuildFolder())
+            let symbolEnd = CFAbsoluteTimeGetCurrent()
+            info("extract symbols: \(symbolsGraph.unifiedGraphs.keys.sorted()) (\(Int64((symbolEnd - symbolStart) * 1000)) ms)")
+
+            let loadSymbols = Symbols(moduleName: primaryModuleName, graphs: symbolsGraph.unifiedGraphs)
+            return loadSymbols
+        }
+
+
+        func handleTranspilation(transpilation: Transpilation) throws {
             for message in transpilation.messages {
                 continuation.yield(.init(message))
             }
             trace(transpilation.output.content)
 
-            let sourceSize = (try? transpilation.sourceFile.url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+            let sourcePath = try AbsolutePath(validating: transpilation.sourceFile.path)
+            let sourceSize = try fs.getFileInfo(sourcePath).size
 
-            info("transpiled from: \(transpilation.sourceFile.url.lastPathComponent) (\(Self.byteCount(for: sourceSize)))", sourceFile: transpilation.sourceFile)
+            info("transpiling \(sourcePath.basename) (\(Self.byteCount(for: .init(sourceSize))))", sourceFile: transpilation.sourceFile)
 
-            if let outputFolder = transpileOptions.outputFolder {
-                let outputFolderURL = URL(fileURLWithPath: outputFolder, isDirectory: true)
-                try FileManager.default.createDirectory(at: outputFolderURL, withIntermediateDirectories: true)
-                let outputFileName = transpilation.sourceFile.url.deletingPathExtension().appendingPathExtension("kt").lastPathComponent
-                let outputFile = outputFolderURL.appendingPathComponent(outputFileName)
-                try transpilation.output.content.write(to: outputFile, atomically: false, encoding: .utf8)
-                info("transpiled to: \(outputFile.lastPathComponent) (\(Self.byteCount(for: transpilation.output.content.utf8.count)))", sourceFile: Source.File(path: outputFile.path))
+            let outputFile = try saveTranspilation()
+
+            info("transpiled \(transpilation.sourceFile.name) (\(Self.byteCount(for: .init(sourceSize))) to \(outputFile.basename) (\(Self.byteCount(for: transpilation.output.content.utf8.count))) (\(Int64(transpilation.duration * 1000)) ms)", sourceFile: Source.File(path: outputFile))
+
+            for message in transpilation.messages {
+                //writeMessage(message)
+                if message.kind == .error {
+                    // throw the first error we see
+                    continuation.finish(throwing: message)
+                    return
+                }
             }
+
             let output = Output(transpilation: transpilation)
-            
             continuation.yield(.init(output))
+
+
+            func saveTranspilation() throws -> AbsolutePath {
+                // the build plug-in's output folder base will be something like ~/Library/Developer/Xcode/DerivedData/Mod-ID/SourcePackages/plugins/module-name.output/ModuleNameKotlin/SkipTranspilePlugIn/ModuleName/src/test/kotlin
+                trace("path: \(outputFolderPath)")
+                let kotlinName = transpilation.kotlinFileName
+                let outputFilePath = kotlinOutputPath(for: kotlinName)
+
+                let kotlinBytes = ByteString(encodingAsUTF8: transpilation.output.content)
+                let fileWritten = try fs.writeChanges(path: outputFilePath, checkSize: true, makeWritable: true, makeReadOnly: true, bytes: kotlinBytes)
+
+                info("wrote to: \(outputFilePath)\(fileWritten ? " (unchanged)" : "")", sourceFile: outputFilePath.sourceFile)
+                return outputFilePath
+            }
+
+        }
+
+
+        // NOTE: when linking between modules, note that SPM and Xcode use different output paths:
+        // Xcode: ~/Library/Developer/Xcode/DerivedData/PROJECT-ID/SourcePackages/plugins/skip-core.output/CrossFoundationKotlinTests/SkipTranspilePlugIn/CrossFoundation
+        // SPM: .build/plugins/outputs/skip-core/
+        func linkDependentModuleSources() throws -> [String] {
+            var dependentModules: [String] = []
+            // transpilation was successful; now set up links to the other output packages (located in different plug-in folders)
+            let moduleBasePath = moduleRootPath.parentDirectory
+
+            /// Attempts to make a link from the `fromPath` to the given relative path.
+            /// If `fromPath` already exists and is a directory, attempt to create links for each of the contents of the directory to the updated relative folder
+            func createMergedLinkTree(from fromPath: AbsolutePath, to relative: String) throws {
+                let destPath = try AbsolutePath(validating: relative, relativeTo: fromPath)
+                if !fs.isDirectory(destPath) {
+                    // skip over anything that is not a destination folder
+                    return
+                }
+                info("creating merged link tree from: \(fromPath) to: \(relative)")
+                if fs.isSymlink(fromPath) {
+                    try fs.removeFileTree(fromPath) // clear any pre-existing symlink
+                }
+
+                // the folder is a directory; recurse into the destination paths in order to link to the local paths
+                if fs.isDirectory(fromPath) {
+                    for fsEntry in try fs.getDirectoryContents(destPath) {
+                        let fromSubPath = fromPath.appending(RelativePath(fsEntry))
+                        // bump up all the relative links to account for the folder we just recursed into.
+                        // e.g.: ../SomeSharedRoot/OtherModule/
+                        // becomes: ../../SomeSharedRoot/OtherModule/someFolder/
+                        let toRelativePath = "../" + relative + "/" + fsEntry
+                        try createMergedLinkTree(from: fromSubPath, to: toRelativePath)
+                    }
+                } else {
+                    try fs.createSymbolicLink(fromPath, pointingAt: destPath, relative: true)
+                }
+            }
+
+            // for each of the specified link/path pairs, create symbol links, either to the base folders, or the the sub-folders that share a common root
+            // this is the logic that allows us to merge two modules (like MyMod and MyModTests) into a single Kotlin module with the idiomatic src/main/kotlin/ and src/test/kotlin/ pair of folders
+            for (linkModuleName, relativeLinkPath) in linkNamePaths {
+                let linkModulePath = moduleBasePath.appending(RelativePath(linkModuleName))
+                info("relativeLinkPath: \(relativeLinkPath) moduleBasePath: \(moduleBasePath) linkModuleName: \(linkModuleName) -> linkModulePath: \(linkModulePath)")
+                try createMergedLinkTree(from: linkModulePath, to: relativeLinkPath)
+                dependentModules.append(linkModuleName)
+            }
+
+            return dependentModules
         }
     }
 }
 
 
+extension Source.File {
+    /// Initialize this file reference with an `AbsolutePath`
+    init(path absolutePath: AbsolutePath) {
+        self.init(path: absolutePath.pathString)
+    }
+}
+
+extension Transpilation {
+    /// The base name for the transpilation's input source file
+    var outputFileBaseName: String {
+        sourceFile.name.hasSuffix(".swift") ? sourceFile.name.dropLast(".swift".count).description : sourceFile.name
+    }
+
+    /// Returns the expected Kotlin file name for this transpilation
+    var kotlinFileName: String {
+        outputFileBaseName + ".kt"
+    }
+}
+
+extension AbsolutePath {
+    /// Converts this FileSystem `AbsolutePath` into a `Source.File` that the transpiler can use.
+    var sourceFile: Source.File {
+        Source.FilePath(path: pathString)
+    }
+}
+
+extension FileSystem {
+
+    /// A version of `FileSystem.writeIfChanged` that allows control over permissions and size check optimizations.
+    @discardableResult func writeChanges(path: AbsolutePath, checkSize: Bool = true, makeWritable: Bool = true, makeReadOnly: Bool = false, bytes: ByteString) throws -> Bool {
+        if !isFile(path) {
+            return try save()
+        }
+
+        // make sure we can overwrite the file (usually clearing the read-only bit we set after writing the file)
+        if makeWritable && !isWritable(path) {
+            try chmod(.userWritable, path: path)
+        }
+
+        let info = try getFileInfo(path)
+        let size = info.size
+        if size != bytes.count {
+            // different size; they must be different
+            return try save()
+        }
+
+        // compare for changes
+        let changed = try bytes.withData { data1 in
+            try readFileContents(path).withData { data2 in
+                data1 != data2
+            }
+        }
+
+        if changed {
+            return try save()
+        } else {
+            return false // file was unchanged
+        }
+
+        func save() throws -> Bool {
+            try createDirectory(path.parentDirectory, recursive: true)
+            try writeFileContents(path, bytes: bytes)
+            if makeReadOnly == true {
+                // remove write access
+                try chmod(.userUnWritable, path: path)
+            }
+            return true
+        }
+
+    }
+}
 // MARK: GradlePhase
 
 protocol GradlePhase: TranspilePhase {
@@ -559,6 +903,7 @@ struct PrintSkipASTAction: AsyncParsableCommand {
 // MARK: Utilities
 
 
+/// A command that forwards itself to another command. Used for aliasing commands.
 struct ForwardingCommand<Base: ParsableCommand, Name: RawRepresentable & CaseIterable>: ParsableCommand where Name.RawValue : StringProtocol {
     static var configuration: CommandConfiguration {
         var cfg = Base.configuration
@@ -690,7 +1035,7 @@ extension StreamingCommand {
     }
 
     /// The closure that will output a message
-    private func writeMessage(_ message: Message, output: String? = nil, terminator: String = "\n") {
+    fileprivate func writeMessage(_ message: Message, output: String? = nil, terminator: String = "\n") {
         if !outputOptions.emitJSON || outputOptions.messagePlain {
             let message = message.description
             outputOptions.streams.write(error: !outputOptions.messageErrout, output: output, message, terminator: terminator)

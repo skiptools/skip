@@ -7,13 +7,14 @@ public struct Transpiler {
     private let sourceFiles: [Source.File]
     private let packageName: String?
     private let symbols: Symbols?
-    public var preprocessorSymbols: Set<String> = []
+    public var preprocessorSymbols: Set<String>
 
     /// Supply files to transpile.
-    public init(sourceFiles: [Source.File], packageName: String? = nil, symbols: Symbols? = nil) {
+    public init(sourceFiles: [Source.File], packageName: String? = nil, symbols: Symbols? = nil, preprocessorSymbols: Set<String> = []) {
         self.sourceFiles = sourceFiles
         self.packageName = packageName
         self.symbols = symbols
+        self.preprocessorSymbols = preprocessorSymbols
     }
 
     /// Perform transpilation, feeding results to the given handler.
@@ -33,9 +34,10 @@ public struct Transpiler {
         try await withThrowingTaskGroup(of: Transpilation.self) { group in
             for sourceFile in sourceFiles {
                 group.addTask {
+                    let start = CFAbsoluteTimeGetCurrent()
                     let syntaxTree = try SyntaxTree(source: Source(file: sourceFile), preprocessorSymbols: preprocessorSymbols, symbols: symbols)
                     let translator = KotlinTranslator(syntaxTree: syntaxTree)
-                    return translator.transpile(codebaseInfo: codebaseInfo)
+                    return translator.transpile(codebaseInfo: codebaseInfo, startTime: start)
                 }
             }
             for try await transpilation in group {

@@ -1,7 +1,7 @@
 /// A plugin used to translate a specific facet of Swift code to Kotlin.
 ///
 /// The plugin lifetime is tied to that of the `KotlinCodebaseInfo`. This means that a given plugin instance may be applied to multiple syntax trees.
-protocol KotlinPlugin {
+public protocol KotlinPlugin {
     /// Gather any needed info from the given Swift syntax tree.
     func gather(from syntaxTree: SyntaxTree)
 
@@ -17,8 +17,5 @@ extension KotlinPlugin {
     }
 
     func didGather() {
-    }
-
-    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
     }
 }
