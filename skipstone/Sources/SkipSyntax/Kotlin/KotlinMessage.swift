@@ -53,11 +53,6 @@ extension Message {
         return Message(kind: .error, message: "Cannot use an extension to add additional constructors to a Kotlin type defined outside of this module", sourceDerived: sourceDerived)
     }
 
-    // TODO: Kotlin interfaces can have default implementations inline. Move inheritance and implementations into generated interface
-    static func kotlinExtensionAddProtocolsToInterface(_ sourceDerived: SourceDerived) -> Message {
-        return Message(kind: .error, message: "Cannot use an extension to add additional protocols to a Kotlin interface", sourceDerived: sourceDerived)
-    }
-
     static func kotlinExtensionAddProtocolsToOutsideType(_ sourceDerived: SourceDerived) -> Message {
         return Message(kind: .error, message: "Cannot use an extension to add additional protocols to a Kotlin type defined outside of this module", sourceDerived: sourceDerived)
     }

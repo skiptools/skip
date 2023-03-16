@@ -911,22 +911,16 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
 
 struct KotlinExtensionDeclaration {
     static func translate(statement: ExtensionDeclaration, translator: KotlinTranslator) -> [KotlinStatement] {
-        // If the extension is on a type outside this module or is on a protocol, use Kotlin extension
-        // functions. Otherwise do not translate the extension - instead we'll move its members into
-        // our declaration of its extended type
+        // If the extension is on a type outside this module, use Kotlin extension functions. Otherwise do not translate the
+        // extension - instead we'll move its members into our declaration of its extended type
         let declarationType = translator.codebaseInfo?.declarationType(of: statement.extends.description, mustBeInModule: true)
-        guard declarationType == nil || declarationType == .protocolDeclaration else {
+        guard declarationType == nil else {
             return []
         }
 
         var kotlinStatements: [KotlinStatement] = []
         if !statement.inherits.isEmpty && translator.codebaseInfo != nil {
-            let message: Message
-            if declarationType == .protocolDeclaration {
-                message = .kotlinExtensionAddProtocolsToInterface(statement)
-            } else {
-                message = .kotlinExtensionAddProtocolsToOutsideType(statement)
-            }
+            let message = Message.kotlinExtensionAddProtocolsToOutsideType(statement)
             kotlinStatements.append(KotlinMessageStatement(message: message))
         }
         for member in statement.members.flatMap({ translator.translateStatement($0) }) {
@@ -956,6 +950,9 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var body: KotlinCodeBlock?
     var delegatingConstructorCall: KotlinExpression?
     var mutationFunctionNames: (willMutate: String, didMutate: String)?
+    var functionType: TypeSignature {
+        return .function(parameters.map(\.signature), returnType)
+    }
 
     // KotlinMemberDeclaration
     var extends: TypeSignature?
@@ -1155,9 +1152,45 @@ class KotlinInterfaceDeclaration: KotlinStatement {
         let kstatement = KotlinInterfaceDeclaration(statement: statement)
         kstatement.inherits = statement.inherits
         kstatement.modifiers = statement.modifiers
-        kstatement.members = statement.members.flatMap { translator.translateStatement($0) }
+
+        var originalMembers = statement.members.flatMap { translator.translateStatement($0) }
+        var newMembers: [KotlinStatement] = []
+        // Move extensions of this type into the type itself rather than use Kotlin extension functions.
+        // This allows us to replace API declarations with implementations. Also Kotlin extension functions
+        // act like static functions, which can lead to different behavior
+        if let codebaseInfo = translator.codebaseInfo {
+            for ext in codebaseInfo.extensions(of: statement) {
+                kstatement.inherits += ext.inherits
+                for extMember in ext.members.flatMap({ translator.translateStatement($0) }) {
+                    if !replaceMember(in: &originalMembers, with: extMember) {
+                        newMembers.append(extMember)
+                    }
+                }
+            }
+        }
+        kstatement.members = originalMembers + newMembers
         kstatement.inherits.forEach { $0.appendKotlinMessages(to: kstatement) }
         return kstatement
+    }
+
+    private static func replaceMember(in originalMembers: inout [KotlinStatement], with member: KotlinStatement) -> Bool {
+        for i in 0..<originalMembers.count {
+            guard originalMembers[i].type == member.type else {
+                continue
+            }
+            if let originalVariableDeclaration = originalMembers[i] as? KotlinVariableDeclaration, let variableDeclaration = member as? KotlinVariableDeclaration {
+                if originalVariableDeclaration.names == variableDeclaration.names {
+                    originalMembers[i] = member
+                    return true
+                }
+            } else if let originalFunctionDeclaration = originalMembers[i] as? KotlinFunctionDeclaration, let functionDeclaration = member as? KotlinFunctionDeclaration {
+                if originalFunctionDeclaration.name == functionDeclaration.name && originalFunctionDeclaration.functionType == functionDeclaration.functionType {
+                    originalMembers[i] = member
+                    return true
+                }
+            }
+        }
+        return false
     }
 
     private init(statement: TypeDeclaration) {

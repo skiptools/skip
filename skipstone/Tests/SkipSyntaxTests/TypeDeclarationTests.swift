@@ -107,6 +107,50 @@ final class TypeDeclarationTests: XCTestCase {
         """)
     }
 
+    func testProtocolExtension() async throws {
+        try await check(swift: """
+        protocol P {
+            var i: Int { get }
+            var j: Int { get }
+            func f(i: Int) -> String
+            func g()
+        }
+        extension P: I {
+            var i: Int {
+                return 1
+            }
+            var k: Int {
+                return 2
+            }
+            func f(i: Int = 1) -> String {
+                return "f"
+            }
+            func h() {
+                print("h")
+            }
+        }
+        """, kotlin: """
+        internal interface P: I {
+            internal val i: Int
+                get() {
+                    return 1
+                }
+            internal val j: Int
+            internal fun f(i: Int = 1): String {
+                return "f"
+            }
+            internal fun g()
+            internal val k: Int
+                get() {
+                    return 2
+                }
+            internal fun h() {
+                print("h")
+            }
+        }
+        """)
+    }
+
     func testGenerics() async throws {
         XCTExpectFailure()
         XCTFail("TODO: Generics in classes, structs, extensions, typealiases. Generic where clauses, etc")
