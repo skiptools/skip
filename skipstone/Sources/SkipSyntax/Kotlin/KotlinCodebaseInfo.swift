@@ -1,3 +1,5 @@
+import SymbolKit
+
 /// Wholistic information about the codebase needed when transpiling Swift to Kotlin.
 public class KotlinCodebaseInfo {
     /// The package being generated.
@@ -172,7 +174,7 @@ public class KotlinCodebaseInfo {
             }
             let startIndex = declarationType(of: typeDeclaration.inherits[0].description, mustBeInModule: false) == .protocolDeclaration ? 0 : 1
             for protocolType in typeDeclaration.inherits[startIndex...] {
-                if symbols.isMember(name: name, type: nil, inProtocol: protocolType) == true {
+                if symbols.protocolType(qualifiedName: protocolType.description, hasMember: name, kind: declaration.modifiers.isStatic ? .typeProperty : .property, type: nil) == true {
                     return true
                 }
             }
@@ -186,7 +188,7 @@ public class KotlinCodebaseInfo {
             }
             let startIndex = declarationType(of: typeDeclaration.inherits[0].description, mustBeInModule: false) == .protocolDeclaration ? 0 : 1
             for protocolType in typeDeclaration.inherits[startIndex...] {
-                if symbols.isMember(name: declaration.name, type: declaration.functionType, inProtocol: protocolType) == true {
+                if symbols.protocolType(qualifiedName: protocolType.description, hasMember: declaration.name, kind: declaration.modifiers.isStatic ? .typeMethod : .method, type: nil) == true {
                     return true
                 }
             }
@@ -315,10 +317,31 @@ private struct ExtensionInfo {
 extension Symbols.Context {
     /// Whether the given name and optional type maps to a member of the given protocol, including inherited protocols.
     ///
-    /// - Returns: true if this is a member of the protocol, false if not, and nil if no symbol for this protocol exists.
-    func isMember(name: String, type: TypeSignature?, inProtocol: TypeSignature) -> Bool? {
-        //~~~
-        return nil
+    /// - Returns: true if this is a member of the protocol, false if not, and nil if there is no known type for the given name.
+    func protocolType(qualifiedName: String, hasMember name: String, kind memberKind: SymbolGraph.Symbol.KindIdentifier, type: TypeSignature?) -> Bool? {
+        let candidates = lookup(name: qualifiedName)
+        var hasType = false
+        for candidate in ranked(candidates) {
+            guard let kind = candidate.kind else {
+                continue
+            }
+            switch kind {
+            case .class:
+                hasType = true
+            case .enum:
+                hasType = true
+            case .struct:
+                hasType = true
+            case .protocol:
+                if hasMember(candidate, name: name, kind: memberKind, type: type) {
+                    return true
+                }
+                hasType = true
+            default:
+                break
+            }
+        }
+        return hasType ? false : nil
     }
 
     /// Whether the given name maps to a symbol that is known to be a mutable struct type.
@@ -415,6 +438,33 @@ extension Symbols.Context {
             }
         }
         return hasType ? false : nil
+    }
+
+    private func hasMember(_ symbol: Symbol, name: String, kind: SymbolGraph.Symbol.KindIdentifier, type: TypeSignature?) -> Bool {
+        for relationship in symbol.relationships {
+            if relationship.kind == .conformsTo && !relationship.isInverse {
+                if let conformsTo = lookup(identifier: relationship.targetIdentifier ?? ""), hasMember(conformsTo, name: name, kind: kind, type: type) {
+                    return true
+                }
+            } else if relationship.kind == .requirementOf && relationship.isInverse {
+                guard let member = lookup(identifier: relationship.targetIdentifier ?? ""), member.name == name, member.kind == kind else {
+                    continue
+                }
+                guard let type else {
+                    return true
+                }
+                if kind == .method || kind == .typeMethod {
+                    if type == member.functionSignature(symbols: symbols) {
+                        return true
+                    }
+                } else {
+                    if type == member.variableType(symbols: symbols) {
+                        return true
+                    }
+                }
+            }
+        }
+        return false
     }
 
     private func constructorSignatures(_ symbol: Symbol) -> [TypeSignature] {

@@ -303,6 +303,22 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """)
     }
+
+    func testOverrideProtocolMember() async throws {
+        try await check(symbols: symbols, swift: """
+        class C: MemberDeclarationTestsProtocol {
+            var i = 0
+            func f() {
+            }
+        }
+        """, kotlin: """
+        internal open class C: MemberDeclarationTestsProtocol {
+            internal override var i = 0
+            internal override open fun f() {
+            }
+        }
+        """)
+    }
 }
 
 var sideEffectOrdering: [String] = []
@@ -338,4 +354,9 @@ private class MemberDeclarationTestsSideEffectsClass {
             sideEffectOrdering.append("didSetOwner")
         }
     }
+}
+
+private protocol MemberDeclarationTestsProtocol {
+    var i: Int { get }
+    func f()
 }
