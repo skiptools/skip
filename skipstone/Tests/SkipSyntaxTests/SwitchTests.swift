@@ -395,9 +395,9 @@ final class SwitchTests: XCTestCase {
 
     func testPartialBinding() async throws {
         // Note: we don't support this for the same reason we don't support 'where' clauses in case statements:
-        // by matching the general case and then using an 'if' in the case body, we could prevent a subsequent case
-        // that would have matched from being executed
-        try await check(expectFailure: true, swift: """
+        // we'd have to match the general case and then use an 'if' in the case body, but that could prevent a
+        // subsequent case that would have matched from being executed
+        try await checkProducesMessage(swift: """
         let t = (1, "s")
         switch t {
         case (0, "s"):
@@ -406,19 +406,6 @@ final class SwitchTests: XCTestCase {
             print(i)
         default:
             print("default")
-        }
-        """, kotlin: """
-        internal val t = Pair(1, "s")
-        when (t) {
-            Pair(0, "") -> {
-                print(0)
-            }
-            else -> {
-                if (t.second = "s") {
-                    val i = t.first
-                    print(i)
-                }
-            }
         }
         """)
     }

@@ -64,10 +64,7 @@ extension XCTestCase {
         let srcFile = try tmpFile(named: "Source.swift", contents: swift)
         let tp = Transpiler(sourceFiles: [Source.File(path: srcFile.path)], symbols: symbols)
         try await tp.transpile { transpilation in
-            //print("transpilation:", transpilation.output)
-            var content = transpilation.output.content
-            let autoImportPrefix = "import skip.lib."
-            content = content.split(separator: "\n", omittingEmptySubsequences: false).filter({ !$0.hasPrefix(autoImportPrefix) }).joined(separator: "\n")
+            let content = trimmedContent(transpilation: transpilation)
             if expectFailure {
                 XCTExpectFailure()
             }
@@ -80,8 +77,24 @@ extension XCTestCase {
         }
     }
 
+    /// Checks that the given Swift generates a message when transpiled.
+    public func checkProducesMessage(symbols: Symbols? = nil, swift: String, file: StaticString = #file, line: UInt = #line) async throws {
+        let srcFile = try tmpFile(named: "Source.swift", contents: swift)
+        let tp = Transpiler(sourceFiles: [Source.File(path: srcFile.path)], symbols: symbols)
+        try await tp.transpile { transpilation in
+            XCTAssertTrue(!transpilation.messages.isEmpty, trimmedContent(transpilation: transpilation))
+            transpilation.messages.forEach { print("Received expected message: \($0)") }
+        }
+    }
+
+    private func trimmedContent(transpilation: Transpilation) -> String {
+        let content = transpilation.output.content
+        let autoImportPrefix = "import skip.lib."
+        return content.split(separator: "\n", omittingEmptySubsequences: false).filter({ !$0.hasPrefix(autoImportPrefix) }).joined(separator: "\n")
+    }
+
     /// Creates a temporary file with the given name and optional contents.
-    public func tmpFile(named fileName: String, contents: String? = nil) throws -> URL {
+    private func tmpFile(named fileName: String, contents: String? = nil) throws -> URL {
         let tmpDir = URL(fileURLWithPath: UUID().uuidString, isDirectory: true, relativeTo: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true))
         try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
         let tmpFile = URL(fileURLWithPath: fileName, isDirectory: false, relativeTo: tmpDir)

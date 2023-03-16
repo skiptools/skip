@@ -77,6 +77,10 @@ extension Message {
         return Message(kind: .error, message: "Skip is unable to determine the owning type for member '\(member)'. Add the owning type (e.g. MyType.\(member))", sourceDerived: sourceDerived)
     }
 
+    static func kotlinOptionalNoneSome(_ sourceDerived: SourceDerived) -> Message {
+        return Message(kind: .error, message: "Kotlin optionals are not enums. Use nil or a value rather than .none or .some. In switch statements, use the moden 'case nil', 'case <value>?', and 'case let <binding>?'", sourceDerived: sourceDerived)
+    }
+
     static func kotlinProtocolConstructor(_ sourceDerived: SourceDerived) -> Message {
         return Message(kind: .error, message: "Kotlin does not support constructors in protocols", sourceDerived: sourceDerived)
     }
@@ -111,7 +115,7 @@ extension Message {
     }
 
     static func kotlinWhenCasePartialBinding(_ sourceDerived: SourceDerived) -> Message {
-        return Message(kind: .error, message: "Kotlin does not support partial bindings in case matches. Match against a concrete value or all bindings", sourceDerived: sourceDerived)
+        return Message(kind: .error, message: "Kotlin does not support partial bindings in case matches. Match against a concrete value or bind all values", sourceDerived: sourceDerived)
     }
 
     static func kotlinWhenCaseWhere(_ sourceDerived: SourceDerived) -> Message {

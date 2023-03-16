@@ -117,8 +117,17 @@ final class TypeInferenceTests: XCTestCase {
     }
 
     func testInit() async throws {
-        XCTExpectFailure()
-        XCTFail("TODO: Test using .init to call constructors")
+        try await check(symbols: symbols, swift: """
+        {
+            let c: TypeInferenceTestsClass = .init(v: 100)
+            typeInferenceTestsClassParamFunc(.init(v: 101))
+        }
+        """, kotlin: """
+        {
+            val c: TypeInferenceTestsClass = TypeInferenceTestsClass(v = 100)
+            typeInferenceTestsClassParamFunc(TypeInferenceTestsClass(v = 101))
+        }
+        """)
     }
 
     func testNestedTypes() {
