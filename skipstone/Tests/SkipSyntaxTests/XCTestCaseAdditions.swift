@@ -65,11 +65,8 @@ extension XCTestCase {
         let tp = Transpiler(sourceFiles: [Source.File(path: srcFile.path)], symbols: symbols)
         try await tp.transpile { transpilation in
             let content = trimmedContent(transpilation: transpilation)
-            if expectFailure {
-                XCTExpectFailure()
-            }
             let messagesString = transpilation.messages.map(\.description).joined(separator: ",")
-            if !transpilation.messages.isEmpty {
+            if !transpilation.messages.isEmpty && !expectFailure {
                 XCTFail("Transpilation produced unexpected messages: \(messagesString)")
             }
             XCTAssertEqual(kotlin.trimmingCharacters(in: .whitespacesAndNewlines), content.trimmingCharacters(in: .whitespacesAndNewlines), messagesString, file: file, line: line)

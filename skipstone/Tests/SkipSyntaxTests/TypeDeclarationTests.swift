@@ -185,7 +185,7 @@ final class TypeDeclarationTests: XCTestCase {
         """)
     }
 
-    func testGenerics() async throws throws {
+    func testGenerics() async throws {
         throw XCTSkip("TODO: Generics in classes, structs, extensions, typealiases. Generic where clauses, etc")
     }
 
