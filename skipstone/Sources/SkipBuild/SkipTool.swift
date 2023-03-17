@@ -633,9 +633,9 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             let symbolFolder = transpileOptions.symbolFolder.flatMap(URL.init(fileURLWithPath:))
             //let symbolFolderPath = try transpileOptions.symbolFolder.flatMap(AbsolutePath.init(validating:))
 
-            let symbolStart = CFAbsoluteTimeGetCurrent()
+            let symbolStart = Date.now.timeIntervalSinceReferenceDate
             let symbolsGraph = try await SkipSystem.extractSymbolGraph(moduleFolder: symbolFolder, moduleNames: allModuleNames, from: URL.moduleBuildFolder())
-            let symbolEnd = CFAbsoluteTimeGetCurrent()
+            let symbolEnd = Date.now.timeIntervalSinceReferenceDate
             info("extract symbols: \(symbolsGraph.unifiedGraphs.keys.sorted()) (\(Int64((symbolEnd - symbolStart) * 1000)) ms)")
 
             let loadSymbols = Symbols(moduleName: primaryModuleName, graphs: symbolsGraph.unifiedGraphs)

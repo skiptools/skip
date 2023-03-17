@@ -65,7 +65,7 @@ public class KotlinTranslator {
         let outputFile = syntaxTree.source.file.outputFile(withExtension: "kt")
         let outputGenerator = OutputGenerator(root: kotlinSyntaxTree.root)
         let (output, outputMap) = outputGenerator.generateOutput(file: outputFile)
-        let endTime = CFAbsoluteTimeGetCurrent() // track the duration for logging
+        let endTime = Date.now.timeIntervalSinceReferenceDate // track the duration for logging
         return Transpilation(sourceFile: syntaxTree.source.file, output: output, outputMap: outputMap, messages: messages, duration: endTime - startTime)
     }
 

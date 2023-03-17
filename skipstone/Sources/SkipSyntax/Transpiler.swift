@@ -34,7 +34,7 @@ public struct Transpiler {
         try await withThrowingTaskGroup(of: Transpilation.self) { group in
             for sourceFile in sourceFiles {
                 group.addTask {
-                    let start = CFAbsoluteTimeGetCurrent()
+                    let start = Date.now.timeIntervalSinceReferenceDate
                     let syntaxTree = try SyntaxTree(source: Source(file: sourceFile), preprocessorSymbols: preprocessorSymbols, symbols: symbols)
                     let translator = KotlinTranslator(syntaxTree: syntaxTree)
                     return translator.transpile(codebaseInfo: codebaseInfo, startTime: start)
