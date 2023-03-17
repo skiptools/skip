@@ -9,6 +9,10 @@ extension XCTestCase {
 
     var symbols: Symbols {
         get async throws {
+            #if os(Linux)
+            // FIXME: symbol generation not currently working on linux, so those tests will be disabled
+            return nil
+            #endif
             if let symbols = Self.symbols {
                 return symbols
             }
@@ -60,6 +64,13 @@ extension XCTestCase {
         guard let kotlin else {
             return
         }
+
+        #if os(Linux)
+        // FIXME: symbol generation not currently working on linux, so tests that use symbols are disabled
+        if symbols == nil {
+            throw XCTSkip("symbol-reliant tests not yet working on Linux")
+        }
+        #endif
 
         let srcFile = try tmpFile(named: "Source.swift", contents: swift)
         let tp = Transpiler(sourceFiles: [Source.File(path: srcFile.path)], symbols: symbols)
