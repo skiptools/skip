@@ -1,7 +1,7 @@
 /// Contextual information used in type inference.
 struct TypeInferenceContext {
     private let symbols: Symbols.Context?
-    private var typePath: [TypeDeclaration] = []
+    private var typePath: [(TypeDeclaration, Bool)] = []
     private var blockPath: [[String: TypeSignature]] = [] // Each entry is map of additional identifier bindings
     private var localIdentifierTypes: [String: TypeSignature] = [:]
 
@@ -31,7 +31,7 @@ struct TypeInferenceContext {
     /// Return a context for evaluating members of the given type.
     func pushing(_ typeDeclaration: TypeDeclaration) -> TypeInferenceContext {
         var context = self
-        context.typePath.append(typeDeclaration)
+        context.typePath.append((typeDeclaration, false))
         return context
     }
 
@@ -43,6 +43,9 @@ struct TypeInferenceContext {
         }
         context.blockPath.append(parameterDictionary)
         context.expectedReturn = functionDeclaration.returnType
+        if functionDeclaration.modifiers.isStatic, let lastTypePath = context.typePath.last {
+            context.typePath[context.typePath.count - 1] = (lastTypePath.0, true)
+        }
         return context
     }
 
@@ -112,17 +115,24 @@ struct TypeInferenceContext {
             }
         }
         if name == "self" || name == "Self" || name == "super" {
-            guard let typeDeclaration = typePath.last else {
+            guard let (typeDeclaration, isStatic) = typePath.last else {
                 return .none
             }
-            return name == "self" || name == "Self" ? typeDeclaration.signature : typeDeclaration.inherits.first ?? .none
+            if name == "super" {
+                return typeDeclaration.inherits.first ?? .none
+            } else if name == "Self" || isStatic {
+                return .metaType(typeDeclaration.signature)
+            } else {
+                return typeDeclaration.signature
+            }
         }
         guard let symbols else {
             return .none
         }
 
-        for typeDeclaration in typePath.reversed() {
-            let symbolType = symbols.identifierSignature(of: name, in: typeDeclaration.signature)
+        for (typeDeclaration, isStatic) in typePath.reversed() {
+            let signature: TypeSignature = isStatic ? .metaType(typeDeclaration.signature) : typeDeclaration.signature
+            let symbolType = symbols.identifierSignature(of: name, in: signature)
             if symbolType != .none {
                 return symbolType
             }
@@ -153,6 +163,13 @@ struct TypeInferenceContext {
                 return types[index]
             }
         }
+        if name == "self" || name == "Type" {
+            if case .metaType = type {
+                return type
+            } else {
+                return .metaType(type)
+            }
+        }
         guard let symbols else {
             return .none
         }
@@ -175,8 +192,9 @@ struct TypeInferenceContext {
         }
 
         // Not a known member function. Check functions that can be invoked without a target type
-        for typeDeclaration in typePath.reversed() {
-            let results = symbols.functionSignature(of: name, in: typeDeclaration.signature, arguments: parameters)
+        for (typeDeclaration, isStatic) in typePath.reversed() {
+            let signature: TypeSignature = isStatic ? .metaType(typeDeclaration.signature) : typeDeclaration.signature
+            let results = symbols.functionSignature(of: name, in: signature, arguments: parameters)
             if !results.isEmpty {
                 return results
             }

@@ -1589,7 +1589,7 @@ class TypeLiteral: Expression {
     }
 
     override var inferredType: TypeSignature {
-        return literal
+        return .metaType(literal)
     }
 
     override var prettyPrintAttributes: [PrettyPrintTree] {

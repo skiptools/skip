@@ -142,6 +142,10 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
                     return .member(base, type.or(type2))
                 }
             }
+        case .metaType(let type):
+            if case .metaType(let type2) = typeSignature {
+                return .metaType(type.or(type2))
+            }
         case .none:
             return typeSignature
         case .optional(.none):
@@ -516,6 +520,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
             return genericTypes.isEmpty ? .any : .named(name, genericTypes)
         case "AnyObject":
             return genericTypes.isEmpty ? .anyObject : .named(name, genericTypes)
+        case "AnyType":
+            return .metaType(.any)
         case "Array":
             return genericTypes.count == 1 ? .array(genericTypes[0]) : .named(name, genericTypes)
         case "Bool":
@@ -558,8 +564,13 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
             return genericTypes.isEmpty ? .void : .named(name, genericTypes)
         default:
             if let lastSeparator = name.lastIndex(of: "."), lastSeparator != name.index(before: name.endIndex) {
-                let base = self.for(name: String(name[..<lastSeparator]), genericTypes: [])
-                let named: TypeSignature = .named(String(name[name.index(after: lastSeparator)...]), genericTypes)
+                let firstPart = String(name[..<lastSeparator])
+                let lastName = String(name[name.index(after: lastSeparator)...])
+                if lastName == "Type" || lastName == "self" {
+                    return .metaType(self.for(name: firstPart, genericTypes: genericTypes))
+                }
+                let base = self.for(name: firstPart, genericTypes: [])
+                let named: TypeSignature = .named(lastName, genericTypes)
                 return .member(base, named)
             } else {
                 return .named(name, genericTypes)
@@ -691,6 +702,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
             return "\(baseType.description).\(type.description)"
         case .metaType(let baseType):
             switch baseType {
+            case .any:
+                return "AnyType"
             case .function:
                 return "(\(baseType.description)).Type"
             default:

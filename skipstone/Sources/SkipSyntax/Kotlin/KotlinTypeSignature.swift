@@ -35,7 +35,7 @@ extension TypeSignature {
         case .member(let baseType, let type):
             return "\(baseType.kotlin).\(type.kotlin)"
         case .metaType(let baseType):
-            return "\(baseType.kotlin)::"
+            return "KClass<\(baseType.kotlin)>"
         case .named(let name, let generics):
             guard !generics.isEmpty else {
                 return name

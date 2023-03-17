@@ -140,9 +140,38 @@ final class TypeInferenceTests: XCTestCase {
         XCTFail("TODO: We should fall back to looking for matching symbols when we don't know the type and using TypeSignature.isCompatible to match")
     }
 
-    func testStaticVsInstanceContext() {
-        XCTExpectFailure()
-        XCTFail("TODO: Test member references in static vs instance contexts. Test duplicate static and instance members")
+    func testStaticVsInstanceContext() async throws {
+        try await check(symbols: symbols, swift: """
+        extension TypeInferenceTestsClass {
+            static func staticContext() -> Bool {
+                return returnEnum() == .case1
+            }
+        
+            func instanceContext() -> Bool {
+                return returnEnum() == .case1
+            }
+        }
+        """, kotlin: """
+        internal fun TypeInferenceTestsClass.Companion.staticContext(): Boolean {
+            return returnEnum() == TypeInferenceTestsEnum.case1
+        }
+
+        internal fun TypeInferenceTestsClass.instanceContext(): Boolean {
+            return returnEnum() == TypeInferenceTestsDuplicateEnum.case1
+        }
+        """)
+    }
+
+    func testStaticMember() async throws {
+        try await check(symbols: symbols, swift: """
+        {
+            let b = TypeInferenceTestsClass.returnEnum() == .case1
+        }
+        """, kotlin: """
+        {
+            val b = TypeInferenceTestsClass.returnEnum() == TypeInferenceTestsEnum.case1
+        }
+        """)
     }
 }
 
@@ -174,6 +203,14 @@ class TypeInferenceTestsClass {
 
     func classReturnMemberFunc() -> TypeInferenceTestsClass {
         return .instance
+    }
+
+    static func returnEnum() -> TypeInferenceTestsEnum {
+        return .case1
+    }
+
+    func returnEnum() -> TypeInferenceTestsDuplicateEnum {
+        return .case1
     }
 }
 // Ensure we're not just guessing when we see e.g. .instance

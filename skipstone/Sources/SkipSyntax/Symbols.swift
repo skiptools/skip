@@ -114,13 +114,17 @@ public class Symbols {
 
         /// Return the type of the given identifier.
         func identifierSignature(of identifier: String) -> TypeSignature {
-            let candidates = lookup(name: identifier).filter { $0.kind == .var }
-            return ranked(candidates).first?.typeSignature(symbols: symbols) ?? .none
+            let candidates = lookup(name: identifier).filter { $0.kind == .var || $0.kind == .class || $0.kind == .struct || $0.kind == .protocol }
+            guard let topRanked = ranked(candidates).first else {
+                return .none
+            }
+            let type = topRanked.typeSignature(symbols: symbols)
+            return topRanked.kind == .var ? type : .metaType(type)
         }
 
         /// Return the type of the given member.
         func identifierSignature(of member: String, in type: TypeSignature) -> TypeSignature {
-            let type = type.asOptional(false)
+            var type = type.asOptional(false)
             if case .tuple(let labels, let types) = type {
                 for (index, label) in labels.enumerated() {
                     if member == label || member == "\(index)" {
@@ -129,10 +133,15 @@ public class Symbols {
                 }
                 return .none
             }
+            var isStatic = false
+            if case .metaType(let base) = type {
+                type = base
+                isStatic = true
+            }
 
             let typeNames = candidateTypeNames(for: type)
             for typeName in typeNames {
-                let type = identifierSignature(of: member, in: typeName)
+                let type = identifierSignature(of: member, in: typeName, isStatic: isStatic)
                 if type != .none {
                     return type
                 }
@@ -144,7 +153,7 @@ public class Symbols {
         ///
         /// This function also works for the creation of an enum case with associated values.
         func functionSignature(of name: String, in type: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
-            let type = type.asOptional(false)
+            var type = type.asOptional(false)
             if case .tuple(let labels, let types) = type {
                 for (index, label) in labels.enumerated() {
                     if name == label || name == "\(index)" {
@@ -154,10 +163,15 @@ public class Symbols {
                 }
                 return []
             }
+            var isStatic = false
+            if case .metaType(let base) = type {
+                type = base
+                isStatic = true
+            }
 
             let typeNames = candidateTypeNames(for: type)
             for typeName in typeNames {
-                let functions = functionSignature(of: name, in: typeName, arguments: arguments)
+                let functions = functionSignature(of: name, in: typeName, arguments: arguments, isStatic: isStatic)
                 if !functions.isEmpty {
                     return functions
                 }
@@ -198,16 +212,21 @@ public class Symbols {
 
         /// Return the signatures of the possible subscripts being called with the given arguments.
         func subscriptSignature(in type: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
-            let type = type.asOptional(false)
+            var type = type.asOptional(false)
             if case .array(let elementType) = type, arguments.count == 1 {
                 return [.function([TypeSignature.Parameter(type: .int)], elementType)]
             } else if case .dictionary(let keyType, let valueType) = type, arguments.count == 1 {
                 return [.function([TypeSignature.Parameter(type: keyType)], valueType)]
             }
+            var isStatic = false
+            if case .metaType(let base) = type {
+                type = base
+                isStatic = true
+            }
 
             let typeNames = candidateTypeNames(for: type)
             for typeName in typeNames {
-                let functions = self.functionSignature(of: "subscript", in: typeName, arguments: arguments)
+                let functions = self.functionSignature(of: "subscript", in: typeName, arguments: arguments, isStatic: isStatic)
                 if !functions.isEmpty {
                     return functions
                 }
@@ -227,10 +246,10 @@ public class Symbols {
             return []
         }
 
-        private func identifierSignature(of member: String, in typeName: String) -> TypeSignature {
+        private func identifierSignature(of member: String, in typeName: String, isStatic: Bool) -> TypeSignature {
             let candidates = ranked(lookup(name: typeName))
             for candidate in candidates {
-                let type = identifierSignature(of: member, in: candidate)
+                let type = identifierSignature(of: member, in: candidate, isStatic: isStatic)
                 if type != .none {
                     return type
                 }
@@ -238,11 +257,11 @@ public class Symbols {
             return .none
         }
 
-        private func identifierSignature(of member: String, in candidate: Symbol) -> TypeSignature {
+        private func identifierSignature(of member: String, in candidate: Symbol, isStatic: Bool) -> TypeSignature {
             for relationship in candidate.relationships {
                 switch relationship.kind {
                 case .memberOf:
-                    guard relationship.isInverse, let memberSymbol = lookup(identifier: relationship.targetIdentifier ?? ""), memberSymbol.name == member else {
+                    guard relationship.isInverse, let memberSymbol = lookup(identifier: relationship.targetIdentifier ?? ""), memberSymbol.name == member, memberSymbol.isStatic == isStatic else {
                         break
                     }
                     return memberSymbol.typeSignature(symbols: symbols)
@@ -250,7 +269,7 @@ public class Symbols {
                     guard !relationship.isInverse, let inheritsFrom = lookup(identifier: relationship.targetIdentifier ?? "") else {
                         break
                     }
-                    let type = identifierSignature(of: member, in: inheritsFrom)
+                    let type = identifierSignature(of: member, in: inheritsFrom, isStatic: isStatic)
                     if type != .none {
                         return type
                     }
@@ -261,11 +280,11 @@ public class Symbols {
             return .none
         }
 
-        private func functionSignature(of name: String, in typeName: String, arguments: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
+        private func functionSignature(of name: String, in typeName: String, arguments: [LabeledValue<TypeSignature>], isStatic: Bool) -> [TypeSignature] {
             let candidates = ranked(lookup(name: typeName))
             var functions: [(symbol: Symbol, signature: TypeSignature)] = []
             for candidate in candidates {
-                for function in functionSignature(of: name, in: candidate, arguments: arguments) {
+                for function in functionSignature(of: name, in: candidate, arguments: arguments, isStatic: isStatic) {
                     if !functions.contains(where: { $0.signature == function.signature }) {
                         functions.append(function)
                     }
@@ -274,12 +293,12 @@ public class Symbols {
             return ranked(functions, keyPath: \.0).map(\.signature)
         }
 
-        private func functionSignature(of name: String, in candidate: Symbol, arguments: [LabeledValue<TypeSignature>]) -> [(symbol: Symbol, signature: TypeSignature)] {
+        private func functionSignature(of name: String, in candidate: Symbol, arguments: [LabeledValue<TypeSignature>], isStatic: Bool) -> [(symbol: Symbol, signature: TypeSignature)] {
             var functions: [(symbol: Symbol, signature: TypeSignature)] = []
             for relationship in candidate.relationships {
                 switch relationship.kind {
                 case .memberOf:
-                    guard relationship.isInverse, let member = lookup(identifier: relationship.targetIdentifier ?? ""), member.name == name else {
+                    guard relationship.isInverse, let member = lookup(identifier: relationship.targetIdentifier ?? ""), member.name == name, member.isStatic == isStatic else {
                         break
                     }
                     if var function = matchFunction(member, arguments: arguments) {
@@ -293,7 +312,7 @@ public class Symbols {
                     guard !relationship.isInverse, let inheritsFrom = lookup(identifier: relationship.targetIdentifier ?? "") else {
                         break
                     }
-                    functions += functionSignature(of: name, in: inheritsFrom, arguments: arguments)
+                    functions += functionSignature(of: name, in: inheritsFrom, arguments: arguments, isStatic: isStatic)
                 default:
                     break
                 }
@@ -399,6 +418,8 @@ public class Symbols {
                 let typeNames = candidateTypeNames(for: type)
                 let baseName = base.description
                 return typeNames.map { "\(baseName).\($0)" }
+            case .metaType(let type):
+                return candidateTypeNames(for: type)
             case .named(let name, _):
                 return [name]
             case .none:
@@ -509,6 +530,10 @@ struct Symbol {
             return .internal
         }
         return Visibility(rawValue: rawValue) ?? .internal
+    }
+
+    var isStatic: Bool {
+        return declarationFragments.hasKeyword("static") || declarationFragments.hasKeyword("class")
     }
 
     func typeSignature(symbols: Symbols) -> TypeSignature {
