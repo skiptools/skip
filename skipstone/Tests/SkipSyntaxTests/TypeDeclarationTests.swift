@@ -185,18 +185,15 @@ final class TypeDeclarationTests: XCTestCase {
         """)
     }
 
-    func testGenerics() async throws {
-        XCTExpectFailure()
-        XCTFail("TODO: Generics in classes, structs, extensions, typealiases. Generic where clauses, etc")
+    func testGenerics() async throws throws {
+        throw XCTSkip("TODO: Generics in classes, structs, extensions, typealiases. Generic where clauses, etc")
     }
 
-    func testTypeDeclaredWithinExtension() {
-        XCTExpectFailure()
-        XCTFail("TODO: Test declaring a type within an extension. We need to move it to the original type extended type definition if in module, error if not")
+    func testTypeDeclaredWithinExtension() throws {
+        throw XCTSkip("TODO: Test declaring a type within an extension. We need to move it to the original type extended type definition if in module, error if not")
     }
 
-    func testTypeDeclaredWithinFunction() {
-        XCTExpectFailure()
-        XCTFail("TODO: Test declaring a type within a function. This includes making sure our plugins process in-function types correctly")
+    func testTypeDeclaredWithinFunction() throws {
+        throw XCTSkip("TODO: Test declaring a type within a function. This includes making sure our plugins process in-function types correctly")
     }
 }

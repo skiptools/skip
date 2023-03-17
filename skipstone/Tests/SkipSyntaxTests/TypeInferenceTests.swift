@@ -164,14 +164,12 @@ final class TypeInferenceTests: XCTestCase {
         """)
     }
 
-    func testNestedTypes() {
-        XCTExpectFailure()
-        XCTFail("TODO: Test nested type symbols")
+    func testNestedTypes() throws {
+        throw XCTSkip("TODO: Test nested type symbols")
     }
 
-    func testBestGuessMatching() {
-        XCTExpectFailure()
-        XCTFail("TODO: We should fall back to looking for matching symbols when we don't know the type and using TypeSignature.isCompatible to match")
+    func testBestGuessMatching() throws {
+        throw XCTSkip("TODO: We should fall back to looking for matching symbols when we don't know the type and using TypeSignature.isCompatible to match")
     }
 }
 

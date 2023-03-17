@@ -86,24 +86,20 @@ final class SymbolsTests: XCTestCase {
         XCTAssertEqual([.function([], tupleSignature)], context.functionSignature(of: "tupleReturn", in: .named("SymbolsTestsClass", []), arguments: []))
     }
 
-    func testSuperclassConstructor() {
-        XCTExpectFailure()
-        XCTFail("TODO: Test custom superclass constructors called on a subclass")
+    func testSuperclassConstructor() throws {
+        throw XCTSkip("TODO: Test custom superclass constructors called on a subclass")
     }
 
-    func testCustomSubscript() {
-        XCTExpectFailure()
-        XCTFail("TODO: Test custom subscript operators")
+    func testCustomSubscript() throws {
+        throw XCTSkip("TODO: Test custom subscript operators")
     }
 
-    func testNestedTypes() {
-        XCTExpectFailure()
-        XCTFail("TODO: Test nested type symbols")
+    func testNestedTypes() throws {
+        throw XCTSkip("TODO: Test nested type symbols")
     }
 
-    func testGenerics() {
-        XCTExpectFailure()
-        XCTFail("TODO: Test generics symbols, including standard type declarations like Dictionary<String, Int>")
+    func testGenerics() throws {
+        throw XCTSkip("TODO: Test generics symbols, including standard type declarations like Dictionary<String, Int>")
     }
 }
 
