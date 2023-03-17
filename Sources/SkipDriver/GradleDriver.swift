@@ -5,6 +5,7 @@
 // as published by the Free Software Foundation https://fsf.org
 import Foundation
 
+#if os(macOS) || os(Linux)
 /// The `GradleDriver` controls the execution of the `gradle` tool,
 /// which is expected to already be installed on the system in the
 /// user's `PATH` environment.
@@ -259,6 +260,7 @@ public struct GradleDriver {
             self.testCases = testCases
         }
 
+        #if os(macOS) || os(Linux)
         /// Loads the test suite information from the JUnit-compatible XML format.
         @available(macOS 10.15, *)
         @available(iOS, unavailable)
@@ -319,6 +321,7 @@ public struct GradleDriver {
             let suite = TestSuite(name: testSuiteName, tests: testCount, skipped: skipCount, failures: failureCount, errors: errorCount, time: duration, testCases: testCases)
             self = suite
         }
+        #endif
     }
 
     public struct TestCase {
@@ -338,6 +341,7 @@ public struct GradleDriver {
             self.failures = failures
         }
 
+        #if os(macOS) || os(Linux)
         @available(macOS 10.15, *)
         @available(iOS, unavailable)
         init(from element: XMLElement, in url: URL) throws {
@@ -373,6 +377,7 @@ public struct GradleDriver {
 
             self.failures = testFailures
         }
+        #endif
     }
 
     public struct TestFailure {
@@ -389,6 +394,7 @@ public struct GradleDriver {
             self.contents = contents
         }
 
+        #if os(macOS) || os(Linux)
         @available(macOS 10.15, *)
         @available(iOS, unavailable)
         init(from element: XMLElement, in url: URL) throws {
@@ -406,22 +412,26 @@ public struct GradleDriver {
             self.type = type
             self.contents = contents
         }
+        #endif
     }
 
+    #if os(macOS) || os(Linux)
     private static func parseTestResults(in testFolder: URL) throws -> [TestSuite] {
-        try FileManager.default.contentsOfDirectory(at: testFolder, includingPropertiesForKeys: [.isDirectoryKey]).compactMap { resultURL in
+        func parseTestSuite(resultURL: URL) throws -> TestSuite? {
             if try resultURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory != false {
-                return nil
+                return Optional<TestSuite>.none
             }
 
             if resultURL.pathExtension != "xml" {
                 print("skipping non .xml test file:", resultURL.path)
-                return nil
+                return Optional<TestSuite>.none
             }
 
             return try TestSuite(contentsOf: resultURL)
         }
+        return try FileManager.default.contentsOfDirectory(at: testFolder, includingPropertiesForKeys: [.isDirectoryKey]).compactMap(parseTestSuite)
     }
+    #endif
 }
 
 public enum GradleDriverError : Error, LocalizedError {
@@ -462,3 +472,4 @@ public enum GradleDriverError : Error, LocalizedError {
         }
     }
 }
+#endif // os(macOS) || os(Linux)
