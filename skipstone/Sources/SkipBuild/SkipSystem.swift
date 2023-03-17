@@ -217,20 +217,13 @@ extension SkipSystem {
 #endif
     }
 
-    static var kotlinCompiler: URL {
-        get throws {
-            // e.g.: /Applications/Android Studio.app/Contents/plugins/Kotlin/kotlinc/bin/kotlinc
-            URL(fileURLWithPath: "Contents/plugins/Kotlin/kotlinc/bin/kotlinc", isDirectory: false, relativeTo: try studioRoot(bundleID: androidStudioBundleID))
-        }
-    }
-
     /// Forks the
     /// - Parameters:
     ///   - studioID: the ID of the app container for the `kotlinc` command
     ///   - script: the script to execute
     /// - Returns: the string result of the script
     public static func kotlinc(script: String) async throws -> String {
-        try await Process.popen(arguments: ["/bin/sh", kotlinCompiler.path, "-e", script])
+        try await Process.popen(arguments: ["/usr/bin/env", "kotlinc", "-e", script])
             .utf8Output()
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -251,8 +244,7 @@ extension SkipSystem {
 
         let outputURL = URL(fileURLWithPath: "output.js", isDirectory: false, relativeTo: tmpDir)
 
-        let result = try await Process.popen(arguments: ["/bin/sh",
-                                                                  kotlinCompiler.path,
+        let result = try await Process.popen(arguments: ["/usr/bin/env", "kotlinc",
                                                                   legacy ? "-Xuse-deprecated-legacy-compiler" : nil,
                                                                   "-output", outputURL.path,
                                                                   sourceURL.path
