@@ -85,8 +85,8 @@ extension Message {
         return Message(kind: .error, message: "Kotlin does not support constructors in protocols", sourceDerived: sourceDerived)
     }
 
-    static func kotlinProtocolStaticFunction(_ sourceDerived: SourceDerived) -> Message {
-        return Message(kind: .error, message: "Kotlin does not support static functions in protocols", sourceDerived: sourceDerived)
+    static func kotlinProtocolStaticMember(_ sourceDerived: SourceDerived) -> Message {
+        return Message(kind: .error, message: "Kotlin does not support static members in protocols", sourceDerived: sourceDerived)
     }
 
     // Idea: duplicate body that we're falling through to (and the following if that too does a fallthrough, etc)

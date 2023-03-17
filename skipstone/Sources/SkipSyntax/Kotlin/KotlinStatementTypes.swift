@@ -999,7 +999,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             if statement.type == .initDeclaration {
                 kstatement.messages.append(.kotlinProtocolConstructor(statement))
             } else if statement.modifiers.isStatic {
-                kstatement.messages.append(.kotlinProtocolStaticFunction(statement))
+                kstatement.messages.append(.kotlinProtocolStaticMember(statement))
             }
         }
         if statement.attributes.attributes.contains(where: { !isIgnorable(attribute: $0) }) {
@@ -1326,9 +1326,13 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         kstatement.willSet = statement.willSet?.translate(translator: translator, expectedReturn: .no)
         kstatement.didSet = statement.didSet?.translate(translator: translator, expectedReturn: .no)
 
+        // Warnings and fixups
         kstatement.declaredType.appendKotlinMessages(to: kstatement)
         if statement.isAsync {
             kstatement.messages.append(.kotlinAsyncProperties(kstatement))
+        }
+        if statement.modifiers.isStatic, let owningTypeDeclaration = statement.owningTypeDeclaration, owningTypeDeclaration === statement.parent, owningTypeDeclaration.type == .protocolDeclaration {
+            kstatement.messages.append(.kotlinProtocolStaticMember(statement))
         }
         if !statement.attributes.isEmpty {
             kstatement.messages.append(.kotlinAttributeUnsupported(statement))

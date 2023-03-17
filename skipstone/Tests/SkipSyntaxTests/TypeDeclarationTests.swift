@@ -99,6 +99,40 @@ final class TypeDeclarationTests: XCTestCase {
         """)
     }
 
+    func testProtocol() async throws {
+        try await check(swift: """
+        protocol P {
+            var i: Int { get }
+            var j: String { get set }
+            func f(i: Int) -> String
+            mutating func g()
+        }
+        """, kotlin: """
+        internal interface P {
+            internal val i: Int
+            internal var j: String
+            internal fun f(i: Int): String
+            internal fun g()
+        }
+        """)
+    }
+
+    func testProtocolStaticMembers() async throws {
+        try await checkProducesMessage(swift: """
+        protocol P {
+            static func f()
+            var i: Int { get }
+        }
+        """)
+
+        try await checkProducesMessage(swift: """
+        protocol P {
+            static var s: Int { get }
+            var i: Int { get }
+        }
+        """)
+    }
+
     func testTypealias() async throws {
         try await check(swift: """
         private typealias IArray = Array<Bool>
