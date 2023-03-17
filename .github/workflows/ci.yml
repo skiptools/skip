@@ -27,9 +27,9 @@ jobs:
           # Reason: tried: '/usr/lib/swift/libswift_StringProcessing.dylib' (no such file), '/usr/local/lib/libswift_StringProcessing.dylib' (no such file), '/usr/lib/libswift_StringProcessing.dylib' (no such file)
 
           # the failure seems to not affect the swift package command, though…
-          swift package --disable-sandbox --allow-writing-to-package-directory skip -version
+          swift package --disable-sandbox --allow-writing-to-package-directory skip version
 
           # also try to run the tool directly from the cache
-          ./.build/artifacts/skip/skiptool.artifactbundle/skiptool -version
+          ./.build/artifacts/skip/skiptool.artifactbundle/skiptool version
 
 
