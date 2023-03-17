@@ -9,7 +9,7 @@ import TSCLibc
 import OSLog
 
 /// The current version of the tool
-public let skipVersion = "0.1.0"
+public let skipVersion = "0.1.2"
 
 struct Options {
     var preprocessorSymbols: [String] = []
