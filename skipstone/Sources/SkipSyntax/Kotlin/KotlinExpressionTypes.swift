@@ -991,6 +991,8 @@ struct KotlinMatchingCase {
 
 class KotlinMemberAccess: KotlinExpression {
     var base: KotlinExpression?
+    // Note: requires dependency implementation("org.jetbrains.kotlin:kotlin-reflect:1.8.10"), import kotlin.reflect.full.*
+    var baseKClass: TypeSignature?
     var member: String
     var useMultlineFormatting = false
     var inferredType: TypeSignature = .none
@@ -1001,6 +1003,7 @@ class KotlinMemberAccess: KotlinExpression {
         if let base = expression.base {
             kexpression.base = translator.translateExpression(base)
             kexpression.useMultlineFormatting = expression.useMultlineFormatting
+            kexpression.baseKClass = kclass(for: base, accessingMember: expression.member, codebaseInfo: translator.codebaseInfo)
         } else if expression.inferredType == .none && translator.codebaseInfo != nil {
             kexpression.messages.append(.kotlinMemberAccessUnknownBaseType(expression, member: expression.member))
         } else if case .optional = expression.inferredType, expression.member == "none" || expression.member == "some" {
@@ -1009,6 +1012,30 @@ class KotlinMemberAccess: KotlinExpression {
         kexpression.inferredType = expression.inferredType
         kexpression.mayBeSharedMutableStruct = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
         return kexpression
+    }
+
+    /// Return the `KClass` instance the given expression evaluates to, if any.
+    private static func kclass(for expression: Expression, accessingMember: String, codebaseInfo: KotlinCodebaseInfo.Context?) -> TypeSignature? {
+        // Must evaluate to X.Type
+        guard case .metaType(let type) = expression.inferredType, type != .none, accessingMember != "self" else {
+            return nil
+        }
+        // A type literal is not the same as KClass<Type>
+        if expression is TypeLiteral {
+            return nil
+        }
+        // Now that we've ruled out a type literal, any other non-Identifier must be represented by a KClass
+        guard let identifier = expression as? Identifier else {
+            return type
+        }
+        guard identifier.name != "Self" && identifier.name != "self" else {
+            return nil
+        }
+        // For an Identifier, check if it's a declared type
+        guard let codebaseInfo else {
+            return nil
+        }
+        return codebaseInfo.declarationType(of: identifier.name, mustBeInModule: false) == nil ? type : nil
     }
 
     init(base: KotlinExpression, member: String) {
@@ -1056,8 +1083,17 @@ class KotlinMemberAccess: KotlinExpression {
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
         if let base {
+            if baseKClass != nil {
+                output.append("(")
+            }
             output.append(base, indentation: indentation)
-            if member != "init" {
+            if let baseKClass {
+                output.append(".companionObjectInstance as \(baseKClass).Companion)")
+            }
+            if member == "self" {
+                // Must be Type.self
+                output.append("::class")
+            } else if member != "init" {
                 if useMultlineFormatting {
                     output.append("\n").append(indentation.inc())
                 }

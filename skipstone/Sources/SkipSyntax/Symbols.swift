@@ -564,9 +564,17 @@ struct Symbol {
             return t.typeSignature(symbols: symbols)
         case .method:
             fallthrough
+        case .typeMethod:
+            fallthrough
+        case .subscript:
+            fallthrough
+        case .typeSubscript:
+            fallthrough
         case .func:
             return functionSignature(symbols: symbols)
         case .property:
+            fallthrough
+        case .typeProperty:
             fallthrough
         case .var:
             return variableType(symbols: symbols)
@@ -760,13 +768,17 @@ struct Symbol {
             if let fragment = specialFragments[i] {
                 switch fragment.kind {
                 case .typeIdentifier:
-                    let type = fragment.typeSignature(symbols: symbols)
+                    var type = fragment.typeSignature(symbols: symbols)
+                    i += fragment.spelling.count
+                    if i + 4 < s.count, s[i] == ".", String(s[(i + 1)...(i + 4)]) == "Type" {
+                        type = .metaType(type)
+                        i += 5
+                    }
                     if inGenerics {
                         genericTypes.append(type)
                     } else {
                         types.append(type)
                     }
-                    i += fragment.spelling.count
                     continue outer
                 case .keyword:
                     i += fragment.spelling.count

@@ -77,4 +77,29 @@ final class ExpressionTests: XCTestCase {
         }
         """)
     }
+
+    func testStaticMemberUsingClassReference() async throws {
+        try await check(symbols: symbols, swift: """
+        func f() {
+            g(c: ExpressionTestsClass.self)
+            g(c: ExpressionTestsClass.typeVar)
+            ExpressionTestsClass.staticFunc()
+            ExpressionTestsClass.typeVar.staticFunc()
+        }
+        """, kotlin: """
+        internal fun f() {
+            g(c = ExpressionTestsClass::class)
+            g(c = ExpressionTestsClass.typeVar)
+            ExpressionTestsClass.staticFunc()
+            (ExpressionTestsClass.typeVar.companionObjectInstance as ExpressionTestsClass.Companion).staticFunc()
+        }
+        """)
+    }
+}
+
+private class ExpressionTestsClass {
+    static let typeVar = ExpressionTestsClass.self
+
+    static func staticFunc() {
+    }
 }
