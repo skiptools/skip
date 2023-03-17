@@ -6,11 +6,11 @@ class KotlinSwiftUIPlugin: KotlinPlugin {
         // Does this file need translation?
         var needsTranslation = false
         for importDeclaration in syntaxTree.root.statements.compactMap({ $0 as? KotlinImportDeclaration }) {
-            // Update SwiftUI imports to CrossUI
+            // Update SwiftUI imports to SkipUI
             if importDeclaration.modulePath.first == "SwiftUI" {
                 needsTranslation = true
-                importDeclaration.modulePath[0] = "CrossUI"
-            } else if importDeclaration.modulePath.first == "CrossUI" {
+                importDeclaration.modulePath[0] = "SkipUI"
+            } else if importDeclaration.modulePath.first == "SkipUI" {
                 needsTranslation = true
             }
         }
@@ -34,7 +34,7 @@ class KotlinSwiftUIPlugin: KotlinPlugin {
             return
         }
 
-        // Replace 'var body' with an override of our Kotlin CrossUI body function
+        // Replace 'var body' with an override of our Kotlin SkipUI body function
         let bodyMethod = KotlinFunctionDeclaration(name: "body", sourceFile: statement.sourceFile, sourceRange: statement.sourceRange)
         bodyMethod.modifiers = statement.modifiers
         bodyMethod.modifiers.isOverride = true

@@ -25,6 +25,7 @@ SKIPPKGDIR=$(dirname ${SKIPPKG})
 cd ${SKIPPKGDIR}
 SEMVER_CURRENT=$(git tag -l --sort=-version:refname | grep '[0-9]*\.[0-9]*\.[0-9]*' | head -n 1)
 SEMVER_NEXT=$(semver bump patch "${SEMVER_CURRENT}")
+#SEMVER_NEXT=$(semver bump minor "${SEMVER_CURRENT}")
 cd -
 
 echo "Creating release and tagging new skip version: ${SEMVER_NEXT}"

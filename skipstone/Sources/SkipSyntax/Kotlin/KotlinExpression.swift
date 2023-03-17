@@ -15,7 +15,7 @@ class KotlinExpression: KotlinSyntaxNode {
 
     /// Return an expression that creates a by-value copy of the result of this expression if needed to maintain proper semantics for struct types.
     ///
-    /// - Seealso: `CrossFoundation.Any.sref()`
+    /// - Seealso: `SkipFoundation.Any.sref()`
     func sref(onUpdate: String? = nil) -> KotlinExpression {
         // If an update block is supplied, we need to perform a sref even if the value isn't shared so
         // that the update is called on any mutation

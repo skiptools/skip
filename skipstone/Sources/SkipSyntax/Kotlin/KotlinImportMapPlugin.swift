@@ -4,11 +4,11 @@
 /// Eventually this should be driven by the `skip.yml` metadata.
 class KotlinImportMapPlugin: KotlinPlugin {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
-        // TBD: rather than replacing a module name with another name like "CrossFoundation" that will be converted to "import cross.foundation", maybe we should instead have a `importDeclaration.kotlinImportOverride` that we can set
+        // TBD: rather than replacing a module name with another name like "SkipFoundation" that will be converted to "import skip.foundation", maybe we should instead have a `importDeclaration.kotlinImportOverride` that we can set
         for importDeclaration in syntaxTree.root.statements.compactMap({ $0 as? KotlinImportDeclaration }) {
             if importDeclaration.modulePath.first == "Foundation" {
-                importDeclaration.modulePath[0] = "CrossFoundation"
-                //importDeclaration.kotlinImportOverride = "cross.foundation"
+                importDeclaration.modulePath[0] = "SkipFoundation"
+                //importDeclaration.kotlinImportOverride = "skip.foundation"
             }
             if importDeclaration.modulePath.first == "XCTest" {
                 importDeclaration.modulePath[0] = "SkipUnit"

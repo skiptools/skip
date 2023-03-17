@@ -336,7 +336,7 @@ extension SkipSystem {
                         let src = """
                         package \(packageName)
 
-                        import cross.foundation.*
+                        import skip.foundation.*
 
                         public final class \(moduleName)Module {
                         }

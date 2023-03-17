@@ -9,7 +9,7 @@ import TSCLibc
 import OSLog
 
 /// The current version of the tool
-public let skipVersion = "0.0.53"
+public let skipVersion = "0.1.0"
 
 struct Options {
     var preprocessorSymbols: [String] = []
@@ -194,6 +194,14 @@ struct VersionCommand: SingleStreamingCommand {
 }
 
 // MARK: InfoCommand
+
+extension FileManager {
+    #if os(iOS)
+    var homeDirectoryForCurrentUser: URL {
+        URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+    }
+    #endif
+}
 
 struct InfoCommand: SingleStreamingCommand {
     static let experimental = false
@@ -457,7 +465,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
         let outputFolderPath = try AbsolutePath(validating: outputFolder, relativeTo: fs.currentWorkingDirectory ?? fs.tempDirectory)
         if !fs.isDirectory(outputFolderPath) {
-            // e.g.: ~Library/Developer/Xcode/DerivedData/PACKAGE-ID/SourcePackages/plugins/skip-core.output/CrossFoundationKotlinTests/SkipTranspilePlugIn/CrossFoundation/src/test/kotlin
+            // e.g.: ~Library/Developer/Xcode/DerivedData/PACKAGE-ID/SourcePackages/plugins/skip-core.output/SkipFoundationKotlinTests/SkipTranspilePlugIn/SkipFoundation/src/test/kotlin
             //throw ValidationError("Folder specified by --output-folder did not exist: \(outputFolder)")
             try fs.createDirectory(outputFolderPath, recursive: true)
         }
@@ -479,7 +487,11 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         let packageName = KotlinTranslator.packageName(forModule: primaryModuleName)
 
         let skipConfig: YAML = try loadSkipConfig() // TODO: use the config for generating the build.gradle.kts
+        #if os(macOS) || os(Linux)
         let symbols: Symbols? = try await loadSymbols()
+        #else
+        let symbols: Symbols? = nil
+        #endif
         let overridden = try copyKotlinOverrides()
         let overriddenSwiftFileNames = overridden.map({ $0.basenameWithoutExt + ".swift" })
 
@@ -616,6 +628,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             return copiedFiles
         }
 
+        #if os(macOS) || os(Linux)
         func loadSymbols() async throws -> Symbols {
             let symbolFolder = transpileOptions.symbolFolder.flatMap(URL.init(fileURLWithPath:))
             //let symbolFolderPath = try transpileOptions.symbolFolder.flatMap(AbsolutePath.init(validating:))
@@ -628,7 +641,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             let loadSymbols = Symbols(moduleName: primaryModuleName, graphs: symbolsGraph.unifiedGraphs)
             return loadSymbols
         }
-
+        #endif
 
         func handleTranspilation(transpilation: Transpilation) throws {
             for message in transpilation.messages {
@@ -643,7 +656,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
             let outputFile = try saveTranspilation()
 
-            info("transpiled \(transpilation.sourceFile.name) (\(Self.byteCount(for: .init(sourceSize))) to \(outputFile.basename) (\(Self.byteCount(for: transpilation.output.content.utf8.count))) (\(Int64(transpilation.duration * 1000)) ms)", sourceFile: Source.File(path: outputFile))
+            info("transpiled \(transpilation.sourceFile.name) (\(Self.byteCount(for: .init(sourceSize)))) to \(outputFile.basename) (\(Self.byteCount(for: transpilation.output.content.utf8.count))) (\(Int64(transpilation.duration * 1000)) ms)", sourceFile: Source.File(path: outputFile))
 
             for message in transpilation.messages {
                 //writeMessage(message)
@@ -675,7 +688,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
 
         // NOTE: when linking between modules, note that SPM and Xcode use different output paths:
-        // Xcode: ~/Library/Developer/Xcode/DerivedData/PROJECT-ID/SourcePackages/plugins/skip-core.output/CrossFoundationKotlinTests/SkipTranspilePlugIn/CrossFoundation
+        // Xcode: ~/Library/Developer/Xcode/DerivedData/PROJECT-ID/SourcePackages/plugins/skip-core.output/SkipFoundationKotlinTests/SkipTranspilePlugIn/SkipFoundation
         // SPM: .build/plugins/outputs/skip-core/
         func linkDependentModuleSources() throws -> [String] {
             var dependentModules: [String] = []

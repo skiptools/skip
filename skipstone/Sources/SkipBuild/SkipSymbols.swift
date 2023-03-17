@@ -18,6 +18,7 @@ public actor SymbolCache {
         let accessLevel: String
     }
 
+    #if os(macOS) || os(Linux)
     public func symbols(for moduleName: String, accessLevel: String = "internal") async throws -> [URL: SymbolGraph] {
         let key = SymbolKey(moduleName: moduleName, accessLevel: accessLevel)
         if let symbols = cache[key] {
@@ -32,6 +33,7 @@ public actor SymbolCache {
         cache[key] = symbols
         return symbols
     }
+    #endif
 }
 
 #if os(macOS) || os(Linux)
