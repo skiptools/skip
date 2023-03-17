@@ -5,35 +5,6 @@ import TSCBasic
 #if canImport(Cocoa)
 import class Cocoa.NSWorkspace
 #endif
-#if canImport(OSLog)
-import OSLog
-#else
-/// Dummy logger for Linux
-public struct Logger {
-    public let subsystem: String
-    public let category: String
-
-    public func log(_ message: String) {
-        print("[log \(subsystem) \(category)] \(message)")
-    }
-
-    public func info(_ message: String) {
-        print("[info \(subsystem) \(category)] \(message)")
-    }
-
-    public func debug(_ message: String) {
-        print("[debug \(subsystem) \(category)] \(message)")
-    }
-
-    public func warning(_ message: String) {
-        print("[warning \(subsystem) \(category)] \(message)")
-    }
-
-    public func error(_ message: String) {
-        print("[error \(subsystem) \(category)] \(message)")
-    }
-}
-#endif
 
 /// The set of targets for this transpilation.
 public struct SkipTargetSet {
@@ -75,7 +46,7 @@ extension SkipSystem {
     /// The bundle identifier for the Android Studio.app installation
     public static let androidStudioBundleID = "com.google.android.studio"
 
-    public static let logger = Logger(subsystem: "skip", category: "assembler")
+    static let logger = Logger(subsystem: "skip", category: "assembler")
 
     /// Returns the home folder for the local Android Studio install based on the bundle ID (`com.google.android.studio`), which contains `kotlinc` and gradle libraries.
     ///

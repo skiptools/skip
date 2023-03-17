@@ -6,7 +6,6 @@ import ArgumentParser
 import Universal
 import TSCBasic
 import TSCLibc
-import OSLog
 
 /// The current version of the tool
 public let skipVersion = "0.1.2"

@@ -2,9 +2,6 @@ import Foundation
 import SkipSyntax
 import SymbolKit
 import TSCBasic
-#if canImport(OSLog)
-import OSLog
-#endif
 
 fileprivate let logger = Logger(subsystem: "skip", category: "symbols")
 
