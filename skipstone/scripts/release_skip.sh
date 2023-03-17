@@ -114,7 +114,7 @@ curl --location --fail --retry 5 --retry-all-errors --retry-max-time 120 -o /dev
 # now jump *back* to the package and make sure we can run the command
 cd -
 if [ "${SKIPPKG}" != "/dev/null" ]; then        
-    swift package --disable-sandbox --allow-writing-to-package-directory skip version
+    swift package --disable-sandbox --allow-writing-to-package-directory skip info
 fi
 
 # finally, jump back and make a corresponding release in the private SwiftSource

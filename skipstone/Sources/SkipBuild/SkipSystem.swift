@@ -8,71 +8,6 @@ import class Cocoa.NSWorkspace
 
 #if os(macOS) || os(Linux)
 public struct SkipSystem {
-    /// Takes the Swift file at the given URL and compiles it with the parameters for extracting symbols, and then returns the parsed symbol graph.
-    ///
-    /// - Parameters:
-    ///   - url: the URL of the Swift file to compile. If this is a `Package.swift` file, then the build will be run with `swift build`, otherwise it will use `swiftc` for a single file.
-    ///   - accessLevel: the default access level for the generated symbols
-    /// - Returns: the parsed SymbolGraph that resulted from the compilation
-    public static func buildSymbols(swift swiftFileURL: URL, singlePass: Bool = false, sdk: String = "macosx", moduleName: String? = nil, accessLevel: String = "private") async throws -> SymbolGraph? {
-        // symbolgraph-extract implementation:
-        // https://github.com/apple/swift-package-manager/blob/main/Sources/Commands/Utilities/SymbolGraphExtract.swift
-
-        // an alternative way to run this could be: `swift package dump-symbol-graph --minimum-access-level private`
-
-        // another alternative could be to fork `swift build` against a Package.swift
-        // https://www.swift.org/documentation/docc/documenting-a-swift-framework-or-package#Create-Documentation-for-a-Swift-Package
-        // swift build --target DeckOfPlayingCards -Xswiftc -emit-symbol-graph -Xswiftc -emit-symbol-graph-dir -Xswiftc .build
-        // this is based on how docc gathers symbols: https://github.com/apple/swift-docc/blob/main/Sources/generate-symbol-graph/main.swift#L157
-        // e.g.: swift build -Xswiftc -emit-symbol-graph -Xswiftc -emit-symbol-graph-dir -Xswiftc ./.build/ -Xswiftc -symbol-graph-minimum-access-level -Xswiftc private
-        // but we also omit synthesized members because they blow up the symbol graph size of any SwiftUI view
-
-        let urlBase = swiftFileURL.deletingPathExtension()
-        let moduleName = moduleName ?? urlBase.lastPathComponent // if the module name is not set, default to the last part of the URL
-        let dir = urlBase.deletingLastPathComponent()
-
-        // construct a command like: xcrun swift -frontend -target $(swiftc -print-target-info | jq -r .target.triple) -sdk $(xcrun --show-sdk-path --sdk macosx) -D DEBUG  -module-name Source -emit-module-path Source.swiftmodule Source.swift
-
-        // first get the correct sdk and target info, a la: swiftc -module-name Source -emit-module-path . Source.swift && swift symbolgraph-extract -output-dir . -target $(swiftc -print-target-info | jq -r .target.triple) -sdk $(xcrun --show-sdk-path --sdk macosx) -minimum-access-level internal -I . -module-name Source
-
-        // get the target info from the JSON emitted from `swift -print-target-info` (e.g., "arm64-apple-macosx13.0")
-        let targetInfoData = try await xcrun("swift", "-print-target-info")
-        let targetInfo = try JSONDecoder().decode(SwiftTarget.self, from: Data(targetInfoData.utf8))
-
-        // get the SDK path (e.g., for "xcrun --show-sdk-path --sdk macosx" it might return "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX13.1.sdk")
-        let sdKPath = try await xcrun("--show-sdk-path", "--sdk", sdk)
-
-        let modulePath = urlBase.appendingPathExtension("swiftmodule").path
-
-        try await xcrun("swift",
-                        "-frontend",
-                        "-module-name", moduleName,
-                        "-target", targetInfo.target.triple,
-                        "-sdk", sdKPath,
-                        "-emit-module-path", modulePath,
-                        swiftFileURL.path)
-
-        try await xcrun("swift",
-                        "symbolgraph-extract",
-                        "-module-name", moduleName,
-                        "-include-spi-symbols",
-                        "-skip-inherited-docs",
-                        "-skip-synthesized-members",
-                        //"-v", // verbose
-                        //"-pretty-print",
-                        //"-skip-synthesized-members",
-                        "-output-dir", dir.path,
-                        "-target", targetInfo.target.triple,
-                        "-sdk", sdKPath,
-                        "-minimum-access-level", accessLevel,
-                        "-I", dir.path)
-
-        let symbolFile = urlBase.appendingPathExtension("symbols.json")
-        let graphData = try Data(contentsOf: symbolFile)
-        let graph = try JSONDecoder().decode(SymbolGraph.self, from: graphData)
-        return graph
-    }
-
     /// A serialize form of a `Package.swift` file, as output by `/usr/bin/xcrun swift package --package-path . dump-package`
     public struct PackageSwift : Decodable {
         public let name: String?
@@ -167,7 +102,7 @@ public struct SkipSystem {
         return (unifiedGraphs, graphSources)
     }
 
-    public static func extractSymbols(moduleFolder moduleBuildFolder: URL? = nil, moduleNames: [String], tmpDir: URL? = nil, sdk: String = "macosx", accessLevel: String = "internal") async throws -> [URL: SymbolGraph] {
+    public static func extractSymbols(moduleFolder moduleBuildFolder: URL? = nil, moduleNames: [String], tmpDir: URL? = nil, accessLevel: String = "internal") async throws -> [URL: SymbolGraph] {
         let moduleBuildFolder = moduleBuildFolder ?? URL.moduleBuildFolder()
 
         // fall back to using a temporary folder
@@ -178,8 +113,18 @@ public struct SkipSystem {
         let targetInfoData = try await xcrun("swift", "-print-target-info")
         let targetInfo = try JSONDecoder().decode(SwiftTarget.self, from: targetInfoData.data(using: .utf8)!)
 
-        // get the SDK path (e.g., for "xcrun --show-sdk-path --sdk macosx" it might return "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX13.1.sdk")
-        let sdKPath = try await xcrun("--show-sdk-path", "--sdk", sdk)
+        // get the SDK path (e.g., for "xcrun --show-sdk-path --sdk macosx" it might return "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platf#orm/Developer/SDKs/MacOSX13.1.sdk")
+        #if os(macOS)
+        let sdkArg: String? = "-sdk"
+        let sdKPath: String? = try await xcrun("--show-sdk-path")
+        let frameworkArg: String? = "-F"
+        let frameworkPath: String? = "\(sdKPath!)/../../Library/Frameworks/"
+        #else
+        let sdkArg: String? = nil
+        let sdKPath: String? = nil
+        let frameworkArg: String? = nil
+        let frameworkPath: String? = nil
+        #endif
 
         var modulePaths: [URL: SymbolGraph] = [:]
 
@@ -206,9 +151,9 @@ public struct SkipSystem {
                                 //"-skip-synthesized-members",
                                 "-output-dir", tmpDir.path,
                                 "-target", targetInfo.target.triple,
-                                "-sdk", sdKPath,
+                                sdkArg, sdKPath,
+                                frameworkArg, frameworkPath,
                                 "-minimum-access-level", accessLevel,
-                                "-F", "\(sdKPath)/../../Library/Frameworks/", // needed for XCTest imports
                                 "-I", moduleBuildFolder.path)
 
             // load the symbol file, as well as any associated extensions with @ suffixes
@@ -225,7 +170,7 @@ public struct SkipSystem {
         return modulePaths
     }
 
-    @discardableResult static func xcrun(permitFailure: Bool = false, _ args: String...) async throws -> String {
+    @discardableResult static func xcrun(permitFailure: Bool = false, _ args: String?...) async throws -> String {
 #if os(macOS)
         // use xcrun, which will use whichever Swift we have set up with Xcode
         let runcmd = "/usr/bin/xcrun"
@@ -236,8 +181,8 @@ public struct SkipSystem {
 #error("unsupported platform")
 #endif
 
-        let result = try await Process.popen(arguments: [runcmd] + args)
-        return try result.utf8Output().trimmingCharacters(in: .whitespacesAndNewlines)
+        let result = try await Process.checkNonZeroExit(arguments: [runcmd] + args.compactMap({ $0 }))
+        return result.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 
