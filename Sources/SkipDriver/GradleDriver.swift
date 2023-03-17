@@ -260,6 +260,8 @@ public struct GradleDriver {
         }
 
         /// Loads the test suite information from the JUnit-compatible XML format.
+        @available(macOS 10.15, *)
+        @available(iOS, unavailable)
         public init(contentsOf url: URL) throws {
             let results = try XMLDocument(contentsOf: url)
             //print("parsed XML results:", results)
@@ -336,6 +338,8 @@ public struct GradleDriver {
             self.failures = failures
         }
 
+        @available(macOS 10.15, *)
+        @available(iOS, unavailable)
         init(from element: XMLElement, in url: URL) throws {
             guard let testCaseName = element.attribute(forName: "name")?.stringValue else {
                 throw GradleDriverError.missingProperty(url: url, propertyName: "name")
@@ -385,6 +389,8 @@ public struct GradleDriver {
             self.contents = contents
         }
 
+        @available(macOS 10.15, *)
+        @available(iOS, unavailable)
         init(from element: XMLElement, in url: URL) throws {
             guard let message = element.attribute(forName: "message")?.stringValue else {
                 throw GradleDriverError.missingProperty(url: url, propertyName: "message")

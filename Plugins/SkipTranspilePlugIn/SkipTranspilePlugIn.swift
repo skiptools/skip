@@ -94,7 +94,7 @@ import PackagePlugin
 
             // build up a relative link path to the related module based on the plug-in output directory structure
             buildModuleArgs += ["--module", peerTargetName + ":" + target.directory.string]
-            // e.g. ../../CrossFoundationKotlin/SkipTranspilePlugIn/CrossFoundation
+            // e.g. ../../SkipFoundationKotlin/SkipTranspilePlugIn/SkipFoundation
             // FIXME: the inserted "../" is needed because LocalFileSystem.createSymbolicLink will resolve the relative path against the destinations *parent* for some reason (SPM bug?)
             let targetLink = "../../../" + target.name + "/" + pluginFolderName + "/" + peerTargetName
             buildModuleArgs += ["--link", peerTargetName + ":" + targetLink]
