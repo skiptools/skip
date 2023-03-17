@@ -11,7 +11,7 @@ extension XCTestCase {
         get async throws {
             #if os(Linux)
             // FIXME: symbol generation not currently working on linux, so those tests will be disabled
-            return nil
+            throw XCTSkip("symbols not available on Linux")
             #endif
             if let symbols = Self.symbols {
                 return symbols
