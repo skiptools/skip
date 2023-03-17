@@ -130,16 +130,6 @@ final class TypeInferenceTests: XCTestCase {
         """)
     }
 
-    func testNestedTypes() {
-        XCTExpectFailure()
-        XCTFail("TODO: Test nested type symbols")
-    }
-
-    func testBestGuessMatching() {
-        XCTExpectFailure()
-        XCTFail("TODO: We should fall back to looking for matching symbols when we don't know the type and using TypeSignature.isCompatible to match")
-    }
-
     func testStaticVsInstanceContext() async throws {
         try await check(symbols: symbols, swift: """
         extension TypeInferenceTestsClass {
@@ -172,6 +162,16 @@ final class TypeInferenceTests: XCTestCase {
             val b = TypeInferenceTestsClass.returnEnum() == TypeInferenceTestsEnum.case1
         }
         """)
+    }
+
+    func testNestedTypes() {
+        XCTExpectFailure()
+        XCTFail("TODO: Test nested type symbols")
+    }
+
+    func testBestGuessMatching() {
+        XCTExpectFailure()
+        XCTFail("TODO: We should fall back to looking for matching symbols when we don't know the type and using TypeSignature.isCompatible to match")
     }
 }
 

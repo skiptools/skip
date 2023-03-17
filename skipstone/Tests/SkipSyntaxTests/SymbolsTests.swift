@@ -80,6 +80,12 @@ final class SymbolsTests: XCTestCase {
         XCTAssertEqual([.function([.init(label: "d", type: .double), .init(label: "s", type: .string)], enumAssociatedValueSignature)], context.functionSignature(of: "case3", in: enumAssociatedValueSignature, arguments: [LabeledValue<TypeSignature>(label: "d", value: .double), LabeledValue<TypeSignature>(label: "s", value: .string)]))
     }
 
+    func testTuples() async throws {
+        let context = try await symbols.context()
+        let tupleSignature: TypeSignature = .tuple([nil, nil], [.named("SymbolsTestsEnum", []), .int])
+        XCTAssertEqual([.function([], tupleSignature)], context.functionSignature(of: "tupleReturn", in: .named("SymbolsTestsClass", []), arguments: []))
+    }
+
     func testSuperclassConstructor() {
         XCTExpectFailure()
         XCTFail("TODO: Test custom superclass constructors called on a subclass")
@@ -88,11 +94,6 @@ final class SymbolsTests: XCTestCase {
     func testCustomSubscript() {
         XCTExpectFailure()
         XCTFail("TODO: Test custom subscript operators")
-    }
-
-    func testTuples() {
-        XCTExpectFailure()
-        XCTFail("TODO: Test tuple symbols, including tuples as parameter and return types")
     }
 
     func testNestedTypes() {
@@ -130,6 +131,10 @@ class SymbolsTestsClass: SymbolsTestsBaseClass {
 
     func trailingClosureF3(_ p1: [Int: String]? = [1: "1"], tc1: () -> [Int]) -> (SymbolsTestsEnum) -> Int {
         return { _ in 0 }
+    }
+
+    func tupleReturn() -> (SymbolsTestsEnum, Int) {
+        return (.case1, 0)
     }
 
     class NestedClass {
