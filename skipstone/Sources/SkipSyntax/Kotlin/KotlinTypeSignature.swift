@@ -35,7 +35,6 @@ extension TypeSignature {
         case .member(let baseType, let type):
             return "\(baseType.kotlin).\(type.kotlin)"
         case .metaType(let baseType):
-            // Note: requires import kotlin.reflect.*
             return "KClass<\(baseType.kotlin)>"
         case .named(let name, let generics):
             guard !generics.isEmpty else {
@@ -254,6 +253,38 @@ extension TypeSignature {
             return false
         }
         return codebaseInfo?.isSealedClassesEnum(qualifiedName: typeName) == true
+    }
+
+    /// Whether this type uses `KClass`, which requires additional imports.
+    var kotlinReferencesKClass: Bool {
+        switch self {
+        case .array(let elementType):
+            return elementType.kotlinReferencesKClass
+        case .composition(let types):
+            return types.contains { $0.kotlinReferencesKClass }
+        case .dictionary(let keyType, let valueType):
+            return keyType.kotlinReferencesKClass || valueType.kotlinReferencesKClass
+        case .function(let parameters, let returnType):
+            return returnType.kotlinReferencesKClass || parameters.contains { $0.type.kotlinReferencesKClass }
+        case .named(_, let genericTypes):
+            return genericTypes.contains { $0.kotlinReferencesKClass }
+        case .optional(let type):
+            return type.kotlinReferencesKClass
+        case .member(let base, let type):
+            return base.kotlinReferencesKClass || type.kotlinReferencesKClass
+        case .metaType:
+            return true
+        case .range(let elementType):
+            return elementType.kotlinReferencesKClass
+        case .set(let elementType):
+            return elementType.kotlinReferencesKClass
+        case .tuple(_, let types):
+            return types.contains { $0.kotlinReferencesKClass }
+        case .unwrappedOptional(let type):
+            return type.kotlinReferencesKClass
+        default:
+            return false
+        }
     }
 }
 

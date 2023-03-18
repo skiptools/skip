@@ -991,7 +991,6 @@ struct KotlinMatchingCase {
 
 class KotlinMemberAccess: KotlinExpression {
     var base: KotlinExpression?
-    // Note: requires dependency implementation("org.jetbrains.kotlin:kotlin-reflect:1.8.10"), import kotlin.reflect.full.*
     var baseKClass: TypeSignature?
     var member: String
     var useMultlineFormatting = false
@@ -1075,6 +1074,12 @@ class KotlinMemberAccess: KotlinExpression {
 
     override func mayBeSharedMutableStructExpression(orType: Bool) -> Bool {
         return mayBeSharedMutableStruct
+    }
+
+    override func insertDependencies(into dependencies: inout KotlinDependencies) {
+        if baseKClass != nil {
+            dependencies.insertReflectFull()
+        }
     }
 
     override var children: [KotlinSyntaxNode] {
@@ -1647,6 +1652,12 @@ class KotlinTypeLiteral: KotlinExpression {
     init(expression: TypeLiteral) {
         self.literal = expression.literal
         super.init(type: .typeLiteral, expression: expression)
+    }
+
+    override func insertDependencies(into dependencies: inout KotlinDependencies) {
+        if literal.kotlinReferencesKClass {
+            dependencies.insertReflect()
+        }
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {

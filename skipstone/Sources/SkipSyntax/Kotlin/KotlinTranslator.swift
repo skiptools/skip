@@ -56,7 +56,6 @@ public class KotlinTranslator {
         self.packageName = codebaseInfo.packageName
 
         let kotlinSyntaxTree = translateSyntaxTree()
-        kotlinSyntaxTree.root.assignParentReferences()
         for plugin in codebaseInfo.plugins {
             plugin.apply(to: kotlinSyntaxTree, translator: self)
         }
@@ -71,35 +70,13 @@ public class KotlinTranslator {
 
     /// Translate syntax trees only.
     public func translateSyntaxTree() -> KotlinSyntaxTree {
-        var packageStatements: [KotlinStatement] = []
-        if let packageName {
-            packageStatements = [
-                KotlinRawStatement(sourceCode: "package \(packageName)"),
-                KotlinRawStatement(sourceCode: ""),
-            ]
-        }
-
-        var requiredImportStatements: [KotlinRawStatement] = [
-        ]
-
-        // manual whitelist of the packages above skip.lib: skip.core and skip.unit
-        if let packageName = packageName, !Set([
-            "skip.core",
-            "skip.unit",
-            "skip.lib",
-        ]).contains(packageName) {
-            requiredImportStatements += [
-                KotlinRawStatement(sourceCode: "import skip.lib.*"),
-                KotlinRawStatement(sourceCode: "import skip.lib.Array"), // Override kotlin.Array
-            ]
-        }
-
-        requiredImportStatements += [
-            KotlinRawStatement(sourceCode: ""),
-        ]
-
         let translatedStatements = syntaxTree.root.statements.flatMap { translateStatement($0) }
-        return KotlinSyntaxTree(sourceFile: syntaxTree.source.file, root: KotlinCodeBlock(statements: packageStatements + requiredImportStatements + translatedStatements))
+        let dependencies = gatherDependencies(from: translatedStatements)
+        let packageStatements = packageStatements()
+        let requiredImportStatements = requiredImportStatements(dependencies: dependencies)
+        let kotlinSyntaxTree = KotlinSyntaxTree(sourceFile: syntaxTree.source.file, dependencies: dependencies, root: KotlinCodeBlock(statements: packageStatements + requiredImportStatements + translatedStatements))
+        kotlinSyntaxTree.root.assignParentReferences()
+        return kotlinSyntaxTree
     }
 
     func translateStatement(_ statement: Statement) -> [KotlinStatement] {
@@ -245,5 +222,44 @@ public class KotlinTranslator {
             }
             return KotlinRawExpression(expression: rawExpression)
         }
+    }
+
+    private func gatherDependencies(from translatedStatements: [KotlinStatement]) -> KotlinDependencies {
+        var dependencies = KotlinDependencies()
+        translatedStatements.forEach {
+            $0.visit {
+                $0.insertDependencies(into: &dependencies)
+                return .recurse(nil)
+            }
+        }
+        return dependencies
+    }
+
+    private func packageStatements() -> [KotlinStatement] {
+        guard let packageName else {
+            return []
+        }
+        return [KotlinRawStatement(sourceCode: "package \(packageName)"), KotlinRawStatement(sourceCode: "")]
+    }
+
+    private func requiredImportStatements(dependencies: KotlinDependencies) -> [KotlinStatement] {
+        // Manual whitelist of the packages above skip.lib: skip.core and skip.unit
+        var importStrings: [String] = []
+        if let packageName = packageName, !Set([
+            "skip.core",
+            "skip.unit",
+            "skip.lib",
+        ]).contains(packageName) {
+            importStrings += [
+                "import skip.lib.*",
+                "import skip.lib.Array", // Override kotlin.Array
+            ]
+        }
+        importStrings += dependencies.imports.map { "import \($0)" }
+        if !importStrings.isEmpty {
+            importStrings.sort()
+            importStrings.append("")
+        }
+        return importStrings.map { KotlinRawStatement(sourceCode: $0) }
     }
 }

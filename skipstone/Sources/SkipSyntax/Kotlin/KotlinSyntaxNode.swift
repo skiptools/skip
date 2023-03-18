@@ -27,6 +27,10 @@ class KotlinSyntaxNode: SourceDerived, OutputNode {
         }
     }
 
+    /// Insert any non-standard dependencies required by this node.
+    func insertDependencies(into dependencies: inout KotlinDependencies) {
+    }
+
     weak var parent: KotlinSyntaxNode?
     var children: [KotlinSyntaxNode] {
         return []

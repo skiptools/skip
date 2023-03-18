@@ -86,12 +86,21 @@ final class ExpressionTests: XCTestCase {
             ExpressionTestsClass.staticFunc()
             ExpressionTestsClass.typeVar.staticFunc()
         }
+
+        func g(c: ExpressionTestsClass.Type) {
+        }
         """, kotlin: """
+        import kotlin.reflect.*
+        import kotlin.reflect.full.*
+
         internal fun f() {
             g(c = ExpressionTestsClass::class)
             g(c = ExpressionTestsClass.typeVar)
             ExpressionTestsClass.staticFunc()
             (ExpressionTestsClass.typeVar.companionObjectInstance as ExpressionTestsClass.Companion).staticFunc()
+        }
+
+        internal fun g(c: KClass<ExpressionTestsClass>) {
         }
         """)
     }

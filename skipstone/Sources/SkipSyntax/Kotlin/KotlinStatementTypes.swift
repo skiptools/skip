@@ -853,6 +853,12 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
         super.init(type: .enumCaseDeclaration, statement: statement)
     }
 
+    override func insertDependencies(into dependencies: inout KotlinDependencies) {
+        if associatedValues.contains(where: { $0.declaredType.kotlinReferencesKClass }) {
+            dependencies.insertReflect()
+        }
+    }
+
     override var children: [KotlinSyntaxNode] {
         var children: [KotlinSyntaxNode] = associatedValues.compactMap { $0.defaultValue }
         if let rawValue {
@@ -1025,6 +1031,12 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     private init(statement: FunctionDeclaration) {
         self.name = statement.type == .initDeclaration ? "constructor" : statement.name
         super.init(type: statement.type == .initDeclaration ? .constructorDeclaration : .functionDeclaration, statement: statement)
+    }
+
+    override func insertDependencies(into dependencies: inout KotlinDependencies) {
+        if returnType.kotlinReferencesKClass || parameters.contains(where: { $0.declaredType.kotlinReferencesKClass }) {
+            dependencies.insertReflect()
+        }
     }
 
     override var children: [KotlinSyntaxNode] {
@@ -1252,6 +1264,12 @@ class KotlinTypealiasDeclaration: KotlinStatement, KotlinMemberDeclaration {
         }
     }
 
+    override func insertDependencies(into dependencies: inout KotlinDependencies) {
+        if aliasedType.kotlinReferencesKClass {
+            dependencies.insertReflect()
+        }
+    }
+
     override func append(to output: OutputGenerator, indentation: Indentation) {
         output.append(indentation).append(modifiers.kotlinMemberString(isOpen: false, suffix: " "))
         output.append("typealias ").append(name).append(" = ").append(aliasedType.kotlin).append("\n")
@@ -1350,6 +1368,12 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         self.names = statement.names
         self.variableTypes = statement.variableTypes
         super.init(type: .variableDeclaration, statement: statement)
+    }
+
+    override func insertDependencies(into dependencies: inout KotlinDependencies) {
+        if declaredType.kotlinReferencesKClass {
+            dependencies.insertReflect()
+        }
     }
 
     override var children: [KotlinSyntaxNode] {
