@@ -113,7 +113,7 @@ public struct SkipSystem {
         let targetInfoData = try await xcrun("swift", "-print-target-info")
         let targetInfo = try JSONDecoder().decode(SwiftTarget.self, from: targetInfoData.data(using: .utf8)!)
 
-        // get the SDK path (e.g., for "xcrun --show-sdk-path --sdk macosx" it might return "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platf#orm/Developer/SDKs/MacOSX13.1.sdk")
+        // get the SDK path (e.g., for "xcrun --show-sdk-path --sdk macosx" it might return "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX13.1.sdk")
         #if os(macOS)
         let sdkArg: String? = "-sdk"
         let sdKPath: String? = try await xcrun("--show-sdk-path", "--sdk", "macosx")

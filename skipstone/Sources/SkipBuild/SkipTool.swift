@@ -8,7 +8,7 @@ import TSCBasic
 import TSCLibc
 
 /// The current version of the tool
-public let skipVersion = "0.1.5"
+public let skipVersion = "0.1.6"
 
 struct Options {
     var preprocessorSymbols: [String] = []
@@ -450,37 +450,37 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
     private func transpile(fs: FileSystem, sourceFiles: Set<AbsolutePath>, with continuation: AsyncThrowingStream<OutputMessage, Error>.Continuation) async throws {
         // the path that will contain the `skip.yml`
         guard let skipFolder = transpileOptions.skipFolder else {
-            throw ValidationError("Must specify --skip-folder")
+            throw error("Must specify --skip-folder")
         }
 
         let skipFolderPath = try AbsolutePath(validating: skipFolder, relativeTo: fs.currentWorkingDirectory ?? fs.tempDirectory)
         if !fs.isDirectory(skipFolderPath) {
-            throw ValidationError("Folder specified by --skip-folder did not exist: \(skipFolderPath)")
+            throw error("Folder specified by --skip-folder did not exist: \(skipFolderPath)")
         }
 
         guard let outputFolder = transpileOptions.outputFolder else {
-            throw ValidationError("Must specify --output-folder")
+            throw error("Must specify --output-folder")
         }
 
         let outputFolderPath = try AbsolutePath(validating: outputFolder, relativeTo: fs.currentWorkingDirectory ?? fs.tempDirectory)
         if !fs.isDirectory(outputFolderPath) {
             // e.g.: ~Library/Developer/Xcode/DerivedData/PACKAGE-ID/SourcePackages/plugins/skip-core.output/SkipFoundationKotlinTests/SkipTranspilePlugIn/SkipFoundation/src/test/kotlin
-            //throw ValidationError("Folder specified by --output-folder did not exist: \(outputFolder)")
+            //throw error("Folder specified by --output-folder did not exist: \(outputFolder)")
             try fs.createDirectory(outputFolderPath, recursive: true)
         }
 
         guard let moduleRoot = transpileOptions.moduleRoot else {
-            throw ValidationError("Must specify --module-root")
+            throw error("Must specify --module-root")
         }
         let moduleRootPath = try AbsolutePath(validating: moduleRoot)
         if !fs.isDirectory(moduleRootPath) {
-            throw ValidationError("Module root path did not exist at: \(moduleRootPath.pathString)")
+            throw error("Module root path did not exist at: \(moduleRootPath.pathString)")
         }
 
         let allModuleNames = moduleNamePaths.map(\.module)
 
         guard let (primaryModuleName, primaryModulePath) = moduleNamePaths.first else {
-            throw ValidationError("Must specify at least one --module")
+            throw error("Must specify at least one --module")
         }
 
         let packageName = KotlinTranslator.packageName(forModule: primaryModuleName)
@@ -599,8 +599,8 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
                 let skipConfig = try fs.readFileContents(skipConfigPath).withData(YAML.parse(_:))
                 try info("starting transpilation with config \(skipConfigPath): \(skipConfig.prettyJSON)")
                 return skipConfig
-            } catch {
-                throw ValidationError("The skip.yml file in the --skip-folder path \(skipConfigPath) could not be loaded: \(error)")
+            } catch let e {
+                throw error("The skip.yml file in the --skip-folder path \(skipConfigPath) could not be loaded: \(e)")
             }
         }
 
@@ -702,6 +702,10 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
                 let destPath = try AbsolutePath(validating: relative, relativeTo: fromPath)
                 if !fs.isDirectory(destPath) {
                     // skip over anything that is not a destination folder
+                    // if it doesn't exist at all, then it is an error
+                    if !fs.exists(destPath) {
+                        throw error("Expected destination path did not exist: \(destPath)")
+                    }
                     return
                 }
                 info("creating merged link tree from: \(fromPath) to: \(relative)")
@@ -1070,8 +1074,9 @@ extension StreamingCommand {
         try msg(.warning, message(), sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
-    func error(_ message: @autoclosure () throws -> String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) rethrows {
+    @discardableResult func error(_ message: @autoclosure () throws -> String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) rethrows -> ValidationError {
         try msg(.error, message(), sourceFile: sourceFile, sourceRange: sourceRange)
+        return ValidationError(try message())
     }
 
     /// Output the given message to standard error
