@@ -193,4 +193,40 @@ final class ClosureTests: XCTestCase {
         }
         """)
     }
+
+    func testPassFunctionForClosure() async throws {
+        try await check(symbols: symbols, swift: """
+        extension ClosureTestsClass {
+            func f() {
+                visit(with: self.visitor)
+            }
+        }
+        """, kotlin: """
+        internal fun ClosureTestsClass.f() {
+            visit(with = this::visitor)
+        }
+        """)
+
+        try await check(symbols: symbols, swift: """
+        extension ClosureTestsClass {
+            func f() {
+                visit(with: visitor)
+            }
+        }
+        """, kotlin: """
+        internal fun ClosureTestsClass.f() {
+            visit(with = ::visitor)
+        }
+        """)
+    }
+}
+
+private class ClosureTestsBaseClass {
+    func visitor(i: Int) {
+    }
+}
+
+private class ClosureTestsClass: ClosureTestsBaseClass {
+    func visit(with: (Int) -> Void) {
+    }
 }

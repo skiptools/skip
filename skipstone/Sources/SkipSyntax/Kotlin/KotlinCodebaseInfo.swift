@@ -247,6 +247,20 @@ public class KotlinCodebaseInfo {
                 return symbols.conformsToError(qualifiedName: qualifiedName) == true
             }
         }
+
+        /// Whether the given name corresponds to a function in the given type.
+        func isFunction(name: String, type: TypeSignature, in owningType: TypeSignature?) -> Bool {
+            guard let symbols, case .function = type else {
+                return false
+            }
+            var owningType = owningType
+            var isStatic = false
+            if case .metaType(let baseType) = owningType {
+                isStatic = true
+                owningType = baseType
+            }
+            return symbols.isFunction(name: name, in: owningType?.description, isStatic: isStatic) == true
+        }
     }
 
     private func addTypeInfo(for typeDeclaration: TypeDeclaration, mayBeMutableStructType: Bool?) {
@@ -334,7 +348,7 @@ extension Symbols.Context {
             case .struct:
                 hasType = true
             case .protocol:
-                if hasMember(candidate, name: name, kind: memberKind, type: type) {
+                if protocolHasMember(candidate, name: name, kind: memberKind, type: type) {
                     return true
                 }
                 hasType = true
@@ -441,10 +455,48 @@ extension Symbols.Context {
         return hasType ? false : nil
     }
 
-    private func hasMember(_ symbol: Symbol, name: String, kind: SymbolGraph.Symbol.KindIdentifier, type: TypeSignature?) -> Bool {
+    /// Whether the given name matches a function name.
+    func isFunction(name: String, in qualifiedName: String?, isStatic: Bool) -> Bool? {
+        if let qualifiedName {
+            let candidates = lookup(name: qualifiedName)
+            var hasType = false
+            for candidate in ranked(candidates) {
+                guard let kind = candidate.kind else {
+                    continue
+                }
+                switch kind {
+                case .class:
+                    fallthrough
+                case .enum:
+                    fallthrough
+                case .extension:
+                    fallthrough
+                case .struct:
+                    fallthrough
+                case .protocol:
+                    hasType = true
+                    if hasFunction(candidate, name: name, isStatic: isStatic) {
+                        return true
+                    }
+                default:
+                    break
+                }
+            }
+            return hasType ? false : nil
+        } else {
+            for candidate in ranked(lookup(name: name)) {
+                if candidate.kind == .func {
+                    return true
+                }
+            }
+            return false
+        }
+    }
+
+    private func protocolHasMember(_ symbol: Symbol, name: String, kind: SymbolGraph.Symbol.KindIdentifier, type: TypeSignature?) -> Bool {
         for relationship in symbol.relationships {
             if relationship.kind == .conformsTo && !relationship.isInverse {
-                if let conformsTo = lookup(identifier: relationship.targetIdentifier ?? ""), hasMember(conformsTo, name: name, kind: kind, type: type) {
+                if let conformsTo = lookup(identifier: relationship.targetIdentifier ?? ""), protocolHasMember(conformsTo, name: name, kind: kind, type: type) {
                     return true
                 }
             } else if relationship.kind == .requirementOf && relationship.isInverse {
@@ -540,6 +592,21 @@ extension Symbols.Context {
             }
             if !member.functionSignature(symbols: symbols).parameters.isEmpty {
                 return true
+            }
+        }
+        return false
+    }
+
+    private func hasFunction(_ symbol: Symbol, name: String, isStatic: Bool) -> Bool {
+        for relationship in symbol.relationships {
+            if relationship.kind == .memberOf && relationship.isInverse, let member = lookup(identifier: relationship.targetIdentifier ?? "") {
+                if member.name == name, (isStatic && member.kind == .typeMethod) || (!isStatic && member.kind == .method) {
+                    return true
+                }
+            } else if relationship.kind == .inheritsFrom, !relationship.isInverse, let inheritsFrom = lookup(identifier: relationship.targetIdentifier ?? "") {
+                if hasFunction(inheritsFrom, name: name, isStatic: isStatic) {
+                    return true
+                }
             }
         }
         return false
