@@ -541,11 +541,6 @@ class KotlinFunctionCall: KotlinExpression {
 
     static func translate(expression: FunctionCall, translator: KotlinTranslator) -> KotlinFunctionCall {
         let kfunction = translator.translateExpression(expression.function)
-        if let kidentifier = kfunction as? KotlinIdentifier {
-            kidentifier.isCalledAsFunction = true
-        } else if let kmemberAccess = kfunction as? KotlinMemberAccess {
-            kmemberAccess.isCalledAsFunction = true
-        }
         let kexpression = KotlinFunctionCall(expression: expression, function: kfunction)
         kexpression.arguments = expression.arguments.map {
             let kargumentExpression = translator.translateExpression($0.value).sref()
@@ -635,13 +630,12 @@ class KotlinIdentifier: KotlinExpression {
     var isLocalIdentifier = false
     var isInOut = false
     var isFunctionReference = false
-    var isCalledAsFunction = false
 
     static func translate(expression: Identifier, translator: KotlinTranslator) -> KotlinIdentifier {
         let kexpression = KotlinIdentifier(expression: expression)
         kexpression.mayBeSharedMutableStruct = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
         kexpression.isLocalIdentifier = expression.isLocalIdentifier
-        kexpression.isFunctionReference = !kexpression.isLocalIdentifier && translator.codebaseInfo?.isFunction(name: expression.name, type: expression.inferredType, in: expression.owningTypeDeclaration?.signature) == true
+        kexpression.isFunctionReference = !expression.isLocalIdentifier && !expression.isCalledAsFunction && translator.codebaseInfo?.isFunction(name: expression.name, type: expression.inferredType, in: expression.owningTypeDeclaration?.signature) == true
         return kexpression
     }
 
@@ -672,7 +666,7 @@ class KotlinIdentifier: KotlinExpression {
         } else if name == "Self" {
             output.append("Companion")
         } else {
-            if isFunctionReference && !isCalledAsFunction {
+            if isFunctionReference {
                 // To refer to a function rather than call it, Kotlin uses ::
                 output.append("::")
             }
@@ -1009,14 +1003,13 @@ class KotlinMemberAccess: KotlinExpression {
     var inferredType: TypeSignature = .none
     var mayBeSharedMutableStruct = false
     var isFunctionReference = false
-    var isCalledAsFunction = false
 
     static func translate(expression: MemberAccess, translator: KotlinTranslator) -> KotlinMemberAccess {
         let kexpression = KotlinMemberAccess(expression: expression)
         if let base = expression.base {
             kexpression.base = translator.translateExpression(base)
             kexpression.useMultlineFormatting = expression.useMultlineFormatting
-            kexpression.isFunctionReference = translator.codebaseInfo?.isFunction(name: expression.member, type: expression.inferredType, in: base.inferredType) == true
+            kexpression.isFunctionReference = !expression.isCalledAsFunction && translator.codebaseInfo?.isFunction(name: expression.member, type: expression.inferredType, in: base.inferredType) == true
             kexpression.baseKClass = kclass(for: base, accessingMember: expression.member, codebaseInfo: translator.codebaseInfo)
         } else if expression.inferredType == .none && translator.codebaseInfo != nil {
             kexpression.messages.append(.kotlinMemberAccessUnknownBaseType(expression, member: expression.member))
@@ -1114,7 +1107,7 @@ class KotlinMemberAccess: KotlinExpression {
                 // Must be Type.self
                 output.append("::class")
             } else if member != "init" {
-                if isFunctionReference && !isCalledAsFunction {
+                if isFunctionReference {
                     // To refer to a function rather than call it, Kotlin uses ::
                     output.append("::")
                 } else {

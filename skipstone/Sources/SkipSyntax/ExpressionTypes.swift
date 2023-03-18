@@ -567,10 +567,12 @@ class FunctionCall: Expression {
         let name: String
         switch function.type {
         case .identifier:
+            (function as? Identifier)?.isCalledAsFunction = true
             baseType = nil
             name = (function as! Identifier).name
         case .memberAccess:
             let memberAccess = function as! MemberAccess
+            memberAccess.isCalledAsFunction = true
             if memberAccess.base == nil {
                 // Supply expected result type as probable base type when base is missing
                 _ = memberAccess.inferTypes(context: context, expecting: expecting)
@@ -621,6 +623,7 @@ class Identifier: Expression {
     let name: String
     /// Whether this appears to be a local variable or parameter.
     private(set) var isLocalIdentifier: Bool
+    var isCalledAsFunction = false
 
     init(name: String, isLocalIdentifier: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
         self.name = name
@@ -816,6 +819,7 @@ class MemberAccess: Expression {
     private(set) var baseType: TypeSignature
     let member: String
     let useMultlineFormatting: Bool
+    var isCalledAsFunction = false
 
     init(base: Expression?, baseType: TypeSignature = .none, member: String, useMultlineFormatting: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
         self.base = base

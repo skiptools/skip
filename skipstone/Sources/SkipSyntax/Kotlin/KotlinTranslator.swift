@@ -74,7 +74,7 @@ public class KotlinTranslator {
         let dependencies = gatherDependencies(from: translatedStatements)
         let packageStatements = packageStatements()
         let requiredImportStatements = requiredImportStatements(dependencies: dependencies)
-        let kotlinSyntaxTree = KotlinSyntaxTree(sourceFile: syntaxTree.source.file, dependencies: dependencies, root: KotlinCodeBlock(statements: packageStatements + requiredImportStatements + translatedStatements))
+        let kotlinSyntaxTree = KotlinSyntaxTree(sourceFile: syntaxTree.source.file, root: KotlinCodeBlock(statements: packageStatements + requiredImportStatements + translatedStatements), dependencies: dependencies)
         kotlinSyntaxTree.root.assignParentReferences()
         return kotlinSyntaxTree
     }
