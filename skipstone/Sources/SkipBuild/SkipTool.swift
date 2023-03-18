@@ -8,7 +8,7 @@ import TSCBasic
 import TSCLibc
 
 /// The current version of the tool
-public let skipVersion = "0.1.4"
+public let skipVersion = "0.1.5"
 
 struct Options {
     var preprocessorSymbols: [String] = []
@@ -550,6 +550,8 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
                 }
 
                 dependencies {
+                    implementation("org.jetbrains.kotlin:kotlin-reflect:1.8.10")
+
                     api("org.jetbrains.kotlin:kotlin-test-junit5")
                     implementation("org.junit.jupiter:junit-jupiter-engine:5.9.1")
 

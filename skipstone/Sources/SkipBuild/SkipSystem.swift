@@ -116,7 +116,7 @@ public struct SkipSystem {
         // get the SDK path (e.g., for "xcrun --show-sdk-path --sdk macosx" it might return "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platf#orm/Developer/SDKs/MacOSX13.1.sdk")
         #if os(macOS)
         let sdkArg: String? = "-sdk"
-        let sdKPath: String? = try await xcrun("--show-sdk-path")
+        let sdKPath: String? = try await xcrun("--show-sdk-path", "--sdk", "macosx")
         let frameworkArg: String? = "-F"
         let frameworkPath: String? = "\(sdKPath!)/../../Library/Frameworks/"
         #else
