@@ -91,6 +91,14 @@ extension Message {
         return Message(kind: .warning, message: "Skip is unable to disambiguate this function call. Consider adding explicit types to the values supplied as arguments", sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
+    static func ifDeclPlacement(_ syntax: SyntaxProtocol, source: Source? = nil, sourceRange: Source.Range? = nil) -> Message {
+        var range = sourceRange
+        if range == nil, let source {
+            range = syntax.range(in: source)
+        }
+        return Message(kind: .error, message: "Skip only supports #if between code block statements or member declarations", source: source, sourceRange: range)
+    }
+
     static func genericUnsupportedWhereType(_ syntax: SyntaxProtocol, source: Source? = nil, sourceRange: Source.Range? = nil) -> Message {
         var range = sourceRange
         if range == nil, let source {

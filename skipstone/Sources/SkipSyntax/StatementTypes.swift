@@ -398,13 +398,13 @@ class IfDefined: Statement {
         case .statements(let syntax):
             return StatementDecoder.decode(syntaxList: syntax, in: syntaxTree)
         case .switchCases(let syntax):
-            return [RawStatement(syntax: syntax, in: syntaxTree)]
+            throw Message.ifDeclPlacement(syntax, source: syntaxTree.source)
         case .decls(let syntax):
             return StatementDecoder.decode(syntaxList: syntax, in: syntaxTree)
         case .postfixExpression(let syntax):
-            throw Message.unsupportedSyntax(syntax, source: syntaxTree.source)
+            throw Message.ifDeclPlacement(syntax, source: syntaxTree.source)
         case .attributes(let syntax):
-            throw Message.unsupportedSyntax(syntax, source: syntaxTree.source)
+            throw Message.ifDeclPlacement(syntax, source: syntaxTree.source)
         }
     }
 }
@@ -913,8 +913,10 @@ class TypeDeclaration: Statement {
         let (inherits, inheritsMessages) = classDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], nil)
         let attributes = Attributes.for(syntax: classDecl.attributes)
         let modifiers = Modifiers.for(syntax: classDecl.modifiers)
-        let (generics, genericsMessages) = Generics.for(syntax: classDecl.genericParameterClause, where: classDecl.genericWhereClause, in: syntaxTree)
-        let members = StatementDecoder.decode(syntaxListContainer: classDecl.members, in: syntaxTree)
+        let associatedTypeDecls = classDecl.members.members.compactMap { $0.decl.kind == .associatedtypeDecl ? $0.decl.as(AssociatedtypeDeclSyntax.self) : nil }
+        let memberDecls = classDecl.members.members.compactMap { $0.decl.kind != .associatedtypeDecl ? $0.decl : nil }
+        let (generics, genericsMessages) = Generics.for(syntax: classDecl.genericParameterClause, associatedTypeSyntax: associatedTypeDecls, where: classDecl.genericWhereClause, in: syntaxTree)
+        let members = memberDecls.flatMap { StatementDecoder.decode(syntax: $0, in: syntaxTree) }
         let statement = TypeDeclaration(type: .classDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: classDecl, sourceFile: syntaxTree.source.file, sourceRange: classDecl.range(in: syntaxTree.source), extras: extras)
         statement.messages = (inheritsMessages ?? []) + genericsMessages
         return statement
@@ -925,8 +927,10 @@ class TypeDeclaration: Statement {
         let (inherits, inheritsMessages) = structDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], nil)
         let attributes = Attributes.for(syntax: structDecl.attributes)
         let modifiers = Modifiers.for(syntax: structDecl.modifiers)
-        let (generics, genericsMessages) = Generics.for(syntax: structDecl.genericParameterClause, where: structDecl.genericWhereClause, in: syntaxTree)
-        let members = StatementDecoder.decode(syntaxListContainer: structDecl.members, in: syntaxTree)
+        let associatedTypeDecls = structDecl.members.members.compactMap { $0.decl.kind == .associatedtypeDecl ? $0.decl.as(AssociatedtypeDeclSyntax.self) : nil }
+        let memberDecls = structDecl.members.members.compactMap { $0.decl.kind != .associatedtypeDecl ? $0.decl : nil }
+        let (generics, genericsMessages) = Generics.for(syntax: structDecl.genericParameterClause, associatedTypeSyntax: associatedTypeDecls, where: structDecl.genericWhereClause, in: syntaxTree)
+        let members = memberDecls.flatMap { StatementDecoder.decode(syntax: $0, in: syntaxTree) }
         let statement = TypeDeclaration(type: .structDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: structDecl, sourceFile: syntaxTree.source.file, sourceRange: structDecl.range(in: syntaxTree.source), extras: extras)
         statement.messages = (inheritsMessages ?? []) + genericsMessages
         return statement
@@ -934,23 +938,29 @@ class TypeDeclaration: Statement {
 
     private static func decodeProtocolDeclaration(_ protocolDecl: ProtocolDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration {
         let name = protocolDecl.identifier.text
-        let (inherits, messages) = protocolDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], nil)
+        let (inherits, inheritsMessages) = protocolDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], nil)
         let attributes = Attributes.for(syntax: protocolDecl.attributes)
         let modifiers = Modifiers.for(syntax: protocolDecl.modifiers)
-        let members = StatementDecoder.decode(syntaxListContainer: protocolDecl.members, in: syntaxTree)
-        let statement = TypeDeclaration(type: .protocolDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, members: members, syntax: protocolDecl, sourceFile: syntaxTree.source.file, sourceRange: protocolDecl.range(in: syntaxTree.source), extras: extras)
-        statement.messages = messages ?? []
+        let associatedTypeDecls = protocolDecl.members.members.compactMap { $0.decl.kind == .associatedtypeDecl ? $0.decl.as(AssociatedtypeDeclSyntax.self) : nil }
+        let memberDecls = protocolDecl.members.members.compactMap { $0.decl.kind != .associatedtypeDecl ? $0.decl : nil }
+        let (generics, genericsMessages) = Generics.for(syntax: nil, associatedTypeSyntax: associatedTypeDecls, in: syntaxTree)
+        let members = memberDecls.flatMap { StatementDecoder.decode(syntax: $0, in: syntaxTree) }
+        let statement = TypeDeclaration(type: .protocolDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: protocolDecl, sourceFile: syntaxTree.source.file, sourceRange: protocolDecl.range(in: syntaxTree.source), extras: extras)
+        statement.messages = (inheritsMessages ?? []) + genericsMessages
         return statement
     }
 
     private static func decodeEnumDeclaration(_ enumDecl: EnumDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration {
         let name = enumDecl.identifier.text
-        let (inherits, messages) = enumDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], nil)
+        let (inherits, inheritsMessages) = enumDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], nil)
         let attributes = Attributes.for(syntax: enumDecl.attributes)
         let modifiers = Modifiers.for(syntax: enumDecl.modifiers)
-        let members = StatementDecoder.decode(syntaxListContainer: enumDecl.members, in: syntaxTree)
-        let statement = TypeDeclaration(type: .enumDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, members: members, syntax: enumDecl, sourceFile: syntaxTree.source.file, sourceRange: enumDecl.range(in: syntaxTree.source), extras: extras)
-        statement.messages = messages ?? []
+        let associatedTypeDecls = enumDecl.members.members.compactMap { $0.decl.kind == .associatedtypeDecl ? $0.decl.as(AssociatedtypeDeclSyntax.self) : nil }
+        let memberDecls = enumDecl.members.members.compactMap { $0.decl.kind != .associatedtypeDecl ? $0.decl : nil }
+        let (generics, genericsMessages) = Generics.for(syntax: nil, associatedTypeSyntax: associatedTypeDecls, in: syntaxTree)
+        let members = memberDecls.flatMap { StatementDecoder.decode(syntax: $0, in: syntaxTree) }
+        let statement = TypeDeclaration(type: .enumDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: enumDecl, sourceFile: syntaxTree.source.file, sourceRange: enumDecl.range(in: syntaxTree.source), extras: extras)
+        statement.messages = (inheritsMessages ?? []) + genericsMessages
         return statement
     }
 
@@ -993,7 +1003,7 @@ class TypeDeclaration: Statement {
     }
 }
 
-// TODO: Generics, patterns (tuple deconstruction, etc)
+// TODO: Generics
 /// `let/var v ...`
 class VariableDeclaration: Statement {
     let names: [String?]
