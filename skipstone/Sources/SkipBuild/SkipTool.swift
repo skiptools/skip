@@ -7,7 +7,7 @@ import Universal
 import TSCBasic
 
 /// The current version of the tool
-public let skipVersion = "0.1.7"
+public let skipVersion = "0.1.8"
 
 struct Options {
     var preprocessorSymbols: [String] = []
@@ -709,7 +709,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
                     }
                     return
                 }
-                info("creating merged link tree from: \(fromPath) to: \(relative)")
+                trace("creating merged link tree from: \(fromPath) to: \(relative)")
                 if fs.isSymlink(fromPath) {
                     try fs.removeFileTree(fromPath) // clear any pre-existing symlink
                 }
