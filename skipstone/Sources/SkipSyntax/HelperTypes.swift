@@ -334,12 +334,9 @@ struct Generics {
     private(set) var entries: [Generic]
     /// This API applies when the given generics have the given types: `extension Container where Element == Int`.
     private(set) var whereEqual: [String: TypeSignature] = [:]
-    /// Declarations that this type or API has certain values for certain inherited constraints: `associatedtype Element = Int`.
-    let declaredTypes: [String: TypeSignature]
 
-    init(entries: [Generic] = [], declaredTypes: [String: TypeSignature] = [:]) {
+    init(entries: [Generic] = []) {
         self.entries = entries
-        self.declaredTypes = declaredTypes
     }
 
     /// Decode the generics information in the given syntax.
@@ -358,20 +355,17 @@ struct Generics {
                 entries.append(Generic(name: name, inherits: inherits))
             }
         }
-        var declaredTypes: [String: TypeSignature] = [:]
         for associatedType in associatedTypeSyntax {
             let name = associatedType.identifier.text
+            var inherits: [TypeSignature] = []
             if let initializer = associatedType.initializer {
-                declaredTypes[name] = TypeSignature.for(syntax: initializer.value)
-            } else {
-                var inherits: [TypeSignature] = []
-                if let inheritance = associatedType.inheritanceClause {
-                    inherits += inheritance.inheritedTypeCollection.map {
-                        TypeSignature.for(syntax: $0.typeName)
-                    }
+                inherits.append(TypeSignature.for(syntax: initializer.value))
+            } else if let inheritance = associatedType.inheritanceClause {
+                inherits += inheritance.inheritedTypeCollection.map {
+                    TypeSignature.for(syntax: $0.typeName)
                 }
-                entries.append(Generic(name: name, inherits: inherits))
             }
+            entries.append(Generic(name: name, inherits: inherits))
         }
         var generics = Generics(entries: entries)
         var messages: [Message] = []
@@ -421,7 +415,7 @@ struct Generics {
     ///
     /// - Returns: `nil` if the parameter is not found, `.composition(types)` for multiple constraints, `.any` for a recognized parameter name without constraints
     func type(of name: String) -> TypeSignature? {
-        return declaredTypes[name] ?? whereEqual[name] ?? entries.first(where: { $0.name == name })?.type
+        return whereEqual[name] ?? entries.first(where: { $0.name == name })?.type
     }
 
     /// Resolve the given type against our generics.
@@ -450,8 +444,6 @@ struct Generics {
             var constraints = ""
             if !$0.inherits.isEmpty {
                 constraints = ": \($0.inherits.map(\.description).joined(separator: ", "))"
-            } else if let isEqual = $0.isEqual {
-                constraints = " = \(isEqual)"
             } else if let whenEqual = $0.whenEqual {
                 constraints = " == \(whenEqual)"
             }
@@ -465,14 +457,11 @@ struct Generics {
 struct Generic {
     var name: String
     var inherits: [TypeSignature] = []
-    var isEqual: TypeSignature?
     var whenEqual: TypeSignature?
 
     /// - Returns: `.composition(types)` for multiple constraints, `.any` for no constraints.
     var type: TypeSignature {
-        if let isEqual {
-            return isEqual
-        } else if let whenEqual {
+        if let whenEqual {
             return whenEqual
         } else if inherits.isEmpty {
             return .any
@@ -486,7 +475,6 @@ struct Generic {
     func qualified(in node: SyntaxNode) -> Generic {
         var generic = self
         generic.inherits = generic.inherits.map { $0.qualified(in: node) }
-        generic.isEqual = generic.isEqual.map { $0.qualified(in: node) }
         generic.whenEqual = generic.whenEqual.map { $0.qualified(in: node) }
         return generic
     }
