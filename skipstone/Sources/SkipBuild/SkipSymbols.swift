@@ -1,7 +1,6 @@
 import Foundation
 import SkipSyntax
 import SymbolKit
-import TSCBasic
 
 fileprivate let logger = Logger(subsystem: "skip", category: "symbols")
 

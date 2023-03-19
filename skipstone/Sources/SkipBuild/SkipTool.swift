@@ -5,10 +5,9 @@ import SwiftSyntax
 import ArgumentParser
 import Universal
 import TSCBasic
-import TSCLibc
 
 /// The current version of the tool
-public let skipVersion = "0.1.6"
+public let skipVersion = "0.1.7"
 
 struct Options {
     var preprocessorSymbols: [String] = []
@@ -483,6 +482,8 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             throw error("Must specify at least one --module")
         }
 
+        let _ = primaryModulePath
+        
         let packageName = KotlinTranslator.packageName(forModule: primaryModuleName)
 
         let skipConfig: YAML = try loadSkipConfig() // TODO: use the config for generating the build.gradle.kts
@@ -565,8 +566,8 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
 
                 for sourceModule in sourceModules {
-                    // don't add a dependency to ourselves
-                    if primaryModuleName == sourceModule || primaryModuleName == sourceModule + "Tests" {
+                    // don't add another dependency to ourselves when we are `Tests`
+                    if primaryModuleName == sourceModule + "Tests" {
                         continue
                     }
 
@@ -653,11 +654,11 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             let sourcePath = try AbsolutePath(validating: transpilation.sourceFile.path)
             let sourceSize = try fs.getFileInfo(sourcePath).size
 
-            info("transpiling \(sourcePath.basename) (\(Self.byteCount(for: .init(sourceSize))))", sourceFile: transpilation.sourceFile)
+            info("transpiling: \(sourcePath.basename) (\(Self.byteCount(for: .init(sourceSize))))", sourceFile: transpilation.sourceFile)
 
             let outputFile = try saveTranspilation()
 
-            info("transpiled \(transpilation.sourceFile.name) (\(Self.byteCount(for: .init(sourceSize)))) to \(outputFile.basename) (\(Self.byteCount(for: transpilation.output.content.utf8.count))) (\(Int64(transpilation.duration * 1000)) ms)", sourceFile: Source.File(path: outputFile))
+            info("transpiled: \(outputFile.basename) (\(Self.byteCount(for: transpilation.output.content.utf8.count))) (\(Int64(transpilation.duration * 1000)) ms)", sourceFile: Source.File(path: outputFile))
 
             for message in transpilation.messages {
                 //writeMessage(message)
@@ -732,7 +733,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             // this is the logic that allows us to merge two modules (like MyMod and MyModTests) into a single Kotlin module with the idiomatic src/main/kotlin/ and src/test/kotlin/ pair of folders
             for (linkModuleName, relativeLinkPath) in linkNamePaths {
                 let linkModulePath = moduleBasePath.appending(RelativePath(linkModuleName))
-                info("relativeLinkPath: \(relativeLinkPath) moduleBasePath: \(moduleBasePath) linkModuleName: \(linkModuleName) -> linkModulePath: \(linkModulePath)")
+                trace("relativeLinkPath: \(relativeLinkPath) moduleBasePath: \(moduleBasePath) linkModuleName: \(linkModuleName) -> linkModulePath: \(linkModulePath)")
                 try createMergedLinkTree(from: linkModulePath, to: relativeLinkPath)
                 dependentModules.append(linkModuleName)
             }

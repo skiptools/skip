@@ -11,6 +11,9 @@
       location = "group:../skip-core">
    </FileRef>
    <FileRef
+      location = "group:../skip-template">
+   </FileRef>
+   <FileRef
       location = "group:../../marcprux/universal">
    </FileRef>
 </Workspace>
