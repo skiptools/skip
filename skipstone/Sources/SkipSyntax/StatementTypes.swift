@@ -868,13 +868,13 @@ class TypealiasDeclaration: Statement {
     }
 }
 
-// TODO: Generics
 /// `class/struct/enum/protocol Type { ... }`
 class TypeDeclaration: Statement {
     let name: String
     private(set) var inherits: [TypeSignature]
     let attributes: Attributes
     private(set) var modifiers: Modifiers
+    private(set) var generics: Generics
     let members: [Statement]
     var qualifiedName: String {
         return _qualifiedName ?? name
@@ -884,12 +884,13 @@ class TypeDeclaration: Statement {
         return TypeSignature.for(name: qualifiedName, genericTypes: [])
     }
 
-    init(type: StatementType, name: String, qualifiedName: String? = nil, inherits: [TypeSignature] = [], attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), members: [Statement] = [], syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(type: StatementType, name: String, qualifiedName: String? = nil, inherits: [TypeSignature] = [], attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), members: [Statement] = [], syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.name = name
         _qualifiedName = qualifiedName
         self.inherits = inherits
         self.attributes = attributes
         self.modifiers = modifiers
+        self.generics = generics
         self.members = members
         super.init(type: type, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
@@ -909,23 +910,25 @@ class TypeDeclaration: Statement {
 
     private static func decodeClassDeclaration(_ classDecl: ClassDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration {
         let name = classDecl.identifier.text
-        let (inherits, messages) = classDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], nil)
+        let (inherits, inheritsMessages) = classDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], nil)
         let attributes = Attributes.for(syntax: classDecl.attributes)
         let modifiers = Modifiers.for(syntax: classDecl.modifiers)
+        let (generics, genericsMessages) = Generics.for(syntax: classDecl.genericParameterClause, where: classDecl.genericWhereClause, in: syntaxTree)
         let members = StatementDecoder.decode(syntaxListContainer: classDecl.members, in: syntaxTree)
-        let statement = TypeDeclaration(type: .classDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, members: members, syntax: classDecl, sourceFile: syntaxTree.source.file, sourceRange: classDecl.range(in: syntaxTree.source), extras: extras)
-        statement.messages = messages ?? []
+        let statement = TypeDeclaration(type: .classDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: classDecl, sourceFile: syntaxTree.source.file, sourceRange: classDecl.range(in: syntaxTree.source), extras: extras)
+        statement.messages = (inheritsMessages ?? []) + genericsMessages
         return statement
     }
 
     private static func decodeStructDeclaration(_ structDecl: StructDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration {
         let name = structDecl.identifier.text
-        let (inherits, messages) = structDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], nil)
+        let (inherits, inheritsMessages) = structDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], nil)
         let attributes = Attributes.for(syntax: structDecl.attributes)
         let modifiers = Modifiers.for(syntax: structDecl.modifiers)
+        let (generics, genericsMessages) = Generics.for(syntax: structDecl.genericParameterClause, where: structDecl.genericWhereClause, in: syntaxTree)
         let members = StatementDecoder.decode(syntaxListContainer: structDecl.members, in: syntaxTree)
-        let statement = TypeDeclaration(type: .structDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, members: members, syntax: structDecl, sourceFile: syntaxTree.source.file, sourceRange: structDecl.range(in: syntaxTree.source), extras: extras)
-        statement.messages = messages ?? []
+        let statement = TypeDeclaration(type: .structDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: structDecl, sourceFile: syntaxTree.source.file, sourceRange: structDecl.range(in: syntaxTree.source), extras: extras)
+        statement.messages = (inheritsMessages ?? []) + genericsMessages
         return statement
     }
 
@@ -959,6 +962,7 @@ class TypeDeclaration: Statement {
         if modifiers.visibility == .default {
             modifiers.visibility = .internal
         }
+        generics = generics.qualified(in: self)
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
@@ -981,6 +985,9 @@ class TypeDeclaration: Statement {
         }
         if !modifiers.isEmpty {
             attrs.append(modifiers.prettyPrintTree)
+        }
+        if !generics.isEmpty {
+            attrs.append(generics.prettyPrintTree)
         }
         return attrs
     }

@@ -79,15 +79,31 @@ extension Message {
         return Message(kind: .error, message: "Skip does not support this Swift syntax [\(syntax.kind)]", source: source, sourceRange: range)
     }
 
-    static func unsupportedTypeSignature(_ typeSyntax: TypeSyntax, source: Source? = nil, sourceRange: Source.Range? = nil) -> Message {
+    static func unsupportedTypeSignature(_ syntax: SyntaxProtocol, source: Source? = nil, sourceRange: Source.Range? = nil) -> Message {
         var range = sourceRange
         if range == nil, let source {
-            range = typeSyntax.range(in: source)
+            range = syntax.range(in: source)
         }
-        return Message(kind: .error, message: "Skip does not support this Swift type syntax [\(typeSyntax.kind)]", source: source, sourceRange: range)
+        return Message(kind: .error, message: "Skip does not support this Swift type syntax [\(syntax.kind)]", source: source, sourceRange: range)
     }
 
     static func ambiguousFunctionCall(sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) -> Message {
         return Message(kind: .warning, message: "Skip is unable to disambiguate this function call. Consider adding explicit types to the values supplied as arguments", sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    static func genericUnsupportedWhereType(_ syntax: SyntaxProtocol, source: Source? = nil, sourceRange: Source.Range? = nil) -> Message {
+        var range = sourceRange
+        if range == nil, let source {
+            range = syntax.range(in: source)
+        }
+        return Message(kind: .error, message: "Skip does not support the referenced type as a generic constraint", source: source, sourceRange: range)
+    }
+
+    static func genericWhereNameMismatch(_ syntax: SyntaxProtocol, source: Source? = nil, sourceRange: Source.Range? = nil) -> Message {
+        var range = sourceRange
+        if range == nil, let source {
+            range = syntax.range(in: source)
+        }
+        return Message(kind: .error, message: "Skip is not able to match this where constraint to a declared generic type", source: source, sourceRange: range)
     }
 }

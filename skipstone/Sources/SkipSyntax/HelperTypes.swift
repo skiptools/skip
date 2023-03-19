@@ -328,6 +328,174 @@ struct Attribute {
     }
 }
 
+/// Generic information for a type or API.
+struct Generics {
+    private(set) var entries: [Generic]
+
+    init(entries: [Generic] = []) {
+        self.entries = entries
+    }
+
+    /// Decode the generics information in the given syntax.
+    static func `for`(syntax: GenericParameterClauseSyntax?, where whereSyntax: GenericWhereClauseSyntax? = nil, in syntaxTree: SyntaxTree) -> (Generics, [Message]) {
+        guard let syntax else {
+            return (Generics(), [])
+        }
+        var entries: [Generic] = []
+        for parameter in syntax.genericParameterList {
+            let name = parameter.name.text
+            var inherits: [TypeSignature] = []
+            if let inheritedType = parameter.inheritedType {
+                inherits.append(.for(syntax: inheritedType))
+            }
+            entries.append(Generic(name: name, inherits: inherits))
+        }
+        var generics = Generics(entries: entries)
+        var messages: [Message] = []
+        generics.apply(syntax.genericWhereClause, in: syntaxTree, messages: &messages)
+        generics.apply(whereSyntax, in: syntaxTree, messages: &messages)
+        return (generics, messages)
+    }
+
+    /// Decode the protocol generics information in the given associated types syntax.
+    static func `for`(associatedTypes: [AssociatedtypeDeclSyntax], where whereSyntax: GenericWhereClauseSyntax? = nil, in syntaxTree: SyntaxTree) -> (Generics, [Message]) {
+        guard !associatedTypes.isEmpty else {
+            return (Generics(), [])
+        }
+        var entries: [Generic] = []
+        var messages: [Message] = []
+        for associatedType in associatedTypes {
+            let name = associatedType.identifier.text
+            if let initializer = associatedType.initializer {
+                let isEqual = TypeSignature.for(syntax: initializer.value)
+                entries.append(Generic(name: name, isEqual: isEqual))
+            } else {
+                var inherits: [TypeSignature] = []
+                if let inheritance = associatedType.inheritanceClause {
+                    inherits += inheritance.inheritedTypeCollection.map {
+                        TypeSignature.for(syntax: $0.typeName)
+                    }
+                }
+                entries.append(Generic(name: name, inherits: inherits))
+            }
+        }
+        var generics = Generics(entries: entries)
+        generics.apply(whereSyntax, in: syntaxTree, messages: &messages)
+        for associatedType in associatedTypes {
+            generics.apply(associatedType.genericWhereClause, in: syntaxTree, messages: &messages)
+        }
+        return (generics, messages)
+    }
+
+    private mutating func apply(_ whereSyntax: GenericWhereClauseSyntax?, in syntaxTree: SyntaxTree, messages: inout [Message]) {
+        guard let whereSyntax else {
+            return
+        }
+        for requirementSyntax in whereSyntax.requirementList {
+            switch requirementSyntax.body {
+            case .sameTypeRequirement(let syntax):
+                apply(entryType: syntax.leftTypeIdentifier, constrainedTo: syntax.rightTypeIdentifier, whenEqual: true, in: syntaxTree, messages: &messages)
+            case .conformanceRequirement(let syntax):
+                apply(entryType: syntax.leftTypeIdentifier, constrainedTo: syntax.rightTypeIdentifier, whenEqual: false, in: syntaxTree, messages: &messages)
+            case .layoutRequirement:
+                messages.append(.unsupportedSyntax(requirementSyntax.body, source: syntaxTree.source))
+            }
+        }
+    }
+
+    private mutating func apply(entryType: TypeSyntax, constrainedTo: TypeSyntax, whenEqual: Bool, in syntaxTree: SyntaxTree, messages: inout [Message]) {
+        let type = TypeSignature.for(syntax: entryType)
+        guard case .named(let name, _) = type else {
+            messages.append(.genericUnsupportedWhereType(entryType, source: syntaxTree.source))
+            return
+        }
+        guard let entryIndex = entries.firstIndex(where: { $0.name == name }) else {
+            messages.append(.genericWhereNameMismatch(entryType, source: syntaxTree.source))
+            return
+        }
+        let constrainedToType = TypeSignature.for(syntax: constrainedTo)
+        if whenEqual {
+            entries[entryIndex].whenEqual = constrainedToType
+        } else {
+            entries[entryIndex].inherits.append(constrainedToType)
+        }
+    }
+
+    /// Return the constrained type of the given generic parameter.
+    ///
+    /// - Returns: `nil` if the parameter is not found, `.composition(types)` for multiple constraints, `.any` for a recognized parameter name without constraints
+    func type(of name: String) -> TypeSignature? {
+        return entries.first(where: { $0.name == name })?.type
+    }
+
+    /// Resolve the given type against our generics.
+    ///
+    /// If the given type maps to a generic, return its constraints. Otherwise return the given type.
+    /// - Seealso: `type(of:)`
+    func resolveType(_ signature: TypeSignature) -> TypeSignature {
+        guard case .named(let name, let genericTypes) = signature, genericTypes.isEmpty else {
+            return signature
+        }
+        return type(of: name) ?? signature
+    }
+
+    func qualified(in node: SyntaxNode) -> Generics {
+        var generics = self
+        generics.entries = generics.entries.map { $0.qualified(in: node) }
+        return generics
+    }
+
+    var isEmpty: Bool {
+        return entries.isEmpty
+    }
+
+    var prettyPrintTree: PrettyPrintTree {
+        let children = entries.map {
+            var constraints = ""
+            if !$0.inherits.isEmpty {
+                constraints = ": \($0.inherits.map(\.description).joined(separator: ", "))"
+            } else if let isEqual = $0.isEqual {
+                constraints = " = \(isEqual)"
+            } else if let whenEqual = $0.whenEqual {
+                constraints = " == \(whenEqual)"
+            }
+            return PrettyPrintTree(root: "\($0.name)\(constraints)")
+        }
+        return PrettyPrintTree(root: "generics", children: children)
+    }
+}
+
+/// Information about a declared generic parameter.
+struct Generic {
+    var name: String
+    var inherits: [TypeSignature] = []
+    var isEqual: TypeSignature?
+    var whenEqual: TypeSignature?
+
+    /// - Returns: `.composition(types)` for multiple constraints, `.any` for no constraints.
+    var type: TypeSignature {
+        if let isEqual {
+            return isEqual
+        } else if let whenEqual {
+            return whenEqual
+        } else if inherits.isEmpty {
+            return .any
+        } else if inherits.count == 1 {
+            return inherits[0]
+        } else {
+            return .composition(inherits)
+        }
+    }
+
+    func qualified(in node: SyntaxNode) -> Generic {
+        var generic = self
+        generic.inherits = generic.inherits.map { $0.qualified(in: node) }
+        generic.isEqual = generic.isEqual.map { $0.qualified(in: node) }
+        generic.whenEqual = generic.whenEqual.map { $0.qualified(in: node) }
+        return generic
+    }
+}
+
 extension String {
     /// If this is an implicit closure parameter - `$0`, `$1`, etc - return its index.
     var implicitClosureParameterIndex: Int? {
