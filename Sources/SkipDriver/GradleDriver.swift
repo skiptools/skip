@@ -96,7 +96,7 @@ public struct GradleDriver {
         // the resulting command will be something like:
         // java -Xmx64m -Xms64m -Dorg.gradle.appname=gradle -classpath /opt/homebrew/Cellar/gradle/8.0.2/libexec/lib/gradle-launcher-8.0.2.jar org.gradle.launcher.GradleMain info
         #if DEBUG
-        //print("execGradle:", gradleArgs + args)
+        print("execGradle:", (gradleArgs + args).joined(separator: " "))
         #endif
         return Process.streamLines(command: gradleArgs + args, environment: env, workingDirectory: workingDirectory, onExit: onExit)
     }
@@ -117,6 +117,9 @@ public struct GradleDriver {
         var args = [
             check ? "check" : "test" // check will run the @Test funcs regardless of @Ignore, as well as other checks
         ]
+
+        // add in the project dir for explicitness (even though it is assumed from the current working directory as well)
+        args += ["--project-dir", workingDirectory.path]
 
         if rerunTasksFlag {
             args += ["--rerun-tasks"]

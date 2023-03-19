@@ -6,7 +6,7 @@
 import Foundation
 import PackagePlugin
 
-/// Build plugin to do pre-work like emit warnings about incompatible Swift before transpiling with Skip.
+/// For a given package names "SourceModuleKotlin", take all the `.swift` source files in the peer "SourceModule" package  and transpiles them to Kotlin, as well as outputting a `build.gradle.kts` file.
 @main struct SkipTranspilePlugIn: BuildToolPlugin {
     /// The name of the plug-in's output folder is the same as the target name for the transpiler
     let pluginFolderName = "SkipTranspilePlugIn"
@@ -14,17 +14,7 @@ import PackagePlugin
     func createBuildCommands(context: PluginContext, target: Target) async throws -> [Command] {
         let skiptool = try context.tool(named: "skiptool")
         let outputFolder = context.pluginWorkDirectory
-        // let pkg = context.package
-
         //print("createBuildCommands:", context.package.id)
-
-        let otherPackages = context.package.dependencies
-        //for otherPackage in otherPackages {
-            //print("otherPackage:", otherPackage.package.id)
-        //}
-
-
-        let packageProducts: [PackagePlugin.PackageDependency]
         guard let sourceTarget = target as? SourceModuleTarget else {
             throw TranspilePlugInError("Target «\(target.name)» was not a source module")
         }
@@ -94,7 +84,7 @@ import PackagePlugin
             peerTarget.name + ":" + peerTarget.directory.string,
         ]
 
-        func addModuleLinkFlag(_ target: Target, packageName: String?) throws {
+        func addModuleLinkFlag(_ target: Target, packageID: String?) throws {
             let targetName = target.name
             if !targetName.hasSuffix(kotlinSuffix) {
                 //print("peer target had invalid name: \(targetName)")
@@ -108,9 +98,8 @@ import PackagePlugin
             // e.g. ../../../skip-core.output/SkipFoundationKotlin/SkipTranspilePlugIn/SkipFoundation
             // FIXME: the inserted "../" is needed because LocalFileSystem.createSymbolicLink will resolve the relative path against the destinations *parent* for some reason (SPM bug?)
             let targetLink: String
-            if let packageName = packageName {
-                targetLink = "../../../../" + packageName + ".output/" + target.name + "/" + pluginFolderName + "/" + peerTargetName
-
+            if let packageID = packageID { // go further up to the external package name
+                targetLink = "../../../../" + packageID + ".output/" + target.name + "/" + pluginFolderName + "/" + peerTargetName
             } else {
                 targetLink = "../../../" + target.name + "/" + pluginFolderName + "/" + peerTargetName
             }
@@ -119,11 +108,11 @@ import PackagePlugin
 
         func addModuleLinkDependency(_ targetDependent: TargetDependency) throws {
             switch targetDependent {
-            case .target(let target):
-                try addModuleLinkFlag(target, packageName: nil)
-            case .product(let product):
+            case .target(let target): // local dependency
+                try addModuleLinkFlag(target, packageID: nil)
+            case .product(let product): // product, possibly in another package
                 for productTarget in product.targets {
-                    try addModuleLinkFlag(productTarget, packageName: product
+                    try addModuleLinkFlag(productTarget, packageID: product
                         .name)
                 }
             @unknown default:
@@ -132,16 +121,20 @@ import PackagePlugin
 
         }
 
+        // create a lookup table from the (arbitrary but unique) product ID to the owning package
+        // this is needed to find the package ID associated with a given product ID
+        var productIDPackages: [Product.ID?: Package] = [:]
+        for targetPackage in context.package.dependencies {
+            for product in targetPackage.package.products {
+                productIDPackages[product.id] = targetPackage.package
+            }
+        }
+
         for (product, target) in target.recursiveTargetProductDependencies {
             if target.name.hasSuffix(kotlinSuffix) { // only link in if the module is named "*Kotlin"
-                // find the correct package name that contains this product (whose id will be an arbtrary number like "32")
-                let targetPackage = context.package.dependencies.first {
-                    $0.package.products.contains { depProduct in
-                        depProduct.id == product?.id
-                    }
-                }
+                // lookup the correct package name that contains this product (whose id will be an arbtrary number like "32")
                 //print("TRANSITIVE: product: \(product?.id ?? "NONE") target: \(target.name) targetPackage: \(targetPackage?.package.id ?? "NONE")")
-                try addModuleLinkFlag(target, packageName: targetPackage?.package.id)
+                try addModuleLinkFlag(target, packageID: productIDPackages[product?.id]?.id)
             }
         }
 
