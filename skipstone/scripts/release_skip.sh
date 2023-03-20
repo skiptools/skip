@@ -1,7 +1,7 @@
 #!/bin/bash -e
 
 # cannot run unless there are currently no diffs
-#git diff --exit-code
+git diff --exit-code
 
 CONFIG=release
 #CONFIG=debug
@@ -16,8 +16,7 @@ DIR=.build/artifactbundle
 GITDATE="$(git log -1 --format=%ad --date=iso-strict)"
 GITREF="$(git rev-parse HEAD)"
 
-# the relative path to the repository that hosts the plug-in
-# and redirects to the binary plug-in
+# the relative path to the repo that hosts the plug-in code and referebce to the binary executable
 SKIPPKG="../skip/Package.swift"
 SKIPPKGDIR=$(dirname ${SKIPPKG})
 
@@ -76,7 +75,7 @@ zip -9 -q --symlinks -r ${ARTIFACTBUNDLE}.zip ${ARTIFACTBUNDLE}
 CHECKSUM=$(shasum -a 256 ${ARTIFACTBUNDLE}.zip | cut -f 1 -d ' ')
 ls -lah ${ARTIFACTBUNDLE}.zip
 
-# the location of the download once we have uploadedit
+# the location of the download once we have uploaded it
 ARTIFACT_URL="https://github.com/skiptools/skip/releases/download/${SEMVER_NEXT}/${ARTIFACTBUNDLE}.zip"
 
 #gh release -R github.com/skiptools/skip delete "main-${RELNAME}" --yes || true

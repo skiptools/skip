@@ -7,7 +7,7 @@ import Universal
 import TSCBasic
 
 /// The current version of the tool
-public let skipVersion = "0.1.9"
+public let skipVersion = "0.1.10"
 
 struct Options {
     var preprocessorSymbols: [String] = []
@@ -364,10 +364,10 @@ struct TranspilePhaseOptions: ParsableArguments {
     var transpile: PhaseGuard = .onDemand // --transpile
 
     @Option(name: [.customLong("module")], help: ArgumentHelp("ModuleName:SourcePath", valueName: "module"))
-    var moduleNames: [String] = [] // --module
+    var moduleNames: [String] = [] // --module name:path
 
     @Option(name: [.customLong("link")], help: ArgumentHelp("ModuleName:LinkPath", valueName: "module"))
-    var linkPaths: [String] = [] // --link
+    var linkPaths: [String] = [] // --link name:path
 
     @Option(help: ArgumentHelp("Path to the folder containing symbols.json", valueName: "path"))
     var symbolFolder: String? = nil // --symbol-folder
@@ -486,7 +486,6 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         
         let packageName = KotlinTranslator.packageName(forModule: primaryModuleName)
 
-        let skipConfig: YAML = try loadSkipConfig() // TODO: use the config for generating the build.gradle.kts
         #if os(macOS) || os(Linux)
         let symbols: Symbols? = try await loadSymbols()
         #else
@@ -494,6 +493,10 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         #endif
         let overridden = try copyKotlinOverrides()
         let overriddenSwiftFileNames = overridden.map({ $0.basenameWithoutExt + ".swift" })
+
+        // load the merge YAML file that represents
+        let (baseSkipConfig, mergedSkipConfig) = try loadSkipConfig()
+        let skipConfig = mergedSkipConfig ?? baseSkipConfig
 
         // skip over any source file whose name would match a copied Kotlin file
         let sources = sourceFiles.map(\.sourceFile).filter { sourceFile in
@@ -513,8 +516,25 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
 
         func generateGradle(for sourceModules: [String], with skipConfig: YAML) throws {
+            let project: GradleProject
+            do {
+                project = try skipConfig.json().decode()
+            } catch let e {
+                throw try error("Unable to parse gradle component of merged skip.yml: \(e) \(try skipConfig.prettyJSON)")
+            }
+
+            let buildContents = project.generate()
+            // we output as a joined string because there is a weird stdout bug with the tool or plugin executor somewhere that causes multi-line strings to be output in the wrong order
+            info("created gradle: \(buildContents.split(separator: "\n").map({ $0.trimmingCharacters(in: .whitespaces) }).joined(separator: "; "))")
+
             try generateSettingsGradle()
             try generatePerModuleGradle()
+
+            func generatePerModuleGradle(exportAPI: Bool = true) throws {
+                let buildGradle = moduleRootPath.appending(components: ["build.gradle.kts"])
+                info("saving \(buildGradle)", sourceFile: buildGradle.sourceFile)
+                try fs.writeChanges(path: buildGradle, makeWritable: true, makeReadOnly: true, bytes: ByteString(encodingAsUTF8: buildContents))
+            }
 
             func generateSettingsGradle() throws {
                 let settingsPath = moduleRootPath.parentDirectory.appending(component: "settings.gradle.kts")
@@ -537,72 +557,52 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
                 info("saving \(settingsPath)", sourceFile: settingsPath.sourceFile)
                 try fs.writeChanges(path: settingsPath, makeWritable: true, makeReadOnly: true, bytes: ByteString(encodingAsUTF8: settingsContents))
             }
+        }
 
-            func generatePerModuleGradle(exportAPI: Bool = true) throws {
-                let buildGradle = moduleRootPath.appending(components: ["build.gradle.kts"])
-
-                var buildContents = """
-                plugins {
-                    kotlin("jvm") version "1.8.10"
-                }
-
-                repositories {
-                    mavenCentral()
-                }
-
-                dependencies {
-                    implementation("org.jetbrains.kotlin:kotlin-reflect:1.8.10")
-
-                    api("org.jetbrains.kotlin:kotlin-test-junit5")
-                    implementation("org.junit.jupiter:junit-jupiter-engine:5.9.1")
-
-                    testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
-                    testImplementation("org.junit.jupiter:junit-jupiter-engine:5.9.1")
-                
-                    //api("org.apache.commons:commons-math3:3.6.1")
-                    //implementation("com.google.guava:guava:31.1-jre")
-
-                """
-
-
-                for sourceModule in sourceModules {
-                    // don't add another dependency to ourselves when we are `Tests`
-                    if primaryModuleName == sourceModule + "Tests" {
-                        continue
-                    }
-
-                    // - api: “dependencies appearing in the api configurations will be transitively exposed to consumers of the library, and as such will appear on the compile classpath of consumers. Dependencies found in the implementation configuration will, on the other hand, not be exposed to consumers, and therefore not leak into the consumers' compile classpath.”
-                    let dependencyType = exportAPI ? "api" : "implementation"
-                    buildContents += """
-                        \(dependencyType)(project(":\(sourceModule)"))
-
-                    """
-                }
-
-                buildContents += """
-
-                }
-
-                tasks.named<Test>("test") {
-                    useJUnitPlatform()
-                }
-
-                """
-
-                info("saving \(buildGradle)", sourceFile: buildGradle.sourceFile)
-                try fs.writeChanges(path: buildGradle, makeWritable: true, makeReadOnly: true, bytes: ByteString(encodingAsUTF8: buildContents))
+        func loadSkipYAML(path: AbsolutePath) throws -> YAML {
+            do {
+                return try fs.readFileContents(path).withData(YAML.parse(_:))
+            } catch let e {
+                throw error("The skip.yml file at \(path) could not be loaded: \(e)", sourceFile: path.sourceFile)
             }
         }
 
-        func loadSkipConfig() throws -> YAML {
-            let skipConfigPath = skipFolderPath.appending(component: "skip.yml")
-            do {
-                let skipConfig = try fs.readFileContents(skipConfigPath).withData(YAML.parse(_:))
-                try info("starting transpilation with config \(skipConfigPath): \(skipConfig.prettyJSON)")
-                return skipConfig
-            } catch let e {
-                throw error("The skip.yml file in the --skip-folder path \(skipConfigPath) could not be loaded: \(e)")
+        /// Loads the `skip.yml` config, optionally merged with the `skip.yml` of all the module dependencies
+        func loadSkipConfig(merge: Bool = true, configFileName: String = "skip.yml") throws -> (base: YAML, aggregate: YAML?) {
+            let configStart = Date().timeIntervalSinceReferenceDate
+            let skipConfigPath = skipFolderPath.appending(component: configFileName)
+            let currentModuleConfig = try loadSkipYAML(path: skipConfigPath)
+            try info("starting transpilation with config \(skipConfigPath): \(currentModuleConfig.prettyJSON)", sourceFile: skipConfigPath.sourceFile)
+
+            if !merge {
+                return (currentModuleConfig, nil) // just the unmerged base YAML
             }
+
+            // build up a merged YAML from the base dependenices to the current module
+            var aggregateYAML: YAML = [:]
+            for (moduleName, modulePath) in moduleNamePaths {
+                info("moduleName: \(moduleName) modulePath: \(modulePath)")
+                let moduleSkipBasePath = try AbsolutePath(validating: modulePath, relativeTo: moduleRootPath)
+                    .appending(components: ["skip"])
+
+                let moduleSkipConfigPath = moduleSkipBasePath.appending(component: configFileName)
+
+                if fs.isFile(moduleSkipConfigPath) {
+                    let moduleYAML = try loadSkipYAML(path: moduleSkipConfigPath)
+                    info("parsed skip.yml for module: \(moduleName) path: \(modulePath) config: \(moduleYAML)", sourceFile: moduleSkipConfigPath.sourceFile)
+                    if moduleYAML.object != nil { // merge as long as the other instance is an object
+                        aggregateYAML = try aggregateYAML.merged(with: moduleYAML)
+                    }
+                }
+            }
+
+            if currentModuleConfig.object != nil { // merge as long as the other instance is an object
+                aggregateYAML = try aggregateYAML.merged(with: currentModuleConfig)
+            }
+
+            let configEnd = Date().timeIntervalSinceReferenceDate
+            info("created aggregate skip.yml for modules: \(moduleNamePaths.map(\.module)) config: \(aggregateYAML) (\(Int64((configEnd - configStart) * 1000)) ms)")
+            return (currentModuleConfig, aggregateYAML)
         }
 
         func kotlinOutputPath(for baseSourceFileName: String) -> AbsolutePath {
@@ -656,9 +656,9 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
             info("transpiling: \(sourcePath.basename) (\(Self.byteCount(for: .init(sourceSize))))", sourceFile: transpilation.sourceFile)
 
-            let outputFile = try saveTranspilation()
+            let (outputFile, changed) = try saveTranspilation()
 
-            info("transpiled: \(outputFile.basename) (\(Self.byteCount(for: transpilation.output.content.utf8.count))) (\(Int64(transpilation.duration * 1000)) ms)", sourceFile: Source.File(path: outputFile))
+            info("transpiled: \(outputFile.basename) (\(Self.byteCount(for: transpilation.output.content.utf8.count))\(!changed ? " [unchanged]" : "")) (\(Int64(transpilation.duration * 1000)) ms)", sourceFile: Source.File(path: outputFile))
 
             for message in transpilation.messages {
                 //writeMessage(message)
@@ -673,7 +673,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             continuation.yield(.init(output))
 
 
-            func saveTranspilation() throws -> AbsolutePath {
+            func saveTranspilation() throws -> (output: AbsolutePath, changed: Bool) {
                 // the build plug-in's output folder base will be something like ~/Library/Developer/Xcode/DerivedData/Mod-ID/SourcePackages/plugins/module-name.output/ModuleNameKotlin/SkipTranspilePlugIn/ModuleName/src/test/kotlin
                 trace("path: \(outputFolderPath)")
                 let kotlinName = transpilation.kotlinFileName
@@ -682,8 +682,8 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
                 let kotlinBytes = ByteString(encodingAsUTF8: transpilation.output.content)
                 let fileWritten = try fs.writeChanges(path: outputFilePath, checkSize: true, makeWritable: true, makeReadOnly: true, bytes: kotlinBytes)
 
-                info("wrote to: \(outputFilePath)\(fileWritten ? " (unchanged)" : "")", sourceFile: outputFilePath.sourceFile)
-                return outputFilePath
+                trace("wrote to: \(outputFilePath)\(!fileWritten ? " (unchanged)" : "")", sourceFile: outputFilePath.sourceFile)
+                return (output: outputFilePath, changed: fileWritten)
             }
 
         }
@@ -1063,8 +1063,8 @@ extension StreamingCommand {
         }
     }
 
-    func trace(_ message: @autoclosure () throws -> String) rethrows {
-        try msg(.trace, message())
+    func trace(_ message: @autoclosure () throws -> String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) rethrows {
+        try msg(.trace, message(), sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
     func info(_ message: @autoclosure () throws -> String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) rethrows {
