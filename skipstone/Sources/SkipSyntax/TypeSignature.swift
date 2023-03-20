@@ -112,6 +112,41 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
         }
     }
 
+    /// Apply the given generic types.
+    func withGenerics(_ generics: [TypeSignature]) -> TypeSignature {
+        switch self {
+        case .array:
+            if generics.count == 1 {
+                return .array(generics[0])
+            }
+        case .dictionary:
+            if generics.count == 2 {
+                return .dictionary(generics[0], generics[1])
+            }
+        case .member(let base, let type):
+            return .member(base, type.withGenerics(generics))
+        case .metaType(let type):
+            return .metaType(type.withGenerics(generics))
+        case .named(let name, _):
+            return .named(name, generics)
+        case .optional(let type):
+            return .optional(type.withGenerics(generics))
+        case .range:
+            if generics.count == 1 {
+                return .range(generics[0])
+            }
+        case .set:
+            if generics.count == 1 {
+                return .set(generics[0])
+            }
+        case .unwrappedOptional(let type):
+            return .unwrappedOptional(type.withGenerics(generics))
+        default:
+            break
+        }
+        return self
+    }
+
     /// Attempt to replace `.none` cases in this type signature with information from the given signature.
     func or(_ typeSignature: TypeSignature) -> TypeSignature {
         switch self {

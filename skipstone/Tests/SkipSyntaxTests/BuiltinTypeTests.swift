@@ -54,9 +54,13 @@ final class BuiltinTypeTests: XCTestCase {
             var a: [Any]
             var ai: [Int]
             var ai2: Array<Int>
+            var ai3 = Array<Int>()
             var m: [Any: Any]
             var mis: [Int: String]
             var mis2: Dictionary<Int, String>
+            var mis3 = Dictionary<Int, String>()
+            var mkis = Dictionary<Int, String>.Key()
+            var mkis2 = Dictionary<Int, String>.Key<Int, String>()
             var tis: (Int, String)
             var tis2: (Int, String, Double)
         }
@@ -65,9 +69,13 @@ final class BuiltinTypeTests: XCTestCase {
             var a: Array<Any>
             var ai: Array<Int>
             var ai2: Array<Int>
+            var ai3 = Array<Int>()
             var m: Dictionary<Any, Any>
             var mis: Dictionary<Int, String>
             var mis2: Dictionary<Int, String>
+            var mis3 = Dictionary<Int, String>()
+            var mkis = Dictionary<Int, String>.Key()
+            var mkis2 = Dictionary<Int, String>.Key<Int, String>()
             var tis: Pair<Int, String>
             var tis2: Triple<Int, String, Double>
         }

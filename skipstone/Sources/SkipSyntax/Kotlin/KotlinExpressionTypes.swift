@@ -626,6 +626,7 @@ class KotlinFunctionCall: KotlinExpression {
 
 class KotlinIdentifier: KotlinExpression {
     var name: String
+    var generics: [TypeSignature] = []
     var mayBeSharedMutableStruct = false
     var isLocalIdentifier = false
     var isInOut = false
@@ -633,6 +634,7 @@ class KotlinIdentifier: KotlinExpression {
 
     static func translate(expression: Identifier, translator: KotlinTranslator) -> KotlinIdentifier {
         let kexpression = KotlinIdentifier(expression: expression)
+        kexpression.generics = expression.generics
         kexpression.mayBeSharedMutableStruct = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
         kexpression.isLocalIdentifier = expression.isLocalIdentifier
         kexpression.isFunctionReference = !expression.isLocalIdentifier && !expression.isCalledAsFunction && translator.codebaseInfo?.isFunction(name: expression.name, type: expression.inferredType, in: expression.owningTypeDeclaration?.signature) == true
@@ -671,6 +673,9 @@ class KotlinIdentifier: KotlinExpression {
                 output.append("::")
             }
             output.append(Self.translateName(name))
+            if !generics.isEmpty {
+                output.append("<\(generics.map(\.kotlin).joined(separator: ", "))>")
+            }
             if isInOut {
                 output.append(".value")
             }
@@ -999,6 +1004,7 @@ class KotlinMemberAccess: KotlinExpression {
     var base: KotlinExpression?
     var baseKClass: TypeSignature?
     var member: String
+    var generics: [TypeSignature] = []
     var useMultlineFormatting = false
     var inferredType: TypeSignature = .none
     var mayBeSharedMutableStruct = false
@@ -1016,6 +1022,7 @@ class KotlinMemberAccess: KotlinExpression {
         } else if case .optional = expression.inferredType, expression.member == "none" || expression.member == "some" {
             kexpression.messages.append(.kotlinOptionalNoneSome(expression))
         }
+        kexpression.generics = expression.generics
         kexpression.inferredType = expression.inferredType
         kexpression.mayBeSharedMutableStruct = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
         return kexpression
@@ -1132,6 +1139,9 @@ class KotlinMemberAccess: KotlinExpression {
             }
         } else {
             output.append(member)
+        }
+        if !generics.isEmpty {
+            output.append("<\(generics.map(\.kotlin).joined(separator: ", "))>")
         }
     }
 }

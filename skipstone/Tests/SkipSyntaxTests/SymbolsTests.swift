@@ -87,6 +87,7 @@ final class SymbolsTests: XCTestCase {
         XCTAssertEqual([.function([], tupleSignature)], context.functionSignature(of: "tupleReturn", in: .named("SymbolsTestsClass", []), arguments: []))
     }
 
+    //~~~
     func testGenericClass() async throws {
         let symbols = try await symbols
         let context = symbols.context()
