@@ -546,10 +546,13 @@ struct Symbol {
                 return .none
             }
             return e.typeSignature(symbols: symbols)
-        case .class:
-            return .named(name, [])
-        case .enum:
-            return .named(name, [])
+        case .class, .enum, .protocol, .struct:
+            guard let typeIndex = declarationFragments.declarationFragments.firstIndex(where: { $0.kind == .identifier }) else {
+                // Could be array, dictionary so pass through TypeSignature
+                return TypeSignature.for(name: name, genericTypes: [])
+            }
+            let (string, specialFragments) = processFragments(Array(declarationFragments.declarationFragments[typeIndex...]))
+            return typeSignature(for: string, specialFragments: specialFragments, symbols: symbols)
         case .extension:
             guard let extensionTo = relationships.first(where: { $0.kind == .extensionTo && !$0.isInverse }) else {
                 return .none
@@ -562,27 +565,10 @@ struct Symbol {
                 }
             }
             return t.typeSignature(symbols: symbols)
-        case .method:
-            fallthrough
-        case .typeMethod:
-            fallthrough
-        case .subscript:
-            fallthrough
-        case .typeSubscript:
-            fallthrough
-        case .func:
+        case .method, .typeMethod, .subscript, .typeSubscript, .func:
             return functionSignature(symbols: symbols)
-        case .property:
-            fallthrough
-        case .typeProperty:
-            fallthrough
-        case .var:
+        case .property, .typeProperty, .var:
             return variableType(symbols: symbols)
-        case .protocol:
-            return .named(name, [])
-        case .struct:
-            // Could be array, dictionary so pass through TypeSignature
-            return TypeSignature.for(name: name, genericTypes: [])
         default:
             return .none
         }
@@ -767,6 +753,17 @@ struct Symbol {
         outer: while i < s.count {
             if let fragment = specialFragments[i] {
                 switch fragment.kind {
+                case .genericParameter:
+                    genericTypes.append(.named(fragment.spelling, []))
+                    i += fragment.spelling.count
+                    continue outer
+                case .keyword:
+                    i += fragment.spelling.count
+                    continue outer
+                case .identifier:
+                    types.append(.named(fragment.spelling, []))
+                    i += fragment.spelling.count
+                    continue outer
                 case .typeIdentifier:
                     var type = fragment.typeSignature(symbols: symbols)
                     i += fragment.spelling.count
@@ -780,9 +777,6 @@ struct Symbol {
                         types.append(type)
                     }
                     continue outer
-                case .keyword:
-                    i += fragment.spelling.count
-                    continue outer
                 default:
                     break
                 }
@@ -791,15 +785,20 @@ struct Symbol {
             switch s[i] {
             case "[":
                 // If we're already in braces, evaluate as a braced type. Otherwise record that we're now in braces and evaluate content
-                if !inBraces {
+                if inBraces {
+                    let (type, endIndex) = typeSignature(for: s, startIndex: i, specialFragments: specialFragments, symbols: symbols)
+                    if let type {
+                        if inGenerics {
+                            genericTypes.append(type)
+                        } else {
+                            types.append(type)
+                        }
+                    }
+                    i = endIndex
+                } else {
                     inBraces = true
                     i += 1
                 }
-                let (type, endIndex) = typeSignature(for: s, startIndex: i, specialFragments: specialFragments, symbols: symbols)
-                if let type {
-                    types.append(type)
-                }
-                i = endIndex
             case "]":
                 if inBraces {
                     i += 1
@@ -810,12 +809,21 @@ struct Symbol {
                 }
                 break outer
             case "(":
-                inParentheses = true
-                let (type, endIndex) = typeSignature(for: s, startIndex: i + 1, specialFragments: specialFragments, symbols: symbols)
-                if let type {
-                    types.append(type)
+                // If we're already in parentheses, evaluate as a parenthesized type. Otherwise record that we're now in parentheses and evaluate content
+                if inParentheses {
+                    let (type, endIndex) = typeSignature(for: s, startIndex: i, specialFragments: specialFragments, symbols: symbols)
+                    if let type {
+                        if inGenerics {
+                            genericTypes.append(type)
+                        } else {
+                            types.append(type)
+                        }
+                    }
+                    i = endIndex
+                } else {
+                    inParentheses = true
+                    i += 1
                 }
-                i = endIndex
             case ")":
                 if inParentheses {
                     if i + 3 < s.count && s[i + 1] == " " && s[i + 2] == "-" && s[i + 3] == ">" {
@@ -834,12 +842,16 @@ struct Symbol {
                 }
                 break outer
             case "<":
-                inGenerics = true
-                let (type, endIndex) = typeSignature(for: s, startIndex: i + 1, specialFragments: specialFragments, symbols: symbols)
-                if let type {
-                    genericTypes.append(type)
+                if inGenerics {
+                    let (type, endIndex) = typeSignature(for: s, startIndex: i + 1, specialFragments: specialFragments, symbols: symbols)
+                    if let type {
+                        genericTypes.append(type)
+                    }
+                    i = endIndex
+                } else {
+                    inGenerics = true
+                    i += 1
                 }
-                i = endIndex
             case ">":
                 if inGenerics {
                     i += 1

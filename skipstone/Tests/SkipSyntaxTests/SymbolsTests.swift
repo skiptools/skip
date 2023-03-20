@@ -7,6 +7,7 @@ final class SymbolsTests: XCTestCase {
         XCTAssertEqual(.string, context.identifierSignature(of: "symbolsTestsVar"))
         XCTAssertEqual(.array(.int), context.identifierSignature(of: "symbolsTestsArrayVar"))
         XCTAssertEqual(.dictionary(.string, .int), context.identifierSignature(of: "symbolsTestsDictionaryVar"))
+        XCTAssertEqual(.dictionary(.string, .dictionary(.string, .int)), context.identifierSignature(of: "symbolsTestsDictionaryOfDictionariesVar"))
         XCTAssertEqual(.named("SymbolsTestsClass", []), context.identifierSignature(of: "symbolsTestsNamedVar"))
     }
 
@@ -86,6 +87,22 @@ final class SymbolsTests: XCTestCase {
         XCTAssertEqual([.function([], tupleSignature)], context.functionSignature(of: "tupleReturn", in: .named("SymbolsTestsClass", []), arguments: []))
     }
 
+    func testGenericClass() async throws {
+        let symbols = try await symbols
+        let context = symbols.context()
+        let candidates = context.lookup(name: "SymbolsTestsGenericClass")
+        let typeSignature = candidates[0].typeSignature(symbols: symbols)
+        print("Signature: \(typeSignature)")
+    }
+
+    func testGenericProtocol() async throws {
+        let symbols = try await symbols
+        let context = symbols.context()
+        let candidates = context.lookup(name: "SymbolsTestsGenericProtocol")
+        let typeSignature = candidates[0].typeSignature(symbols: symbols)
+        print("Signature: \(typeSignature)")
+    }
+
     func testSuperclassConstructor() throws {
         throw XCTSkip("TODO: Test custom superclass constructors called on a subclass")
     }
@@ -106,6 +123,7 @@ final class SymbolsTests: XCTestCase {
 private var symbolsTestsVar = "string"
 private var symbolsTestsArrayVar = [1]
 private var symbolsTestsDictionaryVar: [String: Int] = [:]
+private var symbolsTestsDictionaryOfDictionariesVar: [String: [String: Int]] = [:]
 private var symbolsTestsNamedVar = SymbolsTestsClass()
 
 class SymbolsTestsBaseClass {
@@ -157,4 +175,20 @@ struct SymbolsTestsStruct {
     func f(p: String) -> Int {
         return 1
     }
+}
+
+class SymbolsTestsGenericClass<T: Sequence, U> {
+    var genericVar: T
+
+    init(value: T) {
+        self.genericVar = value
+    }
+
+    func genericFunc() -> T {
+        return genericVar
+    }
+}
+protocol SymbolsTestsGenericProtocol {
+    associatedtype T
+    func get() -> T
 }
