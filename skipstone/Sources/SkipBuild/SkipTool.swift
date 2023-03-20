@@ -7,7 +7,7 @@ import Universal
 import TSCBasic
 
 /// The current version of the tool
-public let skipVersion = "0.1.10"
+public let skipVersion = "0.1.11"
 
 struct Options {
     var preprocessorSymbols: [String] = []
@@ -590,13 +590,13 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
                 if fs.isFile(moduleSkipConfigPath) {
                     let moduleYAML = try loadSkipYAML(path: moduleSkipConfigPath)
                     info("parsed skip.yml for module: \(moduleName) path: \(modulePath) config: \(moduleYAML)", sourceFile: moduleSkipConfigPath.sourceFile)
-                    if moduleYAML.object != nil { // merge as long as the other instance is an object
+                    if moduleYAML.object?["gradle"]?.object != nil { // merge as long as the other instance is an object
                         aggregateYAML = try aggregateYAML.merged(with: moduleYAML)
                     }
                 }
             }
 
-            if currentModuleConfig.object != nil { // merge as long as the other instance is an object
+            if currentModuleConfig.object?["gradle"]?.object != nil { // merge as long as the other instance is an object
                 aggregateYAML = try aggregateYAML.merged(with: currentModuleConfig)
             }
 
