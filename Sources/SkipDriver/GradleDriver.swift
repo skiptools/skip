@@ -150,15 +150,17 @@ public struct GradleDriver {
             args += ["--no-daemon"]
         }
 
+        let moduleURL = URL(fileURLWithPath: module, isDirectory: true, relativeTo: workingDirectory)
+        if !FileManager.default.fileExists(atPath: moduleURL.path) {
+            throw URLError(.fileDoesNotExist, userInfo: [NSFilePathErrorKey: moduleURL.path])
+        }
+
+        let testResultFolder = URL(fileURLWithPath: testResultPath, isDirectory: true, relativeTo: moduleURL)
+        try? FileManager.default.trashItem(at: testResultFolder, resultingItemURL: nil) // remove the test folder, since a build failure won't clear it and it will appear as if the tests ran successfully
+
         let output = try await execGradle(in: workingDirectory, args: args, onExit: exitHandler)
 
         return (output, {
-            let moduleURL = URL(fileURLWithPath: module, isDirectory: true, relativeTo: workingDirectory)
-            if !FileManager.default.fileExists(atPath: moduleURL.path) {
-                throw URLError(.fileDoesNotExist, userInfo: [NSFilePathErrorKey: moduleURL.path])
-            }
-
-            let testResultFolder = URL(fileURLWithPath: testResultPath, isDirectory: true, relativeTo: moduleURL)
             if !FileManager.default.fileExists(atPath: testResultFolder.path) {
                 throw URLError(.fileDoesNotExist, userInfo: [NSFilePathErrorKey: testResultFolder.path])
             }
@@ -250,10 +252,10 @@ public struct GradleDriver {
         public var time: TimeInterval
         public var testCases: [TestCase]
         // public var properties: [String: String]? // TODO
-        // public var systemOut: String? // TODO
-        // public var systemErr: String? // TODO
+         public var systemOut: String?
+         public var systemErr: String?
 
-        public init(name: String, tests: Int, skipped: Int, failures: Int, errors: Int, time: TimeInterval, testCases: [TestCase]) {
+        public init(name: String, tests: Int, skipped: Int, failures: Int, errors: Int, time: TimeInterval, testCases: [TestCase], systemOut: String?, systemErr: String?) {
             self.name = name
             self.tests = tests
             self.skipped = skipped
@@ -261,6 +263,8 @@ public struct GradleDriver {
             self.errors = errors
             self.time = time
             self.testCases = testCases
+            self.systemOut = systemOut
+            self.systemErr = systemErr
         }
 
         #if os(macOS) || os(Linux)
@@ -311,17 +315,25 @@ public struct GradleDriver {
                 testCases.append(try TestCase(from: element, in: url))
             }
 
+            var systemOut = ""
+            var systemErr = ""
+
             for childElement in testsuite.children?.compactMap({ $0 as? XMLElement }) ?? [] {
                 switch childElement.name {
-                case "testcase": try addTestCase(for: childElement)
-                case "properties": break
-                case "system-out": break
-                case "system-err": break
-                default: break // unrecognized key
+                case "testcase":
+                    try addTestCase(for: childElement)
+                case "system-out":
+                    systemOut += childElement.stringValue ?? ""
+                case "system-err":
+                    systemErr += childElement.stringValue ?? ""
+                case "properties":
+                    break // TODO: figure out key/value format
+                default:
+                    break // unrecognized key
                 }
             }
 
-            let suite = TestSuite(name: testSuiteName, tests: testCount, skipped: skipCount, failures: failureCount, errors: errorCount, time: duration, testCases: testCases)
+            let suite = TestSuite(name: testSuiteName, tests: testCount, skipped: skipCount, failures: failureCount, errors: errorCount, time: duration, testCases: testCases, systemOut: systemOut.isEmpty ? nil : systemOut, systemErr: systemErr.isEmpty ? nil : systemErr)
             self = suite
         }
         #endif
