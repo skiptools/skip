@@ -24,7 +24,7 @@ Then run:
 
 ```shell
 alias skip="swift package --disable-sandbox --allow-writing-to-package-directory skip"
-skip -version
+skip info
 ```
 
 The `skip` alias can be persisted for future `Terminal.app` shell sessions by running:
@@ -33,16 +33,17 @@ The `skip` alias can be persisted for future `Terminal.app` shell sessions by ru
 echo 'alias skip="swift package --disable-sandbox --allow-writing-to-package-directory skip"' >> ~/.zprofile
 ```
 
+
 ## System Requirements
 
-macOS 13+ (ARM or Intel), [XCode.app](https://developer.apple.com/xcode/) and [Gradle 8.0+](https://gradle.org/install/#with-a-package-manager).
+macOS 13+ (ARM or Intel), [XCode.app](https://developer.apple.com/xcode/) and [Gradle 8.0+](https://gradle.org/install).
 
 
-## Transpilation
+## Transpilation Output
 
 For a given package named "SourceModule*Kotlin*", the transpiler takes all the `.swift` source files in the peer "SourceModule" package and transpiles the Swift source files into Kotlin. In addition, module-level `build.gradle.kts` and top-level `settings.gradle.kts` files are emitted, such that the output module source can be built or tested with the `gradle` command.
 
-The output folders for the plug-in are dictated by the build system, and so they differs between Xcode and SPM build. An example resulting folder structure is for the base `SkipLib` and `SkipLibKotlin` packages is:
+The output folders for the plug-in are dictated by the build system, and so they differ between Xcode and SPM build. An example resulting folder structure is for the base `SkipLib` and `SkipLibKotlin` packages is:
 
 ```
 ~/Library/Developer/Xcode/DerivedData/Skip-ABC/SourcePackages/plugins/skip-core.output/SkipLibKotlin/SkipTranspilePlugIn
@@ -96,7 +97,7 @@ With SPM plugins, modules have their own independent build output folder, and th
 ```
 
 
-Code that references other modules will be similiarly linked, but at the top level of the module root. Each module added to the `include` list of the generated `seetings.gradle.kts`, so each module will automatically build its dependent modules.
+Code that references other modules will be similiarly linked, but at the top level of the module root. Each module added to the `include` list of the generated `setings.gradle.kts`, so each module will automatically build its dependent modules.
 
 ```
 ~/Library/Developer/Xcode/DerivedData/PKG-ABC/SourcePackages/plugins/skip-template.output/DemoLibKotlinTests/SkipTranspilePlugIn/
