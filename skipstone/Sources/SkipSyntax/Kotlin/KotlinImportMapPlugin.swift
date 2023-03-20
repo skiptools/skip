@@ -15,7 +15,8 @@ class KotlinImportMapPlugin: KotlinPlugin {
                 //importDeclaration.kotlinImportOverride = "skip.unit"
             }
             if importDeclaration.modulePath.first == "OSLog" {
-                //importDeclaration.modulePath[0] = "SkipLog"
+                importDeclaration.modulePath[0] = "SkipFoundation"
+                //importDeclaration.modulePath = ["skip.foundation.Logger"]
                 //importDeclaration.kotlinImportOverride = "skip.log"
             }
         }

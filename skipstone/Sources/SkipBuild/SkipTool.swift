@@ -7,7 +7,7 @@ import Universal
 import TSCBasic
 
 /// The current version of the tool
-public let skipVersion = "0.1.8"
+public let skipVersion = "0.1.9"
 
 struct Options {
     var preprocessorSymbols: [String] = []
@@ -439,10 +439,10 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
     func performCommand(with continuation: AsyncThrowingStream<OutputMessage, Error>.Continuation) async throws {
         let sourceFiles = try precheckOptions.files.map(AbsolutePath.init(validating:))
-        info("performing transpilation to: \(transpileOptions.outputFolder ?? "nowhere") for: \(sourceFiles.map(\.pathString))")
-        info("linkPaths: \(transpileOptions.linkPaths)")
-        info("moduleNames: \(transpileOptions.moduleNames)")
-        info("skipFolder: \(transpileOptions.skipFolder ?? "none")")
+        info("performing transpilation to: \(transpileOptions.outputFolder ?? "nowhere") for: \(sourceFiles.map(\.basename))")
+        trace("linkPaths: \(transpileOptions.linkPaths)")
+        trace("moduleNames: \(transpileOptions.moduleNames)")
+        trace("skipFolder: \(transpileOptions.skipFolder ?? "none")")
         try await self.transpile(fs: localFileSystem, sourceFiles: Set(sourceFiles), with: continuation)
     }
 
