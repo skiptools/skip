@@ -558,13 +558,13 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
         case "AnyType":
             return .metaType(.any)
         case "Array":
-            return genericTypes.count == 1 ? .array(genericTypes[0]) : .named(name, genericTypes)
+            return genericTypes.isEmpty ? .array(.any) : genericTypes.count == 1 ? .array(genericTypes[0]) : .named(name, genericTypes)
         case "Bool":
             return genericTypes.isEmpty ? .bool : .named(name, genericTypes)
         case "Character":
             return genericTypes.isEmpty ? .character : .named(name, genericTypes)
         case "Dictionary":
-            return genericTypes.count == 2 ? .dictionary(genericTypes[0], genericTypes[1]) : .named(name, genericTypes)
+            return genericTypes.isEmpty ? .dictionary(.any, .any) : genericTypes.count == 2 ? .dictionary(genericTypes[0], genericTypes[1]) : .named(name, genericTypes)
         case "Double":
             return genericTypes.isEmpty ? .double : .named(name, genericTypes)
         case "Float":
@@ -580,9 +580,9 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
         case "Int64":
             return genericTypes.isEmpty ? .int64 : .named(name, genericTypes)
         case "Range":
-            return genericTypes.count == 1 ? .range(genericTypes[0]) : .named(name, genericTypes)
+            return genericTypes.isEmpty ? .range(.any) : genericTypes.count == 1 ? .range(genericTypes[0]) : .named(name, genericTypes)
         case "Set":
-            return genericTypes.count == 1 ? .set(genericTypes[0]) : .named(name, genericTypes)
+            return genericTypes.isEmpty ? .set(.any) : genericTypes.count == 1 ? .set(genericTypes[0]) : .named(name, genericTypes)
         case "String":
             return genericTypes.isEmpty ? .string : .named(name, genericTypes)
         case "UInt":

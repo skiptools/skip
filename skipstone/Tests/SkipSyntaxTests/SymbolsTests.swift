@@ -87,22 +87,27 @@ final class SymbolsTests: XCTestCase {
         XCTAssertEqual([.function([], tupleSignature)], context.functionSignature(of: "tupleReturn", in: .named("SymbolsTestsClass", []), arguments: []))
     }
 
-    //~~~
-    func testGenericClass() async throws {
-        let symbols = try await symbols
-        let context = symbols.context()
-        let candidates = context.lookup(name: "SymbolsTestsGenericClass")
-        let typeSignature = candidates[0].typeSignature(symbols: symbols)
-        print("Signature: \(typeSignature)")
+    func testParseComplexGenericMembers() async throws {
+        let context = try await symbols.context()
+        XCTAssertEqual(.optional(.tuple([nil, nil], [.array(.named("SymbolsTestsGenericClass", [.named("T", []), .named("U", [])])), .array(.dictionary(.int, .array(.named("U", []))))])), context.identifierSignature(of: "complexGenericVar", in: .named("SymbolsTestsGenericClass", [])))
+        XCTAssertEqual([.function([.init(type: .tuple([nil, nil], [.array(.int), .dictionary(.int, .string)])), .init(type: .named("SymbolsTestsGenericClass", [.named("T", []), .named("U", [])]))], .optional(.named("SymbolsTestsGenericClass", [.dictionary(.int, .named("SymbolsTestsGenericClass", [.string, .array(.int)])), .array(.named("SymbolsTestsGenericClass", [.int, .int]))])))], context.functionSignature(of: "complexGenericFunc", in: .named("SymbolsTestsGenericClass", []), arguments: [LabeledValue(value: .none), LabeledValue(value: .none)]))
     }
 
-    func testGenericProtocol() async throws {
-        let symbols = try await symbols
-        let context = symbols.context()
-        let candidates = context.lookup(name: "SymbolsTestsGenericProtocol")
-        let typeSignature = candidates[0].typeSignature(symbols: symbols)
-        print("Signature: \(typeSignature)")
-    }
+//    func testParseGenericTypeDeclaration() async throws {
+//        let symbols = try await symbols
+//        let context = symbols.context()
+//        let candidates = context.lookup(name: "SymbolsTestsGenericClass")
+//        let typeSignature = candidates[0].typeSignature(symbols: symbols)
+//        print("Signature: \(typeSignature)")
+//    }
+//
+//    func testGenericProtocol() async throws {
+//        let symbols = try await symbols
+//        let context = symbols.context()
+//        let candidates = context.lookup(name: "SymbolsTestsGenericProtocol")
+//        let typeSignature = candidates[0].typeSignature(symbols: symbols)
+//        print("Signature: \(typeSignature)")
+//    }
 
     func testSuperclassConstructor() throws {
         throw XCTSkip("TODO: Test custom superclass constructors called on a subclass")
@@ -178,15 +183,11 @@ struct SymbolsTestsStruct {
     }
 }
 
-class SymbolsTestsGenericClass<T: Sequence, U> {
-    var genericVar: T
+class SymbolsTestsGenericClass<T, U> {
+    var complexGenericVar: (Array<SymbolsTestsGenericClass<T, U>>, Array<Dictionary<Int, Array<U>>>)?
 
-    init(value: T) {
-        self.genericVar = value
-    }
-
-    func genericFunc() -> T {
-        return genericVar
+    func complexGenericFunc(_: (Array<Int>, Dictionary<Int, String>), _: SymbolsTestsGenericClass<T, U>) -> SymbolsTestsGenericClass<Dictionary<Int, SymbolsTestsGenericClass<String, Array<Int>>>, Array<SymbolsTestsGenericClass<Int, Int>>>? {
+        return nil
     }
 }
 protocol SymbolsTestsGenericProtocol {
