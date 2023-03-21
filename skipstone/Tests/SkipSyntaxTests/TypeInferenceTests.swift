@@ -164,6 +164,14 @@ final class TypeInferenceTests: XCTestCase {
         """)
     }
 
+    func testTypealias() throws {
+        throw XCTSkip("TODO: Test that we can match typealiases to types")
+    }
+
+    func testTypeDeclaredWithinFunction() throws {
+        throw XCTSkip("TODO: Test declaring a type within a function. This includes making sure our plugins process in-function types correctly")
+    }
+
     func testNestedTypes() throws {
         throw XCTSkip("TODO: Test nested type symbols")
     }

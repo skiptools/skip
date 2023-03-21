@@ -117,6 +117,35 @@ extension Parameter where V: Expression {
     }
 }
 
+extension Generics {
+    func append(to output: OutputGenerator, indentation: Indentation) {
+        if entries.isEmpty {
+            return
+        }
+        output.append("<")
+        output.append(entries.map(\.name).joined(separator: ", "))
+        output.append(">")
+    }
+
+    func appendWhere(to output: OutputGenerator, indentation: Indentation) {
+        let constraints = entries.flatMap { entry in
+            entry.inherits.map {
+                (entry.name, $0)
+            }
+        }
+        guard !constraints.isEmpty else {
+            return
+        }
+        output.append(" where ")
+        for (index, (name, type)) in constraints.enumerated() {
+            output.append("\(name): \(type.kotlin)")
+            if index != constraints.count - 1 {
+                output.append(", ")
+            }
+        }
+    }
+}
+
 extension Array where Element == KotlinExpression {
     /// Append this expression array as combined logical conditions, e.g. for an `if`.
     func appendAsLogicalConditions(to output: OutputGenerator, op: Operator = .with(symbol: "&&"), indentation: Indentation) {

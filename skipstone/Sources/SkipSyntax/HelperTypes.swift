@@ -440,14 +440,15 @@ struct Generics {
     }
 
     var prettyPrintTree: PrettyPrintTree {
-        let children = entries.map {
+        var children = entries.map {
             var constraints = ""
             if !$0.inherits.isEmpty {
                 constraints = ": \($0.inherits.map(\.description).joined(separator: ", "))"
-            } else if let whenEqual = $0.whenEqual {
-                constraints = " == \(whenEqual)"
             }
             return PrettyPrintTree(root: "\($0.name)\(constraints)")
+        }
+        for entry in whereEqual {
+            children.append(PrettyPrintTree(root: "\(entry.key) == \(entry.value)"))
         }
         return PrettyPrintTree(root: "generics", children: children)
     }
@@ -457,13 +458,10 @@ struct Generics {
 struct Generic {
     var name: String
     var inherits: [TypeSignature] = []
-    var whenEqual: TypeSignature?
 
     /// - Returns: `.composition(types)` for multiple constraints, `.any` for no constraints.
     var type: TypeSignature {
-        if let whenEqual {
-            return whenEqual
-        } else if inherits.isEmpty {
+        if inherits.isEmpty {
             return .any
         } else if inherits.count == 1 {
             return inherits[0]
@@ -475,7 +473,6 @@ struct Generic {
     func qualified(in node: SyntaxNode) -> Generic {
         var generic = self
         generic.inherits = generic.inherits.map { $0.qualified(in: node) }
-        generic.whenEqual = generic.whenEqual.map { $0.qualified(in: node) }
         return generic
     }
 }

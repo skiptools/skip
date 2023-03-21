@@ -119,6 +119,7 @@ class KotlinConstructorPlugin: KotlinPlugin {
     }
 
     private func superclass(of classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) -> String? {
+        //~~~ inherits.description breaks
         guard let inherits = classDeclaration.inherits.first, translator.codebaseInfo?.declarationType(of: inherits.description, mustBeInModule: false) == .classDeclaration else {
             return nil
         }

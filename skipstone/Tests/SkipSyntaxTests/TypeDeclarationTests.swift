@@ -185,8 +185,105 @@ final class TypeDeclarationTests: XCTestCase {
         """)
     }
 
+    func testGenericClass() async throws {
+        try await check(swift: """
+        class C<T, U> {
+        }
+        """, kotlin: """
+        internal open class C<T, U> {
+        }
+        """)
+
+        try await check(swift: """
+        class Base {
+        }
+        class C<T: I, U>: Base where U: A, U: B {
+        }
+        """, kotlin: """
+        internal open class Base {
+        }
+        internal open class C<T, U>: Base() where T: I, U: A, U: B {
+        }
+        """)
+    }
+
+    func testGenericProtocol() async throws {
+        try await check(swift: """
+        protocol P {
+            associatedtype T
+            associatedtype U
+        }
+        """, kotlin: """
+        internal interface P<T, U> {
+        }
+        """)
+
+        try await check(swift: """
+        protocol Base {
+        }
+        protocol P: Base {
+            associatedtype T: I
+            associatedtype U: A, B
+        }
+        """, kotlin: """
+        internal interface Base {
+        }
+        internal interface P<T, U>: Base where T: I, U: A, U: B {
+        }
+        """)
+    }
+
+    func testGenericInheritance() async throws {
+//        try await check(swift: """
+//        class Base<T> {
+//        }
+//        class C<T>: Base<T> {
+//            func f() -> T? {
+//                return nil
+//            }
+//        }
+//        """, kotlin: """
+//        internal open class Base<T> {
+//        }
+//        internal open class C<T>: Base<T>() {
+//            internal open fun f(): T? {
+//                return null
+//            }
+//        }
+//        """)
+    }
+
     func testGenerics() async throws {
-        throw XCTSkip("TODO: Generics in classes, structs, extensions, typealiases. Generic where clauses, etc")
+        throw XCTSkip("TODO: Generics in classes, structs, extensions, typealiases. Generic where clauses. Members of generic types, including types constrained so we know they're not mutable structs")
+        //~~~ inner classes can use types from outer classes in Swift, but Kotlin has to declare the inner class generic
+        /*
+         class Dict<K, V> {
+             struct Entry {
+                 var key: K
+                 var value: V
+             }
+             var entries: [Entry] = []
+             func put(key: K, value: V) {
+                 entries.append(Entry(key: key, value: value))
+             }
+         }
+         func makeEntry() -> Dict<Int, String>.Entry {
+             return Dict<Int, String>.Entry(key: 1, value: "s")
+         }
+         */
+        //~~~ Swift determines implemented protocol types, but in Kotlin you must declare them
+        /*
+         protocol P {
+             associatedtype T
+             func f() -> T
+         }
+         class C: P {
+             func f() -> Int {
+                 return 0
+             }
+         }
+         *
+         // Test enums and extensions
     }
 
     func testTypeDeclaredWithinExtension() throws {

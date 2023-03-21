@@ -651,6 +651,7 @@ class KotlinClassDeclaration: KotlinStatement {
     var inherits: [TypeSignature] = []
     var superclassCall: String?
     var modifiers = Modifiers()
+    var generics = Generics()
     var declarationType: StatementType
     var members: [KotlinStatement] = []
     var isConstructingPropertyName: String?
@@ -674,6 +675,7 @@ class KotlinClassDeclaration: KotlinStatement {
         let kstatement = KotlinClassDeclaration(statement: statement)
         kstatement.inherits = statement.inherits
         kstatement.modifiers = statement.modifiers
+        kstatement.generics = statement.generics
         var members = statement.members.flatMap { translator.translateStatement($0) }
         // Move extensions of this type into the type itself rather than use Kotlin extension functions.
         // Kotlin extension functions act like static functions, which can lead to different behavior
@@ -747,12 +749,13 @@ class KotlinClassDeclaration: KotlinStatement {
                 } else {
                     output.append("enum class ").append(name)
                 }
-                if let inheritedRawValueType = enumInheritedRawValueType {
-                    inherits = Array(inherits.dropFirst())
-                    output.append("(val rawValue: \(inheritedRawValueType.kotlin))")
-                }
             } else {
                 output.append("class ").append(name)
+            }
+            generics.append(to: output, indentation: indentation)
+            if let inheritedRawValueType = enumInheritedRawValueType {
+                inherits = Array(inherits.dropFirst())
+                output.append("(val rawValue: \(inheritedRawValueType.kotlin))")
             }
             if !inherits.isEmpty {
                 output.append(": ")
@@ -763,8 +766,10 @@ class KotlinClassDeclaration: KotlinStatement {
                         output.append(", ")
                     }
                 }
+                //~~~ Interfaces need generic types specified
                 output.append(inherits.map({ $0.kotlin }).joined(separator: ", "))
             }
+            generics.appendWhere(to: output, indentation: indentation)
         }
         output.append(" {\n")
 
@@ -1158,12 +1163,14 @@ class KotlinInterfaceDeclaration: KotlinStatement {
     var name: String
     var inherits: [TypeSignature] = []
     var modifiers = Modifiers()
+    var generics = Generics()
     var members: [KotlinStatement] = []
 
     static func translate(statement: TypeDeclaration, translator: KotlinTranslator) -> KotlinInterfaceDeclaration {
         let kstatement = KotlinInterfaceDeclaration(statement: statement)
         kstatement.inherits = statement.inherits
         kstatement.modifiers = statement.modifiers
+        kstatement.generics = statement.generics
 
         var originalMembers = statement.members.flatMap { translator.translateStatement($0) }
         var newMembers: [KotlinStatement] = []
@@ -1232,10 +1239,12 @@ class KotlinInterfaceDeclaration: KotlinStatement {
                 output.append("private ")
             }
             output.append("interface ").append(name)
+            generics.append(to: output, indentation: indentation)
             if !inherits.isEmpty {
                 output.append(": ")
                 output.append(inherits.map({ $0.kotlin }).joined(separator: ", "))
             }
+            generics.appendWhere(to: output, indentation: indentation)
         }
         output.append(" {\n")
         children.forEach { output.append($0, indentation: indentation.inc()) }
