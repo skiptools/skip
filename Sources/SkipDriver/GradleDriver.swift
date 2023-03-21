@@ -113,13 +113,16 @@ public struct GradleDriver {
     ///   - testResultPath: the relative path for the test output XML files
     ///   - exitHandler: the exit handler, which may want to permit a process failure in order to have time to parse the tests
     /// - Returns: an array of parsed test suites containing information about the test run
-    public func runTests(check: Bool = false, info infoFlag: Bool = false, plain plainFlag: Bool = true, noDaemon noDaemonFlag: Bool = true, failFast failFastFlag: Bool = false, continue continueFlag: Bool = true, offline offlineFlag: Bool = false, rerunTasks rerunTasksFlag: Bool = true, in workingDirectory: URL, module: String, testResultPath: String = "build/test-results/test", exitHandler: @escaping (ProcessResult) throws -> ()) async throws -> (output: Process.AsyncLineOutput, result: () async throws -> [TestSuite]) {
+    public func runTests(check: Bool = false, info infoFlag: Bool = false, plain plainFlag: Bool = true, noDaemon noDaemonFlag: Bool = true, failFast failFastFlag: Bool = false, continue continueFlag: Bool = true, offline offlineFlag: Bool = false, rerunTasks rerunTasksFlag: Bool = true, in workingDirectory: URL, module: String, testResultPath: String = "build/test-results", exitHandler: @escaping (ProcessResult) throws -> ()) async throws -> (output: Process.AsyncLineOutput, result: () throws -> [TestSuite]) {
         var args = [
             check ? "check" : "test" // check will run the @Test funcs regardless of @Ignore, as well as other checks
         ]
 
         // add in the project dir for explicitness (even though it is assumed from the current working directory as well)
         args += ["--project-dir", workingDirectory.path]
+
+        // this can also be set in a top-level gradle.properties file, but we include it here for good measure
+        args += ["-Pandroid.useAndroidX=true"]
 
         if rerunTasksFlag {
             args += ["--rerun-tasks"]
@@ -159,14 +162,7 @@ public struct GradleDriver {
         try? FileManager.default.trashItem(at: testResultFolder, resultingItemURL: nil) // remove the test folder, since a build failure won't clear it and it will appear as if the tests ran successfully
 
         let output = try await execGradle(in: workingDirectory, args: args, onExit: exitHandler)
-
-        return (output, {
-            if !FileManager.default.fileExists(atPath: testResultFolder.path) {
-                throw URLError(.fileDoesNotExist, userInfo: [NSFilePathErrorKey: testResultFolder.path])
-            }
-
-            return try Self.parseTestResults(in: testResultFolder)
-        })
+        return (output, { try Self.parseTestResults(in: testResultFolder) })
     }
 
     /// Executes `skiptool info` and returns the info dictionary.
@@ -432,6 +428,12 @@ public struct GradleDriver {
 
     #if os(macOS) || os(Linux)
     private static func parseTestResults(in testFolder: URL) throws -> [TestSuite] {
+        let fm = FileManager.default
+        if !fm.fileExists(atPath: testFolder.path) {
+            // missing folder
+            throw URLError(.fileDoesNotExist, userInfo: [NSFilePathErrorKey: testFolder.path])
+        }
+
         func parseTestSuite(resultURL: URL) throws -> TestSuite? {
             if try resultURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory != false {
                 return Optional<TestSuite>.none
@@ -444,7 +446,13 @@ public struct GradleDriver {
 
             return try TestSuite(contentsOf: resultURL)
         }
-        return try FileManager.default.contentsOfDirectory(at: testFolder, includingPropertiesForKeys: [.isDirectoryKey]).compactMap(parseTestSuite)
+
+        let dirs = try fm.contentsOfDirectory(at: testFolder, includingPropertiesForKeys: [.isDirectoryKey])
+
+        // check each subdir (e.g., "build/test-results/test" and "build/test-results/testDebugUnitTest/" and "build/test-results/testReleaseUnitTest/"
+        let subdirs = try dirs.flatMap({ try fm.contentsOfDirectory(at: $0, includingPropertiesForKeys: [.isDirectoryKey]) })
+
+        return try subdirs.compactMap(parseTestSuite)
     }
     #endif
 }
