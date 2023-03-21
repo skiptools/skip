@@ -253,6 +253,18 @@ final class TypeDeclarationTests: XCTestCase {
 //        """)
     }
 
+    func testGenericTypealias() async throws {
+        try await check(swift: """
+        private typealias EArray<E> = Array<E>
+        """, kotlin: """
+        private typealias EArray<E> = Array<E>
+        """)
+
+        try await checkProducesMessage(swift: """
+        private typealias EArray<E> = Array<E> where E: Comparable
+        """)
+    }
+
     func testGenerics() async throws {
         throw XCTSkip("TODO: Generics in classes, structs, extensions, typealiases. Generic where clauses. Members of generic types, including types constrained so we know they're not mutable structs")
         //~~~ inner classes can use types from outer classes in Swift, but Kotlin has to declare the inner class generic
@@ -282,7 +294,7 @@ final class TypeDeclarationTests: XCTestCase {
                  return 0
              }
          }
-         *
+         */
          // Test enums and extensions
     }
 

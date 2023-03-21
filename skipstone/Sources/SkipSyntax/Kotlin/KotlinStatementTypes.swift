@@ -1255,6 +1255,7 @@ class KotlinInterfaceDeclaration: KotlinStatement {
 class KotlinTypealiasDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var name: String
     var modifiers = Modifiers()
+    var generics = Generics()
     var aliasedType: TypeSignature
 
     // KotlinMemberDeclaration
@@ -1266,10 +1267,14 @@ class KotlinTypealiasDeclaration: KotlinStatement, KotlinMemberDeclaration {
     init(statement: TypealiasDeclaration) {
         self.name = statement.name
         self.modifiers = statement.modifiers
+        self.generics = statement.generics
         self.aliasedType = statement.aliasedType
         super.init(type: .typealiasDeclaration, statement: statement)
         if statement.owningTypeDeclaration != nil {
             self.messages.append(.kotlinTypeAliasNested(statement))
+        }
+        if !statement.generics.whereEqual.isEmpty || statement.generics.entries.contains(where: { !$0.inherits.isEmpty }) {
+            self.messages.append(.kotlinTypeAliasConstrainedGenerics(statement))
         }
     }
 
@@ -1281,7 +1286,11 @@ class KotlinTypealiasDeclaration: KotlinStatement, KotlinMemberDeclaration {
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
         output.append(indentation).append(modifiers.kotlinMemberString(isOpen: false, suffix: " "))
-        output.append("typealias ").append(name).append(" = ").append(aliasedType.kotlin).append("\n")
+        output.append("typealias ").append(name)
+        generics.append(to: output, indentation: indentation)
+        output.append(" = ").append(aliasedType.kotlin)
+        generics.appendWhere(to: output, indentation: indentation)
+        output.append("\n")
     }
 }
 

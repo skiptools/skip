@@ -815,20 +815,21 @@ class ImportDeclaration: Statement {
     }
 }
 
-// TODO: Generics
 /// `typealias ...`
 class TypealiasDeclaration: Statement {
     let name: String
     private(set) var modifiers: Modifiers
+    private(set) var generics: Generics
     private(set) var aliasedType: TypeSignature
     var qualifiedName: String {
         return _qualifiedName ?? name
     }
     private var _qualifiedName: String?
 
-    init(name: String, modifiers: Modifiers = Modifiers(), aliasedType: TypeSignature, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(name: String, modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), aliasedType: TypeSignature, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.name = name
         self.modifiers = modifiers
+        self.generics = generics
         self.aliasedType = aliasedType
         super.init(type: .typealiasDeclaration, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
@@ -839,14 +840,18 @@ class TypealiasDeclaration: Statement {
         }
         let name = typealiasDecl.identifier.text
         let modifiers = Modifiers.for(syntax: typealiasDecl.modifiers)
+        let (generics, messages) = Generics.for(syntax: typealiasDecl.genericParameterClause, where: typealiasDecl.genericWhereClause, in: syntaxTree)
         let aliasedType = TypeSignature.for(syntax: typealiasDecl.initializer.value)
-        return [TypealiasDeclaration(name: name, modifiers: modifiers, aliasedType: aliasedType, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
+        let statement = TypealiasDeclaration(name: name, modifiers: modifiers, generics: generics, aliasedType: aliasedType, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
+        statement.messages = messages
+        return [statement]
     }
 
     override func resolveAttributes() {
         if _qualifiedName == nil {
             _qualifiedName = qualifyDeclaredTypeName(name)
         }
+        generics = generics.qualified(in: self)
         aliasedType = aliasedType.qualified(in: self)
         // Aliases in protocols or extensions inherit the visibility of the protocol or extension
         if modifiers.visibility == .default {
@@ -862,6 +867,9 @@ class TypealiasDeclaration: Statement {
         var attrs = [PrettyPrintTree(root: name)]
         if !modifiers.isEmpty {
             attrs.append(modifiers.prettyPrintTree)
+        }
+        if !generics.isEmpty {
+            attrs.append(generics.prettyPrintTree)
         }
         attrs.append(PrettyPrintTree(root: aliasedType.description))
         return attrs
@@ -997,7 +1005,6 @@ class TypeDeclaration: Statement {
     }
 }
 
-// TODO: Generics
 /// `let/var v ...`
 class VariableDeclaration: Statement {
     let names: [String?]

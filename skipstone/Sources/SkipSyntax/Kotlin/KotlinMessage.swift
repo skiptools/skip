@@ -110,6 +110,10 @@ extension Message {
         return Message(kind: .error, message: "Kotlin does not support typealias declarations within types. Consider moving this to a top level declaration", sourceDerived: sourceDerived)
     }
 
+    static func kotlinTypeAliasConstrainedGenerics(_ sourceDerived: SourceDerived) -> Message {
+        return Message(kind: .error, message: "Kotlin typealias declarations do not support constrained generic types", sourceDerived: sourceDerived)
+    }
+
     static func kotlinViewBuilderUnsupportedStatement(_ sourceDerived: SourceDerived) -> Message {
         return Message(kind: .error, message: "This Swift construct is not supported within a @ViewBuilder when translating to Kotlin UI", sourceDerived: sourceDerived)
     }
