@@ -8,14 +8,17 @@ class KotlinImportMapPlugin: KotlinPlugin {
         for importDeclaration in syntaxTree.root.statements.compactMap({ $0 as? KotlinImportDeclaration }) {
             if importDeclaration.modulePath.first == "Foundation" {
                 importDeclaration.modulePath[0] = "SkipFoundation"
+                //importDeclaration.modulePath[0...0] = ["skip", "foundation"]
                 //importDeclaration.kotlinImportOverride = "skip.foundation"
             }
             if importDeclaration.modulePath.first == "XCTest" {
                 importDeclaration.modulePath[0] = "SkipUnit"
-                //importDeclaration.kotlinImportOverride = "skip.unit"
+                //importDeclaration.modulePath[0...0] = ["skip", "unit"]
             }
             if importDeclaration.modulePath.first == "OSLog" {
                 importDeclaration.modulePath[0] = "SkipFoundation"
+                //importDeclaration.modulePath[0...0] = ["skip", "foundation", "Logger"]
+                //importDeclaration.modulePath = ["skip", "foundation"]
                 //importDeclaration.modulePath = ["skip.foundation.Logger"]
                 //importDeclaration.kotlinImportOverride = "skip.log"
             }

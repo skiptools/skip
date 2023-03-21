@@ -8,7 +8,7 @@ import Universal
 import struct Universal.JSON
 
 /// The current version of the tool
-public let skipVersion = "0.1.13"
+public let skipVersion = "0.1.14"
 
 struct Options {
     var preprocessorSymbols: [String] = []
@@ -488,11 +488,6 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         let packageName = KotlinTranslator.packageName(forModule: primaryModuleName)
         let overridden = try copyKotlinOverrides()
         let overriddenSwiftFileNames = overridden.map({ $0.basenameWithoutExt + ".swift" })
-
-        // load the merge YAML file that represents
-        let (skipConfig, configMap) = try loadSkipConfig(merge: true)
-        let _ = configMap
-
         // skip over any source file whose name would match a copied Kotlin file
         let sources = sourceFiles.map(\.sourceFile).filter { sourceFile in
             if overriddenSwiftFileNames.contains(sourceFile.name) {
@@ -503,16 +498,20 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             }
         }
 
+        // load and merge each of the skip.yml files for the dependent modules
+        let (baseSkipConfig, mergedSkipConfig, configMap) = try loadSkipConfig(merge: true)
+        let plugins: [KotlinPlugin] = try createPlugins(for: baseSkipConfig, with: configMap)
+
         #if os(macOS) || os(Linux)
         let symbols: Symbols? = try await loadSymbols()
         #else
         let symbols: Symbols? = nil
         #endif
-        let transpiler = Transpiler(sourceFiles: sources, packageName: packageName, symbols: symbols, preprocessorSymbols: Set(precheckOptions.symbols))
+        let transpiler = Transpiler(sourceFiles: sources, packageName: packageName, symbols: symbols, preprocessorSymbols: Set(precheckOptions.symbols), plugins: plugins)
 
         try await transpiler.transpile(handler: handleTranspilation)
         let sourceModules = try linkDependentModuleSources()
-        try generateGradle(for: sourceModules, with: skipConfig)
+        try generateGradle(for: sourceModules, with: mergedSkipConfig)
 
         return // everything following is a stage of the transpilation process
 
@@ -571,7 +570,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         }
 
         /// Loads the `skip.yml` config, optionally merged with the `skip.yml` of all the module dependencies
-        func loadSkipConfig(merge: Bool = true, configFileName: String = "skip.yml") throws -> (aggregate: SkipConfig, configMap: [String: SkipConfig]) {
+        func loadSkipConfig(merge: Bool = true, configFileName: String = "skip.yml") throws -> (base: SkipConfig, merged: SkipConfig, configMap: [String: SkipConfig]) {
             let configStart = Date().timeIntervalSinceReferenceDate
             let skipConfigPath = skipFolderPath.appending(component: configFileName)
             let currentModuleConfig = try loadSkipConfig(path: skipConfigPath)
@@ -583,7 +582,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             try info("loading skip.yml from \(skipConfigPath): \(currentModuleJSON.prettyJSON)", sourceFile: skipConfigPath.sourceFile)
 
             if !merge {
-                return (currentModuleConfig, configMap) // just the unmerged base YAML
+                return (currentModuleConfig, currentModuleConfig, configMap) // just the unmerged base YAML
             }
 
             // build up a merged YAML from the base dependenices to the current module
@@ -634,7 +633,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
             let configEnd = Date().timeIntervalSinceReferenceDate
             try info("created aggregate skip.yml for modules: \(moduleNamePaths.map(\.module)) config: \(aggregateJSON.canonicalJSON) (\(Int64((configEnd - configStart) * 1000)) ms)")
-            return (aggregateSkipConfig, configMap)
+            return (currentModuleConfig, aggregateSkipConfig, configMap)
         }
 
         func kotlinOutputPath(for baseSourceFileName: String) -> AbsolutePath {
@@ -769,6 +768,17 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
             return dependentModules
         }
+    }
+
+    /// Generate transpiler plug-ins from the given skip config
+    func createPlugins(for config: SkipConfig, with moduleMap: [String: SkipConfig]) throws -> [KotlinPlugin] {
+        var plugins: [KotlinPlugin] = []
+
+        if let packageName = config.skip?.package {
+            throw error("### implement package/module map plugin")
+        }
+
+        return plugins
     }
 }
 
