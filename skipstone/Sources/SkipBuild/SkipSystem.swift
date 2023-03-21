@@ -244,12 +244,20 @@ extension SkipSystem {
 
         let outputURL = URL(fileURLWithPath: "output.js", isDirectory: false, relativeTo: tmpDir)
 
-        let result = try await Process.popen(arguments: ["/usr/bin/env", "kotlinc",
+        let result = try await Process.popen(arguments: ["/usr/bin/env",
+                                                         "-P", "/opt/homebrew/bin:/usr/local/bin",
+                                                         "kotlinc",
                                                                   legacy ? "-Xuse-deprecated-legacy-compiler" : nil,
                                                                   "-output", outputURL.path,
                                                                   sourceURL.path
                                                                  ].compactMap({ $0 }), environment: env)
 
+        guard result.exitStatus == .terminated(code: 0) else {
+            struct BadExitError : LocalizedError {
+                var errorDescription: String?
+            }
+            throw try BadExitError(errorDescription: "Error (\(result.exitStatus)) from process: out: \(result.utf8Output()) err: \(result.utf8stderrOutput())")
+        }
         let _ = result
 
         defer { if cleanup { try? FileManager.default.removeItem(at: outputURL) } }

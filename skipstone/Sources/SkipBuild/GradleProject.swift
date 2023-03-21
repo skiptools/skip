@@ -1,56 +1,57 @@
 import Foundation
 import Universal
 
-/// A Gradle project, represented by a `build.gradle.kts` file.
-///
-/// https://docs.gradle.org/current/dsl/org.gradle.api.Project.html#N14DC0
-public struct GradleProject : Equatable, Codable {
-    private let gradle: GradleBlockContent
+/// Formatting output options for the gradle project
+struct GradleOutputContext {
+    /// The language to create when generating `build.gradle.kts`
+    var dsl: DSL = .kotlin
 
-    private typealias BlockOrCommand = Either<String>.Or<GradleBlock>
-
-    /// Formatting output options for the gradle project
-    public struct GradleOutputContext {
-        /// The language to create when generating `build.gradle.kts`
-        public var dsl: DSL = .kotlin
-
-        /// The supported languages for Gradle project generation
-        public enum DSL {
-            case kotlin
-            //case groovy
-        }
+    /// The supported languages for Gradle project generation
+    enum DSL {
+        case kotlin
+        //case groovy
     }
+}
+
+struct GradleBlock : Equatable, Codable {
+    var block: String?
+    var param: Either<String>.Or<[String]>?
+    var contents: [BlockOrCommand]?
+    var enabled: Bool?
+    var export: Bool?
+
+    typealias BlockOrCommand = Either<String>.Or<GradleBlock>
 
     /// Generates a `build.gradle.*` file with the specified DSL.
     public func generate(context: GradleOutputContext? = nil) -> String {
-        gradle.formatted(context: context ?? GradleOutputContext())
+        formatted(context: context ?? GradleOutputContext(), indent: 0)
     }
 
-    private struct GradleBlockContent : Equatable, Codable {
-        var name: String?
-        var contents: [BlockOrCommand]?
-
-        func formatted(context: GradleOutputContext) -> String {
-            var content = ""
-            content += format(blocks: contents, context: context, indent: 0)
-            return content
+    func formatted(context: GradleOutputContext, indent: Int) -> String {
+        if enabled == false {
+            return ""
         }
+        var content = ""
+        content += Self.format(blocks: contents, context: context, indent: indent)
+        return content
     }
 
-    private struct GradleBlock : Equatable, Codable {
-        var block: String
-        var param: Either<String>.Or<[String]>?
-        var contents: [BlockOrCommand]?
-        var enabled: Bool?
-
-        func formatted(context: GradleOutputContext, indent: Int) -> String {
-            if enabled == false {
-                return ""
+    mutating func removeContent(withExports: Bool) {
+        func mapBlock(block: BlockOrCommand) -> BlockOrCommand? {
+            switch block {
+            case .a(let string):
+                return .a(string)
+            case .b(var content):
+                if content.export == withExports {
+                    return BlockOrCommand?.none
+                } else {
+                    content.removeContent(withExports: withExports)
+                    return .b(content)
+                }
             }
-            var content = ""
-            content += format(blocks: contents, context: context, indent: indent + 4)
-            return content
         }
+
+        contents = contents?.compactMap(mapBlock)
     }
 
 
@@ -62,13 +63,17 @@ public struct GradleProject : Equatable, Codable {
         func formatBlock(_ block: GradleBlock) -> String {
             var str = ""
             str += String(repeating: " ", count: indent)
-            str += block.block
-            if let params = block.param?.map({ [$0 ]}, { $0 }).value {
-                str += "(" + params.joined(separator: ", ") + ")"
+            if let blockName = block.block {
+                str += blockName
+                if let params = block.param?.map({ [$0 ]}, { $0 }).value {
+                    str += "(" + params.joined(separator: ", ") + ")"
+                }
+                str += " {\n"
             }
-            str += " {\n"
-            str += block.formatted(context: context, indent: indent)
-            str += String(repeating: " ", count: indent) + "}\n"
+            str += block.formatted(context: context, indent: indent + 4)
+            if let _ = block.block {
+                str += String(repeating: " ", count: indent) + "}\n"
+            }
             return str
         }
 

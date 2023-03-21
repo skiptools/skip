@@ -26,7 +26,7 @@ final class SkipConfigTests: XCTestCase {
     /// build up the sample from: https://github.com/gradle/native-samples/blob/master/build.gradle.kts
     func testSimplePluginGradle() throws {
         try expectGradle(yaml: """
-        gradle:
+        build:
           contents:
             - block: 'plugins'
               contents:
@@ -40,13 +40,13 @@ final class SkipConfigTests: XCTestCase {
 
     func testMergedGradle() throws {
         try expectGradle(yaml: """
-        gradle:
+        build:
           contents:
             - block: 'plugins'
               contents:
                 - 'id("org.gradle.samples.plugin1")'
         ---
-        gradle:
+        build:
           contents:
             - block: 'plugins'
               contents:
@@ -64,7 +64,7 @@ final class SkipConfigTests: XCTestCase {
 
     func testMergedGradleMultiSection() throws {
         try expectGradle(yaml: """
-        gradle:
+        build:
           contents:
             - block: 'plugins'
               contents:
@@ -75,7 +75,7 @@ final class SkipConfigTests: XCTestCase {
                 - 'implementation("com.google.android.material:material:1.2.0")'
                 - 'implementation("androidx.constraintlayout:constraintlayout:2.0.4")'
         ---
-        gradle:
+        build:
           contents:
             # add a plugin
             - block: 'plugins'
@@ -115,7 +115,7 @@ final class SkipConfigTests: XCTestCase {
     /// build up the sample from: https://docs.gradle.org/current/userguide/third_party_integration.html#sec:embedding_quickstart
     func testSampleQuickstartGradle() throws {
         try expectGradle(yaml: """
-        gradle:
+        build:
           contents:
             - block: 'repositories'
               contents:
@@ -143,7 +143,7 @@ final class SkipConfigTests: XCTestCase {
     /// build up the sample from: https://docs.gradle.org/current/samples/sample_building_android_apps.html
     func testSampleAndroidGradle() throws {
         try expectGradle(yaml: """
-        gradle:
+        build:
           contents:
             - block: 'plugins'
               contents:
