@@ -831,18 +831,28 @@ struct Symbol {
                 i = endIndex
             case ">":
                 if inGenerics {
+                    if let type = types.last {
+                        types[types.count - 1] = type.withGenerics(genericTypes)
+                    }
+                    inGenerics = false
+                    genericTypes = []
                     i += 1
                     if i < s.count && s[i] == "?" {
                         isOptional = true
                         i += 1
                     }
+                } else {
+                    break outer
                 }
-                break outer
+            case ".":
+                let (memberType, endIndex) = typeSignature(for: s, startIndex: i + 1, specialFragments: specialFragments, symbols: symbols)
+                if let memberType, let type = types.last {
+                    types[types.count - 1] = .member(type, memberType)
+                }
+                i = endIndex
             case "?":
-                if inGenerics, let type = genericTypes.last {
-                    genericTypes[genericTypes.count - 1] = .optional(type)
-                } else if !inGenerics, let type = types.last {
-                    types[types.count - 1] = .optional(type)
+                if let type = types.last {
+                    types[types.count - 1] = type.asOptional(true)
                 }
                 i += 1
             case " ":
@@ -900,7 +910,7 @@ struct Symbol {
                 type = .void // ()
             }
         } else if !types.isEmpty {
-            type = types[0].withGenerics(genericTypes)
+            type = types[0]
             if isOptional {
                 type = type?.asOptional(true)
             }

@@ -89,8 +89,17 @@ final class SymbolsTests: XCTestCase {
 
     func testParseComplexGenericMembers() async throws {
         let context = try await symbols.context()
-        XCTAssertEqual(.optional(.tuple([nil, nil], [.array(.named("SymbolsTestsGenericClass", [.named("T", []), .named("U", [])])), .array(.dictionary(.int, .array(.named("U", []))))])), context.identifierSignature(of: "complexGenericVar", in: .named("SymbolsTestsGenericClass", [])))
-        XCTAssertEqual([.function([.init(type: .tuple([nil, nil], [.array(.int), .dictionary(.int, .string)])), .init(type: .named("SymbolsTestsGenericClass", [.named("T", []), .named("U", [])]))], .optional(.named("SymbolsTestsGenericClass", [.dictionary(.int, .named("SymbolsTestsGenericClass", [.string, .array(.int)])), .array(.named("SymbolsTestsGenericClass", [.int, .int]))])))], context.functionSignature(of: "complexGenericFunc", in: .named("SymbolsTestsGenericClass", []), arguments: [LabeledValue(value: .none), LabeledValue(value: .none)]))
+        let varType: TypeSignature = .optional(.tuple([nil, nil], [.array(.named("SymbolsTestsGenericClass", [.named("T", []), .named("U", [])])), .array(.dictionary(.int, .array(.named("U", []))))]))
+        XCTAssertEqual(varType, context.identifierSignature(of: "complexGenericVar", in: .named("SymbolsTestsGenericClass", [])))
+        XCTAssertEqual(varType, context.identifierSignature(of: "complexGenericVar2", in: .named("SymbolsTestsGenericClass", [])))
+
+        let functionType: TypeSignature = .function([.init(type: .tuple([nil, nil], [.array(.int), .dictionary(.int, .string)])), .init(type: .named("SymbolsTestsGenericClass", [.named("T", []), .named("U", [])]))], .optional(.named("SymbolsTestsGenericClass", [.dictionary(.int, .named("SymbolsTestsGenericClass", [.string, .array(.int)])), .array(.named("SymbolsTestsGenericClass", [.int, .int]))])))
+        let functionArguments: [LabeledValue<TypeSignature>] = [LabeledValue(value: .none), LabeledValue(value: .none)]
+        XCTAssertEqual([functionType], context.functionSignature(of: "complexGenericFunc", in: .named("SymbolsTestsGenericClass", []), arguments: functionArguments))
+        XCTAssertEqual([functionType], context.functionSignature(of: "complexGenericFunc2", in: .named("SymbolsTestsGenericClass", []), arguments: functionArguments))
+
+        let nestedVarType: TypeSignature = .member(.named("SymbolsTestsGenericClass", [.int, .string]), .named("NestedClass", []))
+        XCTAssertEqual(nestedVarType, context.identifierSignature(of: "symbolsTestsGenericNestedClassVar"))
     }
 
 //    func testParseGenericTypeDeclaration() async throws {
@@ -185,11 +194,22 @@ struct SymbolsTestsStruct {
 
 class SymbolsTestsGenericClass<T, U> {
     var complexGenericVar: (Array<SymbolsTestsGenericClass<T, U>>, Array<Dictionary<Int, Array<U>>>)?
+    var complexGenericVar2: ([SymbolsTestsGenericClass<T, U>], [[Int: [U]]])?
 
     func complexGenericFunc(_: (Array<Int>, Dictionary<Int, String>), _: SymbolsTestsGenericClass<T, U>) -> SymbolsTestsGenericClass<Dictionary<Int, SymbolsTestsGenericClass<String, Array<Int>>>, Array<SymbolsTestsGenericClass<Int, Int>>>? {
         return nil
     }
+    func complexGenericFunc2(_: ([Int], [Int: String]), _: SymbolsTestsGenericClass<T, U>) -> SymbolsTestsGenericClass<[Int: SymbolsTestsGenericClass<String, [Int]>], [SymbolsTestsGenericClass<Int, Int>]>? {
+        return nil
+    }
+
+    class NestedClass {
+        var n: T?
+    }
 }
+
+var symbolsTestsGenericNestedClassVar: SymbolsTestsGenericClass<Int, String>.NestedClass = .init()
+
 protocol SymbolsTestsGenericProtocol {
     associatedtype T
     func get() -> T
