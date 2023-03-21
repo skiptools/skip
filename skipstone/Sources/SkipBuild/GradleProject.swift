@@ -17,11 +17,26 @@ struct GradleBlock : Equatable, Codable {
     var block: String?
     var param: Either<String>.Or<[String]>?
     var contents: [BlockOrCommand]?
+    /// Set to `false` to disable the block
     var enabled: Bool?
+    /// When set to `false`, this block will not be included when inherited from another config
     var export: Bool?
+    /// A set of contents to remove if they are set
+    var remove: Set<String>?
 
     typealias BlockOrCommand = Either<String>.Or<GradleBlock>
 
+    func filteredContents(remove: Set<String>?) -> [BlockOrCommand] {
+        (contents ?? []).filter {
+            switch $0 {
+            case .a(let str):
+                return remove?.contains(str) != true
+            case .b:
+                return true
+            }
+        }
+
+    }
     /// Generates a `build.gradle.*` file with the specified DSL.
     public func generate(context: GradleOutputContext? = nil) -> String {
         formatted(context: context ?? GradleOutputContext(), indent: 0)
@@ -93,7 +108,8 @@ struct GradleBlock : Equatable, Codable {
                 // if a block with the same name ("block" field) exists, then update that block; otherwise, append it
                 if let index = mergedBlocks.firstIndex(where: { $0.0 == block.block }) {
                     if var fromBlock = mergedBlocks[index].boc.infer() as GradleBlock? {
-                        fromBlock.contents = (fromBlock.contents ?? []) + (block.contents ?? [])
+                        // clear any contents we have explicitly removed from a later block
+                        fromBlock.contents = (fromBlock.filteredContents(remove: block.remove)) + (block.filteredContents(remove: block.remove))
                         mergedBlocks[index].boc = .init(fromBlock)
                     }
                 } else {

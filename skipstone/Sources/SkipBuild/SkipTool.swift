@@ -8,7 +8,7 @@ import Universal
 import struct Universal.JSON
 
 /// The current version of the tool
-public let skipVersion = "0.1.12"
+public let skipVersion = "0.1.13"
 
 struct Options {
     var preprocessorSymbols: [String] = []
@@ -490,8 +490,8 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         let overriddenSwiftFileNames = overridden.map({ $0.basenameWithoutExt + ".swift" })
 
         // load the merge YAML file that represents
-        let (baseSkipConfig, mergedSkipConfig, configMap) = try loadSkipConfig(merge: true)
-        let skipConfig = mergedSkipConfig ?? baseSkipConfig
+        let (skipConfig, configMap) = try loadSkipConfig(merge: true)
+        let _ = configMap
 
         // skip over any source file whose name would match a copied Kotlin file
         let sources = sourceFiles.map(\.sourceFile).filter { sourceFile in
@@ -571,7 +571,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         }
 
         /// Loads the `skip.yml` config, optionally merged with the `skip.yml` of all the module dependencies
-        func loadSkipConfig(merge: Bool = true, configFileName: String = "skip.yml") throws -> (base: SkipConfig, aggregate: SkipConfig?, configMap: [String: SkipConfig]) {
+        func loadSkipConfig(merge: Bool = true, configFileName: String = "skip.yml") throws -> (aggregate: SkipConfig, configMap: [String: SkipConfig]) {
             let configStart = Date().timeIntervalSinceReferenceDate
             let skipConfigPath = skipFolderPath.appending(component: configFileName)
             let currentModuleConfig = try loadSkipConfig(path: skipConfigPath)
@@ -583,11 +583,11 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             try info("loading skip.yml from \(skipConfigPath): \(currentModuleJSON.prettyJSON)", sourceFile: skipConfigPath.sourceFile)
 
             if !merge {
-                return (currentModuleConfig, nil, configMap) // just the unmerged base YAML
+                return (currentModuleConfig, configMap) // just the unmerged base YAML
             }
 
             // build up a merged YAML from the base dependenices to the current module
-            var aggregateConfig: Universal.JSON = [:]
+            var aggregateJSON: Universal.JSON = [:]
 
             for (moduleName, modulePath) in moduleNamePaths {
                 info("moduleName: \(moduleName) modulePath: \(modulePath)")
@@ -597,18 +597,15 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
                 let moduleSkipConfigPath = moduleSkipBasePath.appending(component: configFileName)
 
                 if fs.isFile(moduleSkipConfigPath) {
-                    var moduleConfig = try loadSkipConfig(path: moduleSkipConfigPath)
-                    configMap[moduleName] = moduleConfig
-                    info("parsed skip.yml for module: \(moduleName) path: \(modulePath) config: \(moduleConfig)", sourceFile: moduleSkipConfigPath.sourceFile)
+                    let moduleConfig = try loadSkipConfig(path: moduleSkipConfigPath)
+                    configMap[moduleName] = moduleConfig // remember the raw config for use in configuring transpiler plug-ins
 
-                    // clear the blocks that are excluded from export
-                    moduleConfig.build?.removeContent(withExports: false)
-                    moduleConfig.settings?.removeContent(withExports: false)
-                    aggregateConfig = try aggregateConfig.merged(with: moduleConfig.json())
+                    info("parsed skip.yml for module: \(moduleName) path: \(modulePath) config: \(moduleConfig)", sourceFile: moduleSkipConfigPath.sourceFile)
+                    aggregateJSON = try aggregateJSON.merged(with: moduleConfig.json())
                 }
             }
 
-            aggregateConfig = try aggregateConfig.merged(with: currentModuleJSON)
+            aggregateJSON = try aggregateJSON.merged(with: currentModuleJSON)
 
             // finally, merge with a manually constructed SkipConfig that contains references to the modules this module depends on
             do {
@@ -626,15 +623,18 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
                     }
                 }
 
-                var localConfig = GradleBlock(contents: [.init(GradleBlock(block: "dependencies", contents: contents))])
-                aggregateConfig = try aggregateConfig.merged(with: JSON.object(["build": localConfig.json()]))
+                let localConfig = GradleBlock(contents: [.init(GradleBlock(block: "dependencies", contents: contents))])
+                aggregateJSON = try aggregateJSON.merged(with: JSON.object(["build": localConfig.json()]))
             }
 
-            let aggregateSkipConfig: SkipConfig = try aggregateConfig.decode()
+            var aggregateSkipConfig: SkipConfig = try aggregateJSON.decode()
+            // clear exports and perform final item removal
+            aggregateSkipConfig.build?.removeContent(withExports: true)
+            aggregateSkipConfig.settings?.removeContent(withExports: true)
 
             let configEnd = Date().timeIntervalSinceReferenceDate
-            try info("created aggregate skip.yml for modules: \(moduleNamePaths.map(\.module)) config: \(aggregateConfig.canonicalJSON) (\(Int64((configEnd - configStart) * 1000)) ms)")
-            return (currentModuleConfig, aggregateSkipConfig, configMap)
+            try info("created aggregate skip.yml for modules: \(moduleNamePaths.map(\.module)) config: \(aggregateJSON.canonicalJSON) (\(Int64((configEnd - configStart) * 1000)) ms)")
+            return (aggregateSkipConfig, configMap)
         }
 
         func kotlinOutputPath(for baseSourceFileName: String) -> AbsolutePath {
@@ -687,7 +687,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
             let (outputFile, changed) = try saveTranspilation()
 
-            info("transpiled: \(outputFile.basename) (\(Self.byteCount(for: transpilation.output.content.utf8.count))\(!changed ? " [unchanged]" : "")) (\(Int64(transpilation.duration * 1000)) ms)", sourceFile: Source.File(path: outputFile))
+            info("transpiled: \(outputFile.basename) (\(Self.byteCount(for: transpilation.output.content.utf8.count)))\(!changed ? " [unchanged]" : "") (\(Int64(transpilation.duration * 1000)) ms)", sourceFile: Source.File(path: outputFile))
 
             for message in transpilation.messages {
                 //writeMessage(message)
