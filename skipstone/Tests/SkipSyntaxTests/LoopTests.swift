@@ -88,7 +88,7 @@ final class LoopTests: XCTestCase {
         }
         """, kotlin: """
         internal val e: LoopTestsAssociatedValueEnum
-        while (e is LoopTestsAssociatedValueEnum.case2) {
+        while (e is LoopTestsAssociatedValueEnum.case2case) {
             val i = e.associated0
             print(i)
         }

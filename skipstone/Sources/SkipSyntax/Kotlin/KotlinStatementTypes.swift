@@ -663,13 +663,13 @@ class KotlinClassDeclaration: KotlinStatement {
     }
     var isSealedClassesEnum: Bool {
         get {
-            return _isSealedClassesEnum || members.contains { ($0 as? KotlinEnumCaseDeclaration)?.associatedValues.isEmpty == false }
+            return forceSealedClassesEnum || members.contains { ($0 as? KotlinEnumCaseDeclaration)?.associatedValues.isEmpty == false }
         }
         set {
-            _isSealedClassesEnum = newValue
+            forceSealedClassesEnum = newValue
         }
     }
-    private var _isSealedClassesEnum = false
+    private var forceSealedClassesEnum = false
 
     static func translate(statement: TypeDeclaration, translator: KotlinTranslator) -> KotlinClassDeclaration {
         let kstatement = KotlinClassDeclaration(statement: statement)
@@ -715,6 +715,7 @@ class KotlinClassDeclaration: KotlinStatement {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
+        let isSealedClassesEnum = isSealedClassesEnum
         output.append(indentation)
         if let declaration = extras?.declaration {
             output.append(declaration)
@@ -796,10 +797,17 @@ class KotlinClassDeclaration: KotlinStatement {
         }
 
         // Always add a companion object to public types in case another module extends it with static members
-        if !staticMembers.isEmpty || modifiers.visibility == .public || modifiers.visibility == .open {
+        if !staticMembers.isEmpty || modifiers.visibility == .public || modifiers.visibility == .open || isSealedClassesEnum {
             output.append("\n")
             output.append(memberIndentation).append("companion object {\n")
-            staticMembers.forEach { output.append($0, indentation: memberIndentation.inc()) }
+            let companionMemberIndentation = memberIndentation.inc()
+            if isSealedClassesEnum {
+                enumCases.forEach { $0.appendSealedClassFactory(to: output, forEnum: name, forced: forceSealedClassesEnum, indentation: companionMemberIndentation) }
+                if !staticMembers.isEmpty {
+                    output.append("\n")
+                }
+            }
+            staticMembers.forEach { output.append($0, indentation: companionMemberIndentation) }
             output.append(memberIndentation).append("}\n")
         }
         output.append(indentation).append("}\n")
@@ -839,6 +847,11 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
     var rawValue: KotlinExpression?
     var isLastDeclaration = false
 
+    /// Return the name of the sealed class we create for the given enum case name in an enum with associated values.
+    static func sealedClassName(for caseName: String) -> String {
+        return caseName + "case"
+    }
+
     static func translate(statement: EnumCaseDeclaration, translator: KotlinTranslator) -> KotlinEnumCaseDeclaration {
         let kstatement = KotlinEnumCaseDeclaration(statement: statement)
         kstatement.associatedValues = statement.associatedValues.map { $0.translate(translator: translator) }
@@ -877,26 +890,9 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
         if let declaration = extras?.declaration {
             output.append(declaration)
         } else if let owningClassDeclaration = parent as? KotlinClassDeclaration, owningClassDeclaration.isSealedClassesEnum {
-            output.append("class \(name)")
-            var propertyDeclarations: [String] = []
+            output.append("class \(Self.sealedClassName(for: name))")
             if !associatedValues.isEmpty {
-               output.append("(")
-               for (index, value) in associatedValues.enumerated() {
-                   if let label = value.externalLabel {
-                       output.append(label).append(": ")
-                       propertyDeclarations.append("val associated\(index) = \(label)")
-                   } else {
-                       output.append("val associated\(index): ")
-                   }
-                   output.append(value.declaredType.or(.any).kotlin)
-                   if let defaultValue = value.defaultValue {
-                       output.append(" = ").append(defaultValue, indentation: indentation)
-                   }
-                   if index != associatedValues.count - 1 {
-                       output.append(", ")
-                   }
-               }
-               output.append(")")
+                appendAssociatedValueArguments(to: output, asConstructor: true, indentation: indentation)
             }
             output.append(": \(owningClassDeclaration.name)")
             if let rawValue {
@@ -904,7 +900,11 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
             } else {
                 output.append("() {\n")
             }
-            propertyDeclarations.forEach { output.append(indentation.inc()).append($0).append("\n") }
+            for (index, value) in associatedValues.enumerated() {
+                if let label = value.externalLabel {
+                    output.append(indentation.inc()).append("val \(label) = associated\(index)\n")
+                }
+            }
             output.append(indentation).append("}\n")
         } else {
             output.append(name)
@@ -917,6 +917,54 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
                 output.append(",\n")
             }
         }
+    }
+
+    func appendSealedClassFactory(to output: OutputGenerator, forEnum: String, forced: Bool, indentation: Indentation) {
+        output.append(indentation)
+        // For cases where the sealed class enum is forced, we always create a new instance b/c we assume some transient state may be added,
+        // e.g. the stack trace in the case of Error enums
+        if associatedValues.isEmpty && !forced {
+            output.append("val \(name): \(forEnum) = \(Self.sealedClassName(for: name))()\n")
+        } else {
+            output.append("fun \(name)")
+            appendAssociatedValueArguments(to: output, asConstructor: false, indentation: indentation)
+            output.append(": \(forEnum) {\n")
+            output.append(indentation.inc()).append("return \(Self.sealedClassName(for: name))(")
+            for (index, value) in associatedValues.enumerated() {
+                if let label = value.externalLabel {
+                    output.append(label)
+                } else {
+                    output.append("associated\(index)")
+                }
+                if index != associatedValues.count - 1 {
+                    output.append(", ")
+                }
+            }
+            output.append(")\n")
+            output.append(indentation).append("}\n")
+        }
+    }
+
+    private func appendAssociatedValueArguments(to output: OutputGenerator, asConstructor: Bool, indentation: Indentation) {
+        output.append("(")
+        for (index, value) in associatedValues.enumerated() {
+            if !asConstructor, let label = value.externalLabel {
+                output.append(label).append(": ")
+            } else {
+                if asConstructor {
+                    output.append("val ")
+                }
+                output.append("associated\(index): ")
+            }
+            output.append(value.declaredType.or(.any).kotlin)
+            if !asConstructor, let defaultValue = value.defaultValue {
+                output.append(" = ").append(defaultValue, indentation: indentation)
+            }
+            if index != associatedValues.count - 1 {
+                output.append(", ")
+            }
+        }
+        output.append(")")
     }
 }
 

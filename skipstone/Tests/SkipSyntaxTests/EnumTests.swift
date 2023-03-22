@@ -100,9 +100,16 @@ final class EnumTests: XCTestCase {
         }
         """, kotlin: """
         internal sealed class E {
-            class a: E() {
+            class acase: E() {
             }
-            class b(val associated0: Int = 1, val associated1: String): E() {
+            class bcase(val associated0: Int, val associated1: String): E() {
+            }
+
+            companion object {
+                val a: E = acase()
+                fun b(associated0: Int = 1, associated1: String): E {
+                    return bcase(associated0, associated1)
+                }
             }
         }
         """)
@@ -116,10 +123,17 @@ final class EnumTests: XCTestCase {
         }
         """, kotlin: """
         internal sealed class E {
-            class a: E() {
+            class acase: E() {
             }
-            class b(i: Int = 1, val associated1: String): E() {
-                val associated0 = i
+            class bcase(val associated0: Int, val associated1: String): E() {
+                val i = associated0
+            }
+
+            companion object {
+                val a: E = acase()
+                fun b(i: Int = 1, associated1: String): E {
+                    return bcase(i, associated1)
+                }
             }
         }
         """)
@@ -146,7 +160,7 @@ final class EnumTests: XCTestCase {
         """, kotlin: """
         internal fun f() {
             enumTestsAssociatedValueEnumFunc(e = EnumTestsAssociatedValueEnum.a(100))
-            enumTestsAssociatedValueEnumFunc(e = EnumTestsAssociatedValueEnum.b())
+            enumTestsAssociatedValueEnumFunc(e = EnumTestsAssociatedValueEnum.b)
         }
         """)
     }

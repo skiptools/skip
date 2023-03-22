@@ -246,65 +246,38 @@ struct KotlinCasePattern {
         var value: KotlinExpression?
         var op = Operator.with(symbol: isSealedClassesEnum ? "is" : "==")
         switch expression.value.type {
-        case .binding:
-            if let binding = expression.value as? Binding {
-                // case let x
+        case .binaryOperator:
+            // case let x as Type or case x in range
+            let binaryOperator = expression.value as! BinaryOperator
+            if binaryOperator.op.symbol == "as", let binding = binaryOperator.lhs as? Binding {
+                op = Operator.with(symbol: "is")
+                value = translator.translateExpression(binaryOperator.rhs)
+
                 let identifierPatterns = binding.identifierPatterns
                 let variableTypes = binding.variableTypes
                 updateVariables(for: identifierPatterns, types: variableTypes)
-                if expression.isNonNilMatch {
-                    op = .with(symbol: "!=")
-                    value = KotlinNullLiteral()
-                } else {
-                    value = nil
-                }
             } else {
-                value = translator.translateExpression(expression.value)
-            }
-        case .binaryOperator:
-            if let binaryOperator = expression.value as? BinaryOperator {
-                // case let x as Type
-                if binaryOperator.op.symbol == "as", let binding = binaryOperator.lhs as? Binding {
-                    op = Operator.with(symbol: "is")
-                    value = translator.translateExpression(binaryOperator.rhs)
-        
-                    let identifierPatterns = binding.identifierPatterns
-                    let variableTypes = binding.variableTypes
-                    updateVariables(for: identifierPatterns, types: variableTypes)
-                } else {
-                    if binaryOperator.op.precedence == .range {
-                        op = Operator.with(symbol: "in")
-                    }
-                    value = translator.translateExpression(expression.value)
-                }
-            } else {
-                value = translator.translateExpression(expression.value)
-            }
-        case .prefixOperator:
-            if let prefixOperator = expression.value as? PrefixOperator {
-                if prefixOperator.operatorSymbol == "..<" || prefixOperator.operatorSymbol == "..." {
-                    // case ..<x
+                if binaryOperator.op.precedence == .range {
                     op = Operator.with(symbol: "in")
-                    value = translator.translateExpression(expression.value)
-                } else if prefixOperator.operatorSymbol == "is" {
-                    // case is x
-                    op = Operator.with(symbol: "is")
-                    value = translator.translateExpression(prefixOperator.target)
-                } else {
-                    value = translator.translateExpression(expression.value)
                 }
-            } else {
                 value = translator.translateExpression(expression.value)
             }
-        case .postfixOperator:
-            value = translator.translateExpression(expression.value)
-            // case x...
-            if let postfixOperator = expression.value as? PostfixOperator, postfixOperator.operatorSymbol == "..." {
-                op = Operator.with(symbol: "in")
+        case .binding:
+            // case let x
+            let binding = expression.value as! Binding
+            let identifierPatterns = binding.identifierPatterns
+            let variableTypes = binding.variableTypes
+            updateVariables(for: identifierPatterns, types: variableTypes)
+            if expression.isNonNilMatch {
+                op = .with(symbol: "!=")
+                value = KotlinNullLiteral()
+            } else {
+                value = nil
             }
         case .functionCall:
             // case .enum(let value)
-            if let functionCall = expression.value as? FunctionCall, functionCall.function.type == .memberAccess {
+            let functionCall = expression.value as! FunctionCall
+            if functionCall.function.type == .memberAccess {
                 var hasBindings = false
                 var hasNonBindings = false
                 for (index, argument) in functionCall.arguments.enumerated() {
@@ -319,6 +292,10 @@ struct KotlinCasePattern {
                 }
                 if hasBindings {
                     value = translator.translateExpression(functionCall.function)
+                    if isSealedClassesEnum, let memberAccess = value as? KotlinMemberAccess {
+                        // Change 'is .a' to 'is .acase' to match our sealed class names
+                        memberAccess.member = KotlinEnumCaseDeclaration.sealedClassName(for: memberAccess.member)
+                    }
                     if hasNonBindings {
                         messages.append(.kotlinWhenCasePartialBinding(functionCall))
                     }
@@ -328,33 +305,55 @@ struct KotlinCasePattern {
             } else {
                 value = translator.translateExpression(expression.value)
             }
+        case .memberAccess:
+            value = translator.translateExpression(expression.value)
+            if isSealedClassesEnum, let memberAccess = value as? KotlinMemberAccess {
+                // Change 'is .a' to 'is .acase' to match our sealed class names
+                memberAccess.member = KotlinEnumCaseDeclaration.sealedClassName(for: memberAccess.member)
+            }
+        case .postfixOperator:
+            value = translator.translateExpression(expression.value)
+            // case x...
+            if (expression.value as! PostfixOperator).operatorSymbol == "..." {
+                op = Operator.with(symbol: "in")
+            }
+        case .prefixOperator:
+            let prefixOperator = expression.value as! PrefixOperator
+            if prefixOperator.operatorSymbol == "..<" || prefixOperator.operatorSymbol == "..." {
+                // case ..<x
+                op = Operator.with(symbol: "in")
+                value = translator.translateExpression(expression.value)
+            } else if prefixOperator.operatorSymbol == "is" {
+                // case is x
+                op = Operator.with(symbol: "is")
+                value = translator.translateExpression(prefixOperator.target)
+            } else {
+                value = translator.translateExpression(expression.value)
+            }
         case .tupleLiteral:
             // case let (x, y)
-            if let tupleLiteral = expression.value as? TupleLiteral {
-                var hasBindings = false
-                var hasNonBindings = false
-                for (index, (label, tupleValue)) in zip(tupleLiteral.labels, tupleLiteral.values).enumerated() {
-                    guard let binding = tupleValue as? Binding else {
-                        hasNonBindings = true
-                        continue
-                    }
-                    hasBindings = true
-                    let identifierPatterns = binding.identifierPatterns
-                    let variableTypes = binding.variableTypes
-                    updateVariables(for: identifierPatterns, types: variableTypes, member: label ?? KotlinTupleLiteral.member(index: index))
+            let tupleLiteral = expression.value as! TupleLiteral
+            var hasBindings = false
+            var hasNonBindings = false
+            for (index, (label, tupleValue)) in zip(tupleLiteral.labels, tupleLiteral.values).enumerated() {
+                guard let binding = tupleValue as? Binding else {
+                    hasNonBindings = true
+                    continue
                 }
-                if hasBindings {
-                    if expression.isNonNilMatch {
-                        op = .with(symbol: "!=")
-                        value = KotlinNullLiteral()
-                    } else {
-                        value = nil
-                    }
-                    if hasNonBindings {
-                        messages.append(.kotlinWhenCasePartialBinding(tupleLiteral))
-                    }
+                hasBindings = true
+                let identifierPatterns = binding.identifierPatterns
+                let variableTypes = binding.variableTypes
+                updateVariables(for: identifierPatterns, types: variableTypes, member: label ?? KotlinTupleLiteral.member(index: index))
+            }
+            if hasBindings {
+                if expression.isNonNilMatch {
+                    op = .with(symbol: "!=")
+                    value = KotlinNullLiteral()
                 } else {
-                    value = translator.translateExpression(expression.value)
+                    value = nil
+                }
+                if hasNonBindings {
+                    messages.append(.kotlinWhenCasePartialBinding(tupleLiteral))
                 }
             } else {
                 value = translator.translateExpression(expression.value)

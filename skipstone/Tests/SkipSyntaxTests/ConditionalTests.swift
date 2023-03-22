@@ -492,7 +492,7 @@ final class ConditionalTests: XCTestCase {
         }
         """, kotlin: """
         internal fun f(e: ConditionalTestsAssociatedValueEnum) {
-            if (e is ConditionalTestsAssociatedValueEnum.case2) {
+            if (e is ConditionalTestsAssociatedValueEnum.case2case) {
                 print("A")
             }
         }
@@ -506,7 +506,7 @@ final class ConditionalTests: XCTestCase {
         }
         """, kotlin: """
         internal fun f(e: ConditionalTestsAssociatedValueEnum) {
-            if (e is ConditionalTestsAssociatedValueEnum.case2) {
+            if (e is ConditionalTestsAssociatedValueEnum.case2case) {
                 val s = e.associated1
                 print(s)
             }
@@ -521,7 +521,7 @@ final class ConditionalTests: XCTestCase {
         }
         """, kotlin: """
         internal fun f(e: ConditionalTestsAssociatedValueEnum) {
-            if (e is ConditionalTestsAssociatedValueEnum.case1) {
+            if (e is ConditionalTestsAssociatedValueEnum.case1case) {
                 var num = e.d
                 print(num)
             }
@@ -536,7 +536,7 @@ final class ConditionalTests: XCTestCase {
             print("case2")
         }
         """, kotlin: """
-        if (conditionalTestsAssociatedValueEnumFactory() is ConditionalTestsAssociatedValueEnum.case2) {
+        if (conditionalTestsAssociatedValueEnumFactory() is ConditionalTestsAssociatedValueEnum.case2case) {
             print("case2")
         }
         """)
@@ -547,7 +547,7 @@ final class ConditionalTests: XCTestCase {
         }
         """, kotlin: """
         val matchtarget_0 = conditionalTestsAssociatedValueEnumFactory()
-        if (matchtarget_0 is ConditionalTestsAssociatedValueEnum.case2) {
+        if (matchtarget_0 is ConditionalTestsAssociatedValueEnum.case2case) {
             val i = matchtarget_0.associated0
             print(i)
         }
@@ -570,7 +570,7 @@ final class ConditionalTests: XCTestCase {
         internal val e: ConditionalTestsAssociatedValueEnum
         if (i != null) {
             print(i)
-        } else if (e is ConditionalTestsAssociatedValueEnum.case2) {
+        } else if (e is ConditionalTestsAssociatedValueEnum.case2case) {
             val s = e.associated1
             print(s)
         } else {
@@ -594,7 +594,7 @@ final class ConditionalTests: XCTestCase {
         } else {
             var letexec_0 = false
             val matchtarget_0 = conditionalTestsAssociatedValueEnumFactory()
-            if (matchtarget_0 is ConditionalTestsAssociatedValueEnum.case2) {
+            if (matchtarget_0 is ConditionalTestsAssociatedValueEnum.case2case) {
                 val i = matchtarget_0.associated0
                 val s = matchtarget_0.associated1
                 if (i > 1) {
@@ -620,7 +620,7 @@ final class ConditionalTests: XCTestCase {
         var letexec_0 = false
         i?.let { x ->
             val matchtarget_0 = conditionalTestsAssociatedValueEnumFactory()
-            if (matchtarget_0 is ConditionalTestsAssociatedValueEnum.case2) {
+            if (matchtarget_0 is ConditionalTestsAssociatedValueEnum.case2case) {
                 val i = matchtarget_0.associated0
                 letexec_0 = true
                 print(x + i)
@@ -866,7 +866,7 @@ final class ConditionalTests: XCTestCase {
         print(s)
         """, kotlin: """
         val matchtarget_0 = conditionalTestsAssociatedValueEnumFactory()
-        if (matchtarget_0 !is ConditionalTestsAssociatedValueEnum.case2) {
+        if (matchtarget_0 !is ConditionalTestsAssociatedValueEnum.case2case) {
             print("no")
             return
         }
@@ -884,7 +884,7 @@ final class ConditionalTests: XCTestCase {
         print(s)
         """, kotlin: """
         val matchtarget_0 = conditionalTestsAssociatedValueEnumFactory()
-        if (matchtarget_0 !is ConditionalTestsAssociatedValueEnum.case2) {
+        if (matchtarget_0 !is ConditionalTestsAssociatedValueEnum.case2case) {
             print("no")
             return
         }

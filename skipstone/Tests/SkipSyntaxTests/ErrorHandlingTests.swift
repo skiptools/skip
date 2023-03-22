@@ -142,9 +142,9 @@ final class ErrorHandlingTests: XCTestCase {
         try {
             action1()
             action2()
-        } catch (error: DoCatchTestsErrorEnum.case1) {
+        } catch (error: DoCatchTestsErrorEnum.case1case) {
             print("case1")
-        } catch (error: DoCatchTestsErrorEnum.case2) {
+        } catch (error: DoCatchTestsErrorEnum.case2case) {
             print("case2")
         }
         """)
@@ -164,10 +164,10 @@ final class ErrorHandlingTests: XCTestCase {
         try {
             action1()
             action2()
-        } catch (error: DoCatchTestsErrorAssociatedValueEnum.case1) {
+        } catch (error: DoCatchTestsErrorAssociatedValueEnum.case1case) {
             val code = error.associated0
             print("Caught error: ${code}")
-        } catch (error: DoCatchTestsErrorAssociatedValueEnum.case2) {
+        } catch (error: DoCatchTestsErrorAssociatedValueEnum.case2case) {
             var message = error.associated1
             print("Caught error: ${message}")
         }
@@ -190,9 +190,9 @@ final class ErrorHandlingTests: XCTestCase {
             action2()
         } catch (error: DoCatchTestsErrorStruct) {
             print("Caught error")
-        } catch (error: DoCatchTestsErrorAssociatedValueEnum.case1) {
+        } catch (error: DoCatchTestsErrorAssociatedValueEnum.case1case) {
             print("Caught error")
-        } catch (error: DoCatchTestsErrorAssociatedValueEnum.case2) {
+        } catch (error: DoCatchTestsErrorAssociatedValueEnum.case2case) {
             val code = error.associated0
             val message = error.associated1
             print("Caught error: ${code}: ${message}")
@@ -318,9 +318,18 @@ final class ErrorHandlingTests: XCTestCase {
         }
         """, kotlin: """
         internal sealed class E: Throwable(), Error {
-            class error1: E() {
+            class error1case: E() {
             }
-            class error2: E() {
+            class error2case: E() {
+            }
+
+            companion object {
+                fun error1(): E {
+                    return error1case()
+                }
+                fun error2(): E {
+                    return error2case()
+                }
             }
         }
         """)
@@ -332,9 +341,18 @@ final class ErrorHandlingTests: XCTestCase {
         }
         """, kotlin: """
         internal sealed class E(val rawValue: Int): Throwable(), Error {
-            class error1: E(2) {
+            class error1case: E(2) {
             }
-            class error2: E(3) {
+            class error2case: E(3) {
+            }
+
+            companion object {
+                fun error1(): E {
+                    return error1case()
+                }
+                fun error2(): E {
+                    return error2case()
+                }
             }
         }
         """)

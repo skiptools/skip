@@ -133,11 +133,11 @@ final class SwitchTests: XCTestCase {
         """, kotlin: """
         internal val e = switchTestsAssociatedValueEnumFactory()
         when (e) {
-            is SwitchTestsAssociatedValueEnum.case1 -> {
+            is SwitchTestsAssociatedValueEnum.case1case -> {
                 val dvalue = e.d
                 print(dvalue == Double.zero)
             }
-            is SwitchTestsAssociatedValueEnum.case2 -> {
+            is SwitchTestsAssociatedValueEnum.case2case -> {
                 var s = e.associated1
                 s += "..."
                 print(s)
@@ -157,11 +157,11 @@ final class SwitchTests: XCTestCase {
         """, kotlin: """
         val matchtarget_0 = switchTestsAssociatedValueEnumFactory()
         when (matchtarget_0) {
-            is SwitchTestsAssociatedValueEnum.case1 -> {
+            is SwitchTestsAssociatedValueEnum.case1case -> {
                 val dvalue = matchtarget_0.d
                 print(dvalue == Double.zero)
             }
-            is SwitchTestsAssociatedValueEnum.case2 -> {
+            is SwitchTestsAssociatedValueEnum.case2case -> {
                 var s = matchtarget_0.associated1
                 s += "..."
                 print(s)
