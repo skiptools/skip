@@ -1465,11 +1465,7 @@ class KotlinStringLiteral: KotlinExpression {
                 //output.append(string.replacing("$", with: "\\$")) // macOS 13+
                 output.append(string.split(separator: "$").joined(separator: "\\$"))
             case .expression(let expression):
-                if let identifier = expression as? KotlinIdentifier {
-                    output.append("$").append(identifier, indentation: indentation)
-                } else {
-                    output.append("${").append(expression, indentation: indentation).append("}")
-                }
+                output.append("${").append(expression, indentation: indentation).append("}")
             }
         }
         output.append(delimiter)

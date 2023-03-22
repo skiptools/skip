@@ -130,7 +130,7 @@ final class ConstructorTests: XCTestCase {
                 this.s = s
             }
         
-            internal constructor(both: Int): this(both, s = "$both") {
+            internal constructor(both: Int): this(both, s = "${both}") {
             }
         }
         

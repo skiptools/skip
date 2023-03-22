@@ -38,13 +38,13 @@ final class LiteralTests: XCTestCase {
         try await check(swift: """
         "i = \\(i)"
         """, kotlin: """
-        "i = $i"
+        "i = ${i}"
         """)
 
         try await check(swift: """
-        "It costs $x"
+        "It costs ${x}"
         """, kotlin: """
-        "It costs \\$x"
+        "It costs \\${x}"
         """)
     }
 

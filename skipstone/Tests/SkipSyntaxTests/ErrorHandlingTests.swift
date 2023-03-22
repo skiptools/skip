@@ -50,7 +50,7 @@ final class ErrorHandlingTests: XCTestCase {
             action2()
             throw DoCatchTestsErrorStruct()
         } catch (error: Throwable) {
-            print("Caught error: $error")
+            print("Caught error: ${error}")
         }
         """)
     }
@@ -69,7 +69,7 @@ final class ErrorHandlingTests: XCTestCase {
             action1()
             action2()
         } catch (error: DoCatchTestsErrorStruct) {
-            print("Caught error: $error")
+            print("Caught error: ${error}")
         } catch (error: Throwable) {
         }
         """)
@@ -89,7 +89,7 @@ final class ErrorHandlingTests: XCTestCase {
             action1()
             action2()
         } catch (e: DoCatchTestsErrorStruct) {
-            print("Caught error: $e")
+            print("Caught error: ${e}")
         } catch (error: Throwable) {
         }
         """)
@@ -106,7 +106,7 @@ final class ErrorHandlingTests: XCTestCase {
             action1()
             action2()
         } catch (error: DoCatchTestsErrorStruct) {
-            print("Caught error: $error")
+            print("Caught error: ${error}")
         }
         """)
 
@@ -123,7 +123,7 @@ final class ErrorHandlingTests: XCTestCase {
             action2()
         } catch (error: DoCatchTestsErrorStruct) {
             var error = error
-            print("Caught error: $error")
+            print("Caught error: ${error}")
         }
         """)
     }
@@ -166,10 +166,10 @@ final class ErrorHandlingTests: XCTestCase {
             action2()
         } catch (error: DoCatchTestsErrorAssociatedValueEnum.case1) {
             val code = error.associated0
-            print("Caught error: $code")
+            print("Caught error: ${code}")
         } catch (error: DoCatchTestsErrorAssociatedValueEnum.case2) {
             var message = error.associated1
-            print("Caught error: $message")
+            print("Caught error: ${message}")
         }
         """)
     }
@@ -195,7 +195,7 @@ final class ErrorHandlingTests: XCTestCase {
         } catch (error: DoCatchTestsErrorAssociatedValueEnum.case2) {
             val code = error.associated0
             val message = error.associated1
-            print("Caught error: $code: $message")
+            print("Caught error: ${code}: ${message}")
         }
         """)
     }
@@ -218,7 +218,7 @@ final class ErrorHandlingTests: XCTestCase {
             }
             action2()
         } catch (error: Throwable) {
-            print("Caught error: $error")
+            print("Caught error: ${error}")
         } finally {
             deferaction_0?.invoke()
         }
@@ -258,7 +258,7 @@ final class ErrorHandlingTests: XCTestCase {
                 try {
                     i += 1
                 } catch (error: Throwable) {
-                    print("Caught error $error")
+                    print("Caught error ${error}")
                 } finally {
                     didmutate()
                 }
@@ -270,7 +270,7 @@ final class ErrorHandlingTests: XCTestCase {
                     try {
                         i += 1
                     } catch (error: Throwable) {
-                        print("Caught error $error")
+                        print("Caught error ${error}")
                     }
                 } finally {
                     didmutate()
