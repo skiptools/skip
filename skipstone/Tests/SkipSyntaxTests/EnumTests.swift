@@ -125,5 +125,45 @@ final class EnumTests: XCTestCase {
         """)
     }
 
+    func testEnumUse() async throws {
+        try await check(symbols: symbols, swift: """
+        func f() {
+            enumTestsEnumFunc(e: .a)
+            enumTestsEnumFunc(e: .b)
+        }
+        """, kotlin: """
+        internal fun f() {
+            enumTestsEnumFunc(e = EnumTestsEnum.a)
+            enumTestsEnumFunc(e = EnumTestsEnum.b)
+        }
+        """)
+
+        try await check(symbols: symbols, swift: """
+        func f() {
+            enumTestsAssociatedValueEnumFunc(e: .a(100))
+            enumTestsAssociatedValueEnumFunc(e: .b)
+        }
+        """, kotlin: """
+        internal fun f() {
+            enumTestsAssociatedValueEnumFunc(e = EnumTestsAssociatedValueEnum.a(100))
+            enumTestsAssociatedValueEnumFunc(e = EnumTestsAssociatedValueEnum.b())
+        }
+        """)
+    }
+
     // TODO: Automatic Equatable for enums without associated values converted to sealed classes... other enums too?
+}
+
+enum EnumTestsEnum {
+    case a
+    case b
+}
+func enumTestsEnumFunc(e: EnumTestsEnum) {
+}
+
+enum EnumTestsAssociatedValueEnum {
+    case a(Int)
+    case b
+}
+func enumTestsAssociatedValueEnumFunc(e: EnumTestsAssociatedValueEnum) {
 }
