@@ -80,6 +80,9 @@ extension XCTestCase {
             if !transpilation.messages.isEmpty && !expectFailure {
                 XCTFail("Transpilation produced unexpected messages: \(messagesString)")
             }
+            if expectFailure {
+                XCTExpectFailure()
+            }
             XCTAssertEqual(kotlin.trimmingCharacters(in: .whitespacesAndNewlines), content.trimmingCharacters(in: .whitespacesAndNewlines), messagesString, file: file, line: line)
         }
     }

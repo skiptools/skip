@@ -57,6 +57,10 @@ extension Message {
         return Message(kind: .error, message: "Cannot use an extension to add additional protocols to a Kotlin type defined outside of this module", sourceDerived: sourceDerived)
     }
 
+    static func kotlinExtensionForConstrainedGenericImplementMember(_ sourceDerived: SourceDerived) -> Message {
+        return Message(kind: .error, message: "Kotlin protocol extensions for a particular generic type can add properties and functions but cannot be used to implement requirements of the protocol", sourceDerived: sourceDerived)
+    }
+
     static func kotlinExtensionUnsupportedMember(_ sourceDerived: SourceDerived) -> Message {
         return Message(kind: .error, message: "This declaration is not supported in a Kotlin extension", sourceDerived: sourceDerived)
     }

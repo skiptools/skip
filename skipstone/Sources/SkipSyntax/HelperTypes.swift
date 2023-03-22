@@ -341,7 +341,7 @@ struct Generics {
 
     /// Decode the generics information in the given syntax.
     static func `for`(syntax: GenericParameterClauseSyntax?, associatedTypeSyntax: [AssociatedtypeDeclSyntax] = [], where whereSyntax: GenericWhereClauseSyntax? = nil, in syntaxTree: SyntaxTree) -> (Generics, [Message]) {
-        if syntax == nil && associatedTypeSyntax.isEmpty {
+        if syntax == nil && associatedTypeSyntax.isEmpty && whereSyntax == nil {
             return (Generics(), [])
         }
         var entries: [Generic] = []

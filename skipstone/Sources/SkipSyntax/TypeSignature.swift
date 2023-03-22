@@ -147,6 +147,12 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
         return self
     }
 
+    /// Apply the given generic types.
+    func withGenerics(_ generics: Generics) -> TypeSignature {
+        //~~~
+        return self
+    }
+
     /// Attempt to replace `.none` cases in this type signature with information from the given signature.
     func or(_ typeSignature: TypeSignature) -> TypeSignature {
         switch self {

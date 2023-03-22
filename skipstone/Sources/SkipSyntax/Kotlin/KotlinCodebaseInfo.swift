@@ -168,32 +168,50 @@ public class KotlinCodebaseInfo {
             }
         }
 
-        /// Whether a property with the given signature is implementing an inherited protocol property of the given type.
-        func isProtocolMember(declaration: VariableDeclaration, in typeDeclaration: TypeDeclaration) -> Bool {
-            guard let symbols, !declaration.names.isEmpty, let name = declaration.names[0], !typeDeclaration.inherits.isEmpty else {
+        /// Whether a property with the given signature is implementing a protocol property.
+        func isProtocolMember(declaration: VariableDeclaration, in type: TypeSignature) -> Bool {
+            guard let symbols, !declaration.names.isEmpty, let name = declaration.names[0] else {
                 return false
             }
-            let startIndex = declarationType(of: typeDeclaration.inherits[0].description, mustBeInModule: false) == .protocolDeclaration ? 0 : 1
-            for protocolType in typeDeclaration.inherits[startIndex...] {
-                if symbols.protocolType(qualifiedName: protocolType.description, hasMember: name, kind: declaration.modifiers.isStatic ? .typeProperty : .property, type: nil) == true {
-                    return true
+            // Check parsed type info first so that we can test
+            for info in codebaseInfo.typeInfo[type.description, default: []] {
+                if !info.isPrivate || info.sourceFile == sourceFile {
+                    if info.declarationType == .protocolDeclaration {
+                        return symbols.protocolOf(qualifiedName: type.description, hasMember: name, kind: declaration.modifiers.isStatic ? .typeProperty : .property, type: nil) == true
+                    } else {
+                        for type in info.inherits {
+                            if symbols.protocolOf(qualifiedName: type.description, hasMember: name, kind: declaration.modifiers.isStatic ? .typeProperty : .property, type: nil) == true {
+                                return true
+                            }
+                        }
+                        return false
+                    }
                 }
             }
-            return false
+            return symbols.protocolOf(qualifiedName: type.description, hasMember: name, kind: declaration.modifiers.isStatic ? .typeProperty : .property, type: nil) == true
         }
 
-        /// Whether a function with the given signature is implementing an inherited protocol function of the given type.
-        func isProtocolMember(declaration: FunctionDeclaration, in typeDeclaration: TypeDeclaration) -> Bool {
-            guard let symbols, !typeDeclaration.inherits.isEmpty else {
+        /// Whether a function with the given signature is implementing a protocol function.
+        func isProtocolMember(declaration: FunctionDeclaration, in type: TypeSignature) -> Bool {
+            guard let symbols else {
                 return false
             }
-            let startIndex = declarationType(of: typeDeclaration.inherits[0].description, mustBeInModule: false) == .protocolDeclaration ? 0 : 1
-            for protocolType in typeDeclaration.inherits[startIndex...] {
-                if symbols.protocolType(qualifiedName: protocolType.description, hasMember: declaration.name, kind: declaration.modifiers.isStatic ? .typeMethod : .method, type: nil) == true {
-                    return true
+            // Check parsed type info first so that we can test
+            for info in codebaseInfo.typeInfo[type.description, default: []] {
+                if !info.isPrivate || info.sourceFile == sourceFile {
+                    if info.declarationType == .protocolDeclaration {
+                        return symbols.protocolOf(qualifiedName: type.description, hasMember: declaration.name, kind: declaration.modifiers.isStatic ? .typeMethod : .method, type: nil) == true
+                    } else {
+                        for type in info.inherits {
+                            if symbols.protocolOf(qualifiedName: type.description, hasMember: declaration.name, kind: declaration.modifiers.isStatic ? .typeMethod : .method, type: nil) == true {
+                                return true
+                            }
+                        }
+                        return false
+                    }
                 }
             }
-            return false
+            return symbols.protocolOf(qualifiedName: type.description, hasMember: declaration.name, kind: declaration.modifiers.isStatic ? .typeMethod : .method, type: nil) == true
         }
 
         /// Whether the given qualified type name may map to a mutable struct type.
@@ -330,10 +348,10 @@ private struct ExtensionInfo {
 // Internal for testing
 
 extension Symbols.Context {
-    /// Whether the given name and optional type maps to a member of the given protocol, including inherited protocols.
+    /// Whether the given name and optional type maps to a member of any protocol of the given type, including inherited protocols.
     ///
-    /// - Returns: true if this is a member of the protocol, false if not, and nil if there is no known type for the given name.
-    func protocolType(qualifiedName: String, hasMember name: String, kind memberKind: SymbolGraph.Symbol.KindIdentifier, type: TypeSignature?) -> Bool? {
+    /// - Returns: true if this is a member of a protocol, false if not, and nil if there is no known type for the given name.
+    func protocolOf(qualifiedName: String, hasMember name: String, kind memberKind: SymbolGraph.Symbol.KindIdentifier, type: TypeSignature?) -> Bool? {
         let candidates = lookup(name: qualifiedName)
         var hasType = false
         for candidate in ranked(candidates) {
@@ -341,17 +359,11 @@ extension Symbols.Context {
                 continue
             }
             switch kind {
-            case .class:
+            case .class, .enum, .struct, .extension, .protocol:
                 hasType = true
-            case .enum:
-                hasType = true
-            case .struct:
-                hasType = true
-            case .protocol:
-                if protocolHasMember(candidate, name: name, kind: memberKind, type: type) {
+                if hasProtocolMember(candidate, name: name, kind: memberKind, type: type) {
                     return true
                 }
-                hasType = true
             default:
                 break
             }
@@ -493,10 +505,10 @@ extension Symbols.Context {
         }
     }
 
-    private func protocolHasMember(_ symbol: Symbol, name: String, kind: SymbolGraph.Symbol.KindIdentifier, type: TypeSignature?) -> Bool {
+    private func hasProtocolMember(_ symbol: Symbol, name: String, kind: SymbolGraph.Symbol.KindIdentifier, type: TypeSignature?) -> Bool {
         for relationship in symbol.relationships {
-            if relationship.kind == .conformsTo && !relationship.isInverse {
-                if let conformsTo = lookup(identifier: relationship.targetIdentifier ?? ""), protocolHasMember(conformsTo, name: name, kind: kind, type: type) {
+            if (relationship.kind == .inheritsFrom || relationship.kind == .conformsTo) && !relationship.isInverse {
+                if let inheritsFrom = lookup(identifier: relationship.targetIdentifier ?? ""), hasProtocolMember(inheritsFrom, name: name, kind: kind, type: type) {
                     return true
                 }
             } else if relationship.kind == .requirementOf && relationship.isInverse {

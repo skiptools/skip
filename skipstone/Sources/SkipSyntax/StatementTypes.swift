@@ -644,9 +644,9 @@ class EnumCaseDeclaration: Statement {
 class ExtensionDeclaration: TypeDeclaration {
     let extends: TypeSignature
 
-    init(extends: TypeSignature, inherits: [TypeSignature] = [], attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), members: [Statement] = [], syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(extends: TypeSignature, inherits: [TypeSignature] = [], attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), members: [Statement] = [], syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.extends = extends
-        super.init(type: .extensionDeclaration, name: extends.description, qualifiedName: extends.description, inherits: inherits, attributes: attributes, modifiers: modifiers, members: members, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+        super.init(type: .extensionDeclaration, name: extends.description, qualifiedName: extends.description, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
     override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
@@ -657,12 +657,13 @@ class ExtensionDeclaration: TypeDeclaration {
         guard extends != .none else {
             return nil
         }
-        let (inherits, messages) = extensionDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], [])
+        let (inherits, inheritsMessages) = extensionDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], [])
         let attributes = Attributes.for(syntax: extensionDecl.attributes)
         let modifiers = Modifiers.for(syntax: extensionDecl.modifiers)
+        let (generics, genericsMessages) = Generics.for(syntax: nil, where: extensionDecl.genericWhereClause, in: syntaxTree)
         let members = StatementDecoder.decode(syntaxListContainer: extensionDecl.members, in: syntaxTree)
-        let statement = ExtensionDeclaration(extends: extends, inherits: inherits, attributes: attributes, modifiers: modifiers, members: members, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
-        statement.messages = messages
+        let statement = ExtensionDeclaration(extends: extends, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
+        statement.messages = inheritsMessages + genericsMessages
         return [statement]
     }
 }

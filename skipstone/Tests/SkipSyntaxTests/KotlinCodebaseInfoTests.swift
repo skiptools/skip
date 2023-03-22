@@ -31,21 +31,23 @@ final class KotlinCodebaseInfoTests: XCTestCase {
 
     func testProtocolTypeHasMember() async throws {
         let context = try await symbols.context()
-        XCTAssertNil(context.protocolType(qualifiedName: "NonExistantTypeName", hasMember: "protocolVar", kind: .property, type: nil))
+        XCTAssertNil(context.protocolOf(qualifiedName: "NonExistantTypeName", hasMember: "protocolVar", kind: .property, type: nil))
 
-        XCTAssertEqual(false, context.protocolType(qualifiedName: "KotlinCodebaseInfoTestsNonAnyObjectRestrictedProtocol", hasMember: "baseProtocolVar", kind: .property, type: nil))
-        XCTAssertEqual(true, context.protocolType(qualifiedName: "KotlinCodebaseInfoTestsAnyObjectRestrictedProtocol", hasMember: "baseProtocolVar", kind: .property, type: nil))
-        XCTAssertEqual(true, context.protocolType(qualifiedName: "KotlinCodebaseInfoTestsAnyObjectRestrictedProtocol", hasMember: "baseProtocolVar", kind: .property, type: .int))
-        XCTAssertEqual(false, context.protocolType(qualifiedName: "KotlinCodebaseInfoTestsAnyObjectRestrictedProtocol", hasMember: "baseProtocolVar", kind: .property, type: .string))
+        XCTAssertEqual(false, context.protocolOf(qualifiedName: "KotlinCodebaseInfoTestsNonAnyObjectRestrictedProtocol", hasMember: "baseProtocolVar", kind: .property, type: nil))
+        XCTAssertEqual(true, context.protocolOf(qualifiedName: "KotlinCodebaseInfoTestsAnyObjectRestrictedProtocol", hasMember: "baseProtocolVar", kind: .property, type: nil))
+        XCTAssertEqual(true, context.protocolOf(qualifiedName: "KotlinCodebaseInfoTestsAnyObjectRestrictedProtocol", hasMember: "baseProtocolVar", kind: .property, type: .int))
+        XCTAssertEqual(false, context.protocolOf(qualifiedName: "KotlinCodebaseInfoTestsAnyObjectRestrictedProtocol", hasMember: "baseProtocolVar", kind: .property, type: .string))
 
         let functionType: TypeSignature = .function([.init(label: "i", type: .int)], .string)
-        XCTAssertEqual(false, context.protocolType(qualifiedName: "KotlinCodebaseInfoTestsNonAnyObjectRestrictedProtocol", hasMember: "baseProtocolFunc", kind: .method, type: functionType))
-        XCTAssertEqual(true, context.protocolType(qualifiedName: "KotlinCodebaseInfoTestsAnyObjectRestrictedProtocol", hasMember: "baseProtocolFunc", kind: .method, type: functionType))
-        XCTAssertEqual(false, context.protocolType(qualifiedName: "KotlinCodebaseInfoTestsAnyObjectRestrictedProtocol", hasMember: "baseProtocolFunc", kind: .method, type: .function([.init(label: "i", type: .string)], .string)))
+        XCTAssertEqual(false, context.protocolOf(qualifiedName: "KotlinCodebaseInfoTestsNonAnyObjectRestrictedProtocol", hasMember: "baseProtocolFunc", kind: .method, type: functionType))
+        XCTAssertEqual(true, context.protocolOf(qualifiedName: "KotlinCodebaseInfoTestsAnyObjectRestrictedProtocol", hasMember: "baseProtocolFunc", kind: .method, type: functionType))
+        XCTAssertEqual(false, context.protocolOf(qualifiedName: "KotlinCodebaseInfoTestsAnyObjectRestrictedProtocol", hasMember: "baseProtocolFunc", kind: .method, type: .function([.init(label: "i", type: .string)], .string)))
 
-        XCTAssertEqual(true, context.protocolType(qualifiedName: "KotlinCodebaseInfoTestsTransitiveAnyObjectRestrictedProtocol", hasMember: "baseProtocolVar", kind: .property, type: nil))
-        XCTAssertEqual(true, context.protocolType(qualifiedName: "KotlinCodebaseInfoTestsTransitiveAnyObjectRestrictedProtocol", hasMember: "baseProtocolFunc", kind: .method, type: functionType))
+        XCTAssertEqual(true, context.protocolOf(qualifiedName: "KotlinCodebaseInfoTestsTransitiveAnyObjectRestrictedProtocol", hasMember: "baseProtocolVar", kind: .property, type: nil))
+        XCTAssertEqual(true, context.protocolOf(qualifiedName: "KotlinCodebaseInfoTestsTransitiveAnyObjectRestrictedProtocol", hasMember: "baseProtocolFunc", kind: .method, type: functionType))
 
+        XCTAssertEqual(true, context.protocolOf(qualifiedName: "KotlinCodebaseInfoTestsProtocolImpl", hasMember: "baseProtocolVar", kind: .property, type: nil))
+        XCTAssertEqual(true, context.protocolOf(qualifiedName: "KotlinCodebaseInfoTestsProtocolImpl", hasMember: "baseProtocolFunc", kind: .method, type: functionType))
     }
 }
 
@@ -91,4 +93,10 @@ protocol KotlinCodebaseInfoTestsAnyObjectRestrictedProtocol: AnyObject {
     func baseProtocolFunc(i: Int) -> String
 }
 protocol KotlinCodebaseInfoTestsTransitiveAnyObjectRestrictedProtocol: KotlinCodebaseInfoTestsAnyObjectRestrictedProtocol {
+}
+class KotlinCodebaseInfoTestsProtocolImpl: KotlinCodebaseInfoTestsTransitiveAnyObjectRestrictedProtocol {
+    var baseProtocolVar = 1
+    func baseProtocolFunc(i: Int) -> String {
+        return ""
+    }
 }

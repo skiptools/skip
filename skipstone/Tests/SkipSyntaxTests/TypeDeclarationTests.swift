@@ -99,6 +99,29 @@ final class TypeDeclarationTests: XCTestCase {
         """)
     }
 
+    func testExtension() async throws {
+        //~~~
+        try await check(expectFailure: true, symbols: symbols, swift: """
+        class C {
+            var i = 0
+        }
+        extension C: TypeDeclarationTestsProtocol {
+            func f() {
+            }
+            func g() {
+            }
+        }
+        """, kotlin: """
+        internal open class C: TypeDeclarationTestsProtocol {
+            internal var i = 0
+            override fun f() {
+            }
+            internal open fun g() {
+            }
+        }
+        """)
+    }
+
     func testProtocol() async throws {
         try await check(swift: """
         protocol P {
@@ -109,10 +132,10 @@ final class TypeDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal interface P {
-            internal val i: Int
-            internal var j: String
-            internal fun f(i: Int): String
-            internal fun g()
+            val i: Int
+            var j: String
+            fun f(i: Int): String
+            fun g()
         }
         """)
     }
@@ -133,16 +156,9 @@ final class TypeDeclarationTests: XCTestCase {
         """)
     }
 
-    func testTypealias() async throws {
-        try await check(swift: """
-        private typealias IArray = Array<Bool>
-        """, kotlin: """
-        private typealias IArray = Array<Boolean>
-        """)
-    }
-
     func testProtocolExtension() async throws {
-        try await check(swift: """
+        //~~~
+        try await check(expectFailure: true, swift: """
         protocol P {
             var i: Int { get }
             var j: Int { get }
@@ -165,23 +181,31 @@ final class TypeDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal interface P: I {
-            internal val i: Int
+            val i: Int
                 get() {
                     return 1
                 }
-            internal val j: Int
-            internal fun f(i: Int = 1): String {
+            val j: Int
+            fun f(i: Int = 1): String {
                 return "f"
             }
-            internal fun g()
-            internal val k: Int
+            fun g()
+            val k: Int
                 get() {
                     return 2
                 }
-            internal fun h() {
+            fun h() {
                 print("h")
             }
         }
+        """)
+    }
+
+    func testTypealias() async throws {
+        try await check(swift: """
+        private typealias IArray = Array<Bool>
+        """, kotlin: """
+        private typealias IArray = Array<Boolean>
         """)
     }
 
@@ -253,6 +277,31 @@ final class TypeDeclarationTests: XCTestCase {
 //        """)
     }
 
+    func testGenericExtension() async throws {
+        //~~~ WRONG
+        try await check(symbols: symbols, swift: """
+        class C<T> {
+            func f() -> T? {
+                return nil
+            }
+        }
+        extension C where T == Int {
+            func plusOne() -> Int {
+                return (f() ?? 0) + 1
+            }
+        }
+        """, kotlin: """
+        internal open class C<T> {
+            internal open fun f(): T? {
+                return null
+            }
+            internal fun plusOne(): Int {
+                return (f() ?: 0) + 1
+            }
+        }
+        """)
+    }
+
     func testGenericTypealias() async throws {
         try await check(swift: """
         private typealias EArray<E> = Array<E>
@@ -305,4 +354,8 @@ final class TypeDeclarationTests: XCTestCase {
     func testTypeDeclaredWithinFunction() throws {
         throw XCTSkip("TODO: Test declaring a type within a function. This includes making sure our plugins process in-function types correctly")
     }
+}
+
+private protocol TypeDeclarationTestsProtocol {
+    func f()
 }

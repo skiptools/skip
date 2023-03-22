@@ -922,29 +922,36 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
 
 struct KotlinExtensionDeclaration {
     static func translate(statement: ExtensionDeclaration, translator: KotlinTranslator) -> [KotlinStatement] {
-        // If the extension is on a type outside this module, use Kotlin extension functions. Otherwise do not translate the
-        // extension - instead we'll move its members into our declaration of its extended type
-        let declarationType = translator.codebaseInfo?.declarationType(of: statement.extends.description, mustBeInModule: true)
-        guard declarationType == nil else {
+        // If the extension is on a type outside this module or only applies to certain generic constraints, use Kotlin extension
+        // functions. Otherwise do not translate the extension - instead we'll move its members into the extended type
+        guard statement.generics.whereEqual.isEmpty, translator.codebaseInfo?.declarationType(of: statement.extends.description, mustBeInModule: true) == nil else {
             return []
         }
 
+        let extends = statement.extends.withGenerics(statement.generics)
         var kotlinStatements: [KotlinStatement] = []
         if !statement.inherits.isEmpty && translator.codebaseInfo != nil {
             let message = Message.kotlinExtensionAddProtocolsToOutsideType(statement)
             kotlinStatements.append(KotlinMessageStatement(message: message))
         }
-        for member in statement.members.flatMap({ translator.translateStatement($0) }) {
-            guard let memberDeclaration = member as? KotlinMemberDeclaration else {
-                kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionUnsupportedMember(member)))
-                continue
+        for member in statement.members {
+            if let variableDeclaration = member as? VariableDeclaration, translator.codebaseInfo?.isProtocolMember(declaration: variableDeclaration, in: extends) == true {
+                kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionForConstrainedGenericImplementMember(member)))
+            } else if let functionDeclaration = member as? FunctionDeclaration, translator.codebaseInfo?.isProtocolMember(declaration: functionDeclaration, in: extends) == true {
+                kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionForConstrainedGenericImplementMember(member)))
             }
-            guard member.type != .constructorDeclaration else {
-                kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionAddConstructorsToOutsideType(member)))
-                continue
+            for kmember in translator.translateStatement(member) {
+                guard let memberDeclaration = kmember as? KotlinMemberDeclaration else {
+                    kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionUnsupportedMember(member)))
+                    continue
+                }
+                guard kmember.type != .constructorDeclaration else {
+                    kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionAddConstructorsToOutsideType(member)))
+                    continue
+                }
+                memberDeclaration.extends = extends
+                kotlinStatements.append(kmember)
             }
-            memberDeclaration.extends = statement.extends
-            kotlinStatements.append(member)
         }
         return kotlinStatements
     }
@@ -986,7 +993,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 }
             } else {
                 kstatement.isOpen = !statement.modifiers.isFinal && statement.modifiers.visibility != .private && owningTypeDeclaration.type == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
-                if !kstatement.modifiers.isOverride && translator.codebaseInfo?.isProtocolMember(declaration: statement, in: owningTypeDeclaration) == true {
+                if owningTypeDeclaration.type != .protocolDeclaration && !kstatement.modifiers.isOverride && translator.codebaseInfo?.isProtocolMember(declaration: statement, in: owningTypeDeclaration.signature) == true {
                     kstatement.modifiers.isOverride = true
                 }
                 // Kotlin does not all you to decrease visibility when overriding a member, so we simply make all overrides public to prevent errors
@@ -1012,6 +1019,8 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             } else if statement.modifiers.isStatic {
                 kstatement.messages.append(.kotlinProtocolStaticMember(statement))
             }
+            // Kotlin uses default public visibility on all interface members
+            kstatement.modifiers.visibility = .public
         }
         if statement.attributes.attributes.contains(where: { !isIgnorable(attribute: $0) }) {
             kstatement.messages.append(.kotlinAttributeUnsupported(statement))
@@ -1330,7 +1339,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if let owningTypeDeclaration = statement.owningTypeDeclaration {
             kstatement.isProperty = statement.parent === owningTypeDeclaration
             kstatement.isOpen = kstatement.isProperty && !statement.modifiers.isFinal && statement.modifiers.visibility != .private && owningTypeDeclaration.type == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
-            if kstatement.isProperty && !kstatement.modifiers.isOverride && translator.codebaseInfo?.isProtocolMember(declaration: statement, in: owningTypeDeclaration) == true {
+            if owningTypeDeclaration.type != .protocolDeclaration && kstatement.isProperty && !kstatement.modifiers.isOverride && translator.codebaseInfo?.isProtocolMember(declaration: statement, in: owningTypeDeclaration.signature) == true {
                 kstatement.modifiers.isOverride = true
             }
             // Kotlin does not all you to decrease visibility when overriding a member, so we simply make all overrides public to prevent errors
@@ -1367,8 +1376,12 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if statement.isAsync {
             kstatement.messages.append(.kotlinAsyncProperties(kstatement))
         }
-        if statement.modifiers.isStatic, let owningTypeDeclaration = statement.owningTypeDeclaration, owningTypeDeclaration === statement.parent, owningTypeDeclaration.type == .protocolDeclaration {
-            kstatement.messages.append(.kotlinProtocolStaticMember(statement))
+        if let owningTypeDeclaration = statement.owningTypeDeclaration, owningTypeDeclaration === statement.parent, owningTypeDeclaration.type == .protocolDeclaration {
+            if statement.modifiers.isStatic {
+                kstatement.messages.append(.kotlinProtocolStaticMember(statement))
+            }
+            // Kotlin uses default public visibility on all interface members
+            kstatement.modifiers.visibility = .public
         }
         if !statement.attributes.isEmpty {
             kstatement.messages.append(.kotlinAttributeUnsupported(statement))
