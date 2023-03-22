@@ -15,7 +15,7 @@ class KotlinErrorToThrowablePlugin: KotlinPlugin {
     }
 
     private func processClassDeclaration(_ classDeclaration: KotlinClassDeclaration, codebaseInfo: KotlinCodebaseInfo.Context) {
-        guard codebaseInfo.conformsToError(qualifiedName: classDeclaration.qualifiedName) else {
+        guard codebaseInfo.conformsToError(qualifiedName: classDeclaration.signature.name) else {
             return
         }
         if let firstInherits = classDeclaration.inherits.first, codebaseInfo.declarationType(of: firstInherits.description, mustBeInModule: false) == .classDeclaration {

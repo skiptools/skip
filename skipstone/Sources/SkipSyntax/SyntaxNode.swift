@@ -100,10 +100,10 @@ class SyntaxNode: SourceDerived, PrettyPrintable {
         return nil
     }
 
-    /// Traverse up the syntax tree to fully qualify a type name.
-    final func qualifyReferencedTypeName(_ typeName: String) -> String {
+    /// Traverse up the syntax tree to fully qualify a type.
+    final func qualifyReferencedNamedType(name: String, generics: [TypeSignature]) -> TypeSignature {
         // Look for a qualified name whose last token(s) are the given type name
-        let suffix = ".\(typeName)"
+        let suffix = ".\(name)"
         var current: SyntaxNode? = self
         while current != nil {
             // Find the next declared type up the statement chain
@@ -111,20 +111,20 @@ class SyntaxNode: SourceDerived, PrettyPrintable {
                 break
             }
             // Look for any direct child of that type with a matching qualified name
-            if let referencedType = owningType.children.first(where: { ($0 as? TypeDeclaration)?.qualifiedName.hasSuffix(suffix) == true }) {
-                return (referencedType as! TypeDeclaration).qualifiedName
+            if let referencedType = owningType.children.first(where: { ($0 as? TypeDeclaration)?.signature.name.hasSuffix(suffix) == true }) {
+                return (referencedType as! TypeDeclaration).signature.withGenerics(generics)
             }
             // Move up to the next owning type and repeat
             current = owningType.parent
         }
-        return typeName
+        return .named(name, generics)
     }
 
     /// Traverse up the syntax tree to fully qualify a type name declared by a class, struct, etc.
-    final func qualifyDeclaredTypeName(_ typeName: String) -> String {
+    final func qualifyDeclaredType(_ type: TypeSignature) -> TypeSignature {
         if let typeDeclaration = parent?.owningTypeDeclaration {
-            return "\(typeDeclaration.qualifiedName).\(typeName)"
+            return .member(typeDeclaration.signature, type)
         }
-        return typeName
+        return type
     }
 }

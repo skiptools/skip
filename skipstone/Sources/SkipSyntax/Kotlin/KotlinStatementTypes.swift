@@ -647,7 +647,7 @@ class KotlinWhileLoop: KotlinStatement {
 
 class KotlinClassDeclaration: KotlinStatement {
     var name: String
-    var qualifiedName: String
+    var signature: TypeSignature
     var inherits: [TypeSignature] = []
     var superclassCall: String?
     var modifiers = Modifiers()
@@ -705,7 +705,7 @@ class KotlinClassDeclaration: KotlinStatement {
 
     private init(statement: TypeDeclaration) {
         self.name = statement.name
-        self.qualifiedName = statement.qualifiedName
+        self.signature = statement.signature
         self.declarationType = statement.type
         super.init(type: .classDeclaration, statement: statement)
     }

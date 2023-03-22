@@ -646,7 +646,7 @@ class ExtensionDeclaration: TypeDeclaration {
 
     init(extends: TypeSignature, inherits: [TypeSignature] = [], attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), members: [Statement] = [], syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.extends = extends
-        super.init(type: .extensionDeclaration, name: extends.description, qualifiedName: extends.description, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+        super.init(type: .extensionDeclaration, name: extends.name, signature: extends, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
     override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
@@ -822,10 +822,11 @@ class TypealiasDeclaration: Statement {
     private(set) var modifiers: Modifiers
     private(set) var generics: Generics
     private(set) var aliasedType: TypeSignature
-    var qualifiedName: String {
-        return _qualifiedName ?? name
+    var signature: TypeSignature {
+        //~~~ What generics to supply here?
+        return _signature ?? .named(name, [])
     }
-    private var _qualifiedName: String?
+    private var _signature: TypeSignature?
 
     init(name: String, modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), aliasedType: TypeSignature, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.name = name
@@ -849,8 +850,8 @@ class TypealiasDeclaration: Statement {
     }
 
     override func resolveAttributes() {
-        if _qualifiedName == nil {
-            _qualifiedName = qualifyDeclaredTypeName(name)
+        if _signature == nil {
+            _signature = qualifyDeclaredType(signature)
         }
         generics = generics.qualified(in: self)
         aliasedType = aliasedType.qualified(in: self)
@@ -885,17 +886,15 @@ class TypeDeclaration: Statement {
     private(set) var modifiers: Modifiers
     private(set) var generics: Generics
     let members: [Statement]
-    var qualifiedName: String {
-        return _qualifiedName ?? name
-    }
-    private var _qualifiedName: String?
     var signature: TypeSignature {
-        return TypeSignature.for(name: qualifiedName, genericTypes: [])
+        //~~~ What generics to supply: declared labels or upper bound values? What about protocols? Extensions?
+        return _signature ?? TypeSignature.for(name: name, genericTypes: [])
     }
+    private var _signature: TypeSignature?
 
-    init(type: StatementType, name: String, qualifiedName: String? = nil, inherits: [TypeSignature] = [], attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), members: [Statement] = [], syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(type: StatementType, name: String, signature: TypeSignature? = nil, inherits: [TypeSignature] = [], attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), members: [Statement] = [], syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.name = name
-        _qualifiedName = qualifiedName
+        _signature = signature
         self.inherits = inherits
         self.attributes = attributes
         self.modifiers = modifiers
@@ -968,8 +967,8 @@ class TypeDeclaration: Statement {
     }
 
     override func resolveAttributes() {
-        if _qualifiedName == nil {
-            _qualifiedName = qualifyDeclaredTypeName(name)
+        if _signature == nil {
+            _signature = qualifyDeclaredType(signature)
         }
         inherits = inherits.map { $0.qualified(in: self) }
         if modifiers.visibility == .default {

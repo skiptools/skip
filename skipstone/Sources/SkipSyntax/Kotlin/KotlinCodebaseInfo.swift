@@ -109,7 +109,7 @@ public class KotlinCodebaseInfo {
 
         /// Return all extensions of a given type.
         func extensions(of declaration: TypeDeclaration) -> [ExtensionDeclaration] {
-            return codebaseInfo.extensionInfo[declaration.qualifiedName, default: []].compactMap { info in
+            return codebaseInfo.extensionInfo[declaration.signature.name, default: []].compactMap { info in
                 guard declaration.modifiers.visibility != .private || declaration.sourceFile == info.sourceFile else {
                     return nil
                 }
@@ -255,9 +255,9 @@ public class KotlinCodebaseInfo {
         } else if typeDeclaration.type == .enumDeclaration {
             info.hasAssociatedValues = typeDeclaration.members.contains { ($0 as? EnumCaseDeclaration)?.associatedValues.isEmpty == false }
         }
-        var infos = typeInfo[typeDeclaration.qualifiedName, default: []]
+        var infos = typeInfo[typeDeclaration.signature.name, default: []]
         infos.append(info)
-        typeInfo[typeDeclaration.qualifiedName] = infos
+        typeInfo[typeDeclaration.signature.name] = infos
     }
 
     private func mergeExtensionInfo() {

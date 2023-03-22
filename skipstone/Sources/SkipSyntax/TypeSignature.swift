@@ -224,9 +224,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
         case .metaType(let type):
             return .metaType(type.qualified(in: node))
         case .named(let name, let generics):
-            let qualifiedName = node.qualifyReferencedTypeName(name)
             let generics = generics.map { $0.qualified(in: node) }
-            return Self.for(name: qualifiedName, genericTypes: generics)
+            return node.qualifyReferencedNamedType(name: name, generics: generics)
         case .optional(let type):
             return .optional(type.qualified(in: node))
         case .range(let elementType):

@@ -35,7 +35,7 @@ class KotlinConstructorPlugin: KotlinPlugin {
     }
 
     private func addInheritedConstructors(to classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) -> Bool {
-        let inheritedConstructorParameters = translator.codebaseInfo?.constructorParameters(of: classDeclaration.qualifiedName) ?? []
+        let inheritedConstructorParameters = translator.codebaseInfo?.constructorParameters(of: classDeclaration.signature.name) ?? []
         guard !inheritedConstructorParameters.isEmpty else {
             return false
         }
