@@ -73,7 +73,7 @@ final class GradleDriverTests: XCTestCase {
                 //print("TEST >", line)
             }
 
-            let results = try await parseResults()
+            let results = try parseResults()
 
             XCTAssertEqual(1, results.count)
             let firstResult = try XCTUnwrap(results.first)
