@@ -73,7 +73,7 @@ public struct Source : Encodable {
     public typealias File = FilePath
 
     /// A Swift source file.
-    public struct FilePath: SourceFile, Hashable, Encodable {
+    public struct FilePath: Hashable, Encodable {
         public let path: String
 
         public init(path: String) {
@@ -89,11 +89,6 @@ public struct Source : Encodable {
 
         public var isSwift: Bool {
             return path.hasSuffix(".swift")
-        }
-
-        @available(*, deprecated, message: "prefer TSCBasic.AbsolutePath")
-        public var url: URL {
-            URL(fileURLWithPath: path, isDirectory: false)
         }
 
         public func outputFile(withExtension: String) -> Source.File {
@@ -130,8 +125,4 @@ public struct Source : Encodable {
             return lhs.line < rhs.line || (lhs.line == rhs.line && lhs.column < rhs.column)
         }
     }
-}
-
-public protocol SourceFile {
-
 }

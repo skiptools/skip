@@ -1,4 +1,7 @@
 /// Map output ranges to source ranges.
+///
+/// Note that a `Decodable` version of this structure exists as `SkipUnit.SourceMap`.
+/// These types must maintain serialization compatibility.
 public struct OutputMap : Encodable {
     public struct Entry : Encodable {
         let sourceFile: Source.File

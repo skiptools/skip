@@ -637,9 +637,11 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         }
 
         func kotlinOutputPath(for baseSourceFileName: String) -> AbsolutePath {
-            outputFolderPath.appending(components: packageName.split(separator: ".").map(\.description))
+            outputFolderPath
+                .appending(components: packageName.split(separator: ".").map(\.description)) // split package into directories
                 .appending(RelativePath(baseSourceFileName))
         }
+
 
         /// Copies over the overridden .kt files from `ModuleNameKotlin/skip/*.kt` into the destination folder
         ///
@@ -677,6 +679,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             for message in transpilation.messages {
                 continuation.yield(.init(message))
             }
+
             trace(transpilation.output.content)
 
             let sourcePath = try AbsolutePath(validating: transpilation.sourceFile.path)
@@ -700,7 +703,6 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             let output = Output(transpilation: transpilation)
             continuation.yield(.init(output))
 
-
             func saveTranspilation() throws -> (output: AbsolutePath, changed: Bool) {
                 // the build plug-in's output folder base will be something like ~/Library/Developer/Xcode/DerivedData/Mod-ID/SourcePackages/plugins/module-name.output/ModuleNameKotlin/SkipTranspilePlugIn/ModuleName/src/test/kotlin
                 trace("path: \(outputFolderPath)")
@@ -711,11 +713,15 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
                 let fileWritten = try fs.writeChanges(path: outputFilePath, checkSize: true, makeWritable: true, makeReadOnly: true, bytes: kotlinBytes)
 
                 trace("wrote to: \(outputFilePath)\(!fileWritten ? " (unchanged)" : "")", sourceFile: outputFilePath.sourceFile)
+
+                // also save the output line mapping file: SomeFile.kt -> SomeFile.sourcemap
+                let sourceMappingPath = outputFilePath.deletingPathExtension().appendingPathExtension("sourcemap")
+                let sourceMapData = try JSONEncoder().encode(transpilation.outputMap)
+                try fs.writeChanges(path: sourceMappingPath, makeWritable: true, makeReadOnly: true, bytes: ByteString(sourceMapData))
+
                 return (output: outputFilePath, changed: fileWritten)
             }
-
         }
-
 
         // NOTE: when linking between modules, SPM and Xcode will use different output paths:
         // Xcode: ~/Library/Developer/Xcode/DerivedData/PROJECT-ID/SourcePackages/plugins/skip-core.output/SkipFoundationKotlinTests/SkipTranspilePlugIn/SkipFoundation
@@ -772,11 +778,11 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
     /// Generate transpiler plug-ins from the given skip config
     func createPlugins(for config: SkipConfig, with moduleMap: [String: SkipConfig]) throws -> [KotlinPlugin] {
-        var plugins: [KotlinPlugin] = []
+        let plugins: [KotlinPlugin] = []
 
-        if let packageName = config.skip?.package {
-            throw error("### implement package/module map plugin")
-        }
+        //if let packageName = config.skip?.package {
+            // TODO: throw error("implement package/module map plugin")
+        //}
 
         return plugins
     }
