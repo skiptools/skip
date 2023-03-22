@@ -34,6 +34,24 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
     case unwrappedOptional(TypeSignature)
     case void
 
+    /// The name of this type without generics.
+    var name: String {
+        switch self {
+        case .array:
+            return "Array"
+        case .dictionary:
+            return "Dictionary"
+        case .named(let name, _):
+            return name
+        case .range:
+            return "Range"
+        case .set:
+            return "Set"
+        default:
+            return descriptionUsing(\.name)
+        }
+    }
+
     /// The element type of this sequence.
     var elementType: TypeSignature {
         switch self {
@@ -179,6 +197,83 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
         case .unwrappedOptional(let type):
             return .unwrappedOptional(type.withGenerics(generics))
         default:
+            return self
+        }
+    }
+
+    /// Qualify local type names with any enclosing types.
+    func qualified(in node: SyntaxNode) -> TypeSignature {
+        switch self {
+        case .any:
+            return self
+        case .anyObject:
+            return self
+        case .array(let elementType):
+            return .array(elementType.qualified(in: node))
+        case .bool:
+            return self
+        case .character:
+            return self
+        case .composition(let types):
+            return .composition(types.map { $0.qualified(in: node) })
+        case .dictionary(let keyType, let valueType):
+            return .dictionary(keyType.qualified(in: node), valueType.qualified(in: node))
+        case .double:
+            return self
+        case .float:
+            return self
+        case .function(let parameters, let returnType):
+            let qualifiedParameters = parameters.map { Parameter(label: $0.label, type: $0.type.qualified(in: node), isVariadic: $0.isVariadic, hasDefaultValue: $0.hasDefaultValue) }
+            return .function(qualifiedParameters, returnType.qualified(in: node))
+        case .int:
+            return self
+        case .int8:
+            return self
+        case .int16:
+            return self
+        case .int32:
+            return self
+        case .int64:
+            return self
+        case .member(let baseType, let type):
+            let base = baseType.qualified(in: node)
+            if case .named(let name, let generics) = type {
+                let generics = generics.map { $0.qualified(in: node) }
+                return .member(base, .named(name, generics))
+            } else {
+                return .member(base, type)
+            }
+        case .metaType(let type):
+            return .metaType(type.qualified(in: node))
+        case .named(let name, let generics):
+            let qualifiedName = node.qualifyReferencedTypeName(name)
+            let generics = generics.map { $0.qualified(in: node) }
+            return Self.for(name: qualifiedName, genericTypes: generics)
+        case .none:
+            return self
+        case .optional(let type):
+            return .optional(type.qualified(in: node))
+        case .range(let elementType):
+            return .range(elementType.qualified(in: node))
+        case .set(let elementType):
+            return .set(elementType.qualified(in: node))
+        case .string:
+            return self
+        case .tuple(let labels, let types):
+            return .tuple(labels, types.map { $0.qualified(in: node) })
+        case .uint:
+            return self
+        case .uint8:
+            return self
+        case .uint16:
+            return self
+        case .uint32:
+            return self
+        case .uint64:
+            return self
+        case .unwrappedOptional(let type):
+            return .unwrappedOptional(type.qualified(in: node))
+        case .void:
             return self
         }
     }
@@ -660,105 +755,32 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
         return .tuple(labels, types)
     }
 
-    /// Qualify local type names with any enclosing types.
-    func qualified(in node: SyntaxNode) -> TypeSignature {
-        switch self {
-        case .any:
-            return self
-        case .anyObject:
-            return self
-        case .array(let elementType):
-            return .array(elementType.qualified(in: node))
-        case .bool:
-            return self
-        case .character:
-            return self
-        case .composition(let types):
-            return .composition(types.map { $0.qualified(in: node) })
-        case .dictionary(let keyType, let valueType):
-            return .dictionary(keyType.qualified(in: node), valueType.qualified(in: node))
-        case .double:
-            return self
-        case .float:
-            return self
-        case .function(let parameters, let returnType):
-            let qualifiedParameters = parameters.map { Parameter(label: $0.label, type: $0.type.qualified(in: node), isVariadic: $0.isVariadic, hasDefaultValue: $0.hasDefaultValue) }
-            return .function(qualifiedParameters, returnType.qualified(in: node))
-        case .int:
-            return self
-        case .int8:
-            return self
-        case .int16:
-            return self
-        case .int32:
-            return self
-        case .int64:
-            return self
-        case .member(let baseType, let type):
-            let base = baseType.qualified(in: node)
-            if case .named(let name, let generics) = type {
-                let generics = generics.map { $0.qualified(in: node) }
-                return .member(base, .named(name, generics))
-            } else {
-                return .member(base, type)
-            }
-        case .metaType(let type):
-            return .metaType(type.qualified(in: node))
-        case .named(let name, let generics):
-            let qualifiedName = node.qualifyReferencedTypeName(name)
-            let generics = generics.map { $0.qualified(in: node) }
-            return Self.for(name: qualifiedName, genericTypes: generics)
-        case .none:
-            return self
-        case .optional(let type):
-            return .optional(type.qualified(in: node))
-        case .range(let elementType):
-            return .range(elementType.qualified(in: node))
-        case .set(let elementType):
-            return .set(elementType.qualified(in: node))
-        case .string:
-            return self
-        case .tuple(let labels, let types):
-            return .tuple(labels, types.map { $0.qualified(in: node) })
-        case .uint:
-            return self
-        case .uint8:
-            return self
-        case .uint16:
-            return self
-        case .uint32:
-            return self
-        case .uint64:
-            return self
-        case .unwrappedOptional(let type):
-            return .unwrappedOptional(type.qualified(in: node))
-        case .void:
-            return self
-        }
+    var description: String {
+        return descriptionUsing(\.description)
     }
 
-    var description: String {
+    private func descriptionUsing(_ keyPath: KeyPath<TypeSignature, String>) -> String {
         switch self {
         case .any:
             return "Any"
         case .anyObject:
             return "AnyObject"
         case .array(let elementType):
-            return "[\(elementType.description)]"
+            return "[\(elementType[keyPath: keyPath])]"
         case .bool:
             return "Bool"
         case .character:
             return "Character"
         case .composition(let types):
-            return "(\(types.map { $0.description }.joined(separator: " & ")))"
+            return "(\(types.map { $0[keyPath: keyPath] }.joined(separator: " & ")))"
         case .dictionary(let keyType, let valueType):
-            return "[\(keyType.description): \(valueType.description)]"
+            return "[\(keyType[keyPath: keyPath]): \(valueType[keyPath: keyPath])]"
         case .double:
             return "Double"
         case .float:
             return "Float"
-        case .function(let paramTypes, let returnType):
-            return "(\(paramTypes.map { $0.description }.joined(separator: ", "))) -> \(returnType.description)"
+        case .function(let parameters, let returnType):
+            return "(\(parameters.map { $0.descriptionUsing(keyPath) }.joined(separator: ", "))) -> \(returnType[keyPath: keyPath])"
         case .int:
             return "Int"
         case .int8:
@@ -770,39 +792,39 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
         case .int64:
             return "Int64"
         case .member(let baseType, let type):
-            return "\(baseType.description).\(type.description)"
+            return "\(baseType[keyPath: keyPath]).\(type[keyPath: keyPath])"
         case .metaType(let baseType):
             switch baseType {
             case .any:
                 return "AnyType"
             case .function:
-                return "(\(baseType.description)).Type"
+                return "(\(baseType[keyPath: keyPath])).Type"
             default:
-                return "\(baseType.description).Type"
+                return "\(baseType[keyPath: keyPath]).Type"
             }
         case .named(let name, let generics):
             guard !generics.isEmpty else {
                 return name
             }
-            return "\(name)<\(generics.map { $0.description }.joined(separator: ", "))>"
+            return "\(name)<\(generics.map { $0[keyPath: keyPath] }.joined(separator: ", "))>"
         case .none:
             return "<none>"
         case .optional(let type):
             switch type {
             case .function:
-                return "(\(type.description))?"
+                return "(\(type[keyPath: keyPath]))?"
             default:
-                return "\(type.description)?"
+                return "\(type[keyPath: keyPath])?"
             }
         case .range(let type):
-            return "Range<\(type.description)>"
+            return "Range<\(type[keyPath: keyPath])>"
         case .set(let type):
-            return "Set<\(type.description)>"
+            return "Set<\(type[keyPath: keyPath])>"
         case .string:
             return "String"
         case .tuple(let labels, let types):
             let descriptions = zip(labels, types).map {
-                let typeDescription = $0.1.description
+                let typeDescription = $0.1[keyPath: keyPath]
                 guard let label = $0.0 else {
                     return typeDescription
                 }
@@ -822,9 +844,9 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
         case .unwrappedOptional(let type):
             switch type {
             case .function:
-                return "(\(type.description))!"
+                return "(\(type[keyPath: keyPath]))!"
             default:
-                return "\(type.description)!"
+                return "\(type[keyPath: keyPath])!"
             }
         case .void:
             return "Void"
@@ -851,11 +873,15 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
         }
 
         var description: String {
+            return descriptionUsing(\TypeSignature.description)
+        }
+
+        fileprivate func descriptionUsing(_ keyPath: KeyPath<TypeSignature, String>) -> String {
             var description = ""
             if let label {
                 description += "\(label): "
             }
-            description += type.description
+            description += type[keyPath: keyPath]
             if isVariadic {
                 description += "..."
             }
