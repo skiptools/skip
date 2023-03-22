@@ -204,37 +204,15 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
     /// Qualify local type names with any enclosing types.
     func qualified(in node: SyntaxNode) -> TypeSignature {
         switch self {
-        case .any:
-            return self
-        case .anyObject:
-            return self
         case .array(let elementType):
             return .array(elementType.qualified(in: node))
-        case .bool:
-            return self
-        case .character:
-            return self
         case .composition(let types):
             return .composition(types.map { $0.qualified(in: node) })
         case .dictionary(let keyType, let valueType):
             return .dictionary(keyType.qualified(in: node), valueType.qualified(in: node))
-        case .double:
-            return self
-        case .float:
-            return self
         case .function(let parameters, let returnType):
             let qualifiedParameters = parameters.map { Parameter(label: $0.label, type: $0.type.qualified(in: node), isVariadic: $0.isVariadic, hasDefaultValue: $0.hasDefaultValue) }
             return .function(qualifiedParameters, returnType.qualified(in: node))
-        case .int:
-            return self
-        case .int8:
-            return self
-        case .int16:
-            return self
-        case .int32:
-            return self
-        case .int64:
-            return self
         case .member(let baseType, let type):
             let base = baseType.qualified(in: node)
             if case .named(let name, let generics) = type {
@@ -249,31 +227,17 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
             let qualifiedName = node.qualifyReferencedTypeName(name)
             let generics = generics.map { $0.qualified(in: node) }
             return Self.for(name: qualifiedName, genericTypes: generics)
-        case .none:
-            return self
         case .optional(let type):
             return .optional(type.qualified(in: node))
         case .range(let elementType):
             return .range(elementType.qualified(in: node))
         case .set(let elementType):
             return .set(elementType.qualified(in: node))
-        case .string:
-            return self
         case .tuple(let labels, let types):
             return .tuple(labels, types.map { $0.qualified(in: node) })
-        case .uint:
-            return self
-        case .uint8:
-            return self
-        case .uint16:
-            return self
-        case .uint32:
-            return self
-        case .uint64:
-            return self
         case .unwrappedOptional(let type):
             return .unwrappedOptional(type.qualified(in: node))
-        case .void:
+        default:
             return self
         }
     }
