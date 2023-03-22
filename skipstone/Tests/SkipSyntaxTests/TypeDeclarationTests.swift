@@ -120,6 +120,28 @@ final class TypeDeclarationTests: XCTestCase {
             }
         }
         """)
+
+        // These types are not present in symbols so that we can simulate out-of-module extensions
+        try await check(swift: """
+        extension C {
+            func f() {
+            }
+        }
+        """, kotlin: """
+        internal fun C.f() {
+        }
+        """)
+        try await checkProducesMessage(swift: """
+        extension C: I {
+            func f() {
+            }
+        }
+        """)
+        try await checkProducesMessage(swift: """
+        extension C {
+            init(i: Int)
+        }
+        """)
     }
 
     func testProtocol() async throws {
@@ -136,6 +158,17 @@ final class TypeDeclarationTests: XCTestCase {
             var j: String
             fun f(i: Int): String
             fun g()
+        }
+        """)
+
+        try await checkProducesMessage(swift: """
+        protocol P {
+            static var i: Int { get }
+        }
+        """)
+        try await checkProducesMessage(swift: """
+        protocol P {
+            init(i: Int)
         }
         """)
     }
