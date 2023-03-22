@@ -416,7 +416,7 @@ public class Symbols {
                 return []
             case .member(let base, let type):
                 let typeNames = candidateTypeNames(for: type)
-                let baseName = base.description
+                let baseName = base.name
                 return typeNames.map { "\(baseName).\($0)" }
             case .metaType(let type):
                 return candidateTypeNames(for: type)
@@ -433,7 +433,7 @@ public class Symbols {
             case .void:
                 return []
             default:
-                return [type.description]
+                return [type.name]
             }
         }
     }

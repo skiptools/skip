@@ -80,7 +80,7 @@ public class KotlinCodebaseInfo {
             addTypeInfo(for: typeDeclaration, mayBeMutableStructType: mayBeMutableStructType)
         case .extensionDeclaration:
             let declaration = statement as! ExtensionDeclaration
-            let key = declaration.extends.description
+            let key = declaration.extends.name
             var infos = extensionInfo[key, default: []]
             infos.append(ExtensionInfo(declaration: declaration, sourceFile: statement.sourceFile))
             extensionInfo[key] = infos
@@ -151,7 +151,7 @@ public class KotlinCodebaseInfo {
         func constructorParameters(of qualifiedName: String) -> [[ConstructorParameter]] {
             for info in codebaseInfo.typeInfo[qualifiedName, default: []] {
                 if !info.isPrivate || info.sourceFile == sourceFile {
-                    if info.constructorParameters.isEmpty, let firstInherits = info.inherits.first?.description {
+                    if info.constructorParameters.isEmpty, let firstInherits = info.inherits.first?.name {
                         return constructorParameters(of: firstInherits)
                     } else {
                         return info.constructorParameters
@@ -173,12 +173,12 @@ public class KotlinCodebaseInfo {
             guard !declaration.names.isEmpty, let name = declaration.names[0] else {
                 return false
             }
-            return symbols?.protocolOf(qualifiedName: type.description, hasMember: name, kind: declaration.modifiers.isStatic ? .typeProperty : .property, type: nil) == true
+            return symbols?.protocolOf(qualifiedName: type.name, hasMember: name, kind: declaration.modifiers.isStatic ? .typeProperty : .property, type: nil) == true
         }
 
         /// Whether a function with the given signature is implementing a protocol function.
         func isProtocolMember(declaration: FunctionDeclaration, in type: TypeSignature) -> Bool {
-            return symbols?.protocolOf(qualifiedName: type.description, hasMember: declaration.name, kind: declaration.modifiers.isStatic ? .typeMethod : .method, type: nil) == true
+            return symbols?.protocolOf(qualifiedName: type.name, hasMember: declaration.name, kind: declaration.modifiers.isStatic ? .typeMethod : .method, type: nil) == true
         }
 
         /// Whether the given qualified type name may map to a mutable struct type.
@@ -244,7 +244,7 @@ public class KotlinCodebaseInfo {
                 isStatic = true
                 owningType = baseType
             }
-            return symbols.isFunction(name: name, in: owningType?.description, isStatic: isStatic) == true
+            return symbols.isFunction(name: name, in: owningType?.name, isStatic: isStatic) == true
         }
     }
 

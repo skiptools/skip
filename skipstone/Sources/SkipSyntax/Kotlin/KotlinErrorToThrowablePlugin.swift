@@ -18,7 +18,7 @@ class KotlinErrorToThrowablePlugin: KotlinPlugin {
         guard codebaseInfo.conformsToError(qualifiedName: classDeclaration.signature.name) else {
             return
         }
-        if let firstInherits = classDeclaration.inherits.first, codebaseInfo.declarationType(of: firstInherits.description, mustBeInModule: false) == .classDeclaration {
+        if let firstInherits = classDeclaration.inherits.first, codebaseInfo.declarationType(of: firstInherits.name, mustBeInModule: false) == .classDeclaration {
             classDeclaration.messages.append(.kotlinErrorCannotExtendClass(classDeclaration))
             return
         }
