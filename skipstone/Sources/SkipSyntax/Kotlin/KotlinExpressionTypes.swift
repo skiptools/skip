@@ -1048,7 +1048,7 @@ class KotlinMemberAccess: KotlinExpression {
         guard let codebaseInfo else {
             return nil
         }
-        return codebaseInfo.declarationType(of: identifier.name, mustBeInModule: false) == nil ? type : nil
+        return codebaseInfo.declarationType(of: .named(identifier.name, []), mustBeInModule: false) == nil ? type : nil
     }
 
     init(base: KotlinExpression, member: String) {

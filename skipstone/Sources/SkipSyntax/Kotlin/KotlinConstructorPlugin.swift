@@ -119,7 +119,7 @@ class KotlinConstructorPlugin: KotlinPlugin {
     }
 
     private func superclass(of classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) -> String? {
-        guard let inherits = classDeclaration.inherits.first, translator.codebaseInfo?.declarationType(of: inherits.name, mustBeInModule: false) == .classDeclaration else {
+        guard let inherits = classDeclaration.inherits.first, translator.codebaseInfo?.declarationType(of: inherits, mustBeInModule: false) == .classDeclaration else {
             return nil
         }
         return inherits.description

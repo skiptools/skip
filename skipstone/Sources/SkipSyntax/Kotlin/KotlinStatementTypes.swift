@@ -972,7 +972,7 @@ struct KotlinExtensionDeclaration {
     static func translate(statement: ExtensionDeclaration, translator: KotlinTranslator) -> [KotlinStatement] {
         // If the extension is on a type outside this module or only applies to certain generic constraints, use Kotlin extension
         // functions. Otherwise do not translate the extension - instead we'll move its members into the extended type
-        guard statement.generics.whereEqual.isEmpty, translator.codebaseInfo?.declarationType(of: statement.extends.name, mustBeInModule: true) == nil else {
+        guard statement.generics.whereEqual.isEmpty, translator.codebaseInfo?.declarationType(of: statement.extends, mustBeInModule: true) == nil else {
             return []
         }
 
@@ -1041,7 +1041,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         var owningDeclarationType: StatementType? = nil
         if let owningTypeDeclaration = statement.owningTypeDeclaration, owningTypeDeclaration === statement.parent {
             // Use codebaseInfo rather than .type directly so that extension API is also handled correctly
-            owningDeclarationType = translator.codebaseInfo?.declarationType(of: owningTypeDeclaration.signature.name, mustBeInModule: false) ?? owningTypeDeclaration.type
+            owningDeclarationType = translator.codebaseInfo?.declarationType(of: owningTypeDeclaration.signature, mustBeInModule: false) ?? owningTypeDeclaration.type
             if statement.type == .initDeclaration {
                 kstatement.isOpen = false
                 kstatement.modifiers.isOverride = false // Kotlin does not override constructors
@@ -1405,7 +1405,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         var owningDeclarationType: StatementType? = nil
         if let owningTypeDeclaration = statement.owningTypeDeclaration, owningTypeDeclaration === statement.parent {
             // Use codebaseInfo rather than .type directly so that extension API is also handled correctly
-            owningDeclarationType = translator.codebaseInfo?.declarationType(of: owningTypeDeclaration.signature.name, mustBeInModule: false) ?? owningTypeDeclaration.type
+            owningDeclarationType = translator.codebaseInfo?.declarationType(of: owningTypeDeclaration.signature, mustBeInModule: false) ?? owningTypeDeclaration.type
             kstatement.isProperty = true
             if owningDeclarationType == .protocolDeclaration {
                 // Kotlin uses default public visibility on all interface members

@@ -15,10 +15,10 @@ class KotlinErrorToThrowablePlugin: KotlinPlugin {
     }
 
     private func processClassDeclaration(_ classDeclaration: KotlinClassDeclaration, codebaseInfo: KotlinCodebaseInfo.Context) {
-        guard codebaseInfo.conformsToError(qualifiedName: classDeclaration.signature.name) else {
+        guard codebaseInfo.conformsToError(type: classDeclaration.signature) else {
             return
         }
-        if let firstInherits = classDeclaration.inherits.first, codebaseInfo.declarationType(of: firstInherits.name, mustBeInModule: false) == .classDeclaration {
+        if let firstInherits = classDeclaration.inherits.first, codebaseInfo.declarationType(of: firstInherits, mustBeInModule: false) == .classDeclaration {
             classDeclaration.messages.append(.kotlinErrorCannotExtendClass(classDeclaration))
             return
         }

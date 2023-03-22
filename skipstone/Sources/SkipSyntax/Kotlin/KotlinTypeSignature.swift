@@ -201,23 +201,20 @@ extension TypeSignature {
             return false
         case .int64:
             return false
-        case .named(let name, _):
+        case .named:
             guard let codebaseInfo else {
                 return true
             }
-            return codebaseInfo.mayBeMutableStructType(qualifiedName: name)
+            return codebaseInfo.mayBeMutableStruct(type: self)
         case .none:
             return true
         case .optional(let type):
             return type.kotlinMayBeSharedMutableStruct(codebaseInfo: codebaseInfo)
-        case .member(let base, let type):
-            guard case .named(let name, _) = type else {
-                return type.kotlinMayBeSharedMutableStruct(codebaseInfo: codebaseInfo)
-            }
+        case .member:
             guard let codebaseInfo else {
                 return true
             }
-            return codebaseInfo.mayBeMutableStructType(qualifiedName: "\(base).\(name)")
+            return codebaseInfo.mayBeMutableStruct(type: self)
         case .metaType:
             return false
         case .range:
@@ -249,10 +246,10 @@ extension TypeSignature {
 
     /// Whether this type represents an enum modeled with sealed classes.
     func kotlinIsSealedClassesEnum(codebaseInfo: KotlinCodebaseInfo.Context?) -> Bool {
-        guard case .named(let typeName, _) = asOptional(false) else {
+        guard case .named = asOptional(false) else {
             return false
         }
-        return codebaseInfo?.isSealedClassesEnum(qualifiedName: typeName) == true
+        return codebaseInfo?.isSealedClassesEnum(type: self) == true
     }
 
     /// Whether this type uses `KClass`, which requires additional imports.

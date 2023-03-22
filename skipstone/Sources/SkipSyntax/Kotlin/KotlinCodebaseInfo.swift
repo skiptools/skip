@@ -117,9 +117,9 @@ public class KotlinCodebaseInfo {
             }
         }
 
-        //~~~ Could change this one to TypeSignature
-        /// Whether the given qualified type name is a class, struct, etc, optionally limiting results to this module.
-        func declarationType(of qualifiedName: String, mustBeInModule: Bool) -> StatementType? {
+        /// Whether the given type is a class, struct, etc, optionally limiting results to this module.
+        func declarationType(of type: TypeSignature, mustBeInModule: Bool) -> StatementType? {
+            let qualifiedName = type.name
             for info in codebaseInfo.typeInfo[qualifiedName, default: []] {
                 if !info.isPrivate || info.sourceFile == sourceFile {
                     return info.declarationType
@@ -150,7 +150,8 @@ public class KotlinCodebaseInfo {
 
         /// The signatures of all visible constructors of the given type, including inherited constructors.
         func constructorParameters(of type: TypeSignature) -> [[ConstructorParameter]] {
-            for info in codebaseInfo.typeInfo[type.name, default: []] {
+            let qualifiedName = type.name
+            for info in codebaseInfo.typeInfo[qualifiedName, default: []] {
                 if !info.isPrivate || info.sourceFile == sourceFile {
                     if info.constructorParameters.isEmpty, let firstInherits = info.inherits.first {
                         //~~~ need to map generic names... e.g. class A<T>, class B<X>: A<X> maps T->X or class B: A<Int> maps T->Int
@@ -166,7 +167,7 @@ public class KotlinCodebaseInfo {
                 return []
             }
             //~~~ Need to pass type signature so can apply generics
-            return symbols.constructorSignatures(qualifiedName: type.name).map {
+            return symbols.constructorSignatures(qualifiedName: qualifiedName).map {
                 return $0.parameters.map { ConstructorParameter(label: $0.label, type: $0.type, isVariadic: $0.isVariadic, defaultValue: nil) }
             }
         }
@@ -184,9 +185,9 @@ public class KotlinCodebaseInfo {
             return symbols?.protocolOf(qualifiedName: type.name, hasMember: declaration.name, kind: declaration.modifiers.isStatic ? .typeMethod : .method, type: declaration.functionType) == true
         }
 
-        //~~~ This one too
-        /// Whether the given qualified type name may map to a mutable struct type.
-        func mayBeMutableStructType(qualifiedName: String) -> Bool {
+        /// Whether the given type may be a mutable struct.
+        func mayBeMutableStruct(type: TypeSignature) -> Bool {
+            let qualifiedName = type.name
             for info in codebaseInfo.typeInfo[qualifiedName, default: []] {
                 if !info.isPrivate || info.sourceFile == sourceFile, let mayBeMutableStructType = info.mayBeMutableStructType {
                     return mayBeMutableStructType
@@ -195,9 +196,9 @@ public class KotlinCodebaseInfo {
             return symbols?.isMutableStructType(qualifiedName: qualifiedName) != false
         }
 
-        //~~~ This one too
         /// Whether the given type conforms to `Error` through its protocols, **not** through inheritance.
-        func conformsToError(qualifiedName: String) -> Bool {
+        func conformsToError(type: TypeSignature) -> Bool {
+            let qualifiedName = type.name
             guard qualifiedName != "Error" else {
                 return true
             }
@@ -215,15 +216,15 @@ public class KotlinCodebaseInfo {
             return symbols?.conformsToError(qualifiedName: qualifiedName) == true
         }
 
-        //~~~ And this one
         /// Whether the given enum type has cases with associated values.
-        func isSealedClassesEnum(qualifiedName: String) -> Bool {
+        func isSealedClassesEnum(type: TypeSignature) -> Bool {
+            let qualifiedName = type.name
             for info in codebaseInfo.typeInfo[qualifiedName, default: []] {
                 if !info.isPrivate || info.sourceFile == sourceFile {
                     if info.declarationType != .enumDeclaration {
                         return false
                     }
-                    return info.hasAssociatedValues || conformsToError(qualifiedName: qualifiedName)
+                    return info.hasAssociatedValues || conformsToError(type: type)
                 }
             }
             guard let symbols else {
