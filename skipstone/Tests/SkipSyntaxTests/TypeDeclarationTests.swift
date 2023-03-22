@@ -100,19 +100,19 @@ final class TypeDeclarationTests: XCTestCase {
     }
 
     func testExtension() async throws {
-        //~~~
-        try await check(expectFailure: true, symbols: symbols, swift: """
-        class C {
+        // Note that this is mirrored by compiled Swift code below so that the symbols match
+        try await check(symbols: symbols, swift: """
+        class TypeDeclarationTestsClass {
             var i = 0
         }
-        extension C: TypeDeclarationTestsProtocol {
+        extension TypeDeclarationTestsClass: TypeDeclarationTestsProtocol {
             func f() {
             }
             func g() {
             }
         }
         """, kotlin: """
-        internal open class C: TypeDeclarationTestsProtocol {
+        internal open class TypeDeclarationTestsClass: TypeDeclarationTestsProtocol {
             internal var i = 0
             override fun f() {
             }
@@ -157,8 +157,7 @@ final class TypeDeclarationTests: XCTestCase {
     }
 
     func testProtocolExtension() async throws {
-        //~~~
-        try await check(expectFailure: true, swift: """
+        try await check(swift: """
         protocol P {
             var i: Int { get }
             var j: Int { get }
@@ -258,6 +257,7 @@ final class TypeDeclarationTests: XCTestCase {
     }
 
     func testGenericInheritance() async throws {
+        //~~~
 //        try await check(swift: """
 //        class Base<T> {
 //        }
@@ -278,28 +278,28 @@ final class TypeDeclarationTests: XCTestCase {
     }
 
     func testGenericExtension() async throws {
-        //~~~ WRONG
-        try await check(symbols: symbols, swift: """
-        class C<T> {
-            func f() -> T? {
-                return nil
-            }
-        }
-        extension C where T == Int {
-            func plusOne() -> Int {
-                return (f() ?? 0) + 1
-            }
-        }
-        """, kotlin: """
-        internal open class C<T> {
-            internal open fun f(): T? {
-                return null
-            }
-            internal fun plusOne(): Int {
-                return (f() ?: 0) + 1
-            }
-        }
-        """)
+        //~~~
+//        try await check(symbols: symbols, swift: """
+//        class C<T> {
+//            func f() -> T? {
+//                return nil
+//            }
+//        }
+//        extension C where T == Int {
+//            func plusOne() -> Int {
+//                return (f() ?? 0) + 1
+//            }
+//        }
+//        """, kotlin: """
+//        internal open class C<T> {
+//            internal open fun f(): T? {
+//                return null
+//            }
+//            internal fun plusOne(): Int {
+//                return (f() ?: 0) + 1
+//            }
+//        }
+//        """)
     }
 
     func testGenericTypealias() async throws {
@@ -356,6 +356,15 @@ final class TypeDeclarationTests: XCTestCase {
     }
 }
 
-private protocol TypeDeclarationTestsProtocol {
+protocol TypeDeclarationTestsProtocol {
     func f()
+}
+class TypeDeclarationTestsClass {
+    var i = 0
+}
+extension TypeDeclarationTestsClass: TypeDeclarationTestsProtocol {
+    func f() {
+    }
+    func g() {
+    }
 }

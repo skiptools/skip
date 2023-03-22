@@ -170,48 +170,15 @@ public class KotlinCodebaseInfo {
 
         /// Whether a property with the given signature is implementing a protocol property.
         func isProtocolMember(declaration: VariableDeclaration, in type: TypeSignature) -> Bool {
-            guard let symbols, !declaration.names.isEmpty, let name = declaration.names[0] else {
+            guard !declaration.names.isEmpty, let name = declaration.names[0] else {
                 return false
             }
-            // Check parsed type info first so that we can test
-            for info in codebaseInfo.typeInfo[type.description, default: []] {
-                if !info.isPrivate || info.sourceFile == sourceFile {
-                    if info.declarationType == .protocolDeclaration {
-                        return symbols.protocolOf(qualifiedName: type.description, hasMember: name, kind: declaration.modifiers.isStatic ? .typeProperty : .property, type: nil) == true
-                    } else {
-                        for type in info.inherits {
-                            if symbols.protocolOf(qualifiedName: type.description, hasMember: name, kind: declaration.modifiers.isStatic ? .typeProperty : .property, type: nil) == true {
-                                return true
-                            }
-                        }
-                        return false
-                    }
-                }
-            }
-            return symbols.protocolOf(qualifiedName: type.description, hasMember: name, kind: declaration.modifiers.isStatic ? .typeProperty : .property, type: nil) == true
+            return symbols?.protocolOf(qualifiedName: type.description, hasMember: name, kind: declaration.modifiers.isStatic ? .typeProperty : .property, type: nil) == true
         }
 
         /// Whether a function with the given signature is implementing a protocol function.
         func isProtocolMember(declaration: FunctionDeclaration, in type: TypeSignature) -> Bool {
-            guard let symbols else {
-                return false
-            }
-            // Check parsed type info first so that we can test
-            for info in codebaseInfo.typeInfo[type.description, default: []] {
-                if !info.isPrivate || info.sourceFile == sourceFile {
-                    if info.declarationType == .protocolDeclaration {
-                        return symbols.protocolOf(qualifiedName: type.description, hasMember: declaration.name, kind: declaration.modifiers.isStatic ? .typeMethod : .method, type: nil) == true
-                    } else {
-                        for type in info.inherits {
-                            if symbols.protocolOf(qualifiedName: type.description, hasMember: declaration.name, kind: declaration.modifiers.isStatic ? .typeMethod : .method, type: nil) == true {
-                                return true
-                            }
-                        }
-                        return false
-                    }
-                }
-            }
-            return symbols.protocolOf(qualifiedName: type.description, hasMember: declaration.name, kind: declaration.modifiers.isStatic ? .typeMethod : .method, type: nil) == true
+            return symbols?.protocolOf(qualifiedName: type.description, hasMember: declaration.name, kind: declaration.modifiers.isStatic ? .typeMethod : .method, type: nil) == true
         }
 
         /// Whether the given qualified type name may map to a mutable struct type.

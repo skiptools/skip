@@ -973,7 +973,13 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
 
     // KotlinMemberDeclaration
-    var extends: TypeSignature?
+    var extends: TypeSignature? {
+        didSet {
+            if extends != nil {
+                isOpen = false
+            }
+        }
+    }
     var isStatic: Bool {
         return modifiers.isStatic
     }
@@ -984,7 +990,10 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         kstatement.modifiers = statement.modifiers
         kstatement.returnType = statement.returnType
         kstatement.parameters = statement.parameters.map { $0.translate(translator: translator) }
-        if let owningTypeDeclaration = statement.owningTypeDeclaration {
+        var owningDeclarationType: StatementType? = nil
+        if let owningTypeDeclaration = statement.owningTypeDeclaration, owningTypeDeclaration === statement.parent {
+            // Use codebaseInfo rather than .type directly so that extension API is also handled correctly
+            owningDeclarationType = translator.codebaseInfo?.declarationType(of: owningTypeDeclaration.signature.description, mustBeInModule: false) ?? owningTypeDeclaration.type
             if statement.type == .initDeclaration {
                 kstatement.isOpen = false
                 kstatement.modifiers.isOverride = false // Kotlin does not override constructors
@@ -992,9 +1001,14 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                     kstatement.messages.append(.kotlinConstructorNullReturn(statement))
                 }
             } else {
-                kstatement.isOpen = !statement.modifiers.isFinal && statement.modifiers.visibility != .private && owningTypeDeclaration.type == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
-                if owningTypeDeclaration.type != .protocolDeclaration && !kstatement.modifiers.isOverride && translator.codebaseInfo?.isProtocolMember(declaration: statement, in: owningTypeDeclaration.signature) == true {
-                    kstatement.modifiers.isOverride = true
+                if owningDeclarationType == .protocolDeclaration {
+                    // Kotlin uses default public visibility on all interface members
+                    kstatement.modifiers.visibility = .public
+                } else {
+                    if !kstatement.modifiers.isOverride && translator.codebaseInfo?.isProtocolMember(declaration: statement, in: owningTypeDeclaration.signature) == true {
+                        kstatement.modifiers.isOverride = true
+                    }
+                    kstatement.isOpen = !kstatement.modifiers.isOverride && !statement.modifiers.isFinal && statement.modifiers.visibility != .private && owningDeclarationType == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
                 }
                 // Kotlin does not all you to decrease visibility when overriding a member, so we simply make all overrides public to prevent errors
                 if kstatement.modifiers.isOverride {
@@ -1013,14 +1027,12 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         kstatement.parameters.forEach { $0.declaredType.appendKotlinMessages(to: kstatement) }
 
         // Warnings and fixups
-        if let owningTypeDeclaration = statement.owningTypeDeclaration, owningTypeDeclaration === statement.parent, owningTypeDeclaration.type == .protocolDeclaration {
+        if owningDeclarationType == .protocolDeclaration {
             if statement.type == .initDeclaration {
                 kstatement.messages.append(.kotlinProtocolConstructor(statement))
             } else if statement.modifiers.isStatic {
                 kstatement.messages.append(.kotlinProtocolStaticMember(statement))
             }
-            // Kotlin uses default public visibility on all interface members
-            kstatement.modifiers.visibility = .public
         }
         if statement.attributes.attributes.contains(where: { !isIgnorable(attribute: $0) }) {
             kstatement.messages.append(.kotlinAttributeUnsupported(statement))
@@ -1325,7 +1337,13 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var mutationFunctionNames: (willMutate: String, didMutate: String)?
 
     // KotlinMemberDeclaration
-    var extends: TypeSignature?
+    var extends: TypeSignature? {
+        didSet {
+            if extends != nil {
+                isOpen = false
+            }
+        }
+    }
     var isStatic: Bool {
         return modifiers.isStatic
     }
@@ -1336,17 +1354,25 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         kstatement.isAsync = statement.isAsync
         kstatement.modifiers = statement.modifiers
         kstatement.declaredType = statement.declaredType
-        if let owningTypeDeclaration = statement.owningTypeDeclaration {
-            kstatement.isProperty = statement.parent === owningTypeDeclaration
-            kstatement.isOpen = kstatement.isProperty && !statement.modifiers.isFinal && statement.modifiers.visibility != .private && owningTypeDeclaration.type == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
-            if owningTypeDeclaration.type != .protocolDeclaration && kstatement.isProperty && !kstatement.modifiers.isOverride && translator.codebaseInfo?.isProtocolMember(declaration: statement, in: owningTypeDeclaration.signature) == true {
-                kstatement.modifiers.isOverride = true
+        var owningDeclarationType: StatementType? = nil
+        if let owningTypeDeclaration = statement.owningTypeDeclaration, owningTypeDeclaration === statement.parent {
+            // Use codebaseInfo rather than .type directly so that extension API is also handled correctly
+            owningDeclarationType = translator.codebaseInfo?.declarationType(of: owningTypeDeclaration.signature.description, mustBeInModule: false) ?? owningTypeDeclaration.type
+            kstatement.isProperty = true
+            if owningDeclarationType == .protocolDeclaration {
+                // Kotlin uses default public visibility on all interface members
+                kstatement.modifiers.visibility = .public
+            } else {
+                if !kstatement.modifiers.isOverride && translator.codebaseInfo?.isProtocolMember(declaration: statement, in: owningTypeDeclaration.signature) == true {
+                    kstatement.modifiers.isOverride = true
+                }
+                kstatement.isOpen = !kstatement.modifiers.isOverride && !statement.modifiers.isFinal && statement.modifiers.visibility != .private && owningDeclarationType == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
             }
             // Kotlin does not all you to decrease visibility when overriding a member, so we simply make all overrides public to prevent errors
             if kstatement.modifiers.isOverride {
                 kstatement.modifiers.visibility = .public
             }
-        } else if statement.parent?.parent == nil {
+        } else if statement.owningTypeDeclaration == nil && statement.parent?.parent == nil {
             kstatement.isGlobal = true
         }
         if let value = statement.value {
@@ -1376,12 +1402,10 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if statement.isAsync {
             kstatement.messages.append(.kotlinAsyncProperties(kstatement))
         }
-        if let owningTypeDeclaration = statement.owningTypeDeclaration, owningTypeDeclaration === statement.parent, owningTypeDeclaration.type == .protocolDeclaration {
+        if owningDeclarationType == .protocolDeclaration {
             if statement.modifiers.isStatic {
                 kstatement.messages.append(.kotlinProtocolStaticMember(statement))
             }
-            // Kotlin uses default public visibility on all interface members
-            kstatement.modifiers.visibility = .public
         }
         if !statement.attributes.isEmpty {
             kstatement.messages.append(.kotlinAttributeUnsupported(statement))

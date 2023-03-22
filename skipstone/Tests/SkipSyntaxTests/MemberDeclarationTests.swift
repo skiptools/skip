@@ -305,16 +305,17 @@ final class MemberDeclarationTests: XCTestCase {
     }
 
     func testOverrideProtocolMember() async throws {
+        // Note that this is mirrored by compiled Swift code below so that the symbols match
         try await check(symbols: symbols, swift: """
-        class C: MemberDeclarationTestsProtocol {
+        class MemberDeclarationTestsProtocolImpl: MemberDeclarationTestsProtocol {
             var i = 0
             func f() {
             }
         }
         """, kotlin: """
-        internal open class C: MemberDeclarationTestsProtocol {
+        internal open class MemberDeclarationTestsProtocolImpl: MemberDeclarationTestsProtocol {
             override var i = 0
-            override open fun f() {
+            override fun f() {
             }
         }
         """)
@@ -356,7 +357,12 @@ private class MemberDeclarationTestsSideEffectsClass {
     }
 }
 
-private protocol MemberDeclarationTestsProtocol {
+protocol MemberDeclarationTestsProtocol {
     var i: Int { get }
     func f()
+}
+class MemberDeclarationTestsProtocolImpl: MemberDeclarationTestsProtocol {
+    var i = 0
+    func f() {
+    }
 }
