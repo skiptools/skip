@@ -149,8 +149,38 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
 
     /// Apply the given generic types.
     func withGenerics(_ generics: Generics) -> TypeSignature {
-        //~~~
-        return self
+        let generic = generics.type(of: self)
+        if generic != .none {
+            return generic
+        }
+        switch self {
+        case .array(let element):
+            return .array(element.withGenerics(generics))
+        case .composition(let types):
+            return .composition(types.map { $0.withGenerics(generics) })
+        case .dictionary(let key, let value):
+            return .dictionary(key.withGenerics(generics), value.withGenerics(generics))
+        case .function(let parameters, let returnType):
+            return .function(parameters.map { $0.withGenerics(generics) }, returnType.withGenerics(generics))
+        case .member(let base, let type):
+            return .member(base.withGenerics(generics), type.withGenerics(generics))
+        case .metaType(let base):
+            return .metaType(base.withGenerics(generics))
+        case .named(let name, let genericTypes):
+            return .named(name, genericTypes.map { $0.withGenerics(generics) })
+        case .optional(let type):
+            return .optional(type.withGenerics(generics))
+        case .range(let element):
+            return .range(element.withGenerics(generics))
+        case .set(let element):
+            return .set(element.withGenerics(generics))
+        case .tuple(let labels, let types):
+            return .tuple(labels, types.map { $0.withGenerics(generics) })
+        case .unwrappedOptional(let type):
+            return .unwrappedOptional(type.withGenerics(generics))
+        default:
+            return self
+        }
     }
 
     /// Attempt to replace `.none` cases in this type signature with information from the given signature.
@@ -811,6 +841,12 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
         func or(_ typeSignature: TypeSignature) -> Parameter {
             var parameter = self
             parameter.type = parameter.type.or(typeSignature)
+            return parameter
+        }
+
+        func withGenerics(_ generics: Generics) -> Parameter {
+            var parameter = self
+            parameter.type = parameter.type.withGenerics(generics)
             return parameter
         }
 

@@ -413,20 +413,19 @@ struct Generics {
 
     /// Return the constrained type of the given generic parameter.
     ///
-    /// - Returns: `nil` if the parameter is not found, `.composition(types)` for multiple constraints, `.any` for a recognized parameter name without constraints
-    func type(of name: String) -> TypeSignature? {
-        return whereEqual[name] ?? entries.first(where: { $0.name == name })?.type
+    /// - Returns: `.none` if the parameter is not found, `.composition(types)` for multiple constraints, `.any` for a recognized parameter name without constraints
+    func type(of name: String) -> TypeSignature {
+        return whereEqual[name] ?? entries.first(where: { $0.name == name })?.type ?? .none
     }
 
-    /// Resolve the given type against our generics.
+    /// Return the constrained type of the given generic parameter.
     ///
-    /// If the given type maps to a generic, return its constraints. Otherwise return the given type.
-    /// - Seealso: `type(of:)`
-    func resolveType(_ signature: TypeSignature) -> TypeSignature {
+    /// - Seealso: `type(of: String)`
+    func type(of signature: TypeSignature) -> TypeSignature {
         guard case .named(let name, let genericTypes) = signature, genericTypes.isEmpty else {
-            return signature
+            return .none
         }
-        return type(of: name) ?? signature
+        return type(of: name)
     }
 
     func qualified(in node: SyntaxNode) -> Generics {
