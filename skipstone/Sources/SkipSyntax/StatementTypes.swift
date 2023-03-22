@@ -646,6 +646,7 @@ class ExtensionDeclaration: TypeDeclaration {
 
     init(extends: TypeSignature, inherits: [TypeSignature] = [], attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), members: [Statement] = [], syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.extends = extends
+        //~~~ Need to figure out what the generic parameters are on the type being extended: class C<T>, extension C { ... } T will be missing
         super.init(type: .extensionDeclaration, name: extends.name, signature: extends, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
@@ -887,8 +888,7 @@ class TypeDeclaration: Statement {
     private(set) var generics: Generics
     let members: [Statement]
     var signature: TypeSignature {
-        //~~~ What generics to supply: declared labels or upper bound values? What about protocols? Extensions?
-        return _signature ?? TypeSignature.for(name: name, genericTypes: [])
+        return _signature ?? TypeSignature.for(name: name, genericTypes: generics.entries.map { .named($0.name, []) })
     }
     private var _signature: TypeSignature?
 

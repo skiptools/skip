@@ -117,6 +117,7 @@ public class KotlinCodebaseInfo {
             }
         }
 
+        //~~~ Could change this one to TypeSignature
         /// Whether the given qualified type name is a class, struct, etc, optionally limiting results to this module.
         func declarationType(of qualifiedName: String, mustBeInModule: Bool) -> StatementType? {
             for info in codebaseInfo.typeInfo[qualifiedName, default: []] {
@@ -148,10 +149,11 @@ public class KotlinCodebaseInfo {
         }
 
         /// The signatures of all visible constructors of the given type, including inherited constructors.
-        func constructorParameters(of qualifiedName: String) -> [[ConstructorParameter]] {
-            for info in codebaseInfo.typeInfo[qualifiedName, default: []] {
+        func constructorParameters(of type: TypeSignature) -> [[ConstructorParameter]] {
+            for info in codebaseInfo.typeInfo[type.name, default: []] {
                 if !info.isPrivate || info.sourceFile == sourceFile {
-                    if info.constructorParameters.isEmpty, let firstInherits = info.inherits.first?.name {
+                    if info.constructorParameters.isEmpty, let firstInherits = info.inherits.first {
+                        //~~~ need to map generic names... e.g. class A<T>, class B<X>: A<X> maps T->X or class B: A<Int> maps T->Int
                         return constructorParameters(of: firstInherits)
                     } else {
                         return info.constructorParameters
@@ -163,7 +165,8 @@ public class KotlinCodebaseInfo {
             guard let symbols else {
                 return []
             }
-            return symbols.constructorSignatures(qualifiedName: qualifiedName).map {
+            //~~~ Need to pass type signature so can apply generics
+            return symbols.constructorSignatures(qualifiedName: type.name).map {
                 return $0.parameters.map { ConstructorParameter(label: $0.label, type: $0.type, isVariadic: $0.isVariadic, defaultValue: nil) }
             }
         }
@@ -178,9 +181,10 @@ public class KotlinCodebaseInfo {
 
         /// Whether a function with the given signature is implementing a protocol function.
         func isProtocolMember(declaration: FunctionDeclaration, in type: TypeSignature) -> Bool {
-            return symbols?.protocolOf(qualifiedName: type.name, hasMember: declaration.name, kind: declaration.modifiers.isStatic ? .typeMethod : .method, type: nil) == true
+            return symbols?.protocolOf(qualifiedName: type.name, hasMember: declaration.name, kind: declaration.modifiers.isStatic ? .typeMethod : .method, type: declaration.functionType) == true
         }
 
+        //~~~ This one too
         /// Whether the given qualified type name may map to a mutable struct type.
         func mayBeMutableStructType(qualifiedName: String) -> Bool {
             for info in codebaseInfo.typeInfo[qualifiedName, default: []] {
@@ -191,6 +195,7 @@ public class KotlinCodebaseInfo {
             return symbols?.isMutableStructType(qualifiedName: qualifiedName) != false
         }
 
+        //~~~ This one too
         /// Whether the given type conforms to `Error` through its protocols, **not** through inheritance.
         func conformsToError(qualifiedName: String) -> Bool {
             guard qualifiedName != "Error" else {
@@ -210,6 +215,7 @@ public class KotlinCodebaseInfo {
             return symbols?.conformsToError(qualifiedName: qualifiedName) == true
         }
 
+        //~~~ And this one
         /// Whether the given enum type has cases with associated values.
         func isSealedClassesEnum(qualifiedName: String) -> Bool {
             for info in codebaseInfo.typeInfo[qualifiedName, default: []] {
