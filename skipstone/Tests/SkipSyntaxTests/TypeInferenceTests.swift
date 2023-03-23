@@ -164,6 +164,18 @@ final class TypeInferenceTests: XCTestCase {
         """)
     }
 
+    func testGenerics() throws {
+        throw XCTSkip("Test all aspects of using generic paramters")
+    }
+
+    func testGenericsUpperBounds() throws {
+        throw XCTSkip("Test that we use the upper bounds on generics")
+    }
+
+    func testGenericsWhereEqualExtension() throws {
+        throw XCTSkip("Test that we incorporate generics where clauses on extensions")
+    }
+
     func testTypealias() throws {
         throw XCTSkip("TODO: Test that we can match typealiases to types")
     }

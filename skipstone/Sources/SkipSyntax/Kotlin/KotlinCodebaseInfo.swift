@@ -150,14 +150,20 @@ public class KotlinCodebaseInfo {
 
         /// The signatures of all visible constructors of the given type, including inherited constructors.
         func constructorParameters(of type: TypeSignature) -> [[ConstructorParameter]] {
-            let qualifiedName = type.name
-            for info in codebaseInfo.typeInfo[qualifiedName, default: []] {
+            for info in codebaseInfo.typeInfo[type.name, default: []] {
                 if !info.isPrivate || info.sourceFile == sourceFile {
                     if info.constructorParameters.isEmpty, let firstInherits = info.inherits.first {
-                        //~~~ need to map generic names... e.g. class A<T>, class B<X>: A<X> maps T->X or class B: A<Int> maps T->Int
                         return constructorParameters(of: firstInherits)
                     } else {
-                        return info.constructorParameters
+                        // If we've recursed on super types, map the declared generics to the supertype generics, e.g.:
+                        // class A<T>; class B: A<Int>; map any uses of T => Int
+                        return info.constructorParameters.map { parameters in
+                            return parameters.map {
+                                var p = $0
+                                p.type = p.type.mappingGenerics(from: info.signature.generics, to: type.generics)
+                                return p
+                            }
+                        }
                     }
                 }
             }
@@ -166,8 +172,7 @@ public class KotlinCodebaseInfo {
             guard let symbols else {
                 return []
             }
-            //~~~ Need to pass type signature so can apply generics
-            return symbols.constructorSignatures(qualifiedName: qualifiedName).map {
+            return symbols.constructorSignatures(in: type).map {
                 return $0.parameters.map { ConstructorParameter(label: $0.label, type: $0.type, isVariadic: $0.isVariadic, defaultValue: nil) }
             }
         }
@@ -177,23 +182,22 @@ public class KotlinCodebaseInfo {
             guard !declaration.names.isEmpty, let name = declaration.names[0] else {
                 return false
             }
-            return symbols?.protocolOf(qualifiedName: type.name, hasMember: name, kind: declaration.modifiers.isStatic ? .typeProperty : .property, type: nil) == true
+            return symbols?.protocolOf(type, hasMember: name, kind: declaration.modifiers.isStatic ? .typeProperty : .property, type: nil) == true
         }
 
         /// Whether a function with the given signature is implementing a protocol function.
         func isProtocolMember(declaration: FunctionDeclaration, in type: TypeSignature) -> Bool {
-            return symbols?.protocolOf(qualifiedName: type.name, hasMember: declaration.name, kind: declaration.modifiers.isStatic ? .typeMethod : .method, type: declaration.functionType) == true
+            return symbols?.protocolOf(type, hasMember: declaration.name, kind: declaration.modifiers.isStatic ? .typeMethod : .method, type: declaration.functionType) == true
         }
 
         /// Whether the given type may be a mutable struct.
         func mayBeMutableStruct(type: TypeSignature) -> Bool {
-            let qualifiedName = type.name
-            for info in codebaseInfo.typeInfo[qualifiedName, default: []] {
+            for info in codebaseInfo.typeInfo[type.name, default: []] {
                 if !info.isPrivate || info.sourceFile == sourceFile, let mayBeMutableStructType = info.mayBeMutableStructType {
                     return mayBeMutableStructType
                 }
             }
-            return symbols?.isMutableStructType(qualifiedName: qualifiedName) != false
+            return symbols?.isMutableStruct(type: type) != false
         }
 
         /// Whether the given type conforms to `Error` through its protocols, **not** through inheritance.
@@ -213,13 +217,12 @@ public class KotlinCodebaseInfo {
                     }
                 }
             }
-            return symbols?.conformsToError(qualifiedName: qualifiedName) == true
+            return symbols?.conformsToError(type: type) == true
         }
 
         /// Whether the given enum type has cases with associated values.
         func isSealedClassesEnum(type: TypeSignature) -> Bool {
-            let qualifiedName = type.name
-            for info in codebaseInfo.typeInfo[qualifiedName, default: []] {
+            for info in codebaseInfo.typeInfo[type.name, default: []] {
                 if !info.isPrivate || info.sourceFile == sourceFile {
                     if info.declarationType != .enumDeclaration {
                         return false
@@ -230,13 +233,13 @@ public class KotlinCodebaseInfo {
             guard let symbols else {
                 return false
             }
-            switch symbols.enumHasAssociatedValues(qualifiedName: qualifiedName) {
+            switch symbols.enumHasAssociatedValues(type: type) {
             case nil:
                 return false
             case true?:
                 return true
             case false?:
-                return symbols.conformsToError(qualifiedName: qualifiedName) == true
+                return symbols.conformsToError(type: type) == true
             }
         }
 
@@ -251,12 +254,12 @@ public class KotlinCodebaseInfo {
                 isStatic = true
                 owningType = baseType
             }
-            return symbols.isFunction(name: name, in: owningType?.name, isStatic: isStatic) == true
+            return symbols.isFunction(name: name, in: owningType, isStatic: isStatic) == true
         }
     }
 
     private func addTypeInfo(for typeDeclaration: TypeDeclaration, mayBeMutableStructType: Bool?) {
-        var info = TypeInfo(declarationType: typeDeclaration.type, inherits: typeDeclaration.inherits, mayBeMutableStructType: mayBeMutableStructType, isPrivate: typeDeclaration.modifiers.visibility == .private, sourceFile: typeDeclaration.sourceFile)
+        var info = TypeInfo(declarationType: typeDeclaration.type, signature: typeDeclaration.signature, inherits: typeDeclaration.inherits, mayBeMutableStructType: mayBeMutableStructType, isPrivate: typeDeclaration.modifiers.visibility == .private, sourceFile: typeDeclaration.sourceFile)
         if typeDeclaration.type != .protocolDeclaration {
             info.constructorParameters = constructorParameters(in: typeDeclaration.members)
         } else if typeDeclaration.type == .enumDeclaration {
@@ -297,15 +300,16 @@ public class KotlinCodebaseInfo {
 
     /// Constructor parameter with translatable default value.
     struct ConstructorParameter {
-        let label: String?
-        let type: TypeSignature
-        let isVariadic: Bool
-        let defaultValue: Expression?
+        var label: String?
+        var type: TypeSignature
+        var isVariadic: Bool
+        var defaultValue: Expression?
     }
 }
 
 private struct TypeInfo {
     let declarationType: StatementType
+    let signature: TypeSignature
     let inherits: [TypeSignature]
     let mayBeMutableStructType: Bool?
     let isPrivate: Bool
@@ -322,11 +326,11 @@ private struct ExtensionInfo {
 // Internal for testing
 
 extension Symbols.Context {
-    /// Whether the given name and optional type maps to a member of any protocol of the given type, including inherited protocols.
+    /// Whether the given member name and optional type maps to a member of any protocol of the given declaring type, including inherited protocols.
     ///
     /// - Returns: true if this is a member of a protocol, false if not, and nil if there is no known type for the given name.
-    func protocolOf(qualifiedName: String, hasMember name: String, kind memberKind: SymbolGraph.Symbol.KindIdentifier, type: TypeSignature?) -> Bool? {
-        let candidates = lookup(name: qualifiedName)
+    func protocolOf(_ declaringType: TypeSignature, hasMember name: String, kind memberKind: SymbolGraph.Symbol.KindIdentifier, type: TypeSignature?) -> Bool? {
+        let candidates = lookup(name: declaringType.name)
         var hasType = false
         for candidate in ranked(candidates) {
             guard let kind = candidate.kind else {
@@ -345,11 +349,11 @@ extension Symbols.Context {
         return hasType ? false : nil
     }
 
-    /// Whether the given name maps to a symbol that is known to be a mutable struct type.
+    /// Whether the given type maps to a symbol that is known to be a mutable struct type.
     ///
     /// - Returns: true if a symbol exists for a mutable struct type, false if only immutable type symbols exist, and nil if no type symbol exists.
-    func isMutableStructType(qualifiedName: String) -> Bool? {
-        let candidates = lookup(name: qualifiedName)
+    func isMutableStruct(type: TypeSignature) -> Bool? {
+        let candidates = lookup(name: type.name)
         var hasType = false
         for candidate in ranked(candidates) {
             guard let kind = candidate.kind else {
@@ -380,8 +384,8 @@ extension Symbols.Context {
     /// Whether the given type conforms to `Error` through its protocols, **not** through inheritance.
     ///
     /// - Returns: true if a symbol exists for an error type, false if the type does not conform to `Error`, and nil if no type symbol exists.
-    func conformsToError(qualifiedName: String) -> Bool? {
-        let candidates = lookup(name: qualifiedName)
+    func conformsToError(type: TypeSignature) -> Bool? {
+        let candidates = lookup(name: type.name)
         for candidate in ranked(candidates) {
             guard let kind = candidate.kind else {
                 continue
@@ -397,8 +401,8 @@ extension Symbols.Context {
     }
 
     /// Return the type signatures of all constructors for the given type name, including inherited constructors.
-    func constructorSignatures(qualifiedName: String) -> [TypeSignature] {
-        let candidates = ranked(lookup(name: qualifiedName))
+    func constructorSignatures(in type: TypeSignature) -> [TypeSignature] {
+        let candidates = ranked(lookup(name: type.name))
         for candidate in candidates {
             guard let kind = candidate.kind, candidate.visibility != .private else {
                 continue
@@ -418,8 +422,8 @@ extension Symbols.Context {
     }
 
     /// Whether the given enum has cases with associated values.
-    func enumHasAssociatedValues(qualifiedName: String) -> Bool? {
-        let candidates = lookup(name: qualifiedName)
+    func enumHasAssociatedValues(type: TypeSignature) -> Bool? {
+        let candidates = lookup(name: type.name)
         var hasType = false
         for candidate in ranked(candidates) {
             guard let kind = candidate.kind else {
@@ -442,9 +446,9 @@ extension Symbols.Context {
     }
 
     /// Whether the given name matches a function name.
-    func isFunction(name: String, in qualifiedName: String?, isStatic: Bool) -> Bool? {
-        if let qualifiedName {
-            let candidates = lookup(name: qualifiedName)
+    func isFunction(name: String, in type: TypeSignature?, isStatic: Bool) -> Bool? {
+        if let type {
+            let candidates = lookup(name: type.name)
             var hasType = false
             for candidate in ranked(candidates) {
                 guard let kind = candidate.kind else {
@@ -481,8 +485,14 @@ extension Symbols.Context {
 
     private func hasProtocolMember(_ symbol: Symbol, name: String, kind: SymbolGraph.Symbol.KindIdentifier, type: TypeSignature?) -> Bool {
         for relationship in symbol.relationships {
-            if (relationship.kind == .inheritsFrom || relationship.kind == .conformsTo) && !relationship.isInverse {
+            if relationship.kind == .inheritsFrom && !relationship.isInverse {
+                //~~~ need to map generics
                 if let inheritsFrom = lookup(identifier: relationship.targetIdentifier ?? ""), hasProtocolMember(inheritsFrom, name: name, kind: kind, type: type) {
+                    return true
+                }
+            } else if relationship.kind == .conformsTo && !relationship.isInverse {
+                //~~~ need to map generics
+                if let conformsTo = lookup(identifier: relationship.targetIdentifier ?? ""), hasProtocolMember(conformsTo, name: name, kind: kind, type: type) {
                     return true
                 }
             } else if relationship.kind == .requirementOf && relationship.isInverse {
@@ -523,7 +533,7 @@ extension Symbols.Context {
             signatures.append(member.functionSignature(symbols: symbols))
         }
         if signatures.isEmpty, let inheritsFrom {
-            return constructorSignatures(inheritsFrom)
+            return constructorSignatures(inheritsFrom)//~~~ needs to map to generics applied in extends list, not generics of this symbol .map { $0.mappingGenerics(from: inheritsFrom.generics, to: symbol.generics) }
         }
         return signatures
     }

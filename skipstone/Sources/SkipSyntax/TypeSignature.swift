@@ -108,25 +108,29 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
         return Array(repeating: self, count: count)
     }
 
-    /// Convert this type to/from an optional.
-    func asOptional(_ optional: Bool) -> TypeSignature {
+    /// Return the generics of this type.
+    var generics: [TypeSignature] {
         switch self {
-        case .none:
-            return .none
+        case .array(let element):
+            return [element]
+        case .dictionary(let key, let value):
+            return [key, value]
+        case .member(_, let type):
+            return type.generics
+        case .metaType(let type):
+            return type.generics
+        case .named(_, let generics):
+            return generics
         case .optional(let type):
-            if optional {
-                return self
-            } else {
-                return type
-            }
+            return type.generics
+        case .range(let element):
+            return [element]
+        case .set(let element):
+            return [element]
         case .unwrappedOptional(let type):
-            if optional {
-                return .optional(type)
-            } else {
-                return type
-            }
+            return type.generics
         default:
-            return optional ? .optional(self) : self
+            return []
         }
     }
 
@@ -198,6 +202,66 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
             return .unwrappedOptional(type.withGenerics(generics))
         default:
             return self
+        }
+    }
+
+    /// Map uses of generic parameters.
+    func mappingGenerics(from: [TypeSignature], to: [TypeSignature]) -> TypeSignature {
+        guard !from.isEmpty, from.count == to.count else {
+            return self
+        }
+        func map(_ type: TypeSignature) -> TypeSignature {
+            for i in 0..<from.count {
+                if type == from[i] {
+                    return to[i]
+                }
+            }
+            return type
+        }
+        //~~~ NEXT: TEST SYMBOLS FOR EXTENDS DECLARATIONS... IF NOT WE CAN'T MAP GENERICS
+        switch self {
+        case .array(let element):
+            return .array(map(element))
+        case .dictionary(let key, let value):
+            return .dictionary(map(key), map(value))
+        case .member(let base, let type):
+            return .member(base, type.mappingGenerics(from: from, to: to))
+        case .metaType(let type):
+            return .metaType(type.mappingGenerics(from: from, to: to))
+        case .named(let name, let generics):
+            return .named(name, generics.map { map($0) })
+        case .optional(let type):
+            return .optional(type.mappingGenerics(from: from, to: to))
+        case .range(let element):
+            return .range(map(element))
+        case .set(let element):
+            return .set(map(element))
+        case .unwrappedOptional(let type):
+            return .unwrappedOptional(type.mappingGenerics(from: from, to: to))
+        default:
+            return self
+        }
+    }
+
+    /// Convert this type to/from an optional.
+    func asOptional(_ optional: Bool) -> TypeSignature {
+        switch self {
+        case .none:
+            return .none
+        case .optional(let type):
+            if optional {
+                return self
+            } else {
+                return type
+            }
+        case .unwrappedOptional(let type):
+            if optional {
+                return .optional(type)
+            } else {
+                return type
+            }
+        default:
+            return optional ? .optional(self) : self
         }
     }
 

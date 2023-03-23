@@ -1,53 +1,51 @@
 @testable import SkipSyntax
 import XCTest
 
-// to update the codebase symbols for this test, manually run:
-
 final class KotlinCodebaseInfoTests: XCTestCase {
     func testIsMutableStructType() async throws {
         let context = try await symbols.context()
-        XCTAssertNil(context.isMutableStructType(qualifiedName: "NonExistantTypeName"))
+        XCTAssertNil(context.isMutableStruct(type: .named("NonExistantTypeName", [])))
 
-        XCTAssertEqual(false, context.isMutableStructType(qualifiedName: "KotlinCodebaseInfoTestsClass"))
-        XCTAssertEqual(false, context.isMutableStructType(qualifiedName: "KotlinCodebaseInfoTestsEnum"))
-        XCTAssertEqual(false, context.isMutableStructType(qualifiedName: "KotlinCodebaseInfoTestsImmutableStruct"))
+        XCTAssertEqual(false, context.isMutableStruct(type: .named("KotlinCodebaseInfoTestsClass", [])))
+        XCTAssertEqual(false, context.isMutableStruct(type: .named("KotlinCodebaseInfoTestsEnum", [])))
+        XCTAssertEqual(false, context.isMutableStruct(type: .named("KotlinCodebaseInfoTestsImmutableStruct", [])))
 
-        XCTAssertEqual(true, context.isMutableStructType(qualifiedName: "KotlinCodebaseInfoTestsMutableVarStruct"))
-        XCTAssertEqual(true, context.isMutableStructType(qualifiedName: "KotlinCodebaseInfoTestsMutableComputedVarStruct"))
-        XCTAssertEqual(true, context.isMutableStructType(qualifiedName: "KotlinCodebaseInfoTestsMutableFuncStruct"))
+        XCTAssertEqual(true, context.isMutableStruct(type: .named("KotlinCodebaseInfoTestsMutableVarStruct", [])))
+        XCTAssertEqual(true, context.isMutableStruct(type: .named("KotlinCodebaseInfoTestsMutableComputedVarStruct", [])))
+        XCTAssertEqual(true, context.isMutableStruct(type: .named("KotlinCodebaseInfoTestsMutableFuncStruct", [])))
 
-        XCTAssertEqual(true, context.isMutableStructType(qualifiedName: "KotlinCodebaseInfoTestsNonAnyObjectRestrictedProtocol"))
-        XCTAssertEqual(false, context.isMutableStructType(qualifiedName: "KotlinCodebaseInfoTestsAnyObjectRestrictedProtocol"))
-        XCTAssertEqual(false, context.isMutableStructType(qualifiedName: "KotlinCodebaseInfoTestsTransitiveAnyObjectRestrictedProtocol"))
+        XCTAssertEqual(true, context.isMutableStruct(type: .named("KotlinCodebaseInfoTestsNonAnyObjectRestrictedProtocol", [])))
+        XCTAssertEqual(false, context.isMutableStruct(type: .named("KotlinCodebaseInfoTestsAnyObjectRestrictedProtocol", [])))
+        XCTAssertEqual(false, context.isMutableStruct(type: .named("KotlinCodebaseInfoTestsTransitiveAnyObjectRestrictedProtocol", [])))
     }
 
     func testEnumHasAssociatedValues() async throws {
         let context = try await symbols.context()
-        XCTAssertNil(context.enumHasAssociatedValues(qualifiedName: "NonExistantTypeName"))
+        XCTAssertNil(context.enumHasAssociatedValues(type: .named("NonExistantTypeName", [])))
 
-        XCTAssertEqual(false, context.enumHasAssociatedValues(qualifiedName: "KotlinCodebaseInfoTestsEnum"))
-        XCTAssertEqual(true, context.enumHasAssociatedValues(qualifiedName: "KotlinCodebaseInfoTestsEnumWithAssociatedValues"))
+        XCTAssertEqual(false, context.enumHasAssociatedValues(type: .named("KotlinCodebaseInfoTestsEnum", [])))
+        XCTAssertEqual(true, context.enumHasAssociatedValues(type: .named("KotlinCodebaseInfoTestsEnumWithAssociatedValues", [])))
     }
 
     func testProtocolTypeHasMember() async throws {
         let context = try await symbols.context()
-        XCTAssertNil(context.protocolOf(qualifiedName: "NonExistantTypeName", hasMember: "protocolVar", kind: .property, type: nil))
+        XCTAssertNil(context.protocolOf(.named("NonExistantTypeName", []), hasMember: "protocolVar", kind: .property, type: nil))
 
-        XCTAssertEqual(false, context.protocolOf(qualifiedName: "KotlinCodebaseInfoTestsNonAnyObjectRestrictedProtocol", hasMember: "baseProtocolVar", kind: .property, type: nil))
-        XCTAssertEqual(true, context.protocolOf(qualifiedName: "KotlinCodebaseInfoTestsAnyObjectRestrictedProtocol", hasMember: "baseProtocolVar", kind: .property, type: nil))
-        XCTAssertEqual(true, context.protocolOf(qualifiedName: "KotlinCodebaseInfoTestsAnyObjectRestrictedProtocol", hasMember: "baseProtocolVar", kind: .property, type: .int))
-        XCTAssertEqual(false, context.protocolOf(qualifiedName: "KotlinCodebaseInfoTestsAnyObjectRestrictedProtocol", hasMember: "baseProtocolVar", kind: .property, type: .string))
+        XCTAssertEqual(false, context.protocolOf(.named("KotlinCodebaseInfoTestsNonAnyObjectRestrictedProtocol", []), hasMember: "baseProtocolVar", kind: .property, type: nil))
+        XCTAssertEqual(true, context.protocolOf(.named("KotlinCodebaseInfoTestsAnyObjectRestrictedProtocol", []), hasMember: "baseProtocolVar", kind: .property, type: nil))
+        XCTAssertEqual(true, context.protocolOf(.named("KotlinCodebaseInfoTestsAnyObjectRestrictedProtocol", []), hasMember: "baseProtocolVar", kind: .property, type: .int))
+        XCTAssertEqual(false, context.protocolOf(.named("KotlinCodebaseInfoTestsAnyObjectRestrictedProtocol", []), hasMember: "baseProtocolVar", kind: .property, type: .string))
 
         let functionType: TypeSignature = .function([.init(label: "i", type: .int)], .string)
-        XCTAssertEqual(false, context.protocolOf(qualifiedName: "KotlinCodebaseInfoTestsNonAnyObjectRestrictedProtocol", hasMember: "baseProtocolFunc", kind: .method, type: functionType))
-        XCTAssertEqual(true, context.protocolOf(qualifiedName: "KotlinCodebaseInfoTestsAnyObjectRestrictedProtocol", hasMember: "baseProtocolFunc", kind: .method, type: functionType))
-        XCTAssertEqual(false, context.protocolOf(qualifiedName: "KotlinCodebaseInfoTestsAnyObjectRestrictedProtocol", hasMember: "baseProtocolFunc", kind: .method, type: .function([.init(label: "i", type: .string)], .string)))
+        XCTAssertEqual(false, context.protocolOf(.named("KotlinCodebaseInfoTestsNonAnyObjectRestrictedProtocol", []), hasMember: "baseProtocolFunc", kind: .method, type: functionType))
+        XCTAssertEqual(true, context.protocolOf(.named("KotlinCodebaseInfoTestsAnyObjectRestrictedProtocol", []), hasMember: "baseProtocolFunc", kind: .method, type: functionType))
+        XCTAssertEqual(false, context.protocolOf(.named("KotlinCodebaseInfoTestsAnyObjectRestrictedProtocol", []), hasMember: "baseProtocolFunc", kind: .method, type: .function([.init(label: "i", type: .string)], .string)))
 
-        XCTAssertEqual(true, context.protocolOf(qualifiedName: "KotlinCodebaseInfoTestsTransitiveAnyObjectRestrictedProtocol", hasMember: "baseProtocolVar", kind: .property, type: nil))
-        XCTAssertEqual(true, context.protocolOf(qualifiedName: "KotlinCodebaseInfoTestsTransitiveAnyObjectRestrictedProtocol", hasMember: "baseProtocolFunc", kind: .method, type: functionType))
+        XCTAssertEqual(true, context.protocolOf(.named("KotlinCodebaseInfoTestsTransitiveAnyObjectRestrictedProtocol", []), hasMember: "baseProtocolVar", kind: .property, type: nil))
+        XCTAssertEqual(true, context.protocolOf(.named("KotlinCodebaseInfoTestsTransitiveAnyObjectRestrictedProtocol", []), hasMember: "baseProtocolFunc", kind: .method, type: functionType))
 
-        XCTAssertEqual(true, context.protocolOf(qualifiedName: "KotlinCodebaseInfoTestsProtocolImpl", hasMember: "baseProtocolVar", kind: .property, type: nil))
-        XCTAssertEqual(true, context.protocolOf(qualifiedName: "KotlinCodebaseInfoTestsProtocolImpl", hasMember: "baseProtocolFunc", kind: .method, type: functionType))
+        XCTAssertEqual(true, context.protocolOf(.named("KotlinCodebaseInfoTestsProtocolImpl", []), hasMember: "baseProtocolVar", kind: .property, type: nil))
+        XCTAssertEqual(true, context.protocolOf(.named("KotlinCodebaseInfoTestsProtocolImpl", []), hasMember: "baseProtocolFunc", kind: .method, type: functionType))
     }
 }
 
