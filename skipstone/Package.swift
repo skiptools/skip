@@ -29,7 +29,10 @@ let package = Package(
             .product(name: "SwiftSyntaxParser", package: "swift-syntax"),
             .product(name: "SymbolKit", package: "swift-docc-symbolkit"),
         ]),
-        .testTarget(name: "SkipSyntaxTests", dependencies: ["SkipSyntax", "SkipBuild"], resources: [.copy("symbols")]),
+        .testTarget(name: "SkipSyntaxTests", dependencies: [
+            "SkipSyntax",
+            "SkipBuild",
+        ], resources: [.copy("symbols")]),
 
         .target(name: "SkipBuild", dependencies: [
             "SkipSyntax",

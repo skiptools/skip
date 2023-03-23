@@ -8,7 +8,7 @@ import Universal
 import struct Universal.JSON
 
 /// The current version of the tool
-public let skipVersion = "0.1.14"
+public let skipVersion = "0.1.15"
 
 struct Options {
     var preprocessorSymbols: [String] = []

@@ -13,12 +13,10 @@ public class KotlinTranslator {
     /// Converts a `CamelCased` module name to a `lower.cased` dot-separated package name.
     /// - Parameters:
     ///   - moduleName: The module name to convert.
-    ///   - fallbackPrefix: The package name to prefix if the module name doesn't result in a package name containing dots.
     /// - Returns: The dot-separated package name.
-    public static func packageName(forModule moduleName: String, fallbackPrefix: String? = "skipmodule", trimTests: Bool = true) -> String {
+    public static func packageName(forModule moduleName: String, trimTests: Bool = true) -> String {
         var lastLower = false
         var packageName = ""
-        var hasDot = false
         for c in moduleName {
             let lower = c.lowercased()
             if lower == String(c) {
@@ -26,19 +24,18 @@ public class KotlinTranslator {
             } else {
                 if lastLower == true {
                     packageName += "."
-                    hasDot = true
                 }
                 lastLower = false
             }
             packageName += lower
         }
-        if !hasDot, let fallbackPrefix = fallbackPrefix {
-            packageName = fallbackPrefix + "." + packageName
-        }
 
         // the "Tests" module suffix is special: in Swift XXX and XXXTest are different modules (with a @testable import to allow the tests to access internal symbols), but in Kotlin, test cases need to be in the same package in order to be able to access the symbols
         if trimTests && packageName.hasSuffix(".tests") {
             packageName = String(packageName.dropLast(".tests".count))
+        }
+        if trimTests && packageName.hasSuffix("tests") {
+            packageName = String(packageName.dropLast("tests".count))
         }
         return packageName
     }
