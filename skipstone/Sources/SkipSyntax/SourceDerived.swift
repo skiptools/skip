@@ -1,6 +1,6 @@
 /// An entity that may have been parsed or translated from source.
 protocol SourceDerived {
-    var sourceFile: Source.File? { get }
+    var sourceFile: Source.FilePath? { get }
     var sourceRange: Source.Range? { get }
 
     /// Messages for this derivation.

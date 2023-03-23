@@ -322,10 +322,10 @@ struct PrecheckAction: AsyncParsableCommand, CheckPhase {
     var outputOptions: OutputOptions
 
     func run() async throws {
-        try await perform(on: precheckOptions.files.map({ Source.File(path: $0) }), options: precheckOptions)
+        try await perform(on: precheckOptions.files.map({ Source.FilePath(path: $0) }), options: precheckOptions)
     }
 
-    func perform(on sourceFiles: [Source.File], options: CheckPhaseOptions) async throws {
+    func perform(on sourceFiles: [Source.FilePath], options: CheckPhaseOptions) async throws {
         for sourceFile in sourceFiles {
             let source = try Source(file: sourceFile)
             let syntaxTree = SyntaxTree(source: source, preprocessorSymbols: Set(options.symbols))
@@ -341,9 +341,7 @@ struct PrecheckAction: AsyncParsableCommand, CheckPhase {
     }
 
     /// Xcode requires that we create an output file in order for incremental build tools to work.
-    ///
-    /// - Warning: This is duplicated in SkipCheckBuildPlugin.
-    func outputFileURL(for sourceFile: Source.File, in outputDir: URL) -> URL {
+    func outputFileURL(for sourceFile: Source.FilePath, in outputDir: URL) -> URL {
         var outputFileName = sourceFile.name
         if outputFileName.hasSuffix(".swift") {
             outputFileName = String(outputFileName.dropLast(".swift".count))
@@ -689,7 +687,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
             let (outputFile, changed) = try saveTranspilation()
 
-            info("transpiled: \(outputFile.basename) (\(Self.byteCount(for: transpilation.output.content.utf8.count)))\(!changed ? " [unchanged]" : "") (\(Int64(transpilation.duration * 1000)) ms)", sourceFile: Source.File(path: outputFile))
+            info("transpiled: \(outputFile.basename) (\(Self.byteCount(for: transpilation.output.content.utf8.count)))\(!changed ? " [unchanged]" : "") (\(Int64(transpilation.duration * 1000)) ms)", sourceFile: Source.FilePath(path: outputFile))
 
             for message in transpilation.messages {
                 //writeMessage(message)
@@ -789,7 +787,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 }
 
 
-extension Source.File {
+extension Source.FilePath {
     /// Initialize this file reference with an `AbsolutePath`
     init(path absolutePath: AbsolutePath) {
         self.init(path: absolutePath.pathString)
@@ -809,8 +807,8 @@ extension Transpilation {
 }
 
 extension AbsolutePath {
-    /// Converts this FileSystem `AbsolutePath` into a `Source.File` that the transpiler can use.
-    var sourceFile: Source.File {
+    /// Converts this FileSystem `AbsolutePath` into a `Source.FilePath` that the transpiler can use.
+    var sourceFile: Source.FilePath {
         Source.FilePath(path: pathString)
     }
 }
@@ -928,10 +926,10 @@ struct PrintSwiftASTAction: AsyncParsableCommand {
         var opts = CheckPhaseOptions()
         opts.directory = directory
         opts.symbols = symbols
-        try await perform(on: files.map({ Source.File(path: $0) }), options: opts)
+        try await perform(on: files.map({ Source.FilePath(path: $0) }), options: opts)
     }
 
-    func perform(on sourceFiles: [Source.File], options: CheckPhaseOptions) async throws {
+    func perform(on sourceFiles: [Source.FilePath], options: CheckPhaseOptions) async throws {
         for sourceFile in sourceFiles {
             let syntax = try Parser.parse(source: Source(file: sourceFile).content)
             print(syntax.root.prettyPrintTree)
@@ -951,10 +949,10 @@ struct PrintSkipASTAction: AsyncParsableCommand {
     func run() async throws {
         var opts = CheckPhaseOptions()
         opts.symbols = symbols
-        try await perform(on: files.map({ Source.File(path: $0) }), options: opts)
+        try await perform(on: files.map({ Source.FilePath(path: $0) }), options: opts)
     }
 
-    func perform(on sourceFiles: [Source.File], options: CheckPhaseOptions) async throws {
+    func perform(on sourceFiles: [Source.FilePath], options: CheckPhaseOptions) async throws {
         for sourceFile in sourceFiles {
             let source = try Source(file: sourceFile)
             let syntaxTree = SyntaxTree(source: source, preprocessorSymbols: Set(options.symbols))
@@ -1108,25 +1106,25 @@ extension StreamingCommand {
         }
     }
 
-    func trace(_ message: @autoclosure () throws -> String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) rethrows {
+    func trace(_ message: @autoclosure () throws -> String, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) rethrows {
         try msg(.trace, message(), sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
-    func info(_ message: @autoclosure () throws -> String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) rethrows {
+    func info(_ message: @autoclosure () throws -> String, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) rethrows {
         try msg(.note, message(), sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
-    func warn(_ message: @autoclosure () throws -> String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) rethrows {
+    func warn(_ message: @autoclosure () throws -> String, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) rethrows {
         try msg(.warning, message(), sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
-    @discardableResult func error(_ message: @autoclosure () throws -> String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) rethrows -> ValidationError {
+    @discardableResult func error(_ message: @autoclosure () throws -> String, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) rethrows -> ValidationError {
         try msg(.error, message(), sourceFile: sourceFile, sourceRange: sourceRange)
         return ValidationError(try message())
     }
 
     /// Output the given message to standard error
-    func msg(_ kind: Message.Kind = .note, _ message: @autoclosure () throws -> String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) rethrows {
+    func msg(_ kind: Message.Kind = .note, _ message: @autoclosure () throws -> String, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) rethrows {
         if outputOptions.quiet == true {
             return
         }
@@ -1141,7 +1139,7 @@ extension StreamingCommand {
     /// Output the given message to standard error with no type prefix
     ///
     /// This function is redundant, but works around some compiled issue with disambiguating the default initial arg with the nameless autoclosure final arg.
-    func msg(_ message: @autoclosure () throws -> String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) rethrows {
+    func msg(_ message: @autoclosure () throws -> String, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) rethrows {
         try self.msg(.note, try message(), sourceFile: sourceFile, sourceRange: sourceRange)
     }
 }

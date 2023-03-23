@@ -3,10 +3,10 @@
 /// Kotlin nodes are generally mutable.
 class KotlinSyntaxNode: SourceDerived, OutputNode {
     let nodeName: String
-    let sourceFile: Source.File?
+    let sourceFile: Source.FilePath?
     let sourceRange: Source.Range?
 
-    init(nodeName: String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(nodeName: String, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.nodeName = nodeName
         self.sourceFile = sourceFile
         self.sourceRange = sourceRange

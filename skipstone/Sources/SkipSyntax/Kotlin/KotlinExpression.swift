@@ -2,7 +2,7 @@
 class KotlinExpression: KotlinSyntaxNode {
     let type: KotlinExpressionType
 
-    init(type: KotlinExpressionType, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(type: KotlinExpressionType, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.type = type
         super.init(nodeName: String(describing: type), sourceFile: sourceFile, sourceRange: sourceRange)
     }
@@ -51,7 +51,7 @@ class KotlinExpression: KotlinSyntaxNode {
 class KotlinRawExpression: KotlinExpression {
     let sourceCode: String
 
-    init(sourceCode: String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(sourceCode: String, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.sourceCode = sourceCode
         super.init(type: .raw, sourceFile: sourceFile, sourceRange: sourceRange)
     }

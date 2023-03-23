@@ -4,14 +4,14 @@ import SwiftSyntax
 
 /// Manages the transpilation process.
 public struct Transpiler {
-    private let sourceFiles: [Source.File]
+    private let sourceFiles: [Source.FilePath]
     private let packageName: String?
     private let symbols: Symbols?
     public var preprocessorSymbols: Set<String>
     public var plugins: [KotlinPlugin]
 
     /// Supply files to transpile.
-    public init(sourceFiles: [Source.File], packageName: String? = nil, symbols: Symbols? = nil, preprocessorSymbols: Set<String> = [], plugins: [KotlinPlugin] = []) {
+    public init(sourceFiles: [Source.FilePath], packageName: String? = nil, symbols: Symbols? = nil, preprocessorSymbols: Set<String> = [], plugins: [KotlinPlugin] = []) {
         self.sourceFiles = sourceFiles
         self.packageName = packageName
         self.symbols = symbols

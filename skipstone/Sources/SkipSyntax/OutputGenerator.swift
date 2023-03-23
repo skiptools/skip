@@ -2,7 +2,7 @@
 class OutputGenerator {
     private let root: OutputNode
     private var content = ""
-    private typealias MapEntryOffsets = (sourceFile: Source.File, sourceRange: Source.Range?, offset: Int, length: Int)
+    private typealias MapEntryOffsets = (sourceFile: Source.FilePath, sourceRange: Source.Range?, offset: Int, length: Int)
     private var mapEntryOffsets: [MapEntryOffsets] = []
 
     /// Supply node.
@@ -10,7 +10,7 @@ class OutputGenerator {
         self.root = root
     }
 
-    func generateOutput(file: Source.File) -> (output: Source, map: OutputMap) {
+    func generateOutput(file: Source.FilePath) -> (output: Source, map: OutputMap) {
         append(root, indentation: .zero)
         let output = Source(file: file, content: content)
         let ret = (output, OutputMap(entries: mapEntryOffsets.map { outputMapEntry(for: $0, in: output) }))
@@ -65,7 +65,7 @@ class OutputGenerator {
 
 /// A node in the output graph.
 protocol OutputNode {
-    var sourceFile: Source.File? { get }
+    var sourceFile: Source.FilePath? { get }
     var sourceRange: Source.Range? { get }
 
     /// Any leading trivia before the output. Trivia is not part of the ranges.

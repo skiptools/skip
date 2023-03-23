@@ -1,7 +1,9 @@
 import SwiftSyntax
 
 /// A source code type signature.
-indirect enum TypeSignature: CustomStringConvertible, Hashable {
+///
+/// - Note: `Codable` for use in `CodebaseInfo`.
+indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     case any
     case anyObject
     case array(TypeSignature)
@@ -881,7 +883,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable {
     }
 
     /// A parameter in a function signature.
-    struct Parameter: CustomStringConvertible, Hashable {
+    struct Parameter: CustomStringConvertible, Hashable, Codable {
         var label: String?
         var type: TypeSignature
         var isVariadic = false

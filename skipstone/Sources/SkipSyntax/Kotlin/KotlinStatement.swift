@@ -3,7 +3,7 @@ class KotlinStatement: KotlinSyntaxNode {
     let type: KotlinStatementType
     var extras: StatementExtras?
 
-    init(type: KotlinStatementType, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(type: KotlinStatementType, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.type = type
         self.extras = extras
         super.init(nodeName: String(describing: type), sourceFile: sourceFile, sourceRange: sourceRange)
@@ -42,7 +42,7 @@ class KotlinExpressionStatement: KotlinStatement {
         return kstatement
     }
 
-    init(type: KotlinStatementType = .expression, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(type: KotlinStatementType = .expression, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         super.init(type: type, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 

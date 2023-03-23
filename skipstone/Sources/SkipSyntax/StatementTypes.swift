@@ -1,7 +1,9 @@
 import SwiftSyntax
 
 /// Supported Swift statement types.
-enum StatementType: CaseIterable {
+///
+/// - Note: `Codable` for use in `CodebaseInfo`.
+enum StatementType: CaseIterable, Codable {
     case `break`
     case `continue`
     case `defer`
@@ -100,7 +102,7 @@ enum StatementType: CaseIterable {
 class Break: Statement {
     let label: String?
 
-    init(label: String? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(label: String? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.label = label
         super.init(type: .break, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
@@ -142,7 +144,7 @@ class CodeBlock: Statement {
 class Continue: Statement {
     let label: String?
 
-    init(label: String? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(label: String? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.label = label
         super.init(type: .continue, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
@@ -164,7 +166,7 @@ class Continue: Statement {
 class Defer: Statement {
     let body: CodeBlock
 
-    init(body: CodeBlock, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(body: CodeBlock, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.body = body
         super.init(type: .defer, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
@@ -192,7 +194,7 @@ class DoCatch: Statement {
     let body: CodeBlock
     let catches: [SwitchCase]
 
-    init(body: CodeBlock, catches: [SwitchCase], syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(body: CodeBlock, catches: [SwitchCase], syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.body = body
         self.catches = catches
         super.init(type: .doCatch, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
@@ -234,7 +236,7 @@ class DoCatch: Statement {
 
 /// `fallthrough`
 class Fallthrough: Statement {
-    init(syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         super.init(type: .fallthrough, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
@@ -257,7 +259,7 @@ class ForLoop: Statement {
     let whereGuard: Expression?
     let body: CodeBlock
 
-    init(identifierPatterns: [IdentifierPattern], declaredType: TypeSignature = .none, isTry: Bool = false, isAwait: Bool = false, isNonNilMatch: Bool = false, sequence: Expression, whereGuard: Expression? = nil, body: CodeBlock, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(identifierPatterns: [IdentifierPattern], declaredType: TypeSignature = .none, isTry: Bool = false, isAwait: Bool = false, isNonNilMatch: Bool = false, sequence: Expression, whereGuard: Expression? = nil, body: CodeBlock, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.identifierPatterns = identifierPatterns
         self.declaredType = declaredType
         self.isTry = isTry
@@ -334,7 +336,7 @@ class Guard: Statement {
     let conditions: [Expression]
     let body: CodeBlock
 
-    init(conditions: [Expression], body: CodeBlock, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(conditions: [Expression], body: CodeBlock, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.conditions = conditions
         self.body = body
         super.init(type: .guard, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
@@ -414,7 +416,7 @@ class LabeledStatement: Statement {
     let label: String
     let target: Statement
 
-    init(label: String, target: Statement, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(label: String, target: Statement, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.label = label
         self.target = target
         super.init(type: .labeled, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
@@ -451,7 +453,7 @@ class LabeledStatement: Statement {
 
 /// `return ...`
 class Return: ExpressionStatement {
-    init(expression: Expression? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(expression: Expression? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         super.init(type: .return, expression: expression, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
@@ -482,7 +484,7 @@ class Return: ExpressionStatement {
 class Throw: Statement {
     let error: Expression
 
-    init(error: Expression, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(error: Expression, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.error = error
         super.init(type: .throw, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
@@ -511,7 +513,7 @@ class WhileLoop: Statement {
     let body: CodeBlock
     let isRepeatWhile: Bool
 
-    init(conditions: [Expression], body: CodeBlock, isRepeatWhile: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(conditions: [Expression], body: CodeBlock, isRepeatWhile: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.conditions = conditions
         self.body = body
         self.isRepeatWhile = isRepeatWhile
@@ -582,7 +584,7 @@ class EnumCaseDeclaration: Statement {
     let attributes: Attributes
     private(set) var modifiers: Modifiers
 
-    init(name: String, associatedValues: [Parameter<Expression>], rawValue: Expression? = nil, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(name: String, associatedValues: [Parameter<Expression>], rawValue: Expression? = nil, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.name = name
         self.associatedValues = associatedValues
         self.rawValue = rawValue
@@ -644,7 +646,7 @@ class EnumCaseDeclaration: Statement {
 class ExtensionDeclaration: TypeDeclaration {
     let extends: TypeSignature
 
-    init(extends: TypeSignature, inherits: [TypeSignature] = [], attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), members: [Statement] = [], syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(extends: TypeSignature, inherits: [TypeSignature] = [], attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), members: [Statement] = [], syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.extends = extends
         //~~~ Need to figure out what the generic parameters are on the type being extended: class C<T>, extension C { ... } T will be missing
         super.init(type: .extensionDeclaration, name: extends.name, signature: extends, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
@@ -685,7 +687,7 @@ class FunctionDeclaration: Statement {
         return .function(parameters.map(\.signature), returnType)
     }
 
-    init(type: StatementType, name: String, isOptionalInit: Bool = false, returnType: TypeSignature = .void, parameters: [Parameter<Expression>], isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), body: CodeBlock? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(type: StatementType, name: String, isOptionalInit: Bool = false, returnType: TypeSignature = .void, parameters: [Parameter<Expression>], isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), body: CodeBlock? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.name = name
         self.isOptionalInit = isOptionalInit
         self.returnType = returnType.or(.void)
@@ -798,7 +800,7 @@ class FunctionDeclaration: Statement {
 class ImportDeclaration: Statement {
     let modulePath: [String]
 
-    init(modulePath: [String], syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(modulePath: [String], syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.modulePath = modulePath
         super.init(type: .importDeclaration, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
@@ -828,7 +830,7 @@ class TypealiasDeclaration: Statement {
     }
     private var _signature: TypeSignature?
 
-    init(name: String, modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), aliasedType: TypeSignature, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(name: String, modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), aliasedType: TypeSignature, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.name = name
         self.modifiers = modifiers
         self.generics = generics
@@ -891,7 +893,7 @@ class TypeDeclaration: Statement {
     }
     private var _signature: TypeSignature?
 
-    init(type: StatementType, name: String, signature: TypeSignature? = nil, inherits: [TypeSignature] = [], attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), members: [Statement] = [], syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(type: StatementType, name: String, signature: TypeSignature? = nil, inherits: [TypeSignature] = [], attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), members: [Statement] = [], syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.name = name
         _signature = signature
         self.inherits = inherits
@@ -1022,7 +1024,7 @@ class VariableDeclaration: Statement {
         return declaredType.or(value?.inferredType ?? .none).tupleTypes(count: names.count)
     }
 
-    init(names: [String?], declaredType: TypeSignature = .none, isLet: Bool = false, isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), value: Expression?, getter: Accessor<CodeBlock>? = nil, setter: Accessor<CodeBlock>? = nil, willSet: Accessor<CodeBlock>? = nil, didSet: Accessor<CodeBlock>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(names: [String?], declaredType: TypeSignature = .none, isLet: Bool = false, isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), value: Expression?, getter: Accessor<CodeBlock>? = nil, setter: Accessor<CodeBlock>? = nil, willSet: Accessor<CodeBlock>? = nil, didSet: Accessor<CodeBlock>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.names = names
         self.declaredType = declaredType
         self.isLet = isLet

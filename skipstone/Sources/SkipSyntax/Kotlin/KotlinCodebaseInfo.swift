@@ -37,7 +37,7 @@ public class KotlinCodebaseInfo {
     }
 
     /// Any issues encountered during information gathering.
-    func messages(for sourceFile: Source.File) -> [Message] {
+    func messages(for sourceFile: Source.FilePath) -> [Message] {
         return []
     }
 
@@ -91,7 +91,7 @@ public class KotlinCodebaseInfo {
     }
 
     /// Create a context that can access the given imported modules.
-    func context(importedModuleNames: [String] = [], sourceFile: Source.File? = nil) -> Context {
+    func context(importedModuleNames: [String] = [], sourceFile: Source.FilePath? = nil) -> Context {
         return Context(codebaseInfo: self, symbols: symbols?.context(importedModuleNames: importedModuleNames, sourceFile: sourceFile), sourceFile: sourceFile)
     }
 
@@ -99,9 +99,9 @@ public class KotlinCodebaseInfo {
     struct Context {
         private let symbols: Symbols.Context?
         private let codebaseInfo: KotlinCodebaseInfo
-        private let sourceFile: Source.File?
+        private let sourceFile: Source.FilePath?
 
-        fileprivate init(codebaseInfo: KotlinCodebaseInfo, symbols: Symbols.Context?, sourceFile: Source.File?) {
+        fileprivate init(codebaseInfo: KotlinCodebaseInfo, symbols: Symbols.Context?, sourceFile: Source.FilePath?) {
             self.codebaseInfo = codebaseInfo
             self.symbols = symbols
             self.sourceFile = sourceFile
@@ -313,14 +313,14 @@ private struct TypeInfo {
     let inherits: [TypeSignature]
     let mayBeMutableStructType: Bool?
     let isPrivate: Bool
-    let sourceFile: Source.File?
+    let sourceFile: Source.FilePath?
     var constructorParameters: [[KotlinCodebaseInfo.ConstructorParameter]] = []
     var hasAssociatedValues = false
 }
 
 private struct ExtensionInfo {
     let declaration: ExtensionDeclaration
-    let sourceFile: Source.File?
+    let sourceFile: Source.FilePath?
 }
 
 // Internal for testing

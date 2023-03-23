@@ -191,9 +191,11 @@ enum StringLiteralSegment<E> {
 }
 
 /// Member and type modifiers.
-struct Modifiers: PrettyPrintable {
+///
+/// - Note: `Codable` for use in `CodebaseInfo`.
+struct Modifiers: PrettyPrintable, Codable {
     /// Visibility modifier.
-    enum Visibility: Equatable, Comparable {
+    enum Visibility: Equatable, Comparable, Codable {
         case `private`
         case `default`
         case `internal`
@@ -329,7 +331,9 @@ struct Attribute {
 }
 
 /// Generic information for a type or API.
-struct Generics {
+///
+/// - Note: `Codable` for use in `CodebaseInfo`.
+struct Generics: Codable {
     /// Generic types and any associated inheritance type information for this type or API: `class Container<Owner, Element: Containable>`.
     private(set) var entries: [Generic]
     /// This API applies when the given generics have the given types: `extension Container where Element == Int`.
@@ -454,7 +458,7 @@ struct Generics {
 }
 
 /// Information about a declared generic parameter.
-struct Generic {
+struct Generic: Codable {
     var name: String
     var inherits: [TypeSignature] = []
 

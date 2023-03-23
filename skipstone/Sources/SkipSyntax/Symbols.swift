@@ -25,7 +25,7 @@ public class Symbols {
     }
 
     /// Create a context that can access the given imported modules.
-    func context(importedModuleNames: [String] = [], sourceFile: Source.File? = nil) -> Context {
+    func context(importedModuleNames: [String] = [], sourceFile: Source.FilePath? = nil) -> Context {
         return Context(symbols: self, importedModuleNames: Set(importedModuleNames), sourceFile: sourceFile)
     }
 
@@ -33,9 +33,9 @@ public class Symbols {
     struct Context {
         let symbols: Symbols
         private let importedModuleNames: Set<String>
-        private let sourceFile: Source.File?
+        private let sourceFile: Source.FilePath?
 
-        fileprivate init(symbols: Symbols, importedModuleNames: Set<String>, sourceFile: Source.File?) {
+        fileprivate init(symbols: Symbols, importedModuleNames: Set<String>, sourceFile: Source.FilePath?) {
             self.symbols = symbols
             var importedModuleNames = importedModuleNames
             importedModuleNames.insert("SkipLib") // Contains our supported subset of the Swift builtin module

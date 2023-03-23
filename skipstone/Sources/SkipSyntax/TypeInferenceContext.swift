@@ -11,7 +11,7 @@ struct TypeInferenceContext {
     ///   - Parameter symbols: Available symbol information.
     ///   - Parameter sourceFile: Source file for this context.
     ///   - Parameter statements: Top-level statements from which to determine imports.
-    init(symbols: Symbols? = nil, sourceFile: Source.File?, statements: [Statement]) {
+    init(symbols: Symbols? = nil, sourceFile: Source.FilePath?, statements: [Statement]) {
         if let symbols {
             let importedModuleNames: [String] = statements.compactMap { statement in
                 guard statement.type == .importDeclaration, let importDeclaration = statement as? ImportDeclaration else {

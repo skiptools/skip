@@ -69,11 +69,10 @@ public struct Source : Encodable {
         return Position(line: 1, column: 1)
     }
 
-    // TODO: @available(*, deprecated, renamed: "SourceFile")
-    public typealias File = FilePath
-
     /// A Swift source file.
-    public struct FilePath: Hashable, Encodable {
+    ///
+    /// - Note: `Codable` for use in `CodebaseInfo`.
+    public struct FilePath: Hashable, Codable {
         public let path: String
 
         public init(path: String) {
@@ -91,7 +90,7 @@ public struct Source : Encodable {
             return path.hasSuffix(".swift")
         }
 
-        public func outputFile(withExtension: String) -> Source.File {
+        public func outputFile(withExtension: String) -> Source.FilePath {
             guard let dotIndex = path.lastIndex(of: ".") else {
                 return FilePath(path: "\(path).\(withExtension)")
             }

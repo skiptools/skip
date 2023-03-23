@@ -101,7 +101,7 @@ enum ExpressionType: CaseIterable {
 class ArrayLiteral: Expression {
     let elements: [Expression]
 
-    init(elements: [Expression], syntax: SyntaxProtocol?, sourceFile: Source.File?, sourceRange: Source.Range? = nil) {
+    init(elements: [Expression], syntax: SyntaxProtocol?, sourceFile: Source.FilePath?, sourceRange: Source.Range? = nil) {
         self.elements = elements
         super.init(type: .arrayLiteral, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
@@ -146,7 +146,7 @@ class BinaryOperator: Expression {
     let lhs: Expression
     let rhs: Expression
 
-    init(op: Operator, lhs: Expression, rhs: Expression, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(op: Operator, lhs: Expression, rhs: Expression, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.op = op
         self.lhs = lhs
         self.rhs = rhs
@@ -283,7 +283,7 @@ class Binding: Expression, BindingExpression {
         }
     }
 
-    init(identifierPatterns: [IdentifierPattern], syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(identifierPatterns: [IdentifierPattern], syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.identifierPatterns = identifierPatterns
         super.init(type: .binding, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
@@ -318,7 +318,7 @@ class Binding: Expression, BindingExpression {
 class BooleanLiteral: Expression {
     let literal: Bool
 
-    init(literal: Bool, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(literal: Bool, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.literal = literal
         super.init(type: .booleanLiteral, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
@@ -410,7 +410,7 @@ class Closure: Expression {
     let isThrows: Bool
     let body: CodeBlock
 
-    init(returnType: TypeSignature = .none, parameters: [Parameter<Void>], isAsync: Bool = false, isThrows: Bool = false, body: CodeBlock, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(returnType: TypeSignature = .none, parameters: [Parameter<Void>], isAsync: Bool = false, isThrows: Bool = false, body: CodeBlock, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.returnType = returnType
         self.parameters = parameters
         self.isAsync = isAsync
@@ -476,7 +476,7 @@ class Closure: Expression {
 class DictionaryLiteral: Expression {
     let entries: [(key: Expression, value: Expression)]
 
-    init(entries: [(key: Expression, value: Expression)], syntax: SyntaxProtocol?, sourceFile: Source.File?, sourceRange: Source.Range? = nil) {
+    init(entries: [(key: Expression, value: Expression)], syntax: SyntaxProtocol?, sourceFile: Source.FilePath?, sourceRange: Source.Range? = nil) {
         self.entries = entries
         super.init(type: .dictionaryLiteral, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
@@ -532,7 +532,7 @@ class FunctionCall: Expression {
     let function: Expression
     let arguments: [LabeledValue<Expression>]
 
-    init(function: Expression, arguments: [LabeledValue<Expression>], syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(function: Expression, arguments: [LabeledValue<Expression>], syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.function = function
         self.arguments = arguments
         super.init(type: .functionCall, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
@@ -627,7 +627,7 @@ class Identifier: Expression {
     private(set) var isLocalIdentifier: Bool
     var isCalledAsFunction = false
 
-    init(name: String, generics: [TypeSignature] = [], isLocalIdentifier: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(name: String, generics: [TypeSignature] = [], isLocalIdentifier: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.name = name
         self.generics = generics
         self.isLocalIdentifier = isLocalIdentifier
@@ -680,7 +680,7 @@ class If: Expression {
     let body: CodeBlock
     let elseBody: CodeBlock?
 
-    init(conditions: [Expression], body: CodeBlock, elseBody: CodeBlock? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(conditions: [Expression], body: CodeBlock, elseBody: CodeBlock? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.conditions = conditions
         self.body = body
         self.elseBody = elseBody
@@ -742,7 +742,7 @@ class If: Expression {
 class InOut: Expression {
     let target: Expression
 
-    init(target: Expression, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(target: Expression, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.target = target
         super.init(type: .inout, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
@@ -783,7 +783,7 @@ class MatchingCase: Expression, BindingExpression {
         pattern.bindAsVar()
     }
 
-    init(pattern: CasePattern, declaredType: TypeSignature = .none, target: Expression, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(pattern: CasePattern, declaredType: TypeSignature = .none, target: Expression, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.pattern = pattern
         self.declaredType = declaredType
         self.target = target
@@ -834,7 +834,7 @@ class MemberAccess: Expression {
     let useMultlineFormatting: Bool
     var isCalledAsFunction = false
 
-    init(base: Expression?, baseType: TypeSignature = .none, member: String, generics: [TypeSignature], useMultlineFormatting: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(base: Expression?, baseType: TypeSignature = .none, member: String, generics: [TypeSignature], useMultlineFormatting: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.base = base
         self.baseType = baseType
         self.member = member
@@ -902,7 +902,7 @@ class MemberAccess: Expression {
 
 /// `nil`
 class NilLiteral: Expression {
-    init(syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         super.init(type: .nilLiteral, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
@@ -930,7 +930,7 @@ class NumericLiteral: Expression {
     let literal: String
     let isFloatingPoint: Bool
 
-    init(literal: String, isFloatingPoint: Bool, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(literal: String, isFloatingPoint: Bool, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.literal = literal
         self.isFloatingPoint = isFloatingPoint
         super.init(type: .numericLiteral, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
@@ -978,7 +978,7 @@ class OptionalBinding: Expression, BindingExpression {
     func bindAsVar() {
     }
 
-    init(names: [String?], declaredType: TypeSignature = .none, isLet: Bool = true, value: Expression? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(names: [String?], declaredType: TypeSignature = .none, isLet: Bool = true, value: Expression? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.names = names
         self.declaredType = declaredType
         self.isLet = isLet
@@ -1042,7 +1042,7 @@ class OptionalBinding: Expression, BindingExpression {
 class Parenthesized: Expression {
     let content: Expression
 
-    init(content: Expression, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(content: Expression, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.content = content
         super.init(type: .parenthesized, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
@@ -1074,7 +1074,7 @@ class PostfixOperator: Expression {
     let operatorSymbol: String
     let target: Expression
 
-    init(operatorSymbol: String, target: Expression, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(operatorSymbol: String, target: Expression, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.operatorSymbol = operatorSymbol
         self.target = target
         super.init(type: .postfixOperator, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
@@ -1130,7 +1130,7 @@ class PrefixOperator: Expression {
     let operatorSymbol: String
     let target: Expression
 
-    init(operatorSymbol: String, target: Expression, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(operatorSymbol: String, target: Expression, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.operatorSymbol = operatorSymbol
         self.target = target
         super.init(type: .prefixOperator, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
@@ -1180,7 +1180,7 @@ class StringLiteral: Expression {
     let segments: [StringLiteralSegment<Expression>]
     let isMultiline: Bool
 
-    init(segments: [StringLiteralSegment<Expression>], isMultiline: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(segments: [StringLiteralSegment<Expression>], isMultiline: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.segments = segments
         self.isMultiline = isMultiline
         super.init(type: .stringLiteral, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
@@ -1257,7 +1257,7 @@ class Subscript: Expression {
     let base: Expression
     let arguments: [LabeledValue<Expression>]
 
-    init(base: Expression, arguments: [LabeledValue<Expression>], syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(base: Expression, arguments: [LabeledValue<Expression>], syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.base = base
         self.arguments = arguments
         super.init(type: .subscript, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
@@ -1326,7 +1326,7 @@ class Switch: Expression {
     let on: Expression
     let cases: [SwitchCase]
 
-    init(on: Expression, cases: [SwitchCase], syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(on: Expression, cases: [SwitchCase], syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.on = on
         self.cases = cases
         super.init(type: .switch, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
@@ -1377,7 +1377,7 @@ class SwitchCase: Expression, BindingExpression {
         patterns.forEach { $0.pattern.bindAsVar() }
     }
 
-    init(patterns: [(CasePattern, Expression?)], body: CodeBlock, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(patterns: [(CasePattern, Expression?)], body: CodeBlock, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.patterns = patterns
         self.body = body
         super.init(type: .switchCase, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
@@ -1460,7 +1460,7 @@ class TernaryOperator: Expression {
     let ifTrue: Expression
     let ifFalse: Expression
 
-    init(condition: Expression, ifTrue: Expression, ifFalse: Expression, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(condition: Expression, ifTrue: Expression, ifFalse: Expression, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.condition = condition
         self.ifTrue = ifTrue
         self.ifFalse = ifFalse
@@ -1511,7 +1511,7 @@ class Try: Expression {
         case unwrappedOptional
     }
 
-    init(trying: Expression, kind: Kind = .default, syntax: SyntaxProtocol?, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(trying: Expression, kind: Kind = .default, syntax: SyntaxProtocol?, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.trying = trying
         self.kind = kind
         super.init(type: .try, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
@@ -1560,7 +1560,7 @@ class TupleLiteral: Expression {
     let labels: [String?]
     let values: [Expression]
 
-    init(labels: [String?], values: [Expression], syntax: SyntaxProtocol?, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(labels: [String?], values: [Expression], syntax: SyntaxProtocol?, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.labels = labels
         self.values = values
         super.init(type: .tupleLiteral, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
@@ -1605,7 +1605,7 @@ class TupleLiteral: Expression {
 class TypeLiteral: Expression {
     let literal: TypeSignature
 
-    init(literal: TypeSignature, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(literal: TypeSignature, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.literal = literal
         super.init(type: .typeLiteral, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }

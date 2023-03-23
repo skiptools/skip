@@ -4,7 +4,7 @@ import SwiftSyntax
 class Expression: SyntaxNode {
     let type: ExpressionType
 
-    init(type: ExpressionType, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(type: ExpressionType, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.type = type
         super.init(nodeName: String(describing: type), syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }

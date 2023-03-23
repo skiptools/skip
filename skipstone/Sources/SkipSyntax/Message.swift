@@ -12,7 +12,7 @@ public struct Message: Error, CustomStringConvertible, Encodable {
 
     public let kind: Kind
     public let message: String
-    public let sourceFile: Source.File?
+    public let sourceFile: Source.FilePath?
     public let sourceRange: Source.Range?
 
     init(kind: Kind, message: String, source: Source? = nil, sourceRange: Source.Range? = nil) {
@@ -22,7 +22,7 @@ public struct Message: Error, CustomStringConvertible, Encodable {
         self.sourceRange = sourceRange
     }
 
-    public init(kind: Kind, message: String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    public init(kind: Kind, message: String, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.kind = kind
         self.message = Self.messageWithSource(for: message, in: nil, range: sourceRange)
         self.sourceFile = sourceFile
@@ -87,7 +87,7 @@ extension Message {
         return Message(kind: .error, message: "Skip does not support this Swift type syntax [\(syntax.kind)]", source: source, sourceRange: range)
     }
 
-    static func ambiguousFunctionCall(sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) -> Message {
+    static func ambiguousFunctionCall(sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) -> Message {
         return Message(kind: .warning, message: "Skip is unable to disambiguate this function call. Consider adding explicit types to the values supplied as arguments", sourceFile: sourceFile, sourceRange: sourceRange)
     }
 

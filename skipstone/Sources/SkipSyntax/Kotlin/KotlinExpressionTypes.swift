@@ -40,7 +40,7 @@ class KotlinArrayLiteral: KotlinExpression {
         return kexpression
     }
 
-    init(sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         super.init(type: .arrayLiteral, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
@@ -96,7 +96,7 @@ class KotlinBinaryOperator: KotlinExpression {
         return kexpression
     }
 
-    init(op: Operator, lhs: KotlinExpression, rhs: KotlinExpression, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(op: Operator, lhs: KotlinExpression, rhs: KotlinExpression, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.op = op
         self.lhs = lhs
         self.rhs = rhs
@@ -168,7 +168,7 @@ class KotlinBinaryOperator: KotlinExpression {
 class KotlinBooleanLiteral: KotlinExpression {
     var literal: Bool
 
-    init(literal: Bool = false, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(literal: Bool = false, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.literal = literal
         super.init(type: .booleanLiteral, sourceFile: sourceFile, sourceRange: sourceRange)
     }
@@ -647,7 +647,7 @@ class KotlinIdentifier: KotlinExpression {
         return implicitParameterIndex == 0 ? "it" : "it_\(implicitParameterIndex)"
     }
 
-    init(name: String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(name: String, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.name = name
         super.init(type: .identifier, sourceFile: sourceFile, sourceRange: sourceRange)
     }
@@ -785,7 +785,7 @@ class KotlinIf: KotlinExpression {
         return conditionSets
     }
 
-    init(conditionSets: [ConditionSet], body: KotlinCodeBlock, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(conditionSets: [ConditionSet], body: KotlinCodeBlock, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.conditionSets = conditionSets
         self.body = body
         super.init(type: .if, sourceFile: sourceFile, sourceRange: sourceRange)
@@ -1146,7 +1146,7 @@ class KotlinMemberAccess: KotlinExpression {
 }
 
 class KotlinNullLiteral: KotlinExpression {
-    init(sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         super.init(type: .nullLiteral, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
@@ -1163,7 +1163,7 @@ class KotlinNumericLiteral: KotlinExpression {
     var literal: String
     var isFloatingPoint: Bool
 
-    init(literal: String, isFloatingPoint: Bool = false, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(literal: String, isFloatingPoint: Bool = false, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.literal = literal
         self.isFloatingPoint = isFloatingPoint
         super.init(type: .numericLiteral, sourceFile: sourceFile, sourceRange: sourceRange)
@@ -1242,7 +1242,7 @@ class KotlinParenthesized: KotlinExpression {
         return KotlinParenthesized(expression: expression, content: kcontent)
     }
 
-    init(content: KotlinExpression, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(content: KotlinExpression, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.content = content
         super.init(type: .parenthesized, sourceFile: sourceFile, sourceRange: sourceRange)
     }
@@ -1324,7 +1324,7 @@ class KotlinPrefixOperator: KotlinExpression {
         return kexpression
     }
 
-    init(operatorSymbol: String, target: KotlinExpression, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(operatorSymbol: String, target: KotlinExpression, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.operatorSymbol = operatorSymbol
         self.target = target
         super.init(type: .prefixOperator, sourceFile: sourceFile, sourceRange: sourceRange)
@@ -1435,7 +1435,7 @@ class KotlinStringLiteral: KotlinExpression {
         return kexpression
     }
 
-    init(literal: String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(literal: String, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         super.init(type: .stringLiteral, sourceFile: sourceFile, sourceRange: sourceRange)
         self.segments = [.string(literal)]
     }
@@ -1624,7 +1624,7 @@ class KotlinTupleLiteral: KotlinExpression {
         return KotlinTupleLiteral(expression: expression, values: kvalues)
     }
 
-    init(values: [KotlinExpression], sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(values: [KotlinExpression], sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.values = values
         super.init(type: .tupleLiteral, sourceFile: sourceFile, sourceRange: sourceRange)
     }

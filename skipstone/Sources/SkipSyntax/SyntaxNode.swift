@@ -4,10 +4,10 @@ import SwiftSyntax
 class SyntaxNode: SourceDerived, PrettyPrintable {
     let nodeName: String
     let syntax: SyntaxProtocol?
-    let sourceFile: Source.File?
+    let sourceFile: Source.FilePath?
     let sourceRange: Source.Range?
 
-    init(nodeName: String, syntax: SyntaxProtocol? = nil, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(nodeName: String, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.nodeName = nodeName
         self.syntax = syntax
         self.sourceFile = sourceFile

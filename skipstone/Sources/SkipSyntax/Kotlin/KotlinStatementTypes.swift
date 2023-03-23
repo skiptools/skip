@@ -1097,7 +1097,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         }
     }
 
-    init(name: String, sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(name: String, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.name = name
         super.init(type: name == "constructor" ? .constructorDeclaration : .functionDeclaration, sourceFile: sourceFile, sourceRange: sourceRange)
     }
@@ -1202,7 +1202,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
 class KotlinImportDeclaration: KotlinStatement {
     var modulePath: [String]
 
-    init(modulePath: [String], sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(modulePath: [String], sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.modulePath = modulePath
         super.init(type: .importDeclaration, sourceFile: sourceFile, sourceRange: sourceRange)
     }
@@ -1461,7 +1461,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         return kstatement
     }
 
-    init(names: [String], variableTypes: [TypeSignature], sourceFile: Source.File? = nil, sourceRange: Source.Range? = nil) {
+    init(names: [String], variableTypes: [TypeSignature], sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.names = names
         self.variableTypes = variableTypes
         super.init(type: .variableDeclaration, sourceFile: sourceFile, sourceRange: sourceRange)

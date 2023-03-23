@@ -4,7 +4,7 @@
 /// These types must maintain serialization compatibility.
 public struct OutputMap : Encodable {
     public struct Entry : Encodable {
-        let sourceFile: Source.File
+        let sourceFile: Source.FilePath
         let sourceRange: Source.Range?
         let range: Source.Range
     }
@@ -21,7 +21,7 @@ public struct OutputMap : Encodable {
     }
 
     /// Find the source information for the given output range.
-    public func source(of outputRange: Source.Range) -> (file: Source.File, range: Source.Range?)? {
+    public func source(of outputRange: Source.Range) -> (file: Source.FilePath, range: Source.Range?)? {
         // Use the last entry to include the given output range
         guard let entry = entries.last(where: { $0.range.start >= outputRange.start && $0.range.end >= outputRange.end }) else {
             return nil

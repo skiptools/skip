@@ -73,7 +73,7 @@ extension XCTestCase {
         #endif
 
         let srcFile = try tmpFile(named: "Source.swift", contents: swift)
-        let tp = Transpiler(sourceFiles: [Source.File(path: srcFile.path)], symbols: symbols)
+        let tp = Transpiler(sourceFiles: [Source.FilePath(path: srcFile.path)], symbols: symbols)
         try await tp.transpile { transpilation in
             let content = trimmedContent(transpilation: transpilation)
             let messagesString = transpilation.messages.map(\.description).joined(separator: ",")
@@ -90,7 +90,7 @@ extension XCTestCase {
     /// Checks that the given Swift generates a message when transpiled.
     public func checkProducesMessage(symbols: Symbols? = nil, swift: String, file: StaticString = #file, line: UInt = #line) async throws {
         let srcFile = try tmpFile(named: "Source.swift", contents: swift)
-        let tp = Transpiler(sourceFiles: [Source.File(path: srcFile.path)], symbols: symbols)
+        let tp = Transpiler(sourceFiles: [Source.FilePath(path: srcFile.path)], symbols: symbols)
         try await tp.transpile { transpilation in
             XCTAssertTrue(!transpilation.messages.isEmpty, trimmedContent(transpilation: transpilation))
             transpilation.messages.forEach { print("Received expected message: \($0)") }
