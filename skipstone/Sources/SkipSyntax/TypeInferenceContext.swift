@@ -1,26 +1,31 @@
 /// Contextual information used in type inference.
 struct TypeInferenceContext {
+    private let codebaseInfo: CodebaseInfo.Context?
     private let symbols: Symbols.Context?
     private var typePath: [(TypeDeclaration, Bool)] = []
     private var blockPath: [[String: TypeSignature]] = [] // Each entry is map of additional identifier bindings
     private var localIdentifierTypes: [String: TypeSignature] = [:]
 
+    // TODO: Remove Symbols
     /// Create a top-level context for type inference.
     ///
     /// - Parameters:
+    ///   - codebaseInfo: Available codebase information.
     ///   - symbols: Available symbol information.
     ///   - sourceFile: Source file for this context.
     ///   - statements: Top-level statements from which to determine imports.
-    init(symbols: Symbols? = nil, sourceFile: Source.FilePath?, statements: [Statement]) {
-        if let symbols {
+    init(codebaseInfo: CodebaseInfo? = nil, symbols: Symbols? = nil, sourceFile: Source.FilePath?, statements: [Statement]) {
+        if codebaseInfo != nil || symbols != nil {
             let importedModuleNames: [String] = statements.compactMap { statement in
                 guard statement.type == .importDeclaration, let importDeclaration = statement as? ImportDeclaration else {
                     return nil
                 }
                 return importDeclaration.modulePath.first
             }
-            self.symbols = symbols.context(importedModuleNames: importedModuleNames, sourceFile: sourceFile)
+            self.codebaseInfo = codebaseInfo?.context(importedModuleNames: importedModuleNames, sourceFile: sourceFile)
+            self.symbols = symbols?.context(importedModuleNames: importedModuleNames, sourceFile: sourceFile)
         } else {
+            self.codebaseInfo = nil
             self.symbols = nil
         }
     }

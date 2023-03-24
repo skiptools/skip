@@ -23,10 +23,13 @@ public class CodebaseInfo: Codable {
     /// Gather codebase-level information from the given syntax tree.
     func gather(from syntaxTree: SyntaxTree) {
         assert(!isInUse)
+        var needsVariableTypeInference = false
         for statement in syntaxTree.root.statements {
             switch statement.type {
             case .classDeclaration, .enumDeclaration, .protocolDeclaration, .structDeclaration:
-                rootTypes.append(TypeInfo(statement: statement as! TypeDeclaration, moduleName: moduleName))
+                let typeInfo = TypeInfo(statement: statement as! TypeDeclaration, moduleName: moduleName)
+                rootTypes.append(typeInfo)
+                needsVariableTypeInference = needsVariableTypeInference || typeInfo.needsVariableTypeInference
             case .extensionDeclaration:
                 rootExtensions.append(TypeInfo(statement: statement as! ExtensionDeclaration, moduleName: moduleName))
             case .functionDeclaration:
@@ -34,10 +37,16 @@ public class CodebaseInfo: Codable {
             case .typealiasDeclaration:
                 rootTypealiases.append(TypealiasInfo(statement: statement as! TypealiasDeclaration, moduleName: moduleName))
             case .variableDeclaration:
-                rootVariables.append(VariableInfo(statement: statement as! VariableDeclaration, moduleName: moduleName))
+                let variableInfo = VariableInfo(statement: statement as! VariableDeclaration, moduleName: moduleName)
+                rootVariables.append(variableInfo)
+                needsVariableTypeInference = needsVariableTypeInference || variableInfo.needsTypeInference
             default:
                 break
             }
+        }
+        // Save the syntax trees that have members requiring additional type inference
+        if needsVariableTypeInference {
+            typeInferenceTrees[syntaxTree.source.file] = syntaxTree
         }
     }
 
@@ -45,14 +54,13 @@ public class CodebaseInfo: Codable {
     ///
     /// - Warning: Codebase info should not be used until this has been called. After calling this function, do not mutate info.
     func prepareForUse() {
-        buildItemsByName()
-        inferVariableTypes()
         isInUse = true
+        buildItemsByName()
+        inferVariableTypes() // Requires us to be ready for use
     }
 
     /// Create a context that can access the given imported modules.
     func context(importedModuleNames: [String] = [], sourceFile: Source.FilePath? = nil) -> Context {
-        assert(isInUse)
         return Context(info: self, importedModuleNames: Set(importedModuleNames), sourceFile: sourceFile)
     }
 
@@ -424,9 +432,10 @@ public class CodebaseInfo: Codable {
     private var rootExtensions: [TypeInfo] = []
     private var itemsByName: [String: [CodebaseInfoItem]] = [:]
     private var isInUse = false
+    private var typeInferenceTrees: [Source.FilePath: SyntaxTree] = [:]
 
     private enum CodingKeys: String, CodingKey {
-        // Exclude itemsByName
+        // Only encode moduleName and root infos
         case moduleName, rootTypes, rootTypealiases, rootVariables, rootFunctions, rootExtensions
     }
 
@@ -458,7 +467,35 @@ public class CodebaseInfo: Codable {
     }
 
     private func inferVariableTypes() {
-        //~~~
+        guard !typeInferenceTrees.isEmpty else {
+            return
+        }
+        // We don't need our trees after inferring types
+        let typeInferenceTrees = self.typeInferenceTrees
+        self.typeInferenceTrees = [:]
+
+        var typeInferenceContexts: [Source.FilePath: TypeInferenceContext] = [:]
+        for (sourceFile, syntaxTree) in typeInferenceTrees {
+            let context: TypeInferenceContext
+            if let existingContext = typeInferenceContexts[sourceFile] {
+                context = existingContext
+            } else {
+                context = TypeInferenceContext(codebaseInfo: self, sourceFile: sourceFile, statements: syntaxTree.root.statements)
+                typeInferenceContexts[sourceFile] = context
+            }
+            for i in 0..<rootVariables.count {
+                if rootVariables[i].sourceFile == sourceFile && rootVariables[i].needsTypeInference {
+                    rootVariables[i] = rootVariables[i].inferType(with: context)
+                }
+            }
+            for rootType in rootTypes {
+                if rootType.sourceFile == sourceFile && rootType.needsVariableTypeInference {
+                    if let declaration = syntaxTree.root.statements.first(where: { ($0 as? TypeDeclaration)?.name == rootType.name }) as? TypeDeclaration {
+                        rootType.inferVariableTypes(with: context, declaration: declaration)
+                    }
+                }
+            }
+        }
     }
 
     //~~~ We have to add synthesized constructors ourselves
@@ -489,7 +526,7 @@ public class CodebaseInfo: Codable {
             return types + typealiases + cases + variables + functions
         }
 
-        init(statement: TypeDeclaration, in declaringType: TypeSignature? = nil, moduleName: String) {
+        fileprivate init(statement: TypeDeclaration, in declaringType: TypeSignature? = nil, moduleName: String) {
             self.name = statement.name
             self.declarationType = statement.type
             self.signature = statement.signature
@@ -502,7 +539,7 @@ public class CodebaseInfo: Codable {
             addMembers(statement.members)
         }
 
-        init(statement: ExtensionDeclaration, moduleName: String) {
+        fileprivate init(statement: ExtensionDeclaration, moduleName: String) {
             self.name = statement.name
             self.declarationType = statement.type
             self.signature = statement.signature
@@ -535,6 +572,23 @@ public class CodebaseInfo: Codable {
                 }
             }
         }
+
+        fileprivate var needsVariableTypeInference: Bool {
+            return variables.contains { $0.needsTypeInference } || types.contains { $0.needsVariableTypeInference }
+        }
+
+        fileprivate func inferVariableTypes(with context: TypeInferenceContext, declaration: TypeDeclaration) {
+            let memberContext = context.pushing(declaration)
+            variables = variables.map { $0.needsTypeInference ? $0.inferType(with: memberContext) : $0 }
+            for type in types {
+                guard type.needsVariableTypeInference else {
+                    continue
+                }
+                if let declaration = declaration.members.first(where: { ($0 as? TypeDeclaration)?.name == type.name }) as? TypeDeclaration {
+                    type.inferVariableTypes(with: memberContext, declaration: declaration)
+                }
+            }
+        }
     }
 
     /// Information about a declared global or property.
@@ -543,7 +597,7 @@ public class CodebaseInfo: Codable {
         var declarationType: StatementType {
             return .variableDeclaration
         }
-        let signature: TypeSignature
+        var signature: TypeSignature
         let moduleName: String
         let sourceFile: Source.FilePath?
         let declaringType: TypeSignature?
@@ -552,8 +606,14 @@ public class CodebaseInfo: Codable {
 
         let generics: Generics
         let isReadOnly: Bool
+        var value: Expression?
 
-        init(statement: VariableDeclaration, in declaringType: TypeSignature? = nil, moduleName: String) {
+        private enum CodingKeys: String, CodingKey {
+            // Exclude value expression
+            case name, signature, moduleName, sourceFile, declaringType, visibility, isStatic, generics, isReadOnly
+        }
+
+        fileprivate init(statement: VariableDeclaration, in declaringType: TypeSignature? = nil, moduleName: String) {
             self.name = (statement.names.first ?? "") ?? ""
             self.signature = statement.variableTypes.first ?? .none
             self.moduleName = moduleName
@@ -563,6 +623,25 @@ public class CodebaseInfo: Codable {
             self.isStatic = statement.modifiers.isStatic
             self.generics = Generics() //~~~
             self.isReadOnly = statement.isLet || (statement.getter != nil && statement.setter == nil)
+            if self.signature == .none, self.sourceFile != nil {
+                // We'll try to infer the type after gathering all info
+                self.value = statement.value
+            }
+        }
+
+        fileprivate var needsTypeInference: Bool {
+            return value != nil
+        }
+
+        fileprivate func inferType(with context: TypeInferenceContext) -> VariableInfo {
+            var v = self
+            guard let value = v.value else {
+                return v
+            }
+            v.value = nil // Don't hold on to Expression
+            value.inferTypes(context: context, expecting: .none)
+            v.signature = value.inferredType
+            return v
         }
     }
 
@@ -582,7 +661,7 @@ public class CodebaseInfo: Codable {
         let generics: Generics
         let isMutating: Bool
 
-        init(statement: FunctionDeclaration, in declaringType: TypeSignature? = nil, moduleName: String) {
+        fileprivate init(statement: FunctionDeclaration, in declaringType: TypeSignature? = nil, moduleName: String) {
             self.name = statement.name
             self.signature = statement.functionType
             self.moduleName = moduleName
@@ -612,7 +691,7 @@ public class CodebaseInfo: Codable {
 
         let generics: Generics
 
-        init(statement: TypealiasDeclaration, in declaringType: TypeSignature? = nil, moduleName: String) {
+        fileprivate init(statement: TypealiasDeclaration, in declaringType: TypeSignature? = nil, moduleName: String) {
             self.name = statement.name
             self.signature = statement.signature
             self.moduleName = moduleName
@@ -638,7 +717,7 @@ public class CodebaseInfo: Codable {
             return true
         }
 
-        init(statement: EnumCaseDeclaration, in declaringType: TypeSignature? = nil, moduleName: String) {
+        fileprivate init(statement: EnumCaseDeclaration, in declaringType: TypeSignature? = nil, moduleName: String) {
             self.name = statement.name
             self.signature = statement.signature
             self.moduleName = moduleName
