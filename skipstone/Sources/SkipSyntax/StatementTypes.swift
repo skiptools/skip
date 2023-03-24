@@ -583,6 +583,18 @@ class EnumCaseDeclaration: Statement {
     let rawValue: Expression?
     let attributes: Attributes
     private(set) var modifiers: Modifiers
+    var signature: TypeSignature {
+        guard let owningTypeDeclaration else {
+            return .none
+        }
+        guard !associatedValues.isEmpty else {
+            return owningTypeDeclaration.signature
+        }
+        let parameters = associatedValues.map {
+            TypeSignature.Parameter(label: $0.externalLabel, type: $0.declaredType, isVariadic: $0.isVariadic, hasDefaultValue: $0.defaultValue != nil)
+        }
+        return .function(parameters, owningTypeDeclaration.signature)
+    }
 
     init(name: String, associatedValues: [Parameter<Expression>], rawValue: Expression? = nil, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.name = name

@@ -220,7 +220,6 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             }
             return type
         }
-        //~~~ NEXT: TEST SYMBOLS FOR EXTENDS DECLARATIONS... IF NOT WE CAN'T MAP GENERICS
         switch self {
         case .array(let element):
             return .array(map(element))

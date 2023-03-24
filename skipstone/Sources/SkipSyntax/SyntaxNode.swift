@@ -84,6 +84,11 @@ class SyntaxNode: SourceDerived, PrettyPrintable {
         return nil
     }
 
+    /// Whether this node is at the global/root level.
+    final var isGlobal: Bool {
+        return owningTypeDeclaration == nil && parent?.parent == nil
+    }
+
     /// Find the nearest function declaration by traversing up the syntax tree.
     ///
     /// Returns `nil` if we encounter a type before a function.

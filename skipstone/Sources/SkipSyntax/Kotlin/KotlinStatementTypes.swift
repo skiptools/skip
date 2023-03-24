@@ -1420,7 +1420,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             if kstatement.modifiers.isOverride {
                 kstatement.modifiers.visibility = .public
             }
-        } else if statement.owningTypeDeclaration == nil && statement.parent?.parent == nil {
+        } else if statement.isGlobal {
             kstatement.isGlobal = true
         }
         if let value = statement.value {

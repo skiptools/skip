@@ -8,12 +8,29 @@ public class CodebaseInfo: Codable {
         self.moduleName = moduleName
     }
 
-    /// Merge the given codebase info into this instance.
-    public func merge(_ info: CodebaseInfo) {
-        info.types.forEach { add($0) }
-        info.typealiases.forEach { add($0) }
-        info.variables.forEach { add($0) }
-        info.functions.forEach { add($0) }
+    /// - Note: Remove this when we complete the transition away from SymbolKit.
+    public var symbolsFallback: Symbols?
+
+    /// Add the contents of the given codebase info to our own info.
+    public func add(_ info: CodebaseInfo) {
+        types += info.types
+        typealiases += info.typealiases
+        variables += info.variables
+        functions += info.functions
+        extensions += info.extensions
+        rebuildItemsByName()
+    }
+
+    /// Gather codebase-level information from the given syntax tree.
+    func gather(from syntaxTree: SyntaxTree) {
+        syntaxTree.root.visit(perform: self.visit)
+    }
+
+    /// Finalize codebase info after gathering is complete.
+    func didGather() {
+        mergeExtensions()
+        inferVariableTypes()
+        rebuildItemsByName()
     }
 
     /// Create a context that can access the given imported modules.
@@ -61,18 +78,10 @@ public class CodebaseInfo: Codable {
                 .map(\.0) // return symbol
         }
 
-        /// Score, sort, and filter the given object based on their items.
-        func ranked<T>(_ objects: [T], keyPath: KeyPath<T, CodebaseInfoItem>) -> [T] {
-            return zip(objects, objects.map { rankScore(of: $0[keyPath: keyPath]) })
-                .filter { $0.1 > 0 } // score > 0
-                .sorted { $0.1 > $1.1 } // sort on score
-                .map(\.0) // return object
-        }
-
         /// Score an item based on its visibility in this context.
         ///
         /// A score of 0 indicates that the item is not visible.
-        func rankScore(of item: CodebaseInfoItem) -> Int {
+        private func rankScore(of item: CodebaseInfoItem) -> Int {
             var score = 0
             if item.moduleName == info.moduleName {
                 if let itemSourcePath = item.sourceFile?.path, let sourcePath = sourceFile?.path, itemSourcePath.hasSuffix(sourcePath) {
@@ -384,32 +393,63 @@ public class CodebaseInfo: Codable {
         }
     }
 
-    private var itemsByName: [String: [CodebaseInfoItem]] = [:]
     private var types: [TypeInfo] = []
     private var typealiases: [TypealiasInfo] = []
     private var variables: [VariableInfo] = []
     private var functions: [FunctionInfo] = []
+    private var extensions: [TypeInfo] = []
+    private var itemsByName: [String: [CodebaseInfoItem]] = [:]
 
     private enum CodingKeys: String, CodingKey {
         // Exclude itemsByName
-        case moduleName, types, typealiases, variables, functions
+        case moduleName, types, typealiases, variables, functions, extensions
     }
 
-    private func add(_ info: TypeInfo) {
-        //~~~ deal with extensions... duplicates?
-        types.append(info)
+    private func rebuildItemsByName() {
+        let items: [CodebaseInfoItem] = types + typealiases + variables + functions
+        var itemsByName: [String: [CodebaseInfoItem]] = [:]
+        for item in items {
+            var itemsWithName = itemsByName[item.name, default: []]
+            itemsWithName.append(item)
+            itemsByName[item.name] = itemsWithName
+        }
+        self.itemsByName = itemsByName
     }
 
-    private func add(_ info: TypealiasInfo) {
-        typealiases.append(info)
+    private func mergeExtensions() {
+        //~~~
     }
 
-    private func add(_ info: VariableInfo) {
-        variables.append(info)
+    private func inferVariableTypes() {
+        //~~~
     }
 
-    private func add(_ info: FunctionInfo) {
-        functions.append(info)
+    private func visit(node: SyntaxNode) -> VisitResult<SyntaxNode> {
+        guard let statement = node as? Statement else {
+            // Recurse to find nested declarations
+            return .recurse(nil)
+        }
+        switch statement.type {
+        case .classDeclaration, .enumDeclaration, .protocolDeclaration, .structDeclaration:
+            types.append(TypeInfo(statement: statement as! TypeDeclaration, moduleName: moduleName))
+        case .extensionDeclaration:
+            extensions.append(TypeInfo(statement: statement as! ExtensionDeclaration, moduleName: moduleName))
+        case .functionDeclaration:
+            if statement.isGlobal {
+                functions.append(FunctionInfo(statement: statement as! FunctionDeclaration, moduleName: moduleName))
+            }
+        case .typealiasDeclaration:
+            if statement.isGlobal {
+                typealiases.append(TypealiasInfo(statement: statement as! TypealiasDeclaration, moduleName: moduleName))
+            }
+        case .variableDeclaration:
+            if statement.isGlobal {
+                variables.append(VariableInfo(statement: statement as! VariableDeclaration, moduleName: moduleName))
+            }
+        default:
+            break
+        }
+        return .recurse(nil)
     }
 
     //~~~ We have to add synthesized constructors ourselves
@@ -427,102 +467,161 @@ public class CodebaseInfo: Codable {
                 return nil
             }
         }
-        var visibility: Modifiers.Visibility {
-            return modifiers.visibility
-        }
+        let visibility: Modifiers.Visibility
         var isStatic: Bool {
-            return modifiers.isStatic
+            return true
         }
 
-        let modifiers: Modifiers
         let generics: Generics
-        let inherits: [TypeSignature]
+        var inherits: [TypeSignature]
 
-        var types: [TypeInfo]
-        var typealiases: [TypealiasInfo]
-        var cases: [EnumCaseInfo]
-        var properties: [VariableInfo]
-        var functions: [FunctionInfo]
+        var types: [TypeInfo] = []
+        var typealiases: [TypealiasInfo] = []
+        var cases: [EnumCaseInfo] = []
+        var properties: [VariableInfo] = []
+        var functions: [FunctionInfo] = []
         var members: [CodebaseInfoItem] {
             return types + typealiases + cases + properties + functions
+        }
+
+        init(statement: TypeDeclaration, moduleName: String) {
+            self.name = statement.name
+            self.declarationType = statement.type
+            self.signature = statement.signature
+            self.moduleName = moduleName
+            self.sourceFile = statement.sourceFile
+            self.visibility = statement.modifiers.visibility
+            self.generics = statement.generics
+            self.inherits = statement.inherits
+            addMembers(statement.members)
+        }
+
+        init(statement: ExtensionDeclaration, moduleName: String) {
+            self.name = statement.name
+            self.declarationType = statement.type
+            self.signature = statement.signature
+            self.moduleName = moduleName
+            self.sourceFile = statement.sourceFile
+            self.visibility = statement.modifiers.visibility
+            self.generics = statement.generics
+            self.inherits = statement.inherits
+            addMembers(statement.members)
+        }
+
+        private func addMembers(_ statements: [Statement]) {
+            //~~~
         }
     }
 
     /// Information about a declared global or property.
     struct VariableInfo: CodebaseInfoItem, Codable {
         let name: String
-        let declarationType: StatementType
+        var declarationType: StatementType {
+            return .variableDeclaration
+        }
         let signature: TypeSignature
         let moduleName: String
         let sourceFile: Source.FilePath?
         let declaringType: TypeSignature?
-        var visibility: Modifiers.Visibility {
-            return modifiers.visibility
-        }
-        var isStatic: Bool {
-            return modifiers.isStatic
-        }
+        let visibility: Modifiers.Visibility
+        let isStatic: Bool
 
-        let modifiers: Modifiers
         let generics: Generics
         let isReadOnly: Bool
+
+        init(statement: VariableDeclaration, in declaringType: TypeSignature? = nil, moduleName: String) {
+            self.name = (statement.names.first ?? "") ?? ""
+            self.signature = statement.variableTypes.first ?? .none
+            self.moduleName = moduleName
+            self.sourceFile = statement.sourceFile
+            self.declaringType = declaringType
+            self.visibility = statement.modifiers.visibility
+            self.isStatic = statement.modifiers.isStatic
+            self.generics = Generics() //~~~
+            self.isReadOnly = statement.isLet || (statement.getter != nil && statement.setter == nil)
+        }
     }
 
     /// Information about a declared function.
     struct FunctionInfo: CodebaseInfoItem, Codable {
         let name: String
-        let declarationType: StatementType
+        var declarationType: StatementType {
+            return .functionDeclaration
+        }
         let signature: TypeSignature
         let moduleName: String
         let sourceFile: Source.FilePath?
         let declaringType: TypeSignature?
-        var visibility: Modifiers.Visibility {
-            return modifiers.visibility
-        }
-        var isStatic: Bool {
-            return modifiers.isStatic
-        }
+        let visibility: Modifiers.Visibility
+        let isStatic: Bool
 
-        let modifiers: Modifiers
         let generics: Generics
         let isMutating: Bool
+
+        init(statement: FunctionDeclaration, in declaringType: TypeSignature? = nil, moduleName: String) {
+            self.name = statement.name
+            self.signature = statement.functionType
+            self.moduleName = moduleName
+            self.sourceFile = statement.sourceFile
+            self.declaringType = declaringType
+            self.visibility = statement.modifiers.visibility
+            self.isStatic = statement.modifiers.isStatic
+            self.generics = Generics() //~~~
+            self.isMutating = statement.modifiers.isMutating
+        }
     }
 
     /// Information about a typealias.
     struct TypealiasInfo: CodebaseInfoItem, Codable {
         let name: String
-        let declarationType: StatementType
+        var declarationType: StatementType {
+            return .typealiasDeclaration
+        }
         let signature: TypeSignature
         let moduleName: String
         let sourceFile: Source.FilePath?
         let declaringType: TypeSignature?
-        var visibility: Modifiers.Visibility {
-            return modifiers.visibility
-        }
+        let visibility: Modifiers.Visibility
         var isStatic: Bool {
             return true
         }
 
-        let modifiers: Modifiers
         let generics: Generics
+
+        init(statement: TypealiasDeclaration, in declaringType: TypeSignature? = nil, moduleName: String) {
+            self.name = statement.name
+            self.signature = statement.signature
+            self.moduleName = moduleName
+            self.sourceFile = statement.sourceFile
+            self.declaringType = declaringType
+            self.visibility = statement.modifiers.visibility
+            self.generics = statement.generics
+        }
     }
 
     /// Information about an enum case.
     struct EnumCaseInfo: CodebaseInfoItem, Codable {
         let name: String
-        let declarationType: StatementType
-        let signature: TypeSignature // For enum cases, this is the owning enum or a function returning the owning enum
+        var declarationType: StatementType {
+            return .enumCaseDeclaration
+        }
+        let signature: TypeSignature // Owning enum or a function returning the owning enum
         let moduleName: String
         let sourceFile: Source.FilePath?
         let declaringType: TypeSignature?
-        var visibility: Modifiers.Visibility {
-            return modifiers.visibility
-        }
+        let visibility: Modifiers.Visibility
         var isStatic: Bool {
             return true
         }
 
-        let modifiers: Modifiers
+        init(statement: EnumCaseDeclaration, in declaringType: TypeSignature? = nil, moduleName: String) {
+            self.name = statement.name
+            self.signature = statement.signature
+            self.moduleName = moduleName
+            self.sourceFile = statement.sourceFile
+            self.declaringType = declaringType
+            self.visibility = statement.modifiers.visibility
+        }
     }
 }
 

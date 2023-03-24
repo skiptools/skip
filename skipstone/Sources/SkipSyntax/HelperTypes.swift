@@ -191,10 +191,10 @@ enum StringLiteralSegment<E> {
 }
 
 /// Member and type modifiers.
-///
-/// - Note: `Codable` for use in `CodebaseInfo`.
-struct Modifiers: PrettyPrintable, Codable {
+struct Modifiers: PrettyPrintable {
     /// Visibility modifier.
+    ///
+    /// - Note: `Codable` for use in `CodebaseInfo`.
     enum Visibility: Equatable, Comparable, Codable {
         case `private`
         case `default`
