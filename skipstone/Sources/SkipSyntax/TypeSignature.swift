@@ -503,9 +503,10 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             if case .member(let base2, let type2) = type {
                 return base == base2 && type.isCompatible(with: type2)
             }
-        case .named(let name, _):
-            if case .named(let name2, _) = type {
-                return name == name2
+        case .named:
+            // TODO: This would have to be able to check inheritance relationships to be accurate. We could improve by scoring same-named matches higher
+            if case .named = type {
+                return true
             }
         case .none:
             return true

@@ -661,7 +661,13 @@ class ExtensionDeclaration: TypeDeclaration {
     init(extends: TypeSignature, inherits: [TypeSignature] = [], attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), members: [Statement] = [], syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.extends = extends
         //~~~ Need to figure out what the generic parameters are on the type being extended: class C<T>, extension C { ... } T will be missing
-        super.init(type: .extensionDeclaration, name: extends.name, signature: extends, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+        let name: String
+        if case .member(_, let type) = extends {
+            name = type.name
+        } else {
+            name = extends.name
+        }
+        super.init(type: .extensionDeclaration, name: name, signature: extends, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
     override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
