@@ -188,8 +188,8 @@ final class TypeInferenceTests: XCTestCase {
         throw XCTSkip("TODO: Test nested type symbols")
     }
 
-    func testBestGuessMatching() throws {
-        throw XCTSkip("TODO: We should fall back to looking for matching symbols when we don't know the type and using TypeSignature.isCompatible to match")
+    func testScoredMatching() throws {
+        throw XCTSkip("TODO: We should score parameter matches for functions. Exact matches, inheritance matches for named types, fall back to looking for matching symbols when we don't know the type and using TypeSignature.isCompatible to match")
     }
 }
 

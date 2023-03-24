@@ -15,7 +15,7 @@ class KotlinSyntaxNode: SourceDerived, OutputNode {
     /// Visit this node and its children depth first, performing the given action.
     ///
     /// - Parameters:
-    ///   - Parameter perform: The action to perform.
+    ///   - perform: The action to perform.
     func visit(perform: (KotlinSyntaxNode) -> VisitResult<KotlinSyntaxNode>) {
         if case .recurse(let onLeave) = perform(self) {
             for child in children {

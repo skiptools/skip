@@ -74,8 +74,10 @@ public class CodebaseInfo: Codable {
         ///
         /// If this is a `.`-separated qualified type name, only returns types that match the full path.
         ///
+        /// - Parameters:
+        ///  - qualifiedMatch: If true, names without `.` separators will only match root types.
         /// - Warning: This function does not take symbol visibility into account. See `ranked`.
-        func lookup(name: String) -> [CodebaseInfoItem] {
+        func lookup(name: String, qualifiedMatch: Bool = false) -> [CodebaseInfoItem] {
             let path = name.split(separator: ".").map { String($0) }
             guard !path.isEmpty else {
                 return []
@@ -83,7 +85,9 @@ public class CodebaseInfo: Codable {
             var candidates = info.itemsByName[path[path.count - 1], default: []]
             if path.count > 1 {
                 let baseName = path.dropLast().joined(separator: ".")
-                candidates = candidates.filter { $0.declaringType?.name == baseName }
+                candidates = candidates.filter { ($0 is TypeInfo) && $0.declaringType?.name == baseName }
+            } else if qualifiedMatch {
+                candidates = candidates.filter { !($0 is TypeInfo) || $0.declaringType == nil }
             }
             return candidates
         }
@@ -120,7 +124,7 @@ public class CodebaseInfo: Codable {
         /// Return all type infos visible for the given type.
         func typeInfos(for type: TypeSignature) -> [TypeInfo] {
             return candidateTypeNames(for: type).flatMap { name in
-                let candidates = ranked(lookup(name: name))
+                let candidates = ranked(lookup(name: name, qualifiedMatch: true))
                 return candidates.flatMap { candidate in
                     if let typeInfo = candidate as? TypeInfo {
                         return [typeInfo]

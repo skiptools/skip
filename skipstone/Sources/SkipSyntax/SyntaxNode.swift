@@ -34,7 +34,7 @@ class SyntaxNode: SourceDerived, PrettyPrintable {
     /// Visit this node and its children depth first, performing the given action.
     ///
     /// - Parameters:
-    ///   - Parameter perform: The action to perform.
+    ///   - perform: The action to perform.
     func visit(perform: (SyntaxNode) -> VisitResult<SyntaxNode>) {
         if case .recurse(let onLeave) = perform(self) {
             for child in children {

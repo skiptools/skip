@@ -28,7 +28,7 @@ class KotlinExpression: KotlinSyntaxNode {
     /// Return true if this expression may evaluate to a shared mutable struct type.
     ///
     /// - Parameters:
-    ///   - Parameter orType: If set, also return true if the type of this expression may be a shared mutable struct. E.g. an array literal is not shared, but its type is a shared mutable struct.
+    ///   - orType: If set, also return true if the type of this expression may be a shared mutable struct. E.g. an array literal is not shared, but its type is a shared mutable struct.
     func mayBeSharedMutableStructExpression(orType: Bool) -> Bool {
         return false
     }

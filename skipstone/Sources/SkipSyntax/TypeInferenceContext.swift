@@ -8,9 +8,9 @@ struct TypeInferenceContext {
     /// Create a top-level context for type inference.
     ///
     /// - Parameters:
-    ///   - Parameter symbols: Available symbol information.
-    ///   - Parameter sourceFile: Source file for this context.
-    ///   - Parameter statements: Top-level statements from which to determine imports.
+    ///   - symbols: Available symbol information.
+    ///   - sourceFile: Source file for this context.
+    ///   - statements: Top-level statements from which to determine imports.
     init(symbols: Symbols? = nil, sourceFile: Source.FilePath?, statements: [Statement]) {
         if let symbols {
             let importedModuleNames: [String] = statements.compactMap { statement in
@@ -181,7 +181,7 @@ struct TypeInferenceContext {
     /// The match on the parameter types will attempt to allow for unknown types.
     ///
     /// - Parameters:
-    ///   - Parameter type: The function's owning type if this is a member function, or nil if not.
+    ///   - type: The function's owning type if this is a member function, or nil if not.
     func function(_ name: String, in type: TypeSignature?, parameters: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
         guard let symbols else {
             return []
@@ -207,7 +207,7 @@ struct TypeInferenceContext {
     /// The match on the parameter types will attempt to allow for unknown types.
     ///
     /// - Parameters:
-    ///   - Parameter type: The subscript's owning type.
+    ///   - type: The subscript's owning type.
     func `subscript`(in type: TypeSignature, parameters: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
         guard let symbols else {
             return []

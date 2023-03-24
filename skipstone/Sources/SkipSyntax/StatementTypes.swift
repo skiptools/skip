@@ -653,7 +653,6 @@ class EnumCaseDeclaration: Statement {
     }
 }
 
-// TODO: Generics
 /// `extension Type { ... }`
 class ExtensionDeclaration: TypeDeclaration {
     let extends: TypeSignature
