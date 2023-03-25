@@ -152,7 +152,7 @@ public class CodebaseInfo: Codable {
                     return false
                 }
                 switch candidate.declarationType {
-                case .classDeclaration, .enumDeclaration, .protocolDeclaration, .structDeclaration, .typealiasDeclaration, .variableDeclaration:
+                case .classDeclaration, .enumDeclaration, .protocolDeclaration, .structDeclaration, .typealiasDeclaration, .enumCaseDeclaration, .variableDeclaration:
                     return true
                 default:
                     return false
@@ -162,7 +162,7 @@ public class CodebaseInfo: Codable {
                 return .none
             }
             let type = topRanked.signature
-            return topRanked.declarationType == .variableDeclaration ? type : .metaType(type)
+            return topRanked.declarationType == .variableDeclaration || topRanked.declarationType == .enumCaseDeclaration ? type : .metaType(type)
         }
 
         /// Return the type of the given member.
@@ -290,6 +290,10 @@ public class CodebaseInfo: Codable {
 
         private func identifierSignature(of member: String, in candidate: TypeInfo, isStatic: Bool) -> TypeSignature {
             if let memberInfo = candidate.members.first(where: { $0.name == member && $0.isStatic == isStatic }) {
+                // Enum cases with associated values are modeled as functions, but can also be used as identifiers
+                if memberInfo.declarationType == .enumCaseDeclaration {
+                    return memberInfo.declaringType ?? .none
+                }
                 return memberInfo.signature
             }
             for inherits in candidate.inherits {
@@ -456,7 +460,7 @@ public class CodebaseInfo: Codable {
     private static func addTypeInfo(_ typeInfo: TypeInfo, to itemsByName: inout [String: [CodebaseInfoItem]]) {
         addItem(typeInfo, to: &itemsByName)
         typeInfo.types.forEach { addTypeInfo($0, to: &itemsByName) }
-        let items: [CodebaseInfoItem] = typeInfo.typealiases + typeInfo.variables + typeInfo.functions
+        let items: [CodebaseInfoItem] = typeInfo.typealiases + typeInfo.cases + typeInfo.variables + typeInfo.functions
         items.forEach { addItem($0, to: &itemsByName) }
     }
 
@@ -561,6 +565,8 @@ public class CodebaseInfo: Codable {
                 switch statement.type {
                 case .classDeclaration, .enumDeclaration, .structDeclaration:
                     types.append(TypeInfo(statement: statement as! TypeDeclaration, in: signature, moduleName: moduleName))
+                case .enumCaseDeclaration:
+                    cases.append(EnumCaseInfo(statement: statement as! EnumCaseDeclaration, in: signature, moduleName: moduleName))
                 case .functionDeclaration:
                     functions.append(FunctionInfo(statement: statement as! FunctionDeclaration, in: signature, moduleName: moduleName))
                 case .typealiasDeclaration:
