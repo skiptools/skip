@@ -113,7 +113,12 @@ class KotlinStructPlugin: KotlinPlugin {
             if type == .none && codebaseInfo != nil {
                 variableDeclaration.messages.append(.kotlinConstructorCannotInferPropertyType(variableDeclaration))
             }
-            let defaultValue = variableDeclaration.value.map { KotlinSharedExpressionPointer(shared: $0) }
+            var defaultValue: KotlinExpression? = nil
+            if let value = variableDeclaration.value {
+                defaultValue = KotlinSharedExpressionPointer(shared: value)
+            } else if case .optional = type {
+                defaultValue = KotlinNullLiteral()
+            }
             return Parameter(externalLabel: label, declaredType: type, isVariadic: false, defaultValue: defaultValue)
         }
         constructor.modifiers = Modifiers(visibility: .public)

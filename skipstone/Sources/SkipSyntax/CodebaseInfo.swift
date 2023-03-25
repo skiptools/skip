@@ -147,10 +147,7 @@ public class CodebaseInfo: Codable {
 
         /// Return the type of the given identifier.
         func identifierSignature(of identifier: String) -> TypeSignature {
-            let topRanked = ranked(lookup(name: identifier)).first { candidate in
-                guard candidate.declaringType == nil else {
-                    return false
-                }
+            let topRanked = ranked(lookup(name: identifier, qualifiedMatch: true)).first { candidate in
                 switch candidate.declarationType {
                 case .classDeclaration, .enumDeclaration, .protocolDeclaration, .structDeclaration, .typealiasDeclaration, .enumCaseDeclaration, .variableDeclaration:
                     return true
@@ -192,8 +189,8 @@ public class CodebaseInfo: Codable {
 
         /// Return the signatures of the possible functions being called with the given arguments.
         func functionSignature(of name: String, arguments: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
-            let items = ranked(lookup(name: name))
-            let funcs = items.filter { $0.declaringType == nil && $0.declarationType == .functionDeclaration }
+            let items = ranked(lookup(name: name, qualifiedMatch: true))
+            let funcs = items.filter { $0.declarationType == .functionDeclaration }
             let funcsCandidates = funcs.compactMap { matchFunction($0, arguments: arguments) }
 
             let typeInfos = items.flatMap { (item) -> [TypeInfo] in
