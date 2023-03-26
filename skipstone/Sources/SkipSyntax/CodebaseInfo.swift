@@ -8,9 +8,6 @@ public class CodebaseInfo: Codable {
         self.moduleName = moduleName
     }
 
-    // TODO: Remove this when we complete migration away from Symbols
-    public var symbolsFallback: Symbols?
-
     /// Set dependcy codebase info.
     ///
     /// - Note: Dependency codebase info is not encoded.
@@ -55,8 +52,10 @@ public class CodebaseInfo: Codable {
     /// - Warning: Codebase info should not be used until this has been called. After calling this function, do not mutate info.
     func prepareForUse() {
         isInUse = true
-        buildItemsByName()
-        inferVariableTypes() // Requires us to be ready for use
+        buildItemsByName() // We use this for lookups in subsequent steps
+        inferVariableTypes()
+        addGeneratedConstructors()
+        buildItemsByName() // Final mappings after updates
     }
 
     /// Create a context that can access the given imported modules.
@@ -194,9 +193,6 @@ public class CodebaseInfo: Codable {
             let funcsCandidates = funcs.compactMap { matchFunction($0, arguments: arguments) }
 
             let typeInfos = items.flatMap { (item) -> [TypeInfo] in
-                guard item.declaringType == nil else {
-                    return []
-                }
                 if let typeInfo = item as? TypeInfo {
                     return [typeInfo]
                 } else if let typealiasInfo = item as? TypealiasInfo {
@@ -205,16 +201,8 @@ public class CodebaseInfo: Codable {
                     return []
                 }
             }
-            let initsCandidates = typeInfos.flatMap { typeInfo in
-                let initInfos = typeInfo.functions.filter { $0.name == "init" }
-                return initInfos.compactMap { (initInfo: FunctionInfo) -> TypeSignature? in
-                    guard let signature = matchFunction(initInfo, arguments: arguments), case .function(let argumentTypes, _) = signature else {
-                        return nil
-                    }
-                    // Remap return type of .init from .void to owning type
-                    return .function(argumentTypes, typeInfo.signature)
-                }
-            }
+            let initsCandidates = initSignatures(for: typeInfos, arguments: arguments)
+
             return (funcsCandidates + initsCandidates).reduce(into: [TypeSignature]()) { result, signature in
                 if !result.contains(signature) {
                     result.append(signature)
@@ -290,8 +278,11 @@ public class CodebaseInfo: Codable {
                 // Enum cases with associated values are modeled as functions, but can also be used as identifiers
                 if memberInfo.declarationType == .enumCaseDeclaration {
                     return memberInfo.declaringType ?? .none
+                } else if memberInfo is TypeInfo || memberInfo.declarationType == .typealiasDeclaration {
+                    return .metaType(memberInfo.signature)
+                } else {
+                    return memberInfo.signature
                 }
-                return memberInfo.signature
             }
             for inherits in candidate.inherits {
                 for typeInfo in typeInfos(for: inherits) {
@@ -305,10 +296,18 @@ public class CodebaseInfo: Codable {
         }
 
         private func functionSignature(of name: String, in candidate: TypeInfo, arguments: [LabeledValue<TypeSignature>], isStatic: Bool) -> [TypeSignature] {
-            var functions: [TypeSignature] = []
-            if let memberInfo = candidate.members.first(where: { $0.name == name && $0.isStatic == isStatic }) {
-                if let function = matchFunction(memberInfo, arguments: arguments) {
-                    functions.append(function)
+            let functions = candidate.members.flatMap { (member) -> [TypeSignature] in
+                guard member.name == name && member.isStatic == isStatic else {
+                    return []
+                }
+                if let memberTypeInfo = member as? TypeInfo {
+                    return initSignatures(for: [memberTypeInfo], arguments: arguments)
+                } else if member.declarationType == .typealiasDeclaration {
+                    return initSignatures(for: typeInfos(for: member.signature), arguments: arguments)
+                } else if let function = matchFunction(member, arguments: arguments) {
+                    return [function]
+                } else {
+                    return []
                 }
             }
             if !functions.isEmpty {
@@ -323,6 +322,27 @@ public class CodebaseInfo: Codable {
                 }
             }
             return []
+        }
+
+        private func initSignatures(for typeInfos: [TypeInfo], arguments: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
+            var initSignatures = typeInfos.flatMap { typeInfo in
+                let initInfos = typeInfo.functions.filter { $0.name == "init" }
+                return initInfos.compactMap { (initInfo: FunctionInfo) -> TypeSignature? in
+                    guard let signature = matchFunction(initInfo, arguments: arguments), case .function(let argumentTypes, _) = signature else {
+                        return nil
+                    }
+                    // Remap return type of .init from .void to owning type
+                    return .function(argumentTypes, typeInfo.signature)
+                }
+            }
+
+            // If we don't have any matches and this appears to be a constructor, treat it as one. We take advantage of this
+            // while inferring the types of variable values in prepareForUse(), before we've called generateConstructors()
+            if initSignatures.isEmpty && !typeInfos.isEmpty {
+                let initParameters = arguments.map { TypeSignature.Parameter(label: $0.label, type: $0.value, isVariadic: false, hasDefaultValue: false) }
+                initSignatures.append(.function(initParameters, typeInfos[0].signature))
+            }
+            return initSignatures
         }
 
         private func associatedValueSignatures(of member: String, in candidate: TypeInfo) -> [TypeSignature.Parameter]? {
@@ -499,7 +519,67 @@ public class CodebaseInfo: Codable {
         }
     }
 
-    //~~~ We have to add synthesized constructors ourselves
+    private func addGeneratedConstructors() {
+        rootTypes.forEach { addGeneratedConstructors(to: $0) }
+    }
+
+    private func addGeneratedConstructors(to typeInfo: TypeInfo) {
+        // Handle nested types
+        typeInfo.types.forEach { addGeneratedConstructors(to: $0) }
+        guard typeInfo.declarationType == .classDeclaration || typeInfo.declarationType == .structDeclaration else {
+            return
+        }
+
+        // The compiler only generates if there are no declared constructors
+        let inits = typeInfo.functions.filter { $0.name == "init" }
+        guard inits.isEmpty else {
+            return
+        }
+        var superclassInits: [FunctionInfo] = []
+        if typeInfo.declarationType == .classDeclaration, let superclassSignature = typeInfo.inherits.first {
+            let superclassName: String
+            if case .member(_, let type) = superclassSignature {
+                superclassName = type.name
+            } else {
+                superclassName = superclassSignature.name
+            }
+            let superclassInfos = itemsByName[superclassName, default: []].compactMap { (item) -> TypeInfo? in
+                guard let typeInfo = item as? TypeInfo else {
+                    return nil
+                }
+                return typeInfo.signature.name == superclassSignature.name ? typeInfo : nil
+            }
+            // inherits.first could have been a protocol
+            if superclassInfos.contains(where: { $0.declarationType == .classDeclaration }) {
+                superclassInits = superclassInfos.flatMap { $0.functions.filter { $0.name == "init" } }
+            }
+        }
+        if superclassInits.isEmpty {
+            addMemberwiseConstructor(to: typeInfo)
+        } else {
+            //~~~ Need to map generic parameters
+            for superclassInit in superclassInits {
+                var inheritedInit = superclassInit
+                inheritedInit.moduleName = typeInfo.moduleName
+                inheritedInit.sourceFile = typeInfo.sourceFile
+                inheritedInit.declaringType = typeInfo.signature
+                typeInfo.functions.append(inheritedInit)
+            }
+        }
+    }
+
+    private func addMemberwiseConstructor(to typeInfo: TypeInfo) {
+        let parameters = typeInfo.variables.compactMap { (variable) -> TypeSignature.Parameter? in
+            guard variable.isInitializable else {
+                return nil
+            }
+            return TypeSignature.Parameter(label: variable.name, type: variable.signature, isVariadic: false, hasDefaultValue: variable.hasValue)
+        }
+        let initSignature: TypeSignature = .function(parameters, .void)
+        let initInfo = FunctionInfo(name: "init", signature: initSignature, moduleName: typeInfo.moduleName, sourceFile: typeInfo.sourceFile, declaringType: typeInfo.signature, visibility: typeInfo.visibility)
+        typeInfo.functions.append(initInfo)
+    }
+
     /// Information about a declared type.
     ///
     /// - Note: Unlike the other `CodebaseInfoItem` datastructures, types are modeled as `class` instances so that we can mutate them in place.
@@ -609,11 +689,13 @@ public class CodebaseInfo: Codable {
 
         let generics: Generics
         let isReadOnly: Bool
+        let isInitializable: Bool
+        let hasValue: Bool
         var value: Expression?
 
         private enum CodingKeys: String, CodingKey {
             // Exclude value expression
-            case name, signature, moduleName, sourceFile, declaringType, visibility, isStatic, generics, isReadOnly
+            case name, signature, moduleName, sourceFile, declaringType, visibility, isStatic, generics, isReadOnly, isInitializable, hasValue
         }
 
         fileprivate init(statement: VariableDeclaration, in declaringType: TypeSignature? = nil, moduleName: String) {
@@ -626,6 +708,12 @@ public class CodebaseInfo: Codable {
             self.isStatic = statement.modifiers.isStatic
             self.generics = Generics() //~~~
             self.isReadOnly = statement.isLet || (statement.getter != nil && statement.setter == nil)
+            self.isInitializable = !statement.modifiers.isStatic && statement.getter == nil && (!statement.isLet || statement.value == nil)
+            if case .optional = self.signature {
+                self.hasValue = true
+            } else {
+                self.hasValue = statement.value != nil
+            }
             if self.signature == .none, self.sourceFile != nil {
                 // We'll try to infer the type after gathering all info
                 self.value = statement.value
@@ -655,9 +743,9 @@ public class CodebaseInfo: Codable {
             return .functionDeclaration
         }
         let signature: TypeSignature
-        let moduleName: String
-        let sourceFile: Source.FilePath?
-        let declaringType: TypeSignature?
+        var moduleName: String
+        var sourceFile: Source.FilePath?
+        var declaringType: TypeSignature?
         let visibility: Modifiers.Visibility
         let isStatic: Bool
 
@@ -674,6 +762,18 @@ public class CodebaseInfo: Codable {
             self.isStatic = statement.modifiers.isStatic
             self.generics = Generics() //~~~
             self.isMutating = statement.modifiers.isMutating
+        }
+
+        fileprivate init(name: String, signature: TypeSignature, moduleName: String, sourceFile: Source.FilePath? = nil, declaringType: TypeSignature? = nil, visibility: Modifiers.Visibility, isStatic: Bool = false, generics: Generics = Generics(), isMutating: Bool = false) {
+            self.name = name
+            self.signature = signature
+            self.moduleName = moduleName
+            self.sourceFile = sourceFile
+            self.declaringType = declaringType
+            self.visibility = visibility
+            self.isStatic = isStatic
+            self.generics = generics
+            self.isMutating = isMutating
         }
     }
 
