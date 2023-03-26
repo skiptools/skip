@@ -4,16 +4,18 @@ import SwiftSyntax
 
 /// Manages the transpilation process.
 public struct Transpiler {
-    private let sourceFiles: [Source.FilePath]
     private let packageName: String?
+    private let sourceFiles: [Source.FilePath]
+    private let codebaseInfo: CodebaseInfo
     private let symbols: Symbols?
     public var preprocessorSymbols: Set<String>
     public var plugins: [KotlinPlugin]
 
     /// Supply files to transpile.
-    public init(sourceFiles: [Source.FilePath], packageName: String? = nil, symbols: Symbols? = nil, preprocessorSymbols: Set<String> = [], plugins: [KotlinPlugin] = []) {
-        self.sourceFiles = sourceFiles
+    public init(packageName: String? = nil, sourceFiles: [Source.FilePath], codebaseInfo: CodebaseInfo, symbols: Symbols? = nil, preprocessorSymbols: Set<String> = [], plugins: [KotlinPlugin] = []) {
         self.packageName = packageName
+        self.sourceFiles = sourceFiles
+        self.codebaseInfo = codebaseInfo
         self.symbols = symbols
         self.preprocessorSymbols = preprocessorSymbols
         self.plugins = plugins
@@ -21,25 +23,27 @@ public struct Transpiler {
 
     /// Perform transpilation, feeding results to the given handler.
     public func transpile(handler: (Transpilation) throws -> Void) async throws {
-        let codebaseInfo = KotlinCodebaseInfo(packageName: packageName, symbols: symbols, plugins: plugins)
+        // First create syntax trees used to populate codebase info
+        let kotlinCodebaseInfo = KotlinCodebaseInfo(packageName: packageName, codebaseInfo: codebaseInfo, symbols: symbols, plugins: plugins)
         try await withThrowingTaskGroup(of: SyntaxTree.self) { group in
             for sourceFile in sourceFiles {
                 group.addTask {
-                    return try SyntaxTree(source: Source(file: sourceFile), preprocessorSymbols: preprocessorSymbols, symbols: symbols)
+                    return try SyntaxTree(source: Source(file: sourceFile), preprocessorSymbols: preprocessorSymbols)
                 }
             }
             for try await syntaxTree in group {
-                codebaseInfo.gather(from: syntaxTree)
+                kotlinCodebaseInfo.gather(from: syntaxTree)
             }
-            codebaseInfo.didGather()
+            kotlinCodebaseInfo.prepareForUse()
         }
+        // Next perform transpilation with populated info
         try await withThrowingTaskGroup(of: Transpilation.self) { group in
             for sourceFile in sourceFiles {
                 group.addTask {
                     let start = Date().timeIntervalSinceReferenceDate
-                    let syntaxTree = try SyntaxTree(source: Source(file: sourceFile), preprocessorSymbols: preprocessorSymbols, symbols: symbols)
+                    let syntaxTree = try SyntaxTree(source: Source(file: sourceFile), preprocessorSymbols: preprocessorSymbols, codebaseInfo: codebaseInfo, symbols: symbols)
                     let translator = KotlinTranslator(syntaxTree: syntaxTree)
-                    return translator.transpile(codebaseInfo: codebaseInfo, startTime: start)
+                    return translator.transpile(codebaseInfo: kotlinCodebaseInfo, startTime: start)
                 }
             }
             for try await transpilation in group {

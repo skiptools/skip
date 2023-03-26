@@ -1,10 +1,10 @@
 /// Codable information about the codebase used in type inference and translation.
 public class CodebaseInfo: Codable {
     /// The current module name.
-    public let moduleName: String
+    public let moduleName: String?
 
     /// Supply the current module name.
-    public init(moduleName: String) {
+    public init(moduleName: String? = nil) {
         self.moduleName = moduleName
     }
 
@@ -122,7 +122,7 @@ public class CodebaseInfo: Codable {
                     // Favor a symbol in this module
                     score += 2
                 }
-            } else if importedModuleNames.contains(item.moduleName) && (item.visibility == .public || item.visibility == .open) {
+            } else if let itemModuleName = item.moduleName, importedModuleNames.contains(itemModuleName) && (item.visibility == .public || item.visibility == .open) {
                 score += 1
             }
             return score
@@ -587,7 +587,7 @@ public class CodebaseInfo: Codable {
         let name: String
         let declarationType: StatementType
         let signature: TypeSignature
-        let moduleName: String
+        let moduleName: String?
         let sourceFile: Source.FilePath?
         let declaringType: TypeSignature?
         let visibility: Modifiers.Visibility
@@ -607,7 +607,7 @@ public class CodebaseInfo: Codable {
             return types + typealiases + cases + variables + functions
         }
 
-        fileprivate init(statement: TypeDeclaration, in declaringType: TypeSignature? = nil, moduleName: String) {
+        fileprivate init(statement: TypeDeclaration, in declaringType: TypeSignature? = nil, moduleName: String?) {
             self.name = statement.name
             self.declarationType = statement.type
             self.signature = statement.signature
@@ -620,7 +620,7 @@ public class CodebaseInfo: Codable {
             addMembers(statement.members)
         }
 
-        fileprivate init(statement: ExtensionDeclaration, moduleName: String) {
+        fileprivate init(statement: ExtensionDeclaration, moduleName: String?) {
             self.name = statement.name
             self.declarationType = statement.type
             self.signature = statement.signature
@@ -681,7 +681,7 @@ public class CodebaseInfo: Codable {
             return .variableDeclaration
         }
         var signature: TypeSignature
-        let moduleName: String
+        let moduleName: String?
         let sourceFile: Source.FilePath?
         let declaringType: TypeSignature?
         let visibility: Modifiers.Visibility
@@ -698,7 +698,7 @@ public class CodebaseInfo: Codable {
             case name, signature, moduleName, sourceFile, declaringType, visibility, isStatic, generics, isReadOnly, isInitializable, hasValue
         }
 
-        fileprivate init(statement: VariableDeclaration, in declaringType: TypeSignature? = nil, moduleName: String) {
+        fileprivate init(statement: VariableDeclaration, in declaringType: TypeSignature? = nil, moduleName: String?) {
             self.name = (statement.names.first ?? "") ?? ""
             self.signature = statement.variableTypes.first ?? .none
             self.moduleName = moduleName
@@ -743,7 +743,7 @@ public class CodebaseInfo: Codable {
             return .functionDeclaration
         }
         let signature: TypeSignature
-        var moduleName: String
+        var moduleName: String?
         var sourceFile: Source.FilePath?
         var declaringType: TypeSignature?
         let visibility: Modifiers.Visibility
@@ -752,7 +752,7 @@ public class CodebaseInfo: Codable {
         let generics: Generics
         let isMutating: Bool
 
-        fileprivate init(statement: FunctionDeclaration, in declaringType: TypeSignature? = nil, moduleName: String) {
+        fileprivate init(statement: FunctionDeclaration, in declaringType: TypeSignature? = nil, moduleName: String?) {
             self.name = statement.name
             self.signature = statement.functionType
             self.moduleName = moduleName
@@ -764,7 +764,7 @@ public class CodebaseInfo: Codable {
             self.isMutating = statement.modifiers.isMutating
         }
 
-        fileprivate init(name: String, signature: TypeSignature, moduleName: String, sourceFile: Source.FilePath? = nil, declaringType: TypeSignature? = nil, visibility: Modifiers.Visibility, isStatic: Bool = false, generics: Generics = Generics(), isMutating: Bool = false) {
+        fileprivate init(name: String, signature: TypeSignature, moduleName: String?, sourceFile: Source.FilePath? = nil, declaringType: TypeSignature? = nil, visibility: Modifiers.Visibility, isStatic: Bool = false, generics: Generics = Generics(), isMutating: Bool = false) {
             self.name = name
             self.signature = signature
             self.moduleName = moduleName
@@ -784,7 +784,7 @@ public class CodebaseInfo: Codable {
             return .typealiasDeclaration
         }
         let signature: TypeSignature
-        let moduleName: String
+        let moduleName: String?
         let sourceFile: Source.FilePath?
         let declaringType: TypeSignature?
         let visibility: Modifiers.Visibility
@@ -794,7 +794,7 @@ public class CodebaseInfo: Codable {
 
         let generics: Generics
 
-        fileprivate init(statement: TypealiasDeclaration, in declaringType: TypeSignature? = nil, moduleName: String) {
+        fileprivate init(statement: TypealiasDeclaration, in declaringType: TypeSignature? = nil, moduleName: String?) {
             self.name = statement.name
             self.signature = statement.signature
             self.moduleName = moduleName
@@ -812,7 +812,7 @@ public class CodebaseInfo: Codable {
             return .enumCaseDeclaration
         }
         let signature: TypeSignature // Owning enum or a function returning the owning enum
-        let moduleName: String
+        let moduleName: String?
         let sourceFile: Source.FilePath?
         let declaringType: TypeSignature?
         let visibility: Modifiers.Visibility
@@ -820,7 +820,7 @@ public class CodebaseInfo: Codable {
             return true
         }
 
-        fileprivate init(statement: EnumCaseDeclaration, in declaringType: TypeSignature? = nil, moduleName: String) {
+        fileprivate init(statement: EnumCaseDeclaration, in declaringType: TypeSignature? = nil, moduleName: String?) {
             self.name = statement.name
             self.signature = statement.signature
             self.moduleName = moduleName
@@ -836,7 +836,7 @@ protocol CodebaseInfoItem {
     var name: String { get }
     var declarationType: StatementType { get }
     var signature: TypeSignature { get }
-    var moduleName: String { get }
+    var moduleName: String? { get }
     var sourceFile: Source.FilePath? { get }
     var declaringType: TypeSignature? { get }
     var visibility: Modifiers.Visibility { get }

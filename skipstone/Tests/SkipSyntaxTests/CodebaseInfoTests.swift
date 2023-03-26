@@ -9,7 +9,7 @@ final class CodebaseInfoTests: XCTestCase {
         let source = Source(file: Source.FilePath(path: srcFile.path), content: swift)
         let syntaxTree = SyntaxTree(source: source)
 
-        let codebaseInfo = CodebaseInfo(moduleName: "Test")
+        let codebaseInfo = CodebaseInfo()
         codebaseInfo.gather(from: syntaxTree)
         codebaseInfo.prepareForUse()
         return codebaseInfo.context(importedModuleNames: [], sourceFile: source.file)

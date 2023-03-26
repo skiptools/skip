@@ -505,7 +505,8 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         #else
         let symbols: Symbols? = nil
         #endif
-        let transpiler = Transpiler(sourceFiles: sources, packageName: packageName, symbols: symbols, preprocessorSymbols: Set(precheckOptions.symbols), plugins: plugins)
+        let codebaseInfo = CodebaseInfo(moduleName: primaryModuleName)
+        let transpiler = Transpiler(packageName: packageName, sourceFiles: sources, codebaseInfo: codebaseInfo, symbols: symbols, preprocessorSymbols: Set(precheckOptions.symbols), plugins: plugins)
 
         try await transpiler.transpile(handler: handleTranspilation)
         let sourceModules = try linkDependentModuleSources()

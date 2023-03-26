@@ -6,7 +6,6 @@ struct TypeInferenceContext {
     private var blockPath: [[String: TypeSignature]] = [] // Each entry is map of additional identifier bindings
     private var localIdentifierTypes: [String: TypeSignature] = [:]
 
-    // TODO: Remove Symbols
     /// Create a top-level context for type inference.
     ///
     /// - Parameters:
@@ -131,7 +130,7 @@ struct TypeInferenceContext {
                 return typeDeclaration.signature
             }
         }
-        if codebaseInfo != nil {
+        if symbols == nil {
             guard let codebaseInfo else {
                 return .none
             }
@@ -190,7 +189,7 @@ struct TypeInferenceContext {
                 return .metaType(type)
             }
         }
-        if codebaseInfo != nil {
+        if symbols == nil {
             guard let codebaseInfo else {
                 return .none
             }
@@ -210,7 +209,7 @@ struct TypeInferenceContext {
     /// - Parameters:
     ///   - type: The function's owning type if this is a member function, or nil if not.
     func function(_ name: String, in type: TypeSignature?, parameters: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
-        if codebaseInfo != nil {
+        if symbols == nil {
             guard let codebaseInfo else {
                 return []
             }
@@ -256,7 +255,7 @@ struct TypeInferenceContext {
     /// - Parameters:
     ///   - type: The subscript's owning type.
     func `subscript`(in type: TypeSignature, parameters: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
-        if codebaseInfo != nil {
+        if symbols == nil {
             guard let codebaseInfo else {
                 return []
             }

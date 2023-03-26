@@ -4,12 +4,18 @@ import SymbolKit
 public class KotlinCodebaseInfo {
     /// The package being generated.
     public let packageName: String?
+
+    /// The non-Kotlin-specific codebase info.
+    public let codebaseInfo: CodebaseInfo
+
     /// Plugins being applied to the translation.
     private(set) var plugins: [KotlinPlugin] = []
+
     private let symbols: Symbols?
 
-    public init(packageName: String? = nil, symbols: Symbols? = nil, plugins: [KotlinPlugin] = []) {
+    public init(packageName: String? = nil, codebaseInfo: CodebaseInfo, symbols: Symbols? = nil, plugins: [KotlinPlugin] = []) {
         self.packageName = packageName
+        self.codebaseInfo = codebaseInfo
         self.symbols = symbols
         // Idea: Track which plugins we might need when we come across relevant code during initial translation and save traversing the tree for unnecessary plugins
         self.plugins = [
@@ -26,14 +32,16 @@ public class KotlinCodebaseInfo {
 
     /// Gather codebase-level information from the given syntax tree.
     func gather(from syntaxTree: SyntaxTree) {
+        codebaseInfo.gather(from: syntaxTree)
         syntaxTree.root.visit(perform: self.visit)
         plugins.forEach { $0.gather(from: syntaxTree) }
     }
 
-    /// Finalize codebase info after gathering is complete.
-    func didGather() {
+    /// Finalize codebase info and prepare for use after gathering is complete.
+    func prepareForUse() {
+        codebaseInfo.prepareForUse()
         mergeExtensionInfo()
-        plugins.forEach { $0.didGather() }
+        plugins.forEach { $0.prepareForUse() }
     }
 
     /// Any issues encountered during information gathering.

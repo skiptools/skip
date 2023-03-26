@@ -7,6 +7,7 @@ extension XCTestCase {
     /// Whether to use the locally cached symbols for SkipLib syntax testing
     static let shouldUseLocalSymbols: Bool = true
 
+    // TODO: Remove symbols and load dependent modules for codebaseInfo
     var symbols: Symbols {
         get async throws {
             #if os(Linux)
@@ -73,7 +74,8 @@ extension XCTestCase {
         #endif
 
         let srcFile = try tmpFile(named: "Source.swift", contents: swift)
-        let tp = Transpiler(sourceFiles: [Source.FilePath(path: srcFile.path)], symbols: symbols)
+        let codebaseInfo = CodebaseInfo()
+        let tp = Transpiler(sourceFiles: [Source.FilePath(path: srcFile.path)], codebaseInfo: codebaseInfo, symbols: symbols)
         try await tp.transpile { transpilation in
             let content = trimmedContent(transpilation: transpilation)
             let messagesString = transpilation.messages.map(\.description).joined(separator: ",")
@@ -90,7 +92,8 @@ extension XCTestCase {
     /// Checks that the given Swift generates a message when transpiled.
     public func checkProducesMessage(symbols: Symbols? = nil, swift: String, file: StaticString = #file, line: UInt = #line) async throws {
         let srcFile = try tmpFile(named: "Source.swift", contents: swift)
-        let tp = Transpiler(sourceFiles: [Source.FilePath(path: srcFile.path)], symbols: symbols)
+        let codebaseInfo = CodebaseInfo()
+        let tp = Transpiler(sourceFiles: [Source.FilePath(path: srcFile.path)], codebaseInfo: codebaseInfo, symbols: symbols)
         try await tp.transpile { transpilation in
             XCTAssertTrue(!transpilation.messages.isEmpty, trimmedContent(transpilation: transpilation))
             transpilation.messages.forEach { print("Received expected message: \($0)") }

@@ -6,7 +6,7 @@ public protocol KotlinPlugin {
     func gather(from syntaxTree: SyntaxTree)
 
     /// Called when gathering from all syntax trees is complete.
-    func didGather()
+    func prepareForUse()
 
     /// Apply this plugin to the given Kotlin syntax tree.
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator)
@@ -16,6 +16,6 @@ extension KotlinPlugin {
     func gather(from syntaxTree: SyntaxTree) {
     }
 
-    func didGather() {
+    func prepareForUse() {
     }
 }

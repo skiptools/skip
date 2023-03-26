@@ -37,7 +37,7 @@ final class TriviaTests: XCTestCase {
                 // Copy
                 var copy = this
                 // Double
-                copy.s = (s + s).sref()
+                copy.s = s + s
                 return copy
             }
 
