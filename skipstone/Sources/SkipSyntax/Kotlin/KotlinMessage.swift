@@ -40,10 +40,6 @@ extension Message {
         return Message(kind: .error, message: "Kotlin does not support constructors that return nil. Consider creating a factory function", sourceDerived: sourceDerived)
     }
 
-    static func kotlinEnumModifierUnsupported(_ sourceDerived: SourceDerived) -> Message {
-        return Message(kind: .warning, message: "Kotlin enum cases do not support modifiers", sourceDerived: sourceDerived)
-    }
-
     static func kotlinErrorCannotExtendClass(_ sourceDerived: SourceDerived) -> Message {
         return Message(kind: .error, message: "An Error type cannot extend another class because it will be translated to extend Throwable in Kotlin", sourceDerived: sourceDerived)
     }

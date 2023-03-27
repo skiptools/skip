@@ -636,7 +636,9 @@ class KotlinIdentifier: KotlinExpression {
         kexpression.generics = expression.generics
         kexpression.mayBeSharedMutableStruct = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
         kexpression.isLocalIdentifier = expression.isLocalIdentifier
-        kexpression.isFunctionReference = !expression.isLocalIdentifier && !expression.isCalledAsFunction && translator.codebaseInfo?.isFunction(name: expression.name, type: expression.inferredType, in: expression.owningTypeDeclaration?.signature) == true
+        if case .function = expression.inferredType {
+            kexpression.isFunctionReference = !expression.isLocalIdentifier && !expression.isCalledAsFunction && translator.codebaseInfo?.isFunctionName(expression.name, in: expression.owningTypeDeclaration?.signature) == true
+        }
         return kexpression
     }
 
@@ -1014,7 +1016,9 @@ class KotlinMemberAccess: KotlinExpression {
         if let base = expression.base {
             kexpression.base = translator.translateExpression(base)
             kexpression.useMultlineFormatting = expression.useMultlineFormatting
-            kexpression.isFunctionReference = !expression.isCalledAsFunction && translator.codebaseInfo?.isFunction(name: expression.member, type: expression.inferredType, in: base.inferredType) == true
+            if case .function = expression.inferredType {
+                kexpression.isFunctionReference = !expression.isCalledAsFunction && translator.codebaseInfo?.isFunctionName(expression.member, in: base.inferredType) == true
+            }
             kexpression.baseKClass = kclass(for: base, accessingMember: expression.member, codebaseInfo: translator.codebaseInfo)
         } else if expression.inferredType == .none && translator.codebaseInfo != nil {
             kexpression.messages.append(.kotlinMemberAccessUnknownBaseType(expression, member: expression.member))

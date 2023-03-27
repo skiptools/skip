@@ -622,6 +622,14 @@ class EnumCaseDeclaration: Statement {
     }
 
     override func resolveAttributes() {
+        // Enum case declarations inherit the visibility of the enum
+        if modifiers.visibility == .default {
+            if let owningTypeDeclaration = parent as? TypeDeclaration {
+                modifiers.visibility = owningTypeDeclaration.modifiers.visibility
+            } else {
+                modifiers.visibility = .internal
+            }
+        }
         associatedValues = associatedValues.map { $0.qualifiedType(in: self) }
     }
 

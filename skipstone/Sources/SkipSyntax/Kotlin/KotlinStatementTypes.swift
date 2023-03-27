@@ -680,7 +680,7 @@ class KotlinClassDeclaration: KotlinStatement {
         // Move extensions of this type into the type itself rather than use Kotlin extension functions.
         // Kotlin extension functions act like static functions, which can lead to different behavior
         if let codebaseInfo = translator.codebaseInfo {
-            for ext in codebaseInfo.extensions(of: statement) {
+            for ext in codebaseInfo.extensions(of: statement.signature) {
                 kstatement.inherits += ext.inherits
                 members += ext.members.flatMap { translator.translateStatement($0) }
             }
@@ -857,9 +857,6 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
         kstatement.associatedValues = statement.associatedValues.map { $0.translate(translator: translator) }
         kstatement.associatedValues.forEach { $0.declaredType.appendKotlinMessages(to: kstatement) }
         kstatement.rawValue = statement.rawValue.map { translator.translateExpression($0) }
-        if !statement.modifiers.isEmpty {
-            kstatement.messages.append(.kotlinEnumModifierUnsupported(statement))
-        }
         if !statement.attributes.isEmpty {
             kstatement.messages.append(.kotlinAttributeUnsupported(statement))
         }
@@ -1247,7 +1244,7 @@ class KotlinInterfaceDeclaration: KotlinStatement {
         // This allows us to replace API declarations with implementations. Also Kotlin extension functions
         // act like static functions, which can lead to different behavior
         if let codebaseInfo = translator.codebaseInfo {
-            for ext in codebaseInfo.extensions(of: statement) {
+            for ext in codebaseInfo.extensions(of: statement.signature) {
                 kstatement.inherits += ext.inherits
                 for extMember in ext.members.flatMap({ translator.translateStatement($0) }) {
                     if !replaceMember(in: &originalMembers, with: extMember) {

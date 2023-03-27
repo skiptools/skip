@@ -12,10 +12,8 @@ class KotlinConstructorPlugin: KotlinPlugin {
         let constructors = classDeclaration.members.filter { $0.type == .constructorDeclaration }
         let superclass = superclass(of: classDeclaration, translator: translator)
         if constructors.isEmpty {
-            if classDeclaration.declarationType != .structDeclaration, !addInheritedConstructors(to: classDeclaration, translator: translator) {
-                if let superclass {
-                    classDeclaration.superclassCall = "\(superclass)()"
-                }
+            if classDeclaration.declarationType != .structDeclaration, let superclass, !addInheritedConstructors(to: classDeclaration, translator: translator) {
+                classDeclaration.superclassCall = "\(superclass)()"
             }
         } else {
             var hasNonEmptyConstructor = false
@@ -45,14 +43,14 @@ class KotlinConstructorPlugin: KotlinPlugin {
         return true
     }
 
-    private func addInheritedConstructor(parameters: [KotlinCodebaseInfo.ConstructorParameter], to classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) {
+    private func addInheritedConstructor(parameters: [Parameter<Expression>], to classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) {
         let constructor = KotlinFunctionDeclaration(name: "constructor")
         constructor.modifiers = classDeclaration.modifiers
         constructor.extras = .singleNewline
 
         var superCall = "super("
         constructor.parameters = parameters.enumerated().map { (index, parameter) in
-            let label = parameter.label ?? "p_\(index)"
+            let label = parameter.externalLabel ?? "p_\(index)"
             if index > 0 {
                 superCall += ", "
             }
@@ -62,7 +60,7 @@ class KotlinConstructorPlugin: KotlinPlugin {
             if let defaultValue = parameter.defaultValue {
                 kdefaultValue = translator.translateExpression(defaultValue)
             }
-            return Parameter(externalLabel: label, declaredType: parameter.type, isVariadic: parameter.isVariadic, defaultValue: kdefaultValue)
+            return Parameter(externalLabel: label, declaredType: parameter.declaredType, isVariadic: parameter.isVariadic, defaultValue: kdefaultValue)
         }
         superCall += ")"
         constructor.delegatingConstructorCall = KotlinRawExpression(sourceCode: superCall)
@@ -118,11 +116,11 @@ class KotlinConstructorPlugin: KotlinPlugin {
         }
     }
 
-    private func superclass(of classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) -> String? {
+    private func superclass(of classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) -> TypeSignature? {
         guard let inherits = classDeclaration.inherits.first, translator.codebaseInfo?.declarationType(of: inherits, mustBeInModule: false) == .classDeclaration else {
             return nil
         }
-        return inherits.description
+        return inherits
     }
 
     private func addIsConstructingProperty(to classDeclaration: KotlinClassDeclaration) {

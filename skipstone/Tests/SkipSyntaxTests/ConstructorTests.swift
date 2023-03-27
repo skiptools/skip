@@ -70,10 +70,7 @@ final class ConstructorTests: XCTestCase {
             }
         }
 
-        internal open class B: A {
-
-            internal constructor(): super() {
-            }
+        internal open class B: A() {
         }
 
         internal open class C: A {

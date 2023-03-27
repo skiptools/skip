@@ -32,15 +32,13 @@ public class KotlinCodebaseInfo {
 
     /// Gather codebase-level information from the given syntax tree.
     func gather(from syntaxTree: SyntaxTree) {
-        codebaseInfo.gather(from: syntaxTree)
-        syntaxTree.root.visit(perform: self.visit)
+        codebaseInfo.gather(from: syntaxTree, delegate: self)
         plugins.forEach { $0.gather(from: syntaxTree) }
     }
 
     /// Finalize codebase info and prepare for use after gathering is complete.
     func prepareForUse() {
         codebaseInfo.prepareForUse()
-        mergeExtensionInfo()
         plugins.forEach { $0.prepareForUse() }
     }
 
@@ -49,139 +47,98 @@ public class KotlinCodebaseInfo {
         return []
     }
 
-    fileprivate var typeInfo: [String: [TypeInfo]] = [:]
-    fileprivate var extensionInfo: [String: [ExtensionInfo]] = [:]
-
-    private func visit(node: SyntaxNode) -> VisitResult<SyntaxNode> {
-        guard let statement = node as? Statement else {
-            // Recurse to find nested declarations
-            return .recurse(nil)
-        }
-        switch statement.type {
-        case .classDeclaration:
-            addTypeInfo(for: statement as! TypeDeclaration, mayBeMutableStructType: false)
-            return .recurse(nil)
-        case .enumDeclaration:
-            addTypeInfo(for: statement as! TypeDeclaration, mayBeMutableStructType: false)
-            return .recurse(nil)
-        case .protocolDeclaration:
-            let typeDeclaration = statement as! TypeDeclaration
-            // A protocol may not be mutable struct if it extends from AnyObject, may be if it extends from nothing,
-            // and we're not sure if it extends from other protocols which may themselves extend from AnyObject. We'll
-            // check its symbols later
-            let mayBeMutableStructType: Bool? = typeDeclaration.inherits.contains(.anyObject) ? false : typeDeclaration.inherits.isEmpty ? true : nil
-            addTypeInfo(for: typeDeclaration, mayBeMutableStructType: mayBeMutableStructType)
-            return .skip
-        case .structDeclaration:
-            let typeDeclaration = statement as! TypeDeclaration
-            let mayBeMutableStructType = typeDeclaration.members.contains { member in
-                switch member.type {
-                case .variableDeclaration:
-                    let variableDeclaration = member as! VariableDeclaration
-                    return !variableDeclaration.isLet && (variableDeclaration.getter == nil || variableDeclaration.setter != nil)
-                case .functionDeclaration:
-                    return (member as! FunctionDeclaration).modifiers.isMutating
-                default:
-                    return false
-                }
-            }
-            addTypeInfo(for: typeDeclaration, mayBeMutableStructType: mayBeMutableStructType)
-        case .extensionDeclaration:
-            let declaration = statement as! ExtensionDeclaration
-            let key = declaration.extends.name
-            var infos = extensionInfo[key, default: []]
-            infos.append(ExtensionInfo(declaration: declaration, sourceFile: statement.sourceFile))
-            extensionInfo[key] = infos
-        default:
-            break
-        }
-        return .recurse(nil)
-    }
-
     /// Create a context that can access the given imported modules.
     func context(importedModuleNames: [String] = [], sourceFile: Source.FilePath? = nil) -> Context {
-        return Context(codebaseInfo: self, symbols: symbols?.context(importedModuleNames: importedModuleNames, sourceFile: sourceFile), sourceFile: sourceFile)
+        return Context(codebaseInfo: codebaseInfo.context(importedModuleNames: importedModuleNames, sourceFile: sourceFile), symbols: symbols?.context(importedModuleNames: importedModuleNames, sourceFile: sourceFile))
     }
 
     /// A context for accessing codebase information.
     struct Context {
+        private let codebaseInfo: CodebaseInfo.Context
         private let symbols: Symbols.Context?
-        private let codebaseInfo: KotlinCodebaseInfo
-        private let sourceFile: Source.FilePath?
 
-        fileprivate init(codebaseInfo: KotlinCodebaseInfo, symbols: Symbols.Context?, sourceFile: Source.FilePath?) {
+        fileprivate init(codebaseInfo: CodebaseInfo.Context, symbols: Symbols.Context?) {
             self.codebaseInfo = codebaseInfo
             self.symbols = symbols
-            self.sourceFile = sourceFile
         }
 
         /// Return all extensions of a given type.
-        func extensions(of declaration: TypeDeclaration) -> [ExtensionDeclaration] {
-            return codebaseInfo.extensionInfo[declaration.signature.name, default: []].compactMap { info in
-                guard declaration.modifiers.visibility != .private || declaration.sourceFile == info.sourceFile else {
-                    return nil
-                }
-                return info.declaration
-            }
+        func extensions(of type: TypeSignature) -> [ExtensionDeclaration] {
+            return codebaseInfo.typeInfos(for: type).compactMap { $0.languageAdditions as? ExtensionDeclaration }
         }
 
         /// Whether the given type is a class, struct, etc, optionally limiting results to this module.
         func declarationType(of type: TypeSignature, mustBeInModule: Bool) -> StatementType? {
-            let qualifiedName = type.name
-            for info in codebaseInfo.typeInfo[qualifiedName, default: []] {
-                if !info.isPrivate || info.sourceFile == sourceFile {
-                    return info.declarationType
+            if let symbols {
+                if let typeInfo = codebaseInfo.typeInfos(for: type).first(where: { $0.declarationType != .extensionDeclaration }) {
+                    return typeInfo.declarationType
                 }
-            }
-            guard !mustBeInModule, let symbols else {
-                return nil
-            }
-            for candidate in symbols.ranked(symbols.lookup(name: qualifiedName)) {
-                guard let kind = candidate.kind else {
-                    continue
+                guard !mustBeInModule else {
+                    return nil
                 }
-                switch kind {
-                case .class:
-                    return .classDeclaration
-                case .enum:
-                    return .enumDeclaration
-                case .struct:
-                    return .structDeclaration
-                case .protocol:
-                    return .protocolDeclaration
-                default:
-                    continue
-                }
-            }
-            return nil
-        }
-
-        /// The signatures of all visible constructors of the given type, including inherited constructors.
-        func constructorParameters(of type: TypeSignature) -> [[ConstructorParameter]] {
-            for info in codebaseInfo.typeInfo[type.name, default: []] {
-                if !info.isPrivate || info.sourceFile == sourceFile {
-                    if info.constructorParameters.isEmpty, let firstInherits = info.inherits.first {
-                        return constructorParameters(of: firstInherits)
-                    } else {
-                        // If we've recursed on super types, map the declared generics to the supertype generics, e.g.:
-                        // class A<T>; class B: A<Int>; map any uses of T => Int
-                        return info.constructorParameters.map { parameters in
-                            return parameters.map {
-                                var p = $0
-                                p.type = p.type.mappingGenerics(from: info.signature.generics, to: type.generics)
-                                return p
-                            }
-                        }
+                for candidate in symbols.ranked(symbols.lookup(name: type.name)) {
+                    guard let kind = candidate.kind else {
+                        continue
+                    }
+                    switch kind {
+                    case .class:
+                        return .classDeclaration
+                    case .enum:
+                        return .enumDeclaration
+                    case .struct:
+                        return .structDeclaration
+                    case .protocol:
+                        return .protocolDeclaration
+                    default:
+                        continue
                     }
                 }
+                return nil
+            } else {
+                guard let typeInfo = codebaseInfo.typeInfos(for: type).first(where: { $0.declarationType != .extensionDeclaration }) else {
+                    return nil
+                }
+                if mustBeInModule && typeInfo.moduleName != codebaseInfo.info.moduleName {
+                    return nil
+                }
+                return typeInfo.declarationType
             }
-            // If this is not a type within this module, fall back to using symbols. Note that symbols will be
-            // missing any parameter default value expressions
-            guard let symbols else {
-                return []
+        }
+
+        /// The signatures of all visible constructors of the given type.
+        ///
+        /// The type must be concrete - protocol constructors are excluded.
+        ///
+        /// - Note: The returned parameters are only populated with the external label, declared type, and default value (when available).
+        func constructorParameters(of type: TypeSignature) -> [[Parameter<Expression>]] {
+            let inits = codebaseInfo.typeInfos(for: type).flatMap { (typeInfo) -> [CodebaseInfoItem] in
+                guard typeInfo.declarationType != .protocolDeclaration else {
+                    return []
+                }
+                return typeInfo.visibleMembers(context: codebaseInfo).filter { $0.declarationType == .initDeclaration }
             }
-            return symbols.constructorSignatures(in: type).map {
-                return $0.parameters.map { ConstructorParameter(label: $0.label, type: $0.type, isVariadic: $0.isVariadic, defaultValue: nil) }
+            if inits.isEmpty, let symbols {
+                return symbols.constructorSignatures(in: type).map {
+                    return $0.parameters.map { Parameter<Expression>(externalLabel: $0.label, declaredType: $0.type, isVariadic: $0.isVariadic, isInOut: false, defaultValue: nil) }
+                }
+            }
+            return inits.compactMap { (initInfo) -> [Parameter<Expression>]? in
+                guard let functionInfo = initInfo as? CodebaseInfo.FunctionInfo, case .function(let parameters, _) = functionInfo.signature else {
+                    return nil
+                }
+                // Filter out generated default constructor
+                guard parameters.count > 0 || !functionInfo.isGenerated || inits.count > 1 else {
+                    return nil
+                }
+                var defaultValues: [Expression?]
+                if let additions = functionInfo.languageAdditions as? [Expression?], additions.count == parameters.count {
+                    defaultValues = additions
+                } else {
+                    defaultValues = Array<Expression?>(repeating: nil, count: parameters.count)
+                }
+                return parameters.enumerated().map { (index, parameter) in
+                    Parameter<Expression>(externalLabel: parameter.label, declaredType: parameter.type, isVariadic: parameter.isVariadic, isInOut: false, defaultValue: defaultValues[index])
+                }
             }
         }
 
@@ -190,145 +147,110 @@ public class KotlinCodebaseInfo {
             guard !declaration.names.isEmpty, let name = declaration.names[0] else {
                 return false
             }
-            return symbols?.protocolOf(type, hasMember: name, kind: declaration.modifiers.isStatic ? .typeProperty : .property, type: nil) == true
+            if let symbols {
+                return symbols.protocolOf(type, hasMember: name, kind: declaration.modifiers.isStatic ? .typeProperty : .property, type: nil) == true
+            } else {
+                let protocolSignatures = codebaseInfo.protocolSignatures(for: type)
+                return protocolSignatures.contains { hasMember($0, name: name, type: nil, isStatic: declaration.modifiers.isStatic) }
+            }
         }
 
         /// Whether a function with the given signature is implementing a protocol function.
         func isProtocolMember(declaration: FunctionDeclaration, in type: TypeSignature) -> Bool {
-            return symbols?.protocolOf(type, hasMember: declaration.name, kind: declaration.modifiers.isStatic ? .typeMethod : .method, type: declaration.functionType) == true
+            if let symbols {
+                return symbols.protocolOf(type, hasMember: declaration.name, kind: declaration.modifiers.isStatic ? .typeMethod : .method, type: declaration.functionType) == true
+            } else {
+                let protocolSignatures = codebaseInfo.protocolSignatures(for: type)
+                return protocolSignatures.contains { hasMember($0, name: declaration.name, type: declaration.functionType, isStatic: declaration.modifiers.isStatic) }
+            }
         }
 
         /// Whether the given type may be a mutable struct.
         func mayBeMutableStruct(type: TypeSignature) -> Bool {
-            for info in codebaseInfo.typeInfo[type.name, default: []] {
-                if !info.isPrivate || info.sourceFile == sourceFile, let mayBeMutableStructType = info.mayBeMutableStructType {
-                    return mayBeMutableStructType
+            if let symbols {
+                return symbols.isMutableStruct(type: type) != false
+            } else {
+                let typeInfos = codebaseInfo.typeInfos(for: type)
+                if let structInfo = typeInfos.first(where: { $0.declarationType == .structDeclaration }) {
+                    return structInfo.variables.contains(where: { !$0.isReadOnly }) || structInfo.functions.contains(where: { $0.isMutating })
+                } else if typeInfos.contains(where: { $0.declarationType == .protocolDeclaration }) {
+                    // If this is a protocol that is constrained to class impls, then it isn't a mutable struct. Otherwise it could be
+                    return !codebaseInfo.protocolSignatures(for: type).contains(.anyObject)
+                } else if typeInfos.isEmpty {
+                    // Assume an unknown type could be a mutable struct
+                    let type = type.asOptional(false)
+                    if case .named = type {
+                        return true
+                    } else if type == .any {
+                        return true
+                    } else {
+                        return false
+                    }
+                } else {
+                    return false
                 }
             }
-            return symbols?.isMutableStruct(type: type) != false
         }
 
         /// Whether the given type conforms to `Error` through its protocols, **not** through inheritance.
         func conformsToError(type: TypeSignature) -> Bool {
-            let qualifiedName = type.name
-            guard qualifiedName != "Error" else {
-                return true
+            if let symbols {
+                return symbols.conformsToError(type: type) == true
+            } else {
+                return codebaseInfo.protocolSignatures(for: type).contains(.named("Error", []))
             }
-            for info in codebaseInfo.typeInfo[qualifiedName, default: []] {
-                if !info.isPrivate || info.sourceFile == sourceFile {
-                    if info.inherits.isEmpty {
-                        return false
-                    } else if info.inherits.contains(.named("Error", [])) {
-                        return true
-                    } else {
-                        break // Unknown; check symbols below
-                    }
-                }
-            }
-            return symbols?.conformsToError(type: type) == true
         }
 
         /// Whether the given enum type has cases with associated values.
         func isSealedClassesEnum(type: TypeSignature) -> Bool {
-            for info in codebaseInfo.typeInfo[type.name, default: []] {
-                if !info.isPrivate || info.sourceFile == sourceFile {
-                    if info.declarationType != .enumDeclaration {
-                        return false
-                    }
-                    return info.hasAssociatedValues || conformsToError(type: type)
+            if let symbols {
+                switch symbols.enumHasAssociatedValues(type: type) {
+                case nil:
+                    return false
+                case true?:
+                    return true
+                case false?:
+                    return symbols.conformsToError(type: type) == true
                 }
-            }
-            guard let symbols else {
-                return false
-            }
-            switch symbols.enumHasAssociatedValues(type: type) {
-            case nil:
-                return false
-            case true?:
-                return true
-            case false?:
-                return symbols.conformsToError(type: type) == true
+            } else {
+                guard let enumInfo = codebaseInfo.typeInfos(for: type).first(where: { $0.declarationType == .enumDeclaration }) else {
+                    return false
+                }
+                if enumInfo.cases.contains(where: { if case .function = $0.signature { return true } else { return false } }) {
+                    return true
+                }
+                return conformsToError(type: type)
             }
         }
 
         /// Whether the given name corresponds to a function in the given type.
-        func isFunction(name: String, type: TypeSignature, in owningType: TypeSignature?) -> Bool {
-            guard let symbols, case .function = type else {
-                return false
-            }
-            var owningType = owningType
+        func isFunctionName(_ name: String, in owningType: TypeSignature?) -> Bool {
+            var owningType = owningType?.asOptional(false)
             var isStatic = false
             if case .metaType(let baseType) = owningType {
                 isStatic = true
                 owningType = baseType
             }
-            return symbols.isFunction(name: name, in: owningType, isStatic: isStatic) == true
-        }
-    }
-
-    private func addTypeInfo(for typeDeclaration: TypeDeclaration, mayBeMutableStructType: Bool?) {
-        var info = TypeInfo(declarationType: typeDeclaration.type, signature: typeDeclaration.signature, inherits: typeDeclaration.inherits, mayBeMutableStructType: mayBeMutableStructType, isPrivate: typeDeclaration.modifiers.visibility == .private, sourceFile: typeDeclaration.sourceFile)
-        if typeDeclaration.type != .protocolDeclaration {
-            info.constructorParameters = constructorParameters(in: typeDeclaration.members)
-        } else if typeDeclaration.type == .enumDeclaration {
-            info.hasAssociatedValues = typeDeclaration.members.contains { ($0 as? EnumCaseDeclaration)?.associatedValues.isEmpty == false }
-        }
-        var infos = typeInfo[typeDeclaration.signature.name, default: []]
-        infos.append(info)
-        typeInfo[typeDeclaration.signature.name] = infos
-    }
-
-    private func mergeExtensionInfo() {
-        for typeInfoEntry in typeInfo {
-            typeInfo[typeInfoEntry.key] = typeInfoEntry.value.map {
-                var typeInfo = $0
-                extensionInfo[typeInfoEntry.key, default: []]
-                    .forEach {
-                        if !typeInfo.isPrivate || $0.sourceFile == typeInfo.sourceFile {
-                            typeInfo.constructorParameters += constructorParameters(in: $0.declaration.members)
-                        }
-                    }
-                return typeInfo
+            if let symbols {
+                return symbols.isFunction(name: name, in: owningType, isStatic: isStatic) == true
+            } else {
+                if owningType != nil && !isStatic && name == "init" {
+                    return true
+                }
+                let items = codebaseInfo.ranked(codebaseInfo.lookup(name: name))
+                return items.contains { $0.declarationType == .functionDeclaration && $0.declaringType?.name == owningType?.name }
             }
         }
-    }
 
-    private func constructorParameters(in members: [Statement]) -> [[ConstructorParameter]] {
-        var constructorParameters: [[ConstructorParameter]] = []
-        for member in members {
-            guard let constructor = member as? FunctionDeclaration, constructor.type == .initDeclaration && constructor.modifiers.visibility != .private else {
-                continue
+        private func hasMember(_ owningType: TypeSignature, name: String, type: TypeSignature?, isStatic: Bool) -> Bool {
+            for typeInfo in codebaseInfo.typeInfos(for: owningType) {
+                if typeInfo.visibleMembers(context: codebaseInfo).contains(where: { $0.name == name && $0.isStatic == isStatic && (type == nil || $0.signature == type) }) {
+                    return true
+                }
             }
-            constructorParameters.append(constructor.parameters.map { parameter in
-                ConstructorParameter(label: parameter.externalLabel, type: parameter.declaredType, isVariadic: parameter.isVariadic, defaultValue: parameter.defaultValue)
-            })
+            return false
         }
-        return constructorParameters
     }
-
-    /// Constructor parameter with translatable default value.
-    struct ConstructorParameter {
-        var label: String?
-        var type: TypeSignature
-        var isVariadic: Bool
-        var defaultValue: Expression?
-    }
-}
-
-private struct TypeInfo {
-    let declarationType: StatementType
-    let signature: TypeSignature
-    let inherits: [TypeSignature]
-    let mayBeMutableStructType: Bool?
-    let isPrivate: Bool
-    let sourceFile: Source.FilePath?
-    var constructorParameters: [[KotlinCodebaseInfo.ConstructorParameter]] = []
-    var hasAssociatedValues = false
-}
-
-private struct ExtensionInfo {
-    let declaration: ExtensionDeclaration
-    let sourceFile: Source.FilePath?
 }
 
 // Internal for testing
@@ -614,5 +536,19 @@ extension Symbols.Context {
             }
         }
         return false
+    }
+}
+
+extension KotlinCodebaseInfo: CodebaseInfoGatherDelegate {
+    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather typeInfo: CodebaseInfo.TypeInfo, from statement: ExtensionDeclaration) {
+        // Keep the extension statements around so we can move it to the extended declarations
+        typeInfo.languageAdditions = statement
+    }
+
+    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather functionInfo: inout CodebaseInfo.FunctionInfo, from statement: FunctionDeclaration) {
+        // Track init parameter default values so that we can transfer them to subclass constructors we generate
+        if functionInfo.name == "init" {
+            functionInfo.languageAdditions = statement.parameters.map(\.defaultValue)
+        }
     }
 }

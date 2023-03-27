@@ -2,39 +2,39 @@
 public class CodebaseInfo: Codable {
     /// The current module name.
     public let moduleName: String?
-
+    
     /// Supply the current module name.
     public init(moduleName: String? = nil) {
         self.moduleName = moduleName
     }
-
-    /// Set dependcy codebase info.
+    
+    /// Set dependct modules codebase info.
     ///
     /// - Note: Dependency codebase info is not encoded.
-    public var dependencies: [CodebaseInfo] = [] {
+    public var dependentModules: [CodebaseInfo] = [] {
         didSet {
             assert(!isInUse)
         }
     }
-
+    
     /// Gather codebase-level information from the given syntax tree.
-    func gather(from syntaxTree: SyntaxTree) {
+    func gather(from syntaxTree: SyntaxTree, delegate: CodebaseInfoGatherDelegate? = nil) {
         assert(!isInUse)
         var needsVariableTypeInference = false
         for statement in syntaxTree.root.statements {
             switch statement.type {
             case .classDeclaration, .enumDeclaration, .protocolDeclaration, .structDeclaration:
-                let typeInfo = TypeInfo(statement: statement as! TypeDeclaration, moduleName: moduleName)
+                let typeInfo = TypeInfo(statement: statement as! TypeDeclaration, codebaseInfo: self, delegate: delegate)
                 rootTypes.append(typeInfo)
                 needsVariableTypeInference = needsVariableTypeInference || typeInfo.needsVariableTypeInference
             case .extensionDeclaration:
-                rootExtensions.append(TypeInfo(statement: statement as! ExtensionDeclaration, moduleName: moduleName))
-            case .functionDeclaration:
-                rootFunctions.append(FunctionInfo(statement: statement as! FunctionDeclaration, moduleName: moduleName))
+                rootExtensions.append(TypeInfo(statement: statement as! ExtensionDeclaration, codebaseInfo: self, delegate: delegate))
+            case .functionDeclaration, .initDeclaration:
+                rootFunctions.append(FunctionInfo(statement: statement as! FunctionDeclaration, codebaseInfo: self, delegate: delegate))
             case .typealiasDeclaration:
-                rootTypealiases.append(TypealiasInfo(statement: statement as! TypealiasDeclaration, moduleName: moduleName))
+                rootTypealiases.append(TypealiasInfo(statement: statement as! TypealiasDeclaration, codebaseInfo: self, delegate: delegate))
             case .variableDeclaration:
-                let variableInfo = VariableInfo(statement: statement as! VariableDeclaration, moduleName: moduleName)
+                let variableInfo = VariableInfo(statement: statement as! VariableDeclaration, codebaseInfo: self, delegate: delegate)
                 rootVariables.append(variableInfo)
                 needsVariableTypeInference = needsVariableTypeInference || variableInfo.needsTypeInference
             default:
@@ -46,7 +46,7 @@ public class CodebaseInfo: Codable {
             typeInferenceTrees[syntaxTree.source.file] = syntaxTree
         }
     }
-
+    
     /// Finalize codebase info and prepare for use.
     ///
     /// - Warning: Codebase info should not be used until this has been called. After calling this function, do not mutate info.
@@ -57,18 +57,18 @@ public class CodebaseInfo: Codable {
         addGeneratedConstructors()
         buildItemsByName() // Final mappings after updates
     }
-
+    
     /// Create a context that can access the given imported modules.
     func context(importedModuleNames: [String] = [], sourceFile: Source.FilePath? = nil) -> Context {
         return Context(info: self, importedModuleNames: Set(importedModuleNames), sourceFile: sourceFile)
     }
-
+    
     /// A context for accessing visible codebase information.
     struct Context {
         let info: CodebaseInfo
         private let importedModuleNames: Set<String>
         private let sourceFile: Source.FilePath?
-
+        
         fileprivate init(info: CodebaseInfo, importedModuleNames: Set<String>, sourceFile: Source.FilePath?) {
             self.info = info
             var importedModuleNames = importedModuleNames
@@ -76,7 +76,7 @@ public class CodebaseInfo: Codable {
             self.importedModuleNames = importedModuleNames
             self.sourceFile = sourceFile
         }
-
+        
         /// The items for the given name.
         ///
         /// If this is a `.`-separated qualified type name, only returns types that match the full path.
@@ -98,7 +98,7 @@ public class CodebaseInfo: Codable {
             }
             return candidates
         }
-
+        
         /// Score, sort, and filter the given items.
         ///
         /// - Returns: The items with a score > 0 in order from highest to lowest score.
@@ -108,11 +108,11 @@ public class CodebaseInfo: Codable {
                 .sorted { $0.1 > $1.1 } // sort on score
                 .map(\.0) // return symbol
         }
-
+        
         /// Score an item based on its visibility in this context.
         ///
         /// A score of 0 indicates that the item is not visible.
-        private func rankScore(of item: CodebaseInfoItem) -> Int {
+        func rankScore(of item: CodebaseInfoItem) -> Int {
             var score = 0
             if item.moduleName == info.moduleName {
                 if let itemSourcePath = item.sourceFile?.path, let sourcePath = sourceFile?.path, itemSourcePath.hasSuffix(sourcePath) {
@@ -127,10 +127,10 @@ public class CodebaseInfo: Codable {
             }
             return score
         }
-
+        
         /// Return all type infos visible for the given type.
         func typeInfos(for type: TypeSignature) -> [TypeInfo] {
-            return candidateTypeNames(for: type).flatMap { name in
+            return candidateTypeNames(for: type.asOptional(false)).flatMap { name in
                 let candidates = ranked(lookup(name: name, qualifiedMatch: true))
                 return candidates.flatMap { candidate in
                     if let typeInfo = candidate as? TypeInfo {
@@ -144,6 +144,32 @@ public class CodebaseInfo: Codable {
             }
         }
 
+        /// Return the concrete (i.e. non-protocol inheritance chain for the given type. The type will be first, followed by its superclass, etc.
+        func inheritanceChainSignatures(for type: TypeSignature) -> [TypeSignature] {
+            guard let concreteTypeInfo = typeInfos(for: type).first(where: { $0.declarationType != .protocolDeclaration && $0.declarationType != .extensionDeclaration }) else {
+                return []
+            }
+            guard concreteTypeInfo.declarationType == .classDeclaration, let firstInherits = concreteTypeInfo.inherits.first else {
+                return [concreteTypeInfo.signature]
+            }
+            //~~~ Need to map generics
+            return [concreteTypeInfo.signature] + inheritanceChainSignatures(for: firstInherits)
+        }
+
+        /// Return the protocols the given type conforms to, including inherited protocols. If the type itself is a protocol, it is included.
+        func protocolSignatures(for type: TypeSignature) -> [TypeSignature] {
+            // Gather inherited signatures, then insert the given type at the front if it is also a protocol
+            let type = type.asOptional(false)
+            let typeInfos = typeInfos(for: type)
+            //~~~ Need to map generics
+            var signatures = typeInfos.flatMap { $0.inherits.flatMap { protocolSignatures(for: $0) } }
+            // TODO: Remove special case for Error when we add SkipLib codebase info dependency
+            if type == .anyObject || type == .named("Error", []) || typeInfos.contains(where: { $0.declarationType == .protocolDeclaration }) {
+                signatures.insert(type, at: 0)
+            }
+            return signatures
+        }
+        
         /// Return the type of the given identifier.
         func identifierSignature(of identifier: String) -> TypeSignature {
             let topRanked = ranked(lookup(name: identifier, qualifiedMatch: true)).first { candidate in
@@ -160,7 +186,7 @@ public class CodebaseInfo: Codable {
             let type = topRanked.signature
             return topRanked.declarationType == .variableDeclaration || topRanked.declarationType == .enumCaseDeclaration ? type : .metaType(type)
         }
-
+        
         /// Return the type of the given member.
         func identifierSignature(of member: String, in type: TypeSignature) -> TypeSignature {
             var type = type.asOptional(false)
@@ -185,13 +211,13 @@ public class CodebaseInfo: Codable {
             }
             return .none
         }
-
+        
         /// Return the signatures of the possible functions being called with the given arguments.
         func functionSignature(of name: String, arguments: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
             let items = ranked(lookup(name: name, qualifiedMatch: true))
-            let funcs = items.filter { $0.declarationType == .functionDeclaration }
+            let funcs = items.filter { $0.declarationType == .functionDeclaration || $0.declarationType == .initDeclaration }
             let funcsCandidates = funcs.compactMap { matchFunction($0, arguments: arguments) }
-
+            
             let typeInfos = items.flatMap { (item) -> [TypeInfo] in
                 if let typeInfo = item as? TypeInfo {
                     return [typeInfo]
@@ -202,14 +228,14 @@ public class CodebaseInfo: Codable {
                 }
             }
             let initsCandidates = initSignatures(for: typeInfos, arguments: arguments)
-
+            
             return (funcsCandidates + initsCandidates).reduce(into: [TypeSignature]()) { result, signature in
                 if !result.contains(signature) {
                     result.append(signature)
                 }
             }
         }
-
+        
         /// Return the signatures of the possible member functions being called with the given arguments.
         ///
         /// This function also works for the creation of an enum case with associated values.
@@ -229,7 +255,7 @@ public class CodebaseInfo: Codable {
                 type = base
                 isStatic = true
             }
-
+            
             for typeInfo in typeInfos(for: type) {
                 let functions = functionSignature(of: name, in: typeInfo, arguments: arguments, isStatic: isStatic)
                 if !functions.isEmpty {
@@ -238,7 +264,7 @@ public class CodebaseInfo: Codable {
             }
             return []
         }
-
+        
         /// Return the signatures of the possible subscripts being called with the given arguments.
         func subscriptSignature(in type: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
             var type = type.asOptional(false)
@@ -252,7 +278,7 @@ public class CodebaseInfo: Codable {
                 type = base
                 isStatic = true
             }
-
+            
             for typeInfo in typeInfos(for: type) {
                 let functions = functionSignature(of: "subscript", in: typeInfo, arguments: arguments, isStatic: isStatic)
                 if !functions.isEmpty {
@@ -261,7 +287,7 @@ public class CodebaseInfo: Codable {
             }
             return []
         }
-
+        
         /// Return the associated values of the given enum case.
         func associatedValueSignatures(of member: String, in type: TypeSignature) -> [TypeSignature.Parameter] {
             let type = type.asOptional(false)
@@ -272,9 +298,9 @@ public class CodebaseInfo: Codable {
             }
             return []
         }
-
+        
         private func identifierSignature(of member: String, in candidate: TypeInfo, isStatic: Bool) -> TypeSignature {
-            if let memberInfo = candidate.members.first(where: { $0.name == member && $0.isStatic == isStatic }) {
+            if let memberInfo = candidate.visibleMembers(context: self).first(where: { $0.name == member && $0.isStatic == isStatic }) {
                 // Enum cases with associated values are modeled as functions, but can also be used as identifiers
                 if memberInfo.declarationType == .enumCaseDeclaration {
                     return memberInfo.declaringType ?? .none
@@ -294,9 +320,9 @@ public class CodebaseInfo: Codable {
             }
             return .none
         }
-
+        
         private func functionSignature(of name: String, in candidate: TypeInfo, arguments: [LabeledValue<TypeSignature>], isStatic: Bool) -> [TypeSignature] {
-            let functions = candidate.members.flatMap { (member) -> [TypeSignature] in
+            let functions = candidate.visibleMembers(context: self).flatMap { (member) -> [TypeSignature] in
                 guard member.name == name && member.isStatic == isStatic else {
                     return []
                 }
@@ -323,11 +349,11 @@ public class CodebaseInfo: Codable {
             }
             return []
         }
-
+        
         private func initSignatures(for typeInfos: [TypeInfo], arguments: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
             var initSignatures = typeInfos.flatMap { typeInfo in
-                let initInfos = typeInfo.functions.filter { $0.name == "init" }
-                return initInfos.compactMap { (initInfo: FunctionInfo) -> TypeSignature? in
+                let initInfos = typeInfo.visibleMembers(context: self).filter { $0.declarationType == .initDeclaration }
+                return initInfos.compactMap { (initInfo: CodebaseInfoItem) -> TypeSignature? in
                     guard let signature = matchFunction(initInfo, arguments: arguments), case .function(let argumentTypes, _) = signature else {
                         return nil
                     }
@@ -335,7 +361,7 @@ public class CodebaseInfo: Codable {
                     return .function(argumentTypes, typeInfo.signature)
                 }
             }
-
+            
             // If we don't have any matches and this appears to be a constructor, treat it as one. We take advantage of this
             // while inferring the types of variable values in prepareForUse(), before we've called generateConstructors()
             if initSignatures.isEmpty && !typeInfos.isEmpty {
@@ -344,9 +370,9 @@ public class CodebaseInfo: Codable {
             }
             return initSignatures
         }
-
+        
         private func associatedValueSignatures(of member: String, in candidate: TypeInfo) -> [TypeSignature.Parameter]? {
-            guard let memberInfo = candidate.members.first(where: { $0.name == member && $0.declarationType == .enumCaseDeclaration }) else {
+            guard let memberInfo = candidate.visibleMembers(context: self).first(where: { $0.name == member && $0.declarationType == .enumCaseDeclaration }) else {
                 return nil
             }
             guard case .function(let parameters, _) = memberInfo.signature else {
@@ -354,7 +380,7 @@ public class CodebaseInfo: Codable {
             }
             return parameters
         }
-
+        
         private func matchFunction(_ item: CodebaseInfoItem, arguments: [LabeledValue<TypeSignature>]) -> TypeSignature? {
             guard case .function(let parameters, let returnType) = item.signature else {
                 return nil
@@ -362,7 +388,7 @@ public class CodebaseInfo: Codable {
             guard parameters.count >= arguments.count else {
                 return nil
             }
-
+            
             // Match each argument to a parameter
             var matchingParameters: [TypeSignature.Parameter] = []
             var parameterIndex = 0
@@ -381,14 +407,14 @@ public class CodebaseInfo: Codable {
             }
             return .function(matchingParameters, returnType)
         }
-
+        
         private func matchFunction(_ signature: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> TypeSignature {
             guard case .function(let parameterTypes, _) = signature, parameterTypes.count == arguments.count else {
                 return .none
             }
             return signature
         }
-
+        
         private func matchArgument(_ argument: LabeledValue<TypeSignature>, to parameters: [TypeSignature.Parameter], startIndex: Int) -> Int? {
             for (index, parameter) in parameters[startIndex...].enumerated() {
                 if let label = argument.label {
@@ -411,7 +437,7 @@ public class CodebaseInfo: Codable {
             }
             return nil
         }
-
+        
         private func candidateTypeNames(for type: TypeSignature) -> [String] {
             switch type {
             case .array:
@@ -445,7 +471,7 @@ public class CodebaseInfo: Codable {
             }
         }
     }
-
+    
     private var rootTypes: [TypeInfo] = []
     private var rootTypealiases: [TypealiasInfo] = []
     private var rootVariables: [VariableInfo] = []
@@ -454,34 +480,47 @@ public class CodebaseInfo: Codable {
     private var itemsByName: [String: [CodebaseInfoItem]] = [:]
     private var isInUse = false
     private var typeInferenceTrees: [Source.FilePath: SyntaxTree] = [:]
-
+    
     private enum CodingKeys: String, CodingKey {
         // Only encode moduleName and root infos
         case moduleName, rootTypes, rootTypealiases, rootVariables, rootFunctions, rootExtensions
     }
-
+    
     private func buildItemsByName() {
         var itemsByName: [String: [CodebaseInfoItem]] = [:]
         Self.addCodebaseInfo(self, to: &itemsByName)
-        dependencies.forEach { Self.addCodebaseInfo($0, to: &itemsByName) }
+        dependentModules.forEach { Self.addCodebaseInfo($0, to: &itemsByName, publicOnly: true) }
         self.itemsByName = itemsByName
     }
-
-    private static func addCodebaseInfo(_ info: CodebaseInfo, to itemsByName: inout [String: [CodebaseInfoItem]]) {
-        info.rootTypes.forEach { addTypeInfo($0, to: &itemsByName) }
-        info.rootExtensions.forEach { addTypeInfo($0, to: &itemsByName) }
+    
+    private static func addCodebaseInfo(_ info: CodebaseInfo, to itemsByName: inout [String: [CodebaseInfoItem]], publicOnly: Bool = false) {
+        info.rootTypes.forEach { addTypeInfo($0, to: &itemsByName, publicOnly: publicOnly) }
+        info.rootExtensions.forEach { addTypeInfo($0, to: &itemsByName, publicOnly: publicOnly) }
         let rootItems: [CodebaseInfoItem] = info.rootTypealiases + info.rootVariables + info.rootFunctions
-        rootItems.forEach { addItem($0, to: &itemsByName) }
+        rootItems.forEach { addItem($0, to: &itemsByName, publicOnly: publicOnly) }
     }
-
-    private static func addTypeInfo(_ typeInfo: TypeInfo, to itemsByName: inout [String: [CodebaseInfoItem]]) {
-        addItem(typeInfo, to: &itemsByName)
-        typeInfo.types.forEach { addTypeInfo($0, to: &itemsByName) }
+    
+    private static func addTypeInfo(_ typeInfo: TypeInfo, to itemsByName: inout [String: [CodebaseInfoItem]], publicOnly: Bool) {
+        if publicOnly {
+            guard typeInfo.visibility == .public || typeInfo.visibility == .open else {
+                return
+            }
+            typeInfo.types = typeInfo.types.filter { $0.visibility == .public || $0.visibility == .open }
+            typeInfo.typealiases = typeInfo.typealiases.filter { $0.visibility == .public || $0.visibility == .open }
+            typeInfo.variables = typeInfo.variables.filter { $0.visibility == .public || $0.visibility == .open }
+            typeInfo.functions = typeInfo.functions.filter { $0.visibility == .public || $0.visibility == .open }
+            typeInfo.cases = typeInfo.cases.filter { $0.visibility == .public || $0.visibility == .open }
+        }
+        addItem(typeInfo, to: &itemsByName, publicOnly: publicOnly)
+        typeInfo.types.forEach { addTypeInfo($0, to: &itemsByName, publicOnly: publicOnly) }
         let items: [CodebaseInfoItem] = typeInfo.typealiases + typeInfo.cases + typeInfo.variables + typeInfo.functions
-        items.forEach { addItem($0, to: &itemsByName) }
+        items.forEach { addItem($0, to: &itemsByName, publicOnly: publicOnly) }
     }
-
-    private static func addItem(_ item: CodebaseInfoItem, to itemsByName: inout [String: [CodebaseInfoItem]]) {
+    
+    private static func addItem(_ item: CodebaseInfoItem, to itemsByName: inout [String: [CodebaseInfoItem]], publicOnly: Bool) {
+        guard !publicOnly || item.visibility == .public || item.visibility == .open else {
+            return
+        }
         var itemsWithName = itemsByName[item.name, default: []]
         itemsWithName.append(item)
         itemsByName[item.name] = itemsWithName
@@ -551,7 +590,7 @@ public class CodebaseInfo: Codable {
             }
             // inherits.first could have been a protocol
             if superclassInfos.contains(where: { $0.declarationType == .classDeclaration }) {
-                superclassInits = superclassInfos.flatMap { $0.functions.filter { $0.name == "init" } }
+                superclassInits = superclassInfos.flatMap { $0.functions.filter { $0.name == "init" && ($0.visibility != .private || $0.sourceFile == typeInfo.sourceFile) } }
             }
         }
         if superclassInits.isEmpty {
@@ -563,6 +602,7 @@ public class CodebaseInfo: Codable {
                 inheritedInit.moduleName = typeInfo.moduleName
                 inheritedInit.sourceFile = typeInfo.sourceFile
                 inheritedInit.declaringType = typeInfo.signature
+                inheritedInit.isGenerated = true
                 typeInfo.functions.append(inheritedInit)
             }
         }
@@ -576,7 +616,8 @@ public class CodebaseInfo: Codable {
             return TypeSignature.Parameter(label: variable.name, type: variable.signature, isVariadic: false, hasDefaultValue: variable.hasValue)
         }
         let initSignature: TypeSignature = .function(parameters, .void)
-        let initInfo = FunctionInfo(name: "init", signature: initSignature, moduleName: typeInfo.moduleName, sourceFile: typeInfo.sourceFile, declaringType: typeInfo.signature, visibility: typeInfo.visibility)
+        var initInfo = FunctionInfo(name: "init", declarationType: .initDeclaration, signature: initSignature, moduleName: typeInfo.moduleName, sourceFile: typeInfo.sourceFile, declaringType: typeInfo.signature, visibility: typeInfo.visibility)
+        initInfo.isGenerated = true
         typeInfo.functions.append(initInfo)
     }
 
@@ -594,6 +635,7 @@ public class CodebaseInfo: Codable {
         var isStatic: Bool {
             return true
         }
+        var languageAdditions: Any?
 
         let generics: Generics
         var inherits: [TypeSignature]
@@ -606,25 +648,34 @@ public class CodebaseInfo: Codable {
         var members: [CodebaseInfoItem] {
             return types + typealiases + cases + variables + functions
         }
+        func visibleMembers(context: CodebaseInfo.Context) -> [CodebaseInfoItem] {
+            return members.filter { context.rankScore(of: $0) > 0 }
+        }
 
-        fileprivate init(statement: TypeDeclaration, in declaringType: TypeSignature? = nil, moduleName: String?) {
+        private enum CodingKeys: String, CodingKey {
+            // Exclude language additions
+            case name, declarationType, signature, moduleName, sourceFile, declaringType, visibility, generics, inherits, types, typealiases, cases, variables, functions
+        }
+
+        fileprivate init(statement: TypeDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo, delegate: CodebaseInfoGatherDelegate?) {
             self.name = statement.name
             self.declarationType = statement.type
             self.signature = statement.signature
-            self.moduleName = moduleName
+            self.moduleName = codebaseInfo.moduleName
             self.sourceFile = statement.sourceFile
             self.declaringType = declaringType
             self.visibility = statement.modifiers.visibility
             self.generics = statement.generics
             self.inherits = statement.inherits
-            addMembers(statement.members)
+            addMembers(statement.members, codebaseInfo: codebaseInfo, delegate: delegate)
+            delegate?.codebaseInfo(codebaseInfo, didGather: self, from: statement)
         }
 
-        fileprivate init(statement: ExtensionDeclaration, moduleName: String?) {
+        fileprivate init(statement: ExtensionDeclaration, codebaseInfo: CodebaseInfo, delegate: CodebaseInfoGatherDelegate?) {
             self.name = statement.name
             self.declarationType = statement.type
             self.signature = statement.signature
-            self.moduleName = moduleName
+            self.moduleName = codebaseInfo.moduleName
             self.sourceFile = statement.sourceFile
             if case .member(let base, _) = statement.signature {
                 self.declaringType = base
@@ -634,22 +685,23 @@ public class CodebaseInfo: Codable {
             self.visibility = statement.modifiers.visibility
             self.generics = statement.generics
             self.inherits = statement.inherits
-            addMembers(statement.members)
+            addMembers(statement.members, codebaseInfo: codebaseInfo, delegate: delegate)
+            delegate?.codebaseInfo(codebaseInfo, didGather: self, from: statement)
         }
 
-        private func addMembers(_ statements: [Statement]) {
+        private func addMembers(_ statements: [Statement], codebaseInfo: CodebaseInfo, delegate: CodebaseInfoGatherDelegate?) {
             for statement in statements {
                 switch statement.type {
                 case .classDeclaration, .enumDeclaration, .structDeclaration:
-                    types.append(TypeInfo(statement: statement as! TypeDeclaration, in: signature, moduleName: moduleName))
+                    types.append(TypeInfo(statement: statement as! TypeDeclaration, in: signature, codebaseInfo: codebaseInfo, delegate: delegate))
                 case .enumCaseDeclaration:
-                    cases.append(EnumCaseInfo(statement: statement as! EnumCaseDeclaration, in: signature, moduleName: moduleName))
-                case .functionDeclaration:
-                    functions.append(FunctionInfo(statement: statement as! FunctionDeclaration, in: signature, moduleName: moduleName))
+                    cases.append(EnumCaseInfo(statement: statement as! EnumCaseDeclaration, in: signature, codebaseInfo: codebaseInfo, delegate: delegate))
+                case .functionDeclaration, .initDeclaration:
+                    functions.append(FunctionInfo(statement: statement as! FunctionDeclaration, in: signature, codebaseInfo: codebaseInfo, delegate: delegate))
                 case .typealiasDeclaration:
-                    typealiases.append(TypealiasInfo(statement: statement as! TypealiasDeclaration, in: signature, moduleName: moduleName))
+                    typealiases.append(TypealiasInfo(statement: statement as! TypealiasDeclaration, in: signature, codebaseInfo: codebaseInfo, delegate: delegate))
                 case .variableDeclaration:
-                    variables.append(VariableInfo(statement: statement as! VariableDeclaration, in: signature, moduleName: moduleName))
+                    variables.append(VariableInfo(statement: statement as! VariableDeclaration, in: signature, codebaseInfo: codebaseInfo, delegate: delegate))
                 default:
                     break
                 }
@@ -686,6 +738,7 @@ public class CodebaseInfo: Codable {
         let declaringType: TypeSignature?
         let visibility: Modifiers.Visibility
         let isStatic: Bool
+        var languageAdditions: Any?
 
         let generics: Generics
         let isReadOnly: Bool
@@ -694,14 +747,14 @@ public class CodebaseInfo: Codable {
         var value: Expression?
 
         private enum CodingKeys: String, CodingKey {
-            // Exclude value expression
+            // Exclude value expression, language additions
             case name, signature, moduleName, sourceFile, declaringType, visibility, isStatic, generics, isReadOnly, isInitializable, hasValue
         }
 
-        fileprivate init(statement: VariableDeclaration, in declaringType: TypeSignature? = nil, moduleName: String?) {
+        fileprivate init(statement: VariableDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo, delegate: CodebaseInfoGatherDelegate?) {
             self.name = (statement.names.first ?? "") ?? ""
             self.signature = statement.variableTypes.first ?? .none
-            self.moduleName = moduleName
+            self.moduleName = codebaseInfo.moduleName
             self.sourceFile = statement.sourceFile
             self.declaringType = declaringType
             self.visibility = statement.modifiers.visibility
@@ -718,6 +771,7 @@ public class CodebaseInfo: Codable {
                 // We'll try to infer the type after gathering all info
                 self.value = statement.value
             }
+            delegate?.codebaseInfo(codebaseInfo, didGather: &self, from: statement)
         }
 
         fileprivate var needsTypeInference: Bool {
@@ -739,33 +793,41 @@ public class CodebaseInfo: Codable {
     /// Information about a declared function.
     struct FunctionInfo: CodebaseInfoItem, Codable {
         let name: String
-        var declarationType: StatementType {
-            return .functionDeclaration
-        }
+        let declarationType: StatementType
         let signature: TypeSignature
         var moduleName: String?
         var sourceFile: Source.FilePath?
         var declaringType: TypeSignature?
         let visibility: Modifiers.Visibility
         let isStatic: Bool
+        var languageAdditions: Any?
 
         let generics: Generics
         let isMutating: Bool
+        var isGenerated = false
 
-        fileprivate init(statement: FunctionDeclaration, in declaringType: TypeSignature? = nil, moduleName: String?) {
+        private enum CodingKeys: String, CodingKey {
+            // Exclude language additions
+            case name, declarationType, signature, moduleName, sourceFile, declaringType, visibility, isStatic, generics, isMutating, isGenerated
+        }
+
+        fileprivate init(statement: FunctionDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo, delegate: CodebaseInfoGatherDelegate?) {
             self.name = statement.name
+            self.declarationType = statement.type
             self.signature = statement.functionType
-            self.moduleName = moduleName
+            self.moduleName = codebaseInfo.moduleName
             self.sourceFile = statement.sourceFile
             self.declaringType = declaringType
             self.visibility = statement.modifiers.visibility
             self.isStatic = statement.modifiers.isStatic
             self.generics = Generics() //~~~
             self.isMutating = statement.modifiers.isMutating
+            delegate?.codebaseInfo(codebaseInfo, didGather: &self, from: statement)
         }
 
-        fileprivate init(name: String, signature: TypeSignature, moduleName: String?, sourceFile: Source.FilePath? = nil, declaringType: TypeSignature? = nil, visibility: Modifiers.Visibility, isStatic: Bool = false, generics: Generics = Generics(), isMutating: Bool = false) {
+        fileprivate init(name: String, declarationType: StatementType, signature: TypeSignature, moduleName: String?, sourceFile: Source.FilePath? = nil, declaringType: TypeSignature? = nil, visibility: Modifiers.Visibility, isStatic: Bool = false, generics: Generics = Generics(), isMutating: Bool = false) {
             self.name = name
+            self.declarationType = declarationType
             self.signature = signature
             self.moduleName = moduleName
             self.sourceFile = sourceFile
@@ -791,17 +853,24 @@ public class CodebaseInfo: Codable {
         var isStatic: Bool {
             return true
         }
+        var languageAdditions: Any?
 
         let generics: Generics
 
-        fileprivate init(statement: TypealiasDeclaration, in declaringType: TypeSignature? = nil, moduleName: String?) {
+        private enum CodingKeys: String, CodingKey {
+            // Exclude language additions
+            case name, signature, moduleName, sourceFile, declaringType, visibility, generics
+        }
+
+        fileprivate init(statement: TypealiasDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo, delegate: CodebaseInfoGatherDelegate?) {
             self.name = statement.name
             self.signature = statement.signature
-            self.moduleName = moduleName
+            self.moduleName = codebaseInfo.moduleName
             self.sourceFile = statement.sourceFile
             self.declaringType = declaringType
             self.visibility = statement.modifiers.visibility
             self.generics = statement.generics
+            delegate?.codebaseInfo(codebaseInfo, didGather: &self, from: statement)
         }
     }
 
@@ -819,14 +888,21 @@ public class CodebaseInfo: Codable {
         var isStatic: Bool {
             return true
         }
+        var languageAdditions: Any?
 
-        fileprivate init(statement: EnumCaseDeclaration, in declaringType: TypeSignature? = nil, moduleName: String?) {
+        private enum CodingKeys: String, CodingKey {
+            // Exclude language additions
+            case name, signature, moduleName, sourceFile, declaringType, visibility
+        }
+
+        fileprivate init(statement: EnumCaseDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo, delegate: CodebaseInfoGatherDelegate?) {
             self.name = statement.name
             self.signature = statement.signature
-            self.moduleName = moduleName
+            self.moduleName = codebaseInfo.moduleName
             self.sourceFile = statement.sourceFile
             self.declaringType = declaringType
             self.visibility = statement.modifiers.visibility
+            delegate?.codebaseInfo(codebaseInfo, didGather: &self, from: statement)
         }
     }
 }
@@ -841,4 +917,35 @@ protocol CodebaseInfoItem {
     var declaringType: TypeSignature? { get }
     var visibility: Modifiers.Visibility { get }
     var isStatic: Bool { get }
+    var languageAdditions: Any? { get set }
+}
+
+/// Receive callbacks and add language additions during info gathering.
+protocol CodebaseInfoGatherDelegate {
+    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather typeInfo: CodebaseInfo.TypeInfo, from statement: TypeDeclaration)
+    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather typeInfo: CodebaseInfo.TypeInfo, from statement: ExtensionDeclaration)
+    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather variableInfo: inout CodebaseInfo.VariableInfo, from statement: VariableDeclaration)
+    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather functionInfo: inout CodebaseInfo.FunctionInfo, from statement: FunctionDeclaration)
+    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather typealiasInfo: inout CodebaseInfo.TypealiasInfo, from statement: TypealiasDeclaration)
+    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather enumCaseInfo: inout CodebaseInfo.EnumCaseInfo, from statement: EnumCaseDeclaration)
+}
+
+extension CodebaseInfoGatherDelegate {
+    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather typeInfo: CodebaseInfo.TypeInfo, from statement: TypeDeclaration) {
+    }
+
+    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather typeInfo: CodebaseInfo.TypeInfo, from statement: ExtensionDeclaration) {
+    }
+
+    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather variableInfo: inout CodebaseInfo.VariableInfo, from statement: VariableDeclaration) {
+    }
+
+    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather functionInfo: inout CodebaseInfo.FunctionInfo, from statement: FunctionDeclaration) {
+    }
+
+    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather typealiasInfo: inout CodebaseInfo.TypealiasInfo, from statement: TypealiasDeclaration) {
+    }
+
+    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather enumCaseInfo: inout CodebaseInfo.EnumCaseInfo, from statement: EnumCaseDeclaration) {
+    }
 }
