@@ -810,7 +810,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     /// Return a tuple type made up of the given types.
     static func `for`(labels: [String?], types: [TypeSignature]) -> TypeSignature {
         guard !types.isEmpty else {
-            return .none
+            return .void
         }
         guard types.count > 1 else {
             return types[0]

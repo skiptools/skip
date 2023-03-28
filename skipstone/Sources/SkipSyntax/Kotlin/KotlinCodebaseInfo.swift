@@ -44,7 +44,7 @@ public class KotlinCodebaseInfo {
 
     /// Any issues encountered during information gathering.
     func messages(for sourceFile: Source.FilePath) -> [Message] {
-        return []
+        return codebaseInfo.messages(for: sourceFile)
     }
 
     /// Create a context that can access the given imported modules.

@@ -16,6 +16,11 @@ public class CodebaseInfo: Codable {
             assert(!isInUse)
         }
     }
+
+    /// Messages for the user created during information gathering.
+    func messages(for sourceFile: Source.FilePath) -> [Message] {
+        return messages[sourceFile] ?? []
+    }
     
     /// Gather codebase-level information from the given syntax tree.
     func gather(from syntaxTree: SyntaxTree, delegate: CodebaseInfoGatherDelegate? = nil) {
@@ -476,6 +481,7 @@ public class CodebaseInfo: Codable {
     private var rootFunctions: [FunctionInfo] = []
     private var rootExtensions: [TypeInfo] = []
     private var itemsByName: [String: [CodebaseInfoItem]] = [:]
+    private var messages: [Source.FilePath: [Message]] = [:]
     private var isInUse = false
     private var typeInferenceTrees: [Source.FilePath: SyntaxTree] = [:]
     
@@ -533,25 +539,49 @@ public class CodebaseInfo: Codable {
         self.typeInferenceTrees = [:]
 
         var typeInferenceContexts: [Source.FilePath: TypeInferenceContext] = [:]
-        for (sourceFile, syntaxTree) in typeInferenceTrees {
-            let context: TypeInferenceContext
-            if let existingContext = typeInferenceContexts[sourceFile] {
-                context = existingContext
-            } else {
-                context = TypeInferenceContext(codebaseInfo: self, sourceFile: sourceFile, statements: syntaxTree.root.statements)
-                typeInferenceContexts[sourceFile] = context
-            }
-            for i in 0..<rootVariables.count {
-                if rootVariables[i].sourceFile == sourceFile && rootVariables[i].needsTypeInference {
-                    rootVariables[i] = rootVariables[i].inferType(with: context)
+        var lastNeedsInferenceCount: Int? = nil
+        var needsInferenceCount = 0
+        var isCleanupPass = false
+        while true {
+            for (sourceFile, syntaxTree) in typeInferenceTrees {
+                let context: TypeInferenceContext
+                if let existingContext = typeInferenceContexts[sourceFile] {
+                    context = existingContext
+                } else {
+                    context = TypeInferenceContext(codebaseInfo: self, sourceFile: sourceFile, statements: syntaxTree.root.statements)
+                    typeInferenceContexts[sourceFile] = context
                 }
-            }
-            for rootType in rootTypes {
-                if rootType.sourceFile == sourceFile && rootType.needsVariableTypeInference {
-                    if let declaration = syntaxTree.root.statements.first(where: { ($0 as? TypeDeclaration)?.name == rootType.name }) as? TypeDeclaration {
-                        rootType.inferVariableTypes(with: context, declaration: declaration)
+                for i in 0..<rootVariables.count {
+                    if rootVariables[i].sourceFile == sourceFile && rootVariables[i].needsTypeInference {
+                        if isCleanupPass {
+                            rootVariables[i] = rootVariables[i].cleanupTypeInference(source: syntaxTree.source, messages: &messages)
+                        } else {
+                            rootVariables[i] = rootVariables[i].inferType(with: context)
+                            if rootVariables[i].needsTypeInference {
+                                needsInferenceCount += 1
+                            }
+                        }
                     }
                 }
+                for rootType in rootTypes {
+                    if rootType.sourceFile == sourceFile && rootType.needsVariableTypeInference {
+                        if isCleanupPass {
+                            rootType.cleanupTypeInference(source: syntaxTree.source, messages: &messages)
+                        } else if let declaration = syntaxTree.root.statements.first(where: { ($0 as? TypeDeclaration)?.name == rootType.name }) as? TypeDeclaration {
+                            needsInferenceCount += rootType.inferVariableTypes(with: context, declaration: declaration)
+                        }
+                    }
+                }
+            }
+            // We continue to do type inference passes until we resolve all variable types or until we perform a pass that doesn't
+            // infer any additional types, at which point we do an additional cleanup pass to release references to the syntax tree
+            if isCleanupPass || needsInferenceCount == 0 {
+                break
+            } else if needsInferenceCount == lastNeedsInferenceCount {
+                isCleanupPass = true
+            } else {
+                lastNeedsInferenceCount = needsInferenceCount
+                needsInferenceCount = 0
             }
         }
     }
@@ -710,17 +740,32 @@ public class CodebaseInfo: Codable {
             return variables.contains { $0.needsTypeInference } || types.contains { $0.needsVariableTypeInference }
         }
 
-        fileprivate func inferVariableTypes(with context: TypeInferenceContext, declaration: TypeDeclaration) {
+        fileprivate func inferVariableTypes(with context: TypeInferenceContext, declaration: TypeDeclaration) -> Int {
             let memberContext = context.pushing(declaration)
-            variables = variables.map { $0.needsTypeInference ? $0.inferType(with: memberContext) : $0 }
+            var needsInferenceCount = 0
+            for i in 0..<variables.count {
+                guard variables[i].needsTypeInference else {
+                    continue
+                }
+                variables[i] = variables[i].inferType(with: memberContext)
+                if variables[i].needsTypeInference {
+                    needsInferenceCount += 1
+                }
+            }
             for type in types {
                 guard type.needsVariableTypeInference else {
                     continue
                 }
                 if let declaration = declaration.members.first(where: { ($0 as? TypeDeclaration)?.name == type.name }) as? TypeDeclaration {
-                    type.inferVariableTypes(with: memberContext, declaration: declaration)
+                    needsInferenceCount += type.inferVariableTypes(with: memberContext, declaration: declaration)
                 }
             }
+            return needsInferenceCount
+        }
+
+        fileprivate func cleanupTypeInference(source: Source, messages: inout [Source.FilePath: [Message]]) {
+            variables = variables.map { $0.cleanupTypeInference(source: source, messages: &messages) }
+            types.forEach { $0.cleanupTypeInference(source: source, messages: &messages) }
         }
     }
 
@@ -781,9 +826,25 @@ public class CodebaseInfo: Codable {
             guard let value = v.value else {
                 return v
             }
-            v.value = nil // Don't hold on to Expression
             value.inferTypes(context: context, expecting: .none)
             v.signature = value.inferredType
+            if v.signature.isFullySpecified {
+                v.value = nil
+            }
+            return v
+        }
+
+        fileprivate func cleanupTypeInference(source: Source, messages: inout [Source.FilePath: [Message]]) -> VariableInfo {
+            guard value != nil else {
+                return self
+            }
+            if let sourceFile {
+                var fileMessages = messages[sourceFile, default: []]
+                fileMessages.append(.variableNeedsTypeDeclaration(source: source, sourceRange: value?.sourceRange))
+                messages[sourceFile] = fileMessages
+            }
+            var v = self
+            v.value = nil
             return v
         }
     }

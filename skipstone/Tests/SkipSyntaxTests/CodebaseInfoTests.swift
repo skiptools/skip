@@ -60,6 +60,30 @@ final class CodebaseInfoTests: XCTestCase {
         XCTAssertEqual(.string, context.identifierSignature(of: "s", in: .tuple(["i", "s"], [.int, .string])))
     }
 
+    func testVariableTypeResolution() async throws {
+        let context = try await setUpContext(swift: """
+        struct TestStruct1 {
+            static let v = TestStruct2.v2
+            static let v2 = 100
+        }
+        struct TestStruct2 {
+            static let v2 = TestStruct1.v2
+        }
+        """)
+
+        XCTAssertEqual(.int, context.identifierSignature(of: "v", in: .metaType(.named("TestStruct1", []))))
+        XCTAssertEqual(.int, context.identifierSignature(of: "v2", in: .metaType(.named("TestStruct1", []))))
+        XCTAssertEqual(.int, context.identifierSignature(of: "v2", in: .metaType(.named("TestStruct2", []))))
+    }
+
+    func testFailedVariableTypeResolutionProducesMessage() async throws {
+        try await checkProducesMessage(swift: """
+        struct TestStruct {
+            static let v = TestStruct2.v
+        }
+        """)
+    }
+
     func testMemberNestedType() async throws {
         let context = try await setUpContext(swift: """
         class TestClass {

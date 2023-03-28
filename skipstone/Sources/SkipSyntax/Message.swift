@@ -114,4 +114,8 @@ extension Message {
         }
         return Message(kind: .error, message: "Skip is not able to match this where constraint to a declared generic type", source: source, sourceRange: range)
     }
+
+    static func variableNeedsTypeDeclaration(source: Source? = nil, sourceRange: Source.Range? = nil) -> Message {
+        return Message(kind: .warning, message: "Skip is unable to determine the type of this expression. Consider declaring the variable type explicitly, i.e. 'var v: <Type> = ...'", source: source, sourceRange: sourceRange)
+    }
 }
