@@ -41,12 +41,12 @@ macOS 13+ (ARM or Intel), [XCode.app](https://developer.apple.com/xcode/) and [G
 
 ## Transpilation Output
 
-For a given package named "SourceModule*Kotlin*", the transpiler takes all the `.swift` source files in the peer "SourceModule" package and transpiles the Swift source files into Kotlin. In addition, module-level `build.gradle.kts` and top-level `settings.gradle.kts` files are emitted, such that the output module source can be built or tested with the `gradle` command.
+For a given package named "SourceModule*Kt*", the transpiler takes all the `.swift` source files in the peer "SourceModule" package and transpiles the Swift source files into Kotlin. In addition, module-level `build.gradle.kts` and top-level `settings.gradle.kts` files are emitted, such that the output module source can be built or tested with the `gradle` command.
 
-The output folders for the plug-in are dictated by the build system, and so they differ between Xcode and SPM build. An example resulting folder structure is for the base `SkipLib` and `SkipLibKotlin` packages is:
+The output folders for the plug-in are dictated by the build system, and so they differ between Xcode and SPM build. An example resulting folder structure is for the base `SkipLib` and `SkipLibKt` packages is:
 
 ```
-~/Library/Developer/Xcode/DerivedData/Skip-ABC/SourcePackages/plugins/skip-core.output/SkipLibKotlin/SkipTranspilePlugIn
+~/Library/Developer/Xcode/DerivedData/Skip-ABC/SourcePackages/plugins/skip-core.output/SkipLibKt/SkipTranspilePlugIn
 ├── SkipLib
 │   ├── build.gradle.kts
 │   └── src
@@ -73,7 +73,7 @@ With SPM plugins, modules have their own independent build output folder, and th
 ├── SkipLib
 │   ├── build.gradle.kts
 │   └── src
-│       ├── main -> ../../../../SkipLibKotlin/SkipTranspilePlugIn/SkipLib/src/main
+│       ├── main -> ../../../../SkipLibKt/SkipTranspilePlugIn/SkipLib/src/main
 │       │   └── kotlin
 │       │       └── skip
 │       │           └── lib
@@ -104,7 +104,7 @@ Code that references other modules will be similiarly linked, but at the top lev
 ├── DemoLib
 │   ├── build.gradle.kts
 │   └── src
-│       ├── main -> ../../../../DemoLibKotlin/SkipTranspilePlugIn/DemoLib/src/main
+│       ├── main -> ../../../../DemoLibKt/SkipTranspilePlugIn/DemoLib/src/main
 │       │   └── kotlin
 │       │       └── demo
 │       │           └── lib
@@ -114,7 +114,7 @@ Code that references other modules will be similiarly linked, but at the top lev
 │               └── demo
 │                   └── lib
 │                       └── DemoLibTests.kt
-├── SkipFoundation -> ../../../skip-core.output/SkipFoundationKotlin/SkipTranspilePlugIn/SkipFoundation
+├── SkipFoundation -> ../../../skip-core.output/SkipFoundationKt/SkipTranspilePlugIn/SkipFoundation
 │   ├── build.gradle.kts
 │   └── src
 │       └── main
@@ -137,7 +137,7 @@ Code that references other modules will be similiarly linked, but at the top lev
 │                       ├── TimeZone.kt
 │                       ├── URL.kt
 │                       └── UUID.kt
-├── SkipLib -> ../../../skip-core.output/SkipLibKotlin/SkipTranspilePlugIn/SkipLib
+├── SkipLib -> ../../../skip-core.output/SkipLibKt/SkipTranspilePlugIn/SkipLib
 │   ├── build.gradle.kts
 │   └── src
 │       └── main
@@ -152,7 +152,7 @@ Code that references other modules will be similiarly linked, but at the top lev
 │                       ├── SkipKotlin.kt
 │                       ├── Struct.kt
 │                       └── Tuple.kt
-├── SkipUnit -> ../../../skip-core.output/SkipUnitKotlin/SkipTranspilePlugIn/SkipUnit
+├── SkipUnit -> ../../../skip-core.output/SkipUnitKt/SkipTranspilePlugIn/SkipUnit
 │   ├── build.gradle.kts
 │   └── src
 │       └── main

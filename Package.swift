@@ -7,32 +7,27 @@ let package = Package(
     platforms: [.iOS(.v15), .macOS(.v12), .tvOS(.v15), .watchOS(.v8), .macCatalyst(.v15)],
     products: [
         .plugin(name: "skip", targets: ["SkipCommandPlugIn"]),
-        .plugin(name: "skippy", targets: ["SkipBuildPlugIn"]),
-        .plugin(name: "precheck", targets: ["SkipPrecheckPlugIn"]),
+        .plugin(name: "preflight", targets: ["SkipPreflightPlugIn"]),
         .plugin(name: "transpile", targets: ["SkipTranspilePlugIn"]),
-        .plugin(name: "gradle", targets: ["SkipGradlePlugIn"]),
         .library(name: "SkipDriver", targets: ["SkipDriver"])
     ],
     dependencies: [
+        .package(url: "https://github.com/skiptools/skip-template.git", branch: "main"),
     ],
     targets: [
         .target(name: "SkipDriver", dependencies: ["skiptool"]),
         .testTarget(name: "SkipDriverTests", dependencies: ["SkipDriver"]),
 
+        .plugin(name: "SkipPreflightPlugIn", capability: .buildTool(), dependencies: ["skiptool"]),
+        .plugin(name: "SkipTranspilePlugIn", capability: .buildTool(), dependencies: ["skiptool"]),
+
         .plugin(name: "SkipCommandPlugIn",
             capability: .command(
-                intent: .custom(verb: "skip", 
-                description: "Run Skip transpiler"),
+                intent: .custom(verb: "skip",  description: "Skip Info"),
                 permissions: [
-                    .writeToPackageDirectory(reason: "skip creates source files"),
-                    //.allowNetworkConnections(scope: .all(ports: []), reason: "skip needs the network"), // awaiting Swift 5.9
+                    .writeToPackageDirectory(reason: "Skip needs to have access to the project folder to create and update generated source files."),
                 ]),
             dependencies: ["skiptool"]),
-        .plugin(name: "SkipBuildPlugIn", capability: .buildTool(), dependencies: ["skiptool"]),
-
-        .plugin(name: "SkipPrecheckPlugIn", capability: .buildTool(), dependencies: ["skiptool"]),
-        .plugin(name: "SkipTranspilePlugIn", capability: .buildTool(), dependencies: ["skiptool"]),
-        .plugin(name: "SkipGradlePlugIn", capability: .buildTool(), dependencies: ["skiptool"]),
     ]
 )
 
