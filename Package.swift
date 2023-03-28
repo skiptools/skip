@@ -43,5 +43,5 @@ if let localPath = ProcessInfo.processInfo.environment["SKIPLOCAL"] {
     package.targets += [.executableTarget(name: "skiptool", dependencies: [.product(name: "SkipBuild", package: "SkipSource")], path: "Sources/SkipTool", sources: ["skiptool.swift"])]
 } else {
     // default to using the latest binary skiptool release
-    package.targets += [.binaryTarget(name: "skiptool", url: "https://github.com/skiptools/skip/releases/download/0.2.0/skiptool.artifactbundle.zip", checksum: "4c08cc37687ed4fc0a71e84a394873605c9d2d57a04322f9e365f86222affb02")]
+    package.targets += [.binaryTarget(name: "skiptool", url: "https://github.com/skiptools/skip/releases/download/0.2.1/skiptool.artifactbundle.zip", checksum: "856abdb8cd918617e8cec76479f23896978a7e5703e34cd1d2a06bde096caa6f")]
 }
