@@ -8,7 +8,7 @@ public class SyntaxTree: PrettyPrintable {
     let preprocessorSymbols: Set<String>
     private(set) var root: CodeBlock = CodeBlock(statements: [])
 
-    public init(source: Source, preprocessorSymbols: Set<String> = [], codebaseInfo: CodebaseInfo? = nil, symbols: Symbols? = nil) {
+    public init(source: Source, preprocessorSymbols: Set<String> = [], codebaseInfo: CodebaseInfo? = nil, symbols: SymbolsType? = nil) {
         self.source = source
         self.preprocessorSymbols = preprocessorSymbols
         self.syntax = Parser.parse(source: source.content)

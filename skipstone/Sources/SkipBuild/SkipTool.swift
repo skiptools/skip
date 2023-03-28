@@ -8,7 +8,7 @@ import Universal
 import struct Universal.JSON
 
 /// The current version of the tool
-public let skipVersion = "0.1.15"
+public let skipVersion = "0.2.2"
 
 struct Options {
     var preprocessorSymbols: [String] = []
@@ -409,6 +409,12 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
     @OptionGroup(title: "Output Options")
     var outputOptions: OutputOptions
 
+    #if canImport(SymbolKit)
+    public typealias SymbolsType = Symbols
+    #else
+    public typealias SymbolsType = Void
+    #endif
+
 
     struct Output : MessageConvertible {
         let transpilation: Transpilation
@@ -500,10 +506,10 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         let (baseSkipConfig, mergedSkipConfig, configMap) = try loadSkipConfig(merge: true)
         let plugins: [KotlinPlugin] = try createPlugins(for: baseSkipConfig, with: configMap)
 
-        #if os(macOS) || os(Linux)
-        let symbols: Symbols? = try await loadSymbols()
+        #if canImport(SymbolKit)
+        let symbols: SymbolsType? = try await loadSymbols()
         #else
-        let symbols: Symbols? = nil
+        let symbols: SymbolsType? = nil
         #endif
         let codebaseInfo = CodebaseInfo(moduleName: primaryModuleName)
         let transpiler = Transpiler(packageName: packageName, sourceFiles: sources, codebaseInfo: codebaseInfo, symbols: symbols, preprocessorSymbols: Set(precheckOptions.symbols), plugins: plugins)
@@ -659,8 +665,8 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             return copiedFiles
         }
 
-        #if os(macOS) || os(Linux)
-        func loadSymbols() async throws -> Symbols {
+        #if canImport(SymbolKit)
+        func loadSymbols() async throws -> SymbolsType {
             let symbolFolder = transpileOptions.symbolFolder.flatMap(URL.init(fileURLWithPath:))
             //let symbolFolderPath = try transpileOptions.symbolFolder.flatMap(AbsolutePath.init(validating:))
 

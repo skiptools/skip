@@ -1,4 +1,16 @@
 import Foundation
+
+#if canImport(SymbolKit)
+@available(*, deprecated, message: "remove SymbolKit")
+public typealias SymbolsType = Symbols
+@available(*, deprecated, message: "remove SymbolKit")
+typealias SymbolsContextType = Symbols.Context
+#else
+public typealias SymbolsType = Void
+typealias SymbolsContextType = Void
+#endif
+
+#if canImport(SymbolKit)
 import SymbolKit
 
 /// Provides information about code symbols using`SymbolKit`.
@@ -442,7 +454,7 @@ public class Symbols {
         for entry in graph.symbols {
             if let symbol = symbol(for: entry.value, moduleName: moduleName) {
                 symbolsByIdentifier[symbol.symbol.uniqueIdentifier] = symbol
-            } 
+            }
         }
         if let relationships = graph.relationshipsByLanguage.first(where: { $0.key.interfaceLanguage == "swift" })?.value {
             for relationship in relationships {
@@ -947,3 +959,5 @@ private extension SymbolGraph.Symbol.DeclarationFragments.Fragment {
         return TypeSignature.for(name: spelling, genericTypes: [])
     }
 }
+#endif
+

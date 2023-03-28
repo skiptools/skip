@@ -1,7 +1,7 @@
 /// Contextual information used in type inference.
 struct TypeInferenceContext {
     private let codebaseInfo: CodebaseInfo.Context?
-    private let symbols: Symbols.Context?
+    private let symbols: SymbolsContextType?
     private var typePath: [(TypeDeclaration, Bool)] = []
     private var blockPath: [[String: TypeSignature]] = [] // Each entry is map of additional identifier bindings
     private var localIdentifierTypes: [String: TypeSignature] = [:]
@@ -13,7 +13,7 @@ struct TypeInferenceContext {
     ///   - symbols: Available symbol information.
     ///   - sourceFile: Source file for this context.
     ///   - statements: Top-level statements from which to determine imports.
-    init(codebaseInfo: CodebaseInfo? = nil, symbols: Symbols? = nil, sourceFile: Source.FilePath?, statements: [Statement]) {
+    init(codebaseInfo: CodebaseInfo? = nil, symbols: SymbolsType? = nil, sourceFile: Source.FilePath?, statements: [Statement]) {
         if codebaseInfo != nil || symbols != nil {
             let importedModuleNames: [String] = statements.compactMap { statement in
                 guard statement.type == .importDeclaration, let importDeclaration = statement as? ImportDeclaration else {
@@ -22,7 +22,11 @@ struct TypeInferenceContext {
                 return importDeclaration.modulePath.first
             }
             self.codebaseInfo = codebaseInfo?.context(importedModuleNames: importedModuleNames, sourceFile: sourceFile)
+            #if canImport(SymbolKit)
             self.symbols = symbols?.context(importedModuleNames: importedModuleNames, sourceFile: sourceFile)
+            #else
+            self.symbols = nil
+            #endif
         } else {
             self.codebaseInfo = nil
             self.symbols = nil
@@ -144,6 +148,7 @@ struct TypeInferenceContext {
             }
             return codebaseInfo.identifierSignature(of: name)
         } else {
+            #if canImport(SymbolKit)
             guard let symbols else {
                 return .none
             }
@@ -156,6 +161,9 @@ struct TypeInferenceContext {
                 }
             }
             return symbols.identifierSignature(of: name)
+            #else
+            return .none
+            #endif
         }
     }
 
@@ -195,10 +203,14 @@ struct TypeInferenceContext {
             }
             return codebaseInfo.identifierSignature(of: name, in: type)
         } else {
+            #if canImport(SymbolKit)
             guard let symbols else {
                 return .none
             }
             return symbols.identifierSignature(of: name, in: type)
+            #else
+            return .none
+            #endif
         }
     }
 
@@ -228,6 +240,7 @@ struct TypeInferenceContext {
             }
             return codebaseInfo.functionSignature(of: name, arguments: parameters)
         } else {
+            #if canImport(SymbolKit)
             guard let symbols else {
                 return []
             }
@@ -245,6 +258,9 @@ struct TypeInferenceContext {
                 }
             }
             return symbols.functionSignature(of: name, arguments: parameters)
+            #else
+            return []
+            #endif
         }
     }
 
@@ -261,10 +277,14 @@ struct TypeInferenceContext {
             }
             return codebaseInfo.subscriptSignature(in: type.asOptional(false), arguments: parameters)
         } else {
+            #if canImport(SymbolKit)
             guard let symbols else {
                 return []
             }
             return symbols.subscriptSignature(in: type.asOptional(false), arguments: parameters)
+            #else
+            return []
+            #endif
         }
     }
 

@@ -1,4 +1,6 @@
+#if canImport(SymbolKit)
 import SymbolKit
+#endif
 
 /// Wholistic information about the codebase needed when transpiling Swift to Kotlin.
 public class KotlinCodebaseInfo {
@@ -11,9 +13,9 @@ public class KotlinCodebaseInfo {
     /// Plugins being applied to the translation.
     private(set) var plugins: [KotlinPlugin] = []
 
-    private let symbols: Symbols?
+    private let symbols: SymbolsType?
 
-    public init(packageName: String? = nil, codebaseInfo: CodebaseInfo, symbols: Symbols? = nil, plugins: [KotlinPlugin] = []) {
+    public init(packageName: String? = nil, codebaseInfo: CodebaseInfo, symbols: SymbolsType? = nil, plugins: [KotlinPlugin] = []) {
         self.packageName = packageName
         self.codebaseInfo = codebaseInfo
         self.symbols = symbols
@@ -49,15 +51,26 @@ public class KotlinCodebaseInfo {
 
     /// Create a context that can access the given imported modules.
     func context(importedModuleNames: [String] = [], sourceFile: Source.FilePath? = nil) -> Context {
+        #if canImport(SymbolKit)
         return Context(codebaseInfo: codebaseInfo.context(importedModuleNames: importedModuleNames, sourceFile: sourceFile), symbols: symbols?.context(importedModuleNames: importedModuleNames, sourceFile: sourceFile))
+        #else
+        return Context(codebaseInfo: codebaseInfo.context(importedModuleNames: importedModuleNames, sourceFile: sourceFile))
+        #endif
     }
 
     /// A context for accessing codebase information.
     struct Context {
         private let codebaseInfo: CodebaseInfo.Context
-        private let symbols: Symbols.Context?
 
-        fileprivate init(codebaseInfo: CodebaseInfo.Context, symbols: Symbols.Context?) {
+        #if canImport(SymbolKit)
+        public typealias SymbolsContextType = Symbols.Context
+        #else
+        public typealias SymbolsContextType = Void
+        #endif
+
+        private let symbols: SymbolsContextType?
+
+        fileprivate init(codebaseInfo: CodebaseInfo.Context, symbols: SymbolsContextType? = nil) {
             self.codebaseInfo = codebaseInfo
             self.symbols = symbols
         }
@@ -70,6 +83,7 @@ public class KotlinCodebaseInfo {
         /// Whether the given type is a class, struct, etc, optionally limiting results to this module.
         func declarationType(of type: TypeSignature, mustBeInModule: Bool) -> StatementType? {
             if let symbols {
+                #if canImport(SymbolKit)
                 if let typeInfo = codebaseInfo.typeInfos(for: type).first(where: { $0.declarationType != .extensionDeclaration }) {
                     return typeInfo.declarationType
                 }
@@ -93,6 +107,7 @@ public class KotlinCodebaseInfo {
                         continue
                     }
                 }
+                #endif
                 return nil
             } else {
                 guard let typeInfo = codebaseInfo.typeInfos(for: type).first(where: { $0.declarationType != .extensionDeclaration }) else {
@@ -118,9 +133,11 @@ public class KotlinCodebaseInfo {
                 return typeInfo.visibleMembers(context: codebaseInfo).filter { $0.declarationType == .initDeclaration }
             }
             if inits.isEmpty, let symbols {
+                #if canImport(SymbolKit)
                 return symbols.constructorSignatures(in: type).map {
                     return $0.parameters.map { Parameter<Expression>(externalLabel: $0.label, declaredType: $0.type, isVariadic: $0.isVariadic, isInOut: false, defaultValue: nil) }
                 }
+                #endif
             }
             return inits.compactMap { (initInfo) -> [Parameter<Expression>]? in
                 guard let functionInfo = initInfo as? CodebaseInfo.FunctionInfo, case .function(let parameters, _) = functionInfo.signature else {
@@ -147,22 +164,32 @@ public class KotlinCodebaseInfo {
             guard !declaration.names.isEmpty, let name = declaration.names[0] else {
                 return false
             }
+            #if canImport(SymbolKit)
             if let symbols {
                 return symbols.protocolOf(type, hasMember: name, kind: declaration.modifiers.isStatic ? .typeProperty : .property, type: nil) == true
             } else {
                 let protocolSignatures = codebaseInfo.protocolSignatures(for: type)
                 return protocolSignatures.contains { hasMember($0, name: name, type: nil, isStatic: declaration.modifiers.isStatic) }
             }
+            #else
+            let protocolSignatures = codebaseInfo.protocolSignatures(for: type)
+            return protocolSignatures.contains { hasMember($0, name: name, type: nil, isStatic: declaration.modifiers.isStatic) }
+            #endif
         }
 
         /// Whether a function with the given signature is implementing a protocol function.
         func isProtocolMember(declaration: FunctionDeclaration, in type: TypeSignature) -> Bool {
+            #if canImport(SymbolKit)
             if let symbols {
                 return symbols.protocolOf(type, hasMember: declaration.name, kind: declaration.modifiers.isStatic ? .typeMethod : .method, type: declaration.functionType) == true
             } else {
                 let protocolSignatures = codebaseInfo.protocolSignatures(for: type)
                 return protocolSignatures.contains { hasMember($0, name: declaration.name, type: declaration.functionType, isStatic: declaration.modifiers.isStatic) }
             }
+            #else
+            let protocolSignatures = codebaseInfo.protocolSignatures(for: type)
+            return protocolSignatures.contains { hasMember($0, name: declaration.name, type: declaration.functionType, isStatic: declaration.modifiers.isStatic) }
+            #endif
         }
 
         /// Whether the given member is declared by a protocol of the given type.
@@ -174,7 +201,11 @@ public class KotlinCodebaseInfo {
         /// Whether the given type may be a mutable struct.
         func mayBeMutableStruct(type: TypeSignature) -> Bool {
             if let symbols {
+                #if canImport(SymbolKit)
                 return symbols.isMutableStruct(type: type) != false
+                #else
+                return false
+                #endif
             } else {
                 let typeInfos = codebaseInfo.typeInfos(for: type)
                 if let structInfo = typeInfos.first(where: { $0.declarationType == .structDeclaration }) {
@@ -201,7 +232,11 @@ public class KotlinCodebaseInfo {
         /// Whether the given type conforms to `Error` through its protocols, **not** through inheritance.
         func conformsToError(type: TypeSignature) -> Bool {
             if let symbols {
+                #if canImport(SymbolKit)
                 return symbols.conformsToError(type: type) == true
+                #else
+                return false
+                #endif
             } else {
                 return codebaseInfo.protocolSignatures(for: type).contains(.named("Error", []))
             }
@@ -210,6 +245,7 @@ public class KotlinCodebaseInfo {
         /// Whether the given enum type has cases with associated values.
         func isSealedClassesEnum(type: TypeSignature) -> Bool {
             if let symbols {
+                #if canImport(SymbolKit)
                 switch symbols.enumHasAssociatedValues(type: type) {
                 case nil:
                     return false
@@ -218,6 +254,9 @@ public class KotlinCodebaseInfo {
                 case false?:
                     return symbols.conformsToError(type: type) == true
                 }
+                #else
+                return false
+                #endif
             } else {
                 guard let enumInfo = codebaseInfo.typeInfos(for: type).first(where: { $0.declarationType == .enumDeclaration }) else {
                     return false
@@ -238,7 +277,11 @@ public class KotlinCodebaseInfo {
                 owningType = baseType
             }
             if let symbols {
+                #if canImport(SymbolKit)
                 return symbols.isFunction(name: name, in: owningType, isStatic: isStatic) == true
+                #else
+                return false
+                #endif
             } else {
                 if owningType != nil && name == "init" {
                     return true
@@ -258,6 +301,8 @@ public class KotlinCodebaseInfo {
         }
     }
 }
+
+#if canImport(SymbolKit)
 
 // Internal for testing
 
@@ -544,6 +589,7 @@ extension Symbols.Context {
         return false
     }
 }
+#endif
 
 extension KotlinCodebaseInfo: CodebaseInfoGatherDelegate {
     func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather typeInfo: CodebaseInfo.TypeInfo, from statement: ExtensionDeclaration) {

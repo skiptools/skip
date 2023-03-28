@@ -1,6 +1,8 @@
 import Foundation
 import SkipSyntax
+#if canImport(SymbolKit)
 import SymbolKit
+#endif
 import TSCBasic
 #if canImport(Cocoa)
 import class Cocoa.NSWorkspace
@@ -87,6 +89,7 @@ public struct SkipSystem {
         return try decoder.decode(PackageSwift.self, from: Data(json.utf8))
     }
 
+    #if canImport(SymbolKit)
     /// Extracts the symbols for all the named modules
     public static func extractSymbolGraph(moduleFolder moduleBuildFolder: URL? = nil, moduleNames: [String], from moduleURL: URL) async throws -> (unifiedGraphs: [String: UnifiedSymbolGraph], graphSources: [String: [GraphCollector.GraphKind]]) {
         // gather the symbols for all the targets
@@ -169,6 +172,7 @@ public struct SkipSystem {
 
         return modulePaths
     }
+    #endif
 
     @discardableResult static func xcrun(permitFailure: Bool = false, _ args: String?...) async throws -> String {
 #if os(macOS)

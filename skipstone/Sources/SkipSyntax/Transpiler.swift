@@ -7,12 +7,12 @@ public struct Transpiler {
     private let packageName: String?
     private let sourceFiles: [Source.FilePath]
     private let codebaseInfo: CodebaseInfo
-    private let symbols: Symbols?
+    private let symbols: SymbolsType?
     public var preprocessorSymbols: Set<String>
     public var plugins: [KotlinPlugin]
 
     /// Supply files to transpile.
-    public init(packageName: String? = nil, sourceFiles: [Source.FilePath], codebaseInfo: CodebaseInfo, symbols: Symbols? = nil, preprocessorSymbols: Set<String> = [], plugins: [KotlinPlugin] = []) {
+    public init(packageName: String? = nil, sourceFiles: [Source.FilePath], codebaseInfo: CodebaseInfo, symbols: SymbolsType? = nil, preprocessorSymbols: Set<String> = [], plugins: [KotlinPlugin] = []) {
         self.packageName = packageName
         self.sourceFiles = sourceFiles
         self.codebaseInfo = codebaseInfo

@@ -1,5 +1,6 @@
 import Foundation
 import SkipSyntax
+#if canImport(SymbolKit)
 import SymbolKit
 
 fileprivate let logger = Logger(subsystem: "skip", category: "symbols")
@@ -46,3 +47,5 @@ struct SwiftTarget: Codable {
 
     let target: Target
 }
+#endif
+

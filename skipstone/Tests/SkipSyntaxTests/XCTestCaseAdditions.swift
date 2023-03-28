@@ -1,6 +1,8 @@
 import SkipBuild
 @testable import SkipSyntax
+#if canImport(SymbolKit)
 import SymbolKit
+#endif
 import XCTest
 
 extension XCTestCase {
@@ -8,8 +10,9 @@ extension XCTestCase {
     static let shouldUseLocalSymbols: Bool = true
 
     // TODO: Remove symbols and load dependent modules for codebaseInfo
-    var symbols: Symbols {
+    var symbols: SymbolsType {
         get async throws {
+            #if canImport(SymbolKit)
             #if os(Linux)
             // FIXME: symbol generation not currently working on linux, so those tests will be disabled
             throw XCTSkip("symbols not available on Linux")
@@ -55,13 +58,16 @@ extension XCTestCase {
             let symbols = Symbols(moduleName: "SkipSyntaxTests", graphs: unifiedGraphs)
             Self.symbols = symbols
             return symbols
+            #else
+            fatalError("symbols unavailable")
+            #endif
         }
     }
 
-    private static var symbols: Symbols?
+    private static var symbols: SymbolsType?
 
     /// Checks that the given Swift compiles to the specified Kotlin.
-    public func check(expectFailure: Bool = false, symbols: Symbols? = nil, supportingSwift: String? = nil, swift: String, kotlin: String? = nil, file: StaticString = #file, line: UInt = #line) async throws {
+    public func check(expectFailure: Bool = false, symbols: SymbolsType? = nil, supportingSwift: String? = nil, swift: String, kotlin: String? = nil, file: StaticString = #file, line: UInt = #line) async throws {
         guard let kotlin else {
             return
         }
@@ -97,7 +103,7 @@ extension XCTestCase {
     }
 
     /// Checks that the given Swift generates a message when transpiled.
-    public func checkProducesMessage(symbols: Symbols? = nil, swift: String, file: StaticString = #file, line: UInt = #line) async throws {
+    public func checkProducesMessage(symbols: SymbolsType? = nil, swift: String, file: StaticString = #file, line: UInt = #line) async throws {
         let srcFile = try tmpFile(named: "Source.swift", contents: swift)
         let codebaseInfo = CodebaseInfo()
         let tp = Transpiler(sourceFiles: [Source.FilePath(path: srcFile.path)], codebaseInfo: codebaseInfo, symbols: symbols)
