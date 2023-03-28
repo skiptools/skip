@@ -92,13 +92,19 @@ public struct GradleDriver {
     }
 
     /// Executes `gradle` with the current default arguments and the additional args and returns an async stream of the lines from the combined standard err and standard out.
-    public func execGradle(in workingDirectory: URL, args: [String], env: [String: String] = ProcessInfo.processInfo.environment, onExit: @escaping (ProcessResult) throws -> ()) async throws -> Process.AsyncLineOutput {
+    public func execGradle(in workingDirectory: URL, args: [String], env: [String: String] = [:], onExit: @escaping (ProcessResult) throws -> ()) async throws -> Process.AsyncLineOutput {
         // the resulting command will be something like:
         // java -Xmx64m -Xms64m -Dorg.gradle.appname=gradle -classpath /opt/homebrew/Cellar/gradle/8.0.2/libexec/lib/gradle-launcher-8.0.2.jar org.gradle.launcher.GradleMain info
         #if DEBUG
-        print("execGradle:", (gradleArgs + args).joined(separator: " "))
+        print("execGradle:", (gradleArgs + args).joined(separator: " "), "env:", env)
         #endif
-        return Process.streamLines(command: gradleArgs + args, environment: env, workingDirectory: workingDirectory, onExit: onExit)
+
+        // transfer process environment along with the additional environment
+        var penv = ProcessInfo.processInfo.environment
+        for (key, value) in env {
+            penv[key] = value
+        }
+        return Process.streamLines(command: gradleArgs + args, environment: penv, workingDirectory: workingDirectory, onExit: onExit)
     }
 
     /// Invokes the tests for the given gradle project.
@@ -113,10 +119,12 @@ public struct GradleDriver {
     ///   - testResultPath: the relative path for the test output XML files
     ///   - exitHandler: the exit handler, which may want to permit a process failure in order to have time to parse the tests
     /// - Returns: an array of parsed test suites containing information about the test run
-    public func runTests(check: Bool = false, info infoFlag: Bool = false, plain plainFlag: Bool = true, noDaemon noDaemonFlag: Bool = true, failFast failFastFlag: Bool = false, continue continueFlag: Bool = true, offline offlineFlag: Bool = false, rerunTasks rerunTasksFlag: Bool = true, in workingDirectory: URL, module: String, testResultPath: String = "build/test-results", exitHandler: @escaping (ProcessResult) throws -> ()) async throws -> (output: Process.AsyncLineOutput, result: () throws -> [TestSuite]) {
+    public func runTests(in workingDirectory: URL, module: String, check: Bool = false, info infoFlag: Bool = false, plain plainFlag: Bool = true, maxTestMemory: UInt64? = nil, failFast failFastFlag: Bool = false, continue continueFlag: Bool = true, offline offlineFlag: Bool = false, rerunTasks rerunTasksFlag: Bool = true,  testResultPath: String = "build/test-results", exitHandler: @escaping (ProcessResult) throws -> ()) async throws -> (output: Process.AsyncLineOutput, result: () throws -> [TestSuite]) {
         var args = [
             check ? "check" : "test" // check will run the @Test funcs regardless of @Ignore, as well as other checks
         ]
+
+        var env: [String: String] = [:]
 
         // add in the project dir for explicitness (even though it is assumed from the current working directory as well)
         args += ["--project-dir", workingDirectory.path]
@@ -149,8 +157,40 @@ public struct GradleDriver {
             args += ["--console=plain"]
         }
 
-        if noDaemonFlag {
+        if let maxTestMemory = maxTestMemory {
+            // attempt to run in the same process without forking the daemon
             args += ["--no-daemon"]
+
+            // also need to add in JVM flags, lest we be countermanded with: “To honour the JVM settings for this build a single-use Daemon process will be forked. See https://docs.gradle.org/8.0.2/userguide/gradle_daemon.html#sec:disabling_the_daemon.”
+            // these seem to be quite specific to the gradle version being used, so disabling the daemon in future gradle versions might require tweaking these args (which can be seen by enabling the info flag):
+
+            // Checking if the launcher JVM can be re-used for build. To be re-used, the launcher JVM needs to match the parameters required for the build process: -Xms256m -Xmx512m -Dfile.encoding=UTF-8 -Duser.country=US -Duser.language=en -Duser.variant
+
+            var jvmargs: [String] = []
+
+            jvmargs += ["-Dfile.encoding=UTF-8"]
+            jvmargs += ["-Xms256m"]
+
+            // make a nice memory string if we are dividible by kb/mb/gb
+            let memstr: String
+            let kb = Double(maxTestMemory) / 1024
+            let mb = kb / 1024
+            let gb = mb / 1024
+            if round(gb) == gb {
+                memstr = "\(Int64(gb))g"
+            } else if round(mb) == mb {
+                memstr = "\(Int64(mb))m"
+            } else if round(kb) == kb {
+                memstr = "\(Int64(kb))k"
+            } else {
+                memstr = maxTestMemory.description // raw bytes description
+            }
+
+            jvmargs += ["-Xmx\(memstr)"]
+
+            env["GRADLE_OPTS"] = jvmargs.joined(separator: " ")
+            //args += ["-Dorg.gradle.jvmargs=" + jvmargs.joined(separator: " ")]
+
         }
 
         let moduleURL = URL(fileURLWithPath: module, isDirectory: true, relativeTo: workingDirectory)
@@ -161,7 +201,7 @@ public struct GradleDriver {
         let testResultFolder = URL(fileURLWithPath: testResultPath, isDirectory: true, relativeTo: moduleURL)
         try? FileManager.default.trashItem(at: testResultFolder, resultingItemURL: nil) // remove the test folder, since a build failure won't clear it and it will appear as if the tests ran successfully
 
-        let output = try await execGradle(in: workingDirectory, args: args, onExit: exitHandler)
+        let output = try await execGradle(in: workingDirectory, args: args, env: env, onExit: exitHandler)
         return (output, { try Self.parseTestResults(in: testResultFolder) })
     }
 
