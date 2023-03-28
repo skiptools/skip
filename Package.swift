@@ -12,7 +12,6 @@ let package = Package(
         .library(name: "SkipDriver", targets: ["SkipDriver"])
     ],
     dependencies: [
-        .package(url: "https://github.com/skiptools/skip-template.git", branch: "main"),
     ],
     targets: [
         .target(name: "SkipDriver", dependencies: ["skiptool"]),
@@ -38,5 +37,5 @@ if let localPath = ProcessInfo.processInfo.environment["SKIPLOCAL"] {
     package.targets += [.executableTarget(name: "skiptool", dependencies: [.product(name: "SkipBuild", package: "SkipSource")], path: "Sources/SkipTool", sources: ["skiptool.swift"])]
 } else {
     // default to using the latest binary skiptool release
-    package.targets += [.binaryTarget(name: "skiptool", url: "https://github.com/skiptools/skip/releases/download/0.2.1/skiptool.artifactbundle.zip", checksum: "856abdb8cd918617e8cec76479f23896978a7e5703e34cd1d2a06bde096caa6f")]
+    package.targets += [.binaryTarget(name: "skiptool", url: "https://github.com/skiptools/skip/releases/download/0.2.2/skiptool.artifactbundle.zip", checksum: "ebf673baca6eece4b336b0b875949a1d1198d3a6a864c31ecdd4480a8de91804")]
 }
