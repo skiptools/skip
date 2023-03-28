@@ -768,7 +768,14 @@ class FunctionDeclaration: Statement {
     }
 
     override func resolveAttributes() {
-        returnType = returnType.qualified(in: self)
+        if type == .initDeclaration, let owningTypeDeclaration {
+            returnType = owningTypeDeclaration.signature
+            if isOptionalInit {
+                returnType = .optional(returnType)
+            }
+        } else {
+            returnType = returnType.qualified(in: self)
+        }
         parameters = parameters.map { $0.qualifiedType(in: self) }
         // Functions in protocols or extensions inherit the visibility of the protocol or extension
         if modifiers.visibility == .default {

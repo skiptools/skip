@@ -1007,7 +1007,7 @@ class KotlinMemberAccess: KotlinExpression {
     var member: String
     var generics: [TypeSignature] = []
     var useMultlineFormatting = false
-    var inferredType: TypeSignature = .none
+    var baseType: TypeSignature = .none
     var mayBeSharedMutableStruct = false
     var isFunctionReference = false
 
@@ -1020,13 +1020,17 @@ class KotlinMemberAccess: KotlinExpression {
                 kexpression.isFunctionReference = !expression.isCalledAsFunction && translator.codebaseInfo?.isFunctionName(expression.member, in: base.inferredType) == true
             }
             kexpression.baseKClass = kclass(for: base, accessingMember: expression.member, codebaseInfo: translator.codebaseInfo)
-        } else if expression.inferredType == .none && translator.codebaseInfo != nil {
+        } else if expression.baseType == .none && translator.codebaseInfo != nil {
             kexpression.messages.append(.kotlinMemberAccessUnknownBaseType(expression, member: expression.member))
         } else if case .optional = expression.inferredType, expression.member == "none" || expression.member == "some" {
             kexpression.messages.append(.kotlinOptionalNoneSome(expression))
         }
         kexpression.generics = expression.generics
-        kexpression.inferredType = expression.inferredType
+        if case .metaType(let type) = expression.baseType {
+            kexpression.baseType = type
+        } else {
+            kexpression.baseType = expression.baseType
+        }
         kexpression.mayBeSharedMutableStruct = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
         return kexpression
     }
@@ -1076,7 +1080,7 @@ class KotlinMemberAccess: KotlinExpression {
 
     var baseKind: BaseKind {
         if base == nil {
-            return inferredType == .none ? .unknown : .type(inferredType)
+            return baseType == .none ? .unknown : .type(baseType)
         } else if let identifier = base as? KotlinIdentifier {
             if identifier.name == "self" {
                 return .this
@@ -1132,8 +1136,8 @@ class KotlinMemberAccess: KotlinExpression {
                     output.append(member)
                 }
             }
-        } else if inferredType != .none {
-            output.append(inferredType.kotlin)
+        } else if baseType != .none {
+            output.append(baseType.kotlin)
             if member != "init" {
                 if useMultlineFormatting {
                     output.append("\n").append(indentation.inc())

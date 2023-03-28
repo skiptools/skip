@@ -100,8 +100,11 @@ final class TypeDeclarationTests: XCTestCase {
     }
 
     func testExtension() async throws {
-        // Note that this is mirrored by compiled Swift code below so that the symbols match
-        try await check(symbols: symbols, swift: """
+        try await check(supportingSwift: """
+        protocol TypeDeclarationTestsProtocol {
+            func f()
+        }
+        """, swift: """
         class TypeDeclarationTestsClass {
             var i = 0
         }
@@ -386,18 +389,5 @@ final class TypeDeclarationTests: XCTestCase {
 
     func testTypeDeclaredWithinFunction() throws {
         throw XCTSkip("TODO: Test declaring a type within a function. This includes making sure our plugins process in-function types correctly")
-    }
-}
-
-protocol TypeDeclarationTestsProtocol {
-    func f()
-}
-class TypeDeclarationTestsClass {
-    var i = 0
-}
-extension TypeDeclarationTestsClass: TypeDeclarationTestsProtocol {
-    func f() {
-    }
-    func g() {
     }
 }

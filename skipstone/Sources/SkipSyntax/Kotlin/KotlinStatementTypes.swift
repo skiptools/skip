@@ -1063,7 +1063,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         }
         if let body = statement.body {
             kstatement.body = KotlinCodeBlock.translate(statement: body, translator: translator)
-            kstatement.body?.updateWithExpectedReturn(statement.returnType == .void ? .no : .sref(nil))
+            kstatement.body?.updateWithExpectedReturn(statement.returnType == .void || statement.type == .initDeclaration ? .no : .sref(nil))
             for parameter in kstatement.parameters where parameter.isInOut {
                 kstatement.body?.updateWithInOutParameter(name: parameter.internalLabel)
             }
@@ -1164,7 +1164,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             }
             output.append(")")
             if type != .constructorDeclaration {
-                if returnType != .void {
+                if returnType != .void && type != .constructorDeclaration {
                     output.append(": ").append(returnType.kotlin)
                 }
             } else if let delegatingConstructorCall {

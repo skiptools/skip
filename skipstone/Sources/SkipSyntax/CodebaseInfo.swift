@@ -300,7 +300,8 @@ public class CodebaseInfo: Codable {
         }
         
         private func identifierSignature(of member: String, in candidate: TypeInfo, isStatic: Bool) -> TypeSignature {
-            if let memberInfo = candidate.visibleMembers(context: self).first(where: { $0.name == member && $0.isStatic == isStatic }) {
+            // We allow .init to be used both as a static or instance member
+            if let memberInfo = candidate.visibleMembers(context: self).first(where: { $0.name == member && ($0.declarationType == .initDeclaration || $0.isStatic == isStatic) }) {
                 // Enum cases with associated values are modeled as functions, but can also be used as identifiers
                 if memberInfo.declarationType == .enumCaseDeclaration {
                     return memberInfo.declaringType ?? .none
@@ -323,7 +324,8 @@ public class CodebaseInfo: Codable {
         
         private func functionSignature(of name: String, in candidate: TypeInfo, arguments: [LabeledValue<TypeSignature>], isStatic: Bool) -> [TypeSignature] {
             let functions = candidate.visibleMembers(context: self).flatMap { (member) -> [TypeSignature] in
-                guard member.name == name && member.isStatic == isStatic else {
+                // We allow .init to be used both as a static or instance member
+                guard member.name == name && (member.declarationType == .initDeclaration || member.isStatic == isStatic) else {
                     return []
                 }
                 if let memberTypeInfo = member as? TypeInfo {
@@ -354,11 +356,7 @@ public class CodebaseInfo: Codable {
             var initSignatures = typeInfos.flatMap { typeInfo in
                 let initInfos = typeInfo.visibleMembers(context: self).filter { $0.declarationType == .initDeclaration }
                 return initInfos.compactMap { (initInfo: CodebaseInfoItem) -> TypeSignature? in
-                    guard let signature = matchFunction(initInfo, arguments: arguments), case .function(let argumentTypes, _) = signature else {
-                        return nil
-                    }
-                    // Remap return type of .init from .void to owning type
-                    return .function(argumentTypes, typeInfo.signature)
+                    return matchFunction(initInfo, arguments: arguments)
                 }
             }
             
@@ -615,7 +613,7 @@ public class CodebaseInfo: Codable {
             }
             return TypeSignature.Parameter(label: variable.name, type: variable.signature, isVariadic: false, hasDefaultValue: variable.hasValue)
         }
-        let initSignature: TypeSignature = .function(parameters, .void)
+        let initSignature: TypeSignature = .function(parameters, typeInfo.signature)
         var initInfo = FunctionInfo(name: "init", declarationType: .initDeclaration, signature: initSignature, moduleName: typeInfo.moduleName, sourceFile: typeInfo.sourceFile, declaringType: typeInfo.signature, visibility: typeInfo.visibility)
         initInfo.isGenerated = true
         typeInfo.functions.append(initInfo)

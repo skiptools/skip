@@ -240,7 +240,7 @@ public class KotlinCodebaseInfo {
             if let symbols {
                 return symbols.isFunction(name: name, in: owningType, isStatic: isStatic) == true
             } else {
-                if owningType != nil && !isStatic && name == "init" {
+                if owningType != nil && name == "init" {
                     return true
                 }
                 let items = codebaseInfo.ranked(codebaseInfo.lookup(name: name))
@@ -553,7 +553,7 @@ extension KotlinCodebaseInfo: CodebaseInfoGatherDelegate {
 
     func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather functionInfo: inout CodebaseInfo.FunctionInfo, from statement: FunctionDeclaration) {
         // Track init parameter default values so that we can transfer them to subclass constructors we generate
-        if functionInfo.name == "init" {
+        if functionInfo.declarationType == .initDeclaration {
             functionInfo.languageAdditions = statement.parameters.map(\.defaultValue)
         }
     }

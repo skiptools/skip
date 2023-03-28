@@ -47,6 +47,7 @@ class KotlinConstructorPlugin: KotlinPlugin {
         let constructor = KotlinFunctionDeclaration(name: "constructor")
         constructor.modifiers = classDeclaration.modifiers
         constructor.extras = .singleNewline
+        constructor.returnType = classDeclaration.signature
 
         var superCall = "super("
         constructor.parameters = parameters.enumerated().map { (index, parameter) in
