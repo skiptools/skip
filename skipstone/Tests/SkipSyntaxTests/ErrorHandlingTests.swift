@@ -36,11 +36,15 @@ final class ErrorHandlingTests: XCTestCase {
     }
 
     func testCatchAll() async throws {
-        try await check(symbols: symbols, swift: """
+        try await check(supportingSwift: """
+        struct S: Error {
+            var message = ""
+        }
+        """, swift: """
         do {
             action1()
             action2()
-            throw DoCatchTestsErrorStruct()
+            throw S()
         } catch {
             print("Caught error: \\(error)")
         }
@@ -48,7 +52,7 @@ final class ErrorHandlingTests: XCTestCase {
         try {
             action1()
             action2()
-            throw DoCatchTestsErrorStruct()
+            throw S()
         } catch (error: Throwable) {
             print("Caught error: ${error}")
         }
@@ -56,11 +60,15 @@ final class ErrorHandlingTests: XCTestCase {
     }
 
     func testCatchIs() async throws {
-        try await check(symbols: symbols, swift: """
+        try await check(supportingSwift: """
+        struct S: Error {
+            var message = ""
+        }
+        """, swift: """
         do {
             action1()
             action2()
-        } catch is DoCatchTestsErrorStruct {
+        } catch is S {
             print("Caught error: \\(error)")
         } catch {
         }
@@ -68,7 +76,7 @@ final class ErrorHandlingTests: XCTestCase {
         try {
             action1()
             action2()
-        } catch (error: DoCatchTestsErrorStruct) {
+        } catch (error: S) {
             print("Caught error: ${error}")
         } catch (error: Throwable) {
         }
@@ -76,11 +84,15 @@ final class ErrorHandlingTests: XCTestCase {
     }
 
     func testCatchLetAs() async throws {
-        try await check(symbols: symbols, swift: """
+        try await check(supportingSwift: """
+        struct S: Error {
+            var message = ""
+        }
+        """, swift: """
         do {
             action1()
             action2()
-        } catch let e as DoCatchTestsErrorStruct {
+        } catch let e as S {
             print("Caught error: \\(e)")
         } catch {
         }
@@ -88,40 +100,48 @@ final class ErrorHandlingTests: XCTestCase {
         try {
             action1()
             action2()
-        } catch (e: DoCatchTestsErrorStruct) {
+        } catch (e: S) {
             print("Caught error: ${e}")
         } catch (error: Throwable) {
         }
         """)
 
-        try await check(symbols: symbols, swift: """
+        try await check(supportingSwift: """
+        struct S: Error {
+            var message = ""
+        }
+        """, swift: """
         do {
             action1()
             action2()
-        } catch let error as DoCatchTestsErrorStruct {
+        } catch let error as S {
             print("Caught error: \\(error)")
         }
         """, kotlin: """
         try {
             action1()
             action2()
-        } catch (error: DoCatchTestsErrorStruct) {
+        } catch (error: S) {
             print("Caught error: ${error}")
         }
         """)
 
-        try await check(symbols: symbols, swift: """
+        try await check(supportingSwift: """
+        struct S: Error {
+            var message = ""
+        }
+        """, swift: """
         do {
             action1()
             action2()
-        } catch var error as DoCatchTestsErrorStruct {
+        } catch var error as S {
             print("Caught error: \\(error)")
         }
         """, kotlin: """
         try {
             action1()
             action2()
-        } catch (error: DoCatchTestsErrorStruct) {
+        } catch (error: S) {
             var error = error
             print("Caught error: ${error}")
         }
@@ -129,45 +149,55 @@ final class ErrorHandlingTests: XCTestCase {
     }
 
     func testEnum() async throws {
-        try await check(symbols: symbols, swift: """
+        try await check(supportingSwift: """
+        enum E: Error {
+            case case1
+            case case2
+        }
+        """, swift: """
         do {
             action1()
             action2()
-        } catch DoCatchTestsErrorEnum.case1 {
+        } catch E.case1 {
             print("case1")
-        } catch DoCatchTestsErrorEnum.case2 {
+        } catch E.case2 {
             print("case2")
         }
         """, kotlin: """
         try {
             action1()
             action2()
-        } catch (error: DoCatchTestsErrorEnum.case1case) {
+        } catch (error: E.case1case) {
             print("case1")
-        } catch (error: DoCatchTestsErrorEnum.case2case) {
+        } catch (error: E.case2case) {
             print("case2")
         }
         """)
     }
 
     func testAssociatedValueEnum() async throws {
-        try await check(symbols: symbols, swift: """
+        try await check(supportingSwift: """
+        enum E: Error {
+            case case1(Int)
+            case case2(Int, String)
+        }
+        """, swift: """
         do {
             action1()
             action2()
-        } catch DoCatchTestsErrorAssociatedValueEnum.case1(let code) {
+        } catch E.case1(let code) {
             print("Caught error: \\(code)")
-        } catch DoCatchTestsErrorAssociatedValueEnum.case2(_, var message) {
+        } catch E.case2(_, var message) {
             print("Caught error: \\(message)")
         }
         """, kotlin: """
         try {
             action1()
             action2()
-        } catch (error: DoCatchTestsErrorAssociatedValueEnum.case1case) {
+        } catch (error: E.case1case) {
             val code = error.associated0
             print("Caught error: ${code}")
-        } catch (error: DoCatchTestsErrorAssociatedValueEnum.case2case) {
+        } catch (error: E.case2case) {
             var message = error.associated1
             print("Caught error: ${message}")
         }
@@ -175,24 +205,31 @@ final class ErrorHandlingTests: XCTestCase {
     }
 
     func testMultipleMatches() async throws {
-        try await check(symbols: symbols, swift: """
+        try await check(supportingSwift: """
+        struct S: Error {
+        }
+        enum E: Error {
+            case case1(Int)
+            case case2(Int, String)
+        }
+        """, swift: """
         do {
             action1()
             action2()
-        } catch is DoCatchTestsErrorStruct, DoCatchTestsErrorAssociatedValueEnum.case1 {
+        } catch is S, E.case1 {
             print("Caught error")
-        } catch let DoCatchTestsErrorAssociatedValueEnum.case2(code, message) {
+        } catch let E.case2(code, message) {
             print("Caught error: \\(code): \\(message)")
         }
         """, kotlin: """
         try {
             action1()
             action2()
-        } catch (error: DoCatchTestsErrorStruct) {
+        } catch (error: S) {
             print("Caught error")
-        } catch (error: DoCatchTestsErrorAssociatedValueEnum.case1case) {
+        } catch (error: E.case1case) {
             print("Caught error")
-        } catch (error: DoCatchTestsErrorAssociatedValueEnum.case2case) {
+        } catch (error: E.case2case) {
             val code = error.associated0
             val message = error.associated1
             print("Caught error: ${code}: ${message}")
@@ -201,7 +238,7 @@ final class ErrorHandlingTests: XCTestCase {
     }
 
     func testCatchWithDefer() async throws {
-        try await check(symbols: symbols, swift: """
+        try await check(swift: """
         do {
             action1()
             defer { finalAction() }
@@ -226,7 +263,7 @@ final class ErrorHandlingTests: XCTestCase {
     }
 
     func testMutatingFunctionCombinesTryCatch() async throws {
-        try await check(symbols: symbols, swift: """
+        try await check(swift: """
         struct S {
             var i = 0
             mutating func inc() {
@@ -357,23 +394,4 @@ final class ErrorHandlingTests: XCTestCase {
         }
         """)
     }
-
-    private func action1() {
-    }
-    private func action2() {
-    }
-    private func finalAction() {
-    }
-}
-
-private struct DoCatchTestsErrorStruct: Error {
-    var message = ""
-}
-private enum DoCatchTestsErrorEnum: Error {
-    case case1
-    case case2
-}
-private enum DoCatchTestsErrorAssociatedValueEnum: Error {
-    case case1(Int)
-    case case2(Int, String)
 }

@@ -875,11 +875,14 @@ class MemberAccess: Expression {
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        // When the base type is missing we assume it's the class of the expected result type
         if let base {
             base.inferTypes(context: context, expecting: .none)
             baseType = baseType.or(base.inferredType)
-        } else {
+        } else if case .metaType = expecting {
             baseType = baseType.or(expecting)
+        } else {
+            baseType = baseType.or(.metaType(expecting))
         }
         memberType = context.member(member, in: baseType).withGenerics(generics).or(expecting)
         return context

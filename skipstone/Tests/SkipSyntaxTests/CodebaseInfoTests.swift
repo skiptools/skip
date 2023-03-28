@@ -2,8 +2,6 @@
 import XCTest
 
 final class CodebaseInfoTests: XCTestCase {
-    var context: CodebaseInfo.Context!
-
     private func setUpContext(swift: String) async throws -> CodebaseInfo.Context {
         let srcFile = try tmpFile(named: "Source.swift", contents: swift)
         let source = Source(file: Source.FilePath(path: srcFile.path), content: swift)

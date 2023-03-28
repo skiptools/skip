@@ -165,6 +165,12 @@ public class KotlinCodebaseInfo {
             }
         }
 
+        /// Whether the given member is declared by a protocol of the given type.
+        func isProtocolMember(name: String, type: TypeSignature?, isStatic: Bool, in owningType: TypeSignature) -> Bool {
+            let protocolSignatures = codebaseInfo.protocolSignatures(for: owningType)
+            return protocolSignatures.contains { hasMember($0, name: name, type: type, isStatic: isStatic) }
+        }
+
         /// Whether the given type may be a mutable struct.
         func mayBeMutableStruct(type: TypeSignature) -> Bool {
             if let symbols {

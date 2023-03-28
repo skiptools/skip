@@ -305,15 +305,19 @@ final class MemberDeclarationTests: XCTestCase {
     }
 
     func testOverrideProtocolMember() async throws {
-        // Note that this is mirrored by compiled Swift code below so that the symbols match
-        try await check(symbols: symbols, swift: """
-        class MemberDeclarationTestsProtocolImpl: MemberDeclarationTestsProtocol {
+        try await check(supportingSwift: """
+        protocol P {
+            var i: Int { get }
+            func f()
+        }
+        """, swift: """
+        class PImpl: P {
             var i = 0
             func f() {
             }
         }
         """, kotlin: """
-        internal open class MemberDeclarationTestsProtocolImpl: MemberDeclarationTestsProtocol {
+        internal open class PImpl: P {
             override var i = 0
             override fun f() {
             }
@@ -354,15 +358,5 @@ private class MemberDeclarationTestsSideEffectsClass {
         didSet {
             sideEffectOrdering.append("didSetOwner")
         }
-    }
-}
-
-protocol MemberDeclarationTestsProtocol {
-    var i: Int { get }
-    func f()
-}
-class MemberDeclarationTestsProtocolImpl: MemberDeclarationTestsProtocol {
-    var i = 0
-    func f() {
     }
 }

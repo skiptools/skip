@@ -3,7 +3,20 @@ import XCTest
 
 final class OperatorTests: XCTestCase {
     func testMath() async throws {
-        try await check(symbols: symbols, swift: """
+        let supportingSwift = """
+        extension Int {
+            static var myZero: Int {
+                return 0
+            }
+        }
+        extension Double {
+            static var myZero: Double {
+                return 0.0
+            }
+        }
+        """
+
+        try await check(supportingSwift: supportingSwift, swift: """
         func op(a: Int, b: Int) -> Bool {
             return a + b * 2 == .myZero
         }
@@ -13,7 +26,7 @@ final class OperatorTests: XCTestCase {
         }
         """)
 
-        try await check(symbols: symbols, swift: """
+        try await check(supportingSwift: supportingSwift, swift: """
         func op(a: Double, b: Double) -> Bool {
             return a * b + 2 == .myZero
         }
@@ -25,7 +38,15 @@ final class OperatorTests: XCTestCase {
     }
 
     func testRange() async throws {
-        try await check(symbols: symbols, swift: """
+        let supportingSwift = """
+        extension Int {
+            static var myZero: Int {
+                return 0
+            }
+        }
+        """
+
+        try await check(supportingSwift: supportingSwift, swift: """
         for i in 0...10 {
             let b = i == .myZero
             print(b)
@@ -37,7 +58,7 @@ final class OperatorTests: XCTestCase {
         }
         """)
 
-        try await check(symbols: symbols, swift: """
+        try await check(supportingSwift: supportingSwift, swift: """
         for i in 0..<10 {
             let b = i == .myZero
             print(b)
@@ -49,7 +70,7 @@ final class OperatorTests: XCTestCase {
         }
         """)
 
-        try await check(symbols: symbols, swift: """
+        try await check(supportingSwift: supportingSwift, swift: """
         for i in ..<10 {
             let b = i == .myZero
             print(b)
@@ -61,7 +82,7 @@ final class OperatorTests: XCTestCase {
         }
         """)
 
-        try await check(symbols: symbols, swift: """
+        try await check(supportingSwift: supportingSwift, swift: """
         for i in 10... {
             let b = i == .myZero
             print(b)
@@ -75,7 +96,20 @@ final class OperatorTests: XCTestCase {
     }
 
     func testCast() async throws {
-        try await check(symbols: symbols, swift: """
+        let supportingSwift = """
+        extension Int {
+            static var myZero: Int {
+                return 0
+            }
+        }
+        extension Bool {
+            static var myTrue: Bool {
+                return true
+            }
+        }
+        """
+
+        try await check(supportingSwift: supportingSwift, swift: """
         let i = x as? Int
         let b = i == .myZero
         """, kotlin: """
@@ -83,7 +117,7 @@ final class OperatorTests: XCTestCase {
         internal val b = i == Int.myZero
         """)
 
-        try await check(symbols: symbols, swift: """
+        try await check(supportingSwift: supportingSwift, swift: """
         let i = x as! Int
         let b = i == .myZero
         """, kotlin: """
@@ -91,7 +125,7 @@ final class OperatorTests: XCTestCase {
         internal val b = i == Int.myZero
         """)
 
-        try await check(symbols: symbols, swift: """
+        try await check(supportingSwift: supportingSwift, swift: """
         let b = x is Int
         print(b == .myTrue)
         """, kotlin: """
@@ -101,7 +135,13 @@ final class OperatorTests: XCTestCase {
     }
 
     func testNilCoalescing() async throws {
-        try await check(symbols: symbols, swift: """
+        try await check(supportingSwift: """
+        extension Int {
+            static var myZero: Int {
+                return 0
+            }
+        }
+        """, swift: """
         func f(i: Int?) -> Bool {
             let r = i ?? 0
             return r == .myZero
@@ -115,7 +155,18 @@ final class OperatorTests: XCTestCase {
     }
 
     func testForceUnwrap() async throws {
-        try await check(symbols: symbols, swift: """
+        let supportingSwift = """
+        extension Int {
+            static var myZero: Int {
+                return 0
+            }
+        }
+        class OperatorTestsOptionalHost {
+            var i = 0
+        }
+        """
+
+        try await check(supportingSwift: supportingSwift, swift: """
         {
             let host: OperatorTestsOptionalHost? = nil
             let i = host!.i + 1
@@ -129,7 +180,7 @@ final class OperatorTests: XCTestCase {
         }
         """)
 
-        try await check(symbols: symbols, swift: """
+        try await check(supportingSwift: supportingSwift, swift: """
         {
             let a: [Int]? = nil
             let b = a![0] == .myZero
@@ -141,7 +192,7 @@ final class OperatorTests: XCTestCase {
         }
         """)
 
-        try await check(symbols: symbols, swift: """
+        try await check(supportingSwift: supportingSwift, swift: """
         {
             let a: [OperatorTestsOptionalHost?] = []
             let b = a[0]!.i == .myZero
@@ -155,7 +206,18 @@ final class OperatorTests: XCTestCase {
     }
 
     func testForceOptionalChaining() async throws {
-        try await check(symbols: symbols, swift: """
+        let supportingSwift = """
+        extension Int {
+            static var myZero: Int {
+                return 0
+            }
+        }
+        class OperatorTestsOptionalHost {
+            var i = 0
+        }
+        """
+
+        try await check(supportingSwift: supportingSwift, swift: """
         {
             let host: OperatorTestsOptionalHost? = nil
             let b = host?.i == .myZero
@@ -167,7 +229,7 @@ final class OperatorTests: XCTestCase {
         }
         """)
 
-        try await check(symbols: symbols, swift: """
+        try await check(supportingSwift: supportingSwift, swift: """
         {
             let a: [Int]? = nil
             let b = a?[0] == .myZero
@@ -179,7 +241,7 @@ final class OperatorTests: XCTestCase {
         }
         """)
 
-        try await check(symbols: symbols, swift: """
+        try await check(supportingSwift: supportingSwift, swift: """
         {
             let a: [OperatorTestsOptionalHost?] = []
             let b = a[0]?.i == .myZero
@@ -193,7 +255,13 @@ final class OperatorTests: XCTestCase {
     }
 
     func testTernary() async throws {
-        try await check(symbols: symbols, swift: """
+        try await check(supportingSwift: """
+        extension Int {
+            static var myZero: Int {
+                return 0
+            }
+        }
+        """, swift: """
         func f(i: Int) -> Boolean {
             let even = i % 2 == 0 ? i : i + 1
             return even == .myZero
@@ -205,7 +273,7 @@ final class OperatorTests: XCTestCase {
         }
         """)
 
-        try await check(symbols: symbols, swift: """
+        try await check(swift: """
         func isEven(i: Int) -> Boolean {
             return i % 2 == 0 ? true : false
         }
@@ -215,26 +283,4 @@ final class OperatorTests: XCTestCase {
         }
         """)
     }
-}
-
-private extension Bool {
-    static var myTrue: Bool {
-        return true
-    }
-}
-
-private extension Int {
-    static var myZero: Int {
-        return 0
-    }
-}
-
-private extension Double {
-    static var myZero: Double {
-        return 0.0
-    }
-}
-
-private class OperatorTestsOptionalHost {
-    var i = 0
 }

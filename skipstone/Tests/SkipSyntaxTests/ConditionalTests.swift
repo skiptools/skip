@@ -329,13 +329,17 @@ final class ConditionalTests: XCTestCase {
     }
 
     func testOptionalBindingUsingPreviousOptionalBinding() async throws {
-        try await check(symbols: symbols, swift: """
-        var c: ConditionalTestsClass?
+        try await check(supportingSwift: """
+        class C {
+            var related: C?
+        }
+        """, swift: """
+        var c: C?
         if let x = c, let related = x.related, let doublerelated = related.related {
             print(doublerelated)
         }
         """, kotlin: """
-        internal var c: ConditionalTestsClass? = null
+        internal var c: C? = null
         c?.let { x ->
             x.related?.let { related ->
                 related.related?.let { doublerelated ->
@@ -470,58 +474,52 @@ final class ConditionalTests: XCTestCase {
     }
 
     func testIfCase() async throws {
-        try await check(symbols: symbols, swift: """
-        func f(e: ConditionalTestsEnum) {
+        try await check(supportingSwift: """
+        enum E {
+            case case1
+            case case2
+        }
+        """, swift: """
+        func f(e: E) {
             if case .case1 = e {
                 print("A")
             }
         }
         """, kotlin: """
-        internal fun f(e: ConditionalTestsEnum) {
-            if (e == ConditionalTestsEnum.case1) {
+        internal fun f(e: E) {
+            if (e == E.case1) {
                 print("A")
             }
         }
         """)
 
-        try await check(symbols: symbols, swift: """
-        func f(e: ConditionalTestsAssociatedValueEnum) {
+        try await check(supportingSwift: """
+        enum E {
+            case case1(d: Double)
+            case case2(Int, String)
+        }
+        """, swift: """
+        func f(e: E) {
             if case .case2 = e {
                 print("A")
             }
-        }
-        """, kotlin: """
-        internal fun f(e: ConditionalTestsAssociatedValueEnum) {
-            if (e is ConditionalTestsAssociatedValueEnum.case2case) {
-                print("A")
-            }
-        }
-        """)
-
-        try await check(symbols: symbols, swift: """
-        func f(e: ConditionalTestsAssociatedValueEnum) {
             if case .case2(_, let s) = e {
                 print(s)
             }
-        }
-        """, kotlin: """
-        internal fun f(e: ConditionalTestsAssociatedValueEnum) {
-            if (e is ConditionalTestsAssociatedValueEnum.case2case) {
-                val s = e.associated1
-                print(s)
-            }
-        }
-        """)
-
-        try await check(symbols: symbols, swift: """
-        func f(e: ConditionalTestsAssociatedValueEnum) {
             if case var .case1(d: num) = e {
                 print(num)
             }
         }
         """, kotlin: """
-        internal fun f(e: ConditionalTestsAssociatedValueEnum) {
-            if (e is ConditionalTestsAssociatedValueEnum.case1case) {
+        internal fun f(e: E) {
+            if (e is E.case2case) {
+                print("A")
+            }
+            if (e is E.case2case) {
+                val s = e.associated1
+                print(s)
+            }
+            if (e is E.case1case) {
                 var num = e.d
                 print(num)
             }
@@ -530,24 +528,31 @@ final class ConditionalTests: XCTestCase {
     }
 
     func testIfCaseTargetVariable() async throws {
+        try await check(supportingSwift: """
+        func enumFactory() -> E {
+            return .case1
+        }
+        enum E {
+            case case1
+            case case2(Int, String)
+        }
+        """, swift: """
         // No target variable needed if no bindings
-        try await check(symbols: symbols, swift: """
-        if case .case2 = conditionalTestsAssociatedValueEnumFactory() {
+        if case .case2 = enumFactory() {
             print("case2")
         }
-        """, kotlin: """
-        if (conditionalTestsAssociatedValueEnumFactory() is ConditionalTestsAssociatedValueEnum.case2case) {
-            print("case2")
-        }
-        """)
 
-        try await check(symbols: symbols, swift: """
-        if case .case2(let i, _) = conditionalTestsAssociatedValueEnumFactory() {
+        if case .case2(let i, _) = enumFactory() {
             print(i)
         }
         """, kotlin: """
-        val matchtarget_0 = conditionalTestsAssociatedValueEnumFactory()
-        if (matchtarget_0 is ConditionalTestsAssociatedValueEnum.case2case) {
+        // No target variable needed if no bindings
+        if (enumFactory() is E.case2case) {
+            print("case2")
+        }
+
+        val matchtarget_0 = enumFactory()
+        if (matchtarget_0 is E.case2case) {
             val i = matchtarget_0.associated0
             print(i)
         }
@@ -555,9 +560,14 @@ final class ConditionalTests: XCTestCase {
     }
 
     func testCompoundIfCaseConditions() async throws {
-        try await check(symbols: symbols, swift: """
+        try await check(supportingSwift: """
+        enum E {
+            case case1
+            case case2(Int, String)
+        }
+        """, swift: """
         var i: Int?
-        let e: ConditionalTestsAssociatedValueEnum
+        let e: E
         if let i {
             print(i)
         } else if case .case2(_, let s) = e {
@@ -567,10 +577,10 @@ final class ConditionalTests: XCTestCase {
         }
         """, kotlin: """
         internal var i: Int? = null
-        internal val e: ConditionalTestsAssociatedValueEnum
+        internal val e: E
         if (i != null) {
             print(i)
-        } else if (e is ConditionalTestsAssociatedValueEnum.case2case) {
+        } else if (e is E.case2case) {
             val s = e.associated1
             print(s)
         } else {
@@ -578,11 +588,19 @@ final class ConditionalTests: XCTestCase {
         }
         """)
 
-        try await check(symbols: symbols, swift: """
+        try await check(supportingSwift: """
+        func enumFactory() -> E {
+            return .case1
+        }
+        enum E {
+            case case1
+            case case2(Int, String)
+        }
+        """, swift: """
         var i: Int?
         if let i {
             print(i)
-        } else if case .case2(let i, let s) = conditionalTestsAssociatedValueEnumFactory(), i > 1 {
+        } else if case .case2(let i, let s) = enumFactory(), i > 1 {
             print(s)
         } else {
             print("else")
@@ -593,8 +611,8 @@ final class ConditionalTests: XCTestCase {
             print(i)
         } else {
             var letexec_0 = false
-            val matchtarget_0 = conditionalTestsAssociatedValueEnumFactory()
-            if (matchtarget_0 is ConditionalTestsAssociatedValueEnum.case2case) {
+            val matchtarget_0 = enumFactory()
+            if (matchtarget_0 is E.case2case) {
                 val i = matchtarget_0.associated0
                 val s = matchtarget_0.associated1
                 if (i > 1) {
@@ -608,9 +626,17 @@ final class ConditionalTests: XCTestCase {
         }
         """)
 
-        try await check(symbols: symbols, swift: """
+        try await check(supportingSwift: """
+        func enumFactory() -> E {
+            return .case1
+        }
+        enum E {
+            case case1
+            case case2(Int, String)
+        }
+        """, swift: """
         var i: Int?
-        if let x = i, case .case2(let i, _) = conditionalTestsAssociatedValueEnumFactory() {
+        if let x = i, case .case2(let i, _) = enumFactory() {
             print(x + i)
         } else {
             print("else")
@@ -619,8 +645,8 @@ final class ConditionalTests: XCTestCase {
         internal var i: Int? = null
         var letexec_0 = false
         i?.let { x ->
-            val matchtarget_0 = conditionalTestsAssociatedValueEnumFactory()
-            if (matchtarget_0 is ConditionalTestsAssociatedValueEnum.case2case) {
+            val matchtarget_0 = enumFactory()
+            if (matchtarget_0 is E.case2case) {
                 val i = matchtarget_0.associated0
                 letexec_0 = true
                 print(x + i)
@@ -781,15 +807,19 @@ final class ConditionalTests: XCTestCase {
     }
 
     func testGuardOptionalBindingUsingPreviousOptionalBinding() async throws {
-        try await check(symbols: symbols, swift: """
-        var c: ConditionalTestsClass?
+        try await check(supportingSwift: """
+        class C {
+            var related: C?
+        }
+        """, swift: """
+        var c: C?
         guard var c, c > 5, let related = c.related, let doublerelated = related.related else {
             doSomethingWith(c)
             return
         }
         print(doublerelated)
         """, kotlin: """
-        internal var c: ConditionalTestsClass? = null
+        internal var c: C? = null
         var c_0 = c
         if ((c_0 == null) || (c_0 <= 5)) {
             doSomethingWith(c)
@@ -840,16 +870,21 @@ final class ConditionalTests: XCTestCase {
     }
 
     func testGuardCase() async throws {
-        try await check(symbols: symbols, swift: """
-        let e: ConditionalTestsEnum
+        try await check(supportingSwift: """
+        enum E {
+            case case1
+            case case2
+        }
+        """, swift: """
+        let e: E
         guard case .case1 = e else {
             print("no")
             return
         }
         print(e)
         """, kotlin: """
-        internal val e: ConditionalTestsEnum
-        if (e != ConditionalTestsEnum.case1) {
+        internal val e: E
+        if (e != E.case1) {
             print("no")
             return
         }
@@ -858,15 +893,23 @@ final class ConditionalTests: XCTestCase {
     }
 
     func testGuardCaseTargetVariable() async throws {
-        try await check(symbols: symbols, swift: """
-        guard case var .case2(_, s) = conditionalTestsAssociatedValueEnumFactory() else {
+        try await check(supportingSwift: """
+        func enumFactory() -> E {
+            return .case1
+        }
+        enum E {
+            case case1
+            case case2(Int, String)
+        }
+        """, swift: """
+        guard case var .case2(_, s) = enumFactory() else {
             print("no")
             return
         }
         print(s)
         """, kotlin: """
-        val matchtarget_0 = conditionalTestsAssociatedValueEnumFactory()
-        if (matchtarget_0 !is ConditionalTestsAssociatedValueEnum.case2case) {
+        val matchtarget_0 = enumFactory()
+        if (matchtarget_0 !is E.case2case) {
             print("no")
             return
         }
@@ -876,15 +919,23 @@ final class ConditionalTests: XCTestCase {
     }
 
     func testGuardCaseMultipleConditions() async throws {
-        try await check(symbols: symbols, swift: """
-        guard case let .case2(i, s) = conditionalTestsAssociatedValueEnumFactory(), i > 10 else {
+        try await check(supportingSwift: """
+        func enumFactory() -> E {
+            return .case1
+        }
+        enum E {
+            case case1
+            case case2(Int, String)
+        }
+        """, swift: """
+        guard case let .case2(i, s) = enumFactory(), i > 10 else {
             print("no")
             return
         }
         print(s)
         """, kotlin: """
-        val matchtarget_0 = conditionalTestsAssociatedValueEnumFactory()
-        if (matchtarget_0 !is ConditionalTestsAssociatedValueEnum.case2case) {
+        val matchtarget_0 = enumFactory()
+        if (matchtarget_0 !is E.case2case) {
             print("no")
             return
         }
@@ -897,20 +948,4 @@ final class ConditionalTests: XCTestCase {
         print(s_0)
         """)
     }
-}
-
-private class ConditionalTestsClass {
-    var related: ConditionalTestsClass?
-}
-
-private enum ConditionalTestsEnum {
-    case case1
-    case case2
-}
-private enum ConditionalTestsAssociatedValueEnum {
-    case case1(d: Double)
-    case case2(Int, String)
-}
-private func conditionalTestsAssociatedValueEnumFactory() -> ConditionalTestsAssociatedValueEnum {
-    return .case1(d: 100.0)
 }

@@ -61,7 +61,7 @@ extension XCTestCase {
     private static var symbols: Symbols?
 
     /// Checks that the given Swift compiles to the specified Kotlin.
-    public func check(expectFailure: Bool = false, symbols: Symbols? = nil, swift: String, kotlin: String? = nil, file: StaticString = #file, line: UInt = #line) async throws {
+    public func check(expectFailure: Bool = false, symbols: Symbols? = nil, supportingSwift: String? = nil, swift: String, kotlin: String? = nil, file: StaticString = #file, line: UInt = #line) async throws {
         guard let kotlin else {
             return
         }
@@ -74,18 +74,25 @@ extension XCTestCase {
         #endif
 
         let srcFile = try tmpFile(named: "Source.swift", contents: swift)
+        var srcFiles = [Source.FilePath(path: srcFile.path)]
+        if let supportingSwift {
+            let supportingFile = try tmpFile(named: "Support.swift", contents: supportingSwift)
+            srcFiles.append(Source.FilePath(path: supportingFile.path))
+        }
         let codebaseInfo = CodebaseInfo()
-        let tp = Transpiler(sourceFiles: [Source.FilePath(path: srcFile.path)], codebaseInfo: codebaseInfo, symbols: symbols)
+        let tp = Transpiler(sourceFiles: srcFiles, codebaseInfo: codebaseInfo, symbols: symbols)
         try await tp.transpile { transpilation in
-            let content = trimmedContent(transpilation: transpilation)
             let messagesString = transpilation.messages.map(\.description).joined(separator: ",")
             if !transpilation.messages.isEmpty && !expectFailure {
                 XCTFail("Transpilation produced unexpected messages: \(messagesString)")
             }
-            if expectFailure {
-                XCTExpectFailure()
+            if transpilation.sourceFile == srcFiles.first {
+                let content = trimmedContent(transpilation: transpilation)
+                if expectFailure {
+                    XCTExpectFailure()
+                }
+                XCTAssertEqual(kotlin.trimmingCharacters(in: .whitespacesAndNewlines), content.trimmingCharacters(in: .whitespacesAndNewlines), messagesString, file: file, line: line)
             }
-            XCTAssertEqual(kotlin.trimmingCharacters(in: .whitespacesAndNewlines), content.trimmingCharacters(in: .whitespacesAndNewlines), messagesString, file: file, line: line)
         }
     }
 

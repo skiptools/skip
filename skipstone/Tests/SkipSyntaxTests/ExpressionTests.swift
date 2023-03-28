@@ -79,36 +79,46 @@ final class ExpressionTests: XCTestCase {
     }
 
     func testStaticMemberUsingClassReference() async throws {
-        try await check(symbols: symbols, swift: """
-        func f() {
-            g(c: ExpressionTestsClass.self)
-            g(c: ExpressionTestsClass.typeVar)
-            ExpressionTestsClass.staticFunc()
-            ExpressionTestsClass.typeVar.staticFunc()
+        try await check(swift: """
+        class C {
+            static let typeVar = C.self
+
+            static func staticFunc() {
+            }
         }
 
-        func g(c: ExpressionTestsClass.Type) {
+        func f() {
+            g(c: C.self)
+            g(c: C.typeVar)
+            C.staticFunc()
+            C.typeVar.staticFunc()
+        }
+
+        func g(c: C.Type) {
         }
         """, kotlin: """
         import kotlin.reflect.*
         import kotlin.reflect.full.*
 
-        internal fun f() {
-            g(c = ExpressionTestsClass::class)
-            g(c = ExpressionTestsClass.typeVar)
-            ExpressionTestsClass.staticFunc()
-            (ExpressionTestsClass.typeVar.companionObjectInstance as ExpressionTestsClass.Companion).staticFunc()
+        internal open class C {
+
+            companion object {
+                internal val typeVar = C::class
+
+                internal fun staticFunc() {
+                }
+            }
         }
 
-        internal fun g(c: KClass<ExpressionTestsClass>) {
+        internal fun f() {
+            g(c = C::class)
+            g(c = C.typeVar)
+            C.staticFunc()
+            (C.typeVar.companionObjectInstance as C.Companion).staticFunc()
+        }
+
+        internal fun g(c: KClass<C>) {
         }
         """)
-    }
-}
-
-private class ExpressionTestsClass {
-    static let typeVar = ExpressionTestsClass.self
-
-    static func staticFunc() {
     }
 }

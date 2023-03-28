@@ -550,6 +550,40 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         return type == .none || type == .any || type == .anyObject
     }
 
+    /// Whether this type signature does not have any `.none` values.
+    var isFullySpecified: Bool {
+        switch self {
+        case .array(let element):
+            return element.isFullySpecified
+        case .composition(let types):
+            return !types.contains { !$0.isFullySpecified }
+        case .dictionary(let key, let value):
+            return key.isFullySpecified && value.isFullySpecified
+        case .function(let parameters, let returnType):
+            return !parameters.contains(where: { !$0.type.isFullySpecified }) && returnType.isFullySpecified
+        case .member(let base, let type):
+            return base.isFullySpecified && type.isFullySpecified
+        case .metaType(let type):
+            return type.isFullySpecified
+        case .named(_, let generics):
+            return !generics.contains { !$0.isFullySpecified }
+        case .none:
+            return false
+        case .optional(let type):
+            return type.isFullySpecified
+        case .range(let element):
+            return element.isFullySpecified
+        case .set(let element):
+            return element.isFullySpecified
+        case .tuple(_, let types):
+            return !types.contains { !$0.isFullySpecified }
+        case .unwrappedOptional(let type):
+            return type.isFullySpecified
+        default:
+            return true
+        }
+    }
+
     /// Whether the given syntax is an inout value.
     static func isInOut(syntax: TypeSyntax) -> Bool {
         switch syntax.kind {

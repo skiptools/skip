@@ -767,7 +767,7 @@ public class CodebaseInfo: Codable {
             } else {
                 self.hasValue = statement.value != nil
             }
-            if self.signature == .none, self.sourceFile != nil {
+            if !self.signature.isFullySpecified, self.sourceFile != nil {
                 // We'll try to infer the type after gathering all info
                 self.value = statement.value
             }

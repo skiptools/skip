@@ -101,19 +101,27 @@ final class SwitchTests: XCTestCase {
     }
 
     func testEnum() async throws {
-        try await check(symbols: symbols, swift: """
-        switch switchTestsEnumFactory() {
+        try await check(supportingSwift: """
+        enum E {
+            case case1
+            case case2
+        }
+        func enumFactory() -> E {
+            return .case1
+        }
+        """, swift: """
+        switch enumFactory() {
         case .case1
             print("1")
         case .case2
             print("2")
         }
         """, kotlin: """
-        when (switchTestsEnumFactory()) {
-            SwitchTestsEnum.case1 -> {
+        when (enumFactory()) {
+            E.case1 -> {
                 print("1")
             }
-            SwitchTestsEnum.case2 -> {
+            E.case2 -> {
                 print("2")
             }
         }
@@ -121,8 +129,23 @@ final class SwitchTests: XCTestCase {
     }
 
     func testAssociatedValueEnum() async throws {
-        try await check(symbols: symbols, swift: """
-        let e = switchTestsAssociatedValueEnumFactory()
+        let supportingSwift = """
+        enum E {
+            case case1(d: Double)
+            case case2(Int, String)
+        }
+        func enumFactory() -> E {
+            return .case1(d: 100.0)
+        }
+        extension Double {
+            var zero: Double {
+                return 0.0
+            }
+        }
+        """
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        let e = enumFactory()
         switch e {
         case let .case1(d: dvalue):
             print(dvalue == .zero)
@@ -131,13 +154,13 @@ final class SwitchTests: XCTestCase {
             print(s)
         }
         """, kotlin: """
-        internal val e = switchTestsAssociatedValueEnumFactory()
+        internal val e = enumFactory()
         when (e) {
-            is SwitchTestsAssociatedValueEnum.case1case -> {
+            is E.case1case -> {
                 val dvalue = e.d
                 print(dvalue == Double.zero)
             }
-            is SwitchTestsAssociatedValueEnum.case2case -> {
+            is E.case2case -> {
                 var s = e.associated1
                 s += "..."
                 print(s)
@@ -146,8 +169,8 @@ final class SwitchTests: XCTestCase {
         """)
 
         // Extract switch value to avoid side effects from repeating it for bindings
-        try await check(symbols: symbols, swift: """
-        switch switchTestsAssociatedValueEnumFactory() {
+        try await check(supportingSwift: supportingSwift, swift: """
+        switch enumFactory() {
         case let .case1(d: dvalue):
             print(dvalue == .zero)
         case .case2(_, var s):
@@ -155,13 +178,13 @@ final class SwitchTests: XCTestCase {
             print(s)
         }
         """, kotlin: """
-        val matchtarget_0 = switchTestsAssociatedValueEnumFactory()
+        val matchtarget_0 = enumFactory()
         when (matchtarget_0) {
-            is SwitchTestsAssociatedValueEnum.case1case -> {
+            is E.case1case -> {
                 val dvalue = matchtarget_0.d
                 print(dvalue == Double.zero)
             }
-            is SwitchTestsAssociatedValueEnum.case2case -> {
+            is E.case2case -> {
                 var s = matchtarget_0.associated1
                 s += "..."
                 print(s)
@@ -470,26 +493,5 @@ final class SwitchTests: XCTestCase {
             }
         }
         """)
-    }
-}
-
-private enum SwitchTestsEnum {
-    case case1
-    case case2
-}
-private enum SwitchTestsAssociatedValueEnum {
-    case case1(d: Double)
-    case case2(Int, String)
-}
-private func switchTestsEnumFactory() -> SwitchTestsEnum {
-    return .case1
-}
-private func switchTestsAssociatedValueEnumFactory() -> SwitchTestsAssociatedValueEnum {
-    return .case1(d: 100.0)
-}
-
-private extension Double {
-    var zero: Double {
-        return 0.0
     }
 }
