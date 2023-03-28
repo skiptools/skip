@@ -66,10 +66,10 @@ The output folders for the plug-in are dictated by the build system, and so they
 
 ```
 
-With SPM plugins, modules have their own independent build output folder, and the plugin can only write to its own output folder. For this reason, when building multiple modules, symbolic links will be created that span between the module output folders and create a consitent and buildable project hierarchy. For example, the `SkipLibTests` and `SkipLibKotlinTests` packages will merge the two transpiled Swift modules into a single Kotlin module using relative links to the peer packages, as seen in the following tree:
+With SPM plugins, modules have their own independent build output folder, and the plugin can only write to its own output folder. For this reason, when building multiple modules, symbolic links will be created that span between the module output folders and create a consitent and buildable project hierarchy. For example, the `SkipLibTests` and `SkipLibTestsKt` packages will merge the two transpiled Swift modules into a single Kotlin module using relative links to the peer packages, as seen in the following tree:
 
 ```
-~/Library/Developer/Xcode/DerivedData/Skip-ABC/SourcePackages/plugins/skip-core.output/SkipLibKotlinTests/SkipTranspilePlugIn
+~/Library/Developer/Xcode/DerivedData/Skip-ABC/SourcePackages/plugins/skip-core.output/SkipLibTestsKt/SkipTranspilePlugIn
 ├── SkipLib
 │   ├── build.gradle.kts
 │   └── src
@@ -100,7 +100,7 @@ With SPM plugins, modules have their own independent build output folder, and th
 Code that references other modules will be similiarly linked, but at the top level of the module root. Each module added to the `include` list of the generated `setings.gradle.kts`, so each module will automatically build its dependent modules.
 
 ```
-~/Library/Developer/Xcode/DerivedData/PKG-ABC/SourcePackages/plugins/skip-template.output/DemoLibKotlinTests/SkipTranspilePlugIn/
+~/Library/Developer/Xcode/DerivedData/PKG-ABC/SourcePackages/plugins/skip-template.output/DemoLibTestsKt/SkipTranspilePlugIn/
 ├── DemoLib
 │   ├── build.gradle.kts
 │   └── src

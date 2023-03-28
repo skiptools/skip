@@ -23,25 +23,24 @@ import PackagePlugin
         let skipFolder = sourceTarget.directory.appending(["skip"])
 
         // the peer for the current target
-        // e.g.: CrossSQLKotlin -> CrossSQL
-        // e.g.: CrossSQLKotlinTests -> CrossSQLTests
+        // e.g.: SkipLibKotlin -> SkipLib
+        // e.g.: SkipLibTestsKt -> SkipLibTests
         let peerTarget: Target
 
         let testSuffix = "Tests"
-        let kotlinSuffix = "Kotlin"
-        let isTest = target.name.hasSuffix(testSuffix)
-        let kotlinModule: String // the Kotlin module, which will be the same for both TargetName and TargetNameTests
+        let kotlinSuffix = "Kt"
+        let isTest = target.name.hasSuffix(testSuffix + kotlinSuffix)
+        let kotlinModule = String(target.name.dropLast(isTest ? (testSuffix + kotlinSuffix).count : kotlinSuffix.count))
         if isTest {
-            if !target.name.hasSuffix(kotlinSuffix + testSuffix) {
-                throw TranspilePlugInError("Target «\(target.name)» must have suffix «\(kotlinSuffix + testSuffix)»")
+            if !target.name.hasSuffix(testSuffix + kotlinSuffix) {
+                throw TranspilePlugInError("Target «\(target.name)» must have suffix «\(testSuffix + kotlinSuffix)»")
             }
 
             // convert ModuleKotlinTests -> ModuleTests
-            kotlinModule = String(target.name.dropLast(kotlinSuffix.count + testSuffix.count))
             let expectedName = kotlinModule + testSuffix
 
             // Known issue with SPM in Xcode: we cannot have a depencency from one testTarget to another, or we hit the error:
-            // Enable to resolve build file: XCBCore.BuildFile (The workspace has a reference to a missing target with GUID 'PACKAGE-TARGET:CrossSQLTests')
+            // Enable to resolve build file: XCBCore.BuildFile (The workspace has a reference to a missing target with GUID 'PACKAGE-TARGET:SkipLibTests')
             // so we cannot use `target.dependencies.first` to find the target; we just need to scan by name
             guard let dependencyTarget = try context.package.targets(named: [expectedName]).first else {
                 throw TranspilePlugInError("Target «\(target.name)» should have a peer test target named «\(expectedName)»")
@@ -53,7 +52,6 @@ import PackagePlugin
                 throw TranspilePlugInError("Target «\(target.name)» must have suffix «\(kotlinSuffix)»")
             }
 
-            kotlinModule = String(target.name.dropLast(kotlinSuffix.count))
             let expectedName = kotlinModule
 
             guard let primaryDependency = target.dependencies.first,
