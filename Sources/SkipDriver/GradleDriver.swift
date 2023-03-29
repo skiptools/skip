@@ -120,7 +120,7 @@ public struct GradleDriver {
     ///   - testResultPath: the relative path for the test output XML files
     ///   - exitHandler: the exit handler, which may want to permit a process failure in order to have time to parse the tests
     /// - Returns: an array of parsed test suites containing information about the test run
-    public func runTests(in workingDirectory: URL, module: String, check: Bool = false, info infoFlag: Bool = false, plain plainFlag: Bool = true, maxTestMemory: UInt64? = nil, failFast failFastFlag: Bool = false, continue continueFlag: Bool = true, offline offlineFlag: Bool = false, rerunTasks rerunTasksFlag: Bool = true,  testResultPath: String = "build/test-results", exitHandler: @escaping (ProcessResult) throws -> ()) async throws -> (output: Process.AsyncLineOutput, result: () throws -> [TestSuite]) {
+    public func runTests(in workingDirectory: URL, module: String, check: Bool = false, info infoFlag: Bool = false, plain plainFlag: Bool = true, maxTestMemory: UInt64? = nil, failFast failFastFlag: Bool = false, continue continueFlag: Bool = false, offline offlineFlag: Bool = false, rerunTasks rerunTasksFlag: Bool = true, testResultPath: String = "build/test-results", exitHandler: @escaping (ProcessResult) throws -> ()) async throws -> (output: Process.AsyncLineOutput, result: () throws -> [TestSuite]) {
         var args = [
             check ? "check" : "test" // check will run the @Test funcs regardless of @Ignore, as well as other checks
         ]
