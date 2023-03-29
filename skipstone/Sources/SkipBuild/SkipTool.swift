@@ -477,16 +477,9 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
         let packageName = KotlinTranslator.packageName(forModule: primaryModuleName)
         let overridden = try copyKotlinOverrides()
-        let overriddenSwiftFileNames = overridden.map({ $0.basenameWithoutExt + ".swift" })
+        let overriddenKotlinFiles = overridden.map({ $0.basename })
         // skip over any source file whose name would match a copied Kotlin file
-        let sources = sourceFiles.map(\.sourceFile).filter { sourceFile in
-            if overriddenSwiftFileNames.contains(sourceFile.name) {
-                info("skipped transpilation of overridden file \(sourceFile.path)", sourceFile: sourceFile)
-                return false
-            } else {
-                return true
-            }
-        }
+        let sources = sourceFiles.map(\.sourceFile)
 
         // load and merge each of the skip.yml files for the dependent modules
         let (baseSkipConfig, mergedSkipConfig, configMap) = try loadSkipConfig(merge: true)
@@ -548,7 +541,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             encoder.outputFormatting = [
                 .sortedKeys, // needed for deterministic output
                 .withoutEscapingSlashes,
-                .prettyPrinted,
+                //.prettyPrinted,
             ]
             let codebaseBytes = ByteString(Array(try encoder.encode(codebaseInfo)))
 
@@ -720,11 +713,15 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             let sourcePath = try AbsolutePath(validating: transpilation.sourceFile.path)
             let sourceSize = try fs.getFileInfo(sourcePath).size
 
-            info("transpiling: \(sourcePath.basename) (\(Self.byteCount(for: .init(sourceSize))))", sourceFile: transpilation.sourceFile)
+            info("transpiled: \(sourcePath.basename) (\(Self.byteCount(for: .init(sourceSize))))", sourceFile: transpilation.sourceFile)
 
-            let (outputFile, changed) = try saveTranspilation()
+            let (outputFile, changed, overridden) = try saveTranspilation()
 
-            info("\(!changed ? "unchanged" : "wrote") transpilation (\(Self.byteCount(for: transpilation.output.content.lengthOfBytes(using: .utf8)))) (\(Int64(transpilation.duration * 1000)) ms): \(outputFile.basename)", sourceFile: Source.FilePath(path: outputFile))
+            if overridden {
+                info("override transpilation (\(Self.byteCount(for: transpilation.output.content.lengthOfBytes(using: .utf8)))) (\(Int64(transpilation.duration * 1000)) ms): \(transpilation.sourceFile.name)", sourceFile: transpilation.sourceFile)
+            } else {
+                info("\(!changed ? "unchanged" : "wrote") transpilation (\(Self.byteCount(for: transpilation.output.content.lengthOfBytes(using: .utf8)))) (\(Int64(transpilation.duration * 1000)) ms): \(outputFile.basename)", sourceFile: outputFile.sourceFile)
+            }
 
             for message in transpilation.messages {
                 //writeMessage(message)
@@ -738,11 +735,16 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             let output = Output(transpilation: transpilation)
             continuation.yield(.init(output))
 
-            func saveTranspilation() throws -> (output: AbsolutePath, changed: Bool) {
+            func saveTranspilation() throws -> (output: AbsolutePath, changed: Bool, overridden: Bool) {
                 // the build plug-in's output folder base will be something like ~/Library/Developer/Xcode/DerivedData/Mod-ID/SourcePackages/plugins/module-name.output/ModuleNameKotlin/SkipTranspilePlugIn/ModuleName/src/test/kotlin
                 trace("path: \(outputFolderPath)")
+
                 let kotlinName = transpilation.kotlinFileName
                 let outputFilePath = kotlinOutputPath(for: kotlinName)
+
+                if overriddenKotlinFiles.contains(kotlinName) {
+                    return (output: outputFilePath, changed: false, overridden: true)
+                }
 
                 let kotlinBytes = ByteString(encodingAsUTF8: transpilation.output.content)
                 let fileWritten = try fs.writeChanges(path: outputFilePath, checkSize: true, makeReadOnly: true, bytes: kotlinBytes)
@@ -754,7 +756,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
                 let sourceMapData = try JSONEncoder().encode(transpilation.outputMap)
                 try fs.writeChanges(path: sourceMappingPath, makeReadOnly: true, bytes: ByteString(sourceMapData))
 
-                return (output: outputFilePath, changed: fileWritten)
+                return (output: outputFilePath, changed: fileWritten, overridden: false)
             }
         }
 

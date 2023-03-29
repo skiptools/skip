@@ -140,12 +140,14 @@ if [ "${SKIPPKG}" != "/dev/null" ]; then
 fi
 
 # finally, jump back and make a corresponding release in the private SwiftSource
-cd -
+cd '-'
 
-#git add "${VERSION_PATH}"
-#git commit -m "Release ${SEMVER_NEXT}" "${VERSION_PATH}"
-#git tag --sign "${SEMVER_NEXT}" -m "Release ${SEMVER_NEXT}"
-#git push --follow-tags
+echo "Hit return to tag ${VERSION_PATH}"
+
+git add "${VERSION_PATH}"
+git commit -m "Release ${SEMVER_NEXT}" "${VERSION_PATH}"
+git tag --sign "${SEMVER_NEXT}" -m "Release ${SEMVER_NEXT}"
+git push --follow-tags
 
 # get the new ref after we have pushed to SkipSource
 GITREF="$(git rev-parse HEAD)"
