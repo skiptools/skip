@@ -32,6 +32,8 @@ public class CodebaseInfo: Codable {
             case .functionDeclaration, .initDeclaration:
                 rootFunctions.append(FunctionInfo(statement: statement as! FunctionDeclaration, codebaseInfo: self, delegate: delegate))
             case .typealiasDeclaration:
+                #warning("FIXME: crashes SkipFoundationKt")
+                break // FIXME: rootTypealiases results in crash with SkipFoundationKt build
                 rootTypealiases.append(TypealiasInfo(statement: statement as! TypealiasDeclaration, codebaseInfo: self, delegate: delegate))
             case .variableDeclaration:
                 let variableInfo = VariableInfo(statement: statement as! VariableDeclaration, codebaseInfo: self, delegate: delegate)

@@ -25,9 +25,8 @@ public struct SkipCommandExecutor: AsyncParsableCommand {
                                                            subcommands: [
                                                             VersionCommand.self,
                                                             InfoCommand.self,
-                                                            PrecheckAction.self,
+                                                            PreflightAction.self,
                                                             TranspileAction.self,
-                                                            GradleAction.self,
                                                             PrintSwiftASTAction.self,
                                                             PrintSkipASTAction.self,
                                                             //DoctorAction.self, // TODO: check installation status, like `brew doctor` and `flutter doctor`
@@ -285,7 +284,7 @@ extension PhaseGuard : ExpressibleByArgument {
 // MARK: CheckPhase
 
 protocol CheckPhase : SkipPhase {
-    var precheckOptions: CheckPhaseOptions { get }
+    var preflightOptions: CheckPhaseOptions { get }
 }
 
 struct CheckPhaseOptions: ParsableArguments {
@@ -303,7 +302,7 @@ struct CheckPhaseOptions: ParsableArguments {
 }
 
 extension CheckPhase {
-    func performPrecheckActions() async throws -> CheckResult {
+    func performPreflightActions() async throws -> CheckResult {
         return CheckResult()
     }
 }
@@ -312,17 +311,17 @@ struct CheckResult {
 
 }
 
-struct PrecheckAction: AsyncParsableCommand, CheckPhase {
-    static var configuration = CommandConfiguration(commandName: "precheck", abstract: "Perform transpilation prechecks")
+struct PreflightAction: AsyncParsableCommand, CheckPhase {
+    static var configuration = CommandConfiguration(commandName: "preflight", abstract: "Perform transpilation preflights")
 
     @OptionGroup(title: "Check Options")
-    var precheckOptions: CheckPhaseOptions
+    var preflightOptions: CheckPhaseOptions
 
     @OptionGroup(title: "Output Options")
     var outputOptions: OutputOptions
 
     func run() async throws {
-        try await perform(on: precheckOptions.files.map({ Source.FilePath(path: $0) }), options: precheckOptions)
+        try await perform(on: preflightOptions.files.map({ Source.FilePath(path: $0) }), options: preflightOptions)
     }
 
     func perform(on sourceFiles: [Source.FilePath], options: CheckPhaseOptions) async throws {
@@ -346,7 +345,7 @@ struct PrecheckAction: AsyncParsableCommand, CheckPhase {
         if outputFileName.hasSuffix(".swift") {
             outputFileName = String(outputFileName.dropLast(".swift".count))
         }
-        outputFileName += "_skipcheck.swift"
+        outputFileName += "_preflight.swift"
         return outputDir.appendingPathComponent(outputFileName)
     }
 }
@@ -391,7 +390,7 @@ struct TranspileResult {
 
 extension TranspilePhase {
     func performTranspileActions() async throws -> (check: CheckResult, transpile: TranspileResult) {
-        let checkResult = try await performPrecheckActions()
+        let checkResult = try await performPreflightActions()
         let transpileResult = TranspileResult()
         return (checkResult, transpileResult)
     }
@@ -401,7 +400,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
     static var configuration = CommandConfiguration(commandName: "transpile", abstract: "Transpile Swift to Kotlin")
 
     @OptionGroup(title: "Check Options")
-    var precheckOptions: CheckPhaseOptions
+    var preflightOptions: CheckPhaseOptions
 
     @OptionGroup(title: "Transpile Options")
     var transpileOptions: TranspilePhaseOptions
@@ -414,7 +413,6 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
     #else
     public typealias SymbolsType = Void
     #endif
-
 
     struct Output : MessageConvertible {
         let transpilation: Transpilation
@@ -443,7 +441,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
     }
 
     func performCommand(with continuation: AsyncThrowingStream<OutputMessage, Error>.Continuation) async throws {
-        let sourceFiles = try precheckOptions.files.map(AbsolutePath.init(validating:))
+        let sourceFiles = try preflightOptions.files.map(AbsolutePath.init(validating:))
         info("performing transpilation to: \(transpileOptions.outputFolder ?? "nowhere") for: \(sourceFiles.map(\.basename))")
         trace("linkPaths: \(transpileOptions.linkPaths)")
         trace("moduleNames: \(transpileOptions.moduleNames)")
@@ -457,7 +455,9 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             throw error("Must specify --skip-folder")
         }
 
-        let skipFolderPath = try AbsolutePath(validating: skipFolder, relativeTo: fs.currentWorkingDirectory ?? fs.tempDirectory)
+        let baseOutputPath = try fs.currentWorkingDirectory ?? fs.tempDirectory
+
+        let skipFolderPath = try AbsolutePath(validating: skipFolder, relativeTo: baseOutputPath)
         if !fs.isDirectory(skipFolderPath) {
             throw error("Folder specified by --skip-folder did not exist: \(skipFolderPath)")
         }
@@ -466,7 +466,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             throw error("Must specify --output-folder")
         }
 
-        let outputFolderPath = try AbsolutePath(validating: outputFolder, relativeTo: fs.currentWorkingDirectory ?? fs.tempDirectory)
+        let outputFolderPath = try AbsolutePath(validating: outputFolder, relativeTo: baseOutputPath)
         if !fs.isDirectory(outputFolderPath) {
             // e.g.: ~Library/Developer/Xcode/DerivedData/PACKAGE-ID/SourcePackages/plugins/skip-core.output/SkipFoundationKotlinTests/SkipTranspilePlugIn/SkipFoundation/src/test/kotlin
             //throw error("Folder specified by --output-folder did not exist: \(outputFolder)")
@@ -495,7 +495,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         // skip over any source file whose name would match a copied Kotlin file
         let sources = sourceFiles.map(\.sourceFile).filter { sourceFile in
             if overriddenSwiftFileNames.contains(sourceFile.name) {
-                info("skipping transpilation of overridden file \(sourceFile.path)", sourceFile: sourceFile)
+                info("skipped transpilation of overridden file \(sourceFile.path)", sourceFile: sourceFile)
                 return false
             } else {
                 return true
@@ -506,19 +506,72 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         let (baseSkipConfig, mergedSkipConfig, configMap) = try loadSkipConfig(merge: true)
         let plugins: [KotlinPlugin] = try createPlugins(for: baseSkipConfig, with: configMap)
 
-        #if canImport(SymbolKit)
         let symbols: SymbolsType? = try await loadSymbols()
-        #else
-        let symbols: SymbolsType? = nil
-        #endif
-        let codebaseInfo = CodebaseInfo(moduleName: primaryModuleName)
-        let transpiler = Transpiler(packageName: packageName, sourceFiles: sources, codebaseInfo: codebaseInfo, symbols: symbols, preprocessorSymbols: Set(precheckOptions.symbols), plugins: plugins)
 
+        var dependentCodebaseInfos: [CodebaseInfo] = []
+
+        let moduleBasePath = moduleRootPath.parentDirectory
+
+        /// The relative path for cached codebase info JSON
+        func codebaseInfoPath(forModule moduleName: String) -> RelativePath {
+            RelativePath(moduleName + ".skipcode.json")
+        }
+
+        let codebaseInfo = try loadCodebaseInfo() // initialize the codebaseinfo and load DependentModuleName.skipcode.json
+
+        let transpiler = Transpiler(packageName: packageName, sourceFiles: sources, codebaseInfo: codebaseInfo, symbols: symbols, preprocessorSymbols: Set(preflightOptions.symbols), plugins: plugins)
         try await transpiler.transpile(handler: handleTranspilation)
+        try saveCodebaseInfo() // save out the ModuleName.skipcode.json
+
         let sourceModules = try linkDependentModuleSources()
         try generateGradle(for: sourceModules, with: mergedSkipConfig)
 
+
         return // everything following is a stage of the transpilation process
+
+        func loadCodebaseInfo() throws -> CodebaseInfo {
+            let decoder = JSONDecoder()
+
+            // go through the '--link modulename:../../some/path' arguments and try to load the modulename.skipcode.json symbols from the previous module's transpilation output
+            for (linkModuleName, relativeLinkPath) in linkNamePaths {
+                let linkModulePath = moduleRootPath
+                    .appending(RelativePath(relativeLinkPath))
+                let dependencyCodebaseInfo = linkModulePath
+                    .parentDirectory
+                    .appending(codebaseInfoPath(forModule: linkModuleName))
+
+                do {
+                    let codebaseLoadStart = Date().timeIntervalSinceReferenceDate
+                    let cbinfo = try fs.readFileContents(dependencyCodebaseInfo).withData {
+                        try decoder.decode(CodebaseInfo.self, from: $0)
+                    }
+                    dependentCodebaseInfos.append(cbinfo)
+                    let codebaseLoadEnd = Date().timeIntervalSinceReferenceDate
+                    info("loaded codebase (\(Int64((codebaseLoadEnd - codebaseLoadStart) * 1000)) ms) for \(linkModuleName) with relative: \(relativeLinkPath) path: \(dependencyCodebaseInfo)", sourceFile: dependencyCodebaseInfo.sourceFile)
+                } catch {
+                    warn("error loading codebase for linkModuleName: \(linkModuleName) from: \(dependencyCodebaseInfo.pathString) error: \(error.localizedDescription)", sourceFile: dependencyCodebaseInfo.sourceFile)
+                }
+            }
+
+            let codebaseInfo = CodebaseInfo(moduleName: primaryModuleName)
+            codebaseInfo.dependentModules = dependentCodebaseInfos
+            return codebaseInfo
+        }
+
+        func saveCodebaseInfo() throws {
+            let outputFilePath = moduleBasePath.appending(codebaseInfoPath(forModule: primaryModuleName))
+
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [
+                .sortedKeys, // needed for deterministic output
+                .withoutEscapingSlashes,
+                .prettyPrinted,
+            ]
+            let codebaseBytes = ByteString(Array(try encoder.encode(codebaseInfo)))
+
+            let codebaseWritten = try fs.writeChanges(path: outputFilePath, checkSize: true, makeReadOnly: true, bytes: codebaseBytes)
+            info("\(!codebaseWritten ? "unchanged" : "wrote") codebase (\(Self.byteCount(for: .init(codebaseBytes.count)))): \(outputFilePath.basename)", sourceFile: outputFilePath.sourceFile)
+        }
 
 
         func generateGradle(for sourceModules: [String], with skipConfig: SkipConfig) throws {
@@ -528,16 +581,16 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             func generatePerModuleGradle() throws {
                 let buildContents = (skipConfig.build ?? .init()).generate(context: .init(dsl: .kotlin))
                 // we output as a joined string because there is a weird stdout bug with the tool or plugin executor somewhere that causes multi-line strings to be output in the wrong order
-                info("created gradle: \(buildContents.split(separator: "\n").map({ $0.trimmingCharacters(in: .whitespaces) }).joined(separator: "; "))")
+                trace("created gradle: \(buildContents.split(separator: "\n").map({ $0.trimmingCharacters(in: .whitespaces) }).joined(separator: "; "))")
 
                 let buildGradle = moduleRootPath.appending(components: ["build.gradle.kts"])
-                info("saving \(buildGradle)", sourceFile: buildGradle.sourceFile)
                 let contents = """
                 // build.gradle.kts generated by Skip for \(primaryModuleName)
 
                 """ + buildContents
 
-                try fs.writeChanges(path: buildGradle, makeWritable: true, makeReadOnly: true, bytes: ByteString(encodingAsUTF8: contents))
+                let changed = try fs.writeChanges(path: buildGradle, makeReadOnly: true, bytes: ByteString(encodingAsUTF8: contents))
+                info("\(!changed ? "unchanged" : "wrote") gradle (\(Self.byteCount(for: .init(contents.count)))): \(buildGradle.basename)", sourceFile: buildGradle.sourceFile)
             }
 
             func generateSettingsGradle() throws {
@@ -557,8 +610,8 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
                     """
                 }
 
-                info("saving \(settingsPath)", sourceFile: settingsPath.sourceFile)
-                try fs.writeChanges(path: settingsPath, makeWritable: true, makeReadOnly: true, bytes: ByteString(encodingAsUTF8: settingsContents))
+                let changed = try fs.writeChanges(path: settingsPath, makeReadOnly: true, bytes: ByteString(encodingAsUTF8: settingsContents))
+                info("\(!changed ? "unchanged" : "wrote") settings (\(Self.byteCount(for: .init(settingsContents.count)))): \(settingsPath.basename)", sourceFile: settingsPath.sourceFile)
             }
         }
 
@@ -584,7 +637,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             configMap[primaryModuleName] = currentModuleConfig
 
             let currentModuleJSON = try currentModuleConfig.json()
-            try info("loading skip.yml from \(skipConfigPath): \(currentModuleJSON.prettyJSON)", sourceFile: skipConfigPath.sourceFile)
+            try trace("loading skip.yml from \(skipConfigPath): \(currentModuleJSON.prettyJSON)", sourceFile: skipConfigPath.sourceFile)
 
             if !merge {
                 return (currentModuleConfig, currentModuleConfig, configMap) // just the unmerged base YAML
@@ -601,10 +654,11 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
                 let moduleSkipConfigPath = moduleSkipBasePath.appending(component: configFileName)
 
                 if fs.isFile(moduleSkipConfigPath) {
+                    let skipConfigLoadStart = Date().timeIntervalSinceReferenceDate
                     let moduleConfig = try loadSkipConfig(path: moduleSkipConfigPath)
                     configMap[moduleName] = moduleConfig // remember the raw config for use in configuring transpiler plug-ins
-
-                    info("parsed skip.yml for module: \(moduleName) path: \(modulePath) config: \(moduleConfig)", sourceFile: moduleSkipConfigPath.sourceFile)
+                    let skipConfigLoadEnd = Date().timeIntervalSinceReferenceDate
+                    info("loaded config (\(Int64((skipConfigLoadEnd - skipConfigLoadStart) * 1000)) ms) skip.yml for module: \(moduleName) path: \(moduleSkipConfigPath)", sourceFile: moduleSkipConfigPath.sourceFile)
                     aggregateJSON = try aggregateJSON.merged(with: moduleConfig.json())
                 }
             }
@@ -637,7 +691,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             aggregateSkipConfig.settings?.removeContent(withExports: true)
 
             let configEnd = Date().timeIntervalSinceReferenceDate
-            try info("created aggregate skip.yml for modules: \(moduleNamePaths.map(\.module)) config: \(aggregateJSON.canonicalJSON) (\(Int64((configEnd - configStart) * 1000)) ms)")
+            try info("created aggregate skip.yml (\(Int64((configEnd - configStart) * 1000)) ms) for modules: \(moduleNamePaths.map(\.module))")
             return (currentModuleConfig, aggregateSkipConfig, configMap)
         }
 
@@ -651,22 +705,30 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         /// Copies over the overridden .kt files from `ModuleNameKotlin/skip/*.kt` into the destination folder
         ///
         /// Any Kotlin files that are overridden will not be transpiled.
-        func copyKotlinOverrides() throws -> Set<AbsolutePath> {
+        func copyKotlinOverrides(makeLinks: Bool = true) throws -> Set<AbsolutePath> {
             var copiedFiles: Set<AbsolutePath> = []
             for file in try fs.getDirectoryContents(skipFolderPath) {
                 if file.hasSuffix(".kt") {
                     let sourcePath = AbsolutePath(skipFolderPath, file)
-                    info("copying overridden source: \(file)", sourceFile: sourcePath.sourceFile)
                     let outputFilePath = kotlinOutputPath(for: file)
-                    try fs.writeChanges(path: outputFilePath, checkSize: true, bytes: fs.readFileContents(sourcePath))
+                    if makeLinks {
+                        // we make links instead of copying so the file can be edited from the gradle project structure
+                        try? fs.removeFileTree(outputFilePath)
+                        try fs.createDirectory(outputFilePath.parentDirectory, recursive: true) // ensure parent exists
+                        try fs.createSymbolicLink(outputFilePath, pointingAt: sourcePath, relative: false)
+                        info("linked overridden source: \(sourcePath.pathString) to: \(outputFilePath.pathString)", sourceFile: sourcePath.sourceFile)
+                    } else {
+                        try fs.writeChanges(path: outputFilePath, checkSize: true, bytes: fs.readFileContents(sourcePath))
+                        info("copied overridden source: \(sourcePath.pathString) to: \(outputFilePath.pathString)", sourceFile: sourcePath.sourceFile)
+                    }
                     copiedFiles.insert(outputFilePath)
                 }
             }
             return copiedFiles
         }
 
-        #if canImport(SymbolKit)
         func loadSymbols() async throws -> SymbolsType {
+            #if canImport(SymbolKit)
             let symbolFolder = transpileOptions.symbolFolder.flatMap(URL.init(fileURLWithPath:))
             //let symbolFolderPath = try transpileOptions.symbolFolder.flatMap(AbsolutePath.init(validating:))
 
@@ -677,8 +739,10 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
             let loadSymbols = Symbols(moduleName: primaryModuleName, graphs: symbolsGraph.unifiedGraphs)
             return loadSymbols
+            #else
+            return SymbolsType()
+            #endif
         }
-        #endif
 
         func handleTranspilation(transpilation: Transpilation) throws {
             for message in transpilation.messages {
@@ -694,7 +758,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
             let (outputFile, changed) = try saveTranspilation()
 
-            info("transpiled: \(outputFile.basename) (\(Self.byteCount(for: transpilation.output.content.utf8.count)))\(!changed ? " [unchanged]" : "") (\(Int64(transpilation.duration * 1000)) ms)", sourceFile: Source.FilePath(path: outputFile))
+            info("\(!changed ? "unchanged" : "wrote") transpilation (\(Self.byteCount(for: transpilation.output.content.lengthOfBytes(using: .utf8)))) (\(Int64(transpilation.duration * 1000)) ms): \(outputFile.basename)", sourceFile: Source.FilePath(path: outputFile))
 
             for message in transpilation.messages {
                 //writeMessage(message)
@@ -715,14 +779,14 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
                 let outputFilePath = kotlinOutputPath(for: kotlinName)
 
                 let kotlinBytes = ByteString(encodingAsUTF8: transpilation.output.content)
-                let fileWritten = try fs.writeChanges(path: outputFilePath, checkSize: true, makeWritable: true, makeReadOnly: true, bytes: kotlinBytes)
+                let fileWritten = try fs.writeChanges(path: outputFilePath, checkSize: true, makeReadOnly: true, bytes: kotlinBytes)
 
                 trace("wrote to: \(outputFilePath)\(!fileWritten ? " (unchanged)" : "")", sourceFile: outputFilePath.sourceFile)
 
                 // also save the output line mapping file: SomeFile.kt -> SomeFile.sourcemap
                 let sourceMappingPath = outputFilePath.deletingPathExtension().appendingPathExtension("sourcemap")
                 let sourceMapData = try JSONEncoder().encode(transpilation.outputMap)
-                try fs.writeChanges(path: sourceMappingPath, makeWritable: true, makeReadOnly: true, bytes: ByteString(sourceMapData))
+                try fs.writeChanges(path: sourceMappingPath, makeReadOnly: true, bytes: ByteString(sourceMapData))
 
                 return (output: outputFilePath, changed: fileWritten)
             }
@@ -854,6 +918,10 @@ extension FileSystem {
         }
 
         func save() throws -> Bool {
+            if isSymlink(path) {
+                // if the file already exists but it is a link, delete it so we can overwrite it
+                try? removeFileTree(path)
+            }
             try createDirectory(path.parentDirectory, recursive: true)
             try writeFileContents(path, bytes: bytes)
             if makeReadOnly == true {
@@ -863,53 +931,6 @@ extension FileSystem {
             return true
         }
 
-    }
-}
-// MARK: GradlePhase
-
-protocol GradlePhase: TranspilePhase {
-    var gradleOptions: GradlePhaseOptions { get }
-}
-
-struct GradlePhaseOptions: ParsableArguments {
-//    @Option(help: ArgumentHelp("Condition for gradle phase", valueName: "force/no"))
-//    var gradle: PhaseGuard = .onDemand
-
-    @Option(help: ArgumentHelp("Path to Android Studio.app", valueName: "folder"))
-    var studioHome: String? = nil
-
-}
-
-struct GradleResult {
-
-}
-
-extension GradlePhase {
-    func performGradleActions() async throws -> (check: CheckResult, transpile: TranspileResult, gradle: GradleResult) {
-        let transpileResult = try await performTranspileActions()
-        let gradleResult = GradleResult()
-        return (check: transpileResult.check, transpile: transpileResult.transpile, gradle: gradleResult)
-    }
-}
-
-
-struct GradleAction: GradlePhase {
-    static var configuration = CommandConfiguration(commandName: "gradle", abstract: "Gradle build system interface")
-
-    @OptionGroup(title: "Output Options")
-    var outputOptions: OutputOptions
-
-    @OptionGroup(title: "Precheck Options")
-    var precheckOptions: CheckPhaseOptions
-
-    @OptionGroup(title: "Transpile Options")
-    var transpileOptions: TranspilePhaseOptions
-
-    @OptionGroup(title: "Gradle Options")
-    var gradleOptions: GradlePhaseOptions
-
-    func run() async throws {
-        throw ValidationError("Not yet supported")
     }
 }
 
@@ -990,7 +1011,7 @@ struct ForwardingCommand<Base: ParsableCommand, Name: RawRepresentable & CaseIte
 }
 
 //enum SkippyCommandName : String, CaseIterable { case skippy }
-//typealias SkippyAction = ForwardingCommand<PrecheckAction, SkippyCommandName>
+//typealias SkippyAction = ForwardingCommand<PreflightAction, SkippyCommandName>
 
 
 // MARK: Streaming command support
@@ -1139,7 +1160,7 @@ extension StreamingCommand {
             return // skip debug output unless we are running verbose
         }
 
-        writeMessage(Message(kind: kind, message: try message(), sourceFile: sourceFile, sourceRange: sourceRange))
+        writeMessage(Message(kind: kind, message: "Skip " + (try message()), sourceFile: sourceFile, sourceRange: sourceRange))
     }
 
 
