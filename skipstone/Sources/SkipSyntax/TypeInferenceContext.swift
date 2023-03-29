@@ -1,7 +1,6 @@
 /// Contextual information used in type inference.
 struct TypeInferenceContext {
     private let codebaseInfo: CodebaseInfo.Context?
-    private let symbols: SymbolsContextType?
     private var typePath: [(TypeDeclaration, Bool)] = []
     private var blockPath: [[String: TypeSignature]] = [] // Each entry is map of additional identifier bindings
     private var localIdentifierTypes: [String: TypeSignature] = [:]
@@ -13,8 +12,8 @@ struct TypeInferenceContext {
     ///   - symbols: Available symbol information.
     ///   - sourceFile: Source file for this context.
     ///   - statements: Top-level statements from which to determine imports.
-    init(codebaseInfo: CodebaseInfo? = nil, symbols: SymbolsType? = nil, sourceFile: Source.FilePath?, statements: [Statement]) {
-        if codebaseInfo != nil || symbols != nil {
+    init(codebaseInfo: CodebaseInfo? = nil, sourceFile: Source.FilePath?, statements: [Statement]) {
+        if codebaseInfo != nil {
             let importedModuleNames: [String] = statements.compactMap { statement in
                 guard statement.type == .importDeclaration, let importDeclaration = statement as? ImportDeclaration else {
                     return nil
@@ -22,14 +21,8 @@ struct TypeInferenceContext {
                 return importDeclaration.modulePath.first
             }
             self.codebaseInfo = codebaseInfo?.context(importedModuleNames: importedModuleNames, sourceFile: sourceFile)
-            #if canImport(SymbolKit)
-            self.symbols = symbols?.context(importedModuleNames: importedModuleNames, sourceFile: sourceFile)
-            #else
-            self.symbols = nil
-            #endif
         } else {
             self.codebaseInfo = nil
-            self.symbols = nil
         }
     }
 
@@ -134,37 +127,19 @@ struct TypeInferenceContext {
                 return typeDeclaration.signature
             }
         }
-        if symbols == nil {
-            guard let codebaseInfo else {
-                return .none
-            }
 
-            for (typeDeclaration, isStatic) in typePath.reversed() {
-                let signature: TypeSignature = isStatic ? .metaType(typeDeclaration.signature) : typeDeclaration.signature
-                let type = codebaseInfo.identifierSignature(of: name, in: signature)
-                if type != .none {
-                    return type
-                }
-            }
-            return codebaseInfo.identifierSignature(of: name)
-        } else {
-            #if canImport(SymbolKit)
-            guard let symbols else {
-                return .none
-            }
-
-            for (typeDeclaration, isStatic) in typePath.reversed() {
-                let signature: TypeSignature = isStatic ? .metaType(typeDeclaration.signature) : typeDeclaration.signature
-                let symbolType = symbols.identifierSignature(of: name, in: signature)
-                if symbolType != .none {
-                    return symbolType
-                }
-            }
-            return symbols.identifierSignature(of: name)
-            #else
+        guard let codebaseInfo else {
             return .none
-            #endif
         }
+
+        for (typeDeclaration, isStatic) in typePath.reversed() {
+            let signature: TypeSignature = isStatic ? .metaType(typeDeclaration.signature) : typeDeclaration.signature
+            let type = codebaseInfo.identifierSignature(of: name, in: signature)
+            if type != .none {
+                return type
+            }
+        }
+        return codebaseInfo.identifierSignature(of: name)
     }
 
     /// Whether the given name maps to a local identifier or parameter.
@@ -197,21 +172,10 @@ struct TypeInferenceContext {
                 return .metaType(type)
             }
         }
-        if symbols == nil {
-            guard let codebaseInfo else {
-                return .none
-            }
-            return codebaseInfo.identifierSignature(of: name, in: type)
-        } else {
-            #if canImport(SymbolKit)
-            guard let symbols else {
-                return .none
-            }
-            return symbols.identifierSignature(of: name, in: type)
-            #else
+        guard let codebaseInfo else {
             return .none
-            #endif
         }
+        return codebaseInfo.identifierSignature(of: name, in: type)
     }
 
     /// Return the signatures of the functions matching the given parameters.
@@ -221,47 +185,23 @@ struct TypeInferenceContext {
     /// - Parameters:
     ///   - type: The function's owning type if this is a member function, or nil if not.
     func function(_ name: String, in type: TypeSignature?, parameters: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
-        if symbols == nil {
-            guard let codebaseInfo else {
-                return []
-            }
-            let type = type?.asOptional(false)
-            if let type {
-                return codebaseInfo.functionSignature(of: name, in: type, arguments: parameters)
-            }
-
-            // Not a known member function. Check functions that can be invoked without a target type
-            for (typeDeclaration, isStatic) in typePath.reversed() {
-                let signature: TypeSignature = isStatic ? .metaType(typeDeclaration.signature) : typeDeclaration.signature
-                let results = codebaseInfo.functionSignature(of: name, in: signature, arguments: parameters)
-                if !results.isEmpty {
-                    return results
-                }
-            }
-            return codebaseInfo.functionSignature(of: name, arguments: parameters)
-        } else {
-            #if canImport(SymbolKit)
-            guard let symbols else {
-                return []
-            }
-            let type = type?.asOptional(false)
-            if let type {
-                return symbols.functionSignature(of: name, in: type, arguments: parameters)
-            }
-
-            // Not a known member function. Check functions that can be invoked without a target type
-            for (typeDeclaration, isStatic) in typePath.reversed() {
-                let signature: TypeSignature = isStatic ? .metaType(typeDeclaration.signature) : typeDeclaration.signature
-                let results = symbols.functionSignature(of: name, in: signature, arguments: parameters)
-                if !results.isEmpty {
-                    return results
-                }
-            }
-            return symbols.functionSignature(of: name, arguments: parameters)
-            #else
+        guard let codebaseInfo else {
             return []
-            #endif
         }
+        let type = type?.asOptional(false)
+        if let type {
+            return codebaseInfo.functionSignature(of: name, in: type, arguments: parameters)
+        }
+
+        // Not a known member function. Check functions that can be invoked without a target type
+        for (typeDeclaration, isStatic) in typePath.reversed() {
+            let signature: TypeSignature = isStatic ? .metaType(typeDeclaration.signature) : typeDeclaration.signature
+            let results = codebaseInfo.functionSignature(of: name, in: signature, arguments: parameters)
+            if !results.isEmpty {
+                return results
+            }
+        }
+        return codebaseInfo.functionSignature(of: name, arguments: parameters)
     }
 
     /// Return the signatures of the subscripts matching the given parameters.
@@ -271,21 +211,10 @@ struct TypeInferenceContext {
     /// - Parameters:
     ///   - type: The subscript's owning type.
     func `subscript`(in type: TypeSignature, parameters: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
-        if symbols == nil {
-            guard let codebaseInfo else {
-                return []
-            }
-            return codebaseInfo.subscriptSignature(in: type.asOptional(false), arguments: parameters)
-        } else {
-            #if canImport(SymbolKit)
-            guard let symbols else {
-                return []
-            }
-            return symbols.subscriptSignature(in: type.asOptional(false), arguments: parameters)
-            #else
+        guard let codebaseInfo else {
             return []
-            #endif
         }
+        return codebaseInfo.subscriptSignature(in: type.asOptional(false), arguments: parameters)
     }
 
     /// For an operation on two types, return the probable result type.

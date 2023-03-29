@@ -408,12 +408,6 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
     @OptionGroup(title: "Output Options")
     var outputOptions: OutputOptions
 
-    #if canImport(SymbolKit)
-    public typealias SymbolsType = Symbols
-    #else
-    public typealias SymbolsType = Void
-    #endif
-
     struct Output : MessageConvertible {
         let transpilation: Transpilation
 
@@ -481,8 +475,6 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             throw error("Module root path did not exist at: \(moduleRootPath.pathString)")
         }
 
-        let allModuleNames = moduleNamePaths.map(\.module)
-
         guard let (primaryModuleName, primaryModulePath) = moduleNamePaths.first else {
             throw error("Must specify at least one --module")
         }
@@ -506,8 +498,6 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         let (baseSkipConfig, mergedSkipConfig, configMap) = try loadSkipConfig(merge: true)
         let plugins: [KotlinPlugin] = try createPlugins(for: baseSkipConfig, with: configMap)
 
-        let symbols: SymbolsType? = try await loadSymbols()
-
         var dependentCodebaseInfos: [CodebaseInfo] = []
 
         let moduleBasePath = moduleRootPath.parentDirectory
@@ -519,7 +509,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
         let codebaseInfo = try loadCodebaseInfo() // initialize the codebaseinfo and load DependentModuleName.skipcode.json
 
-        let transpiler = Transpiler(packageName: packageName, sourceFiles: sources, codebaseInfo: codebaseInfo, symbols: symbols, preprocessorSymbols: Set(preflightOptions.symbols), plugins: plugins)
+        let transpiler = Transpiler(packageName: packageName, sourceFiles: sources, codebaseInfo: codebaseInfo, preprocessorSymbols: Set(preflightOptions.symbols), plugins: plugins)
         try await transpiler.transpile(handler: handleTranspilation)
         try saveCodebaseInfo() // save out the ModuleName.skipcode.json
 
@@ -691,7 +681,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             aggregateSkipConfig.settings?.removeContent(withExports: true)
 
             let configEnd = Date().timeIntervalSinceReferenceDate
-            try info("created aggregate skip.yml (\(Int64((configEnd - configStart) * 1000)) ms) for modules: \(moduleNamePaths.map(\.module))")
+            info("created aggregate skip.yml (\(Int64((configEnd - configStart) * 1000)) ms) for modules: \(moduleNamePaths.map(\.module))")
             return (currentModuleConfig, aggregateSkipConfig, configMap)
         }
 
@@ -725,23 +715,6 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
                 }
             }
             return copiedFiles
-        }
-
-        func loadSymbols() async throws -> SymbolsType {
-            #if canImport(SymbolKit)
-            let symbolFolder = transpileOptions.symbolFolder.flatMap(URL.init(fileURLWithPath:))
-            //let symbolFolderPath = try transpileOptions.symbolFolder.flatMap(AbsolutePath.init(validating:))
-
-            let symbolStart = Date().timeIntervalSinceReferenceDate
-            let symbolsGraph = try await SkipSystem.extractSymbolGraph(moduleFolder: symbolFolder, moduleNames: allModuleNames, from: URL.moduleBuildFolder())
-            let symbolEnd = Date().timeIntervalSinceReferenceDate
-            info("extract symbols: \(symbolsGraph.unifiedGraphs.keys.sorted()) (\(Int64((symbolEnd - symbolStart) * 1000)) ms)")
-
-            let loadSymbols = Symbols(moduleName: primaryModuleName, graphs: symbolsGraph.unifiedGraphs)
-            return loadSymbols
-            #else
-            return SymbolsType()
-            #endif
         }
 
         func handleTranspilation(transpilation: Transpilation) throws {
@@ -856,7 +829,6 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         return plugins
     }
 }
-
 
 extension Source.FilePath {
     /// Initialize this file reference with an `AbsolutePath`
@@ -1172,4 +1144,16 @@ extension StreamingCommand {
     }
 }
 
+// MARK: Helpers
+
 typealias BufferedOutputByteStream = TSCBasic.BufferedOutputByteStream
+
+private extension AbsolutePath {
+    func deletingPathExtension() -> AbsolutePath {
+        parentDirectory.appending(component: basenameWithoutExt)
+    }
+
+    func appendingPathExtension(_ ext: String) -> AbsolutePath {
+        parentDirectory.appending(component: basenameWithoutExt + "." + ext)
+    }
+}
