@@ -1,10 +1,31 @@
 #!/bin/bash -e
+#
+# This script will coorinate releasing a binary artifact of:
+# https://github.com/skiptools/SkipSource.git
+# which will be published to the plug-in repository's releases:
+# https://github.com/skiptools/skip/releases
+#
+# The https://github.com/skiptools/skip.git repository
+# will be tagged with the next semantic version up from
+# its last tag.
+#
+# To make a patch release (like 1.0.2 -> 1.0.3), run:
+#
+#  ./scripts/release_skip.sh
+#
+# To make a minor release (like 1.0.2 -> 1.1.0):
+#
+#  SEMVER_BUMP='minor' ./scripts/release_skip.sh
+#
+# To make a major release (like 1.0.2 -> 2.0.0):
+#
+#  SEMVER_BUMP='major' ./scripts/release_skip.sh
 
-# cannot run unless there are currently no diffs
-git diff --exit-code
+# cannot run unless there are currently no diffs; override by running: 
+# SKIPDIFF=true ./scripts/release_skip.sh
+eval ${SKIPDIFF:-"git diff --exit-code"}
 
-CONFIG=release
-#CONFIG=debug
+SKIPCONFIG=${SKIPCONFIG:-"release"}
 
 PRODUCT=SkipRunner
 ARTIFACTTOOL=skiptool
@@ -23,18 +44,20 @@ SKIPPKGDIR=$(dirname ${SKIPPKG})
 # once we get this repo sync'd, we can rely on both tags being the same
 cd ${SKIPPKGDIR}
 SEMVER_CURRENT=$(git tag -l --sort=-version:refname | grep '[0-9]*\.[0-9]*\.[0-9]*' | head -n 1)
-SEMVER_NEXT=$(semver bump patch "${SEMVER_CURRENT}")
-#SEMVER_NEXT=$(semver bump minor "${SEMVER_CURRENT}")
-cd -
+SEMVER_NEXT=$(semver bump "${SEMVER_BUMP:-patch}" "${SEMVER_CURRENT}")
+
+cd '-'
 
 echo "Creating release and tagging new skip version: ${SEMVER_NEXT}"
 
 # mark the internal version
-RUNNER_PATH="Sources/SkipBuild/SkipTool.swift"
-sed -I '' 's;public let skipVersion = .*;public let skipVersion = "'${SEMVER_NEXT}'";g' ${RUNNER_PATH}
+VERSION_PATH="Sources/SkipSyntax/Version.swift"
 
+sed -I '' 's;public let skipVersion = .*;public let skipVersion = "'${SEMVER_NEXT}'";g' "${VERSION_PATH}"
 
-swift build --arch arm64 --arch x86_64 --configuration ${CONFIG} --product ${PRODUCT}
+git diff "${VERSION_PATH}"
+
+swift build --arch arm64 --arch x86_64 --configuration ${SKIPCONFIG} --product ${PRODUCT}
 
 set -o pipefail
 
@@ -43,7 +66,7 @@ mv -f ${DIR}/${ARTIFACTBUNDLE} ${DIR}/${ARTIFACTBUNDLE}.bk.`date +%s` || true
 mkdir -p ${DIR}/${ARTIFACTBUNDLE}
 
 # the secret --arch flag emits to the (undocumented) "apple" build folder
-cp -av .build/apple/Products/${CONFIG}/${PRODUCT} ${DIR}/${ARTIFACTBUNDLE}/${ARTIFACTTOOL}
+cp -av .build/apple/Products/${SKIPCONFIG}/${PRODUCT} ${DIR}/${ARTIFACTBUNDLE}/${ARTIFACTTOOL}
 
 cd ${DIR}
 
@@ -119,8 +142,8 @@ fi
 # finally, jump back and make a corresponding release in the private SwiftSource
 cd -
 
-#git add "${RUNNER_PATH}"
-#git commit -m "Release ${SEMVER_NEXT}" "${RUNNER_PATH}"
+#git add "${VERSION_PATH}"
+#git commit -m "Release ${SEMVER_NEXT}" "${VERSION_PATH}"
 #git tag --sign "${SEMVER_NEXT}" -m "Release ${SEMVER_NEXT}"
 #git push --follow-tags
 

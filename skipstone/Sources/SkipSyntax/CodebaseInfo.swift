@@ -32,8 +32,6 @@ public class CodebaseInfo: Codable {
             case .functionDeclaration, .initDeclaration:
                 rootFunctions.append(FunctionInfo(statement: statement as! FunctionDeclaration, codebaseInfo: self, delegate: delegate))
             case .typealiasDeclaration:
-                #warning("FIXME: crashes SkipFoundationKt")
-                break // FIXME: rootTypealiases results in crash with SkipFoundationKt build
                 rootTypealiases.append(TypealiasInfo(statement: statement as! TypealiasDeclaration, codebaseInfo: self, delegate: delegate))
             case .variableDeclaration:
                 let variableInfo = VariableInfo(statement: statement as! VariableDeclaration, codebaseInfo: self, delegate: delegate)
@@ -94,9 +92,9 @@ public class CodebaseInfo: Codable {
             var candidates = info.itemsByName[path[path.count - 1], default: []]
             if path.count > 1 {
                 let baseName = path.dropLast().joined(separator: ".")
-                candidates = candidates.filter { ($0 is TypeInfo) && $0.declaringType?.name == baseName }
+                candidates = candidates.filter { ($0 is TypeInfo || $0 is TypealiasInfo) && $0.declaringType?.name == baseName }
             } else if qualifiedMatch {
-                candidates = candidates.filter { !($0 is TypeInfo) || $0.declaringType == nil }
+                candidates = candidates.filter { !($0 is TypeInfo || $0 is TypealiasInfo) || $0.declaringType == nil }
             }
             return candidates
         }
@@ -864,7 +862,7 @@ public class CodebaseInfo: Codable {
 
         fileprivate init(statement: TypealiasDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo, delegate: CodebaseInfoGatherDelegate?) {
             self.name = statement.name
-            self.signature = statement.signature
+            self.signature = statement.aliasedType
             self.moduleName = codebaseInfo.moduleName
             self.sourceFile = statement.sourceFile
             self.declaringType = declaringType

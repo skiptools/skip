@@ -7,9 +7,6 @@ import TSCBasic
 import Universal
 import struct Universal.JSON
 
-/// The current version of the tool
-public let skipVersion = "0.2.2"
-
 struct Options {
     var preprocessorSymbols: [String] = []
 }
@@ -524,9 +521,8 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
             // go through the '--link modulename:../../some/path' arguments and try to load the modulename.skipcode.json symbols from the previous module's transpilation output
             for (linkModuleName, relativeLinkPath) in linkNamePaths {
-                let linkModulePath = moduleRootPath
+                let dependencyCodebaseInfo = moduleRootPath
                     .appending(RelativePath(relativeLinkPath))
-                let dependencyCodebaseInfo = linkModulePath
                     .parentDirectory
                     .appending(codebaseInfoPath(forModule: linkModuleName))
 
@@ -537,7 +533,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
                     }
                     dependentCodebaseInfos.append(cbinfo)
                     let codebaseLoadEnd = Date().timeIntervalSinceReferenceDate
-                    info("loaded codebase (\(Int64((codebaseLoadEnd - codebaseLoadStart) * 1000)) ms) for \(linkModuleName) with relative: \(relativeLinkPath) path: \(dependencyCodebaseInfo)", sourceFile: dependencyCodebaseInfo.sourceFile)
+                    info("loaded codebase (\(Int64((codebaseLoadEnd - codebaseLoadStart) * 1000)) ms) for \(linkModuleName) from: \(dependencyCodebaseInfo.relative(to: moduleRootPath))", sourceFile: dependencyCodebaseInfo.sourceFile)
                 } catch {
                     warn("error loading codebase for linkModuleName: \(linkModuleName) from: \(dependencyCodebaseInfo.pathString) error: \(error.localizedDescription)", sourceFile: dependencyCodebaseInfo.sourceFile)
                 }
