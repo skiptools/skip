@@ -67,9 +67,9 @@ public class KotlinCodebaseInfo {
                 guard let typealiasInfo = crossPlatformTypealias(forUnknownType: type) else {
                     return nil
                 }
-                return !mustBeInModule || typealiasInfo.moduleName == codebaseInfo.info.moduleName ? .classDeclaration : nil
+                return !mustBeInModule || typealiasInfo.moduleName == codebaseInfo.codebaseInfo.moduleName ? .classDeclaration : nil
             }
-            if mustBeInModule && typeInfo.moduleName != codebaseInfo.info.moduleName {
+            if mustBeInModule && typeInfo.moduleName != codebaseInfo.codebaseInfo.moduleName {
                 return nil
             }
             return typeInfo.declarationType

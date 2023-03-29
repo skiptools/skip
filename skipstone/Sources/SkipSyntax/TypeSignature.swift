@@ -148,6 +148,10 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                 return .dictionary(generics[0], generics[1])
             }
         case .member(let base, let type):
+            // Special case for stripping generics
+            if generics.isEmpty {
+                return .member(base.withGenerics([]), type.withGenerics([]))
+            }
             return .member(base, type.withGenerics(generics))
         case .metaType(let type):
             return .metaType(type.withGenerics(generics))
@@ -309,9 +313,10 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     /// Attempt to replace `.none` cases in this type signature with information from the given signature.
     func or(_ typeSignature: TypeSignature) -> TypeSignature {
         switch self {
-        case .array(.none):
-            if case .array = typeSignature {
-                return typeSignature
+        case .array(let elementType):
+            if case .array(let elementType2) = typeSignature {
+                let resolvedElementType = elementType.or(elementType2)
+                return .array(resolvedElementType)
             }
         case .dictionary(let keyType, let valueType):
             if case .dictionary(let keyType2, let valueType2) = typeSignature {
@@ -342,35 +347,35 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             }
         case .none:
             return typeSignature
-        case .optional(.none):
-            if case .optional = typeSignature {
-                return typeSignature
+        case .optional(let type):
+            if case .optional(let type2) = typeSignature {
+                return .optional(type.or(type2))
             }
-            if case .unwrappedOptional(let type) = typeSignature {
-                return .optional(type)
+            if case .unwrappedOptional(let type2) = typeSignature {
+                return .optional(type.or(type2))
             }
-            return .optional(typeSignature)
-        case .range(.none):
-            if case .range = typeSignature {
-                return typeSignature
+        case .range(let elementType):
+            if case .range(let elementType2) = typeSignature {
+                let resolvedElementType = elementType.or(elementType2)
+                return .range(resolvedElementType)
             }
-        case .set(.none):
-            if case .set = typeSignature {
-                return typeSignature
+        case .set(let elementType):
+            if case .set(let elementType2) = typeSignature {
+                let resolvedElementType = elementType.or(elementType2)
+                return .set(resolvedElementType)
             }
         case .tuple(let labels, let types):
             if case .tuple(_, let types2) = typeSignature, types.count == types2.count {
                 let resolvedTypes = zip(types, types2).map { $0.0.or($0.1) }
                 return .tuple(labels, resolvedTypes)
             }
-        case .unwrappedOptional(.none):
-            if case .unwrappedOptional = typeSignature {
-                return typeSignature
+        case .unwrappedOptional(let type):
+            if case .unwrappedOptional(let type2) = typeSignature {
+                return .unwrappedOptional(type.or(type2))
             }
-            if case .optional(let type) = typeSignature {
-                return .unwrappedOptional(type)
+            if case .optional(let type2) = typeSignature {
+                return .unwrappedOptional(type.or(type2))
             }
-            return .unwrappedOptional(typeSignature)
         default:
             break
         }
@@ -435,119 +440,152 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         }
     }
 
-    /// Whether this type may be represented by the given type using fuzzy matching.
-    func isCompatible(with type: TypeSignature) -> Bool {
-        if type == self {
-            return true
+    /// Score this type's compatibility for use as a parameter of the given type.
+    ///
+    /// 2 = Exact match
+    /// 1 = Compatible
+    /// 0 = Unknown match
+    /// nil = Not compatible
+    ///
+    /// Compound type with multiple elements return an average of their elements' scores.
+    func compatibilityScore(target: TypeSignature, codebaseInfo: CodebaseInfo.Context) -> Double? {
+        if self == target {
+            return 2.0
         }
-
-        let type = type.asOptional(false)
-        if type == self {
-            return true
+        var target = target
+        var targetIsOptional = false
+        if case .optional(let type) = target {
+            target = type
+            targetIsOptional = true
+            if self == target {
+                return 2.0
+            }
         }
 
         switch self {
-        case .any:
-            return true
-        case .anyObject:
-            return true
-        case .array(let elementType):
-            if case .array(let elementType2) = type {
-                return elementType.isCompatible(with: elementType2)
+        case .array(let element):
+            if case .array(let targetElement) = target {
+                guard let elementScore = element.compatibilityScore(target: targetElement, codebaseInfo: codebaseInfo) else {
+                    return nil
+                }
+                return (2.0 + elementScore) / 2.0
             }
-            if case .range(let elementType2) = type {
-                return elementType.isCompatible(with: elementType2)
-            }
-            if case .set(let elementType2) = type {
-                return elementType.isCompatible(with: elementType2)
+            if case .set(let targetElement) = target {
+                guard let elementScore = element.compatibilityScore(target: targetElement, codebaseInfo: codebaseInfo) else {
+                    return nil
+                }
+                return (2.0 + elementScore) / 2.0
             }
         case .character:
-            if type.isStringy {
-                return true
+            if target.isStringy {
+                return 1.0
             }
         case .dictionary(let keyType, let valueType):
-            if case .dictionary(let keyType2, let valueType2) = type {
-                return keyType.isCompatible(with: keyType2) && valueType.isCompatible(with: valueType2)
+            if case .dictionary(let keyType2, let valueType2) = target {
+                guard let keyScore = keyType.compatibilityScore(target: keyType2, codebaseInfo: codebaseInfo), let valueScore = valueType.compatibilityScore(target: valueType2, codebaseInfo: codebaseInfo) else {
+                    return nil
+                }
+                return (2.0 + keyScore + 2.0 + valueScore) / 4.0
             }
-        case .double:
-            fallthrough
-        case .float:
-            fallthrough
-        case .int:
-            fallthrough
-        case .int8:
-            fallthrough
-        case .int16:
-            fallthrough
-        case .int32:
-            fallthrough
-        case .int64:
-            fallthrough
-        case .uint:
-            fallthrough
-        case .uint8:
-            fallthrough
-        case .uint16:
-            fallthrough
-        case .uint32:
-            fallthrough
-        case .uint64:
-            if type.isNumeric {
-                return true
+        case .double, .float:
+            if target.isFloatingPoint {
+                return 1.5
+            }
+            if target.isNumeric {
+                return 1.0
+            }
+        case .int, .int8, .int16, .int32, .int64, .uint, .uint8, .uint16, .uint64:
+            if target.isFloatingPoint {
+                return 1.0
+            }
+            if target.isNumeric {
+                return 1.5
             }
         case .function:
-            if case .function = type {
-                return true
+            // TODO: Match params and return type
+            if case .function = target {
+                return 1.0
             }
-        case .member(let base, let type):
-            if case .member(let base2, let type2) = type {
-                return base == base2 && type.isCompatible(with: type2)
+        case .member, .named:
+            // TODO: Match on generics
+            let type = withGenerics([])
+            let target = target.withGenerics([])
+            // Consider a match on all except generics a very close match
+            if type == target {
+                return 1.95
             }
-        case .named:
-            // TODO: This would have to be able to check inheritance relationships to be accurate. We could improve by scoring same-named matches higher
-            if case .named = type {
-                return true
+            // Take away a tenth of a point for each level down the inheritance chain, so that less derived matches score lower.
+            // This will allow another function with a more specific parameter type to score higher
+            let inherits = codebaseInfo.inheritanceChainSignatures(for: type)
+            if inherits.count > 1 {
+                for i in 1..<inherits.count {
+                    if inherits[i].withGenerics([]) == target {
+                        return 2.0 - (Double(i) * 0.1)
+                    }
+                }
+            }
+            let protocols = codebaseInfo.protocolSignatures(for: type).map { $0.withGenerics([]) }
+            if protocols.contains(target) {
+                return 1.5
             }
         case .none:
-            return true
-        case .optional(let wrappedType):
-            return wrappedType.isCompatible(with: type)
-        case .range(let elementType):
-            if case .array(let elementType2) = type {
-                return elementType.isCompatible(with: elementType2)
+            return 0.0
+        case .optional(let type):
+            guard targetIsOptional else {
+                // Can't pass an optional value to a non-optional parameter
+                return nil
             }
-            if case .range(let elementType2) = type {
-                return elementType.isCompatible(with: elementType2)
+            return type.compatibilityScore(target: target, codebaseInfo: codebaseInfo)
+        case .range(let element):
+            if case .range(let targetElement) = target {
+                guard let elementScore = element.compatibilityScore(target: targetElement, codebaseInfo: codebaseInfo) else {
+                    return nil
+                }
+                return (2.0 + elementScore) / 2.0
             }
-            if case .set(let elementType2) = type {
-                return elementType.isCompatible(with: elementType2)
-            }
-        case .set(let elementType):
-            if case .array(let elementType2) = type {
-                return elementType.isCompatible(with: elementType2)
-            }
-            if case .range(let elementType2) = type {
-                return elementType.isCompatible(with: elementType2)
-            }
-            if case .set(let elementType2) = type {
-                return elementType.isCompatible(with: elementType2)
+        case .set(let element):
+            if case .set(let targetElement) = target {
+                guard let elementScore = element.compatibilityScore(target: targetElement, codebaseInfo: codebaseInfo) else {
+                    return nil
+                }
+                return (2.0 + elementScore) / 2.0
             }
         case .string:
-            if type.isStringy {
-                return true
+            if target.isStringy {
+                return 1.0
             }
         case .tuple(_, let types):
-            if case .tuple(_, let types2) = type {
-                return types.count == types2.count && !zip(types, types2).contains(where: { !$0.0.isCompatible(with: $0.1) })
+            if case .tuple(_, let targetTypes) = target {
+                guard types.count == targetTypes.count else {
+                    return nil
+                }
+                var totalScore = 0.0
+                for (type, targetType) in zip(types, targetTypes) {
+                    guard let score = type.compatibilityScore(target: targetType, codebaseInfo: codebaseInfo) else {
+                        return nil
+                    }
+                    totalScore += score
+                }
+                return (2.0 + totalScore) / Double(1 + types.count)
             }
-        case .unwrappedOptional(let wrappedType):
-            return wrappedType.isCompatible(with: type)
+        case .unwrappedOptional(let type):
+            return type.compatibilityScore(target: target, codebaseInfo: codebaseInfo)
         case .void:
-            return type == .none
+            if target == .none {
+                return 1.0
+            }
         default:
             break
         }
-        return type == .none || type == .any || type == .anyObject
+
+        switch target {
+        case .any, .anyObject:
+            return 1.0
+        case .none:
+            return 0.0
+        default:
+            return nil
+        }
     }
 
     /// Whether this type signature does not have any `.none` values.

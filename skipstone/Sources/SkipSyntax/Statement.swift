@@ -25,7 +25,7 @@ class Statement: SyntaxNode {
 }
 
 /// Decode statements from syntax.
-struct StatementDecoder {
+struct  StatementDecoder {
     static func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) -> [Statement] {
         let extras = StatementExtras.decode(syntax: syntax)
         var statements: [Statement] = []

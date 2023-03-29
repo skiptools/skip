@@ -88,7 +88,7 @@ extension Message {
     }
 
     static func ambiguousFunctionCall(sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) -> Message {
-        return Message(kind: .warning, message: "Skip is unable to disambiguate this function call. Consider adding explicit types to the values supplied as arguments", sourceFile: sourceFile, sourceRange: sourceRange)
+        return Message(kind: .warning, message: "Skip is unable to disambiguate this function call. Consider differentiating your functions with unique parameter labels", sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
     static func ifDeclPlacement(_ syntax: SyntaxProtocol, source: Source? = nil, sourceRange: Source.Range? = nil) -> Message {

@@ -155,6 +155,51 @@ final class CodebaseInfoTests: XCTestCase {
         XCTAssertEqual([.function([.init(label: "tc1", type: .function([], .array(.int)))], .function([.init(type: .named("TestEnum", []))], .int))], context.functionSignature(of: "trailingClosureF3", in: .named("TestClass", []), arguments: [LabeledValue<TypeSignature>(label: nil, value: .function([], .none))]))
     }
 
+    func testFunctionOverload() async throws {
+        let context = try await setUpContext(swift: """
+        func f(p: Int32) -> Int32 {
+            return 0
+        }
+        func f(p: Float) -> Float {
+            return 0
+        }
+        func f(p: String) -> String {
+            return s
+        }
+        func f(p: Any) -> Any {
+            return 1
+        }
+        """)
+
+        XCTAssertEqual([.function([.init(label: "p", type: .int32)], .int32)], context.functionSignature(of: "f", arguments: [.init(label: "p", value: .int)]))
+        XCTAssertEqual([.function([.init(label: "p", type: .float)], .float)], context.functionSignature(of: "f", arguments: [.init(label: "p", value: .double)]))
+        XCTAssertEqual([.function([.init(label: "p", type: .string)], .string)], context.functionSignature(of: "f", arguments: [.init(label: "p", value: .string)]))
+        XCTAssertEqual([.function([.init(label: "p", type: .any)], .any)], context.functionSignature(of: "f", arguments: [.init(label: "p", value: .array(.int))]))
+        XCTAssertEqual(4, context.functionSignature(of: "f", arguments: [.init(label: "p", value: .none)]).count)
+    }
+
+    func testInheritanceFunctionOverload() async throws {
+        let context = try await setUpContext(swift: """
+        protocol P {}
+        class A: P {}
+        class B: A {}
+        class C: B {}
+        class D {}
+
+        func f(p: B) {
+        }
+        func f(p: P) {
+        }
+        func f(p: Any) {
+        }
+        """)
+
+        XCTAssertEqual([.function([.init(label: "p", type: .named("P", []))], .void)], context.functionSignature(of: "f", arguments: [.init(label: "p", value: .named("P", []))]))
+        XCTAssertEqual([.function([.init(label: "p", type: .named("P", []))], .void)], context.functionSignature(of: "f", arguments: [.init(label: "p", value: .named("A", []))]))
+        XCTAssertEqual([.function([.init(label: "p", type: .named("B", []))], .void)], context.functionSignature(of: "f", arguments: [.init(label: "p", value: .named("B", []))]))
+        XCTAssertEqual([.function([.init(label: "p", type: .any)], .void)], context.functionSignature(of: "f", arguments: [.init(label: "p", value: .named("D", []))]))
+    }
+
     func testConstructor() async throws {
         let context = try await setUpContext(swift: """
         struct TestStruct {

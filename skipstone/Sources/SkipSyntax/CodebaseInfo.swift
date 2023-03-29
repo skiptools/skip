@@ -65,17 +65,17 @@ public class CodebaseInfo: Codable {
     
     /// Create a context that can access the given imported modules.
     func context(importedModuleNames: [String] = [], sourceFile: Source.FilePath? = nil) -> Context {
-        return Context(info: self, importedModuleNames: Set(importedModuleNames), sourceFile: sourceFile)
+        return Context(codebaseInfo: self, importedModuleNames: Set(importedModuleNames), sourceFile: sourceFile)
     }
     
     /// A context for accessing visible codebase information.
     struct Context {
-        let info: CodebaseInfo
+        let codebaseInfo: CodebaseInfo
         private let importedModuleNames: Set<String>
         private let sourceFile: Source.FilePath?
         
-        fileprivate init(info: CodebaseInfo, importedModuleNames: Set<String>, sourceFile: Source.FilePath?) {
-            self.info = info
+        fileprivate init(codebaseInfo: CodebaseInfo, importedModuleNames: Set<String>, sourceFile: Source.FilePath?) {
+            self.codebaseInfo = codebaseInfo
             var importedModuleNames = importedModuleNames
             importedModuleNames.insert("SkipLib") // Contains our supported subset of the Swift builtin module
             self.importedModuleNames = importedModuleNames
@@ -94,7 +94,7 @@ public class CodebaseInfo: Codable {
             guard !path.isEmpty else {
                 return []
             }
-            var candidates = info.itemsByName[path[path.count - 1], default: []]
+            var candidates = codebaseInfo.itemsByName[path[path.count - 1], default: []]
             if path.count > 1 {
                 let baseName = path.dropLast().joined(separator: ".")
                 candidates = candidates.filter { ($0 is TypeInfo || $0 is TypealiasInfo) && $0.declaringType?.name == baseName }
@@ -119,7 +119,7 @@ public class CodebaseInfo: Codable {
         /// A score of 0 indicates that the item is not visible.
         func rankScore(of item: CodebaseInfoItem) -> Int {
             var score = 0
-            if item.moduleName == info.moduleName {
+            if item.moduleName == codebaseInfo.moduleName {
                 if let itemSourcePath = item.sourceFile?.path, let sourcePath = sourceFile?.path, itemSourcePath.hasSuffix(sourcePath) {
                     // Favor a symbol in this file
                     score += 3
@@ -232,13 +232,13 @@ public class CodebaseInfo: Codable {
                     return []
                 }
             }
-            let initsCandidates = initSignatures(for: typeInfos, arguments: arguments)
-            
-            return (funcsCandidates + initsCandidates).reduce(into: [TypeSignature]()) { result, signature in
-                if !result.contains(signature) {
-                    result.append(signature)
-                }
+            let initsCandidates = initCandidates(for: typeInfos, arguments: arguments)
+            let sortedCandidates = Set(funcsCandidates + initsCandidates).sorted { $0.score > $1.score }
+            guard let topCandidate = sortedCandidates.first else {
+                return []
             }
+            // Return all matches with the top score
+            return sortedCandidates.filter { $0.score >= topCandidate.score }.map(\.signature)
         }
         
         /// Return the signatures of the possible member functions being called with the given arguments.
@@ -249,7 +249,7 @@ public class CodebaseInfo: Codable {
             if case .tuple(let labels, let types) = type {
                 for (index, label) in labels.enumerated() {
                     if name == label || name == "\(index)" {
-                        let function = matchFunction(types[index], arguments: arguments)
+                        let function = matchTuple(types[index], arguments: arguments)
                         return function == .none ? [] : [function]
                     }
                 }
@@ -260,14 +260,17 @@ public class CodebaseInfo: Codable {
                 type = base
                 isStatic = true
             }
-            
+
+            var candidates: Set<FunctionCandidate> = []
             for typeInfo in typeInfos(for: type) {
-                let functions = functionSignature(of: name, in: typeInfo, arguments: arguments, isStatic: isStatic)
-                if !functions.isEmpty {
-                    return functions
-                }
+                functionCandidates(for: name, in: typeInfo, arguments: arguments, isStatic: isStatic).forEach { candidates.insert($0) }
             }
-            return []
+            let sortedCandidates = candidates.sorted { $0.score > $1.score }
+            guard let topCandidate = sortedCandidates.first else {
+                return []
+            }
+            // Return all matches with the top score
+            return sortedCandidates.filter { $0.score >= topCandidate.score }.map(\.signature)
         }
         
         /// Return the signatures of the possible subscripts being called with the given arguments.
@@ -283,14 +286,17 @@ public class CodebaseInfo: Codable {
                 type = base
                 isStatic = true
             }
-            
+
+            var candidates: Set<FunctionCandidate> = []
             for typeInfo in typeInfos(for: type) {
-                let functions = functionSignature(of: "subscript", in: typeInfo, arguments: arguments, isStatic: isStatic)
-                if !functions.isEmpty {
-                    return functions
-                }
+                functionCandidates(for: "subscript", in: typeInfo, arguments: arguments, isStatic: isStatic).forEach { candidates.insert($0) }
             }
-            return []
+            let sortedCandidates = candidates.sorted { $0.score > $1.score }
+            guard let topCandidate = sortedCandidates.first else {
+                return []
+            }
+            // Return all matches with the top score
+            return sortedCandidates.filter { $0.score >= topCandidate.score }.map(\.signature)
         }
         
         /// Return the associated values of the given enum case.
@@ -304,9 +310,9 @@ public class CodebaseInfo: Codable {
             return []
         }
         
-        private func identifierSignature(of member: String, in candidate: TypeInfo, isStatic: Bool) -> TypeSignature {
+        private func identifierSignature(of member: String, in typeInfo: TypeInfo, isStatic: Bool) -> TypeSignature {
             // We allow .init to be used both as a static or instance member
-            if let memberInfo = candidate.visibleMembers(context: self).first(where: { $0.name == member && ($0.declarationType == .initDeclaration || $0.isStatic == isStatic) }) {
+            if let memberInfo = typeInfo.visibleMembers(context: self).first(where: { $0.name == member && ($0.declarationType == .initDeclaration || $0.isStatic == isStatic) }) {
                 // Enum cases with associated values are modeled as functions, but can also be used as identifiers
                 if memberInfo.declarationType == .enumCaseDeclaration {
                     return memberInfo.declaringType ?? .none
@@ -316,9 +322,9 @@ public class CodebaseInfo: Codable {
                     return memberInfo.signature
                 }
             }
-            for inherits in candidate.inherits {
-                for typeInfo in typeInfos(for: inherits) {
-                    let signature = identifierSignature(of: member, in: typeInfo, isStatic: isStatic)
+            for inherits in typeInfo.inherits {
+                for inheritsInfo in typeInfos(for: inherits) {
+                    let signature = identifierSignature(of: member, in: inheritsInfo, isStatic: isStatic)
                     if signature != .none {
                         return signature
                     }
@@ -326,41 +332,37 @@ public class CodebaseInfo: Codable {
             }
             return .none
         }
-        
-        private func functionSignature(of name: String, in candidate: TypeInfo, arguments: [LabeledValue<TypeSignature>], isStatic: Bool) -> [TypeSignature] {
-            let functions = candidate.visibleMembers(context: self).flatMap { (member) -> [TypeSignature] in
+
+        /// - Note: Returns unsorted, un-deduped results.
+        private func functionCandidates(for name: String, in typeInfo: TypeInfo, arguments: [LabeledValue<TypeSignature>], isStatic: Bool) -> [FunctionCandidate] {
+            var candidates = typeInfo.visibleMembers(context: self).flatMap { (member) -> [FunctionCandidate] in
                 // We allow .init to be used both as a static or instance member
                 guard member.name == name && (member.declarationType == .initDeclaration || member.isStatic == isStatic) else {
                     return []
                 }
                 if let memberTypeInfo = member as? TypeInfo {
-                    return initSignatures(for: [memberTypeInfo], arguments: arguments)
+                    return initCandidates(for: [memberTypeInfo], arguments: arguments)
                 } else if member.declarationType == .typealiasDeclaration {
-                    return initSignatures(for: typeInfos(for: member.signature), arguments: arguments)
-                } else if let function = matchFunction(member, arguments: arguments) {
-                    return [function]
+                    return initCandidates(for: typeInfos(for: member.signature), arguments: arguments)
+                } else if let candidate = matchFunction(member, arguments: arguments) {
+                    return [candidate]
                 } else {
                     return []
                 }
             }
-            if !functions.isEmpty {
-                return functions
-            }
-            for inherits in candidate.inherits {
-                for typeInfo in typeInfos(for: inherits) {
-                    let functions = functionSignature(of: name, in: typeInfo, arguments: arguments, isStatic: isStatic)
-                    if !functions.isEmpty {
-                        return functions
-                    }
+            for inherits in typeInfo.inherits {
+                for inheritsInfo in typeInfos(for: inherits) {
+                    candidates += functionCandidates(for: name, in: inheritsInfo, arguments: arguments, isStatic: isStatic)
                 }
             }
-            return []
+            return candidates
         }
-        
-        private func initSignatures(for typeInfos: [TypeInfo], arguments: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
+
+        /// - Note: Returns unsorted, un-deduped results.
+        private func initCandidates(for typeInfos: [TypeInfo], arguments: [LabeledValue<TypeSignature>]) -> [FunctionCandidate] {
             var initSignatures = typeInfos.flatMap { typeInfo in
                 let initInfos = typeInfo.visibleMembers(context: self).filter { $0.declarationType == .initDeclaration }
-                return initInfos.compactMap { (initInfo: CodebaseInfoItem) -> TypeSignature? in
+                return initInfos.compactMap { (initInfo: CodebaseInfoItem) -> FunctionCandidate? in
                     return matchFunction(initInfo, arguments: arguments)
                 }
             }
@@ -369,13 +371,13 @@ public class CodebaseInfo: Codable {
             // while inferring the types of variable values in prepareForUse(), before we've called generateConstructors()
             if initSignatures.isEmpty && !typeInfos.isEmpty {
                 let initParameters = arguments.map { TypeSignature.Parameter(label: $0.label, type: $0.value, isVariadic: false, hasDefaultValue: false) }
-                initSignatures.append(.function(initParameters, typeInfos[0].signature))
+                initSignatures.append(FunctionCandidate(signature: .function(initParameters, typeInfos[0].signature), score: 0.0))
             }
             return initSignatures
         }
         
-        private func associatedValueSignatures(of member: String, in candidate: TypeInfo) -> [TypeSignature.Parameter]? {
-            guard let memberInfo = candidate.visibleMembers(context: self).first(where: { $0.name == member && $0.declarationType == .enumCaseDeclaration }) else {
+        private func associatedValueSignatures(of member: String, in typeInfo: TypeInfo) -> [TypeSignature.Parameter]? {
+            guard let memberInfo = typeInfo.visibleMembers(context: self).first(where: { $0.name == member && $0.declarationType == .enumCaseDeclaration }) else {
                 return nil
             }
             guard case .function(let parameters, _) = memberInfo.signature else {
@@ -383,8 +385,15 @@ public class CodebaseInfo: Codable {
             }
             return parameters
         }
+
+        private func matchTuple(_ signature: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> TypeSignature {
+            guard case .function(let parameterTypes, _) = signature, parameterTypes.count == arguments.count else {
+                return .none
+            }
+            return signature
+        }
         
-        private func matchFunction(_ item: CodebaseInfoItem, arguments: [LabeledValue<TypeSignature>]) -> TypeSignature? {
+        private func matchFunction(_ item: CodebaseInfoItem, arguments: [LabeledValue<TypeSignature>]) -> FunctionCandidate? {
             guard case .function(let parameters, let returnType) = item.signature else {
                 return nil
             }
@@ -395,12 +404,14 @@ public class CodebaseInfo: Codable {
             // Match each argument to a parameter
             var matchingParameters: [TypeSignature.Parameter] = []
             var parameterIndex = 0
+            var totalScore = 0.0
             for argument in arguments {
-                guard let matchingIndex = matchArgument(argument, to: parameters, startIndex: parameterIndex) else {
+                guard let (matchingIndex, score) = matchArgument(argument, to: parameters, startIndex: parameterIndex) else {
                     return nil
                 }
                 matchingParameters.append(parameters[matchingIndex].or(argument.value))
                 parameterIndex = matchingIndex + 1
+                totalScore += score
             }
             // Make sure there are no more required parameters
             if parameterIndex < parameters.count {
@@ -408,31 +419,26 @@ public class CodebaseInfo: Codable {
                     return nil
                 }
             }
-            return .function(matchingParameters, returnType)
+            return FunctionCandidate(signature: .function(matchingParameters, returnType), score: totalScore)
         }
-        
-        private func matchFunction(_ signature: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> TypeSignature {
-            guard case .function(let parameterTypes, _) = signature, parameterTypes.count == arguments.count else {
-                return .none
-            }
-            return signature
-        }
-        
-        private func matchArgument(_ argument: LabeledValue<TypeSignature>, to parameters: [TypeSignature.Parameter], startIndex: Int) -> Int? {
+
+        private func matchArgument(_ argument: LabeledValue<TypeSignature>, to parameters: [TypeSignature.Parameter], startIndex: Int) -> (index: Int, score: Double)? {
+            // Note: in the algorith below we give an extra point for matching a label (or absence of one), as opposed to
+            // being a trailing closure that omits the label
             for (index, parameter) in parameters[startIndex...].enumerated() {
                 if let label = argument.label {
                     // If there is a label, then it either has to match or we have to be able to skip this parameter
-                    if parameter.label == label {
-                        return startIndex + index
+                    if label == parameter.label, let score = argument.value.compatibilityScore(target: parameter.type, codebaseInfo: self) {
+                        return (startIndex + index, 1.0 + score)
                     } else if !parameter.hasDefaultValue {
                         return nil
                     }
                 } else {
                     // If there is no label, then either this parameter has to have no label or it has to be a trailing closure
-                    if parameter.label == nil && parameter.type.isCompatible(with: argument.value) {
-                        return startIndex + index
-                    } else if case .function = parameter.type, parameter.type.isCompatible(with: argument.value) {
-                        return startIndex + index
+                    if parameter.label == nil, let score = argument.value.compatibilityScore(target: parameter.type, codebaseInfo: self) {
+                        return (startIndex + index, 1.0 + score)
+                    } else if case .function = parameter.type, let score = argument.value.compatibilityScore(target: parameter.type, codebaseInfo: self) {
+                        return (startIndex + index, score)
                     } else if !parameter.hasDefaultValue {
                         return nil
                     }
@@ -473,6 +479,11 @@ public class CodebaseInfo: Codable {
                 return [type.name]
             }
         }
+    }
+
+    private struct FunctionCandidate: Hashable {
+        let signature: TypeSignature
+        let score: Double
     }
     
     private var rootTypes: [TypeInfo] = []
