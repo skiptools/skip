@@ -511,7 +511,7 @@ class KotlinTryCatch: KotlinStatement {
         var caseTargetVariable: KotlinCaseTargetVariable? = nil
         for catchCase in statement.catches {
             // Every enum that conforms to Error is translated to sealed classes, so we pass isSealedClassesEnum: true
-            // here even without knowing the enum class and consulting symbols
+            // here even without knowing the enum class and consulting codebase info
             var (kcatch, catchMessages) = KotlinCase.translate(expression: catchCase, matchingOn: matchOn, isSealedClassesEnum: true, caseTargetVariable: &caseTargetVariable, translator: translator)
             let promotedBindingIdentifier = promotedBindingIdentifier(from: &kcatch)
             for pattern in kcatch.patterns {

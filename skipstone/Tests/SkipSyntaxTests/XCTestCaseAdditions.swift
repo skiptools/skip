@@ -3,21 +3,11 @@ import SkipBuild
 import XCTest
 
 extension XCTestCase {
-    /// Whether to use the locally cached symbols for SkipLib syntax testing
-    static let shouldUseLocalSymbols: Bool = true
-
     /// Checks that the given Swift compiles to the specified Kotlin.
     public func check(expectFailure: Bool = false, supportingSwift: String? = nil, swift: String, kotlin: String? = nil, file: StaticString = #file, line: UInt = #line) async throws {
         guard let kotlin else {
             return
         }
-
-        #if os(Linux)
-        // FIXME: symbol generation not currently working on linux, so tests that use symbols are disabled
-        if symbols == nil {
-            throw XCTSkip("symbol-reliant tests not yet working on Linux")
-        }
-        #endif
 
         let srcFile = try tmpFile(named: "Source.swift", contents: swift)
         var srcFiles = [Source.FilePath(path: srcFile.path)]

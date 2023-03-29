@@ -124,7 +124,7 @@ final class TypeDeclarationTests: XCTestCase {
         }
         """)
 
-        // These types are not present in symbols so that we can simulate out-of-module extensions
+        // Extend unknown types so that we can simulate out-of-module extensions
         try await check(swift: """
         extension C {
             func f() {

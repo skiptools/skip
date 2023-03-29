@@ -82,7 +82,7 @@ class KotlinSwiftUIPlugin: KotlinPlugin {
     }
 
     private func isView(_ classDeclaration: KotlinClassDeclaration) -> Bool {
-        // TODO: Ask symbols
+        // TODO: Ask codebase info
         return classDeclaration.inherits.contains(.named("View", []))
     }
 

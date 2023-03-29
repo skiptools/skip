@@ -9,7 +9,6 @@ struct TypeInferenceContext {
     ///
     /// - Parameters:
     ///   - codebaseInfo: Available codebase information.
-    ///   - symbols: Available symbol information.
     ///   - sourceFile: Source file for this context.
     ///   - statements: Top-level statements from which to determine imports.
     init(codebaseInfo: CodebaseInfo? = nil, sourceFile: Source.FilePath?, statements: [Statement]) {
