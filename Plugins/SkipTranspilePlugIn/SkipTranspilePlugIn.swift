@@ -54,15 +54,11 @@ import PackagePlugin
 
             let expectedName = kotlinModule
 
-            guard let primaryDependency = target.dependencies.first,
-                case .target(let dependencyTarget) = primaryDependency else {
-                throw TranspilePlugInError("Target «\(target.name)» should have initial dependency on «\(expectedName)»")
+            guard let dependencyTarget = try context.package.targets(named: [expectedName]).first else {
+                throw TranspilePlugInError("Target «\(target.name)» should have a peer test target named «\(expectedName)»")
             }
 
             peerTarget = dependencyTarget
-            if peerTarget.name != expectedName {
-                throw TranspilePlugInError("Target «\(target.name)» should have initial dependency on «\(expectedName)»")
-            }
         }
 
         guard let swiftSourceTarget  = peerTarget as? SourceModuleTarget else {

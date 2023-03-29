@@ -13,7 +13,10 @@ import PackagePlugin
 /// - Note: The location of your Command Line Tools must be set in Xcode->Settings->Locations
 @main struct SkipCommand: CommandPlugin {
     func performCommand(context: PluginContext, arguments: [String]) async throws {
-        let runner = try context.tool(named: "skiptool")
+        try runCommand(tool: context.tool(named: "skiptool"), arguments: arguments)
+    }
+
+    fileprivate func runCommand(tool runner: PackagePlugin.PluginContext.Tool, arguments: [String]) throws {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: runner.path.string)
         process.arguments = arguments
@@ -21,3 +24,13 @@ import PackagePlugin
         process.waitUntilExit()
     }
 }
+
+#if canImport(XcodeProjectPlugin)
+import XcodeProjectPlugin
+
+extension SkipCommand: XcodeCommandPlugin {
+    func performCommand(context: XcodePluginContext, arguments: [String]) throws {
+        try runCommand(tool: context.tool(named: "skiptool"), arguments: arguments)
+    }
+}
+#endif

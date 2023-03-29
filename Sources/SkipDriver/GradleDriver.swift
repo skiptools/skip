@@ -96,7 +96,8 @@ public struct GradleDriver {
         // the resulting command will be something like:
         // java -Xmx64m -Xms64m -Dorg.gradle.appname=gradle -classpath /opt/homebrew/Cellar/gradle/8.0.2/libexec/lib/gradle-launcher-8.0.2.jar org.gradle.launcher.GradleMain info
         #if DEBUG
-        print("execGradle:", (gradleArgs + args).joined(separator: " "), "env:", env)
+        // output the launch message in a format that makes it easy to copy and paste the result into the terminal
+        print("execGradle:", env.keys.sorted().map { $0 + "=\"" + env[$0, default: ""] + "\"" }.joined(separator: " "), (gradleArgs + args).joined(separator: " "))
         #endif
 
         // transfer process environment along with the additional environment

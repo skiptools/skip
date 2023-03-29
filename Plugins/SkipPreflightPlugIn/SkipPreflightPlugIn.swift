@@ -15,7 +15,7 @@ import PackagePlugin
         let runner = try context.tool(named: "skiptool").path
         let inputPaths = sourceModuleTarget.sourceFiles(withSuffix: ".swift").map { $0.path }
         let outputDir = context.pluginWorkDirectory
-        return inputPaths.map { Command.buildCommand(displayName: "skippy", executable: runner, arguments: ["precheck", "-O", "\(outputDir.string)", $0.string], inputFiles: [$0], outputFiles: [$0.outputPath(in: outputDir)]) }
+        return inputPaths.map { Command.buildCommand(displayName: "skippy", executable: runner, arguments: ["preflight", "-O", "\(outputDir.string)", $0.string], inputFiles: [$0], outputFiles: [$0.outputPath(in: outputDir)]) }
     }
 }
 
@@ -29,7 +29,7 @@ extension SkipPreflightPlugIn: XcodeBuildToolPlugin {
             .filter { $0.type == .source && $0.path.extension == "swift" }
             .map { $0.path }
         let outputDir = context.pluginWorkDirectory
-        return inputPaths.map { Command.buildCommand(displayName: "skippy", executable: runner, arguments: ["precheck", "-O", "\(outputDir.string)", $0.string], inputFiles: [$0], outputFiles: [$0.outputPath(in: outputDir)]) }
+        return inputPaths.map { Command.buildCommand(displayName: "skippy", executable: runner, arguments: ["preflight", "-O", "\(outputDir.string)", $0.string], inputFiles: [$0], outputFiles: [$0.outputPath(in: outputDir)]) }
     }
 }
 #endif
@@ -43,7 +43,7 @@ extension Path {
         if outputFileName.hasSuffix(".swift") {
             outputFileName = String(lastComponent.dropLast(".swift".count))
         }
-        outputFileName += "_skipcheck.swift"
+        outputFileName += "_preflight.swift"
         return outputDir.appending(subpath: outputFileName)
     }
 }
