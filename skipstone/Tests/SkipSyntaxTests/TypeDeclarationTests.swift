@@ -242,6 +242,18 @@ final class TypeDeclarationTests: XCTestCase {
         """, kotlin: """
         private typealias IArray = Array<Boolean>
         """)
+
+        try await check(swift: """
+        typealias SkipUUID = java.util.UUID
+        {
+            let u = SkipUUID.uuidString()
+        }
+        """, kotlin: """
+        internal typealias SkipUUID = java.util.UUID
+        {
+            val u = SkipUUID.uuidString()
+        }
+        """)
     }
 
     func testGenericClass() async throws {

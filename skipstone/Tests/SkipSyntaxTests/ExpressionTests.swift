@@ -86,11 +86,13 @@ final class ExpressionTests: XCTestCase {
             static func staticFunc() {
             }
         }
+        typealias X = C
 
         func f() {
             g(c: C.self)
             g(c: C.typeVar)
             C.staticFunc()
+            X.staticFunc()
             C.typeVar.staticFunc()
         }
 
@@ -109,11 +111,13 @@ final class ExpressionTests: XCTestCase {
                 }
             }
         }
+        internal typealias X = C
 
         internal fun f() {
             g(c = C::class)
             g(c = C.typeVar)
             C.staticFunc()
+            X.staticFunc()
             (C.typeVar.companionObjectInstance as C.Companion).staticFunc()
         }
 

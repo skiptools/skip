@@ -64,7 +64,10 @@ public class KotlinCodebaseInfo {
         /// Whether the given type is a class, struct, etc, optionally limiting results to this module.
         func declarationType(of type: TypeSignature, mustBeInModule: Bool) -> StatementType? {
             guard let typeInfo = codebaseInfo.typeInfos(for: type).first(where: { $0.declarationType != .extensionDeclaration }) else {
-                return nil
+                guard let typealiasInfo = crossPlatformTypealias(forUnknownType: type) else {
+                    return nil
+                }
+                return !mustBeInModule || typealiasInfo.moduleName == codebaseInfo.info.moduleName ? .classDeclaration : nil
             }
             if mustBeInModule && typeInfo.moduleName != codebaseInfo.info.moduleName {
                 return nil
@@ -137,7 +140,8 @@ public class KotlinCodebaseInfo {
                 // Assume an unknown type could be a mutable struct
                 let type = type.asOptional(false)
                 if case .named = type {
-                    return true
+                    // Cross platform typealiases should not be treated as mutable structs
+                    return crossPlatformTypealias(forUnknownType: type) == nil
                 } else if type == .any {
                     return true
                 } else {
@@ -172,6 +176,12 @@ public class KotlinCodebaseInfo {
             }
             let items = codebaseInfo.ranked(codebaseInfo.lookup(name: name))
             return items.contains { $0.declarationType == .functionDeclaration && $0.declaringType?.name == owningType?.name }
+        }
+
+        /// Cross platform library code may create typealiases to unknown types. Return any typealias for the given unknown type.
+        private func crossPlatformTypealias(forUnknownType type: TypeSignature) -> CodebaseInfo.TypealiasInfo? {
+            let members = codebaseInfo.ranked(codebaseInfo.lookup(name: type.name, qualifiedMatch: true))
+            return members.first(where: { $0.declarationType == .typealiasDeclaration }) as? CodebaseInfo.TypealiasInfo
         }
 
         private func hasMember(_ owningType: TypeSignature, name: String, type: TypeSignature?, isStatic: Bool) -> Bool {
