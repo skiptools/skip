@@ -30,7 +30,7 @@ let package = Package(
         .testTarget(name: "SkipSyntaxTests", dependencies: [
             "SkipSyntax",
             "SkipBuild",
-        ], resources: [.copy("symbols")]),
+        ]),
 
         .target(name: "SkipBuild", dependencies: [
             "SkipSyntax",

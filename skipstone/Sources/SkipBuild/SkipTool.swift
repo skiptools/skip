@@ -364,9 +364,6 @@ struct TranspilePhaseOptions: ParsableArguments {
     @Option(name: [.customLong("link")], help: ArgumentHelp("ModuleName:LinkPath", valueName: "module"))
     var linkPaths: [String] = [] // --link name:path
 
-    @Option(help: ArgumentHelp("Path to the folder containing symbols.json", valueName: "path"))
-    var symbolFolder: String? = nil // --symbol-folder
-
     @Option(help: ArgumentHelp("Path to the folder that contains skip.yml and overrides", valueName: "path"))
     var skipFolder: String? = nil // --skip-folder
 
