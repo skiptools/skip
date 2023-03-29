@@ -218,6 +218,18 @@ final class CodebaseInfoTests: XCTestCase {
         XCTAssertEqual([.function([], tupleSignature)], context.functionSignature(of: "tupleReturn", in: .named("TestClass", []), arguments: []))
     }
 
+    func testTypealiasResolution() async throws {
+        let context = try await setUpContext(swift: """
+        class TestClass {
+        }
+        typealias TestAlias = TestClass
+        """)
+
+        let typeInfos = context.typeInfos(for: .named("TestAlias", []))
+        XCTAssertEqual(1, typeInfos.count)
+        XCTAssertEqual("TestClass", typeInfos.first?.name)
+    }
+
     func testInheritedConstructors() throws {
         throw XCTSkip("TODO: Test custom superclass constructors called on a subclass and general constructor inheritance")
     }

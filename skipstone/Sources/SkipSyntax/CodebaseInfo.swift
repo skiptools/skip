@@ -97,9 +97,9 @@ public class CodebaseInfo: Codable {
             var candidates = info.itemsByName[path[path.count - 1], default: []]
             if path.count > 1 {
                 let baseName = path.dropLast().joined(separator: ".")
-                candidates = candidates.filter { ($0 is TypeInfo) && $0.declaringType?.name == baseName }
+                candidates = candidates.filter { ($0 is TypeInfo || $0 is TypealiasInfo) && $0.declaringType?.name == baseName }
             } else if qualifiedMatch {
-                candidates = candidates.filter { !($0 is TypeInfo) || $0.declaringType == nil }
+                candidates = candidates.filter { !($0 is TypeInfo || $0 is TypealiasInfo) || $0.declaringType == nil }
             }
             return candidates
         }
@@ -923,7 +923,7 @@ public class CodebaseInfo: Codable {
 
         fileprivate init(statement: TypealiasDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo, delegate: CodebaseInfoGatherDelegate?) {
             self.name = statement.name
-            self.signature = statement.signature
+            self.signature = statement.aliasedType
             self.moduleName = codebaseInfo.moduleName
             self.sourceFile = statement.sourceFile
             self.declaringType = declaringType
