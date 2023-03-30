@@ -19,7 +19,7 @@ class KotlinConstructorPlugin: KotlinPlugin {
             var hasNonEmptyConstructor = false
             for constructor in constructors {
                 if let constructor = constructor as? KotlinFunctionDeclaration {
-                    fixupConstructor(constructor, isSubclass: superclass != nil)
+                    fixupConstructor(constructor, isSubclass: superclass != nil, translator: translator)
                     if constructor.body?.statements.isEmpty == false {
                         hasNonEmptyConstructor = true
                     }
@@ -72,7 +72,7 @@ class KotlinConstructorPlugin: KotlinPlugin {
         classDeclaration.members.append(constructor)
     }
 
-    private func fixupConstructor(_ constructor: KotlinFunctionDeclaration, isSubclass: Bool) {
+    private func fixupConstructor(_ constructor: KotlinFunctionDeclaration, isSubclass: Bool, translator: KotlinTranslator) {
         guard constructor.delegatingConstructorCall == nil, let body = constructor.body else {
             return
         }
@@ -83,7 +83,7 @@ class KotlinConstructorPlugin: KotlinPlugin {
                 continue
             }
             if constructor.delegatingConstructorCall != nil {
-                statement.messages.append(.kotlinConstructorSingleDelegatingStatement(statement))
+                statement.messages.append(.kotlinConstructorSingleDelegatingStatement(statement, source: translator.syntaxTree.source))
                 break
             }
             body.statements.remove(at: index)

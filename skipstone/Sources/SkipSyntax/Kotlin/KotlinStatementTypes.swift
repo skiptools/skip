@@ -191,7 +191,7 @@ class KotlinCodeBlock: KotlinStatement {
     }
 
     /// Perform any updates to handle references to the given `inout` parameter.
-    func updateWithInOutParameter(name: String) {
+    func updateWithInOutParameter(name: String, source: Source) {
         visit { node in
             // TODO: We could attempt to identify more re-bindings of the identifier
             if let identifier = node as? KotlinIdentifier {
@@ -200,7 +200,7 @@ class KotlinCodeBlock: KotlinStatement {
                 }
             } else if let variableDeclaration = node as? KotlinVariableDeclaration {
                 if variableDeclaration.names.contains(name) {
-                    variableDeclaration.messages.append(.kotlinInOutParameterAssignment(variableDeclaration))
+                    variableDeclaration.messages.append(.kotlinInOutParameterAssignment(variableDeclaration, source: source))
                 }
             }
             return .recurse(nil)
@@ -421,7 +421,7 @@ class KotlinLabeledStatement: KotlinStatement {
     var target: KotlinStatement
 
     static func translate(statement: LabeledStatement, translator: KotlinTranslator) -> KotlinLabeledStatement {
-        let ktarget = translator.translateStatement(statement.target).first ?? KotlinMessageStatement(message: .kotlinUntranslatable(statement))
+        let ktarget = translator.translateStatement(statement.target).first ?? KotlinMessageStatement(message: .kotlinUntranslatable(statement, source: translator.syntaxTree.source))
         return KotlinLabeledStatement(statement: statement, target: ktarget)
     }
 
@@ -520,7 +520,7 @@ class KotlinTryCatch: KotlinStatement {
                         binaryOperator.lhs = KotlinIdentifier(name: promotedBindingIdentifier)
                     }
                 } else {
-                    messages.append(.kotlinCatchCaseCast(pattern))
+                    messages.append(.kotlinCatchCaseCast(pattern, source: translator.syntaxTree.source))
                 }
             }
             kcatches.append(kcatch)
@@ -593,14 +593,14 @@ class KotlinWhileLoop: KotlinStatement {
                 let (variable, optionalCondition) = KotlinOptionalBinding.translate(expression: optionalBinding, translator: translator)
                 kconditions.append(optionalCondition)
                 if variable != nil {
-                    messages.append(.kotlinLoopOptionalBinding(optionalBinding))
+                    messages.append(.kotlinLoopOptionalBinding(optionalBinding, source: translator.syntaxTree.source))
                 }
             } else if let matchingCase = condition as? MatchingCase {
                 let (targetVariable, bindingVariables, caseCondition) = KotlinMatchingCase.translate(expression: matchingCase, translator: translator)
                 kconditions.append(caseCondition)
                 caseBindingVariables += bindingVariables
                 if targetVariable != nil {
-                    messages.append(.kotlinLoopCaseValue(matchingCase))
+                    messages.append(.kotlinLoopCaseValue(matchingCase, source: translator.syntaxTree.source))
                 }
             } else {
                 kconditions.append(translator.translateExpression(condition))
@@ -687,9 +687,9 @@ class KotlinClassDeclaration: KotlinStatement {
         }
         kstatement.members = members
         kstatement.processEnumCaseDeclarations()
-        kstatement.inherits.forEach { $0.appendKotlinMessages(to: kstatement) }
+        kstatement.inherits.forEach { $0.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
         if statement.attributes.attributes.contains(where: { !isIgnorable(attribute: $0) }) {
-            kstatement.messages.append(.kotlinAttributeUnsupported(statement))
+            kstatement.messages.append(.kotlinAttributeUnsupported(statement, source: translator.syntaxTree.source))
         }
         return kstatement
     }
@@ -855,10 +855,10 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
     static func translate(statement: EnumCaseDeclaration, translator: KotlinTranslator) -> KotlinEnumCaseDeclaration {
         let kstatement = KotlinEnumCaseDeclaration(statement: statement)
         kstatement.associatedValues = statement.associatedValues.map { $0.translate(translator: translator) }
-        kstatement.associatedValues.forEach { $0.declaredType.appendKotlinMessages(to: kstatement) }
+        kstatement.associatedValues.forEach { $0.declaredType.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
         kstatement.rawValue = statement.rawValue.map { translator.translateExpression($0) }
         if !statement.attributes.isEmpty {
-            kstatement.messages.append(.kotlinAttributeUnsupported(statement))
+            kstatement.messages.append(.kotlinAttributeUnsupported(statement, source: translator.syntaxTree.source))
         }
         return kstatement
     }
@@ -976,22 +976,22 @@ struct KotlinExtensionDeclaration {
         let extends = statement.extends.withGenerics(statement.generics)
         var kotlinStatements: [KotlinStatement] = []
         if !statement.inherits.isEmpty && translator.codebaseInfo != nil {
-            let message = Message.kotlinExtensionAddProtocolsToOutsideType(statement)
+            let message = Message.kotlinExtensionAddProtocolsToOutsideType(statement, source: translator.syntaxTree.source)
             kotlinStatements.append(KotlinMessageStatement(message: message))
         }
         for member in statement.members {
             if let variableDeclaration = member as? VariableDeclaration, translator.codebaseInfo?.isProtocolMember(declaration: variableDeclaration, in: extends) == true {
-                kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionForConstrainedGenericImplementMember(member)))
+                kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionForConstrainedGenericImplementMember(member, source: translator.syntaxTree.source)))
             } else if let functionDeclaration = member as? FunctionDeclaration, translator.codebaseInfo?.isProtocolMember(declaration: functionDeclaration, in: extends) == true {
-                kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionForConstrainedGenericImplementMember(member)))
+                kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionForConstrainedGenericImplementMember(member, source: translator.syntaxTree.source)))
             }
             for kmember in translator.translateStatement(member) {
                 guard let memberDeclaration = kmember as? KotlinMemberDeclaration else {
-                    kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionUnsupportedMember(member)))
+                    kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionUnsupportedMember(member, source: translator.syntaxTree.source)))
                     continue
                 }
                 guard kmember.type != .constructorDeclaration else {
-                    kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionAddConstructorsToOutsideType(member)))
+                    kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionAddConstructorsToOutsideType(member, source: translator.syntaxTree.source)))
                     continue
                 }
                 memberDeclaration.extends = extends
@@ -1043,7 +1043,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 kstatement.isOpen = false
                 kstatement.modifiers.isOverride = false // Kotlin does not override constructors
                 if statement.isOptionalInit {
-                    kstatement.messages.append(.kotlinConstructorNullReturn(statement))
+                    kstatement.messages.append(.kotlinConstructorNullReturn(statement, source: translator.syntaxTree.source))
                 }
             } else {
                 if owningDeclarationType == .protocolDeclaration {
@@ -1065,22 +1065,22 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             kstatement.body = KotlinCodeBlock.translate(statement: body, translator: translator)
             kstatement.body?.updateWithExpectedReturn(statement.returnType == .void || statement.type == .initDeclaration ? .no : .sref(nil))
             for parameter in kstatement.parameters where parameter.isInOut {
-                kstatement.body?.updateWithInOutParameter(name: parameter.internalLabel)
+                kstatement.body?.updateWithInOutParameter(name: parameter.internalLabel, source: translator.syntaxTree.source)
             }
         }
-        kstatement.returnType.appendKotlinMessages(to: kstatement)
-        kstatement.parameters.forEach { $0.declaredType.appendKotlinMessages(to: kstatement) }
+        kstatement.returnType.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source)
+        kstatement.parameters.forEach { $0.declaredType.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
 
         // Warnings and fixups
         if owningDeclarationType == .protocolDeclaration {
             if statement.type == .initDeclaration {
-                kstatement.messages.append(.kotlinProtocolConstructor(statement))
+                kstatement.messages.append(.kotlinProtocolConstructor(statement, source: translator.syntaxTree.source))
             } else if statement.modifiers.isStatic {
-                kstatement.messages.append(.kotlinProtocolStaticMember(statement))
+                kstatement.messages.append(.kotlinProtocolStaticMember(statement, source: translator.syntaxTree.source))
             }
         }
         if statement.attributes.attributes.contains(where: { !isIgnorable(attribute: $0) }) {
-            kstatement.messages.append(.kotlinAttributeUnsupported(statement))
+            kstatement.messages.append(.kotlinAttributeUnsupported(statement, source: translator.syntaxTree.source))
         }
         return kstatement
     }
@@ -1254,7 +1254,7 @@ class KotlinInterfaceDeclaration: KotlinStatement {
             }
         }
         kstatement.members = originalMembers + newMembers
-        kstatement.inherits.forEach { $0.appendKotlinMessages(to: kstatement) }
+        kstatement.inherits.forEach { $0.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
         return kstatement
     }
 
@@ -1322,7 +1322,7 @@ class KotlinTypealiasDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var name: String
     var modifiers = Modifiers()
     var generics = Generics()
-    var aliasedType: TypeSignature
+    var aliasedType: TypeSignature = .none
 
     // KotlinMemberDeclaration
     var extends: TypeSignature?
@@ -1330,18 +1330,23 @@ class KotlinTypealiasDeclaration: KotlinStatement, KotlinMemberDeclaration {
         return false
     }
 
-    init(statement: TypealiasDeclaration) {
-        self.name = statement.name
-        self.modifiers = statement.modifiers
-        self.generics = statement.generics
-        self.aliasedType = statement.aliasedType
-        super.init(type: .typealiasDeclaration, statement: statement)
+    static func translate(statement: TypealiasDeclaration, translator: KotlinTranslator) -> KotlinTypealiasDeclaration {
+        let kstatement = KotlinTypealiasDeclaration(statement: statement)
+        kstatement.modifiers = statement.modifiers
+        kstatement.generics = statement.generics
+        kstatement.aliasedType = statement.aliasedType
         if statement.owningTypeDeclaration != nil {
-            self.messages.append(.kotlinTypeAliasNested(statement))
+            kstatement.messages.append(.kotlinTypeAliasNested(statement, source: translator.syntaxTree.source))
         }
         if !statement.generics.whereEqual.isEmpty || statement.generics.entries.contains(where: { !$0.inherits.isEmpty }) {
-            self.messages.append(.kotlinTypeAliasConstrainedGenerics(statement))
+            kstatement.messages.append(.kotlinTypeAliasConstrainedGenerics(statement, source: translator.syntaxTree.source))
         }
+        return kstatement
+    }
+
+    private init(statement: TypealiasDeclaration) {
+        self.name = statement.name
+        super.init(type: .typealiasDeclaration, statement: statement)
     }
 
     override func insertDependencies(into dependencies: inout KotlinDependencies) {
@@ -1443,17 +1448,17 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         kstatement.didSet = statement.didSet?.translate(translator: translator, expectedReturn: .no)
 
         // Warnings and fixups
-        kstatement.declaredType.appendKotlinMessages(to: kstatement)
+        kstatement.declaredType.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source)
         if statement.isAsync {
-            kstatement.messages.append(.kotlinAsyncProperties(kstatement))
+            kstatement.messages.append(.kotlinAsyncProperties(kstatement, source: translator.syntaxTree.source))
         }
         if owningDeclarationType == .protocolDeclaration {
             if statement.modifiers.isStatic {
-                kstatement.messages.append(.kotlinProtocolStaticMember(statement))
+                kstatement.messages.append(.kotlinProtocolStaticMember(statement, source: translator.syntaxTree.source))
             }
         }
         if !statement.attributes.isEmpty {
-            kstatement.messages.append(.kotlinAttributeUnsupported(statement))
+            kstatement.messages.append(.kotlinAttributeUnsupported(statement, source: translator.syntaxTree.source))
         }
         return kstatement
     }

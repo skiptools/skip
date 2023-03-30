@@ -29,8 +29,11 @@ public struct Message: Error, CustomStringConvertible, Encodable {
         self.sourceRange = sourceRange
     }
 
-    init(kind: Kind, message: String, sourceDerived: SourceDerived) {
-        self = Message(kind: kind, message: message, sourceFile: sourceDerived.sourceFile, sourceRange: sourceDerived.sourceRange)
+    init(kind: Kind, message: String, sourceDerived: SourceDerived, source: Source? = nil) {
+        self.kind = kind
+        self.message = Self.messageWithSource(for: message, in: source, range: sourceDerived.sourceRange)
+        self.sourceFile = sourceDerived.sourceFile ?? source?.file
+        self.sourceRange = sourceDerived.sourceRange
     }
 
     public var description: String {
@@ -71,51 +74,36 @@ public struct Message: Error, CustomStringConvertible, Encodable {
 }
 
 extension Message {
-    static func unsupportedSyntax(_ syntax: SyntaxProtocol, source: Source? = nil, sourceRange: Source.Range? = nil) -> Message {
-        var range = sourceRange
-        if range == nil, let source {
-            range = syntax.range(in: source)
-        }
+    static func unsupportedSyntax(_ syntax: SyntaxProtocol, source: Source) -> Message {
+        let range = syntax.range(in: source)
         return Message(kind: .error, message: "Skip does not support this Swift syntax [\(syntax.kind)]", source: source, sourceRange: range)
     }
 
-    static func unsupportedTypeSignature(_ syntax: SyntaxProtocol, source: Source? = nil, sourceRange: Source.Range? = nil) -> Message {
-        var range = sourceRange
-        if range == nil, let source {
-            range = syntax.range(in: source)
-        }
+    static func unsupportedTypeSignature(_ syntax: SyntaxProtocol, source: Source) -> Message {
+        let range = syntax.range(in: source)
         return Message(kind: .error, message: "Skip does not support this Swift type syntax [\(syntax.kind)]", source: source, sourceRange: range)
     }
 
-    static func ambiguousFunctionCall(sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) -> Message {
-        return Message(kind: .warning, message: "Skip is unable to disambiguate this function call. Consider differentiating your functions with unique parameter labels", sourceFile: sourceFile, sourceRange: sourceRange)
+    static func ambiguousFunctionCall(sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .warning, message: "Skip is unable to disambiguate this function call. Consider differentiating your functions with unique parameter labels", sourceDerived: sourceDerived, source: source)
     }
 
-    static func ifDeclPlacement(_ syntax: SyntaxProtocol, source: Source? = nil, sourceRange: Source.Range? = nil) -> Message {
-        var range = sourceRange
-        if range == nil, let source {
-            range = syntax.range(in: source)
-        }
+    static func ifDeclPlacement(_ syntax: SyntaxProtocol, source: Source) -> Message {
+        let range = syntax.range(in: source)
         return Message(kind: .error, message: "Skip only supports #if between code block statements or member declarations", source: source, sourceRange: range)
     }
 
-    static func genericUnsupportedWhereType(_ syntax: SyntaxProtocol, source: Source? = nil, sourceRange: Source.Range? = nil) -> Message {
-        var range = sourceRange
-        if range == nil, let source {
-            range = syntax.range(in: source)
-        }
+    static func genericUnsupportedWhereType(_ syntax: SyntaxProtocol, source: Source) -> Message {
+        let range = syntax.range(in: source)
         return Message(kind: .error, message: "Skip does not support the referenced type as a generic constraint", source: source, sourceRange: range)
     }
 
-    static func genericWhereNameMismatch(_ syntax: SyntaxProtocol, source: Source? = nil, sourceRange: Source.Range? = nil) -> Message {
-        var range = sourceRange
-        if range == nil, let source {
-            range = syntax.range(in: source)
-        }
+    static func genericWhereNameMismatch(_ syntax: SyntaxProtocol, source: Source) -> Message {
+        let range = syntax.range(in: source)
         return Message(kind: .error, message: "Skip is not able to match this where constraint to a declared generic type", source: source, sourceRange: range)
     }
 
-    static func variableNeedsTypeDeclaration(source: Source? = nil, sourceRange: Source.Range? = nil) -> Message {
-        return Message(kind: .warning, message: "Skip is unable to determine the type of this expression. Consider declaring the variable type explicitly, i.e. 'var v: <Type> = ...'", source: source, sourceRange: sourceRange)
+    static func variableNeedsTypeDeclaration(sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .warning, message: "Skip is unable to determine the type of this expression. Consider declaring the variable type explicitly, i.e. 'var v: <Type> = ...'", sourceDerived: sourceDerived, source: source)
     }
 }

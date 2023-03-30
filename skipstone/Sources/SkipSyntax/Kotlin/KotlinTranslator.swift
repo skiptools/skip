@@ -48,7 +48,7 @@ public class KotlinTranslator {
             }
             return importDeclaration.modulePath.first
         }
-        let codebaseInfoContext = codebaseInfo.context(importedModuleNames: importedModuleNames, sourceFile: syntaxTree.source.file)
+        let codebaseInfoContext = codebaseInfo.context(importedModuleNames: importedModuleNames, source: syntaxTree.source)
         self.codebaseInfo = codebaseInfoContext
         self.packageName = codebaseInfo.packageName
 
@@ -92,7 +92,7 @@ public class KotlinTranslator {
             case .expression:
                 return [KotlinExpressionStatement.translate(statement: statement as! ExpressionStatement, translator: self)]
             case .fallthrough:
-                return [KotlinMessageStatement(message: .kotlinSwitchFallthrough(statement))]
+                return [KotlinMessageStatement(message: .kotlinSwitchFallthrough(statement, source: syntaxTree.source))]
             case .forLoop:
                 return [KotlinForLoop.translate(statement: statement as! ForLoop, translator: self)]
             case .guard:
@@ -127,7 +127,7 @@ public class KotlinTranslator {
             case .structDeclaration:
                 return [KotlinClassDeclaration.translate(statement: statement as! TypeDeclaration, translator: self)]
             case .typealiasDeclaration:
-                return [KotlinTypealiasDeclaration(statement: statement as! TypealiasDeclaration)]
+                return [KotlinTypealiasDeclaration.translate(statement: statement as! TypealiasDeclaration, translator: self)]
             case .variableDeclaration:
                 return [KotlinVariableDeclaration.translate(statement: statement as! VariableDeclaration, translator: self)]
             case .raw:
@@ -137,7 +137,7 @@ public class KotlinTranslator {
             }
             throw Message.kotlinUntranslatable(statement, source: syntaxTree.source)
         } catch {
-            let message = error as? Message ?? Message.kotlinUntranslatable(statement)
+            let message = error as? Message ?? Message.kotlinUntranslatable(statement, source: syntaxTree.source)
             let rawStatement: RawStatement
             if let syntax = statement.syntax {
                 rawStatement = RawStatement(syntax: syntax, message: message, extras: statement.extras, in: syntaxTree)
@@ -210,7 +210,7 @@ public class KotlinTranslator {
             }
             throw Message.kotlinUntranslatable(expression, source: syntaxTree.source)
         } catch {
-            let message = error as? Message ?? Message.kotlinUntranslatable(expression)
+            let message = error as? Message ?? Message.kotlinUntranslatable(expression, source: syntaxTree.source)
             let rawExpression: RawExpression
             if let syntax = expression.syntax {
                 rawExpression = RawExpression(syntax: syntax, message: message, in: syntaxTree)

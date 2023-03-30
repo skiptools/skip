@@ -193,7 +193,7 @@ struct KotlinCase {
         var messages: [Message] = []
         let caseValues: [(KotlinExpression?, [KotlinBindingVariable])] = expression.patterns.map { pattern in
             if let whereGuard = pattern.whereGuard {
-                messages.append(.kotlinWhenCaseWhere(whereGuard))
+                messages.append(.kotlinWhenCaseWhere(whereGuard, source: translator.syntaxTree.source))
             }
             let (targetVariable, bindingVariables, condition, caseMessages) = KotlinCasePattern.translate(expression: pattern.pattern, target: caseTargetVariable?.identifier ?? matchingOn, isSealedClassesEnum: isSealedClassesEnum, translator: translator)
             messages += caseMessages
@@ -297,7 +297,7 @@ struct KotlinCasePattern {
                         memberAccess.member = KotlinEnumCaseDeclaration.sealedClassName(for: memberAccess.member)
                     }
                     if hasNonBindings {
-                        messages.append(.kotlinWhenCasePartialBinding(functionCall))
+                        messages.append(.kotlinWhenCasePartialBinding(functionCall, source: translator.syntaxTree.source))
                     }
                 } else {
                     value = translator.translateExpression(expression.value)
@@ -353,7 +353,7 @@ struct KotlinCasePattern {
                     value = nil
                 }
                 if hasNonBindings {
-                    messages.append(.kotlinWhenCasePartialBinding(tupleLiteral))
+                    messages.append(.kotlinWhenCasePartialBinding(tupleLiteral, source: translator.syntaxTree.source))
                 }
             } else {
                 value = translator.translateExpression(expression.value)
@@ -1021,9 +1021,9 @@ class KotlinMemberAccess: KotlinExpression {
             }
             kexpression.baseKClass = kclass(for: base, accessingMember: expression.member, codebaseInfo: translator.codebaseInfo)
         } else if expression.baseType == .none && translator.codebaseInfo != nil {
-            kexpression.messages.append(.kotlinMemberAccessUnknownBaseType(expression, member: expression.member))
+            kexpression.messages.append(.kotlinMemberAccessUnknownBaseType(expression, source: translator.syntaxTree.source, member: expression.member))
         } else if case .optional = expression.inferredType, expression.member == "none" || expression.member == "some" {
-            kexpression.messages.append(.kotlinOptionalNoneSome(expression))
+            kexpression.messages.append(.kotlinOptionalNoneSome(expression, source: translator.syntaxTree.source))
         }
         kexpression.generics = expression.generics
         if case .metaType(let type) = expression.baseType {
@@ -1623,10 +1623,10 @@ class KotlinTupleLiteral: KotlinExpression {
 
     static func translate(expression: TupleLiteral, translator: KotlinTranslator) throws -> KotlinTupleLiteral {
         guard !expression.labels.contains(where: { $0 != nil }) else {
-           throw Message.kotlinTupleLabels(expression)
+            throw Message.kotlinTupleLabels(expression, source: translator.syntaxTree.source)
         }
         guard expression.values.count <= 3 else {
-            throw Message.kotlinTupleArity(expression)
+            throw Message.kotlinTupleArity(expression, source: translator.syntaxTree.source)
         }
         let kvalues = expression.values.map { translator.translateExpression($0) }
         return KotlinTupleLiteral(expression: expression, values: kvalues)

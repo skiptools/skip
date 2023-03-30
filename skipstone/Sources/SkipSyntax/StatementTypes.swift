@@ -1134,7 +1134,7 @@ class VariableDeclaration: Statement {
                     case "didSet":
                         didSet = Accessor(body: body)
                     default:
-                        messages.append(.unsupportedSyntax(accessor, source: syntaxTree.source, sourceRange: accessor.range(in: syntaxTree.source)))
+                        messages.append(.unsupportedSyntax(accessor, source: syntaxTree.source))
                     }
                 }
             case .getter(let codeBlockSyntax):

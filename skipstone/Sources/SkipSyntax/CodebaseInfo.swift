@@ -64,22 +64,22 @@ public class CodebaseInfo: Codable {
     }
     
     /// Create a context that can access the given imported modules.
-    func context(importedModuleNames: [String] = [], sourceFile: Source.FilePath? = nil) -> Context {
-        return Context(codebaseInfo: self, importedModuleNames: Set(importedModuleNames), sourceFile: sourceFile)
+    func context(importedModuleNames: [String] = [], source: Source) -> Context {
+        return Context(codebaseInfo: self, importedModuleNames: Set(importedModuleNames), source: source)
     }
     
     /// A context for accessing visible codebase information.
     struct Context {
         let codebaseInfo: CodebaseInfo
+        let source: Source
         private let importedModuleNames: Set<String>
-        private let sourceFile: Source.FilePath?
-        
-        fileprivate init(codebaseInfo: CodebaseInfo, importedModuleNames: Set<String>, sourceFile: Source.FilePath?) {
+
+        fileprivate init(codebaseInfo: CodebaseInfo, importedModuleNames: Set<String>, source: Source) {
             self.codebaseInfo = codebaseInfo
+            self.source = source
             var importedModuleNames = importedModuleNames
             importedModuleNames.insert("SkipLib") // Contains our supported subset of the Swift builtin module
             self.importedModuleNames = importedModuleNames
-            self.sourceFile = sourceFile
         }
         
         /// The items for the given name.
@@ -120,7 +120,7 @@ public class CodebaseInfo: Codable {
         func rankScore(of item: CodebaseInfoItem) -> Int {
             var score = 0
             if item.moduleName == codebaseInfo.moduleName {
-                if let itemSourcePath = item.sourceFile?.path, let sourcePath = sourceFile?.path, itemSourcePath.hasSuffix(sourcePath) {
+                if let itemSourcePath = item.sourceFile?.path, itemSourcePath.hasSuffix(source.file.path) {
                     // Favor a symbol in this file
                     score += 3
                 } else if item.visibility != .private {
@@ -559,7 +559,7 @@ public class CodebaseInfo: Codable {
                 if let existingContext = typeInferenceContexts[sourceFile] {
                     context = existingContext
                 } else {
-                    context = TypeInferenceContext(codebaseInfo: self, sourceFile: sourceFile, statements: syntaxTree.root.statements)
+                    context = TypeInferenceContext(codebaseInfo: self, source: syntaxTree.source, statements: syntaxTree.root.statements)
                     typeInferenceContexts[sourceFile] = context
                 }
                 for i in 0..<rootVariables.count {
@@ -851,7 +851,7 @@ public class CodebaseInfo: Codable {
             }
             if let sourceFile {
                 var fileMessages = messages[sourceFile, default: []]
-                fileMessages.append(.variableNeedsTypeDeclaration(source: source, sourceRange: value?.sourceRange))
+                fileMessages.append(.variableNeedsTypeDeclaration(sourceDerived: value!, source: source))
                 messages[sourceFile] = fileMessages
             }
             var v = self

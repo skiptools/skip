@@ -5,21 +5,21 @@ class KotlinStructPlugin: KotlinPlugin {
     private let mutationFunctionNames = ("willmutate", "didmutate")
 
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
-        syntaxTree.root.visit { visit($0, codebaseInfo: translator.codebaseInfo) }
+        syntaxTree.root.visit { visit($0, translator: translator) }
     }
 
-    private func visit(_ node: KotlinSyntaxNode, codebaseInfo: KotlinCodebaseInfo.Context?) -> VisitResult<KotlinSyntaxNode> {
+    private func visit(_ node: KotlinSyntaxNode, translator: KotlinTranslator) -> VisitResult<KotlinSyntaxNode> {
         if let classDeclaration = node as? KotlinClassDeclaration {
             if classDeclaration.declarationType == .structDeclaration {
-                updateStructDeclaration(classDeclaration, codebaseInfo: codebaseInfo)
+                updateStructDeclaration(classDeclaration, translator: translator)
             }
         } else if let variableDeclaration = node as? KotlinVariableDeclaration {
-            if !variableDeclaration.isStatic, !variableDeclaration.isReadOnly, let extends = variableDeclaration.extends, codebaseInfo?.declarationType(of: extends, mustBeInModule: false) == .structDeclaration {
+            if !variableDeclaration.isStatic, !variableDeclaration.isReadOnly, let extends = variableDeclaration.extends, translator.codebaseInfo?.declarationType(of: extends, mustBeInModule: false) == .structDeclaration {
                 variableDeclaration.mutationFunctionNames = mutationFunctionNames
             }
             return .skip
         } else if let functionDeclaration = node as? KotlinFunctionDeclaration {
-            if functionDeclaration.modifiers.isMutating, let extends = functionDeclaration.extends, codebaseInfo?.declarationType(of: extends, mustBeInModule: false) == .structDeclaration {
+            if functionDeclaration.modifiers.isMutating, let extends = functionDeclaration.extends, translator.codebaseInfo?.declarationType(of: extends, mustBeInModule: false) == .structDeclaration {
                 functionDeclaration.mutationFunctionNames = mutationFunctionNames
             }
         }
@@ -27,7 +27,7 @@ class KotlinStructPlugin: KotlinPlugin {
         return .recurse(nil)
     }
 
-    private func updateStructDeclaration(_ classDeclaration: KotlinClassDeclaration, codebaseInfo: KotlinCodebaseInfo.Context?) {
+    private func updateStructDeclaration(_ classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) {
         var hasConstructors = false
         var isMutable = false
         var initializableVariableDeclarations: [KotlinVariableDeclaration] = []
@@ -51,7 +51,7 @@ class KotlinStructPlugin: KotlinPlugin {
         }
 
         if !hasConstructors && !initializableVariableDeclarations.isEmpty {
-            addMemberwiseConstructor(to: classDeclaration, variableDeclarations: initializableVariableDeclarations, codebaseInfo: codebaseInfo)
+            addMemberwiseConstructor(to: classDeclaration, variableDeclarations: initializableVariableDeclarations, translator: translator)
         } else if isMutable && !initializableVariableDeclarations.isEmpty {
             addMutableStructCopyConstructor(to: classDeclaration, variableDeclarations: initializableVariableDeclarations)
         }
@@ -105,13 +105,13 @@ class KotlinStructPlugin: KotlinPlugin {
         classDeclaration.members.append(scopy)
     }
 
-    private func addMemberwiseConstructor(to classDeclaration: KotlinClassDeclaration, variableDeclarations: [KotlinVariableDeclaration], codebaseInfo: KotlinCodebaseInfo.Context?) {
+    private func addMemberwiseConstructor(to classDeclaration: KotlinClassDeclaration, variableDeclarations: [KotlinVariableDeclaration], translator: KotlinTranslator) {
         let constructor = KotlinFunctionDeclaration(name: "constructor")
         constructor.parameters = variableDeclarations.map { variableDeclaration in
             let label = variableDeclaration.names[0]
             let type = variableDeclaration.variableTypes[0]
-            if type == .none && codebaseInfo != nil {
-                variableDeclaration.messages.append(.kotlinConstructorCannotInferPropertyType(variableDeclaration))
+            if type == .none && translator.codebaseInfo != nil {
+                variableDeclaration.messages.append(.kotlinConstructorCannotInferPropertyType(variableDeclaration, source: translator.syntaxTree.source))
             }
             var defaultValue: KotlinExpression? = nil
             if let value = variableDeclaration.value {

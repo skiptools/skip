@@ -5,13 +5,17 @@ struct TypeInferenceContext {
     private var blockPath: [[String: TypeSignature]] = [] // Each entry is map of additional identifier bindings
     private var localIdentifierTypes: [String: TypeSignature] = [:]
 
+    /// Context source.
+    let source: Source
+
     /// Create a top-level context for type inference.
     ///
     /// - Parameters:
     ///   - codebaseInfo: Available codebase information.
-    ///   - sourceFile: Source file for this context.
+    ///   - source: Source for this context.
     ///   - statements: Top-level statements from which to determine imports.
-    init(codebaseInfo: CodebaseInfo? = nil, sourceFile: Source.FilePath?, statements: [Statement]) {
+    init(codebaseInfo: CodebaseInfo? = nil, source: Source, statements: [Statement]) {
+        self.source = source
         if codebaseInfo != nil {
             let importedModuleNames: [String] = statements.compactMap { statement in
                 guard statement.type == .importDeclaration, let importDeclaration = statement as? ImportDeclaration else {
@@ -19,7 +23,7 @@ struct TypeInferenceContext {
                 }
                 return importDeclaration.modulePath.first
             }
-            self.codebaseInfo = codebaseInfo?.context(importedModuleNames: importedModuleNames, sourceFile: sourceFile)
+            self.codebaseInfo = codebaseInfo?.context(importedModuleNames: importedModuleNames, source: source)
         } else {
             self.codebaseInfo = nil
         }

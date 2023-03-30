@@ -148,7 +148,7 @@ class RawExpression: Expression {
         if let message {
             self.messages = [message]
         } else {
-            self.messages = [.unsupportedSyntax(syntax, source: source, sourceRange: range)]
+            self.messages = [.unsupportedSyntax(syntax, source: source)]
         }
     }
 

@@ -36,7 +36,7 @@ extension InheritedTypeListSyntax {
             if typeSignature != .none {
                 return typeSignature
             } else {
-                messages.append(.unsupportedTypeSignature(typeSyntax.typeName, source: syntaxTree.source, sourceRange: typeSyntax.range(in: syntaxTree.source)))
+                messages.append(.unsupportedTypeSignature(typeSyntax.typeName, source: syntaxTree.source))
                 return nil
             }
         }
@@ -79,7 +79,7 @@ extension ReturnClauseSyntax {
         var signature = TypeSignature.for(syntax: returnType)
         if signature == .none {
             signature = .void
-            messages.append(.unsupportedTypeSignature(returnType, source: syntaxTree.source, sourceRange: range(in: syntaxTree.source)))
+            messages.append(.unsupportedTypeSignature(returnType, source: syntaxTree.source))
         }
         return signature
     }
@@ -100,7 +100,7 @@ extension ParameterClauseSyntax {
                 type = TypeSignature.for(syntax: typeSyntax)
                 if type == .none {
                     type = .any
-                    messages.append(.unsupportedTypeSignature(typeSyntax, source: syntaxTree.source, sourceRange: typeSyntax.range(in: syntaxTree.source)))
+                    messages.append(.unsupportedTypeSignature(typeSyntax, source: syntaxTree.source))
                 }
                 isInOut = TypeSignature.isInOut(syntax: typeSyntax)
             }

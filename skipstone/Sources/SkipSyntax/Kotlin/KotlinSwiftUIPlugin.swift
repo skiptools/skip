@@ -15,15 +15,15 @@ class KotlinSwiftUIPlugin: KotlinPlugin {
             }
         }
         if needsTranslation {
-            syntaxTree.root.visit(perform: self.visit)
+            syntaxTree.root.visit { visit($0, source: translator.syntaxTree.source) }
         }
     }
 
-    private func visit(_ node: KotlinSyntaxNode) -> VisitResult<KotlinSyntaxNode> {
+    private func visit(_ node: KotlinSyntaxNode, source: Source) -> VisitResult<KotlinSyntaxNode> {
         if let variableDeclaration = node as? KotlinVariableDeclaration {
             translateVariableDeclaration(variableDeclaration)
         } else if let functionCall = node as? KotlinFunctionCall {
-            translateFunctionCall(functionCall)
+            translateFunctionCall(functionCall, source: source)
             return .skip
         }
         return .recurse(nil)
@@ -46,14 +46,14 @@ class KotlinSwiftUIPlugin: KotlinPlugin {
         bodyMethod.assignParentReferences()
     }
 
-    private func translateFunctionCall(_ functionCall: KotlinFunctionCall) {
+    private func translateFunctionCall(_ functionCall: KotlinFunctionCall, source: Source) {
         for viewBuilder in viewBuilderParameters(in: functionCall) {
-            translateViewBuilder(viewBuilder.body)
+            translateViewBuilder(viewBuilder.body, source: source)
             viewBuilder.body.assignParentReferences()
         }
     }
 
-    private func translateViewBuilder(_ codeBlock: KotlinCodeBlock) {
+    private func translateViewBuilder(_ codeBlock: KotlinCodeBlock, source: Source) {
         codeBlock.statements = codeBlock.statements.map { translateViewBuilderStatement($0) }
         guard codeBlock.statements.count > 1, !hasExplicitReturn(codeBlock) else {
             return
@@ -63,7 +63,7 @@ class KotlinSwiftUIPlugin: KotlinPlugin {
         for statement in codeBlock.statements {
             if statement.type != .expression {
                 // TODO: We should be appending the raw code here
-                statement.messages.append(.kotlinViewBuilderUnsupportedStatement(statement))
+                statement.messages.append(.kotlinViewBuilderUnsupportedStatement(statement, source: source))
             } else if let expression = (statement as! KotlinExpressionStatement).expression {
                 elements.append(expression)
             }

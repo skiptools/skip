@@ -10,7 +10,7 @@ final class CodebaseInfoTests: XCTestCase {
         let codebaseInfo = CodebaseInfo()
         codebaseInfo.gather(from: syntaxTree)
         codebaseInfo.prepareForUse()
-        return codebaseInfo.context(importedModuleNames: [], sourceFile: source.file)
+        return codebaseInfo.context(importedModuleNames: [], source: source)
     }
 
     func testIdentifierType() async throws {

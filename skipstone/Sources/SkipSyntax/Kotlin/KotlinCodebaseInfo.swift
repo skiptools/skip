@@ -44,16 +44,18 @@ public class KotlinCodebaseInfo {
     }
 
     /// Create a context that can access the given imported modules.
-    func context(importedModuleNames: [String] = [], sourceFile: Source.FilePath? = nil) -> Context {
-        Context(codebaseInfo: codebaseInfo.context(importedModuleNames: importedModuleNames, sourceFile: sourceFile))
+    func context(importedModuleNames: [String] = [], source: Source) -> Context {
+        Context(codebaseInfo: codebaseInfo.context(importedModuleNames: importedModuleNames, source: source), source: source)
     }
 
     /// A context for accessing codebase information.
     struct Context {
+        let source: Source
         private let codebaseInfo: CodebaseInfo.Context
 
-        fileprivate init(codebaseInfo: CodebaseInfo.Context) {
+        fileprivate init(codebaseInfo: CodebaseInfo.Context, source: Source) {
             self.codebaseInfo = codebaseInfo
+            self.source = source
         }
 
         /// Return all extensions of a given type.
@@ -197,7 +199,7 @@ public class KotlinCodebaseInfo {
 
 extension KotlinCodebaseInfo: CodebaseInfoGatherDelegate {
     func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather typeInfo: CodebaseInfo.TypeInfo, from statement: ExtensionDeclaration) {
-        // Keep the extension statements around so we can move it to the extended declarations
+        // Keep the extension statement around so we can move it to the extended declarations
         typeInfo.languageAdditions = statement
     }
 

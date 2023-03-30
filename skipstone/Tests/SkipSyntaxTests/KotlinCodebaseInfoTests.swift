@@ -11,7 +11,7 @@ final class KotlinCodebaseInfoTests: XCTestCase {
         let kotlinCodebaseInfo = KotlinCodebaseInfo(codebaseInfo: codebaseInfo)
         kotlinCodebaseInfo.gather(from: syntaxTree)
         kotlinCodebaseInfo.prepareForUse()
-        return kotlinCodebaseInfo.context(importedModuleNames: [], sourceFile: source.file)
+        return kotlinCodebaseInfo.context(importedModuleNames: [], source: source)
     }
 
     func testIsMutableStructType() async throws {

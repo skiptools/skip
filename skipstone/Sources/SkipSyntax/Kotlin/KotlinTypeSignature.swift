@@ -93,30 +93,30 @@ extension TypeSignature {
     }
 
     /// Add appropriate messages if this type is not supported.
-    func appendKotlinMessages(to node: KotlinSyntaxNode) {
+    func appendKotlinMessages(to node: KotlinSyntaxNode, source: Source) {
         switch self {
         case .any:
             break
         case .anyObject:
             break
         case .array(let elementType):
-            elementType.appendKotlinMessages(to: node)
+            elementType.appendKotlinMessages(to: node, source: source)
         case .bool:
             break
         case .character:
             break
         case .composition:
-            node.messages.append(.kotlinComposedTypes(node))
+            node.messages.append(.kotlinComposedTypes(node, source: source))
         case .dictionary(let keyType, let valueType):
-            keyType.appendKotlinMessages(to: node)
-            valueType.appendKotlinMessages(to: node)
+            keyType.appendKotlinMessages(to: node, source: source)
+            valueType.appendKotlinMessages(to: node, source: source)
         case .double:
             break
         case .float:
             break
         case .function(let parameters, let returnType):
-            parameters.forEach { $0.type.appendKotlinMessages(to: node) }
-            returnType.appendKotlinMessages(to: node)
+            parameters.forEach { $0.type.appendKotlinMessages(to: node, source: source) }
+            returnType.appendKotlinMessages(to: node, source: source)
         case .int:
             break
         case .int8:
@@ -128,29 +128,29 @@ extension TypeSignature {
         case .int64:
             break
         case .member(_, let type):
-            type.appendKotlinMessages(to: node)
+            type.appendKotlinMessages(to: node, source: source)
         case .metaType(let type):
-            type.appendKotlinMessages(to: node)
+            type.appendKotlinMessages(to: node, source: source)
         case .named(_, let generics):
-            generics.forEach { $0.appendKotlinMessages(to: node) }
+            generics.forEach { $0.appendKotlinMessages(to: node, source: source) }
         case .none:
             break
         case .optional(let type):
-            type.appendKotlinMessages(to: node)
+            type.appendKotlinMessages(to: node, source: source)
         case .range(let elementType):
-            elementType.appendKotlinMessages(to: node)
+            elementType.appendKotlinMessages(to: node, source: source)
         case .set(let elementType):
-            elementType.appendKotlinMessages(to: node)
+            elementType.appendKotlinMessages(to: node, source: source)
         case .string:
             break
         case .tuple(let labels, let types):
             if labels.contains(where: { $0 != nil }) {
-                node.messages.append(.kotlinTupleLabels(node))
+                node.messages.append(.kotlinTupleLabels(node, source: source))
             }
             if types.count > 3 {
-                node.messages.append(.kotlinTupleArity(node))
+                node.messages.append(.kotlinTupleArity(node, source: source))
             }
-            types.forEach { $0.appendKotlinMessages(to: node) }
+            types.forEach { $0.appendKotlinMessages(to: node, source: source) }
         case .uint:
             break
         case .uint8:
@@ -162,7 +162,7 @@ extension TypeSignature {
         case .uint64:
             break
         case .unwrappedOptional(let type):
-            type.appendKotlinMessages(to: node)
+            type.appendKotlinMessages(to: node, source: source)
         case .void:
             break
         }

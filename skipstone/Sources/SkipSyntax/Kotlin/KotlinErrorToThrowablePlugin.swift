@@ -19,7 +19,7 @@ class KotlinErrorToThrowablePlugin: KotlinPlugin {
             return
         }
         if let firstInherits = classDeclaration.inherits.first, codebaseInfo.declarationType(of: firstInherits, mustBeInModule: false) == .classDeclaration {
-            classDeclaration.messages.append(.kotlinErrorCannotExtendClass(classDeclaration))
+            classDeclaration.messages.append(.kotlinErrorCannotExtendClass(classDeclaration, source: codebaseInfo.source))
             return
         }
 

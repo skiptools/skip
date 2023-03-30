@@ -594,7 +594,7 @@ class FunctionCall: Expression {
         let candidateFunctions = context.function(name, in: baseType, parameters: parameters)
         if !candidateFunctions.isEmpty {
             if candidateFunctions.count > 1 {
-                messages.append(.ambiguousFunctionCall(sourceFile: sourceFile, sourceRange: sourceRange))
+                messages.append(.ambiguousFunctionCall(sourceDerived: self, source: context.source))
             }
             let function = candidateFunctions.first { $0.returnType == expecting } ?? candidateFunctions[0]
             // Re-infer arguments now that we know the parameter types
@@ -1299,7 +1299,7 @@ class Subscript: Expression {
         let candidateFunctions = context.subscript(in: base.inferredType, parameters: parameters)
         if !candidateFunctions.isEmpty {
             if candidateFunctions.count > 1 {
-                messages.append(.ambiguousFunctionCall(sourceFile: sourceFile, sourceRange: sourceRange))
+                messages.append(.ambiguousFunctionCall(sourceDerived: self, source: context.source))
             }
             let function = candidateFunctions.first { $0.returnType == expecting } ?? candidateFunctions[0]
             // Re-infer arguments now that we know the parameter types
