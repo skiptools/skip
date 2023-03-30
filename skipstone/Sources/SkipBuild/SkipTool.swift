@@ -456,7 +456,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
         let outputFolderPath = try AbsolutePath(validating: outputFolder, relativeTo: baseOutputPath)
         if !fs.isDirectory(outputFolderPath) {
-            // e.g.: ~Library/Developer/Xcode/DerivedData/PACKAGE-ID/SourcePackages/plugins/skip-core.output/SkipFoundationKotlinTests/SkipTranspilePlugIn/SkipFoundation/src/test/kotlin
+            // e.g.: ~Library/Developer/Xcode/DerivedData/PACKAGE-ID/SourcePackages/plugins/skiphub.output/SkipFoundationKotlinTests/SkipTranspilePlugIn/SkipFoundation/src/test/kotlin
             //throw error("Folder specified by --output-folder did not exist: \(outputFolder)")
             try fs.createDirectory(outputFolderPath, recursive: true)
         }
@@ -761,8 +761,8 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         }
 
         // NOTE: when linking between modules, SPM and Xcode will use different output paths:
-        // Xcode: ~/Library/Developer/Xcode/DerivedData/PROJECT-ID/SourcePackages/plugins/skip-core.output/SkipFoundationKotlinTests/SkipTranspilePlugIn/SkipFoundation
-        // SPM: .build/plugins/outputs/skip-core/
+        // Xcode: ~/Library/Developer/Xcode/DerivedData/PROJECT-ID/SourcePackages/plugins/skiphub.output/SkipFoundationKotlinTests/SkipTranspilePlugIn/SkipFoundation
+        // SPM: .build/plugins/outputs/skiphub/
         func linkDependentModuleSources() throws -> [String] {
             var dependentModules: [String] = []
             // transpilation was successful; now set up links to the other output packages (located in different plug-in folders)

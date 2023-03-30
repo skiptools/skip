@@ -8,7 +8,7 @@
       location = "group:../skip">
    </FileRef>
    <FileRef
-      location = "group:../skip-core">
+      location = "group:../skiphub">
    </FileRef>
    <FileRef
       location = "group:../skip-template">
