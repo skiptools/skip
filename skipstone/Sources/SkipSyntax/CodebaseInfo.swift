@@ -123,11 +123,11 @@ public class CodebaseInfo: Codable {
                 if let itemSourcePath = item.sourceFile?.path, itemSourcePath.hasSuffix(source.file.path) {
                     // Favor a symbol in this file
                     score += 3
-                } else if item.visibility != .private {
+                } else if item.modifiers.visibility != .private {
                     // Favor a symbol in this module
                     score += 2
                 }
-            } else if let itemModuleName = item.moduleName, importedModuleNames.contains(itemModuleName) && (item.visibility == .public || item.visibility == .open) {
+            } else if let itemModuleName = item.moduleName, importedModuleNames.contains(itemModuleName) && (item.modifiers.visibility == .public || item.modifiers.visibility == .open) {
                 score += 1
             }
             return score
@@ -517,14 +517,14 @@ public class CodebaseInfo: Codable {
     
     private static func addTypeInfo(_ typeInfo: TypeInfo, to itemsByName: inout [String: [CodebaseInfoItem]], publicOnly: Bool) {
         if publicOnly {
-            guard typeInfo.visibility == .public || typeInfo.visibility == .open else {
+            guard typeInfo.modifiers.visibility == .public || typeInfo.modifiers.visibility == .open else {
                 return
             }
-            typeInfo.types = typeInfo.types.filter { $0.visibility == .public || $0.visibility == .open }
-            typeInfo.typealiases = typeInfo.typealiases.filter { $0.visibility == .public || $0.visibility == .open }
-            typeInfo.variables = typeInfo.variables.filter { $0.visibility == .public || $0.visibility == .open }
-            typeInfo.functions = typeInfo.functions.filter { $0.visibility == .public || $0.visibility == .open }
-            typeInfo.cases = typeInfo.cases.filter { $0.visibility == .public || $0.visibility == .open }
+            typeInfo.types = typeInfo.types.filter { $0.modifiers.visibility == .public || $0.modifiers.visibility == .open }
+            typeInfo.typealiases = typeInfo.typealiases.filter { $0.modifiers.visibility == .public || $0.modifiers.visibility == .open }
+            typeInfo.variables = typeInfo.variables.filter { $0.modifiers.visibility == .public || $0.modifiers.visibility == .open }
+            typeInfo.functions = typeInfo.functions.filter { $0.modifiers.visibility == .public || $0.modifiers.visibility == .open }
+            typeInfo.cases = typeInfo.cases.filter { $0.modifiers.visibility == .public || $0.modifiers.visibility == .open }
         }
         addItem(typeInfo, to: &itemsByName, publicOnly: publicOnly)
         typeInfo.types.forEach { addTypeInfo($0, to: &itemsByName, publicOnly: publicOnly) }
@@ -533,7 +533,7 @@ public class CodebaseInfo: Codable {
     }
     
     private static func addItem(_ item: CodebaseInfoItem, to itemsByName: inout [String: [CodebaseInfoItem]], publicOnly: Bool) {
-        guard !publicOnly || item.visibility == .public || item.visibility == .open else {
+        guard !publicOnly || item.modifiers.visibility == .public || item.modifiers.visibility == .open else {
             return
         }
         var itemsWithName = itemsByName[item.name, default: []]
@@ -629,7 +629,7 @@ public class CodebaseInfo: Codable {
             }
             // inherits.first could have been a protocol
             if superclassInfos.contains(where: { $0.declarationType == .classDeclaration }) {
-                superclassInits = superclassInfos.flatMap { $0.functions.filter { $0.name == "init" && ($0.visibility != .private || $0.sourceFile == typeInfo.sourceFile) } }
+                superclassInits = superclassInfos.flatMap { $0.functions.filter { $0.name == "init" && ($0.modifiers.visibility != .private || $0.sourceFile == typeInfo.sourceFile) } }
             }
         }
         if superclassInits.isEmpty {
@@ -655,7 +655,7 @@ public class CodebaseInfo: Codable {
             return TypeSignature.Parameter(label: variable.name, type: variable.signature, isVariadic: false, hasDefaultValue: variable.hasValue)
         }
         let initSignature: TypeSignature = .function(parameters, typeInfo.signature)
-        var initInfo = FunctionInfo(name: "init", declarationType: .initDeclaration, signature: initSignature, moduleName: typeInfo.moduleName, sourceFile: typeInfo.sourceFile, declaringType: typeInfo.signature, visibility: typeInfo.visibility)
+        var initInfo = FunctionInfo(name: "init", declarationType: .initDeclaration, signature: initSignature, moduleName: typeInfo.moduleName, sourceFile: typeInfo.sourceFile, declaringType: typeInfo.signature, modifiers: typeInfo.modifiers)
         initInfo.isGenerated = true
         typeInfo.functions.append(initInfo)
     }
@@ -670,7 +670,7 @@ public class CodebaseInfo: Codable {
         let moduleName: String?
         let sourceFile: Source.FilePath?
         let declaringType: TypeSignature?
-        let visibility: Modifiers.Visibility
+        let modifiers: Modifiers
         var isStatic: Bool {
             return true
         }
@@ -693,7 +693,7 @@ public class CodebaseInfo: Codable {
 
         private enum CodingKeys: String, CodingKey {
             // Exclude language additions
-            case name, declarationType, signature, moduleName, sourceFile, declaringType, visibility, generics, inherits, types, typealiases, cases, variables, functions
+            case name, declarationType, signature, moduleName, sourceFile, declaringType, modifiers, generics, inherits, types, typealiases, cases, variables, functions
         }
 
         fileprivate init(statement: TypeDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo, delegate: CodebaseInfoGatherDelegate?) {
@@ -703,7 +703,7 @@ public class CodebaseInfo: Codable {
             self.moduleName = codebaseInfo.moduleName
             self.sourceFile = statement.sourceFile
             self.declaringType = declaringType
-            self.visibility = statement.modifiers.visibility
+            self.modifiers = statement.modifiers
             self.generics = statement.generics
             self.inherits = statement.inherits
             addMembers(statement.members, codebaseInfo: codebaseInfo, delegate: delegate)
@@ -721,7 +721,7 @@ public class CodebaseInfo: Codable {
             } else {
                 self.declaringType = nil
             }
-            self.visibility = statement.modifiers.visibility
+            self.modifiers = statement.modifiers
             self.generics = statement.generics
             self.inherits = statement.inherits
             addMembers(statement.members, codebaseInfo: codebaseInfo, delegate: delegate)
@@ -790,8 +790,10 @@ public class CodebaseInfo: Codable {
         let moduleName: String?
         let sourceFile: Source.FilePath?
         let declaringType: TypeSignature?
-        let visibility: Modifiers.Visibility
-        let isStatic: Bool
+        let modifiers: Modifiers
+        var isStatic: Bool {
+            return modifiers.isStatic
+        }
         var languageAdditions: Any?
 
         let generics: Generics
@@ -802,7 +804,7 @@ public class CodebaseInfo: Codable {
 
         private enum CodingKeys: String, CodingKey {
             // Exclude value expression, language additions
-            case name, signature, moduleName, sourceFile, declaringType, visibility, isStatic, generics, isReadOnly, isInitializable, hasValue
+            case name, signature, moduleName, sourceFile, declaringType, modifiers, generics, isReadOnly, isInitializable, hasValue
         }
 
         fileprivate init(statement: VariableDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo, delegate: CodebaseInfoGatherDelegate?) {
@@ -811,8 +813,7 @@ public class CodebaseInfo: Codable {
             self.moduleName = codebaseInfo.moduleName
             self.sourceFile = statement.sourceFile
             self.declaringType = declaringType
-            self.visibility = statement.modifiers.visibility
-            self.isStatic = statement.modifiers.isStatic
+            self.modifiers = statement.modifiers
             self.generics = Generics() //~~~
             self.isReadOnly = statement.isLet || (statement.getter != nil && statement.setter == nil)
             self.isInitializable = !statement.modifiers.isStatic && statement.getter == nil && (!statement.isLet || statement.value == nil)
@@ -868,8 +869,10 @@ public class CodebaseInfo: Codable {
         var moduleName: String?
         var sourceFile: Source.FilePath?
         var declaringType: TypeSignature?
-        let visibility: Modifiers.Visibility
-        let isStatic: Bool
+        let modifiers: Modifiers
+        var isStatic: Bool {
+            return modifiers.isStatic
+        }
         var languageAdditions: Any?
 
         let generics: Generics
@@ -878,7 +881,7 @@ public class CodebaseInfo: Codable {
 
         private enum CodingKeys: String, CodingKey {
             // Exclude language additions
-            case name, declarationType, signature, moduleName, sourceFile, declaringType, visibility, isStatic, generics, isMutating, isGenerated
+            case name, declarationType, signature, moduleName, sourceFile, declaringType, modifiers, generics, isMutating, isGenerated
         }
 
         fileprivate init(statement: FunctionDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo, delegate: CodebaseInfoGatherDelegate?) {
@@ -888,22 +891,20 @@ public class CodebaseInfo: Codable {
             self.moduleName = codebaseInfo.moduleName
             self.sourceFile = statement.sourceFile
             self.declaringType = declaringType
-            self.visibility = statement.modifiers.visibility
-            self.isStatic = statement.modifiers.isStatic
+            self.modifiers = statement.modifiers
             self.generics = Generics() //~~~
             self.isMutating = statement.modifiers.isMutating
             delegate?.codebaseInfo(codebaseInfo, didGather: &self, from: statement)
         }
 
-        fileprivate init(name: String, declarationType: StatementType, signature: TypeSignature, moduleName: String?, sourceFile: Source.FilePath? = nil, declaringType: TypeSignature? = nil, visibility: Modifiers.Visibility, isStatic: Bool = false, generics: Generics = Generics(), isMutating: Bool = false) {
+        fileprivate init(name: String, declarationType: StatementType, signature: TypeSignature, moduleName: String?, sourceFile: Source.FilePath? = nil, declaringType: TypeSignature? = nil, modifiers: Modifiers, generics: Generics = Generics(), isMutating: Bool = false) {
             self.name = name
             self.declarationType = declarationType
             self.signature = signature
             self.moduleName = moduleName
             self.sourceFile = sourceFile
             self.declaringType = declaringType
-            self.visibility = visibility
-            self.isStatic = isStatic
+            self.modifiers = modifiers
             self.generics = generics
             self.isMutating = isMutating
         }
@@ -919,7 +920,7 @@ public class CodebaseInfo: Codable {
         let moduleName: String?
         let sourceFile: Source.FilePath?
         let declaringType: TypeSignature?
-        let visibility: Modifiers.Visibility
+        let modifiers: Modifiers
         var isStatic: Bool {
             return true
         }
@@ -929,7 +930,7 @@ public class CodebaseInfo: Codable {
 
         private enum CodingKeys: String, CodingKey {
             // Exclude language additions
-            case name, signature, moduleName, sourceFile, declaringType, visibility, generics
+            case name, signature, moduleName, sourceFile, declaringType, modifiers, generics
         }
 
         fileprivate init(statement: TypealiasDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo, delegate: CodebaseInfoGatherDelegate?) {
@@ -938,7 +939,7 @@ public class CodebaseInfo: Codable {
             self.moduleName = codebaseInfo.moduleName
             self.sourceFile = statement.sourceFile
             self.declaringType = declaringType
-            self.visibility = statement.modifiers.visibility
+            self.modifiers = statement.modifiers
             self.generics = statement.generics
             delegate?.codebaseInfo(codebaseInfo, didGather: &self, from: statement)
         }
@@ -954,7 +955,7 @@ public class CodebaseInfo: Codable {
         let moduleName: String?
         let sourceFile: Source.FilePath?
         let declaringType: TypeSignature?
-        let visibility: Modifiers.Visibility
+        let modifiers: Modifiers
         var isStatic: Bool {
             return true
         }
@@ -962,7 +963,7 @@ public class CodebaseInfo: Codable {
 
         private enum CodingKeys: String, CodingKey {
             // Exclude language additions
-            case name, signature, moduleName, sourceFile, declaringType, visibility
+            case name, signature, moduleName, sourceFile, declaringType, modifiers
         }
 
         fileprivate init(statement: EnumCaseDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo, delegate: CodebaseInfoGatherDelegate?) {
@@ -971,7 +972,7 @@ public class CodebaseInfo: Codable {
             self.moduleName = codebaseInfo.moduleName
             self.sourceFile = statement.sourceFile
             self.declaringType = declaringType
-            self.visibility = statement.modifiers.visibility
+            self.modifiers = statement.modifiers
             delegate?.codebaseInfo(codebaseInfo, didGather: &self, from: statement)
         }
     }
@@ -985,7 +986,7 @@ protocol CodebaseInfoItem {
     var moduleName: String? { get }
     var sourceFile: Source.FilePath? { get }
     var declaringType: TypeSignature? { get }
-    var visibility: Modifiers.Visibility { get }
+    var modifiers: Modifiers { get }
     var isStatic: Bool { get }
     var languageAdditions: Any? { get set }
 }

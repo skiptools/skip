@@ -352,6 +352,205 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """)
     }
+
+    func testFunctionSignatureConflicts() async throws {
+        try await check(swift: """
+        func f(a: Int) {
+        }
+        func f(c: Int) {
+        }
+        func f(b: Int) {
+        }
+        func f(a: Double) {
+        }
+        func g(a: Int) {
+        }
+        """, kotlin: """
+        internal fun f(a: Int, unusedp_0: Nothing? = null) {
+        }
+        internal fun f(c: Int) {
+        }
+        internal fun f(b: Int, unusedp_0: Nothing? = null, unusedp_1: Nothing? = null) {
+        }
+        internal fun f(a: Double) {
+        }
+        internal fun g(a: Int) {
+        }
+        """)
+    }
+
+    func testMemberFunctionSignatureConflicts() async throws {
+        try await check(swift: """
+        class A {
+            func f(a: Int) {
+            }
+            func f(b: Int) {
+            }
+        }
+        """, kotlin: """
+        internal open class A {
+            internal open fun f(a: Int, unusedp_0: Nothing? = null) {
+            }
+            internal open fun f(b: Int) {
+            }
+        }
+        """)
+
+        try await check(swift: """
+        class A {
+            func f(a: Int) {
+            }
+        }
+        class B: A {
+            func f(b: Int) {
+            }
+        }
+        class C {
+            func f(c: Int) {
+            }
+        }
+        """, kotlin: """
+        internal open class A {
+            internal open fun f(a: Int) {
+            }
+        }
+        internal open class B: A() {
+            internal open fun f(b: Int, unusedp_0: Nothing? = null) {
+            }
+        }
+        internal open class C {
+            internal open fun f(c: Int) {
+            }
+        }
+        """)
+
+        try await check(swift: """
+        class A {
+            func f(a: Int) {
+            }
+        }
+        class B: A {
+            override func f(a: Int) {
+            }
+        }
+        """, kotlin: """
+        internal open class A {
+            internal open fun f(a: Int) {
+            }
+        }
+        internal open class B: A() {
+            override fun f(a: Int) {
+            }
+        }
+        """)
+
+        // Make sure we aren't dependent on param alpha order
+        try await check(swift: """
+        class A {
+            func f(c: Int) {
+            }
+        }
+        class B: A {
+            func f(b: Int) {
+            }
+        }
+        class C {
+            func f(a: Int) {
+            }
+        }
+        """, kotlin: """
+        internal open class A {
+            internal open fun f(c: Int) {
+            }
+        }
+        internal open class B: A() {
+            internal open fun f(b: Int, unusedp_0: Nothing? = null) {
+            }
+        }
+        internal open class C {
+            internal open fun f(a: Int) {
+            }
+        }
+        """)
+
+        try await check(swift: """
+        class A {
+            func f(a: Int) {
+            }
+            func g(z: Int) {
+            }
+        }
+        class B: A {
+            func f(b: Int) {
+            }
+        }
+        class C: B {
+            func f(c: Int) {
+            }
+            func g(a: Int) {
+            }
+        }
+        """, kotlin: """
+        internal open class A {
+            internal open fun f(a: Int) {
+            }
+            internal open fun g(z: Int) {
+            }
+        }
+        internal open class B: A() {
+            internal open fun f(b: Int, unusedp_0: Nothing? = null) {
+            }
+        }
+        internal open class C: B() {
+            internal open fun f(c: Int, unusedp_0: Nothing? = null, unusedp_1: Nothing? = null) {
+            }
+            internal open fun g(a: Int, unusedp_0: Nothing? = null) {
+            }
+        }
+        """)
+    }
+
+    func testProtocolFunctionSignatureConflicts() async throws {
+        try await check(swift: """
+        class A: P {
+            func f(a: Int) {
+            }
+            func f(b: Int) {
+            }
+        }
+        protocol P {
+            func f(a: Int)
+        }
+        """, kotlin: """
+        internal open class A: P {
+            override fun f(a: Int) {
+            }
+            internal open fun f(b: Int, unusedp_0: Nothing? = null) {
+            }
+        }
+        internal interface P {
+            fun f(a: Int)
+        }
+        """)
+    }
+
+    func testInitSignatureConflicts() async throws {
+//        try await check(swift: """
+//        class A {
+//            func f(a: Int) {
+//            }
+//            func f(b: Int) {
+//            }
+//        }
+//        """, kotlin: """
+//        internal open class A {
+//            internal open fun f(a: Int, unusedp_0: Nothing? = null) {
+//            }
+//            internal open fun f(b: Int) {
+//            }
+//        }
+//        """)
+    }
 }
 
 var sideEffectOrdering: [String] = []

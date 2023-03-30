@@ -980,10 +980,12 @@ struct KotlinExtensionDeclaration {
             kotlinStatements.append(KotlinMessageStatement(message: message))
         }
         for member in statement.members {
-            if let variableDeclaration = member as? VariableDeclaration, translator.codebaseInfo?.isProtocolMember(declaration: variableDeclaration, in: extends) == true {
-                kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionForConstrainedGenericImplementMember(member, source: translator.syntaxTree.source)))
-            } else if let functionDeclaration = member as? FunctionDeclaration, translator.codebaseInfo?.isProtocolMember(declaration: functionDeclaration, in: extends) == true {
-                kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionForConstrainedGenericImplementMember(member, source: translator.syntaxTree.source)))
+            if !statement.generics.whereEqual.isEmpty {
+                if let variableDeclaration = member as? VariableDeclaration, translator.codebaseInfo?.isProtocolMember(declaration: variableDeclaration, in: extends) == true {
+                    kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionForConstrainedGenericImplementMember(member, source: translator.syntaxTree.source)))
+                } else if let functionDeclaration = member as? FunctionDeclaration, translator.codebaseInfo?.isProtocolMember(declaration: functionDeclaration, in: extends) == true {
+                    kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionForConstrainedGenericImplementMember(member, source: translator.syntaxTree.source)))
+                }
             }
             for kmember in translator.translateStatement(member) {
                 guard let memberDeclaration = kmember as? KotlinMemberDeclaration else {
@@ -1009,10 +1011,12 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var parameters: [Parameter<KotlinExpression>] = []
     var isAsync = false
     var isOpen = false
+    var isGlobal = false
     var modifiers = Modifiers()
     var body: KotlinCodeBlock?
     var delegatingConstructorCall: KotlinExpression?
     var mutationFunctionNames: (willMutate: String, didMutate: String)?
+    var uniquifyingParameterCount = 0
     var functionType: TypeSignature {
         return .function(parameters.map(\.signature), returnType)
     }
@@ -1060,6 +1064,8 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                     kstatement.modifiers.visibility = .public
                 }
             }
+        } else if statement.isGlobal {
+            kstatement.isGlobal = true
         }
         if let body = statement.body {
             kstatement.body = KotlinCodeBlock.translate(statement: body, translator: translator)
@@ -1158,7 +1164,13 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 if let defaultValue = parameter.defaultValue {
                     output.append(" = ").append(defaultValue, indentation: indentation)
                 }
-                if index != parameters.count - 1 {
+                if index != parameters.count - 1 || uniquifyingParameterCount > 0 {
+                    output.append(", ")
+                }
+            }
+            for i in 0..<uniquifyingParameterCount {
+                output.append("unusedp_\(i): Nothing? = null")
+                if i != uniquifyingParameterCount - 1 {
                     output.append(", ")
                 }
             }
