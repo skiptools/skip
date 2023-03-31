@@ -169,34 +169,6 @@ final class FeatureSupportTests: XCTestCase {
             """)
     }
 
-    func testNestedClass() async throws {
-        // error: unresolved reference: companionObjectInstance
-        try await check(compiler: nil, swiftCode: {
-            class Foo {
-                class Bar {
-                    class Baz {
-                        static let prop = "ABC"
-                    }
-                }
-            }
-            return Foo.Bar.Baz.prop
-        }, kotlin: """
-            import kotlin.reflect.full.*
-            
-            open class Foo {
-                open class Bar {
-                    open class Baz {
-            
-                        companion object {
-                            val prop = "ABC"
-                        }
-                    }
-                }
-            }
-            return ((Foo.Bar.companionObjectInstance as Foo.Bar.Companion).Baz.companionObjectInstance as Foo.Bar.Baz.Companion).prop
-            """)
-    }
-
     func testNestedClassInFunction() async throws {
         try await check(swiftCode: {
             class Foo {

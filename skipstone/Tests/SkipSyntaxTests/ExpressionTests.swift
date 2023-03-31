@@ -124,5 +124,28 @@ final class ExpressionTests: XCTestCase {
         internal fun g(c: KClass<C>) {
         }
         """)
+
+        try await check(compiler: nil, swiftCode: {
+            class Foo {
+                class Bar {
+                    class Baz {
+                        static let prop = "ABC"
+                    }
+                }
+            }
+            return Foo.Bar.Baz.prop
+        }, kotlin: """
+        open class Foo {
+            open class Bar {
+                open class Baz {
+
+                    companion object {
+                        val prop = "ABC"
+                    }
+                }
+            }
+        }
+        return Foo.Bar.Baz.prop
+        """)
     }
 }

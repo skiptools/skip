@@ -1045,6 +1045,10 @@ class KotlinMemberAccess: KotlinExpression {
         if expression is TypeLiteral {
             return nil
         }
+        // Is this a nested class type name?
+        if let memberAccess = expression as? MemberAccess, case .member(_, let nestedType) = type, nestedType.name == memberAccess.member {
+            return nil
+        }
         // Now that we've ruled out a type literal, any other non-Identifier must be represented by a KClass
         guard let identifier = expression as? Identifier else {
             return type
