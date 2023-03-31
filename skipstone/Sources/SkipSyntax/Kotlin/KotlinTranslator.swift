@@ -3,7 +3,7 @@ import Foundation
 /// Translates a Swift syntax tree to Kotlin code.
 public class KotlinTranslator {
     let syntaxTree: SyntaxTree
-    private(set) var codebaseInfo: KotlinCodebaseInfo.Context?
+    private(set) var codebaseInfo: CodebaseInfo.Context?
     private(set) var packageName: String?
 
     public init(syntaxTree: SyntaxTree) {
@@ -41,7 +41,7 @@ public class KotlinTranslator {
     }
 
     /// Translate and transpile to source code.
-    public func transpile(codebaseInfo: KotlinCodebaseInfo, startTime: TimeInterval) -> Transpilation {
+    public func transpile(codebaseInfo: CodebaseInfo, startTime: TimeInterval) -> Transpilation {
         let importedModuleNames: [String] = syntaxTree.root.statements.compactMap { statement in
             guard statement.type == .importDeclaration, let importDeclaration = statement as? ImportDeclaration else {
                 return nil
@@ -50,11 +50,11 @@ public class KotlinTranslator {
         }
         let codebaseInfoContext = codebaseInfo.context(importedModuleNames: importedModuleNames, source: syntaxTree.source)
         self.codebaseInfo = codebaseInfoContext
-        self.packageName = codebaseInfo.packageName
+        self.packageName = codebaseInfo.kotlin?.packageName
 
         let kotlinSyntaxTree = translateSyntaxTree()
-        for plugin in codebaseInfo.plugins {
-            plugin.apply(to: kotlinSyntaxTree, translator: self)
+        if let plugins = codebaseInfo.kotlin?.plugins {
+            plugins.forEach { $0.apply(to: kotlinSyntaxTree, translator: self) }
         }
 
         let messages = codebaseInfo.messages(for: syntaxTree.source.file) + kotlinSyntaxTree.messages

@@ -6,7 +6,7 @@ public protocol KotlinPlugin {
     func gather(from syntaxTree: SyntaxTree)
 
     /// Called when gathering from all syntax trees is complete.
-    func prepareForUse(codebaseInfo: KotlinCodebaseInfo)
+    func prepareForUse(codebaseInfo: CodebaseInfo)
 
     /// Any issues encountered during information gathering.
     func messages(for sourceFile: Source.FilePath) -> [Message]
@@ -19,7 +19,7 @@ extension KotlinPlugin {
     func gather(from syntaxTree: SyntaxTree) {
     }
 
-    func prepareForUse(codebaseInfo: KotlinCodebaseInfo) {
+    func prepareForUse(codebaseInfo: CodebaseInfo) {
     }
 
     func messages(for sourceFile: Source.FilePath) -> [Message] {

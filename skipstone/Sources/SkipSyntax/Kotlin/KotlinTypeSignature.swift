@@ -169,7 +169,7 @@ extension TypeSignature {
     }
 
     /// Whether this type might represent a shared mutable struct.
-    func kotlinMayBeSharedMutableStruct(codebaseInfo: KotlinCodebaseInfo.Context?) -> Bool {
+    func kotlinMayBeSharedMutableStruct(codebaseInfo: CodebaseInfo.Context?) -> Bool {
         switch self {
         case .any:
             return true
@@ -245,7 +245,7 @@ extension TypeSignature {
     }
 
     /// Whether this type represents an enum modeled with sealed classes.
-    func kotlinIsSealedClassesEnum(codebaseInfo: KotlinCodebaseInfo.Context?) -> Bool {
+    func kotlinIsSealedClassesEnum(codebaseInfo: CodebaseInfo.Context?) -> Bool {
         guard case .named = asOptional(false) else {
             return false
         }

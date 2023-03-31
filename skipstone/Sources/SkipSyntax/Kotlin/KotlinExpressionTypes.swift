@@ -1036,7 +1036,7 @@ class KotlinMemberAccess: KotlinExpression {
     }
 
     /// Return the `KClass` instance the given expression evaluates to, if any.
-    private static func kclass(for expression: Expression, accessingMember: String, codebaseInfo: KotlinCodebaseInfo.Context?) -> TypeSignature? {
+    private static func kclass(for expression: Expression, accessingMember: String, codebaseInfo: CodebaseInfo.Context?) -> TypeSignature? {
         // Must evaluate to X.Type
         guard case .metaType(let type) = expression.inferredType, type != .none, accessingMember != "self" else {
             return nil

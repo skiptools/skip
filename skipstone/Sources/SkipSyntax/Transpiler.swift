@@ -22,7 +22,7 @@ public struct Transpiler {
     /// Perform transpilation, feeding results to the given handler.
     public func transpile(handler: (Transpilation) throws -> Void) async throws {
         // First create syntax trees used to populate codebase info
-        let kotlinCodebaseInfo = KotlinCodebaseInfo(packageName: packageName, codebaseInfo: codebaseInfo, plugins: plugins)
+        codebaseInfo.kotlin = KotlinCodebaseInfo(packageName: packageName, plugins: plugins)
         try await withThrowingTaskGroup(of: SyntaxTree.self) { group in
             for sourceFile in sourceFiles {
                 group.addTask {
@@ -30,9 +30,9 @@ public struct Transpiler {
                 }
             }
             for try await syntaxTree in group {
-                kotlinCodebaseInfo.gather(from: syntaxTree)
+                codebaseInfo.gather(from: syntaxTree)
             }
-            kotlinCodebaseInfo.prepareForUse()
+            codebaseInfo.prepareForUse()
         }
         // Next perform transpilation with populated info
         try await withThrowingTaskGroup(of: Transpilation.self) { group in
@@ -41,7 +41,7 @@ public struct Transpiler {
                     let start = Date().timeIntervalSinceReferenceDate
                     let syntaxTree = try SyntaxTree(source: Source(file: sourceFile), preprocessorSymbols: preprocessorSymbols, codebaseInfo: codebaseInfo)
                     let translator = KotlinTranslator(syntaxTree: syntaxTree)
-                    return translator.transpile(codebaseInfo: kotlinCodebaseInfo, startTime: start)
+                    return translator.transpile(codebaseInfo: codebaseInfo, startTime: start)
                 }
             }
             for try await transpilation in group {

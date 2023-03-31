@@ -2,16 +2,16 @@
 import XCTest
 
 final class KotlinCodebaseInfoTests: XCTestCase {
-    private func setUpContext() async throws -> KotlinCodebaseInfo.Context {
+    private func setUpContext() async throws -> CodebaseInfo.Context {
         let srcFile = try tmpFile(named: "Source.swift", contents: swift)
         let source = Source(file: Source.FilePath(path: srcFile.path), content: swift)
         let syntaxTree = SyntaxTree(source: source)
 
         let codebaseInfo = CodebaseInfo()
-        let kotlinCodebaseInfo = KotlinCodebaseInfo(codebaseInfo: codebaseInfo)
-        kotlinCodebaseInfo.gather(from: syntaxTree)
-        kotlinCodebaseInfo.prepareForUse()
-        return kotlinCodebaseInfo.context(importedModuleNames: [], source: source)
+        codebaseInfo.kotlin = KotlinCodebaseInfo()
+        codebaseInfo.gather(from: syntaxTree)
+        codebaseInfo.prepareForUse()
+        return codebaseInfo.context(importedModuleNames: [], source: source)
     }
 
     func testIsMutableStructType() async throws {

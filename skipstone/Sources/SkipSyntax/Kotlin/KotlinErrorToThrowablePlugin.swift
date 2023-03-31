@@ -7,14 +7,14 @@ class KotlinErrorToThrowablePlugin: KotlinPlugin {
         syntaxTree.root.visit { visit($0, codebaseInfo: codebaseInfo) }
     }
 
-    private func visit(_ node: KotlinSyntaxNode, codebaseInfo: KotlinCodebaseInfo.Context) -> VisitResult<KotlinSyntaxNode> {
+    private func visit(_ node: KotlinSyntaxNode, codebaseInfo: CodebaseInfo.Context) -> VisitResult<KotlinSyntaxNode> {
         if let classDeclaration = node as? KotlinClassDeclaration {
             processClassDeclaration(classDeclaration, codebaseInfo: codebaseInfo)
         }
         return .recurse(nil)
     }
 
-    private func processClassDeclaration(_ classDeclaration: KotlinClassDeclaration, codebaseInfo: KotlinCodebaseInfo.Context) {
+    private func processClassDeclaration(_ classDeclaration: KotlinClassDeclaration, codebaseInfo: CodebaseInfo.Context) {
         guard codebaseInfo.conformsToError(type: classDeclaration.signature) else {
             return
         }
