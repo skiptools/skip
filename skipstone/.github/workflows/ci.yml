@@ -26,5 +26,7 @@ jobs:
         run: KOTLINC=kotlinc swift test -v --configuration debug --parallel
 
       - name: Swift Test Linux (Release)
+        # disabled for CI speed (release build of dependencies is slow)
+        if: false
         run: swift test -v --configuration release -Xswiftc -enable-testing --parallel
 
