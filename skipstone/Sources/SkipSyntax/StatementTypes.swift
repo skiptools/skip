@@ -621,7 +621,7 @@ class EnumCaseDeclaration: Statement {
         }
     }
 
-    override func resolveAttributes() {
+    override func resolveAttributes(in syntaxTree: SyntaxTree) {
         // Enum case declarations inherit the visibility of the enum
         if modifiers.visibility == .default {
             if let owningTypeDeclaration = parent as? TypeDeclaration {
@@ -767,7 +767,10 @@ class FunctionDeclaration: Statement {
         return statement
     }
 
-    override func resolveAttributes() {
+    override func resolveAttributes(in syntaxTree: SyntaxTree) {
+        if parent?.owningFunctionDeclaration != nil {
+            messages.append(.localFunctionsNotSupported(sourceDerived: self, source: syntaxTree.source))
+        }
         if type == .initDeclaration, let owningTypeDeclaration {
             returnType = owningTypeDeclaration.signature
             if isOptionalInit {
@@ -883,7 +886,7 @@ class TypealiasDeclaration: Statement {
         return [statement]
     }
 
-    override func resolveAttributes() {
+    override func resolveAttributes(in syntaxTree: SyntaxTree) {
         if _signature == nil {
             _signature = qualifyDeclaredType(signature)
         }
@@ -999,7 +1002,10 @@ class TypeDeclaration: Statement {
         return statement
     }
 
-    override func resolveAttributes() {
+    override func resolveAttributes(in syntaxTree: SyntaxTree) {
+        if parent?.owningFunctionDeclaration != nil {
+            messages.append(.localTypesNotSupported(sourceDerived: self, source: syntaxTree.source))
+        }
         if _signature == nil {
             _signature = qualifyDeclaredType(signature)
         }
@@ -1151,7 +1157,7 @@ class VariableDeclaration: Statement {
         return declaration
     }
 
-    override func resolveAttributes() {
+    override func resolveAttributes(in syntaxTree: SyntaxTree) {
         declaredType = declaredType.qualified(in: self)
         // Variables in protocols or extensions inherit the visibility of the protocol or extension
         if modifiers.visibility == .default {

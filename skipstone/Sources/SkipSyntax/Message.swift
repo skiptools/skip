@@ -103,6 +103,14 @@ extension Message {
         return Message(kind: .error, message: "Skip is not able to match this where constraint to a declared generic type", source: source, sourceRange: range)
     }
 
+    static func localFunctionsNotSupported(sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Skip does not support nested functions. Consider making this an independent function", sourceDerived: sourceDerived, source: source)
+    }
+
+    static func localTypesNotSupported(sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Skip does not support type declarations within functions. Consider making this an independent type", sourceDerived: sourceDerived, source: source)
+    }
+
     static func variableNeedsTypeDeclaration(sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .warning, message: "Skip is unable to determine the type of this expression. Consider declaring the variable type explicitly, i.e. 'var v: <Type> = ...'", sourceDerived: sourceDerived, source: source)
     }

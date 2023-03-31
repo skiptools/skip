@@ -650,7 +650,7 @@ class Identifier: Expression {
         return Identifier(name: name, generics: generics, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
-    override func resolveAttributes() {
+    override func resolveAttributes(in syntaxTree: SyntaxTree) {
         generics = generics.map { $0.qualified(in: self) }
     }
 
@@ -803,7 +803,7 @@ class MatchingCase: Expression, BindingExpression {
         return MatchingCase(pattern: pattern, declaredType: declaredType, target: target, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
-    override func resolveAttributes() {
+    override func resolveAttributes(in syntaxTree: SyntaxTree) {
         declaredType = declaredType.qualified(in: self)
     }
 
@@ -869,7 +869,7 @@ class MemberAccess: Expression {
         return MemberAccess(base: base, member: member, generics: generics, useMultlineFormatting: useMultlineFormatting, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
-    override func resolveAttributes() {
+    override func resolveAttributes(in syntaxTree: SyntaxTree) {
         baseType = baseType.qualified(in: self)
         generics = generics.map { $0.qualified(in: self) }
     }
@@ -1009,7 +1009,7 @@ class OptionalBinding: Expression, BindingExpression {
         return OptionalBinding(names: names, declaredType: declaredType, isLet: isLet, value: value, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
-    override func resolveAttributes() {
+    override func resolveAttributes(in syntaxTree: SyntaxTree) {
         declaredType = declaredType.qualified(in: self)
     }
 

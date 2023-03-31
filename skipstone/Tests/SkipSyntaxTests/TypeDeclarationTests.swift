@@ -395,11 +395,18 @@ final class TypeDeclarationTests: XCTestCase {
          // Test enums and extensions
     }
 
-    func testTypeDeclaredWithinExtension() throws {
-        throw XCTSkip("TODO: Test declaring a type within an extension. We need to move it to the original type extended type definition if in module, error if not")
+    func testLocalTypes() async throws {
+        try await checkProducesMessage(swift: """
+        func f() -> Int {
+            class F {
+                static let x = 1
+            }
+            return F.x + 1
+        }
+        """)
     }
 
-    func testTypeDeclaredWithinFunction() throws {
-        throw XCTSkip("TODO: Test declaring a type within a function. This includes making sure our plugins process in-function types correctly")
+    func testTypeDeclaredWithinExtension() throws {
+        throw XCTSkip("TODO: Test declaring a type within an extension. We need to move it to the original type extended type definition if in module, error if not")
     }
 }

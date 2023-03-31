@@ -169,147 +169,68 @@ final class FeatureSupportTests: XCTestCase {
             """)
     }
 
-    func testNestedClassInFunction() async throws {
-        try await check(swiftCode: {
-            class Foo {
-                func someFunction() {
-                    class NestedClass {
-                    }
-                }
-            }
-            return ""
-        }, kotlin: """
-            open class Foo {
-                open fun someFunction() {
-                    open class NestedClass {
-                    }
-                }
-            }
-            return ""
-            """)
-    }
-
-    func testNestedDoubleClassInFunction() async throws {
-        // error: class is not allowed here
-        // open class NestedClass3 {
-        try await check(compiler: nil, swiftCode: {
-            class Foo {
-                public func someFunction() {
-                    class NestedClass {
-                        func someOtherFunction() {
-                            class NestedClass2 {
-                                class NestedClass3 {
-                                    func yetAnotherFunction() -> String {
-                                        return "XXX"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            return ""
-        }, kotlin: """
-            open class Foo {
-                open fun someFunction() {
-                    open class NestedClass {
-                        open fun someOtherFunction() {
-                            open class NestedClass2 {
-                                open class NestedClass3 {
-                                    open fun yetAnotherFunction(): String {
-                                        return "XXX"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            return ""
-            """)
-    }
-
-    func testNestedStructInFunction() async throws {
-        // error: modifier 'internal' is not applicable to 'local class'
-        try await check(swift: """
-        class Foo {
-            public func someFunction() {
-                struct NestedStruct {
-                }
-            }
-        }
-        """, kotlin: """
-        internal open class Foo {
-            open fun someFunction() {
-                internal class NestedStruct {
-                }
-            }
-        }
-        """)
-    }
-
-    func testNestedSimpleEnumInFunction() async throws {
-        // error: modifier 'enum' is not applicable to 'local class'
-        try await check(swift: """
-        class Foo {
-            public func someFunction() {
-                enum NestedEnum {
-                    case case1, case2, case3
-                }
-            }
-        }
-        """, kotlin: """
-        internal open class Foo {
-            open fun someFunction() {
-                internal enum class NestedEnum {
-                    case1,
-                    case2,
-                    case3;
-                }
-            }
-        }
-        """)
-    }
-
-    func testNestedComplexEnumInFunction() async throws {
-        // error: modifier 'sealed' is not applicable to 'local class'
-        try await check(swift: """
-        class Foo {
-            public func someFunction() {
-                enum ComplexEnum {
-                    case case1(String)
-                    case case2(Int)
-                    case case3(Bool)
-                }
-            }
-        }
-        """, kotlin: """
-        internal open class Foo {
-            open fun someFunction() {
-                internal sealed class ComplexEnum {
-                    class case1case(val associated0: String): ComplexEnum() {
-                    }
-                    class case2case(val associated0: Int): ComplexEnum() {
-                    }
-                    class case3case(val associated0: Boolean): ComplexEnum() {
-                    }
-
-                    companion object {
-                        fun case1(associated0: String): ComplexEnum {
-                            return case1case(associated0)
-                        }
-                        fun case2(associated0: Int): ComplexEnum {
-                            return case2case(associated0)
-                        }
-                        fun case3(associated0: Boolean): ComplexEnum {
-                            return case3case(associated0)
-                        }
-                    }
-                }
-            }
-        }
-        """)
-    }
+//    func testNestedSimpleEnumInFunction() async throws {
+//        // error: modifier 'enum' is not applicable to 'local class'
+//        try await check(swift: """
+//        class Foo {
+//            public func someFunction() {
+//                enum NestedEnum {
+//                    case case1, case2, case3
+//                }
+//            }
+//        }
+//        """, kotlin: """
+//        internal open class Foo {
+//            open fun someFunction() {
+//                internal enum class NestedEnum {
+//                    case1,
+//                    case2,
+//                    case3;
+//                }
+//            }
+//        }
+//        """)
+//    }
+//
+//    func testNestedComplexEnumInFunction() async throws {
+//        // error: modifier 'sealed' is not applicable to 'local class'
+//        try await check(swift: """
+//        class Foo {
+//            public func someFunction() {
+//                enum ComplexEnum {
+//                    case case1(String)
+//                    case case2(Int)
+//                    case case3(Bool)
+//                }
+//            }
+//        }
+//        """, kotlin: """
+//        internal open class Foo {
+//            open fun someFunction() {
+//                internal sealed class ComplexEnum {
+//                    class case1case(val associated0: String): ComplexEnum() {
+//                    }
+//                    class case2case(val associated0: Int): ComplexEnum() {
+//                    }
+//                    class case3case(val associated0: Boolean): ComplexEnum() {
+//                    }
+//
+//                    companion object {
+//                        fun case1(associated0: String): ComplexEnum {
+//                            return case1case(associated0)
+//                        }
+//                        fun case2(associated0: Int): ComplexEnum {
+//                            return case2case(associated0)
+//                        }
+//                        fun case3(associated0: Boolean): ComplexEnum {
+//                            return case3case(associated0)
+//                        }
+//                    }
+//                }
+//            }
+//        }
+//        """)
+//    }
 }
 
 

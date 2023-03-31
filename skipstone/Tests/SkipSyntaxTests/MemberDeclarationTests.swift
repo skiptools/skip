@@ -660,6 +660,17 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """)
     }
+
+    func testLocalFunctions() async throws {
+        try await checkProducesMessage(swift: """
+        func f() -> Int {
+            func g() -> Int {
+                return 1
+            }
+            return g() + 1
+        }
+        """)
+    }
 }
 
 var sideEffectOrdering: [String] = []

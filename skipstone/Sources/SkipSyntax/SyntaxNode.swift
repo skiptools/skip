@@ -15,7 +15,7 @@ class SyntaxNode: SourceDerived, PrettyPrintable {
     }
 
     /// Resolve contextual information about this node's attributes after the parent node is set.
-    func resolveAttributes() {
+    func resolveAttributes(in syntaxTree: SyntaxTree) {
     }
 
     /// Perform type inference.

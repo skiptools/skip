@@ -18,7 +18,7 @@ public class SyntaxTree: PrettyPrintable {
         var resolveQueue: [SyntaxNode] = [root]
         while !resolveQueue.isEmpty {
             let node = resolveQueue.removeFirst()
-            node.resolveAttributes()
+            node.resolveAttributes(in: self)
             node.children.forEach { $0.parent = node }
             resolveQueue += node.children
         }
