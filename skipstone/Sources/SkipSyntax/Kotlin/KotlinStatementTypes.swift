@@ -1012,6 +1012,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var isAsync = false
     var isOpen = false
     var isGlobal = false
+    var annotations: [String] = []
     var modifiers = Modifiers()
     var body: KotlinCodeBlock?
     var delegatingConstructorCall: KotlinExpression?
@@ -1132,6 +1133,9 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if let declaration = extras?.declaration {
             output.append(declaration)
         } else {
+            for annotation in annotations {
+                output.append(annotation + " ")
+            }
             output.append(modifiers.kotlinMemberString(isOpen: isOpen, suffix: " "))
             if isAsync {
                 output.append("suspend ")

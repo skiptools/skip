@@ -23,7 +23,7 @@ extension XCTestCase {
     ///   - kotlin: the expected kotlin, or the literal `// SKIPME` when the
     ///   - file: the file of the call site, expected to be `#file`
     ///   - line: the line of the call site, expected to be `#line`
-    public func check(expectFailure: Bool = false, compiler: String? = ProcessInfo.processInfo.environment["KOTLINC"], replaceInlineSKIPME: Int? = 1, supportingSwift: String? = nil, swift: StaticString? = nil, swiftCode: (() throws -> String?)? = nil, kotlin: String, fixup fixupKotlinBlock: ((String) -> (String)) = { $0 }, file: StaticString = #file, line: UInt = #line) async throws {
+    public func check(expectFailure: Bool = false, compiler: String? = ProcessInfo.processInfo.environment["KOTLINC"], replaceInlineSKIPME: Int? = 1, supportingSwift: String? = nil, swift: StaticString? = nil, swiftCode: (() throws -> String?)? = nil, kotlin: String, fixup fixupKotlinBlock: ((String) -> (String)) = { $0 }, plugins: [KotlinPlugin] = [], file: StaticString = #file, line: UInt = #line) async throws {
 
         func fixup(code: String) -> String {
             var code = fixupKotlinBlock(code)
@@ -81,7 +81,7 @@ extension XCTestCase {
             srcFiles.append(Source.FilePath(path: supportingFile.path))
         }
         let codebaseInfo = CodebaseInfo()
-        let tp = Transpiler(sourceFiles: srcFiles, codebaseInfo: codebaseInfo)
+        let tp = Transpiler(sourceFiles: srcFiles, codebaseInfo: codebaseInfo, plugins: plugins)
         var transpilations: [Transpilation] = []
         try await tp.transpile { transpilations.append($0) }
         guard let transpilation = transpilations.first else {

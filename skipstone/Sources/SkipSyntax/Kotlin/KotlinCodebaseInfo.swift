@@ -179,7 +179,8 @@ public class KotlinCodebaseInfo: CodebaseInfoLanguageAdditions, CodebaseInfoLang
             KotlinDeferPlugin(),
             KotlinUniquifyFunctionSignaturesPlugin(),
             //KotlinSwiftUIPlugin(),
-            KotlinImportMapPlugin(), // TODO: drive this from skip.yml metadata
+            KotlinImportMapPlugin(),
+            KotlinTestAnnotationPlugin(),
         ] + plugins
     }
 
