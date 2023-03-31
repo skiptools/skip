@@ -11,6 +11,10 @@ on:
     #- cron: '0 0,12 * * *'
 
 jobs:
+  ci-skiphub:
+    if: github.event_name != 'pull_request'
+    uses: skiptools/skiphub/.github/workflows/ci.yml@main
+
   ci-linux:
     runs-on: ubuntu-latest
     timeout-minutes: 30
