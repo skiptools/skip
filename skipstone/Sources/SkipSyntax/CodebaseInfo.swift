@@ -492,11 +492,11 @@ public class CodebaseInfo: Codable {
         let score: Double
     }
     
-    private var rootTypes: [TypeInfo] = []
-    private var rootTypealiases: [TypealiasInfo] = []
-    private var rootVariables: [VariableInfo] = []
-    private var rootFunctions: [FunctionInfo] = []
-    private var rootExtensions: [TypeInfo] = []
+    private(set) var rootTypes: [TypeInfo] = []
+    private(set) var rootTypealiases: [TypealiasInfo] = []
+    private(set) var rootVariables: [VariableInfo] = []
+    private(set) var rootFunctions: [FunctionInfo] = []
+    private(set) var rootExtensions: [TypeInfo] = []
     private var itemsByName: [String: [CodebaseInfoItem]] = [:]
     private var messages: [Source.FilePath: [Message]] = [:]
     private var isInUse = false

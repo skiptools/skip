@@ -1,7 +1,10 @@
 /// Uniquify Kotlin functions translated from Swift functions that are only differentkated on their parameter labels.
 class KotlinUniquifyFunctionSignaturesPlugin: KotlinPlugin {
     func prepareForUse(codebaseInfo: CodebaseInfo) {
-
+        for function in codebaseInfo.rootFunctions {
+            initializeUniquifyingParameterCounts(for: function, codebaseInfo: codebaseInfo)
+        }
+        //~~~
     }
 
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
@@ -44,18 +47,36 @@ class KotlinUniquifyFunctionSignaturesPlugin: KotlinPlugin {
             return 0
         }
         let key = Key(for: functionDeclaration, in: type)
-        let counts: [ParameterCount]
-        if let cachedCounts = uniquifyingParameterCounts[key] {
-            counts = cachedCounts
-        } else {
-            counts = initializeUniquifyingParameterCounts(for: key, in: type, codebaseInfo: codebaseInfo)
-            uniquifyingParameterCounts[key] = counts
-        }
-        if let count = counts.first(where: { $0.isMatch(for: functionDeclaration, in: type, codebaseInfo: codebaseInfo) }) {
-            return count.count
-        } else {
+        guard let counts = uniquifyingParameterCounts[key] else {
             return 0
         }
+        guard let count = counts.first(where: { $0.isMatch(for: functionDeclaration, in: type, codebaseInfo: codebaseInfo) }) else {
+            return 0
+        }
+        return count.count
+    }
+    //~~~
+//        let counts: [ParameterCount]
+//        if let cachedCounts = uniquifyingParameterCounts[key] {
+//            counts = cachedCounts
+//        } else {
+//            counts = initializeUniquifyingParameterCounts(for: key, in: type, codebaseInfo: codebaseInfo)
+//            uniquifyingParameterCounts[key] = counts
+//        }
+//        if let count = counts.first(where: { $0.isMatch(for: functionDeclaration, in: type, codebaseInfo: codebaseInfo) }) {
+//            return count.count
+//        } else {
+//            return 0
+//        }
+//    }
+
+    private func initializeUniquifyingParameterCounts(for functionInfo: CodebaseInfo.FunctionInfo, codebaseInfo: CodebaseInfo) {
+        let key = Key(for: functionInfo)
+        guard !uniquifyingParameterCounts.keys.contains(key) else {
+            return
+        }
+        let counts = initializeUniquifyingParameterCounts(for: key, in: functionInfo.declaringType, codebaseInfo: codebaseInfo)
+        uniquifyingParameterCounts[key] = counts
     }
 
     private func initializeUniquifyingParameterCounts(for key: Key, in type: TypeSignature?, codebaseInfo: CodebaseInfo.Context) -> [ParameterCount] {
@@ -65,7 +86,8 @@ class KotlinUniquifyFunctionSignaturesPlugin: KotlinPlugin {
             return []
         }
         let labelGroups = infos.reduce(into: [String: [CodebaseInfo.FunctionInfo]]()) { result, info in
-            guard case .function(let parameters, _) = info.signature, parameters.count > 0 else {
+            let parameters = info.signature.parameters
+            guard !parameters.isEmpty else {
                 return
             }
             let labels = parameters.map { $0.label ?? "" }.joined(separator: ", ")
@@ -193,10 +215,10 @@ class KotlinUniquifyFunctionSignaturesPlugin: KotlinPlugin {
             candidates = codebaseInfo.lookup(name: key.name).filter { $0.declarationType == .functionDeclaration && !$0.modifiers.isOverride }
         }
         return candidates.compactMap { info in
-            guard let functionInfo = info as? CodebaseInfo.FunctionInfo, case .function(let parameters, _) = functionInfo.signature else {
+            guard let functionInfo = info as? CodebaseInfo.FunctionInfo else {
                 return nil
             }
-            return key.parameterTypes == parameters.map(\.type) ? functionInfo: nil
+            return key.parameterTypes == functionInfo.signature.parameters.map(\.type) ? functionInfo: nil
         }
     }
 }
@@ -206,10 +228,16 @@ private struct Key: Hashable {
     let isInit: Bool
     let parameterTypes: [TypeSignature]
 
+    init(for functionInfo: CodebaseInfo.FunctionInfo) {
+        self.isInit = functionInfo.declarationType == .initDeclaration
+        self.name = self.isInit ? (functionInfo.declaringType?.name ?? "") : functionInfo.name
+        self.parameterTypes = functionInfo.signature.parameters.map(\.type)
+    }
+
     init(for functionDeclaration: KotlinFunctionDeclaration, in type: TypeSignature?) {
         self.isInit = functionDeclaration.type == .constructorDeclaration
         self.name = self.isInit ? (type?.name ?? "") : functionDeclaration.name
-        self.parameterTypes = functionDeclaration.parameters.map(\.declaredType)
+        self.parameterTypes = functionDeclaration.functionType.parameters.map(\.type)
     }
 }
 
@@ -251,11 +279,7 @@ private struct LabelDeclarer {
     let visibility: Modifiers.Visibility
 
     init(for functionInfo: CodebaseInfo.FunctionInfo, codebaseInfo: CodebaseInfo.Context) {
-        if case .function(let parameters, _) = functionInfo.signature {
-            self.parameters = parameters
-        } else {
-            self.parameters = [] // Shouldn't happen
-        }
+        self.parameters = functionInfo.signature.parameters
         self.type = functionInfo.declaringType
         if let type = functionInfo.declaringType {
             if functionInfo.declarationType == .initDeclaration {
