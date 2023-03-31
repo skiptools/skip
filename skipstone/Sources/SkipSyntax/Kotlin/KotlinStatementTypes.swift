@@ -1161,7 +1161,8 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 if parameter.isInOut {
                     output.append(">")
                 }
-                if let defaultValue = parameter.defaultValue {
+                // Kotlin does not allow default values to override functions
+                if let defaultValue = parameter.defaultValue, !modifiers.isOverride {
                     output.append(" = ").append(defaultValue, indentation: indentation)
                 }
                 if index != parameters.count - 1 || uniquifyingParameterCount > 0 {
@@ -1169,7 +1170,10 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 }
             }
             for i in 0..<uniquifyingParameterCount {
-                output.append("unusedp_\(i): Nothing? = null")
+                output.append("unusedp_\(i): Nothing?")
+                if !modifiers.isOverride {
+                    output.append(" = null")
+                }
                 if i != uniquifyingParameterCount - 1 {
                     output.append(", ")
                 }
@@ -1239,6 +1243,7 @@ class KotlinImportDeclaration: KotlinStatement {
 
 class KotlinInterfaceDeclaration: KotlinStatement {
     var name: String
+    var signature: TypeSignature
     var inherits: [TypeSignature] = []
     var modifiers = Modifiers()
     var generics = Generics()
@@ -1292,6 +1297,7 @@ class KotlinInterfaceDeclaration: KotlinStatement {
 
     private init(statement: TypeDeclaration) {
         self.name = statement.name
+        self.signature = statement.signature
         super.init(type: .interfaceDeclaration, statement: statement)
     }
 

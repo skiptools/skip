@@ -532,24 +532,90 @@ final class MemberDeclarationTests: XCTestCase {
             fun f(a: Int)
         }
         """)
+
+        try await check(swift: """
+        protocol P1 {
+            func f(a: Int)
+        }
+        protocol P2 {
+            func f(a: Double)
+        }
+        protocol P3: P1, P2 {
+            func f(b: Int)
+        }
+        class A: P1 {
+            func f(a: Int) {
+            }
+        }
+        class B: P2, P3 {
+            func f(a: Int) {
+            }
+            func f(a: Double) {
+            }
+            func f(b: Int) {
+            }
+        }
+        """, kotlin: """
+        internal interface P1 {
+            fun f(a: Int)
+        }
+        internal interface P2 {
+            fun f(a: Double)
+        }
+        internal interface P3: P1, P2 {
+            fun f(b: Int, unusedp_0: Nothing? = null)
+        }
+        internal open class A: P1 {
+            override fun f(a: Int) {
+            }
+        }
+        internal open class B: P2, P3 {
+            override fun f(a: Int) {
+            }
+            override fun f(a: Double) {
+            }
+            override fun f(b: Int, unusedp_0: Nothing?) {
+            }
+        }
+        """)
     }
 
     func testInitSignatureConflicts() async throws {
-//        try await check(swift: """
-//        class A {
-//            func f(a: Int) {
-//            }
-//            func f(b: Int) {
-//            }
-//        }
-//        """, kotlin: """
-//        internal open class A {
-//            internal open fun f(a: Int, unusedp_0: Nothing? = null) {
-//            }
-//            internal open fun f(b: Int) {
-//            }
-//        }
-//        """)
+        try await check(swift: """
+        class A {
+            init(a: Int) {
+            }
+            init(b: Int) {
+            }
+        }
+        class B: A {
+            override init(a: Int) {
+            }
+            init(c: Int) {
+            }
+        }
+        class C: A {
+            init(c: Int) {
+            }
+        }
+        """, kotlin: """
+        internal open class A {
+            internal constructor(a: Int, unusedp_0: Nothing? = null) {
+            }
+            internal constructor(b: Int) {
+            }
+        }
+        internal open class B: A {
+            internal constructor(a: Int, unusedp_0: Nothing? = null): super() {
+            }
+            internal constructor(c: Int): super() {
+            }
+        }
+        internal open class C: A {
+            internal constructor(c: Int): super() {
+            }
+        }
+        """)
     }
 }
 
