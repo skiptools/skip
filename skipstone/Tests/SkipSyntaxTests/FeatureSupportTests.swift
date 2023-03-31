@@ -83,6 +83,47 @@ final class FeatureSupportTests: XCTestCase {
             """)
     }
 
+    func testCheckSwiftFib() async throws {
+        try await check(swiftCode: {
+            func fibonacci(_ n: Int) -> Int {
+                var a = 0
+                var b = 1
+
+                if n == 0 {
+                    return a
+                } else if n == 1 {
+                    return b
+                } else {
+                    for _ in 2...n {
+                        let c = a + b
+                        a = b
+                        b = c
+                    }
+                    return b
+                }
+            }
+            return "\(fibonacci(11))"
+        }, kotlin: """
+            fun fibonacci(n: Int): Int {
+                var a = 0
+                var b = 1
+                if (n == 0) {
+                    return a
+                } else if (n == 1) {
+                    return b
+                } else {
+                    for (unusedbinding in 2 .. n) {
+                        val c = a + b
+                        a = b
+                        b = c
+                    }
+                    return b
+                }
+            }
+            return "${fibonacci(11)}"
+            """)
+    }
+    
     func testCheckDisambiguateFunc() async throws {
         // failed - Transpilation produced unexpected messages: Source.swift: warning: Skip is unable to disambiguate this function call. Consider differentiating your functions with unique parameter labels
 
@@ -306,6 +347,7 @@ final class FeatureSupportTests: XCTestCase {
         """)
     }
 }
+
 
 
 
