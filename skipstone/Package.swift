@@ -30,6 +30,7 @@ let package = Package(
         .testTarget(name: "SkipSyntaxTests", dependencies: [
             "SkipSyntax",
             "SkipBuild",
+            .product(name: "TSCBasic", package: "swift-tools-support-core"),
         ]),
 
         .target(name: "SkipBuild", dependencies: [

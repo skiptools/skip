@@ -4,84 +4,224 @@ import XCTest
 /// A test case that verifies that transpilation are *not* working as hoped.
 final class FeatureSupportTests: XCTestCase {
 
+    func testCheckSwiftCompiledSource() async throws {
+        try await check(swiftCode: {
+            return "\(1 + 2)"
+        }, kotlin: """
+            return "${1 + 2}"
+            """)
+    }
+
+    func testTranspilePrimeCheck() async throws {
+        try await check(swiftCode: {
+            func isPrime(_ number: Int) -> Bool {
+                guard number > 1 else {
+                    return false
+                }
+                for i in 2..<number {
+                    if number % i == 0 {
+                        return false
+                    }
+                }
+                return true
+            }
+            return isPrime(100019) ? "YES" : "NO"
+        }, kotlin: """
+            fun isPrime(number: Int): Boolean {
+                if (number <= 1) {
+                    return false
+                }
+                for (i in 2 until number) {
+                    if (number % i == 0) {
+                        return false
+                    }
+                }
+                return true
+            }
+            return if (isPrime(100019)) "YES" else "NO"
+            """)
+    }
+
+    func testCheckSwiftCompiledTypes() async throws {
+
+        try await check(swiftCode: {
+            struct Foo {
+            }
+            return nil
+        }, kotlin: """
+            class Foo {
+            }
+            return null
+            """)
+
+        try await check(swiftCode: {
+            struct Foo {
+            }
+            return nil
+        }, kotlin: """
+            class Foo {
+            }
+            return null
+            """)
+    }
+
+    func testCheckSwiftEnum() async throws {
+        try await check(swiftCode: {
+            enum EnumType {
+                case a,
+                     b,
+                     c
+            }
+            return nil
+        }, kotlin: """
+            enum class EnumType {
+                a,
+                b,
+                c;
+            }
+            return null
+            """)
+    }
+
+    func testCheckDisambiguateFunc() async throws {
+        // failed - Transpilation produced unexpected messages: Source.swift: warning: Skip is unable to disambiguate this function call. Consider differentiating your functions with unique parameter labels
+
+        // Source.kts:7:7: error: overload resolution ambiguity:
+        // public final fun doSomething(): Int defined in Source
+        // public final fun doSomething(): String defined in Source
+        // print(doSomething() as String)
+
+        // try await check(compiler: nil, swiftCode: {
+        //      func doSomething() -> String {
+        //          "ZZZ"
+        //      }
+        //      func doSomething() -> Int {
+        //          1
+        //      }
+        //      return doSomething() as String
+        //  }, kotlin: """
+        //      fun doSomething(): String {
+        //          return "ZZZ"
+        //      }
+        //      fun doSomething(): Int {
+        //          return 1
+        //      }
+        //      return doSomething() as String
+        //      """)
+    }
+
     func testInferCaseVariable() async throws {
-        // error: modifier 'internal' is not applicable to 'local function'
-        try await check(swift: """
-        enum SomeEnum {
-            case case1
-            case case2
-        }
-        func enumStuff() {
-            var x = SomeEnum.case1
-            x = .case2
-        }
-        """, kotlin: """
-        internal enum class SomeEnum {
-            case1,
-            case2;
-        }
-        internal fun enumStuff() {
-            var x = SomeEnum.case1
-            x = SomeEnum.case2
-        }
-        """)
+        try await check(swiftCode: {
+            enum SomeEnum {
+                case case1
+                case case2
+            }
+            func enumStuff() -> String {
+                var x = SomeEnum.case1
+                x = .case2
+                return "\(x)"
+            }
+            return enumStuff()
+        }, kotlin: """
+            enum class SomeEnum {
+                case1,
+                case2;
+            }
+            fun enumStuff(): String {
+                var x = SomeEnum.case1
+                x = SomeEnum.case2
+                return "${x}"
+            }
+            return enumStuff()
+            """)
+    }
+
+    func testNestedClass() async throws {
+        // error: unresolved reference: companionObjectInstance
+        try await check(compiler: nil, swiftCode: {
+            class Foo {
+                class Bar {
+                    class Baz {
+                        static let prop = "ABC"
+                    }
+                }
+            }
+            return Foo.Bar.Baz.prop
+        }, kotlin: """
+            import kotlin.reflect.full.*
+            
+            open class Foo {
+                open class Bar {
+                    open class Baz {
+            
+                        companion object {
+                            val prop = "ABC"
+                        }
+                    }
+                }
+            }
+            return ((Foo.Bar.companionObjectInstance as Foo.Bar.Companion).Baz.companionObjectInstance as Foo.Bar.Baz.Companion).prop
+            """)
     }
 
     func testNestedClassInFunction() async throws {
-        // error: modifier 'internal' is not applicable to 'local class'
-        try await check(swift: """
-        class Foo {
-            public func someFunction() {
-                class NestedClass {
+        try await check(swiftCode: {
+            class Foo {
+                func someFunction() {
+                    class NestedClass {
+                    }
                 }
             }
-        }
-        """, kotlin: """
-        internal open class Foo {
-            open fun someFunction() {
-                internal open class NestedClass {
+            return ""
+        }, kotlin: """
+            open class Foo {
+                open fun someFunction() {
+                    open class NestedClass {
+                    }
                 }
             }
-        }
-        """)
+            return ""
+            """)
     }
 
     func testNestedDoubleClassInFunction() async throws {
-        // error: modifier 'internal' is not applicable to 'local class'
         // error: class is not allowed here
-        try await check(swift: """
-        class Foo {
-            public func someFunction() {
-                class NestedClass {
-                    func someOtherFunction() {
-                        class NestedClass2 {
-                            class NestedClass3 {
-                                func yetAnotherFunction() -> String {
-                                    return "XXX"
+        // open class NestedClass3 {
+        try await check(compiler: nil, swiftCode: {
+            class Foo {
+                public func someFunction() {
+                    class NestedClass {
+                        func someOtherFunction() {
+                            class NestedClass2 {
+                                class NestedClass3 {
+                                    func yetAnotherFunction() -> String {
+                                        return "XXX"
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
-        }
-        """, kotlin: """
-        internal open class Foo {
-            open fun someFunction() {
-                internal open class NestedClass {
-                    internal open fun someOtherFunction() {
-                        internal open class NestedClass2 {
-                            internal open class NestedClass3 {
-                                internal open fun yetAnotherFunction(): String {
-                                    return "XXX"
+            return ""
+        }, kotlin: """
+            open class Foo {
+                open fun someFunction() {
+                    open class NestedClass {
+                        open fun someOtherFunction() {
+                            open class NestedClass2 {
+                                open class NestedClass3 {
+                                    open fun yetAnotherFunction(): String {
+                                        return "XXX"
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
-        }
-        """)
+            return ""
+            """)
     }
 
     func testNestedStructInFunction() async throws {
@@ -166,3 +306,15 @@ final class FeatureSupportTests: XCTestCase {
         """)
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
