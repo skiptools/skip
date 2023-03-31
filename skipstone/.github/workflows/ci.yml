@@ -19,8 +19,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
+      - name: Check kotlinc
+        run: which kotlinc
+
       - name: Swift Test Linux (Debug)
-        run: swift test -v --configuration debug --parallel
+        run: KOTLINC=kotlinc swift test -v --configuration debug --parallel
 
       - name: Swift Test Linux (Release)
         run: swift test -v --configuration release -Xswiftc -enable-testing --parallel
