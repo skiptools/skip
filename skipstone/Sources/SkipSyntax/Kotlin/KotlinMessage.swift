@@ -58,16 +58,16 @@ extension Message {
         return Message(kind: .error, message: "This declaration is not supported in a Kotlin extension", sourceDerived: sourceDerived, source: source)
     }
 
-    static func kotlinFunctionUniquifyImplementable(name: String, parameters: [TypeSignature], in type: TypeSignature?, source: Source) -> Message {
+    static func kotlinFunctionDisambiguateImplementable(name: String, parameters: [TypeSignature], in type: TypeSignature?, sourceFile: Source.FilePath) -> Message {
         let function = "\(type?.description ?? "").\(name)(\(parameters.map(\.description).joined(separator: ", ")))"
-        let message = "Function \(function) has the same name and parameter types as a conflicting function, but Skip is unable to change its signature because this function can be overridden by types in other modules. Kotlin does not differentiate functions on parameter labels. Consider changing the name of this function"
-        return Message(kind: .warning, message: message, source: source)
+        let message = "Function \(function) has the same name and parameter types as a conflicting function, but Skip is unable to change its signature because this function can be overridden by types in other modules. Kotlin does not disambiguate functions on parameter labels. Consider changing the name of this function"
+        return Message(kind: .warning, message: message, sourceFile: sourceFile)
     }
 
-    static func kotlinFunctionUniquifyProtocol(name: String, parameters: [TypeSignature], in type: TypeSignature?, source: Source) -> Message {
+    static func kotlinFunctionDisambiguateProtocol(name: String, parameters: [TypeSignature], in type: TypeSignature?, sourceFile: Source.FilePath) -> Message {
         let function = "\(type?.description ?? "").\(name)(\(parameters.map(\.description).joined(separator: ", ")))"
-        let message = "Function \(function) has the same name and parameter types as a conflicting function, but Skip is unable to change its signature because it is part of a protocol that may be implemented by other types. Kotlin does not differentiate functions on parameter labels. Consider changing the name of this function"
-        return Message(kind: .warning, message: message, source: source)
+        let message = "Function \(function) has the same name and parameter types as a conflicting function, but Skip is unable to change its signature because it is part of a protocol that may be implemented by other types. Kotlin does not disambiguate functions on parameter labels. Consider changing the name of this function"
+        return Message(kind: .warning, message: message, sourceFile: sourceFile)
     }
 
     static func kotlinInOutParameterAssignment(_ sourceDerived: SourceDerived, source: Source) -> Message {

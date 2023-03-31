@@ -1,10 +1,27 @@
-/// Uniquify Kotlin functions translated from Swift functions that are only differentkated on their parameter labels.
-class KotlinUniquifyFunctionSignaturesPlugin: KotlinPlugin {
+/// Disambiguate Kotlin functions translated from Swift functions that are only differentkated on their parameter labels.
+class KotlinDisambiguateFunctionsPlugin: KotlinPlugin {
     func prepareForUse(codebaseInfo: CodebaseInfo) {
-        for function in codebaseInfo.rootFunctions {
-            initializeUniquifyingParameterCounts(for: function, codebaseInfo: codebaseInfo)
+        for functionInfo in codebaseInfo.rootFunctions {
+            initializeDisambiguatingParameterCounts(for: functionInfo, codebaseInfo: codebaseInfo)
         }
-        //~~~
+        for typeInfo in codebaseInfo.rootTypes {
+            initializeDisambiguatingParameterCounts(for: typeInfo, codebaseInfo: codebaseInfo)
+        }
+        for extensionInfo in codebaseInfo.rootExtensions {
+            for functionInfo in extensionInfo.members.compactMap({ $0 as? CodebaseInfo.FunctionInfo }) {
+                initializeDisambiguatingParameterCounts(for: functionInfo, codebaseInfo: codebaseInfo)
+            }
+        }
+    }
+
+    private func initializeDisambiguatingParameterCounts(for typeInfo: CodebaseInfo.TypeInfo, codebaseInfo: CodebaseInfo) {
+        for memberInfo in typeInfo.members {
+            if let typeInfo = memberInfo as? CodebaseInfo.TypeInfo {
+                initializeDisambiguatingParameterCounts(for: typeInfo, codebaseInfo: codebaseInfo)
+            } else if let functionInfo = memberInfo as? CodebaseInfo.FunctionInfo {
+                initializeDisambiguatingParameterCounts(for: functionInfo, codebaseInfo: codebaseInfo)
+            }
+        }
     }
 
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
@@ -20,34 +37,34 @@ class KotlinUniquifyFunctionSignaturesPlugin: KotlinPlugin {
     private func visit(_ node: KotlinSyntaxNode, codebaseInfo: CodebaseInfo.Context) -> VisitResult<KotlinSyntaxNode> {
         if let classDeclaration = node as? KotlinClassDeclaration {
             let functionDeclarations = classDeclaration.members.compactMap { $0 as? KotlinFunctionDeclaration }
-            functionDeclarations.forEach { uniquifyFunctionDeclaration($0, in: classDeclaration.signature, codebaseInfo: codebaseInfo) }
+            functionDeclarations.forEach { disambiguateFunctionDeclaration($0, in: classDeclaration.signature, codebaseInfo: codebaseInfo) }
         } else if let interfaceDeclaration = node as? KotlinInterfaceDeclaration {
             let functionDeclarations = interfaceDeclaration.members.compactMap { $0 as? KotlinFunctionDeclaration }
-            functionDeclarations.forEach { uniquifyFunctionDeclaration($0, in: interfaceDeclaration.signature, codebaseInfo: codebaseInfo) }
+            functionDeclarations.forEach { disambiguateFunctionDeclaration($0, in: interfaceDeclaration.signature, codebaseInfo: codebaseInfo) }
         } else if let functionDeclaration = node as? KotlinFunctionDeclaration {
             if functionDeclaration.isGlobal || functionDeclaration.extends != nil {
-                uniquifyFunctionDeclaration(functionDeclaration, in: functionDeclaration.extends, codebaseInfo: codebaseInfo)
+                disambiguateFunctionDeclaration(functionDeclaration, in: functionDeclaration.extends, codebaseInfo: codebaseInfo)
             }
         }
         return .recurse(nil)
     }
 
-    private func uniquifyFunctionDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, in type: TypeSignature?, codebaseInfo: CodebaseInfo.Context) {
-        // We uniquify functions that have the same name and parameter types but different parameter labels by appending extra
+    private func disambiguateFunctionDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, in type: TypeSignature?, codebaseInfo: CodebaseInfo.Context) {
+        // We disambiguate functions that have the same name and parameter types but different parameter labels by appending extra
         // unused parameters to satisfy the Kotlin compiler. Because labels are not part of the function signature, we have to
         // append different numbers of extra parameters for each conflicting version
-        functionDeclaration.uniquifyingParameterCount = uniquifyingParameterCount(for: functionDeclaration, in: type, codebaseInfo: codebaseInfo)
+        functionDeclaration.disambiguatingParameterCount = disambiguatingParameterCount(for: functionDeclaration, in: type, codebaseInfo: codebaseInfo)
     }
 
-    private var uniquifyingParameterCounts: [Key: [ParameterCount]] = [:]
+    private var disambiguatingParameterCounts: [Key: [ParameterCount]] = [:]
     private var messages: [Source.FilePath: [Message]] = [:]
 
-    private func uniquifyingParameterCount(for functionDeclaration: KotlinFunctionDeclaration, in type: TypeSignature?, codebaseInfo: CodebaseInfo.Context) -> Int {
+    private func disambiguatingParameterCount(for functionDeclaration: KotlinFunctionDeclaration, in type: TypeSignature?, codebaseInfo: CodebaseInfo.Context) -> Int {
         guard !functionDeclaration.parameters.isEmpty else {
             return 0
         }
         let key = Key(for: functionDeclaration, in: type)
-        guard let counts = uniquifyingParameterCounts[key] else {
+        guard let counts = disambiguatingParameterCounts[key] else {
             return 0
         }
         guard let count = counts.first(where: { $0.isMatch(for: functionDeclaration, in: type, codebaseInfo: codebaseInfo) }) else {
@@ -55,31 +72,17 @@ class KotlinUniquifyFunctionSignaturesPlugin: KotlinPlugin {
         }
         return count.count
     }
-    //~~~
-//        let counts: [ParameterCount]
-//        if let cachedCounts = uniquifyingParameterCounts[key] {
-//            counts = cachedCounts
-//        } else {
-//            counts = initializeUniquifyingParameterCounts(for: key, in: type, codebaseInfo: codebaseInfo)
-//            uniquifyingParameterCounts[key] = counts
-//        }
-//        if let count = counts.first(where: { $0.isMatch(for: functionDeclaration, in: type, codebaseInfo: codebaseInfo) }) {
-//            return count.count
-//        } else {
-//            return 0
-//        }
-//    }
 
-    private func initializeUniquifyingParameterCounts(for functionInfo: CodebaseInfo.FunctionInfo, codebaseInfo: CodebaseInfo) {
+    private func initializeDisambiguatingParameterCounts(for functionInfo: CodebaseInfo.FunctionInfo, codebaseInfo: CodebaseInfo) {
         let key = Key(for: functionInfo)
-        guard !uniquifyingParameterCounts.keys.contains(key) else {
+        guard !disambiguatingParameterCounts.keys.contains(key) else {
             return
         }
-        let counts = initializeUniquifyingParameterCounts(for: key, in: functionInfo.declaringType, codebaseInfo: codebaseInfo)
-        uniquifyingParameterCounts[key] = counts
+        let counts = initializeDisambiguatingParameterCounts(for: key, in: functionInfo.declaringType, codebaseInfo: codebaseInfo)
+        disambiguatingParameterCounts[key] = counts
     }
 
-    private func initializeUniquifyingParameterCounts(for key: Key, in type: TypeSignature?, codebaseInfo: CodebaseInfo.Context) -> [ParameterCount] {
+    private func initializeDisambiguatingParameterCounts(for key: Key, in type: TypeSignature?, codebaseInfo: CodebaseInfo) -> [ParameterCount] {
         // First group same-param-type function infos on labels, and only process cases that have potential conflicts
         let infos = nonOverrideFunctionInfos(for: key, in: type, codebaseInfo: codebaseInfo)
         guard infos.count > 1 else {
@@ -110,8 +113,8 @@ class KotlinUniquifyFunctionSignaturesPlugin: KotlinPlugin {
         let concreteDeclarers = labelDeclarers.filter { !$0.inheritanceChain.isEmpty || $0.protocols.isEmpty }
         var labelCounts: [LabelKey: Int] = [:]
         var nextCount = 1
-        initializeLabelCounts(key: key, labelDeclarers: protocolDeclarers, labelCounts: &labelCounts, nextCount: &nextCount, source: codebaseInfo.source)
-        initializeLabelCounts(key: key, labelDeclarers: concreteDeclarers, labelCounts: &labelCounts, nextCount: &nextCount, source: codebaseInfo.source)
+        initializeLabelCounts(key: key, labelDeclarers: protocolDeclarers, labelCounts: &labelCounts, nextCount: &nextCount)
+        initializeLabelCounts(key: key, labelDeclarers: concreteDeclarers, labelCounts: &labelCounts, nextCount: &nextCount)
 
         return labelCounts.compactMap { (labelKey, count) -> ParameterCount? in
             guard count > 0 else {
@@ -121,7 +124,7 @@ class KotlinUniquifyFunctionSignaturesPlugin: KotlinPlugin {
         }
     }
 
-    private func initializeLabelCounts(key: Key, labelDeclarers: [LabelDeclarer], labelCounts: inout [LabelKey: Int], nextCount: inout Int, source: Source) {
+    private func initializeLabelCounts(key: Key, labelDeclarers: [LabelDeclarer], labelCounts: inout [LabelKey: Int], nextCount: inout Int) {
         // Brute force comparison to see if a given declarer is in the inheritance or protocol chains of any other label group, causing a conflict.
         // Assign each conflict a unique count, which means that we may be adding higher counts than needed but simplifies things a little
         for i in 0..<labelDeclarers.count {
@@ -162,13 +165,13 @@ class KotlinUniquifyFunctionSignaturesPlugin: KotlinPlugin {
                 }
                 // Should we map the other side?
                 if !labelDeclarers[i].isInModule || (iProtocolMatch != nil && jProtocolMatch == nil) || (jProtocolMatch == nil && !labelDeclarers[j].isImplementable && labelDeclarers[i].isImplementable) {
-                    if !warn(key: key, for: labelDeclarers[j], protocolMatch: jProtocolMatch, source: source) {
+                    if !warn(key: key, for: labelDeclarers[j], protocolMatch: jProtocolMatch) {
                         labelCounts[LabelKey(parameters: labelDeclarers[j].parameters, declaringType: labelDeclarers[j].type)] = nextCount
                         nextCount += 1
                     }
                     continue
                 } else {
-                    if !warn(key: key, for: labelDeclarers[i], protocolMatch: iProtocolMatch, source: source) {
+                    if !warn(key: key, for: labelDeclarers[i], protocolMatch: iProtocolMatch) {
                         count = nextCount
                         nextCount += 1
                     }
@@ -188,16 +191,20 @@ class KotlinUniquifyFunctionSignaturesPlugin: KotlinPlugin {
         return (nil, nil)
     }
 
-    private func warn(key: Key, for declarer: LabelDeclarer, protocolMatch: TypeSignature?, source: Source) -> Bool {
+    private func warn(key: Key, for declarer: LabelDeclarer, protocolMatch: TypeSignature?) -> Bool {
         if declarer.isImplementable {
-            var fileMessages = messages[source.file, default: []]
-            fileMessages.append(.kotlinFunctionUniquifyImplementable(name: key.name, parameters: key.parameterTypes, in: declarer.type, source: source))
-            messages[source.file] = fileMessages
+            if let sourceFile = declarer.sourceFile {
+                var fileMessages = messages[sourceFile, default: []]
+                fileMessages.append(.kotlinFunctionDisambiguateImplementable(name: key.name, parameters: key.parameterTypes, in: declarer.type, sourceFile: sourceFile))
+                messages[sourceFile] = fileMessages
+            }
             return true
         } else if protocolMatch != nil {
-            var fileMessages = messages[source.file, default: []]
-            fileMessages.append(.kotlinFunctionUniquifyProtocol(name: key.name, parameters: key.parameterTypes, in: declarer.type, source: source))
-            messages[source.file] = fileMessages
+            if let sourceFile = declarer.sourceFile {
+                var fileMessages = messages[sourceFile, default: []]
+                fileMessages.append(.kotlinFunctionDisambiguateProtocol(name: key.name, parameters: key.parameterTypes, in: declarer.type, sourceFile: sourceFile))
+                messages[sourceFile] = fileMessages
+            }
             return true
         } else {
             return false
@@ -205,7 +212,7 @@ class KotlinUniquifyFunctionSignaturesPlugin: KotlinPlugin {
     }
 
     /// - Note: This function includes `private` members that may not be visible to this context. It does **not** include override members.
-    private func nonOverrideFunctionInfos(for key: Key, in type: TypeSignature?, codebaseInfo: CodebaseInfo.Context) -> [CodebaseInfo.FunctionInfo] {
+    private func nonOverrideFunctionInfos(for key: Key, in type: TypeSignature?, codebaseInfo: CodebaseInfo) -> [CodebaseInfo.FunctionInfo] {
         let candidates: [CodebaseInfoItem]
         if let type, key.isInit {
             candidates = codebaseInfo.typeInfos(for: type).flatMap {
@@ -261,7 +268,7 @@ private struct ParameterCount {
         if type == declaringType {
             return true
         }
-        return !isInit && (codebaseInfo.inheritanceChainSignatures(for: type).contains(declaringType) || codebaseInfo.protocolSignatures(for: type).contains(declaringType))
+        return !isInit && (codebaseInfo.global.inheritanceChainSignatures(for: type).contains(declaringType) || codebaseInfo.global.protocolSignatures(for: type).contains(declaringType))
     }
 }
 
@@ -277,8 +284,9 @@ private struct LabelDeclarer {
     let protocols: [TypeSignature]
     let isInModule: Bool
     let visibility: Modifiers.Visibility
+    let sourceFile: Source.FilePath?
 
-    init(for functionInfo: CodebaseInfo.FunctionInfo, codebaseInfo: CodebaseInfo.Context) {
+    init(for functionInfo: CodebaseInfo.FunctionInfo, codebaseInfo: CodebaseInfo) {
         self.parameters = functionInfo.signature.parameters
         self.type = functionInfo.declaringType
         if let type = functionInfo.declaringType {
@@ -293,8 +301,9 @@ private struct LabelDeclarer {
             self.inheritanceChain = []
             self.protocols = []
         }
-        self.isInModule = functionInfo.moduleName == codebaseInfo.codebaseInfo.moduleName
+        self.isInModule = functionInfo.moduleName == codebaseInfo.moduleName
         self.visibility = functionInfo.modifiers.visibility
+        self.sourceFile = functionInfo.sourceFile
     }
 
     func isKind(of labelDeclarer: LabelDeclarer) -> Bool {

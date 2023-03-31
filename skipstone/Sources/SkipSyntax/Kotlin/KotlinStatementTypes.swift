@@ -1017,7 +1017,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var body: KotlinCodeBlock?
     var delegatingConstructorCall: KotlinExpression?
     var mutationFunctionNames: (willMutate: String, didMutate: String)?
-    var uniquifyingParameterCount = 0
+    var disambiguatingParameterCount = 0
     var functionType: TypeSignature {
         return .function(parameters.map(\.signature), returnType)
     }
@@ -1169,16 +1169,16 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 if let defaultValue = parameter.defaultValue, !modifiers.isOverride {
                     output.append(" = ").append(defaultValue, indentation: indentation)
                 }
-                if index != parameters.count - 1 || uniquifyingParameterCount > 0 {
+                if index != parameters.count - 1 || disambiguatingParameterCount > 0 {
                     output.append(", ")
                 }
             }
-            for i in 0..<uniquifyingParameterCount {
+            for i in 0..<disambiguatingParameterCount {
                 output.append("unusedp_\(i): Nothing?")
                 if !modifiers.isOverride {
                     output.append(" = null")
                 }
-                if i != uniquifyingParameterCount - 1 {
+                if i != disambiguatingParameterCount - 1 {
                     output.append(", ")
                 }
             }

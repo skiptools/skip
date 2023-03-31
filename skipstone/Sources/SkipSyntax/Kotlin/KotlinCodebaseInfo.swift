@@ -13,20 +13,20 @@ extension CodebaseInfo {
 extension CodebaseInfo.Context {
     /// Return all extensions of a given type.
     func extensions(of type: TypeSignature) -> [ExtensionDeclaration] {
-        assert(codebaseInfo.kotlin != nil)
+        assert(global.kotlin != nil)
         return typeInfos(for: type).compactMap { $0.languageAdditions as? ExtensionDeclaration }
     }
 
     /// Whether the given type is a class, struct, etc, optionally limiting results to this module.
     func declarationType(of type: TypeSignature, mustBeInModule: Bool) -> StatementType? {
-        assert(codebaseInfo.kotlin != nil)
+        assert(global.kotlin != nil)
         guard let typeInfo = typeInfos(for: type).first(where: { $0.declarationType != .extensionDeclaration }) else {
             guard let typealiasInfo = crossPlatformTypealias(forUnknownType: type) else {
                 return nil
             }
-            return !mustBeInModule || typealiasInfo.moduleName == codebaseInfo.moduleName ? .classDeclaration : nil
+            return !mustBeInModule || typealiasInfo.moduleName == global.moduleName ? .classDeclaration : nil
         }
-        if mustBeInModule && typeInfo.moduleName != codebaseInfo.moduleName {
+        if mustBeInModule && typeInfo.moduleName != global.moduleName {
             return nil
         }
         return typeInfo.declarationType
@@ -38,7 +38,7 @@ extension CodebaseInfo.Context {
     ///
     /// - Note: The returned parameters are only populated with the external label, declared type, and default value (when available).
     func constructorParameters(of type: TypeSignature) -> [[Parameter<Expression>]] {
-        assert(codebaseInfo.kotlin != nil)
+        assert(global.kotlin != nil)
         let inits = typeInfos(for: type).flatMap { (typeInfo) -> [CodebaseInfoItem] in
             guard typeInfo.declarationType != .protocolDeclaration else {
                 return []
@@ -67,37 +67,37 @@ extension CodebaseInfo.Context {
 
     /// Whether a property with the given signature is implementing a protocol property.
     func isProtocolMember(declaration: VariableDeclaration, in type: TypeSignature) -> Bool {
-        assert(codebaseInfo.kotlin != nil)
+        assert(global.kotlin != nil)
         guard !declaration.names.isEmpty, let name = declaration.names[0] else {
             return false
         }
-        let protocolSignatures = protocolSignatures(for: type)
+        let protocolSignatures = global.protocolSignatures(for: type)
         return protocolSignatures.contains { hasMember($0, name: name, type: nil, isStatic: declaration.modifiers.isStatic) }
     }
 
     /// Whether a function with the given signature is implementing a protocol function.
     func isProtocolMember(declaration: FunctionDeclaration, in type: TypeSignature) -> Bool {
-        assert(codebaseInfo.kotlin != nil)
-        let protocolSignatures = protocolSignatures(for: type)
+        assert(global.kotlin != nil)
+        let protocolSignatures = global.protocolSignatures(for: type)
         return protocolSignatures.contains { hasMember($0, name: declaration.name, type: declaration.functionType, isStatic: declaration.modifiers.isStatic) }
     }
 
     /// Whether the given member is declared by a protocol of the given type.
     func isProtocolMember(name: String, type: TypeSignature?, isStatic: Bool, in owningType: TypeSignature) -> Bool {
-        assert(codebaseInfo.kotlin != nil)
-        let protocolSignatures = protocolSignatures(for: owningType)
+        assert(global.kotlin != nil)
+        let protocolSignatures = global.protocolSignatures(for: owningType)
         return protocolSignatures.contains { hasMember($0, name: name, type: type, isStatic: isStatic) }
     }
 
     /// Whether the given type may be a mutable struct.
     func mayBeMutableStruct(type: TypeSignature) -> Bool {
-        assert(codebaseInfo.kotlin != nil)
+        assert(global.kotlin != nil)
         let typeInfos = typeInfos(for: type)
         if let structInfo = typeInfos.first(where: { $0.declarationType == .structDeclaration }) {
             return structInfo.variables.contains(where: { !$0.isReadOnly }) || structInfo.functions.contains(where: { $0.isMutating })
         } else if typeInfos.contains(where: { $0.declarationType == .protocolDeclaration }) {
             // If this is a protocol that is constrained to class impls, then it isn't a mutable struct. Otherwise it could be
-            return !protocolSignatures(for: type).contains(.anyObject)
+            return !global.protocolSignatures(for: type).contains(.anyObject)
         } else if typeInfos.isEmpty {
             // Assume an unknown type could be a mutable struct
             let type = type.asOptional(false)
@@ -116,13 +116,13 @@ extension CodebaseInfo.Context {
 
     /// Whether the given type conforms to `Error` through its protocols, **not** through inheritance.
     func conformsToError(type: TypeSignature) -> Bool {
-        assert(codebaseInfo.kotlin != nil)
-        return protocolSignatures(for: type).contains(.named("Error", []))
+        assert(global.kotlin != nil)
+        return global.protocolSignatures(for: type).contains(.named("Error", []))
     }
 
     /// Whether the given enum type has cases with associated values.
     func isSealedClassesEnum(type: TypeSignature) -> Bool {
-        assert(codebaseInfo.kotlin != nil)
+        assert(global.kotlin != nil)
         guard let enumInfo = typeInfos(for: type).first(where: { $0.declarationType == .enumDeclaration }) else {
             return false
         }
@@ -134,18 +134,18 @@ extension CodebaseInfo.Context {
 
     /// Whether the given name corresponds to a function in the given type.
     func isFunctionName(_ name: String, in owningType: TypeSignature?) -> Bool {
-        assert(codebaseInfo.kotlin != nil)
+        assert(global.kotlin != nil)
         let owningType = owningType?.asOptional(false)
         if owningType != nil && name == "init" {
             return true
         }
-        let items = ranked(lookup(name: name))
+        let items = ranked(global.lookup(name: name))
         return items.contains { $0.declarationType == .functionDeclaration && $0.declaringType?.name == owningType?.name }
     }
 
     /// Cross platform library code may create typealiases to unknown types. Return any typealias for the given unknown type.
     private func crossPlatformTypealias(forUnknownType type: TypeSignature) -> CodebaseInfo.TypealiasInfo? {
-        let members = ranked(lookup(name: type.name, qualifiedMatch: true))
+        let members = ranked(global.lookup(name: type.name, qualifiedMatch: true))
         return members.first(where: { $0.declarationType == .typealiasDeclaration }) as? CodebaseInfo.TypealiasInfo
     }
 
@@ -177,7 +177,7 @@ public class KotlinCodebaseInfo: CodebaseInfoLanguageAdditions, CodebaseInfoLang
             KotlinConstructorPlugin(),
             KotlinIfWhenPlugin(),
             KotlinDeferPlugin(),
-            KotlinUniquifyFunctionSignaturesPlugin(),
+            KotlinDisambiguateFunctionsPlugin(),
             //KotlinSwiftUIPlugin(),
             KotlinImportMapPlugin(),
             KotlinTestAnnotationPlugin(),

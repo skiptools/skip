@@ -14,7 +14,7 @@ class KotlinTestAnnotationPlugin: KotlinPlugin {
             if functionDeclaration.name.hasPrefix("test")
                 && !functionDeclaration.isStatic
                 && !functionDeclaration.isGlobal {
-                let signatures = codebaseInfo.inheritanceChainSignatures(for: owningClass.signature)
+                let signatures = codebaseInfo.global.inheritanceChainSignatures(for: owningClass.signature)
                 if let owningType = signatures.last {
                     let infos = codebaseInfo.typeInfos(for: owningType)
                     // check for whether the containing class inherits from `XCTestCase`

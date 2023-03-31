@@ -516,7 +516,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             }
             // Take away a tenth of a point for each level down the inheritance chain, so that less derived matches score lower.
             // This will allow another function with a more specific parameter type to score higher
-            let inherits = codebaseInfo.inheritanceChainSignatures(for: type)
+            let inherits = codebaseInfo.global.inheritanceChainSignatures(for: type)
             if inherits.count > 1 {
                 for i in 1..<inherits.count {
                     if inherits[i].withGenerics([]) == target {
@@ -524,7 +524,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                     }
                 }
             }
-            let protocols = codebaseInfo.protocolSignatures(for: type).map { $0.withGenerics([]) }
+            let protocols = codebaseInfo.global.protocolSignatures(for: type).map { $0.withGenerics([]) }
             if protocols.contains(target) {
                 return 1.5
             }

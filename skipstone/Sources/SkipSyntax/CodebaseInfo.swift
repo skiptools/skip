@@ -67,47 +67,92 @@ public class CodebaseInfo: Codable {
         inferVariableTypes()
         addGeneratedConstructors()
         buildItemsByName() // Final mappings after updates
+        languageAdditions?.prepareForUse(codebaseInfo: self)
     }
     
     /// Create a context that can access the given imported modules.
     func context(importedModuleNames: [String] = [], source: Source) -> Context {
-        return Context(codebaseInfo: self, importedModuleNames: Set(importedModuleNames), source: source)
+        return Context(global: self, importedModuleNames: Set(importedModuleNames), source: source)
+    }
+
+    /// The items for the given name.
+    ///
+    /// If this is a `.`-separated qualified type name, only returns types that match the full path.
+    ///
+    /// - Parameters:
+    ///  - qualifiedMatch: If true, names without `.` separators will only match root types.
+    func lookup(name: String, qualifiedMatch: Bool = false) -> [CodebaseInfoItem] {
+        let path = name.split(separator: ".").map { String($0) }
+        guard !path.isEmpty else {
+            return []
+        }
+        var candidates = itemsByName[path[path.count - 1], default: []]
+        if path.count > 1 {
+            let baseName = path.dropLast().joined(separator: ".")
+            candidates = candidates.filter { ($0 is TypeInfo || $0 is TypealiasInfo) && $0.declaringType?.name == baseName }
+        } else if qualifiedMatch {
+            candidates = candidates.filter { !($0 is TypeInfo || $0 is TypealiasInfo) || $0.declaringType == nil }
+        }
+        return candidates
+    }
+
+    /// Return all type infos for the given type.
+    func typeInfos(for type: TypeSignature, candidateFilter: (([CodebaseInfoItem]) -> [CodebaseInfoItem])? = nil) -> [TypeInfo] {
+        return candidateTypeNames(for: type.asOptional(false)).flatMap { name in
+            var candidates = lookup(name: name, qualifiedMatch: true)
+            if let candidateFilter {
+                candidates = candidateFilter(candidates)
+            }
+            return candidates.flatMap { candidate in
+                if let typeInfo = candidate as? TypeInfo {
+                    return [typeInfo]
+                } else if let typealiasInfo = candidate as? TypealiasInfo {
+                    return typeInfos(for: typealiasInfo.signature)
+                } else {
+                    return []
+                }
+            }
+        }
+    }
+
+    /// Return the concrete (i.e. non-protocol inheritance chain for the given type. The type will be first, followed by its superclass, etc.
+    func inheritanceChainSignatures(for type: TypeSignature) -> [TypeSignature] {
+        guard let concreteTypeInfo = typeInfos(for: type).first(where: { $0.declarationType != .protocolDeclaration && $0.declarationType != .extensionDeclaration }) else {
+            return []
+        }
+        guard concreteTypeInfo.declarationType == .classDeclaration, let firstInherits = concreteTypeInfo.inherits.first else {
+            return [concreteTypeInfo.signature]
+        }
+        //~~~ Need to map generics
+        return [concreteTypeInfo.signature] + inheritanceChainSignatures(for: firstInherits)
+    }
+
+    /// Return the protocols the given type conforms to, including inherited protocols. If the type itself is a protocol, it is included.
+    func protocolSignatures(for type: TypeSignature) -> [TypeSignature] {
+        // Gather inherited signatures, then insert the given type at the front if it is also a protocol
+        let type = type.asOptional(false)
+        let typeInfos = typeInfos(for: type)
+        //~~~ Need to map generics
+        var signatures = typeInfos.flatMap { $0.inherits.flatMap { protocolSignatures(for: $0) } }
+        // TODO: Remove special case for Error when we add SkipLib codebase info dependency
+        if type == .anyObject || type == .named("Error", []) || typeInfos.contains(where: { $0.declarationType == .protocolDeclaration }) {
+            signatures.insert(type, at: 0)
+        }
+        return signatures
     }
     
     /// A context for accessing visible codebase information.
     struct Context {
-        let codebaseInfo: CodebaseInfo
+        let global: CodebaseInfo
         let source: Source
         private let importedModuleNames: Set<String>
 
-        fileprivate init(codebaseInfo: CodebaseInfo, importedModuleNames: Set<String>, source: Source) {
-            self.codebaseInfo = codebaseInfo
+        fileprivate init(global: CodebaseInfo, importedModuleNames: Set<String>, source: Source) {
+            self.global = global
             self.source = source
             var importedModuleNames = importedModuleNames
             importedModuleNames.insert("SkipLib") // Contains our supported subset of the Swift builtin module
             self.importedModuleNames = importedModuleNames
-        }
-        
-        /// The items for the given name.
-        ///
-        /// If this is a `.`-separated qualified type name, only returns types that match the full path.
-        ///
-        /// - Parameters:
-        ///  - qualifiedMatch: If true, names without `.` separators will only match root types.
-        /// - Warning: This function does not take symbol visibility into account. See `ranked`.
-        func lookup(name: String, qualifiedMatch: Bool = false) -> [CodebaseInfoItem] {
-            let path = name.split(separator: ".").map { String($0) }
-            guard !path.isEmpty else {
-                return []
-            }
-            var candidates = codebaseInfo.itemsByName[path[path.count - 1], default: []]
-            if path.count > 1 {
-                let baseName = path.dropLast().joined(separator: ".")
-                candidates = candidates.filter { ($0 is TypeInfo || $0 is TypealiasInfo) && $0.declaringType?.name == baseName }
-            } else if qualifiedMatch {
-                candidates = candidates.filter { !($0 is TypeInfo || $0 is TypealiasInfo) || $0.declaringType == nil }
-            }
-            return candidates
         }
         
         /// Score, sort, and filter the given items.
@@ -125,7 +170,7 @@ public class CodebaseInfo: Codable {
         /// A score of 0 indicates that the item is not visible.
         func rankScore(of item: CodebaseInfoItem) -> Int {
             var score = 0
-            if item.moduleName == codebaseInfo.moduleName {
+            if item.moduleName == global.moduleName {
                 if let itemSourcePath = item.sourceFile?.path, itemSourcePath.hasSuffix(source.file.path) {
                     // Favor a symbol in this file
                     score += 3
@@ -141,49 +186,12 @@ public class CodebaseInfo: Codable {
         
         /// Return all type infos visible for the given type.
         func typeInfos(for type: TypeSignature) -> [TypeInfo] {
-            return candidateTypeNames(for: type.asOptional(false)).flatMap { name in
-                let candidates = ranked(lookup(name: name, qualifiedMatch: true))
-                return candidates.flatMap { candidate in
-                    if let typeInfo = candidate as? TypeInfo {
-                        return [typeInfo]
-                    } else if let typealiasInfo = candidate as? TypealiasInfo {
-                        return typeInfos(for: typealiasInfo.signature)
-                    } else {
-                        return []
-                    }
-                }
-            }
-        }
-
-        /// Return the concrete (i.e. non-protocol inheritance chain for the given type. The type will be first, followed by its superclass, etc.
-        func inheritanceChainSignatures(for type: TypeSignature) -> [TypeSignature] {
-            guard let concreteTypeInfo = typeInfos(for: type).first(where: { $0.declarationType != .protocolDeclaration && $0.declarationType != .extensionDeclaration }) else {
-                return []
-            }
-            guard concreteTypeInfo.declarationType == .classDeclaration, let firstInherits = concreteTypeInfo.inherits.first else {
-                return [concreteTypeInfo.signature]
-            }
-            //~~~ Need to map generics
-            return [concreteTypeInfo.signature] + inheritanceChainSignatures(for: firstInherits)
-        }
-
-        /// Return the protocols the given type conforms to, including inherited protocols. If the type itself is a protocol, it is included.
-        func protocolSignatures(for type: TypeSignature) -> [TypeSignature] {
-            // Gather inherited signatures, then insert the given type at the front if it is also a protocol
-            let type = type.asOptional(false)
-            let typeInfos = typeInfos(for: type)
-            //~~~ Need to map generics
-            var signatures = typeInfos.flatMap { $0.inherits.flatMap { protocolSignatures(for: $0) } }
-            // TODO: Remove special case for Error when we add SkipLib codebase info dependency
-            if type == .anyObject || type == .named("Error", []) || typeInfos.contains(where: { $0.declarationType == .protocolDeclaration }) {
-                signatures.insert(type, at: 0)
-            }
-            return signatures
+            return global.typeInfos(for: type, candidateFilter: ranked)
         }
         
         /// Return the type of the given identifier.
         func identifierSignature(of identifier: String) -> TypeSignature {
-            let topRanked = ranked(lookup(name: identifier, qualifiedMatch: true)).first { candidate in
+            let topRanked = ranked(global.lookup(name: identifier, qualifiedMatch: true)).first { candidate in
                 switch candidate.declarationType {
                 case .classDeclaration, .enumDeclaration, .protocolDeclaration, .structDeclaration, .typealiasDeclaration, .enumCaseDeclaration, .variableDeclaration:
                     return true
@@ -225,7 +233,7 @@ public class CodebaseInfo: Codable {
         
         /// Return the signatures of the possible functions being called with the given arguments.
         func functionSignature(of name: String, arguments: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
-            let items = ranked(lookup(name: name, qualifiedMatch: true))
+            let items = ranked(global.lookup(name: name, qualifiedMatch: true))
             let funcs = items.filter { $0.declarationType == .functionDeclaration || $0.declarationType == .initDeclaration }
             let funcsCandidates = funcs.compactMap { matchFunction($0, arguments: arguments) }
             
@@ -452,38 +460,38 @@ public class CodebaseInfo: Codable {
             }
             return nil
         }
-        
-        private func candidateTypeNames(for type: TypeSignature) -> [String] {
-            switch type {
-            case .array:
-                return ["Array"]
-            case .composition(let types):
-                return types.flatMap { candidateTypeNames(for: $0) }
-            case .dictionary:
-                return ["Dictionary"]
-            case .function:
-                return []
-            case .member(let base, let type):
-                let typeNames = candidateTypeNames(for: type)
-                let baseName = base.name
-                return typeNames.map { "\(baseName).\($0)" }
-            case .metaType(let type):
-                return candidateTypeNames(for: type)
-            case .named(let name, _):
-                return [name]
-            case .none:
-                return []
-            case .optional(let type):
-                return candidateTypeNames(for: type)
-            case .set:
-                return ["Set"]
-            case .unwrappedOptional(let type):
-                return candidateTypeNames(for: type)
-            case .void:
-                return []
-            default:
-                return [type.name]
-            }
+    }
+
+    private func candidateTypeNames(for type: TypeSignature) -> [String] {
+        switch type {
+        case .array:
+            return ["Array"]
+        case .composition(let types):
+            return types.flatMap { candidateTypeNames(for: $0) }
+        case .dictionary:
+            return ["Dictionary"]
+        case .function:
+            return []
+        case .member(let base, let type):
+            let typeNames = candidateTypeNames(for: type)
+            let baseName = base.name
+            return typeNames.map { "\(baseName).\($0)" }
+        case .metaType(let type):
+            return candidateTypeNames(for: type)
+        case .named(let name, _):
+            return [name]
+        case .none:
+            return []
+        case .optional(let type):
+            return candidateTypeNames(for: type)
+        case .set:
+            return ["Set"]
+        case .unwrappedOptional(let type):
+            return candidateTypeNames(for: type)
+        case .void:
+            return []
+        default:
+            return [type.name]
         }
     }
 
@@ -693,6 +701,7 @@ public class CodebaseInfo: Codable {
         var members: [CodebaseInfoItem] {
             return types + typealiases + cases + variables + functions
         }
+
         func visibleMembers(context: CodebaseInfo.Context) -> [CodebaseInfoItem] {
             return members.filter { context.rankScore(of: $0) > 0 }
         }
