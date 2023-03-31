@@ -94,10 +94,6 @@ extension XCTestCase {
         }
         if transpilation.sourceFile == srcFiles.first {
             let content = fixup(code: trimmedContent(transpilation: transpilation))
-            if expectFailure {
-                XCTExpectFailure()
-            }
-
             let kotlinCode = kotlin.trimmingCharacters(in: .whitespacesAndNewlines)
 
             // insert the Kotlin code in the test case where it says // SKIPME
@@ -130,7 +126,11 @@ extension XCTestCase {
                 }
             }
 
-            XCTAssertEqual(kotlinCode, content.trimmingCharacters(in: .whitespacesAndNewlines), messagesString, file: file, line: line)
+            if expectFailure {
+                XCTAssertNotEqual(kotlinCode, content.trimmingCharacters(in: .whitespacesAndNewlines), messagesString, file: file, line: line)
+            } else {
+                XCTAssertEqual(kotlinCode, content.trimmingCharacters(in: .whitespacesAndNewlines), messagesString, file: file, line: line)
+            }
         }
 
         // if we spcify to fork the kotlinc compiler, proceed with evaluating and comparing the results
@@ -149,6 +149,7 @@ extension XCTestCase {
 
         if let swiftCode = swiftCode,
            let swiftResult = try swiftCode() {
+            
             XCTAssertEqual(swiftResult, kotlinResult, file: file, line: line)
         }
     }

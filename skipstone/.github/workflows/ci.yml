@@ -23,7 +23,5 @@ jobs:
         run: swift test -v --configuration debug --parallel
 
       - name: Swift Test Linux (Release)
-        # disabled to speed of CI
-        if: false
         run: swift test -v --configuration release -Xswiftc -enable-testing --parallel
 
