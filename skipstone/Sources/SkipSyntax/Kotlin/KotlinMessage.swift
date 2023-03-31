@@ -58,6 +58,18 @@ extension Message {
         return Message(kind: .error, message: "This declaration is not supported in a Kotlin extension", sourceDerived: sourceDerived, source: source)
     }
 
+    static func kotlinFunctionUniquifyImplementable(name: String, parameters: [TypeSignature], in type: TypeSignature?, source: Source) -> Message {
+        let function = "\(type?.description ?? "").\(name)(\(parameters.map(\.description).joined(separator: ", ")))"
+        let message = "Function \(function) has the same name and parameter types as a conflicting function, but Skip is unable to change its signature because this function can be overridden by types in other modules. Kotlin does not differentiate functions on parameter labels. Consider changing the name of this function"
+        return Message(kind: .warning, message: message, source: source)
+    }
+
+    static func kotlinFunctionUniquifyProtocol(name: String, parameters: [TypeSignature], in type: TypeSignature?, source: Source) -> Message {
+        let function = "\(type?.description ?? "").\(name)(\(parameters.map(\.description).joined(separator: ", ")))"
+        let message = "Function \(function) has the same name and parameter types as a conflicting function, but Skip is unable to change its signature because it is part of a protocol that may be implemented by other types. Kotlin does not differentiate functions on parameter labels. Consider changing the name of this function"
+        return Message(kind: .warning, message: message, source: source)
+    }
+
     static func kotlinInOutParameterAssignment(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .warning, message: "Shadowing an inout parameter with a variable of the same name may produce incorrect Kotlin. Consider using a different variable name", sourceDerived: sourceDerived, source: source)
     }

@@ -1,9 +1,17 @@
 /// Uniquify Kotlin functions translated from Swift functions that are only differentkated on their parameter labels.
 class KotlinUniquifyFunctionSignaturesPlugin: KotlinPlugin {
+    func prepareForUse(codebaseInfo: KotlinCodebaseInfo) {
+
+    }
+
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
         if let codebaseInfo = translator.codebaseInfo {
             syntaxTree.root.visit { visit($0, codebaseInfo: codebaseInfo) }
         }
+    }
+
+    func messages(for sourceFile: Source.FilePath) -> [Message] {
+        return messages[sourceFile] ?? []
     }
 
     private func visit(_ node: KotlinSyntaxNode, codebaseInfo: KotlinCodebaseInfo.Context) -> VisitResult<KotlinSyntaxNode> {
@@ -29,6 +37,7 @@ class KotlinUniquifyFunctionSignaturesPlugin: KotlinPlugin {
     }
 
     private var uniquifyingParameterCounts: [Key: [ParameterCount]] = [:]
+    private var messages: [Source.FilePath: [Message]] = [:]
 
     private func uniquifyingParameterCount(for functionDeclaration: KotlinFunctionDeclaration, in type: TypeSignature?, codebaseInfo: KotlinCodebaseInfo.Context) -> Int {
         guard !functionDeclaration.parameters.isEmpty else {
@@ -79,8 +88,8 @@ class KotlinUniquifyFunctionSignaturesPlugin: KotlinPlugin {
         let concreteDeclarers = labelDeclarers.filter { !$0.inheritanceChain.isEmpty || $0.protocols.isEmpty }
         var labelCounts: [LabelKey: Int] = [:]
         var nextCount = 1
-        initializeLabelCounts(for: protocolDeclarers, labelCounts: &labelCounts, nextCount: &nextCount)
-        initializeLabelCounts(for: concreteDeclarers, labelCounts: &labelCounts, nextCount: &nextCount)
+        initializeLabelCounts(key: key, labelDeclarers: protocolDeclarers, labelCounts: &labelCounts, nextCount: &nextCount, source: codebaseInfo.source)
+        initializeLabelCounts(key: key, labelDeclarers: concreteDeclarers, labelCounts: &labelCounts, nextCount: &nextCount, source: codebaseInfo.source)
 
         return labelCounts.compactMap { (labelKey, count) -> ParameterCount? in
             guard count > 0 else {
@@ -90,13 +99,13 @@ class KotlinUniquifyFunctionSignaturesPlugin: KotlinPlugin {
         }
     }
 
-    private func initializeLabelCounts(for labelDeclarers: [LabelDeclarer], labelCounts: inout [LabelKey: Int], nextCount: inout Int) {
+    private func initializeLabelCounts(key: Key, labelDeclarers: [LabelDeclarer], labelCounts: inout [LabelKey: Int], nextCount: inout Int, source: Source) {
         // Brute force comparison to see if a given declarer is in the inheritance or protocol chains of any other label group, causing a conflict.
         // Assign each conflict a unique count, which means that we may be adding higher counts than needed but simplifies things a little
         for i in 0..<labelDeclarers.count {
             // Have we already mapped this?
-            let key = LabelKey(parameters: labelDeclarers[i].parameters, declaringType: labelDeclarers[i].type)
-            if labelCounts.keys.contains(key) {
+            let labelKey = LabelKey(parameters: labelDeclarers[i].parameters, declaringType: labelDeclarers[i].type)
+            if labelCounts.keys.contains(labelKey) {
                 continue
             }
             // Or have we mapped this for a protocol of ours? We shouldn't have to check superclasses because we filter function overrides out
@@ -131,20 +140,20 @@ class KotlinUniquifyFunctionSignaturesPlugin: KotlinPlugin {
                 }
                 // Should we map the other side?
                 if !labelDeclarers[i].isInModule || (iProtocolMatch != nil && jProtocolMatch == nil) || (jProtocolMatch == nil && !labelDeclarers[j].isImplementable && labelDeclarers[i].isImplementable) {
-                    if !warn(for: labelDeclarers[j], protocolMatch: jProtocolMatch) {
+                    if !warn(key: key, for: labelDeclarers[j], protocolMatch: jProtocolMatch, source: source) {
                         labelCounts[LabelKey(parameters: labelDeclarers[j].parameters, declaringType: labelDeclarers[j].type)] = nextCount
                         nextCount += 1
                     }
                     continue
                 } else {
-                    if !warn(for: labelDeclarers[i], protocolMatch: iProtocolMatch) {
+                    if !warn(key: key, for: labelDeclarers[i], protocolMatch: iProtocolMatch, source: source) {
                         count = nextCount
                         nextCount += 1
                     }
                     break
                 }
             }
-            labelCounts[key] = count
+            labelCounts[labelKey] = count
         }
     }
 
@@ -157,12 +166,16 @@ class KotlinUniquifyFunctionSignaturesPlugin: KotlinPlugin {
         return (nil, nil)
     }
 
-    private func warn(for declarer: LabelDeclarer, protocolMatch: TypeSignature?) -> Bool {
+    private func warn(key: Key, for declarer: LabelDeclarer, protocolMatch: TypeSignature?, source: Source) -> Bool {
         if declarer.isImplementable {
-            //~~~ warn
+            var fileMessages = messages[source.file, default: []]
+            fileMessages.append(.kotlinFunctionUniquifyImplementable(name: key.name, parameters: key.parameterTypes, in: declarer.type, source: source))
+            messages[source.file] = fileMessages
             return true
         } else if protocolMatch != nil {
-            //~~~ warn
+            var fileMessages = messages[source.file, default: []]
+            fileMessages.append(.kotlinFunctionUniquifyProtocol(name: key.name, parameters: key.parameterTypes, in: declarer.type, source: source))
+            messages[source.file] = fileMessages
             return true
         } else {
             return false

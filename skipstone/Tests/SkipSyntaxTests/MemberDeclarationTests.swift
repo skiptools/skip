@@ -397,6 +397,25 @@ final class MemberDeclarationTests: XCTestCase {
         """)
 
         try await check(swift: """
+        open class A {
+            open func f(a: Int) {
+            }
+            func f(b: Int) {
+            }
+        }
+        """, kotlin: """
+        open class A {
+            open fun f(a: Int) {
+            }
+            internal open fun f(b: Int, unusedp_0: Nothing? = null) {
+            }
+
+            companion object {
+            }
+        }
+        """)
+
+        try await check(swift: """
         class A {
             func f(a: Int) {
             }
@@ -508,6 +527,15 @@ final class MemberDeclarationTests: XCTestCase {
             }
         }
         """)
+
+        try await checkProducesMessage(swift: """
+        open class A {
+            open func f(a: Int) {
+            }
+            open func f(b: Int) {
+            }
+        }
+        """)
     }
 
     func testProtocolFunctionSignatureConflicts() async throws {
@@ -576,6 +604,21 @@ final class MemberDeclarationTests: XCTestCase {
             }
             override fun f(b: Int, unusedp_0: Nothing?) {
             }
+        }
+        """)
+
+        try await checkProducesMessage(swift: """
+        class A: P1, P2 {
+            func f(a: Int) {
+            }
+            func f(b: Int) {
+            }
+        }
+        public protocol P1 {
+            func f(a: Int)
+        }
+        public protocol P2 {
+            func f(b: Int)
         }
         """)
     }

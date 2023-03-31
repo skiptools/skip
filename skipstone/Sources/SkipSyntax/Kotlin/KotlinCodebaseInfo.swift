@@ -36,12 +36,12 @@ public class KotlinCodebaseInfo {
     /// Finalize codebase info and prepare for use after gathering is complete.
     func prepareForUse() {
         codebaseInfo.prepareForUse()
-        plugins.forEach { $0.prepareForUse() }
+        plugins.forEach { $0.prepareForUse(codebaseInfo: self) }
     }
 
     /// Any issues encountered during information gathering.
     func messages(for sourceFile: Source.FilePath) -> [Message] {
-        return codebaseInfo.messages(for: sourceFile)
+        return codebaseInfo.messages(for: sourceFile) + plugins.flatMap { $0.messages(for: sourceFile) }
     }
 
     /// Create a context that can access the given imported modules.
