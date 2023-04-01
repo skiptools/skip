@@ -97,17 +97,22 @@ public class CodebaseInfo: Codable {
     }
 
     /// Return all type infos for the given type.
-    func typeInfos(for type: TypeSignature, candidateFilter: (([CodebaseInfoItem]) -> [CodebaseInfoItem])? = nil) -> [TypeInfo] {
+    func typeInfos(for type: TypeSignature) -> [TypeInfo] {
+        return typeInfos(for: type, candidateMap: { $0 })
+    }
+
+    private func typeInfos(for type: TypeSignature, candidateMap: ([CodebaseInfoItem]) -> [CodebaseInfoItem], recursionDepth: Int = 0) -> [TypeInfo] {
+        // Invalid Swift code containing circular typealiases can cause infinite recursion
+        guard recursionDepth < 10 else {
+            return []
+        }
         return candidateTypeNames(for: type.asOptional(false)).flatMap { name in
-            var candidates = lookup(name: name, qualifiedMatch: true)
-            if let candidateFilter {
-                candidates = candidateFilter(candidates)
-            }
+            let candidates = candidateMap(lookup(name: name, qualifiedMatch: true))
             return candidates.flatMap { candidate in
                 if let typeInfo = candidate as? TypeInfo {
                     return [typeInfo]
                 } else if let typealiasInfo = candidate as? TypealiasInfo {
-                    return typeInfos(for: typealiasInfo.signature)
+                    return typeInfos(for: typealiasInfo.signature, candidateMap: candidateMap, recursionDepth: recursionDepth + 1)
                 } else {
                     return []
                 }
@@ -186,7 +191,7 @@ public class CodebaseInfo: Codable {
         
         /// Return all type infos visible for the given type.
         func typeInfos(for type: TypeSignature) -> [TypeInfo] {
-            return global.typeInfos(for: type, candidateFilter: ranked)
+            return global.typeInfos(for: type, candidateMap: ranked)
         }
         
         /// Return the type of the given identifier.

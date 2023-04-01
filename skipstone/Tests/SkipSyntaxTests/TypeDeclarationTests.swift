@@ -256,6 +256,26 @@ final class TypeDeclarationTests: XCTestCase {
         """)
     }
 
+    func testTypealiasToSelf() async throws {
+        try await check(swift: """
+        typealias A = A
+
+        class A {
+        }
+
+        class B : A {
+        }
+        """, kotlin: """
+        internal typealias A = A
+
+        internal open class A {
+        }
+
+        internal open class B: A() {
+        }
+        """)
+    }
+
     func testGenericClass() async throws {
         try await check(swift: """
         class C<T, U> {
