@@ -671,6 +671,24 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """)
     }
+
+    func testGenericFunction() async throws {
+        try await check(swift: """
+        func f<T, U>(a: T, b: U) -> T {
+        }
+        """, kotlin: """
+        internal fun <T, U> f(a: T, b: U): T {
+        }
+        """)
+
+        try await check(swift: """
+        func f<T: I, U>(a: T, b: U) -> Int where U: J {
+        }
+        """, kotlin: """
+        internal fun <T, U> f(a: T, b: U): Int where T: I, U: J {
+        }
+        """)
+    }
 }
 
 var sideEffectOrdering: [String] = []

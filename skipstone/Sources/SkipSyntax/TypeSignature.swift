@@ -224,6 +224,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             }
             return type
         }
+        //~~~ This looks broken: break it down all the way to a .named with no generics, then map()
         switch self {
         case .array(let element):
             return .array(map(element))

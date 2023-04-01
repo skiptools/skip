@@ -696,7 +696,6 @@ class ExtensionDeclaration: TypeDeclaration {
     }
 }
 
-// TODO: Generics
 /// `func f() { ... }`
 class FunctionDeclaration: Statement {
     let name: String
@@ -707,12 +706,13 @@ class FunctionDeclaration: Statement {
     let isThrows: Bool
     let attributes: Attributes
     private(set) var modifiers: Modifiers
+    private(set) var generics: Generics
     let body: CodeBlock?
     var functionType: TypeSignature {
         return .function(parameters.map(\.signature), returnType)
     }
 
-    init(type: StatementType, name: String, isOptionalInit: Bool = false, returnType: TypeSignature = .void, parameters: [Parameter<Expression>], isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), body: CodeBlock? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(type: StatementType, name: String, isOptionalInit: Bool = false, returnType: TypeSignature = .void, parameters: [Parameter<Expression>], isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), body: CodeBlock? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.name = name
         self.isOptionalInit = isOptionalInit
         self.returnType = returnType.or(.void)
@@ -721,6 +721,7 @@ class FunctionDeclaration: Statement {
         self.isThrows = isThrows
         self.attributes = attributes
         self.modifiers = modifiers
+        self.generics = generics
         self.body = body
         super.init(type: type, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
@@ -737,33 +738,35 @@ class FunctionDeclaration: Statement {
 
     private static func decodeFunctionDeclaration(_ functionDecl: FunctionDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> FunctionDeclaration {
         let name = functionDecl.identifier.text
-        let (returnType, parameters, messages) = functionDecl.signature.typeSignatures(in: syntaxTree)
+        let (returnType, parameters, signatureMessges) = functionDecl.signature.typeSignatures(in: syntaxTree)
         let isAsync = functionDecl.signature.effectSpecifiers?.asyncSpecifier != nil
         let isThrows = functionDecl.signature.effectSpecifiers?.throwsSpecifier != nil
         let attributes = Attributes.for(syntax: functionDecl.attributes)
         let modifiers = Modifiers.for(syntax: functionDecl.modifiers)
+        let (generics, genericsMessages) = Generics.for(syntax: functionDecl.genericParameterClause, where: functionDecl.genericWhereClause, in: syntaxTree)
         var body: CodeBlock? = nil
         if let bodySyntax = functionDecl.body {
             body = CodeBlock(statements: StatementDecoder.decode(syntaxListContainer: bodySyntax, in: syntaxTree))
         }
-        let statement = FunctionDeclaration(type: .functionDeclaration, name: name, returnType: returnType, parameters: parameters, isAsync: isAsync, isThrows: isThrows, attributes: attributes, modifiers: modifiers, body: body, syntax: functionDecl, sourceFile: syntaxTree.source.file, sourceRange: functionDecl.range(in: syntaxTree.source), extras: extras)
-        statement.messages = messages
+        let statement = FunctionDeclaration(type: .functionDeclaration, name: name, returnType: returnType, parameters: parameters, isAsync: isAsync, isThrows: isThrows, attributes: attributes, modifiers: modifiers, generics: generics, body: body, syntax: functionDecl, sourceFile: syntaxTree.source.file, sourceRange: functionDecl.range(in: syntaxTree.source), extras: extras)
+        statement.messages = signatureMessges + genericsMessages
         return statement
     }
 
     private static func decodeInitializerDeclaration(_ initializerDecl: InitializerDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> FunctionDeclaration {
         let isOptionalInit = initializerDecl.optionalMark != nil
-        let (_, parameters, messages) = initializerDecl.signature.typeSignatures(in: syntaxTree)
+        let (_, parameters, signatureMessages) = initializerDecl.signature.typeSignatures(in: syntaxTree)
         let isAsync = initializerDecl.signature.effectSpecifiers?.asyncSpecifier != nil
         let isThrows = initializerDecl.signature.effectSpecifiers?.throwsSpecifier != nil
         let attributes = Attributes.for(syntax: initializerDecl.attributes)
         let modifiers = Modifiers.for(syntax: initializerDecl.modifiers)
+        let (generics, genericsMessages) = Generics.for(syntax: initializerDecl.genericParameterClause, where: initializerDecl.genericWhereClause, in: syntaxTree)
         var body: CodeBlock? = nil
         if let bodySyntax = initializerDecl.body {
             body = CodeBlock(statements: StatementDecoder.decode(syntaxListContainer: bodySyntax, in: syntaxTree))
         }
-        let statement = FunctionDeclaration(type: .initDeclaration, name: "init", isOptionalInit: isOptionalInit, returnType: .void, parameters: parameters, isAsync: isAsync, isThrows: isThrows, attributes: attributes, modifiers: modifiers, body: body, syntax: initializerDecl, sourceFile: syntaxTree.source.file, sourceRange: initializerDecl.range(in: syntaxTree.source), extras: extras)
-        statement.messages = messages
+        let statement = FunctionDeclaration(type: .initDeclaration, name: "init", isOptionalInit: isOptionalInit, returnType: .void, parameters: parameters, isAsync: isAsync, isThrows: isThrows, attributes: attributes, modifiers: modifiers, generics: generics, body: body, syntax: initializerDecl, sourceFile: syntaxTree.source.file, sourceRange: initializerDecl.range(in: syntaxTree.source), extras: extras)
+        statement.messages = signatureMessages + genericsMessages
         return statement
     }
 
@@ -788,6 +791,7 @@ class FunctionDeclaration: Statement {
                 modifiers.visibility = .internal
             }
         }
+        generics = generics.qualified(in: self)
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
@@ -826,6 +830,9 @@ class FunctionDeclaration: Statement {
         }
         if !modifiers.isEmpty {
             attrs.append(modifiers.prettyPrintTree)
+        }
+        if !generics.isEmpty {
+            attrs.append(generics.prettyPrintTree)
         }
         return attrs
     }
@@ -954,31 +961,31 @@ class TypeDeclaration: Statement {
 
     private static func decodeClassDeclaration(_ classDecl: ClassDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration {
         let name = classDecl.identifier.text
-        let (inherits, inheritsMessages) = classDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], nil)
+        let (inherits, inheritsMessages) = classDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], [])
         let attributes = Attributes.for(syntax: classDecl.attributes)
         let modifiers = Modifiers.for(syntax: classDecl.modifiers)
         let (generics, genericsMessages) = Generics.for(syntax: classDecl.genericParameterClause, where: classDecl.genericWhereClause, in: syntaxTree)
         let members = StatementDecoder.decode(syntaxListContainer: classDecl.members, in: syntaxTree)
         let statement = TypeDeclaration(type: .classDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: classDecl, sourceFile: syntaxTree.source.file, sourceRange: classDecl.range(in: syntaxTree.source), extras: extras)
-        statement.messages = (inheritsMessages ?? []) + genericsMessages
+        statement.messages = inheritsMessages + genericsMessages
         return statement
     }
 
     private static func decodeStructDeclaration(_ structDecl: StructDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration {
         let name = structDecl.identifier.text
-        let (inherits, inheritsMessages) = structDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], nil)
+        let (inherits, inheritsMessages) = structDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], [])
         let attributes = Attributes.for(syntax: structDecl.attributes)
         let modifiers = Modifiers.for(syntax: structDecl.modifiers)
         let (generics, genericsMessages) = Generics.for(syntax: structDecl.genericParameterClause, where: structDecl.genericWhereClause, in: syntaxTree)
         let members = StatementDecoder.decode(syntaxListContainer: structDecl.members, in: syntaxTree)
         let statement = TypeDeclaration(type: .structDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: structDecl, sourceFile: syntaxTree.source.file, sourceRange: structDecl.range(in: syntaxTree.source), extras: extras)
-        statement.messages = (inheritsMessages ?? []) + genericsMessages
+        statement.messages = inheritsMessages + genericsMessages
         return statement
     }
 
     private static func decodeProtocolDeclaration(_ protocolDecl: ProtocolDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration {
         let name = protocolDecl.identifier.text
-        let (inherits, inheritsMessages) = protocolDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], nil)
+        let (inherits, inheritsMessages) = protocolDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], [])
         let attributes = Attributes.for(syntax: protocolDecl.attributes)
         let modifiers = Modifiers.for(syntax: protocolDecl.modifiers)
         let associatedTypeDecls = protocolDecl.members.members.compactMap { $0.decl.kind == .associatedtypeDecl ? $0.decl.as(AssociatedtypeDeclSyntax.self) : nil }
@@ -986,19 +993,19 @@ class TypeDeclaration: Statement {
         let (generics, genericsMessages) = Generics.for(syntax: nil, associatedTypeSyntax: associatedTypeDecls, where: protocolDecl.genericWhereClause, in: syntaxTree)
         let members = memberDecls.flatMap { StatementDecoder.decode(syntax: $0, in: syntaxTree) }
         let statement = TypeDeclaration(type: .protocolDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: protocolDecl, sourceFile: syntaxTree.source.file, sourceRange: protocolDecl.range(in: syntaxTree.source), extras: extras)
-        statement.messages = (inheritsMessages ?? []) + genericsMessages
+        statement.messages = inheritsMessages + genericsMessages
         return statement
     }
 
     private static func decodeEnumDeclaration(_ enumDecl: EnumDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration {
         let name = enumDecl.identifier.text
-        let (inherits, inheritsMessages) = enumDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], nil)
+        let (inherits, inheritsMessages) = enumDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], [])
         let attributes = Attributes.for(syntax: enumDecl.attributes)
         let modifiers = Modifiers.for(syntax: enumDecl.modifiers)
         let (generics, genericsMessages) = Generics.for(syntax: enumDecl.genericParameters, where: enumDecl.genericWhereClause, in: syntaxTree)
         let members = StatementDecoder.decode(syntaxListContainer: enumDecl.members, in: syntaxTree)
         let statement = TypeDeclaration(type: .enumDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: enumDecl, sourceFile: syntaxTree.source.file, sourceRange: enumDecl.range(in: syntaxTree.source), extras: extras)
-        statement.messages = (inheritsMessages ?? []) + genericsMessages
+        statement.messages = inheritsMessages + genericsMessages
         return statement
     }
 

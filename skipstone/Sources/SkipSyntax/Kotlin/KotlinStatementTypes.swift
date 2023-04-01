@@ -1014,6 +1014,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var isGlobal = false
     var annotations: [String] = []
     var modifiers = Modifiers()
+    var generics = Generics()
     var body: KotlinCodeBlock?
     var delegatingConstructorCall: KotlinExpression?
     var mutationFunctionNames: (willMutate: String, didMutate: String)?
@@ -1038,6 +1039,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         let kstatement = KotlinFunctionDeclaration(statement: statement)
         kstatement.isAsync = statement.isAsync
         kstatement.modifiers = statement.modifiers
+        kstatement.generics = statement.generics
         kstatement.returnType = statement.returnType
         kstatement.parameters = statement.parameters.map { $0.translate(translator: translator) }
         var owningDeclarationType: StatementType? = nil
@@ -1144,6 +1146,10 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             if type != .constructorDeclaration {
                 output.append("fun ")
             }
+            if !generics.isEmpty {
+                generics.append(to: output, indentation: indentation)
+                output.append(" ")
+            }
             if let extends {
                 output.append(extends.kotlin).append(".")
                 if isStatic {
@@ -1190,6 +1196,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             } else if let delegatingConstructorCall {
                 output.append(": ").append(delegatingConstructorCall, indentation: indentation)
             }
+            generics.appendWhere(to: output, indentation: indentation)
         }
         if let body {
             output.append(" {\n")
