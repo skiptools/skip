@@ -27,8 +27,22 @@ class KotlinStatement: KotlinSyntaxNode {
 
 /// Additional requirements for type members to handle extensions and companion objects in Kotlin.
 protocol KotlinMemberDeclaration: AnyObject {
-    var extends: TypeSignature? { get set }
+    var extends: (TypeSignature, Generics)? { get set }
     var isStatic: Bool { get }
+}
+
+extension KotlinMemberDeclaration {
+    func appendExtends(to output: OutputGenerator, indentation: Indentation) {
+        guard let extends else {
+            return
+        }
+        output.append(extends.0.kotlin)
+        extends.1.append(to: output, indentation: indentation)
+        output.append(".")
+        if isStatic {
+            output.append("Companion.")
+        }
+    }
 }
 
 class KotlinExpressionStatement: KotlinStatement {

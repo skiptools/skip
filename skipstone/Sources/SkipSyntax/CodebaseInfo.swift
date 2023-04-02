@@ -101,6 +101,11 @@ public class CodebaseInfo: Codable {
         return typeInfos(for: type, candidateMap: { $0 })
     }
 
+    /// Return the type info for the given type's primary declaration, omitting extensions.
+    func primaryTypeInfo(for type: TypeSignature) -> TypeInfo? {
+        return typeInfos(for: type).first { $0.declarationType != .extensionDeclaration }
+    }
+
     private func typeInfos(for type: TypeSignature, candidateMap: ([CodebaseInfoItem]) -> [CodebaseInfoItem], recursionDepth: Int = 0) -> [TypeInfo] {
         // Invalid Swift code containing circular typealiases can cause infinite recursion
         guard recursionDepth < 10 else {
@@ -192,6 +197,11 @@ public class CodebaseInfo: Codable {
         /// Return all type infos visible for the given type.
         func typeInfos(for type: TypeSignature) -> [TypeInfo] {
             return global.typeInfos(for: type, candidateMap: ranked)
+        }
+
+        /// Return the type info for the given type's primary declaration, omitting extensions.
+        func primaryTypeInfo(for type: TypeSignature) -> TypeInfo? {
+            return typeInfos(for: type).first { $0.declarationType != .extensionDeclaration }
         }
         
         /// Return the type of the given identifier.

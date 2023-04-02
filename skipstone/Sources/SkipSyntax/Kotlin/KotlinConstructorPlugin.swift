@@ -13,7 +13,7 @@ class KotlinConstructorPlugin: KotlinPlugin {
         let superclass = superclass(of: classDeclaration, translator: translator)
         if constructors.isEmpty {
             if classDeclaration.declarationType != .structDeclaration, let superclass, !addInheritedConstructors(to: classDeclaration, translator: translator) {
-                classDeclaration.superclassCall = "\(superclass)()"
+                classDeclaration.superclassCall = "\(superclass.kotlin)()"
             }
         } else {
             var hasNonEmptyConstructor = false

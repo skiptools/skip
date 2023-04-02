@@ -337,9 +337,7 @@ struct Attribute {
 /// - Note: `Codable` for use in `CodebaseInfo`.
 struct Generics: Codable {
     /// Generic types and any associated inheritance type information for this type or API: `class Container<Owner, Element: Containable>`.
-    private(set) var entries: [Generic]
-    /// This API applies when the given generics have the given types: `extension Container where Element == Int`.
-    private(set) var whereEqual: [String: TypeSignature] = [:]
+    var entries: [Generic]
 
     init(entries: [Generic] = []) {
         self.entries = entries
@@ -405,13 +403,16 @@ struct Generics: Codable {
             messages.append(.genericUnsupportedWhereType(entryType, source: syntaxTree.source))
             return
         }
-        guard let entryIndex = entries.firstIndex(where: { $0.name == name }) else {
-            messages.append(.genericWhereNameMismatch(entryType, source: syntaxTree.source))
-            return
+        let entryIndex: Int
+        if let index = entries.firstIndex(where: { $0.name == name }) {
+            entryIndex = index
+        } else {
+            entryIndex = entries.count
+            entries.append(Generic(name: name))
         }
         let constrainedToType = TypeSignature.for(syntax: constrainedTo)
         if whereEqual {
-            self.whereEqual[name] = constrainedToType
+            entries[entryIndex].whereEqual = constrainedToType
         } else {
             entries[entryIndex].inherits.append(constrainedToType)
         }
@@ -420,18 +421,31 @@ struct Generics: Codable {
     /// Return the constrained type of the given generic parameter.
     ///
     /// - Returns: `.none` if the parameter is not found, `.composition(types)` for multiple constraints, `.any` for a recognized parameter name without constraints
-    func type(of name: String) -> TypeSignature {
-        return whereEqual[name] ?? entries.first(where: { $0.name == name })?.type ?? .none
+    func constrainedType(of name: String) -> TypeSignature {
+        return entries.first(where: { $0.name == name })?.constrainedType ?? .none
     }
 
     /// Return the constrained type of the given generic parameter.
     ///
     /// - Seealso: `type(of: String)`
-    func type(of signature: TypeSignature) -> TypeSignature {
+    func constrainedType(of signature: TypeSignature) -> TypeSignature {
         guard case .named(let name, let genericTypes) = signature, genericTypes.isEmpty else {
             return .none
         }
-        return type(of: name)
+        return constrainedType(of: name)
+    }
+
+    /// Apply equality and inheritance constraints from the given instance to this one.
+    ///
+    /// Use this to create a complete set of generics from the additional constraints declared by a type extension.
+    func applying(constraints: Generics) -> Generics {
+        var generics = self
+        for ci in 0..<constraints.entries.count {
+            if let i = generics.entries.firstIndex(where: { $0.name == constraints.entries[ci].name }) {
+                generics.entries[i] = constraints.entries[ci]
+            }
+        }
+        return generics
     }
 
     func qualified(in node: SyntaxNode) -> Generics {
@@ -445,15 +459,14 @@ struct Generics: Codable {
     }
 
     var prettyPrintTree: PrettyPrintTree {
-        var children = entries.map {
+        let children = entries.map {
             var constraints = ""
-            if !$0.inherits.isEmpty {
+            if let whereEqual = $0.whereEqual {
+                constraints = " = \(whereEqual)"
+            } else if !$0.inherits.isEmpty {
                 constraints = ": \($0.inherits.map(\.description).joined(separator: ", "))"
             }
             return PrettyPrintTree(root: "\($0.name)\(constraints)")
-        }
-        for entry in whereEqual {
-            children.append(PrettyPrintTree(root: "\(entry.key) == \(entry.value)"))
         }
         return PrettyPrintTree(root: "generics", children: children)
     }
@@ -463,9 +476,15 @@ struct Generics: Codable {
 struct Generic: Codable {
     var name: String
     var inherits: [TypeSignature] = []
+    var whereEqual: TypeSignature?
 
+    /// The constrained type of this generic.
+    ///
     /// - Returns: `.composition(types)` for multiple constraints, `.any` for no constraints.
-    var type: TypeSignature {
+    var constrainedType: TypeSignature {
+        if let whereEqual {
+            return whereEqual
+        }
         if inherits.isEmpty {
             return .any
         } else if inherits.count == 1 {
@@ -477,6 +496,7 @@ struct Generic: Codable {
 
     func qualified(in node: SyntaxNode) -> Generic {
         var generic = self
+        generic.whereEqual = generic.whereEqual.map { $0.qualified(in: node) }
         generic.inherits = generic.inherits.map { $0.qualified(in: node) }
         return generic
     }

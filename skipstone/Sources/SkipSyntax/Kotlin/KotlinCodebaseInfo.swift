@@ -20,7 +20,7 @@ extension CodebaseInfo.Context {
     /// Whether the given type is a class, struct, etc, optionally limiting results to this module.
     func declarationType(of type: TypeSignature, mustBeInModule: Bool) -> StatementType? {
         assert(global.kotlin != nil)
-        guard let typeInfo = typeInfos(for: type).first(where: { $0.declarationType != .extensionDeclaration }) else {
+        guard let typeInfo = primaryTypeInfo(for: type) else {
             guard let typealiasInfo = crossPlatformTypealias(forUnknownType: type) else {
                 return nil
             }
@@ -65,28 +65,49 @@ extension CodebaseInfo.Context {
         }
     }
 
-    /// Whether a property with the given signature is implementing a protocol property.
-    func isProtocolMember(declaration: VariableDeclaration, in type: TypeSignature) -> Bool {
-        assert(global.kotlin != nil)
+    /// Whether this declaration is implementing a property of the given type, excluding members that apply to specific generic constraints.
+    func isImplementingUnconstrainedMember(declaration: VariableDeclaration, in type: TypeSignature) -> Bool {
         guard !declaration.names.isEmpty, let name = declaration.names[0] else {
             return false
         }
-        let protocolSignatures = global.protocolSignatures(for: type)
-        return protocolSignatures.contains { hasMember($0, name: name, type: nil, isStatic: declaration.modifiers.isStatic) }
+        return isUnconstrainedMember(name: name, type: nil, isStatic: declaration.modifiers.isStatic, in: type)
     }
 
-    /// Whether a function with the given signature is implementing a protocol function.
-    func isProtocolMember(declaration: FunctionDeclaration, in type: TypeSignature) -> Bool {
+    /// Whether this declaration is implementing a function of the given type, excluding members that apply to specific generic constraints.
+    func isImplementingUnconstrainedMember(declaration: FunctionDeclaration, in type: TypeSignature) -> Bool {
+        return isUnconstrainedMember(name: declaration.name, type: declaration.functionType, isStatic: declaration.modifiers.isStatic, in: type)
+    }
+
+    /// Whether the given member is declared by the given type, excluding members that apply to specific generic constraints.
+    func isUnconstrainedMember(name: String, type: TypeSignature?, isStatic: Bool, in owningType: TypeSignature) -> Bool {
         assert(global.kotlin != nil)
-        let protocolSignatures = global.protocolSignatures(for: type)
-        return protocolSignatures.contains { hasMember($0, name: declaration.name, type: declaration.functionType, isStatic: declaration.modifiers.isStatic) }
+        let concreteSignatures = global.inheritanceChainSignatures(for: owningType)
+        if !concreteSignatures.isEmpty {
+            return concreteSignatures.contains { hasMember($0, name: name, type: type, isStatic: isStatic, filterConstrained: true) }
+        } else {
+            let protocolSignatures = global.protocolSignatures(for: owningType)
+            return protocolSignatures.contains { hasMember($0, name: name, type: type, isStatic: isStatic, filterConstrained: true) }
+        }
+    }
+
+    /// Whether this declaration is implementing a protocol property.
+    func isImplementingProtocolMember(declaration: VariableDeclaration, in type: TypeSignature) -> Bool {
+        guard !declaration.names.isEmpty, let name = declaration.names[0] else {
+            return false
+        }
+        return isProtocolMember(name: name, type: nil, isStatic: declaration.modifiers.isStatic, in: type)
+    }
+
+    /// Whether this declaration is implementing a protocol function.
+    func isImplementingProtocolMember(declaration: FunctionDeclaration, in type: TypeSignature) -> Bool {
+        return isProtocolMember(name: declaration.name, type: declaration.functionType, isStatic: declaration.modifiers.isStatic, in: type)
     }
 
     /// Whether the given member is declared by a protocol of the given type.
     func isProtocolMember(name: String, type: TypeSignature?, isStatic: Bool, in owningType: TypeSignature) -> Bool {
         assert(global.kotlin != nil)
         let protocolSignatures = global.protocolSignatures(for: owningType)
-        return protocolSignatures.contains { hasMember($0, name: name, type: type, isStatic: isStatic) }
+        return protocolSignatures.contains { hasMember($0, name: name, type: type, isStatic: isStatic, filterConstrained: false) }
     }
 
     /// Whether the given type may be a mutable struct.
@@ -149,8 +170,11 @@ extension CodebaseInfo.Context {
         return members.first(where: { $0.declarationType == .typealiasDeclaration }) as? CodebaseInfo.TypealiasInfo
     }
 
-    private func hasMember(_ owningType: TypeSignature, name: String, type: TypeSignature?, isStatic: Bool) -> Bool {
+    private func hasMember(_ owningType: TypeSignature, name: String, type: TypeSignature?, isStatic: Bool, filterConstrained: Bool) -> Bool {
         for typeInfo in typeInfos(for: owningType) {
+            if filterConstrained && typeInfo.declarationType == .extensionDeclaration && !typeInfo.generics.isEmpty {
+                continue
+            }
             if typeInfo.visibleMembers(context: self).contains(where: { $0.name == name && $0.isStatic == isStatic && (type == nil || $0.signature == type) }) {
                 return true
             }

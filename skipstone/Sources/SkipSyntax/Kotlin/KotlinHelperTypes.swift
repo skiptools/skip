@@ -49,6 +49,13 @@ struct KotlinCaseTargetVariable {
     }
 }
 
+extension ExtensionDeclaration {
+    /// Whether this extension's members can be moved into the extended type definition.
+    var canMoveIntoExtendedType: Bool {
+        return extends.generics.isEmpty && generics.isEmpty
+    }
+}
+
 extension Accessor where B: CodeBlock {
     /// Translate to an equivalent Kotlin accessor.
     func translate(translator: KotlinTranslator, expectedReturn: KotlinExpectedReturn) -> Accessor<KotlinCodeBlock> {
@@ -118,12 +125,18 @@ extension Parameter where V: Expression {
 }
 
 extension Generics {
+    func filterWhereEqual() -> Generics {
+        var generics = self
+        generics.entries = generics.entries.filter { $0.whereEqual == nil }
+        return generics
+    }
+
     func append(to output: OutputGenerator, indentation: Indentation) {
         if entries.isEmpty {
             return
         }
         output.append("<")
-        output.append(entries.map(\.name).joined(separator: ", "))
+        output.append(entries.map { $0.whereEqual?.kotlin ?? $0.name }.joined(separator: ", "))
         output.append(">")
     }
 

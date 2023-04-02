@@ -98,11 +98,6 @@ extension Message {
         return Message(kind: .error, message: "Skip does not support the referenced type as a generic constraint", source: source, sourceRange: range)
     }
 
-    static func genericWhereNameMismatch(_ syntax: SyntaxProtocol, source: Source) -> Message {
-        let range = syntax.range(in: source)
-        return Message(kind: .error, message: "Skip is not able to match this where constraint to a declared generic type", source: source, sourceRange: range)
-    }
-
     static func localFunctionsNotSupported(sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Skip does not support nested functions. Consider making this an independent function", sourceDerived: sourceDerived, source: source)
     }

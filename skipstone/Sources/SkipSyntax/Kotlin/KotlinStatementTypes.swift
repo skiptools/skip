@@ -680,7 +680,7 @@ class KotlinClassDeclaration: KotlinStatement {
         // Move extensions of this type into the type itself rather than use Kotlin extension functions.
         // Kotlin extension functions act like static functions, which can lead to different behavior
         if let codebaseInfo = translator.codebaseInfo {
-            for ext in codebaseInfo.extensions(of: statement.signature) {
+            for ext in codebaseInfo.extensions(of: statement.signature) where ext.canMoveIntoExtendedType {
                 kstatement.inherits += ext.inherits
                 members += ext.members.flatMap { translator.translateStatement($0) }
             }
@@ -967,23 +967,22 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
 
 struct KotlinExtensionDeclaration {
     static func translate(statement: ExtensionDeclaration, translator: KotlinTranslator) -> [KotlinStatement] {
-        // If the extension is on a type outside this module or only applies to certain generic constraints, use Kotlin extension
+        // If the extension can't move into its extended type or is on a type outside this module, use Kotlin extension
         // functions. Otherwise do not translate the extension - instead we'll move its members into the extended type
-        guard statement.generics.whereEqual.isEmpty, translator.codebaseInfo?.declarationType(of: statement.extends, mustBeInModule: true) == nil else {
+        guard !statement.canMoveIntoExtendedType || translator.codebaseInfo?.declarationType(of: statement.extends, mustBeInModule: true) == nil else {
             return []
         }
 
-        let extends = statement.extends.withGenerics(statement.generics)
         var kotlinStatements: [KotlinStatement] = []
         if !statement.inherits.isEmpty && translator.codebaseInfo != nil {
             let message = Message.kotlinExtensionAddProtocolsToOutsideType(statement, source: translator.syntaxTree.source)
             kotlinStatements.append(KotlinMessageStatement(message: message))
         }
         for member in statement.members {
-            if !statement.generics.whereEqual.isEmpty {
-                if let variableDeclaration = member as? VariableDeclaration, translator.codebaseInfo?.isProtocolMember(declaration: variableDeclaration, in: extends) == true {
+            if !statement.generics.isEmpty {
+                if let variableDeclaration = member as? VariableDeclaration, translator.codebaseInfo?.isImplementingUnconstrainedMember(declaration: variableDeclaration, in: statement.extends) == true {
                     kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionForConstrainedGenericImplementMember(member, source: translator.syntaxTree.source)))
-                } else if let functionDeclaration = member as? FunctionDeclaration, translator.codebaseInfo?.isProtocolMember(declaration: functionDeclaration, in: extends) == true {
+                } else if let functionDeclaration = member as? FunctionDeclaration, translator.codebaseInfo?.isImplementingUnconstrainedMember(declaration: functionDeclaration, in: statement.extends) == true {
                     kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionForConstrainedGenericImplementMember(member, source: translator.syntaxTree.source)))
                 }
             }
@@ -996,7 +995,7 @@ struct KotlinExtensionDeclaration {
                     kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionAddConstructorsToOutsideType(member, source: translator.syntaxTree.source)))
                     continue
                 }
-                memberDeclaration.extends = extends
+                memberDeclaration.extends = (statement.extends, statement.generics)
                 kotlinStatements.append(kmember)
             }
         }
@@ -1024,7 +1023,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
 
     // KotlinMemberDeclaration
-    var extends: TypeSignature? {
+    var extends: (TypeSignature, Generics)? {
         didSet {
             if extends != nil {
                 isOpen = false
@@ -1033,6 +1032,15 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
     var isStatic: Bool {
         return modifiers.isStatic
+    }
+    var combinedGenerics: Generics {
+        guard let extendsGenerics = extends?.1, !extendsGenerics.isEmpty else {
+            return generics
+        }
+        guard !generics.isEmpty else {
+            return extendsGenerics
+        }
+        return Generics(entries: generics.entries + extendsGenerics.entries)
     }
 
     static func translate(statement: FunctionDeclaration, translator: KotlinTranslator) -> KotlinFunctionDeclaration {
@@ -1057,7 +1065,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                     // Kotlin uses default public visibility on all interface members
                     kstatement.modifiers.visibility = .public
                 } else {
-                    if !kstatement.modifiers.isOverride && translator.codebaseInfo?.isProtocolMember(declaration: statement, in: owningTypeDeclaration.signature) == true {
+                    if !kstatement.modifiers.isOverride && translator.codebaseInfo?.isImplementingProtocolMember(declaration: statement, in: owningTypeDeclaration.signature) == true {
                         kstatement.modifiers.isOverride = true
                     }
                     kstatement.isOpen = !kstatement.modifiers.isOverride && !statement.modifiers.isFinal && statement.modifiers.visibility != .private && owningDeclarationType == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
@@ -1146,16 +1154,12 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             if type != .constructorDeclaration {
                 output.append("fun ")
             }
+            let generics = combinedGenerics.filterWhereEqual()
             if !generics.isEmpty {
                 generics.append(to: output, indentation: indentation)
                 output.append(" ")
             }
-            if let extends {
-                output.append(extends.kotlin).append(".")
-                if isStatic {
-                    output.append("Companion.")
-                }
-            }
+            appendExtends(to: output, indentation: indentation)
             output.append(name).append("(")
             for (index, parameter) in parameters.enumerated() {
                 if parameter.isVariadic {
@@ -1196,7 +1200,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             } else if let delegatingConstructorCall {
                 output.append(": ").append(delegatingConstructorCall, indentation: indentation)
             }
-            generics.appendWhere(to: output, indentation: indentation)
+            combinedGenerics.appendWhere(to: output, indentation: indentation)
         }
         if let body {
             output.append(" {\n")
@@ -1354,7 +1358,7 @@ class KotlinTypealiasDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var aliasedType: TypeSignature = .none
 
     // KotlinMemberDeclaration
-    var extends: TypeSignature?
+    var extends: (TypeSignature, Generics)?
     var isStatic: Bool {
         return false
     }
@@ -1367,7 +1371,7 @@ class KotlinTypealiasDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if statement.owningTypeDeclaration != nil {
             kstatement.messages.append(.kotlinTypeAliasNested(statement, source: translator.syntaxTree.source))
         }
-        if !statement.generics.whereEqual.isEmpty || statement.generics.entries.contains(where: { !$0.inherits.isEmpty }) {
+        if statement.generics.entries.contains(where: { !$0.inherits.isEmpty || $0.whereEqual != nil }) {
             kstatement.messages.append(.kotlinTypeAliasConstrainedGenerics(statement, source: translator.syntaxTree.source))
         }
         return kstatement
@@ -1416,7 +1420,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var mutationFunctionNames: (willMutate: String, didMutate: String)?
 
     // KotlinMemberDeclaration
-    var extends: TypeSignature? {
+    var extends: (TypeSignature, Generics)? {
         didSet {
             if extends != nil {
                 isOpen = false
@@ -1442,7 +1446,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 // Kotlin uses default public visibility on all interface members
                 kstatement.modifiers.visibility = .public
             } else {
-                if !kstatement.modifiers.isOverride && translator.codebaseInfo?.isProtocolMember(declaration: statement, in: owningTypeDeclaration.signature) == true {
+                if !kstatement.modifiers.isOverride && translator.codebaseInfo?.isImplementingProtocolMember(declaration: statement, in: owningTypeDeclaration.signature) == true {
                     kstatement.modifiers.isOverride = true
                 }
                 kstatement.isOpen = !kstatement.modifiers.isOverride && !statement.modifiers.isFinal && statement.modifiers.visibility != .private && owningDeclarationType == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
@@ -1552,12 +1556,11 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             } else {
                 output.append("var ")
             }
-            if let extends {
-                output.append(extends.kotlin).append(".")
-                if isStatic {
-                    output.append("Companion.")
-                }
+            if let generics = extends?.1.filterWhereEqual(), !generics.isEmpty {
+                generics.appendWhere(to: output, indentation: indentation)
+                output.append(" ")
             }
+            appendExtends(to: output, indentation: indentation)
             if names.count > 1 {
                 output.append("(")
             }
@@ -1577,6 +1580,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                     output.append(" = null")
                 }
             }
+            extends?.1.appendWhere(to: output, indentation: indentation)
         }
         output.append("\n")
 

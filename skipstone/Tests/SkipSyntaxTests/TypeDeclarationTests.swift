@@ -325,46 +325,137 @@ final class TypeDeclarationTests: XCTestCase {
     }
 
     func testGenericInheritance() async throws {
-        //~~~
-//        try await check(swift: """
-//        class Base<T> {
-//        }
-//        class C<T>: Base<T> {
-//            func f() -> T? {
-//                return nil
-//            }
-//        }
-//        """, kotlin: """
-//        internal open class Base<T> {
-//        }
-//        internal open class C<T>: Base<T>() {
-//            internal open fun f(): T? {
-//                return null
-//            }
-//        }
-//        """)
+        try await check(swift: """
+        class Base<T> {
+        }
+        class C<U>: Base<U> {
+            func f() -> U? {
+                return nil
+            }
+        }
+        class D: Base<Bool> {
+        }
+        class E: Base<Array<Custom<Bool>>> {
+        }
+        """, kotlin: """
+        internal open class Base<T> {
+        }
+        internal open class C<U>: Base<U>() {
+            internal open fun f(): U? {
+                return null
+            }
+        }
+        internal open class D: Base<Boolean>() {
+        }
+        internal open class E: Base<Array<Custom<Boolean>>>() {
+        }
+        """)
     }
 
     func testGenericExtension() async throws {
-        //~~~
-//        try await check(symbols: symbols, swift: """
+        try await check(swift: """
+        class C<T> {
+            func f() -> T? {
+                return nil
+            }
+        }
+        extension C<Int> {
+            var v: Int {
+                return 1
+            }
+            func plusOne() -> Int {
+                return (f() ?? 0) + 1
+            }
+        }
+        """, kotlin: """
+        internal open class C<T> {
+            internal open fun f(): T? {
+                return null
+            }
+        }
+        internal val C<Int>.v: Int
+            get() {
+                return 1
+            }
+        internal fun C<Int>.plusOne(): Int {
+            return (f() ?: 0) + 1
+        }
+        """)
+
+        try await check(swift: """
+        class C<T> {
+            func f() -> T? {
+                return nil
+            }
+        }
+        extension C where T == Int {
+            var v: Int {
+                return 1
+            }
+            func plusOne() -> Int {
+                return (f() ?? 0) + 1
+            }
+        }
+        """, kotlin: """
+        internal open class C<T> {
+            internal open fun f(): T? {
+                return null
+            }
+        }
+        internal val C<Int>.v: Int
+            get() {
+                return 1
+            }
+        internal fun C<Int>.plusOne(): Int {
+            return (f() ?: 0) + 1
+        }
+        """)
+
+        try await check(supportingSwift: """
+        protocol P {
+        }
+        """, swift: """
+        class C<T, U> {
+        }
+        extension C where T == Int, U: P {
+            var v: U? {
+                return nil
+            }
+            func f<V: P>(p1: U, p2: V) -> Int {
+                return 1
+            }
+        }
+        """, kotlin: """
+        internal open class C<T, U> {
+        }
+        internal val <U> C<Int, U>.v: U? where U: P
+            get() {
+                return nil
+            }
+        internal fun <U, V> C<Int, U>.f(): Int where U: P, V: P {
+            return 1
+        }
+        """)
+
+        // ~~~ TODO: We need to apply generics to our calls to isImplementingUnconstrainedMember for this to work
+//        try await checkProducesMessage(swift: """
 //        class C<T> {
-//            func f() -> T? {
-//                return nil
+//            func f(p: T) {
+//            }
+//        }
+//        extension C<Int> {
+//            func f(p: Int) {
+//            }
+//        }
+//        """)
+//
+//        try await checkProducesMessage(swift: """
+//        class C<T> {
+//            func f(p: T) {
 //            }
 //        }
 //        extension C where T == Int {
-//            func plusOne() -> Int {
-//                return (f() ?? 0) + 1
-//            }
-//        }
-//        """, kotlin: """
-//        internal open class C<T> {
-//            internal open fun f(): T? {
-//                return null
-//            }
-//            internal fun plusOne(): Int {
-//                return (f() ?: 0) + 1
+//            func f(p: Int) {
 //            }
 //        }
 //        """)

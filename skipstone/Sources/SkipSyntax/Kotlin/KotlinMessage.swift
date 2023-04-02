@@ -51,7 +51,7 @@ extension Message {
     }
 
     static func kotlinExtensionForConstrainedGenericImplementMember(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "Kotlin protocol extensions for a particular generic type can add properties and functions but cannot be used to implement requirements of the protocol", sourceDerived: sourceDerived, source: source)
+        return Message(kind: .error, message: "A Kotlin extension with generic constraints can add new properties and functions, but it cannot be used to override members or implement protocol requirements", sourceDerived: sourceDerived, source: source)
     }
 
     static func kotlinExtensionUnsupportedMember(_ sourceDerived: SourceDerived, source: Source) -> Message {

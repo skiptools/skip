@@ -43,7 +43,7 @@ class KotlinDisambiguateFunctionsPlugin: KotlinPlugin {
             functionDeclarations.forEach { disambiguateFunctionDeclaration($0, in: interfaceDeclaration.signature, codebaseInfo: codebaseInfo) }
         } else if let functionDeclaration = node as? KotlinFunctionDeclaration {
             if functionDeclaration.isGlobal || functionDeclaration.extends != nil {
-                disambiguateFunctionDeclaration(functionDeclaration, in: functionDeclaration.extends, codebaseInfo: codebaseInfo)
+                disambiguateFunctionDeclaration(functionDeclaration, in: functionDeclaration.extends?.0, codebaseInfo: codebaseInfo)
             }
         }
         return .recurse(nil)

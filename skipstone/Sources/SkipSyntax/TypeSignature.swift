@@ -175,37 +175,37 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         return self
     }
 
-    /// Apply the given generic types.
-    func withGenerics(_ generics: Generics) -> TypeSignature {
-        let generic = generics.type(of: self)
+    /// Apply the given generic types to form a constrained type with generics replaced by their constraints.
+    func constrainedTypeWithGenerics(_ generics: Generics) -> TypeSignature {
+        let generic = generics.constrainedType(of: self)
         if generic != .none {
             return generic
         }
         switch self {
         case .array(let element):
-            return .array(element.withGenerics(generics))
+            return .array(element.constrainedTypeWithGenerics(generics))
         case .composition(let types):
-            return .composition(types.map { $0.withGenerics(generics) })
+            return .composition(types.map { $0.constrainedTypeWithGenerics(generics) })
         case .dictionary(let key, let value):
-            return .dictionary(key.withGenerics(generics), value.withGenerics(generics))
+            return .dictionary(key.constrainedTypeWithGenerics(generics), value.constrainedTypeWithGenerics(generics))
         case .function(let parameters, let returnType):
-            return .function(parameters.map { $0.withGenerics(generics) }, returnType.withGenerics(generics))
+            return .function(parameters.map { $0.constrainedTypeWithGenerics(generics) }, returnType.constrainedTypeWithGenerics(generics))
         case .member(let base, let type):
-            return .member(base.withGenerics(generics), type.withGenerics(generics))
+            return .member(base.constrainedTypeWithGenerics(generics), type.constrainedTypeWithGenerics(generics))
         case .metaType(let base):
-            return .metaType(base.withGenerics(generics))
+            return .metaType(base.constrainedTypeWithGenerics(generics))
         case .named(let name, let genericTypes):
-            return .named(name, genericTypes.map { $0.withGenerics(generics) })
+            return .named(name, genericTypes.map { $0.constrainedTypeWithGenerics(generics) })
         case .optional(let type):
-            return .optional(type.withGenerics(generics))
+            return .optional(type.constrainedTypeWithGenerics(generics))
         case .range(let element):
-            return .range(element.withGenerics(generics))
+            return .range(element.constrainedTypeWithGenerics(generics))
         case .set(let element):
-            return .set(element.withGenerics(generics))
+            return .set(element.constrainedTypeWithGenerics(generics))
         case .tuple(let labels, let types):
-            return .tuple(labels, types.map { $0.withGenerics(generics) })
+            return .tuple(labels, types.map { $0.constrainedTypeWithGenerics(generics) })
         case .unwrappedOptional(let type):
-            return .unwrappedOptional(type.withGenerics(generics))
+            return .unwrappedOptional(type.constrainedTypeWithGenerics(generics))
         default:
             return self
         }
@@ -968,9 +968,9 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return parameter
         }
 
-        func withGenerics(_ generics: Generics) -> Parameter {
+        func constrainedTypeWithGenerics(_ generics: Generics) -> Parameter {
             var parameter = self
-            parameter.type = parameter.type.withGenerics(generics)
+            parameter.type = parameter.type.constrainedTypeWithGenerics(generics)
             return parameter
         }
 
