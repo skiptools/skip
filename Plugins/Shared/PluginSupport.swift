@@ -239,6 +239,7 @@ extension CommandPlugin {
 
             \(packageAddition)
 
+            ```
             """
 
 
