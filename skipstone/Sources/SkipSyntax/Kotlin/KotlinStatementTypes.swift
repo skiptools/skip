@@ -975,16 +975,26 @@ struct KotlinExtensionDeclaration {
 
         var kotlinStatements: [KotlinStatement] = []
         if !statement.inherits.isEmpty && translator.codebaseInfo != nil {
-            let message = Message.kotlinExtensionAddProtocolsToOutsideType(statement, source: translator.syntaxTree.source)
+            let message: Message
+            if !statement.canMoveIntoExtendedType {
+                message = Message.kotlinExtensionAddProtocolsToUnmovable(statement, source: translator.syntaxTree.source)
+            } else {
+                message = Message.kotlinExtensionAddProtocolsToOutsideType(statement, source: translator.syntaxTree.source)
+            }
             kotlinStatements.append(KotlinMessageStatement(message: message))
         }
+        var extends = statement.extends
+        var generics = statement.generics
+        if let extendedTypeInfo = translator.codebaseInfo?.primaryTypeInfo(for: statement.extends) {
+            // Strip the generics from the extended type and put the complete set of constraints into the generics object
+            extends = statement.extends.withGenerics([])
+            generics = extendedTypeInfo.generics.merge(additions: generics, from: statement.extends)
+        }
         for member in statement.members {
-            if !statement.generics.isEmpty {
-                if let variableDeclaration = member as? VariableDeclaration, translator.codebaseInfo?.isImplementingUnconstrainedMember(declaration: variableDeclaration, in: statement.extends) == true {
-                    kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionForConstrainedGenericImplementMember(member, source: translator.syntaxTree.source)))
-                } else if let functionDeclaration = member as? FunctionDeclaration, translator.codebaseInfo?.isImplementingUnconstrainedMember(declaration: functionDeclaration, in: statement.extends) == true {
-                    kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionForConstrainedGenericImplementMember(member, source: translator.syntaxTree.source)))
-                }
+            if let variableDeclaration = member as? VariableDeclaration, translator.codebaseInfo?.isImplementingMember(declaration: variableDeclaration, in: extends) == true {
+                kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionImplementMember(member, source: translator.syntaxTree.source)))
+            } else if let functionDeclaration = member as? FunctionDeclaration, translator.codebaseInfo?.isImplementingMember(declaration: functionDeclaration, in: extends) == true {
+                kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionImplementMember(member, source: translator.syntaxTree.source)))
             }
             for kmember in translator.translateStatement(member) {
                 guard let memberDeclaration = kmember as? KotlinMemberDeclaration else {
@@ -995,7 +1005,7 @@ struct KotlinExtensionDeclaration {
                     kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionAddConstructorsToOutsideType(member, source: translator.syntaxTree.source)))
                     continue
                 }
-                memberDeclaration.extends = (statement.extends, statement.generics)
+                memberDeclaration.extends = (extends, generics)
                 kotlinStatements.append(kmember)
             }
         }
@@ -1030,17 +1040,17 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             }
         }
     }
-    var isStatic: Bool {
-        return modifiers.isStatic
-    }
-    var combinedGenerics: Generics {
+    var extendsCombinedGenerics: Generics {
         guard let extendsGenerics = extends?.1, !extendsGenerics.isEmpty else {
             return generics
         }
         guard !generics.isEmpty else {
             return extendsGenerics
         }
-        return Generics(entries: extendsGenerics.entries + generics.entries)
+        return extendsGenerics.merge(additions: generics)
+    }
+    var isStatic: Bool {
+        return modifiers.isStatic
     }
 
     static func translate(statement: FunctionDeclaration, translator: KotlinTranslator) -> KotlinFunctionDeclaration {
@@ -1154,7 +1164,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             if type != .constructorDeclaration {
                 output.append("fun ")
             }
-            let generics = combinedGenerics.filterWhereEqual()
+            let generics = extendsCombinedGenerics.filterWhereEqual()
             if !generics.isEmpty {
                 generics.append(to: output, indentation: indentation)
                 output.append(" ")
@@ -1200,7 +1210,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             } else if let delegatingConstructorCall {
                 output.append(": ").append(delegatingConstructorCall, indentation: indentation)
             }
-            combinedGenerics.appendWhere(to: output, indentation: indentation)
+            extendsCombinedGenerics.appendWhere(to: output, indentation: indentation)
         }
         if let body {
             output.append(" {\n")

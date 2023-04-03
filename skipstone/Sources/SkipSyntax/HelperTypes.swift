@@ -398,19 +398,23 @@ struct Generics: Codable {
     }
 
     private mutating func apply(entryType: TypeSyntax, constrainedTo: TypeSyntax, whereEqual: Bool, in syntaxTree: SyntaxTree, messages: inout [Message]) {
-        let type = TypeSignature.for(syntax: entryType)
-        guard case .named(let name, _) = type else {
-            messages.append(.genericUnsupportedWhereType(entryType, source: syntaxTree.source))
-            return
-        }
+        var type = TypeSignature.for(syntax: entryType)
+        var constrainedToType = TypeSignature.for(syntax: constrainedTo)
         let entryIndex: Int
-        if let index = entries.firstIndex(where: { $0.name == name }) {
+        if case .named(let name, _) = type, let index = entries.firstIndex(where: { $0.name == name }) {
             entryIndex = index
+        } else if whereEqual, case .named(let name, _) = constrainedToType, let index = entries.firstIndex(where: { $0.name == name }) {
+            entryIndex = index
+            swap(&type, &constrainedToType)
         } else {
-            entryIndex = entries.count
-            entries.append(Generic(name: name))
+            if case .named(let name, _) = type {
+                entryIndex = entries.count
+                entries.append(Generic(name: name))
+            } else {
+                messages.append(.genericUnsupportedWhereType(entryType, source: syntaxTree.source))
+                return
+            }
         }
-        let constrainedToType = TypeSignature.for(syntax: constrainedTo)
         if whereEqual {
             entries[entryIndex].whereEqual = constrainedToType
         } else {
@@ -435,14 +439,22 @@ struct Generics: Codable {
         return constrainedType(of: name)
     }
 
-    /// Apply equality and inheritance constraints from the given instance to this one.
+    /// Merge the given constraints with these, allowing the given constraints to override our own.
     ///
-    /// Use this to create a complete set of generics from the additional constraints declared by a type extension.
-    func applying(constraints: Generics) -> Generics {
+    /// Use this to create a complete set of generics from the additional constraints declared by a function or type extension.
+    func merge(additions: Generics, from extensionSignature: TypeSignature? = nil) -> Generics {
         var generics = self
-        for ci in 0..<constraints.entries.count {
-            if let i = generics.entries.firstIndex(where: { $0.name == constraints.entries[ci].name }) {
-                generics.entries[i] = constraints.entries[ci]
+        if let extensionGenerics = extensionSignature?.generics, extensionGenerics.count == entries.count {
+            for i in 0..<entries.count {
+                generics.entries[i].whereEqual = extensionGenerics[i]
+            }
+        } else {
+            for addi in 0..<additions.entries.count {
+                if let i = generics.entries.firstIndex(where: { $0.name == additions.entries[addi].name }) {
+                    generics.entries[i] = additions.entries[addi]
+                } else {
+                    generics.entries.append(additions.entries[addi])
+                }
             }
         }
         return generics

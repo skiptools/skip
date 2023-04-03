@@ -440,23 +440,22 @@ final class TypeDeclarationTests: XCTestCase {
         }
         """)
 
-        //~~~
-//        try await check(supportingSwift: """
-//        protocol P {
-//        }
-//        """, swift: """
-//        class C<T, U> {
-//        }
-//        extension C where T: P {
-//            func f(p: T) {
-//            }
-//        }
-//        """, kotlin: """
-//        internal open class C<T, U> {
-//        }
-//        internal fun <T, U> C<T, U>.f(p: T) where T: P {
-//        }
-//        """)
+        try await check(supportingSwift: """
+        protocol P {
+        }
+        """, swift: """
+        class C<T, U> {
+        }
+        extension C where T: P {
+            func f(p: T) {
+            }
+        }
+        """, kotlin: """
+        internal open class C<T, U> {
+        }
+        internal fun <T, U> C<T, U>.f(p: T) where T: P {
+        }
+        """)
 
         try await check(supportingSwift: """
         protocol P {

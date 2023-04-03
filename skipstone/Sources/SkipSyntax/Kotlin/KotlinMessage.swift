@@ -50,8 +50,12 @@ extension Message {
         return Message(kind: .error, message: "Cannot use an extension to add additional protocols to a Kotlin type defined outside of this module", sourceDerived: sourceDerived, source: source)
     }
 
-    static func kotlinExtensionForConstrainedGenericImplementMember(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "A Kotlin extension with generic constraints can add new properties and functions, but it cannot be used to override members or implement protocol requirements", sourceDerived: sourceDerived, source: source)
+    static func kotlinExtensionAddProtocolsToUnmovable(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "This extension cannot be merged into its extended Kotlin type definition. Therefore it cannot add additional protocols", sourceDerived: sourceDerived, source: source)
+    }
+
+    static func kotlinExtensionImplementMember(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "This extension cannot be merged into its extended Kotlin type definition. Therefore it can add new properties and functions, but it cannot be used to override members or implement protocol requirements", sourceDerived: sourceDerived, source: source)
     }
 
     static func kotlinExtensionUnsupportedMember(_ sourceDerived: SourceDerived, source: Source) -> Message {

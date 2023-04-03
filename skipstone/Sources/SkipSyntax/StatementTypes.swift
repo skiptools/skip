@@ -667,7 +667,6 @@ class ExtensionDeclaration: TypeDeclaration {
 
     init(extends: TypeSignature, inherits: [TypeSignature] = [], attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), members: [Statement] = [], syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.extends = extends
-        //~~~ For signature, need to figure out what the generic parameters are on the type being extended? class C<T>, extension C { ... } T will be missing
         let name: String
         if case .member(_, let type) = extends {
             name = type.withGenerics([]).name
