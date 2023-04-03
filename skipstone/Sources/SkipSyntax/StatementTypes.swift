@@ -667,12 +667,12 @@ class ExtensionDeclaration: TypeDeclaration {
 
     init(extends: TypeSignature, inherits: [TypeSignature] = [], attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), members: [Statement] = [], syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.extends = extends
-        //~~~ Need to figure out what the generic parameters are on the type being extended: class C<T>, extension C { ... } T will be missing
+        //~~~ For signature, need to figure out what the generic parameters are on the type being extended? class C<T>, extension C { ... } T will be missing
         let name: String
         if case .member(_, let type) = extends {
-            name = type.name
+            name = type.withGenerics([]).name
         } else {
-            name = extends.name
+            name = extends.withGenerics([]).name
         }
         super.init(type: .extensionDeclaration, name: name, signature: extends, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
@@ -931,6 +931,7 @@ class TypeDeclaration: Statement {
     private(set) var generics: Generics
     let members: [Statement]
     var signature: TypeSignature {
+        //~~~ How do we want to treat generics?
         return _signature ?? TypeSignature.for(name: name, genericTypes: generics.entries.map { .named($0.name, []) })
     }
     private var _signature: TypeSignature?

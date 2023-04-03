@@ -1268,7 +1268,7 @@ class KotlinInterfaceDeclaration: KotlinStatement {
         let kstatement = KotlinInterfaceDeclaration(statement: statement)
         kstatement.inherits = statement.inherits
         kstatement.modifiers = statement.modifiers
-        kstatement.generics = statement.generics
+        kstatement.generics = translator.codebaseInfo?.global.protocolGenerics(for: statement.signature) ?? statement.generics
 
         var originalMembers = statement.members.flatMap { translator.translateStatement($0) }
         var newMembers: [KotlinStatement] = []

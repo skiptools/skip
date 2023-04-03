@@ -322,6 +322,35 @@ final class TypeDeclarationTests: XCTestCase {
         internal interface P<T, U>: Base where T: I, U: A, U: B {
         }
         """)
+
+        //~~~
+//        try await check(swift: """
+//        protocol Base {
+//            associatedtype T: A
+//        }
+//        protocol P: Base {
+//            associatedtype U: B
+//        }
+//        """, kotlin: """
+//        internal interface Base<T> where T: A {
+//        }
+//        internal interface P<T, U>: Base<T> where T: A, U: B {
+//        }
+//        """)
+//
+//        try await check(swift: """
+//        protocol Base {
+//            associatedtype T
+//        }
+//        protocol P: Base where T == Int {
+//            associatedtype U
+//        }
+//        """, kotlin: """
+//        internal interface Base<T> {
+//        }
+//        internal interface P<U>: Base<Int> {
+//        }
+//        """)
     }
 
     func testGenericInheritance() async throws {
