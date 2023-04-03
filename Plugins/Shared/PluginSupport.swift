@@ -189,7 +189,6 @@ extension CommandPlugin {
                         import SkipUnit
 
                         /// This test case will run the transpiled tests for the \(target.name) module using the `JUnitTestCase.testProjectGradle()` harness.
-                        @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
                         class \(testClass): JUnitTestCase {
                         }
 
