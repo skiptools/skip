@@ -8,6 +8,7 @@ let package = Package(
         .plugin(name: "hello-skip", targets: ["Hello Skip"]),
         .plugin(name: "run-kotlin-tests", targets: ["Run Kotlin Tests"]),
         .plugin(name: "synchronize-gradle", targets: ["Synchronize Gradle Project"]),
+        .plugin(name: "skip", targets: ["Skip Custom Command"]),
 
         .plugin(name: "preflight", targets: ["skip-preflight"]),
         .plugin(name: "transpile", targets: ["skip-transpiler"]),
@@ -94,5 +95,5 @@ if let localPath = ProcessInfo.processInfo.environment["SKIPLOCAL"] {
     package.targets += [.executableTarget(name: "skiptool", dependencies: [.product(name: "SkipBuild", package: "SkipSource")], path: "Sources/SkipTool", sources: ["skiptool.swift"])]
 } else {
     // default to using the latest binary skiptool release
-    package.targets += [.binaryTarget(name: "skiptool", url: "https://github.com/skiptools/skip/releases/download/0.3.6/skiptool.artifactbundle.zip", checksum: "cf3b97db1854f2664e691f8aebd746f8561e225d60368f482eb26847b6183137")]
+    package.targets += [.binaryTarget(name: "skiptool", url: "https://github.com/skiptools/skip/releases/download/0.3.7/skiptool.artifactbundle.zip", checksum: "fa7ff7e17234ddc04bf0aec22931beecc29f8e6d9808d00308e1ba5b08174c5c")]
 }
