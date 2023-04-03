@@ -25,13 +25,6 @@ struct StatementExtras {
     /// Decode the trivia on the given syntax to parse extras.
     static func decode(syntax: SyntaxProtocol) -> StatementExtras? {
         let trailingTriviaString = processTrailingTrivia(syntax: syntax)
-        guard let trivia = syntax.leadingTrivia else {
-            guard !trailingTriviaString.isEmpty else {
-                return nil
-            }
-            return StatementExtras(directives: [], leadingTrivia: [], trailingTrivia: [trailingTriviaString])
-        }
-
         var directives: [Directive] = []
         var directive: Directive? = nil
         var directiveLines: [String] = []
@@ -63,7 +56,7 @@ struct StatementExtras {
             directiveLines = []
         }
 
-        var triviaString = trivia.description
+        var triviaString = syntax.leadingTrivia.description
         // Drop initial newline that is typically the trailing newline of the preceding statement
         if triviaString.hasPrefix("\n") {
             triviaString = String(triviaString.dropFirst())
@@ -125,10 +118,7 @@ struct StatementExtras {
     }
 
     private static func processTrailingTrivia(syntax: SyntaxProtocol) -> String {
-        guard let trailingTrivia = syntax.trailingTrivia else {
-            return ""
-        }
-        return trailingTrivia.description.trimmingCharacters(in: .whitespacesAndNewlines)
+        syntax.trailingTrivia.description.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// All statements contained in our directives.
