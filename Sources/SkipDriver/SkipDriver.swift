@@ -29,7 +29,10 @@ public actor SkipDriver {
 
         return result
     }
+}
 
+@available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+extension SkipDriver {
     /// Forks the given command and returns an async stream of parsed JSON messages, one dictionary for each line of output.
     public static func execSkip(_ arguments: [String], environment: [String: String] = ProcessInfo.processInfo.environment, workingDirectory: URL? = nil) throws -> AsyncThrowingCompactMapSequence<AsyncThrowingStream<Data, Swift.Error>, NSDictionary> {
         let skiptool = try findSkipTool()
