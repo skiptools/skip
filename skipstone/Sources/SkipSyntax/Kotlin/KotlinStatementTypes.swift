@@ -1040,7 +1040,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         guard !generics.isEmpty else {
             return extendsGenerics
         }
-        return Generics(entries: generics.entries + extendsGenerics.entries)
+        return Generics(entries: extendsGenerics.entries + generics.entries)
     }
 
     static func translate(statement: FunctionDeclaration, translator: KotlinTranslator) -> KotlinFunctionDeclaration {
@@ -1557,7 +1557,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 output.append("var ")
             }
             if let generics = extends?.1.filterWhereEqual(), !generics.isEmpty {
-                generics.appendWhere(to: output, indentation: indentation)
+                generics.append(to: output, indentation: indentation)
                 output.append(" ")
             }
             appendExtends(to: output, indentation: indentation)

@@ -84,52 +84,54 @@ extension XCTestCase {
         let tp = Transpiler(sourceFiles: srcFiles, codebaseInfo: codebaseInfo, plugins: plugins)
         var transpilations: [Transpilation] = []
         try await tp.transpile { transpilations.append($0) }
-        guard let transpilation = transpilations.first else {
+        guard !transpilations.isEmpty else {
             return XCTFail("transpilation produced no result", file: file, line: line)
         }
 
-        let messagesString = transpilation.messages.map(\.description).joined(separator: ",")
-        if !transpilation.messages.isEmpty && !expectFailure {
-            XCTFail("Transpilation produced unexpected messages: \(messagesString)", file: file, line: line)
-        }
-        if transpilation.sourceFile == srcFiles.first {
-            let content = fixup(code: trimmedContent(transpilation: transpilation))
-            let kotlinCode = kotlin.trimmingCharacters(in: .whitespacesAndNewlines)
-
-            // insert the Kotlin code in the test case where it says // SKIPME
-            if var skipmeCount = replaceInlineSKIPME, skipmeCount > 0 {
-                if kotlinCode == "// SKIPME" {
-                    // insert the Kotlin code where it says SKIPME, but indent so it lines up with the Swift multi-line string
-                    let sourceContents = try sourceFileContents()
-                    var testSourceOutput = ""
-                    for sourceLine in sourceContents.components(separatedBy: .newlines) {
-                        if skipmeCount > 0,
-                           sourceLine.trimmingCharacters(in: .whitespaces) == "// SKIPME" {
-                            let leadingSpace = sourceLine.enumerated().first(where: { $0.element != " " })?.offset ?? 0
-                            let pad = String(repeating: " ", count: leadingSpace)
-                            let indentedContent = content
-                                .trimmingCharacters(in: .newlines)
-                                .components(separatedBy: .newlines)
-                                .map({ pad + $0 })
-                                .joined(separator: "\n")
-                            testSourceOutput += indentedContent + "\n"
-                            skipmeCount += 1
-                        } else {
-                            testSourceOutput += sourceLine + "\n"
+        for transpilation in transpilations {
+            let messagesString = transpilation.messages.map(\.description).joined(separator: ",")
+            if !transpilation.messages.isEmpty && !expectFailure {
+                XCTFail("Transpilation produced unexpected messages: \(messagesString)", file: file, line: line)
+            }
+            if transpilation.sourceFile == srcFiles.first {
+                let content = fixup(code: trimmedContent(transpilation: transpilation))
+                let kotlinCode = kotlin.trimmingCharacters(in: .whitespacesAndNewlines)
+                
+                // insert the Kotlin code in the test case where it says // SKIPME
+                if var skipmeCount = replaceInlineSKIPME, skipmeCount > 0 {
+                    if kotlinCode == "// SKIPME" {
+                        // insert the Kotlin code where it says SKIPME, but indent so it lines up with the Swift multi-line string
+                        let sourceContents = try sourceFileContents()
+                        var testSourceOutput = ""
+                        for sourceLine in sourceContents.components(separatedBy: .newlines) {
+                            if skipmeCount > 0,
+                               sourceLine.trimmingCharacters(in: .whitespaces) == "// SKIPME" {
+                                let leadingSpace = sourceLine.enumerated().first(where: { $0.element != " " })?.offset ?? 0
+                                let pad = String(repeating: " ", count: leadingSpace)
+                                let indentedContent = content
+                                    .trimmingCharacters(in: .newlines)
+                                    .components(separatedBy: .newlines)
+                                    .map({ pad + $0 })
+                                    .joined(separator: "\n")
+                                testSourceOutput += indentedContent + "\n"
+                                skipmeCount += 1
+                            } else {
+                                testSourceOutput += sourceLine + "\n"
+                            }
+                        }
+                        
+                        if sourceContents != testSourceOutput {
+                            print("saving updated SKIPME source to:", sourceURL)
+                            try testSourceOutput.write(to: sourceURL, atomically: true, encoding: .utf8)
                         }
                     }
-
-                    if sourceContents != testSourceOutput {
-                        print("saving updated SKIPME source to:", sourceURL)
-                        try testSourceOutput.write(to: sourceURL, atomically: true, encoding: .utf8)
-                    }
                 }
-            }
-
-            if expectFailure {
-                XCTAssertNotEqual(kotlinCode, content.trimmingCharacters(in: .whitespacesAndNewlines), messagesString, file: file, line: line)
-            } else {
-                XCTAssertEqual(kotlinCode, content.trimmingCharacters(in: .whitespacesAndNewlines), messagesString, file: file, line: line)
+                
+                if expectFailure {
+                    XCTAssertNotEqual(kotlinCode, content.trimmingCharacters(in: .whitespacesAndNewlines), messagesString, file: file, line: line)
+                } else {
+                    XCTAssertEqual(kotlinCode, content.trimmingCharacters(in: .whitespacesAndNewlines), messagesString, file: file, line: line)
+                }
             }
         }
 

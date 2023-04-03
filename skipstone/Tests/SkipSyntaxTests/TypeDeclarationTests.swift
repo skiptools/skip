@@ -440,6 +440,24 @@ final class TypeDeclarationTests: XCTestCase {
         }
         """)
 
+        //~~~
+//        try await check(supportingSwift: """
+//        protocol P {
+//        }
+//        """, swift: """
+//        class C<T, U> {
+//        }
+//        extension C where T: P {
+//            func f(p: T) {
+//            }
+//        }
+//        """, kotlin: """
+//        internal open class C<T, U> {
+//        }
+//        internal fun <T, U> C<T, U>.f(p: T) where T: P {
+//        }
+//        """)
+
         try await check(supportingSwift: """
         protocol P {
         }
@@ -459,9 +477,9 @@ final class TypeDeclarationTests: XCTestCase {
         }
         internal val <U> C<Int, U>.v: U? where U: P
             get() {
-                return nil
+                return null
             }
-        internal fun <U, V> C<Int, U>.f(): Int where U: P, V: P {
+        internal fun <U, V> C<Int, U>.f(p1: U, p2: V): Int where U: P, V: P {
             return 1
         }
         """)
