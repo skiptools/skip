@@ -9,6 +9,7 @@ import Foundation
 /// The `GradleDriver` controls the execution of the `gradle` tool,
 /// which is expected to already be installed on the system in the
 /// user's `PATH` environment.
+@available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
 public struct GradleDriver {
     /// The minimum version of Kotlin we can work with
     public static let minimumKotlinVersion = Version(1, 8, 0)

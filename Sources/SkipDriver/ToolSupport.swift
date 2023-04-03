@@ -5,6 +5,7 @@
 // as published by the Free Software Foundation https://fsf.org
 import Foundation
 
+@available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
 extension Process {
     /// An async stream of standard out + err data resulting from process execution
     public typealias AsyncDataOutput = AsyncThrowingStream<Data, Swift.Error>

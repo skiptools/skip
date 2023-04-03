@@ -5,6 +5,7 @@
 // as published by the Free Software Foundation https://fsf.org
 import Foundation
 
+@available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
 public actor SkipDriver {
     /// Executes `skiptool info` and returns the info dictionary.
     public static func skipInfo(messageHandler: (NSDictionary) -> () = { _ in }) async throws -> NSDictionary {
