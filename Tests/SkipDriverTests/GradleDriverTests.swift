@@ -52,18 +52,18 @@ final class GradleDriverTests: XCTestCase {
             (true, true, true),
         ] {
             runIndex += 1
-            let canRunOffline = runIndex > 0 // after the initial run (when the dependencies should be downloaded and cached), we should be able to run the tests in offline mode
+            // let canRunOffline = runIndex > 0 // after the initial run (when the dependencies should be downloaded and cached), we should be able to run the tests in offline mode
 
             // sabotage the test so it failes
             if failure || error {
                 try sabotageTest(failure: failure, error: error)
             }
 
-            let (output, parseResults) = try await driver.runTests(check: false, failFast: failFast, offline: canRunOffline, in: tmp, module: modname, exitHandler: { result in
+            let (output, parseResults) = try await driver.runTests(in: tmp, module: modname, check: false, failFast: failFast, offline: true, exitHandler: { result in
                 if !failure && !error {
                     guard case .terminated(0) = result.exitStatus else {
                         // we failed, but did not expect an error
-                        return XCTFail("unexpected gradle process failure when running rests")
+                        return XCTFail("unexpected gradle process failure when running rests with failure=\(failure) error=\(error) failFast=\(failFast)")
                     }
                 }
             })

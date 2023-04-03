@@ -46,7 +46,7 @@ For a given package named "SourceModule*Kt*", the transpiler takes all the `.swi
 The output folders for the plug-in are dictated by the build system, and so they differ between Xcode and SPM build. An example resulting folder structure is for the base `SkipLib` and `SkipLibKt` packages is:
 
 ```
-~/Library/Developer/Xcode/DerivedData/Skip-ABC/SourcePackages/plugins/skip-core.output/SkipLibKt/SkipTranspilePlugIn
+~/Library/Developer/Xcode/DerivedData/Skip-ABC/SourcePackages/plugins/skip-core.output/SkipLibKt/skip-transpiler
 ├── SkipLib
 │   ├── build.gradle.kts
 │   └── src
@@ -69,11 +69,11 @@ The output folders for the plug-in are dictated by the build system, and so they
 With SPM plugins, modules have their own independent build output folder, and the plugin can only write to its own output folder. For this reason, when building multiple modules, symbolic links will be created that span between the module output folders and create a consitent and buildable project hierarchy. For example, the `SkipLibTests` and `SkipLibTestsKt` packages will merge the two transpiled Swift modules into a single Kotlin module using relative links to the peer packages, as seen in the following tree:
 
 ```
-~/Library/Developer/Xcode/DerivedData/Skip-ABC/SourcePackages/plugins/skip-core.output/SkipLibTestsKt/SkipTranspilePlugIn
+~/Library/Developer/Xcode/DerivedData/Skip-ABC/SourcePackages/plugins/skip-core.output/SkipLibTestsKt/skip-transpiler
 ├── SkipLib
 │   ├── build.gradle.kts
 │   └── src
-│       ├── main -> ../../../../SkipLibKt/SkipTranspilePlugIn/SkipLib/src/main
+│       ├── main -> ../../../../SkipLibKt/skip-transpiler/SkipLib/src/main
 │       │   └── kotlin
 │       │       └── skip
 │       │           └── lib
@@ -100,21 +100,21 @@ With SPM plugins, modules have their own independent build output folder, and th
 Code that references other modules will be similiarly linked, but at the top level of the module root. Each module added to the `include` list of the generated `setings.gradle.kts`, so each module will automatically build its dependent modules.
 
 ```
-~/Library/Developer/Xcode/DerivedData/PKG-ABC/SourcePackages/plugins/skip-template.output/DemoLibTestsKt/SkipTranspilePlugIn/
-├── DemoLib
+~/Library/Developer/Xcode/DerivedData/PKG-ABC/SourcePackages/plugins/skip-template.output/TemplateLibTestsKt/skip-transpiler/
+├── TemplateLib
 │   ├── build.gradle.kts
 │   └── src
-│       ├── main -> ../../../../DemoLibKt/SkipTranspilePlugIn/DemoLib/src/main
+│       ├── main -> ../../../../TemplateLibKt/skip-transpiler/TemplateLib/src/main
 │       │   └── kotlin
 │       │       └── demo
 │       │           └── lib
-│       │               └── DemoLib.kt
+│       │               └── TemplateLib.kt
 │       └── test
 │           └── kotlin
 │               └── demo
 │                   └── lib
-│                       └── DemoLibTests.kt
-├── SkipFoundation -> ../../../skip-core.output/SkipFoundationKt/SkipTranspilePlugIn/SkipFoundation
+│                       └── TemplateLibTests.kt
+├── SkipFoundation -> ../../../skip-core.output/SkipFoundationKt/skip-transpiler/SkipFoundation
 │   ├── build.gradle.kts
 │   └── src
 │       └── main
@@ -137,7 +137,7 @@ Code that references other modules will be similiarly linked, but at the top lev
 │                       ├── TimeZone.kt
 │                       ├── URL.kt
 │                       └── UUID.kt
-├── SkipLib -> ../../../skip-core.output/SkipLibKt/SkipTranspilePlugIn/SkipLib
+├── SkipLib -> ../../../skip-core.output/SkipLibKt/skip-transpiler/SkipLib
 │   ├── build.gradle.kts
 │   └── src
 │       └── main
@@ -152,7 +152,7 @@ Code that references other modules will be similiarly linked, but at the top lev
 │                       ├── SkipKotlin.kt
 │                       ├── Struct.kt
 │                       └── Tuple.kt
-├── SkipUnit -> ../../../skip-core.output/SkipUnitKt/SkipTranspilePlugIn/SkipUnit
+├── SkipUnit -> ../../../skip-core.output/SkipUnitKt/skip-transpiler/SkipUnit
 │   ├── build.gradle.kts
 │   └── src
 │       └── main
@@ -167,11 +167,11 @@ Code that references other modules will be similiarly linked, but at the top lev
 In this case, the `settings.gradle.kts` file will reference each of the linked modules like so:
 
 ```kotlin
-rootProject.name = "DemoLibTests"
+rootProject.name = "TemplateLibTests"
 
 include("SkipLib")
 include("SkipFoundation")
-include("DemoLib")
+include("TemplateLib")
 include("SkipUnit")
 ```
 

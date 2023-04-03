@@ -9,7 +9,7 @@ import PackagePlugin
 /// For a given package names "SourceModuleKotlin", take all the `.swift` source files in the peer "SourceModule" package  and transpiles them to Kotlin, as well as outputting a `build.gradle.kts` file.
 @main struct SkipTranspilePlugIn: BuildToolPlugin {
     /// The name of the plug-in's output folder is the same as the target name for the transpiler
-    let pluginFolderName = "SkipTranspilePlugIn"
+    let pluginFolderName = "skip-transpiler"
 
     func createBuildCommands(context: PluginContext, target: Target) async throws -> [Command] {
         let skiptool = try context.tool(named: "skiptool")
@@ -19,8 +19,8 @@ import PackagePlugin
             throw TranspilePlugInError("Target «\(target.name)» was not a source module")
         }
 
-        // look for ModuleKotlin/Sources/skip/skip.yml
-        let skipFolder = sourceTarget.directory.appending(["skip"])
+        // look for ModuleKotlin/Sources/Skip/skip.yml
+        let skipFolder = sourceTarget.directory.appending(["Skip"])
 
         // the peer for the current target
         // e.g.: SkipLibKotlin -> SkipLib
@@ -88,8 +88,8 @@ import PackagePlugin
 
             // build up a relative link path to the related module based on the plug-in output directory structure
             buildModuleArgs += ["--module", peerTargetName + ":" + target.directory.string]
-            // e.g. ../../SkipFoundationKotlin/SkipTranspilePlugIn/SkipFoundation
-            // e.g. ../../../skiphub.output/SkipFoundationKotlin/SkipTranspilePlugIn/SkipFoundation
+            // e.g. ../../SkipFoundationKotlin/skip-transpiler/SkipFoundation
+            // e.g. ../../../skiphub.output/SkipFoundationKotlin/skip-transpiler/SkipFoundation
             // FIXME: the inserted "../" is needed because LocalFileSystem.createSymbolicLink will resolve the relative path against the destinations *parent* for some reason (SPM bug?)
             let targetLink: String
             if let packageID = packageID { // go further up to the external package name
@@ -137,22 +137,39 @@ import PackagePlugin
 
         let sourceOutputPath = URL(fileURLWithPath: isTest ? "src/test/kotlin" : "src/main/kotlin", isDirectory: true, relativeTo: outputBase)
 
+        // the marker file with the most recent input source file, either explicitly as the transpilation args, or any configuration files that are loaded as a side-effect
+        let markerFile = outputURL.appendingPathComponent(".skipbuild")
+
+        // the input files consist of all the swift, kotlin, and .yml files in all of the sources
+        //let inputFiles = sourceTarget.sourceFiles(withSuffix: "").map({ $0 }) + swiftSourceTarget.sourceFiles(withSuffix: "").map({ $0 })
+
+        //let outputFiles = [Path(markerFile.path)]
+        //print("inputFiles:", inputFiles.map(\.path))
+        //print("outputFiles:", outputFiles)
+
+        let outputFile = outputURL.appendingPathComponent(".skipbuild.out") // save output log
+
         // note that commands are executed in reverse order
         return [
             .buildCommand(displayName: "Skip Transpile \(target.name)", executable: skiptool.path, arguments: [
                 "transpile",
+                "--marker-file", markerFile.path,
                 "--output-folder", sourceOutputPath.path,
                 "--module-root", outputBase.path,
                 "--skip-folder", skipFolder.string,
+                "--output", outputFile.path,
                 //"-v",
                 ]
                 + buildModuleArgs
-                + sourceFilePaths),
-            .buildCommand(displayName: "Skip Info", executable: skiptool.path, arguments: [
-                "info",
-                "-v",
-                "-E",
-            ]),
+                + sourceFilePaths
+                //, inputFiles: inputFiles.map(\.path), outputFiles: outputFiles
+            )
+
+//            .buildCommand(displayName: "Skip Info", executable: skiptool.path, arguments: [
+//                "info",
+//                "-v",
+//                "-E",
+//            ]),
         ]
     }
 }
