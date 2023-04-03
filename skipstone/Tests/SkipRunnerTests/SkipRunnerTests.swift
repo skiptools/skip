@@ -38,9 +38,9 @@ public class SkipRunnerTests : XCTestCase {
     public func XXXtestSkipRunnerCrash() async throws {
         let _ = try await tool("transpile",
              "--output-folder",
-             "~/Library/Developer/Xcode/DerivedData/Skip-XXX/SourcePackages/plugins/skiphub.output/SkipFoundationKt/SkipTranspilePlugIn/SkipFoundation/src/main/kotlin",
+             "~/Library/Developer/Xcode/DerivedData/Skip-XXX/SourcePackages/plugins/skiphub.output/SkipFoundationKt/skip-transpiler/SkipFoundation/src/main/kotlin",
              "--module-root",
-             "~/Library/Developer/Xcode/DerivedData/Skip-XXX/SourcePackages/plugins/skiphub.output/SkipFoundationKt/SkipTranspilePlugIn/SkipFoundation",
+             "~/Library/Developer/Xcode/DerivedData/Skip-XXX/SourcePackages/plugins/skiphub.output/SkipFoundationKt/skip-transpiler/SkipFoundation",
              "--skip-folder",
              "/opt/src/github/skiptools/skiphub/Sources/SkipFoundationKt/skip",
              "--module",
@@ -48,7 +48,7 @@ public class SkipRunnerTests : XCTestCase {
              "--module",
              "SkipLib:/opt/src/github/skiptools/skiphub/Sources/SkipLibKt",
              "--link",
-             "SkipLib:../../../SkipLibKt/SkipTranspilePlugIn/SkipLib",
+             "SkipLib:../../../SkipLibKt/skip-transpiler/SkipLib",
              "~/skiptools/skiphub/Sources/SkipFoundation/Bundle.swift",
              "~/skiptools/skiphub/Sources/SkipFoundation/UUID.swift"
         )

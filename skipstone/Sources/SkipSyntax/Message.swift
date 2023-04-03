@@ -5,9 +5,9 @@ public struct Message: Error, CustomStringConvertible, Encodable {
     public enum Kind: String, Encodable, Equatable {
         /// A trace-level statement that will only be emitted in debug mode
         case trace
-        case note
-        case warning
-        case error
+        case note // SwiftSyntax.DiagnosticSeverity.note
+        case warning // SwiftSyntax.DiagnosticSeverity.warning
+        case error // SwiftSyntax.DiagnosticSeverity.error
     }
 
     public let kind: Kind

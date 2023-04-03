@@ -275,6 +275,14 @@ final class CodebaseInfoTests: XCTestCase {
         XCTAssertEqual("TestClass", typeInfos.first?.name)
     }
 
+    func testDecodeCodebaseInfo() throws {
+        let encoded = """
+        {"moduleName":"SkipUnit","rootExtensions":[],"rootFunctions":[],"rootTypealiases":[],"rootTypes":[],"rootVariables":[]}
+        """
+        let info = try JSONDecoder().decode(CodebaseInfo.self, from: encoded.utf8Data)
+        XCTAssertEqual("SkipUnit", info.moduleName)
+    }
+
     func testInheritedConstructors() throws {
         throw XCTSkip("TODO: Test custom superclass constructors called on a subclass and general constructor inheritance")
     }
