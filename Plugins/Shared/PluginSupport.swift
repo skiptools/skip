@@ -16,7 +16,7 @@ enum SkipBuildCommand {
 struct SkipCommandOptions : OptionSet {
     let rawValue: Int
 
-    public static let `default`: Self = [scaffold, preflight, transpile, targets]
+    public static let `default`: Self = [scaffold, preflight, transpile, targets, inplace]
 
     /// Create the scaffold of folders and files for Kt targets.
     public static let scaffold = Self(rawValue: 1 << 0)
@@ -30,8 +30,8 @@ struct SkipCommandOptions : OptionSet {
     /// Add the Kt targets to the Package.swift
     public static let targets = Self(rawValue: 1 << 3)
 
-//    /// Add the Package.swift modification directly to the file rather than the README.md
-//    public static let inplace = Self(rawValue: 1 << 4)
+    /// Add the Package.swift modification directly to the file rather than the README.md
+    public static let inplace = Self(rawValue: 1 << 4)
 }
 
 
@@ -47,7 +47,12 @@ extension CommandPlugin {
 
         var args = ArgumentExtractor(arguments)
         let targetArgs = args.extractOption(named: "target")
-        let targets = try context.package.targets(named: targetArgs)
+        var targets = try context.package.targets(named: targetArgs)
+        // when no targets are specified (e.g., when running the CLI `swift package plugin skip-init`), enable all the targets
+        if targets.isEmpty {
+            targets = context.package.targets
+        }
+
         //let overwrite = args.extractFlag(named: "overwrite") > 0
         let sourceTargets = targets
             .compactMap { $0 as? SwiftSourceModuleTarget }
@@ -85,7 +90,10 @@ extension CommandPlugin {
 
         """
 
-        var packageAddition = ""
+        // the marker comment that will be used to delimit the Skip-edited section of the Package.swift
+        let packageAdditionMarker = "// MARK: Skip Kotlin Peer Targets"
+        var packageAddition = packageAdditionMarker + "\n\n"
+
         var scaffoldCommands = ""
 
         // source target ordering seems to be random
@@ -235,7 +243,7 @@ extension CommandPlugin {
             the bottom of the project's `Package.swift` file:
 
             ```
-            // MARK: Skip Kotlin Peer Targets
+            \(packageAdditionMarker)
 
             \(packageAddition)
 
@@ -256,7 +264,8 @@ extension CommandPlugin {
         }
 
 
-        let outputFolder = context.package.directory.appending(subpath: "Skip")
+        let packageDir = context.package.directory
+        let outputFolder = packageDir.appending(subpath: "Skip")
         try FileManager.default.createDirectory(atPath: outputFolder.string, withIntermediateDirectories: true)
 
         let outputPath = outputFolder.appending(subpath: "README.md")
@@ -270,9 +279,26 @@ extension CommandPlugin {
         let packageOutput = context.pluginWorkDirectory.removingLastComponent().appending(subpath: context.package.id + "." + ext)
         for target in sourceTargets {
             let kotlinTargetName = target.name + "Kt"
+            let linkPath = outputFolder.appending(subpath: kotlinTargetName).string
+            if (try? FileManager.default.destinationOfSymbolicLink(atPath: linkPath)) != nil {
+                // remove and re-create any existing symbolic link
+                try FileManager.default.removeItem(atPath: linkPath)
+            }
             try FileManager.default.createSymbolicLink(
-                atPath: outputFolder.appending(subpath: kotlinTargetName).string,
+                atPath: linkPath,
                 withDestinationPath: packageOutput.appending(subpath: kotlinTargetName).appending(subpath: "skip-transpiler").string)
+        }
+
+        if options.contains(.inplace) && !packageAddition.isEmpty {
+            let packageFile = packageDir.appending(subpath: "Package.swift")
+            var encoding: String.Encoding = .utf8
+            var packageContents = try String(contentsOfFile: packageFile.string, usedEncoding: &encoding)
+            // trim off anything after the skip marker
+            packageContents = packageContents.components(separatedBy: packageAdditionMarker).first?.description ?? packageContents
+
+            packageContents += packageAddition
+            try packageContents.write(toFile: packageFile.string, atomically: true, encoding: encoding)
+            Diagnostics.remark("Updated Package.swift with frameworks")
         }
     }
 }

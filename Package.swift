@@ -20,7 +20,7 @@ let package = Package(
     targets: [
         .plugin(name: "Hello Skip",
                 capability: .command(
-                    intent: .custom(verb: "skip-welcome",  description: "Show an introduction to Skip and how it can be added to this project."),
+                    intent: .custom(verb: "skip-init",  description: "Show an introduction to Skip and how it can be added to this project."),
                     permissions: [
                         .writeToPackageDirectory(reason: """
                         Skip: Swift Kotlin Interop”
