@@ -19,7 +19,7 @@ let package = Package(
     targets: [
         .plugin(name: "Hello Skip",
                 capability: .command(
-                    intent: .custom(verb: "skip",  description: "Show an introduction to Skip and how it can be added to this project."),
+                    intent: .custom(verb: "skip-welcome",  description: "Show an introduction to Skip and how it can be added to this project."),
                     permissions: [
                         .writeToPackageDirectory(reason: """
                         Skip: Swift Kotlin Interop”
@@ -44,16 +44,25 @@ let package = Package(
 
         .plugin(name: "Run Kotlin Tests",
                 capability: .command(
-                    intent: .custom(verb: "skip",  description: "Add Kotlin Targets to the current Package.swift"),
+                    intent: .custom(verb: "skip-test",  description: "Add Kotlin Targets to the current Package.swift"),
                     permissions: [
                         .writeToPackageDirectory(reason: "Skip needs to create and update the Skip folder in the project."),
                     ]),
                 dependencies: ["skiptool"],
                 path: "Plugins/RunGradleTests"),
 
+        .plugin(name: "Skip Custom Command",
+                capability: .command(
+                    intent: .custom(verb: "skip",  description: "Run a custom Skip command by specifying arguments manually"),
+                    permissions: [
+                        .writeToPackageDirectory(reason: "Skip needs to create and update the Skip folder in the project."),
+                    ]),
+                dependencies: ["skiptool"],
+                path: "Plugins/SkipCommand"),
+
         .plugin(name: "Synchronize Gradle Project",
                 capability: .command(
-                    intent: .custom(verb: "skip",  description: "Create local links to the transpiled gradle project(s)"),
+                    intent: .custom(verb: "skip-sync",  description: "Create local links to the transpiled gradle project(s)"),
                     permissions: [
                         .writeToPackageDirectory(reason: "Skip needs to create and update the Skip folder in the project."),
                     ]),

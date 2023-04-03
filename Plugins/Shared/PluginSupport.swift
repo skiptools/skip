@@ -48,9 +48,10 @@ extension CommandPlugin {
         var args = ArgumentExtractor(arguments)
         let targetArgs = args.extractOption(named: "target")
         let targets = try context.package.targets(named: targetArgs)
-        let sourceTargets = targets.compactMap { $0 as? SwiftSourceModuleTarget }
-        let overwrite = args.extractFlag(named: "overwrite") > 0
-        let _ = overwrite
+        //let overwrite = args.extractFlag(named: "overwrite") > 0
+        let sourceTargets = targets
+            .compactMap { $0 as? SwiftSourceModuleTarget }
+            .filter { !$0.name.hasSuffix("Kt") } // ignore any "Kt" targets
         let targetNames = sourceTargets.map(\.moduleName)
 
         Diagnostics.remark("targets: \(targetNames)")
@@ -87,25 +88,45 @@ extension CommandPlugin {
         var packageAddition = ""
         var scaffoldCommands = ""
 
-        for target in sourceTargets {
+        // source target ordering seems to be random
+        let allSourceTargets = sourceTargets.sorted { $0.name < $1.name }
+
+        for target in allSourceTargets {
             let targetName = target.name
             let targetDir = target.directory
 
-            if targetName.hasSuffix("Kt") {
-                Diagnostics.remark("ignoring Kt target \(target.name)")
-                continue
+            func addTargetDependencies() {
+                for targetDep in target.dependencies {
+                    switch targetDep {
+                    case .target(let target):
+                        packageAddition += """
+                            .target(name: "\(target.name)Kt"),
+
+                        """
+                    case .product(let product):
+                        packageAddition += """
+                            .product(name: "\(product.name)Kt", package: "\(product.id)"),
+
+                        """
+                    @unknown default:
+                        break
+                    }
+                }
             }
+
 
             if target.kind == .test {
                 packageAddition += """
                 package.targets += [
-                    .testTarget(name: "\(targetName)TestsKt", dependencies: [
-                        "\(targetName)Kt",
-                        .product(name: "SkipUnit", package: "skiphub"),
+                    .testTarget(name: "\(targetName)Kt", dependencies: [
+
+                """
+                addTargetDependencies()
+                packageAddition += """
                         .product(name: "SkipUnitKt", package: "skiphub"),
                     ],
-                                resources: [.copy("Skip")],
-                                plugins: [.plugin(name: "transpile", package: "skip")])
+                    resources: [.copy("Skip")],
+                    plugins: [.plugin(name: "transpile", package: "skip")])
                 ]
 
 
@@ -120,41 +141,19 @@ extension CommandPlugin {
 
                 package.targets += [
                     .target(name: "\(targetName)Kt", dependencies: [
-                        "\(targetName)",
-                        .product(name: "SkipFoundationKt", package: "skiphub"),
+                        .target(name: "\(targetName)"),
 
                 """
-
-                if options.contains(.scaffold) {
-                    // create the folder and skip config file
-                }
-
-                for targetDep in target.dependencies {
-                    switch targetDep {
-                    case .target(let target):
-                        contents += """
-                        .target(name: "\(target.name)Kt"),
-
-                        """
-                    case .product(let product):
-                        contents += """
-                        .product(name: "\(product.name)Kt", package: "\(product.id)"),
-
-                        """
-                    @unknown default:
-                        break
-                    }
-                }
-
+                addTargetDependencies()
                 packageAddition += """
+                        .product(name: "SkipFoundationKt", package: "skiphub"),
                     ],
-                            resources: [.copy("Skip")],
-                            plugins: [.plugin(name: "transpile", package: "skip")])
+                    resources: [.copy("Skip")],
+                    plugins: [.plugin(name: "transpile", package: "skip")])
                 ]
 
 
                 """
-
             }
 
 
@@ -167,11 +166,12 @@ extension CommandPlugin {
 
             if options.contains(.scaffold) {
                 // create the directory and test case stub
-                let targetDirKt = targetDir.string + "Kt/Skip"
-                Diagnostics.remark("creating target folder: \(targetDirKt)")
-                try FileManager.default.createDirectory(atPath: targetDirKt, withIntermediateDirectories: true)
+                let targetDirKt = targetDir.string + "Kt"
+                let targetDirKtSkip = targetDirKt + "/Skip"
+                Diagnostics.remark("creating target folder: \(targetDirKtSkip)")
+                try FileManager.default.createDirectory(atPath: targetDirKtSkip, withIntermediateDirectories: true)
 
-                let skipConfig = targetDirKt + "/skip.yml"
+                let skipConfig = targetDirKtSkip + "/skip.yml"
                 if !FileManager.default.fileExists(atPath: skipConfig) {
                     try """
                     # Skip configuration file for \(target.name)
@@ -179,9 +179,42 @@ extension CommandPlugin {
                     """.write(toFile: skipConfig, atomically: true, encoding: .utf8)
                 }
 
+                // create a test case stub
+                if target.kind == .test {
+                    let testClass = target.name + "Kt"
+                    let testSource = targetDirKt + "/\(testClass).swift"
+
+                    if !FileManager.default.fileExists(atPath: testSource) {
+                        try """
+                        import SkipUnit
+
+                        /// This test case will run the transpiled tests for the \(target.name) module using the `JUnitTestCase.testProjectGradle()` harness.
+                        class \(testClass): JUnitTestCase {
+                        }
+
+                        """.write(toFile: testSource, atomically: true, encoding: .utf8)
+                    }
+                }
+
+                if target.kind != .test {
+                    let moduleClass = target.name + "ModuleKt"
+                    let testSource = targetDirKt + "/\(moduleClass).swift"
+
+                    if !FileManager.default.fileExists(atPath: testSource) {
+                        try """
+                        import SkipFoundation
+
+                        /// A link to the \(moduleClass) module
+                        public extension Bundle {
+                            static let \(moduleClass) = Bundle.module
+                        }
+                        """.write(toFile: testSource, atomically: true, encoding: .utf8)
+                    }
+                }
+
                 // include a sample Kotlin file as an extension point for the user
                 if target.kind != .test {
-                    let kotlinSource = targetDirKt + "/\(target.name).kt"
+                    let kotlinSource = targetDirKtSkip + "/\(target.name)KotlinSupport.kt"
                     if !FileManager.default.fileExists(atPath: kotlinSource) {
                         try """
                         // Kotlin included in this file will be included in the transpiled package for \(target.name)
@@ -228,5 +261,17 @@ extension CommandPlugin {
         let outputPath = outputFolder.appending(subpath: "README.md")
         Diagnostics.remark("saving to \(outputPath.string)")
         try contents.write(toFile: outputPath.string, atomically: true, encoding: .utf8)
+
+
+        // In the Skip folder, create links to all the output targets that will contain the transpiled Pradle projects
+        // e.g. ~/Library/Developer/Xcode/DerivedData/PACKAGE-ID/SourcePackages/plugins/Hello Skip.output/../skip-template.output
+        let ext = context.pluginWorkDirectory.extension ?? "output"
+        let packageOutput = context.pluginWorkDirectory.removingLastComponent().appending(subpath: context.package.id + "." + ext)
+        for target in sourceTargets {
+            let kotlinTargetName = target.name + "Kt"
+            try FileManager.default.createSymbolicLink(
+                atPath: outputFolder.appending(subpath: kotlinTargetName).string,
+                withDestinationPath: packageOutput.appending(subpath: kotlinTargetName).appending(subpath: "skip-transpiler").string)
+        }
     }
 }
