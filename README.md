@@ -7,8 +7,8 @@ The `skip` plug-in for Xcode transpiles Swift targets into Kotlin projects.
 Add the following line at the bottom of your `Package.swift` file:
 
 ```swift
-package.dependencies += [.package(url: "https://github.com/skiptools/skip.git", from: "0.0.0")]
-package.dependencies += [.package(url: "https://github.com/skiptools/skiphub.git", from: "0.0.0")]
+package.dependencies += [.package(url: "https://github.com/skiptools/skip.git", from: "0.3.10")]
+package.dependencies += [.package(url: "https://github.com/skiptools/skip.git", from: "0.3.10")]
 ```
 
 The comment-click your target in the Xcode project navigator
