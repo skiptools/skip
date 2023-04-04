@@ -32,7 +32,10 @@ request permission to save files to the project directory.
 
 Once the plugin has completed, new targets will be appended to the end of the `Package.swift` file.
 You can run the test cases by selecting `MyLibrary-Package` running on `My Mac`.
-Successful transpilation and rest case runs will show up in the log.
+Successful transpilation and test case runs will show up in the log.
+Note that the Kotlin test cases must be run against the macOS target,
+and Gradle must be installed on the machine (e.g. with: `brew install gradle`
+or from https://gradle.org).
 
 <img width="1412" alt="skip-init-screenshot-2" src="https://user-images.githubusercontent.com/659086/229834667-f2939738-d21a-4814-94a1-63e316ca2dc5.png">
 
