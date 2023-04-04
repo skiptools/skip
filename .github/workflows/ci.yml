@@ -35,6 +35,8 @@ jobs:
       - name: Create New Skip Package
         run: |
           swift package init --type library --name SomeLibrary
+          cat Package.swift
+          swift test
 
           echo 'package.dependencies += [.package(url: "https://github.com/skiptools/skip.git", from: "0.0.0")]' >> Package.swift
           swift package --allow-writing-to-package-directory skip version
