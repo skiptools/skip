@@ -212,7 +212,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     }
 
     /// Map uses of generic parameters.
-    func mappingGenerics(from: [TypeSignature], to: [TypeSignature]) -> TypeSignature {
+    func mappingGenerics(from: [TypeSignature]? = nil, to: [TypeSignature]) -> TypeSignature {
+        let from = from ?? self.generics
         guard !from.isEmpty, from.count == to.count else {
             return self
         }

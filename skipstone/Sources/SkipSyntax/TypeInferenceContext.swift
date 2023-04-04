@@ -137,7 +137,8 @@ struct TypeInferenceContext {
 
         for (typeDeclaration, isStatic) in typePath.reversed() {
             let signature: TypeSignature = isStatic ? .metaType(typeDeclaration.signature) : typeDeclaration.signature
-            let type = codebaseInfo.identifierSignature(of: name, in: signature)
+            //~~~
+            let type = codebaseInfo.identifierSignature(of: name, inConstrained: signature)
             if type != .none {
                 return type
             }
@@ -178,7 +179,8 @@ struct TypeInferenceContext {
         guard let codebaseInfo else {
             return .none
         }
-        return codebaseInfo.identifierSignature(of: name, in: type)
+        //~~~
+        return codebaseInfo.identifierSignature(of: name, inConstrained: type)
     }
 
     /// Return the signatures of the functions matching the given parameters.

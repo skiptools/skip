@@ -51,13 +51,13 @@ final class CodebaseInfoTests: XCTestCase {
         }
         """)
 
-        XCTAssertEqual(.int, context.identifierSignature(of: "letVar", in: .named("TestStruct", [])))
-        XCTAssertEqual(.int, context.identifierSignature(of: "computedVar", in: .named("TestStruct", [])))
+        XCTAssertEqual(.int, context.identifierSignature(of: "letVar", inConstrained: .named("TestStruct", [])))
+        XCTAssertEqual(.int, context.identifierSignature(of: "computedVar", inConstrained: .named("TestStruct", [])))
 
-        XCTAssertEqual(.function([.init(label: "p", type: .string)], .int), context.identifierSignature(of: "f", in: .named("TestStruct", [])))
+        XCTAssertEqual(.function([.init(label: "p", type: .string)], .int), context.identifierSignature(of: "f", inConstrained: .named("TestStruct", [])))
 
-        XCTAssertEqual(.string, context.identifierSignature(of: "1", in: .tuple(["i", "s"], [.int, .string])))
-        XCTAssertEqual(.string, context.identifierSignature(of: "s", in: .tuple(["i", "s"], [.int, .string])))
+        XCTAssertEqual(.string, context.identifierSignature(of: "1", inConstrained: .tuple(["i", "s"], [.int, .string])))
+        XCTAssertEqual(.string, context.identifierSignature(of: "s", inConstrained: .tuple(["i", "s"], [.int, .string])))
     }
 
     func testVariableTypeResolution() async throws {
@@ -71,9 +71,9 @@ final class CodebaseInfoTests: XCTestCase {
         }
         """)
 
-        XCTAssertEqual(.int, context.identifierSignature(of: "v", in: .metaType(.named("TestStruct1", []))))
-        XCTAssertEqual(.int, context.identifierSignature(of: "v2", in: .metaType(.named("TestStruct1", []))))
-        XCTAssertEqual(.int, context.identifierSignature(of: "v2", in: .metaType(.named("TestStruct2", []))))
+        XCTAssertEqual(.int, context.identifierSignature(of: "v", inConstrained: .metaType(.named("TestStruct1", []))))
+        XCTAssertEqual(.int, context.identifierSignature(of: "v2", inConstrained: .metaType(.named("TestStruct1", []))))
+        XCTAssertEqual(.int, context.identifierSignature(of: "v2", inConstrained: .metaType(.named("TestStruct2", []))))
     }
 
     func testFailedVariableTypeResolutionProducesMessage() async throws {
@@ -93,8 +93,8 @@ final class CodebaseInfoTests: XCTestCase {
         }
         """)
 
-        XCTAssertEqual(.int, context.identifierSignature(of: "n", in: .named("TestClass.Nested", [])))
-        XCTAssertEqual(.int, context.identifierSignature(of: "n", in: .member(.named("TestClass", []), .named("Nested", []))))
+        XCTAssertEqual(.int, context.identifierSignature(of: "n", inConstrained: .named("TestClass.Nested", [])))
+        XCTAssertEqual(.int, context.identifierSignature(of: "n", inConstrained: .member(.named("TestClass", []), .named("Nested", []))))
     }
 
     func testSubscript() async throws {
@@ -233,11 +233,11 @@ final class CodebaseInfoTests: XCTestCase {
         """)
 
         let enumSignature: TypeSignature = .named("TestEnum", [])
-        XCTAssertEqual(enumSignature, context.identifierSignature(of: "case1", in: .metaType(enumSignature)))
+        XCTAssertEqual(enumSignature, context.identifierSignature(of: "case1", inConstrained: .metaType(enumSignature)))
         XCTAssertEqual([], context.associatedValueSignatures(of: "case1", in: .metaType(enumSignature)))
 
         let enumAssociatedValueSignature: TypeSignature = .named("AssociatedValueEnum", [])
-        XCTAssertEqual(enumAssociatedValueSignature, context.identifierSignature(of: "case2", in: .metaType(enumAssociatedValueSignature)))
+        XCTAssertEqual(enumAssociatedValueSignature, context.identifierSignature(of: "case2", inConstrained: .metaType(enumAssociatedValueSignature)))
         XCTAssertEqual([], context.associatedValueSignatures(of: "case1", in: .metaType(enumAssociatedValueSignature)))
         XCTAssertEqual([.init(type: .int)], context.associatedValueSignatures(of: "case2", in: .metaType(enumAssociatedValueSignature)))
         XCTAssertEqual([.init(label: "d", type: .double), .init(label: "s", type: .string)], context.associatedValueSignatures(of: "case3", in: .metaType(enumAssociatedValueSignature)))

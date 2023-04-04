@@ -335,7 +335,7 @@ struct Attribute {
 /// Generic information for a type or API.
 ///
 /// - Note: `Codable` for use in `CodebaseInfo`.
-struct Generics: Codable {
+struct Generics: Equatable, Codable {
     /// Generic types and any associated inheritance type information for this type or API: `class Container<Owner, Element: Containable>`.
     var entries: [Generic]
 
@@ -461,6 +461,20 @@ struct Generics: Codable {
         return result
     }
 
+    /// Merge an extension's generics into its extended type.
+    func merge(extension signature: TypeSignature, generics: Generics) -> Generics {
+        let extensionGenerics = signature.generics
+        var result = self
+        if extensionGenerics.count == entries.count {
+            for i in 0..<entries.count {
+                result.entries[i].whereEqual = extensionGenerics[i]
+            }
+        } else {
+            result = result.merge(overrides: generics, addNew: true)
+        }
+        return result
+    }
+
     func qualified(in node: SyntaxNode) -> Generics {
         var generics = self
         generics.entries = generics.entries.map { $0.qualified(in: node) }
@@ -486,7 +500,7 @@ struct Generics: Codable {
 }
 
 /// Information about a declared generic parameter.
-struct Generic: Codable {
+struct Generic: Equatable, Codable {
     var name: String
     var inherits: [TypeSignature] = []
     var whereEqual: TypeSignature?

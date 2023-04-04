@@ -988,16 +988,7 @@ struct KotlinExtensionDeclaration {
         if let extendedTypeInfo = translator.codebaseInfo?.primaryTypeInfo(forNamed: statement.extends) {
             // Strip the generics from the extended type and put the complete set of constraints into the generics object
             extends = statement.extends.withGenerics([])
-            generics = extendedTypeInfo.generics
-
-            let extendsGenerics = statement.extends.generics
-            if extendsGenerics.count == generics.entries.count {
-                for i in 0..<generics.entries.count {
-                    generics.entries[i].whereEqual = extendsGenerics[i]
-                }
-            } else {
-                generics = generics.merge(overrides: statement.generics, addNew: true)
-            }
+            generics = extendedTypeInfo.generics.merge(extension: statement.extends, generics: statement.generics)
         }
         for member in statement.members {
             if let variableDeclaration = member as? VariableDeclaration, translator.codebaseInfo?.isImplementingMember(declaration: variableDeclaration, in: extends) == true {
