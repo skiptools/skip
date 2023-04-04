@@ -41,6 +41,8 @@ jobs:
         run: |
           swift package init --type library --name SomeLibrary
 
+          swift test
+
           cat >> Package.swift << EOF
           package.dependencies += [.package(url: "https://github.com/skiptools/skip.git", from: "0.0.0")]
           package.dependencies += [.package(url: "https://github.com/skiptools/skiphub.git", from: "0.0.0")]
