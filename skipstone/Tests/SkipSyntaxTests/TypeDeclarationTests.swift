@@ -257,6 +257,7 @@ final class TypeDeclarationTests: XCTestCase {
     }
 
     func testTypealiasToSelf() async throws {
+        // Note: this is invalid Swift, so it doesn't really matter that the output is also invalid
         try await check(swift: """
         typealias A = A
 
@@ -271,7 +272,37 @@ final class TypeDeclarationTests: XCTestCase {
         internal open class A {
         }
 
-        internal open class B: A() {
+        internal open class B: A {
+
+            internal constructor(): super() {
+            }
+
+            internal constructor(): super() {
+            }
+
+            internal constructor(): super() {
+            }
+
+            internal constructor(): super() {
+            }
+
+            internal constructor(): super() {
+            }
+
+            internal constructor(): super() {
+            }
+
+            internal constructor(): super() {
+            }
+
+            internal constructor(): super() {
+            }
+
+            internal constructor(): super() {
+            }
+
+            internal constructor(): super() {
+            }
         }
         """)
     }

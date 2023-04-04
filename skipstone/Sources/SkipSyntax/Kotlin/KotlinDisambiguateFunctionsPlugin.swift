@@ -215,7 +215,7 @@ class KotlinDisambiguateFunctionsPlugin: KotlinPlugin {
     private func nonOverrideFunctionInfos(for key: Key, in type: TypeSignature?, codebaseInfo: CodebaseInfo) -> [CodebaseInfo.FunctionInfo] {
         let candidates: [CodebaseInfoItem]
         if let type, key.isInit {
-            candidates = codebaseInfo.typeInfos(for: type).flatMap {
+            candidates = codebaseInfo.typeInfos(forNamed: type).flatMap {
                 $0.functions.filter { $0.declarationType == .initDeclaration }
             }
         } else {
@@ -268,7 +268,7 @@ private struct ParameterCount {
         if type == declaringType {
             return true
         }
-        return !isInit && (codebaseInfo.global.inheritanceChainSignatures(for: type).contains(declaringType) || codebaseInfo.global.protocolSignatures(for: type).contains(declaringType))
+        return !isInit && (codebaseInfo.global.inheritanceChainSignatures(forNamed: type).contains(declaringType) || codebaseInfo.global.protocolSignatures(forNamed: type).contains(declaringType))
     }
 }
 
@@ -289,13 +289,13 @@ private struct LabelDeclarer {
     init(for functionInfo: CodebaseInfo.FunctionInfo, codebaseInfo: CodebaseInfo) {
         self.parameters = functionInfo.signature.parameters
         self.type = functionInfo.declaringType
-        if let type = functionInfo.declaringType {
+        if let type {
             if functionInfo.declarationType == .initDeclaration {
                 self.inheritanceChain = [type]
                 self.protocols = []
             } else {
-                self.inheritanceChain = codebaseInfo.inheritanceChainSignatures(for: type)
-                self.protocols = codebaseInfo.protocolSignatures(for: type)
+                self.inheritanceChain = codebaseInfo.inheritanceChainSignatures(forNamed: type)
+                self.protocols = codebaseInfo.protocolSignatures(forNamed: type)
             }
         } else {
             self.inheritanceChain = []

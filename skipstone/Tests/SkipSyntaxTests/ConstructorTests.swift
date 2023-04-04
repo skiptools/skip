@@ -341,6 +341,60 @@ final class ConstructorTests: XCTestCase {
         }
         """)
     }
+
+    func testMemberwiseGenericConstructor() async throws {
+        //~~~ should not be sref()ing U: need to resolve generic upper bounds
+        try await check(swift: """
+        struct S<T, U: AnyObject> {
+            let t: T
+            let u: U
+        }
+        """, kotlin: """
+        internal class S<T, U> where U: Any {
+            internal val t: T
+                get() {
+                    return field.sref()
+                }
+            internal val u: U
+                get() {
+                    return field.sref()
+                }
+
+            constructor(t: T, u: U) {
+                this.t = t
+                this.u = u
+            }
+        }
+        """)
+    }
+
+    func testInheritedGenericConstructor() async throws {
+        try await check(swift: """
+        class Base<T, U> {
+            init(t: T, u: U) {
+            }
+        }
+        class C<X>: Base<Int, X> {
+        }
+        class D: C<String> {
+        }
+        """, kotlin: """
+        internal open class Base<T, U> {
+            internal constructor(t: T, u: U) {
+            }
+        }
+        internal open class C<X>: Base<Int, X> {
+
+            internal constructor(t: Int, u: X): super(t, u) {
+            }
+        }
+        internal open class D: C<String> {
+
+            internal constructor(t: Int, u: String): super(t, u) {
+            }
+        }
+        """)
+    }
 }
 
 private class ConstructorTestsSideEffectBase {

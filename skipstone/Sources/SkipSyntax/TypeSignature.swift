@@ -216,32 +216,32 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         guard !from.isEmpty, from.count == to.count else {
             return self
         }
-        func map(_ type: TypeSignature) -> TypeSignature {
-            for i in 0..<from.count {
-                if type == from[i] {
-                    return to[i]
-                }
-            }
-            return type
-        }
-        //~~~ This looks broken: break it down all the way to a .named with no generics, then map()
         switch self {
         case .array(let element):
-            return .array(map(element))
+            return .array(element.mappingGenerics(from: from, to: to))
+        case .composition(let types):
+            return .composition(types.map { $0.mappingGenerics(from: from, to: to) })
         case .dictionary(let key, let value):
-            return .dictionary(map(key), map(value))
+            return .dictionary(key.mappingGenerics(from: from, to: to), value.mappingGenerics(from: from, to: to))
+        case .function(let parameters, let returnType):
+            return .function(parameters.map { $0.mappingGenerics(from: from, to: to) }, returnType.mappingGenerics(from: from, to: to))
         case .member(let base, let type):
-            return .member(base, type.mappingGenerics(from: from, to: to))
+            return .member(base.mappingGenerics(from: from, to: to), type.mappingGenerics(from: from, to: to))
         case .metaType(let type):
             return .metaType(type.mappingGenerics(from: from, to: to))
         case .named(let name, let generics):
-            return .named(name, generics.map { map($0) })
+            if generics.isEmpty, let fromIndex = from.firstIndex(of: self) {
+                return to[fromIndex]
+            }
+            return .named(name, generics.map { $0.mappingGenerics(from: from, to: to) })
         case .optional(let type):
             return .optional(type.mappingGenerics(from: from, to: to))
         case .range(let element):
-            return .range(map(element))
+            return .range(element.mappingGenerics(from: from, to: to))
         case .set(let element):
-            return .set(map(element))
+            return .set(element.mappingGenerics(from: from, to: to))
+        case .tuple(let labels, let types):
+            return .tuple(labels, types.map { $0.mappingGenerics(from: from, to: to) })
         case .unwrappedOptional(let type):
             return .unwrappedOptional(type.mappingGenerics(from: from, to: to))
         default:
@@ -517,7 +517,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             }
             // Take away a tenth of a point for each level down the inheritance chain, so that less derived matches score lower.
             // This will allow another function with a more specific parameter type to score higher
-            let inherits = codebaseInfo.global.inheritanceChainSignatures(for: type)
+            let inherits = codebaseInfo.global.inheritanceChainSignatures(forNamed: type)
             if inherits.count > 1 {
                 for i in 1..<inherits.count {
                     if inherits[i].withGenerics([]) == target {
@@ -525,7 +525,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                     }
                 }
             }
-            let protocols = codebaseInfo.global.protocolSignatures(for: type).map { $0.withGenerics([]) }
+            let protocols = codebaseInfo.global.protocolSignatures(forNamed: type).map { $0.withGenerics([]) }
             if protocols.contains(target) {
                 return 1.5
             }
@@ -965,6 +965,12 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         func or(_ typeSignature: TypeSignature) -> Parameter {
             var parameter = self
             parameter.type = parameter.type.or(typeSignature)
+            return parameter
+        }
+
+        func mappingGenerics(from: [TypeSignature], to: [TypeSignature]) -> Parameter {
+            var parameter = self
+            parameter.type = parameter.type.mappingGenerics(from: from, to: to)
             return parameter
         }
 

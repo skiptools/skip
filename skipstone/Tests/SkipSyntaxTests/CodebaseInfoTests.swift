@@ -270,7 +270,7 @@ final class CodebaseInfoTests: XCTestCase {
         typealias TestAlias = TestClass
         """)
 
-        let typeInfos = context.typeInfos(for: .named("TestAlias", []))
+        let typeInfos = context.typeInfos(forNamed: .named("TestAlias", []))
         XCTAssertEqual(1, typeInfos.count)
         XCTAssertEqual("TestClass", typeInfos.first?.name)
     }

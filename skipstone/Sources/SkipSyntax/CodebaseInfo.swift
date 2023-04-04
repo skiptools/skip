@@ -97,16 +97,16 @@ public class CodebaseInfo: Codable {
     }
 
     /// Return all type infos for the given type.
-    func typeInfos(for type: TypeSignature) -> [TypeInfo] {
-        return typeInfos(for: type, candidateMap: { $0 })
+    func typeInfos(forNamed type: TypeSignature) -> [TypeInfo] {
+        return typeInfos(forNamed: type, candidateMap: { $0 })
     }
 
     /// Return the type info for the given type's primary declaration, omitting extensions.
-    func primaryTypeInfo(for type: TypeSignature) -> TypeInfo? {
-        return typeInfos(for: type).first { $0.declarationType != .extensionDeclaration }
+    func primaryTypeInfo(forNamed type: TypeSignature) -> TypeInfo? {
+        return typeInfos(forNamed: type).first { $0.declarationType != .extensionDeclaration }
     }
 
-    private func typeInfos(for type: TypeSignature, candidateMap: ([CodebaseInfoItem]) -> [CodebaseInfoItem], recursionDepth: Int = 0) -> [TypeInfo] {
+    private func typeInfos(forNamed type: TypeSignature, candidateMap: ([CodebaseInfoItem]) -> [CodebaseInfoItem], recursionDepth: Int = 0) -> [TypeInfo] {
         // Invalid Swift code containing circular typealiases can cause infinite recursion
         guard recursionDepth < 10 else {
             return []
@@ -117,7 +117,7 @@ public class CodebaseInfo: Codable {
                 if let typeInfo = candidate as? TypeInfo {
                     return [typeInfo]
                 } else if let typealiasInfo = candidate as? TypealiasInfo {
-                    return typeInfos(for: typealiasInfo.signature, candidateMap: candidateMap, recursionDepth: recursionDepth + 1)
+                    return typeInfos(forNamed: typealiasInfo.signature, candidateMap: candidateMap, recursionDepth: recursionDepth + 1)
                 } else {
                     return []
                 }
@@ -125,28 +125,34 @@ public class CodebaseInfo: Codable {
         }
     }
 
-    /// Return the concrete (i.e. non-protocol) inheritance chain for the given type. The type will be first, followed by its superclass, etc.
-    func inheritanceChainSignatures(for type: TypeSignature) -> [TypeSignature] {
-        guard let concreteTypeInfo = typeInfos(for: type).first(where: { $0.declarationType != .protocolDeclaration && $0.declarationType != .extensionDeclaration }) else {
+    /// Return the concrete (i.e. non-protocol) inheritance chain for the given type.
+    ///
+    /// The type will be first, followed by its superclass, etc.
+    ///
+    /// - Note: Any generics on the given type are not applied to the result signatures.
+    func inheritanceChainSignatures(forNamed type: TypeSignature) -> [TypeSignature] {
+        guard let concreteTypeInfo = typeInfos(forNamed: type).first(where: { $0.declarationType != .protocolDeclaration && $0.declarationType != .extensionDeclaration }) else {
             return []
         }
         guard concreteTypeInfo.declarationType == .classDeclaration, let firstInherits = concreteTypeInfo.inherits.first else {
             return [concreteTypeInfo.signature]
         }
-        //~~~ Need to map generics
-        return [concreteTypeInfo.signature] + inheritanceChainSignatures(for: firstInherits)
+        return [concreteTypeInfo.signature] + inheritanceChainSignatures(forNamed: firstInherits)
     }
 
-    /// Return the protocols the given type conforms to, including inherited protocols. If the type itself is a protocol, it is included.
-    func protocolSignatures(for type: TypeSignature) -> [TypeSignature] {
+    /// Return the protocols the given type conforms to, including inherited protocols.
+    ///
+    /// If the type itself is a protocol, it is included.
+    func protocolSignatures(forNamed type: TypeSignature) -> [TypeSignature] {
         // Gather inherited signatures, then insert the given type at the front if it is also a protocol
         let type = type.asOptional(false)
-        let typeInfos = typeInfos(for: type)
-        //~~~ Need to map generics
-        var signatures = typeInfos.flatMap { $0.inherits.flatMap { protocolSignatures(for: $0) } }
+        let typeInfos = typeInfos(forNamed: type)
+        var signatures = typeInfos.flatMap { $0.inherits.flatMap { protocolSignatures(forNamed: $0) } }
         // TODO: Remove special case for Error when we add SkipLib codebase info dependency
-        if type == .anyObject || type == .named("Error", []) || typeInfos.contains(where: { $0.declarationType == .protocolDeclaration }) {
+        if type == .anyObject || type == .named("Error", []) {
             signatures.insert(type, at: 0)
+        } else if let protocolInfo = typeInfos.first(where: { $0.declarationType == .protocolDeclaration }) {
+            signatures.insert(protocolInfo.signature, at: 0)
         }
         return signatures
     }
@@ -195,13 +201,13 @@ public class CodebaseInfo: Codable {
         }
         
         /// Return all type infos visible for the given type.
-        func typeInfos(for type: TypeSignature) -> [TypeInfo] {
-            return global.typeInfos(for: type, candidateMap: ranked)
+        func typeInfos(forNamed type: TypeSignature) -> [TypeInfo] {
+            return global.typeInfos(forNamed: type, candidateMap: ranked)
         }
 
         /// Return the type info for the given type's primary declaration, omitting extensions.
-        func primaryTypeInfo(for type: TypeSignature) -> TypeInfo? {
-            return typeInfos(for: type).first { $0.declarationType != .extensionDeclaration }
+        func primaryTypeInfo(forNamed type: TypeSignature) -> TypeInfo? {
+            return typeInfos(forNamed: type).first { $0.declarationType != .extensionDeclaration }
         }
         
         /// Return the type of the given identifier.
@@ -237,7 +243,7 @@ public class CodebaseInfo: Codable {
                 type = base
                 isStatic = true
             }
-            for typeInfo in typeInfos(for: type) {
+            for typeInfo in typeInfos(forNamed: type) {
                 let type = identifierSignature(of: member, in: typeInfo, isStatic: isStatic)
                 if type != .none {
                     return type
@@ -256,7 +262,7 @@ public class CodebaseInfo: Codable {
                 if let typeInfo = item as? TypeInfo {
                     return [typeInfo]
                 } else if let typealiasInfo = item as? TypealiasInfo {
-                    return self.typeInfos(for: typealiasInfo.signature)
+                    return self.typeInfos(forNamed: typealiasInfo.signature)
                 } else {
                     return []
                 }
@@ -291,7 +297,7 @@ public class CodebaseInfo: Codable {
             }
 
             var candidates: Set<FunctionCandidate> = []
-            for typeInfo in typeInfos(for: type) {
+            for typeInfo in typeInfos(forNamed: type) {
                 functionCandidates(for: name, in: typeInfo, arguments: arguments, isStatic: isStatic).forEach { candidates.insert($0) }
             }
             let sortedCandidates = candidates.sorted { $0.score > $1.score }
@@ -317,7 +323,7 @@ public class CodebaseInfo: Codable {
             }
 
             var candidates: Set<FunctionCandidate> = []
-            for typeInfo in typeInfos(for: type) {
+            for typeInfo in typeInfos(forNamed: type) {
                 functionCandidates(for: "subscript", in: typeInfo, arguments: arguments, isStatic: isStatic).forEach { candidates.insert($0) }
             }
             let sortedCandidates = candidates.sorted { $0.score > $1.score }
@@ -331,7 +337,7 @@ public class CodebaseInfo: Codable {
         /// Return the associated values of the given enum case.
         func associatedValueSignatures(of member: String, in type: TypeSignature) -> [TypeSignature.Parameter] {
             let type = type.asOptional(false)
-            for typeInfo in typeInfos(for: type) {
+            for typeInfo in typeInfos(forNamed: type) {
                 if let types = associatedValueSignatures(of: member, in: typeInfo) {
                     return types
                 }
@@ -352,7 +358,7 @@ public class CodebaseInfo: Codable {
                 }
             }
             for inherits in typeInfo.inherits {
-                for inheritsInfo in typeInfos(for: inherits) {
+                for inheritsInfo in typeInfos(forNamed: inherits) {
                     let signature = identifierSignature(of: member, in: inheritsInfo, isStatic: isStatic)
                     if signature != .none {
                         return signature
@@ -372,7 +378,7 @@ public class CodebaseInfo: Codable {
                 if let memberTypeInfo = member as? TypeInfo {
                     return initCandidates(for: [memberTypeInfo], arguments: arguments)
                 } else if member.declarationType == .typealiasDeclaration {
-                    return initCandidates(for: typeInfos(for: member.signature), arguments: arguments)
+                    return initCandidates(for: typeInfos(forNamed: member.signature), arguments: arguments)
                 } else if let candidate = matchFunction(member, arguments: arguments) {
                     return [candidate]
                 } else {
@@ -380,7 +386,7 @@ public class CodebaseInfo: Codable {
                 }
             }
             for inherits in typeInfo.inherits {
-                for inheritsInfo in typeInfos(for: inherits) {
+                for inheritsInfo in typeInfos(forNamed: inherits) {
                     candidates += functionCandidates(for: name, in: inheritsInfo, arguments: arguments, isStatic: isStatic)
                 }
             }
@@ -638,40 +644,34 @@ public class CodebaseInfo: Codable {
         }
 
         // The compiler only generates if there are no declared constructors
-        let inits = typeInfo.functions.filter { $0.name == "init" }
+        let inits = typeInfo.functions.filter { $0.declarationType == .initDeclaration }
         guard inits.isEmpty else {
             return
         }
-        var superclassInits: [FunctionInfo] = []
-        if typeInfo.declarationType == .classDeclaration, let superclassSignature = typeInfo.inherits.first {
-            let superclassName: String
-            if case .member(_, let type) = superclassSignature {
-                superclassName = type.name
-            } else {
-                superclassName = superclassSignature.name
-            }
-            let superclassInfos = itemsByName[superclassName, default: []].compactMap { (item) -> TypeInfo? in
-                guard let typeInfo = item as? TypeInfo else {
-                    return nil
-                }
-                return typeInfo.signature.name == superclassSignature.name ? typeInfo : nil
-            }
+        var inheritInits: [FunctionInfo] = []
+        var inheritGenerics: [TypeSignature] = []
+        var targetGenerics: [TypeSignature] = []
+        if typeInfo.declarationType == .classDeclaration, let inheritSignature = typeInfo.inherits.first {
+            // Filter out extensions with generic constraints
+            let inheritInfos = typeInfos(forNamed: inheritSignature)
+                .filter { $0.declarationType != .extensionDeclaration || ($0.generics.isEmpty && $0.signature.generics.isEmpty) }
             // inherits.first could have been a protocol
-            if superclassInfos.contains(where: { $0.declarationType == .classDeclaration }) {
-                superclassInits = superclassInfos.flatMap { $0.functions.filter { $0.name == "init" && ($0.modifiers.visibility != .private || $0.sourceFile == typeInfo.sourceFile) } }
+            if let primaryInheritInfo = inheritInfos.first(where: { $0.declarationType == .classDeclaration }) {
+                inheritGenerics = primaryInheritInfo.signature.generics
+                targetGenerics = inheritSignature.generics
+                inheritInits = inheritInfos.flatMap { $0.functions.filter { $0.declarationType == .initDeclaration && ($0.modifiers.visibility != .private || $0.sourceFile == typeInfo.sourceFile) } }
             }
         }
-        if superclassInits.isEmpty {
+        if inheritInits.isEmpty {
             addMemberwiseConstructor(to: typeInfo)
         } else {
-            //~~~ Need to map generic parameters
-            for superclassInit in superclassInits {
-                var inheritedInit = superclassInit
-                inheritedInit.moduleName = typeInfo.moduleName
-                inheritedInit.sourceFile = typeInfo.sourceFile
-                inheritedInit.declaringType = typeInfo.signature
-                inheritedInit.isGenerated = true
-                typeInfo.functions.append(inheritedInit)
+            for var inheritInit in inheritInits {
+                inheritInit.moduleName = typeInfo.moduleName
+                inheritInit.sourceFile = typeInfo.sourceFile
+                inheritInit.declaringType = typeInfo.signature
+                inheritInit.signature = inheritInit.signature.mappingGenerics(from: inheritGenerics, to: targetGenerics)
+                inheritInit.isGenerated = true
+                typeInfo.functions.append(inheritInit)
             }
         }
     }
@@ -895,7 +895,7 @@ public class CodebaseInfo: Codable {
     struct FunctionInfo: CodebaseInfoItem, Codable {
         let name: String
         let declarationType: StatementType
-        let signature: TypeSignature
+        var signature: TypeSignature
         var moduleName: String?
         var sourceFile: Source.FilePath?
         var declaringType: TypeSignature?

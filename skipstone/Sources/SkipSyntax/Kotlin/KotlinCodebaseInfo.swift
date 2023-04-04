@@ -14,13 +14,13 @@ extension CodebaseInfo.Context {
     /// Return all extensions of a given type.
     func extensions(of type: TypeSignature) -> [ExtensionDeclaration] {
         assert(global.kotlin != nil)
-        return typeInfos(for: type).compactMap { $0.languageAdditions as? ExtensionDeclaration }
+        return typeInfos(forNamed: type).compactMap { $0.languageAdditions as? ExtensionDeclaration }
     }
 
     /// Whether the given type is a class, struct, etc, optionally limiting results to this module.
     func declarationType(of type: TypeSignature, mustBeInModule: Bool) -> StatementType? {
         assert(global.kotlin != nil)
-        guard let typeInfo = primaryTypeInfo(for: type) else {
+        guard let typeInfo = primaryTypeInfo(forNamed: type) else {
             guard let typealiasInfo = crossPlatformTypealias(forUnknownType: type) else {
                 return nil
             }
@@ -39,7 +39,7 @@ extension CodebaseInfo.Context {
     /// - Note: The returned parameters are only populated with the external label, declared type, and default value (when available).
     func constructorParameters(of type: TypeSignature) -> [[Parameter<Expression>]] {
         assert(global.kotlin != nil)
-        let inits = typeInfos(for: type).flatMap { (typeInfo) -> [CodebaseInfoItem] in
+        let inits = typeInfos(forNamed: type).flatMap { (typeInfo) -> [CodebaseInfoItem] in
             guard typeInfo.declarationType != .protocolDeclaration else {
                 return []
             }
@@ -81,11 +81,12 @@ extension CodebaseInfo.Context {
     /// Whether the given member is declared by the given type, excluding Kotlin extension properties and functions.
     func isMember(name: String, type: TypeSignature?, isStatic: Bool, in owningType: TypeSignature) -> Bool {
         assert(global.kotlin != nil)
-        let concreteSignatures = global.inheritanceChainSignatures(for: owningType)
+        //~~~ Need to map generics
+        let concreteSignatures = global.inheritanceChainSignatures(forNamed: owningType)
         if !concreteSignatures.isEmpty {
             return concreteSignatures.contains { hasMember($0, name: name, type: type, isStatic: isStatic, filterKotlinExtensions: true) }
         } else {
-            let protocolSignatures = global.protocolSignatures(for: owningType)
+            let protocolSignatures = global.protocolSignatures(forNamed: owningType)
             return protocolSignatures.contains { hasMember($0, name: name, type: type, isStatic: isStatic, filterKotlinExtensions: true) }
         }
     }
@@ -106,19 +107,20 @@ extension CodebaseInfo.Context {
     /// Whether the given member is declared by a protocol of the given type.
     func isProtocolMember(name: String, type: TypeSignature?, isStatic: Bool, in owningType: TypeSignature) -> Bool {
         assert(global.kotlin != nil)
-        let protocolSignatures = global.protocolSignatures(for: owningType)
+        //~~~ Need to map generics
+        let protocolSignatures = global.protocolSignatures(forNamed: owningType)
         return protocolSignatures.contains { hasMember($0, name: name, type: type, isStatic: isStatic, filterKotlinExtensions: false) }
     }
 
     /// Whether the given type may be a mutable struct.
     func mayBeMutableStruct(type: TypeSignature) -> Bool {
         assert(global.kotlin != nil)
-        let typeInfos = typeInfos(for: type)
+        let typeInfos = typeInfos(forNamed: type)
         if let structInfo = typeInfos.first(where: { $0.declarationType == .structDeclaration }) {
             return structInfo.variables.contains(where: { !$0.isReadOnly }) || structInfo.functions.contains(where: { $0.isMutating })
         } else if typeInfos.contains(where: { $0.declarationType == .protocolDeclaration }) {
             // If this is a protocol that is constrained to class impls, then it isn't a mutable struct. Otherwise it could be
-            return !global.protocolSignatures(for: type).contains(.anyObject)
+            return !global.protocolSignatures(forNamed: type).contains(.anyObject)
         } else if typeInfos.isEmpty {
             // Assume an unknown type could be a mutable struct
             let type = type.asOptional(false)
@@ -138,13 +140,13 @@ extension CodebaseInfo.Context {
     /// Whether the given type conforms to `Error` through its protocols, **not** through inheritance.
     func conformsToError(type: TypeSignature) -> Bool {
         assert(global.kotlin != nil)
-        return global.protocolSignatures(for: type).contains(.named("Error", []))
+        return global.protocolSignatures(forNamed: type).contains(.named("Error", []))
     }
 
     /// Whether the given enum type has cases with associated values.
     func isSealedClassesEnum(type: TypeSignature) -> Bool {
         assert(global.kotlin != nil)
-        guard let enumInfo = typeInfos(for: type).first(where: { $0.declarationType == .enumDeclaration }) else {
+        guard let enumInfo = typeInfos(forNamed: type).first(where: { $0.declarationType == .enumDeclaration }) else {
             return false
         }
         if enumInfo.cases.contains(where: { if case .function = $0.signature { return true } else { return false } }) {
@@ -171,7 +173,7 @@ extension CodebaseInfo.Context {
     }
 
     private func hasMember(_ owningType: TypeSignature, name: String, type: TypeSignature?, isStatic: Bool, filterKotlinExtensions: Bool) -> Bool {
-        for typeInfo in typeInfos(for: owningType) {
+        for typeInfo in typeInfos(forNamed: owningType) {
             if filterKotlinExtensions && typeInfo.declarationType == .extensionDeclaration {
                 if let extensionDeclaration = typeInfo.languageAdditions as? ExtensionDeclaration {
                     if !extensionDeclaration.canMoveIntoExtendedType {

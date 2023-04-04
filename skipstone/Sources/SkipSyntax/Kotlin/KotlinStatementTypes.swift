@@ -985,7 +985,7 @@ struct KotlinExtensionDeclaration {
         }
         var extends = statement.extends
         var generics = statement.generics
-        if let extendedTypeInfo = translator.codebaseInfo?.primaryTypeInfo(for: statement.extends) {
+        if let extendedTypeInfo = translator.codebaseInfo?.primaryTypeInfo(forNamed: statement.extends) {
             // Strip the generics from the extended type and put the complete set of constraints into the generics object
             extends = statement.extends.withGenerics([])
             generics = extendedTypeInfo.generics
@@ -1312,7 +1312,7 @@ class KotlinInterfaceDeclaration: KotlinStatement {
         // Map correct generic constraints onto every declared protocol
         var kstatementGenerics = Generics()
         kstatement.inherits = kstatement.inherits.map { (inherit, generics) in
-            guard let inheritGenerics = codebaseInfo.primaryTypeInfo(for: inherit)?.generics else {
+            guard let inheritGenerics = codebaseInfo.primaryTypeInfo(forNamed: inherit)?.generics else {
                 return (inherit, generics)
             }
             let resultGenerics = inheritGenerics.merge(overrides: statement.generics)
