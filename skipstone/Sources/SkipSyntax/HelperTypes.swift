@@ -441,23 +441,24 @@ struct Generics: Codable {
 
     /// Merge the given constraints with these, allowing the given constraints to override our own.
     ///
-    /// Use this to create a complete set of generics from the additional constraints declared by a function or type extension.
-    func merge(additions: Generics, from extensionSignature: TypeSignature? = nil) -> Generics {
-        var generics = self
-        if let extensionGenerics = extensionSignature?.generics, extensionGenerics.count == entries.count {
-            for i in 0..<entries.count {
-                generics.entries[i].whereEqual = extensionGenerics[i]
-            }
-        } else {
-            for addi in 0..<additions.entries.count {
-                if let i = generics.entries.firstIndex(where: { $0.name == additions.entries[addi].name }) {
-                    generics.entries[i] = additions.entries[addi]
-                } else {
-                    generics.entries.append(additions.entries[addi])
-                }
+    /// Use this to create a complete set of generics from the additional constraints declared by a function, extension, sub-protocol, etc.
+    func merge(overrides generics: Generics, addNew: Bool = false) -> Generics {
+        guard !generics.isEmpty else {
+            return self
+        }
+        var result = self
+        for i in 0..<generics.entries.count {
+            if let ri = result.entries.firstIndex(where: { $0.name == generics.entries[i].name }) {
+                result.entries[ri] = generics.entries[i]
+            } else if case .named(let name, []) = generics.entries[i].whereEqual, let ri = result.entries.firstIndex(where: { $0.name == name }) {
+                // If there is a constraint setting some new generic name equal to an existing name, replace the existing
+                // name with the new name
+                result.entries[ri] = Generic(name: generics.entries[i].name)
+            } else if addNew {
+                result.entries.append(generics.entries[i])
             }
         }
-        return generics
+        return result
     }
 
     func qualified(in node: SyntaxNode) -> Generics {

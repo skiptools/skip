@@ -150,13 +150,6 @@ public class CodebaseInfo: Codable {
         }
         return signatures
     }
-
-    /// Return all generic mappings in the conformance tree for the given type.
-    func protocolGenerics(for type: TypeSignature) -> Generics {
-        //~~~
-        return primaryTypeInfo(for: type)?.generics ?? Generics()
-    }
-
     
     /// A context for accessing visible codebase information.
     struct Context {

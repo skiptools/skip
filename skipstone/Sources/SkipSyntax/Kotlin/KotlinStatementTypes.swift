@@ -988,7 +988,16 @@ struct KotlinExtensionDeclaration {
         if let extendedTypeInfo = translator.codebaseInfo?.primaryTypeInfo(for: statement.extends) {
             // Strip the generics from the extended type and put the complete set of constraints into the generics object
             extends = statement.extends.withGenerics([])
-            generics = extendedTypeInfo.generics.merge(additions: generics, from: statement.extends)
+            generics = extendedTypeInfo.generics
+
+            let extendsGenerics = statement.extends.generics
+            if extendsGenerics.count == generics.entries.count {
+                for i in 0..<generics.entries.count {
+                    generics.entries[i].whereEqual = extendsGenerics[i]
+                }
+            } else {
+                generics = generics.merge(overrides: statement.generics, addNew: true)
+            }
         }
         for member in statement.members {
             if let variableDeclaration = member as? VariableDeclaration, translator.codebaseInfo?.isImplementingMember(declaration: variableDeclaration, in: extends) == true {
@@ -1047,7 +1056,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         guard !generics.isEmpty else {
             return extendsGenerics
         }
-        return extendsGenerics.merge(additions: generics)
+        return extendsGenerics.merge(overrides: generics, addNew: true)
     }
     var isStatic: Bool {
         return modifiers.isStatic
@@ -1269,34 +1278,48 @@ class KotlinImportDeclaration: KotlinStatement {
 class KotlinInterfaceDeclaration: KotlinStatement {
     var name: String
     var signature: TypeSignature
-    var inherits: [TypeSignature] = []
+    var inherits: [(TypeSignature, Generics)] = []
     var modifiers = Modifiers()
     var generics = Generics()
     var members: [KotlinStatement] = []
 
     static func translate(statement: TypeDeclaration, translator: KotlinTranslator) -> KotlinInterfaceDeclaration {
         let kstatement = KotlinInterfaceDeclaration(statement: statement)
-        kstatement.inherits = statement.inherits
         kstatement.modifiers = statement.modifiers
-        kstatement.generics = translator.codebaseInfo?.global.protocolGenerics(for: statement.signature) ?? statement.generics
+        kstatement.inherits = statement.inherits.map { ($0, Generics()) }
+        kstatement.generics = statement.generics
+        kstatement.members = statement.members.flatMap { translator.translateStatement($0) }
+        kstatement.inherits.forEach { $0.0.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
+        guard let codebaseInfo = translator.codebaseInfo else {
+            return kstatement
+        }
 
-        var originalMembers = statement.members.flatMap { translator.translateStatement($0) }
-        var newMembers: [KotlinStatement] = []
         // Move extensions of this type into the type itself rather than use Kotlin extension functions.
         // This allows us to replace API declarations with implementations. Also Kotlin extension functions
         // act like static functions, which can lead to different behavior
-        if let codebaseInfo = translator.codebaseInfo {
-            for ext in codebaseInfo.extensions(of: statement.signature) {
-                kstatement.inherits += ext.inherits
-                for extMember in ext.members.flatMap({ translator.translateStatement($0) }) {
-                    if !replaceMember(in: &originalMembers, with: extMember) {
-                        newMembers.append(extMember)
-                    }
+        var originalMembers = kstatement.members
+        var newMembers: [KotlinStatement] = []
+        for ext in codebaseInfo.extensions(of: statement.signature) where ext.canMoveIntoExtendedType {
+            kstatement.inherits += ext.inherits.map { ($0, Generics()) }
+            for extMember in ext.members.flatMap({ translator.translateStatement($0) }) {
+                if !replaceMember(in: &originalMembers, with: extMember) {
+                    newMembers.append(extMember)
                 }
             }
         }
         kstatement.members = originalMembers + newMembers
-        kstatement.inherits.forEach { $0.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
+
+        // Map correct generic constraints onto every declared protocol
+        var kstatementGenerics = Generics()
+        kstatement.inherits = kstatement.inherits.map { (inherit, generics) in
+            guard let inheritGenerics = codebaseInfo.primaryTypeInfo(for: inherit)?.generics else {
+                return (inherit, generics)
+            }
+            let resultGenerics = inheritGenerics.merge(overrides: statement.generics)
+            kstatementGenerics = kstatementGenerics.merge(overrides: inheritGenerics, addNew: true)
+            return (inherit.withGenerics([]), resultGenerics)
+        }
+        kstatement.generics = kstatementGenerics.merge(overrides: statement.generics, addNew: true).filterWhereEqual()
         return kstatement
     }
 
@@ -1351,7 +1374,13 @@ class KotlinInterfaceDeclaration: KotlinStatement {
             generics.append(to: output, indentation: indentation)
             if !inherits.isEmpty {
                 output.append(": ")
-                output.append(inherits.map({ $0.kotlin }).joined(separator: ", "))
+                for (index, inherit) in inherits.enumerated() {
+                    output.append(inherit.0.kotlin)
+                    inherit.1.append(to: output, indentation: indentation)
+                    if index != inherits.count - 1 {
+                        output.append(", ")
+                    }
+                }
             }
             generics.appendWhere(to: output, indentation: indentation)
         }

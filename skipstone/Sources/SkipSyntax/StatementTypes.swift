@@ -669,9 +669,9 @@ class ExtensionDeclaration: TypeDeclaration {
         self.extends = extends
         let name: String
         if case .member(_, let type) = extends {
-            name = type.withGenerics([]).name
+            name = type.name
         } else {
-            name = extends.withGenerics([]).name
+            name = extends.name
         }
         super.init(type: .extensionDeclaration, name: name, signature: extends, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
