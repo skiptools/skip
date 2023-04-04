@@ -125,7 +125,7 @@ public class CodebaseInfo: Codable {
         }
     }
 
-    /// Return the concrete (i.e. non-protocol inheritance chain for the given type. The type will be first, followed by its superclass, etc.
+    /// Return the concrete (i.e. non-protocol) inheritance chain for the given type. The type will be first, followed by its superclass, etc.
     func inheritanceChainSignatures(for type: TypeSignature) -> [TypeSignature] {
         guard let concreteTypeInfo = typeInfos(for: type).first(where: { $0.declarationType != .protocolDeclaration && $0.declarationType != .extensionDeclaration }) else {
             return []
