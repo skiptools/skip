@@ -4,28 +4,9 @@ on:
   push:
     branches: [ main ]
   schedule:
-    # run at 9AM & 9PM UTC
-    - cron:  '0 9,21 * * *'
+    - cron: '0 3,9,15,21 * * *'
 
 jobs:
-  tool:
-    # needs: https://github.com/actions/runner-images/issues/6426
-    #runs-on: macos-13
-    runs-on: macos-12
-    steps:
-      - name: Check Tool
-        run: |
-          mkdir /tmp/ExampleSkipProject
-          cd /tmp/ExampleSkipProject
-          swift package init
-          swift test
-          echo 'package.dependencies += [.package(url: "https://github.com/skiptools/skip", from: "0.0.0")]' >> Package.swift
-
-          swift package --disable-sandbox --allow-writing-to-package-directory skip version
-
-          # also try to run the tool directly from the cache
-          ./.build/artifacts/skip/skiptool.artifactbundle/skiptool version
-
   skip-init:
     # needs: https://github.com/actions/runner-images/issues/6426
     #runs-on: macos-13
@@ -33,35 +14,28 @@ jobs:
     steps:
       - name: Create New Skip Package
         run: |
-          mkdir /tmp/SomeLibrary
-          cd /tmp/SomeLibrary
-          swift package init 
-          #--type library --name SomeLibrary
+          mkdir SomeLibrary
+          cd SomeLibrary
 
-          cat Package.swift
-          swift test
+          swift package init 
 
           echo 'package.dependencies += [.package(url: "https://github.com/skiptools/skip", from: "0.0.0")]' >> Package.swift
-          cat Package.swift
-          swift package --disable-sandbox --allow-writing-to-package-directory skip version
-
           echo 'package.dependencies += [.package(url: "https://github.com/skiptools/skiphub", from: "0.0.0")]' >> Package.swift
-          cat Package.swift
-          swift package --allow-writing-to-package-directory skip version || echo SKIP VERSION 2 FAILED
 
-          swift package resolve
-          cat Package.resolved | jq .
-
-          echo "Creating scaffold" 
           swift package plugin --allow-writing-to-package-directory skip-init
 
-          cat Package.swift
+          # the artifact tool should be downloaded locally
+          ./.build/artifacts/skip/skiptool.artifactbundle/skiptool version
+
+          cat Package.swift Package.resolved
           
           xcodebuild test -skipPackagePluginValidation -sdk "macosx" -destination "platform=macosx" -scheme SomeLibrary-Package
 
-          # add in a failure and ensure the test now fails
+          # add in an assertion failure to ensure the test now fails
           echo 'extension SomeLibraryTests { func testFailure() { XCTAssertEqual(1, 2) } }' >> Tests/SomeLibraryTests/SomeLibraryTests.swift
 
           xcodebuild test -skipPackagePluginValidation -sdk "macosx" -destination "platform=macosx" -scheme SomeLibrary-Package && false || true
 
+          brew install tree || true
+          tree -l -I build
 
