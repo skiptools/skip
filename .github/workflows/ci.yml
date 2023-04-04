@@ -22,8 +22,8 @@ jobs:
           echo 'package.dependencies += [.package(url: "https://github.com/skiptools/skip", from: "0.0.0")]' >> Package.swift
           echo 'package.dependencies += [.package(url: "https://github.com/skiptools/skiphub", from: "0.0.0")]' >> Package.swift
 
-          #swift package plugin --allow-writing-to-package-directory skip-init
-          echo yes | swift package plugin skip-init
+          #echo yes | swift package plugin skip-init
+          swift package plugin --allow-writing-to-package-directory skip-init
 
           # the artifact tool should be downloaded locally
           ./.build/artifacts/skip/skiptool.artifactbundle/skiptool version
