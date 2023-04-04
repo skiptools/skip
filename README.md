@@ -2,15 +2,21 @@ The `skip` plug-in for Xcode transpiles Swift targets into Kotlin projects.
 
 ## Quick Start
 
-Add the following two lines at the end of your `Package.swift` file:
+To add the Skip transpiler plugin and core library support to a Swift library
+project, add the following lines at the end of the `Package.swift` file:
 
 ```
-package.dependencies += [.package(url: "https://github.com/skiptools/skip.git", from: "0.3.11")]
-package.dependencies += [.package(url: "https://github.com/skiptools/skip.git", from: "0.3.11")]
+package.dependencies += [.package(url: "https://github.com/skiptools/skip.git", from: "0.0.0")]
+package.dependencies += [.package(url: "https://github.com/skiptools/skip.git", from: "0.0.0")]
 ```
 
-Command-click your package in the Xcode Project Navigator
-and select "Hello Skip" from the context menu (or run the
-command `swift package plugin skip-init` from the terminal
-in the project directory).
+Select your package's root folder in the Xcode Project Navigator
+and select "Hello Skip" from the "skip" section of the package's
+context menu.
+Alternatively, from the terminal your can run the command 
+`swift package plugin skip-init` from the project directory. 
 
+When prompted to select the targets, you can choose which individual
+targets should have transpilation peer targets created
+You will be prompted with a description of the plugin and
+request permission to save files to the project directory.

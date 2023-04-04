@@ -41,16 +41,18 @@ jobs:
         run: |
           swift package init --type library --name SomeLibrary
 
-          swift test
+          echo 'package.dependencies += [.package(url: "https://github.com/skiptools/skip.git", from: "0.0.0")]' >> Package.swift
+          echo 'package.dependencies += [.package(url: "https://github.com/skiptools/skiphub.git", from: "0.0.0")]' >> Package.swift
 
-          cat >> Package.swift << EOF
-          package.dependencies += [.package(url: "https://github.com/skiptools/skip.git", from: "0.0.0")]
-          package.dependencies += [.package(url: "https://github.com/skiptools/skiphub.git", from: "0.0.0")]
-          EOF
-
-          swift package plugin --allow-writing-to-package-directory skip-init || true
+          swift package plugin --allow-writing-to-package-directory skip-init
 
           cat Package.swift
           
           xcodebuild test -skipPackagePluginValidation -sdk "macosx" -destination "platform=macosx" -scheme SomeLibrary-Package
+
+          # add in a failure and ensure the test now fails
+          echo 'extension SomeLibraryTests { func testFailure() { XCTAssertEqual(1, 2) } }' >> Tests/SomeLibraryTests/SomeLibraryTests.swift
+
+          xcodebuild test -skipPackagePluginValidation -sdk "macosx" -destination "platform=macosx" -scheme SomeLibrary-Package && false || true
+
 
