@@ -17,6 +17,6 @@ Alternatively, from the terminal your can run the command
 `swift package plugin skip-init` from the project directory. 
 
 When prompted to select the targets, you can choose which individual
-targets should have transpilation peer targets created
-You will be prompted with a description of the plugin and
+targets should have transpilation peer targets created for them.
+You will then be prompted with a description of the plugin and
 request permission to save files to the project directory.

@@ -33,7 +33,11 @@ jobs:
     steps:
       - name: Create New Skip Package
         run: |
-          swift package init --type library --name SomeLibrary
+          mkdir /tmp/SomeLibrary
+          cd /tmp/SomeLibrary
+          swift package init 
+          #--type library --name SomeLibrary
+
           cat Package.swift
           swift test
 
