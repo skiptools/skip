@@ -47,6 +47,8 @@ jobs:
           EOF
 
           swift package plugin --allow-writing-to-package-directory skip-init
+
+          cat Package.swift
           
           xcodebuild test -skipPackagePluginValidation -sdk "macosx" -destination "platform=macosx" -scheme SomeLibrary-Package
 
