@@ -19,9 +19,8 @@ jobs:
           cd /tmp/ExampleSkipProject
           swift package init
           swift test
-          echo 'package.dependencies += [.package(url: "https://github.com/skiptools/skip.git", from: "0.0.0")]' >> Package.swift
+          echo 'package.dependencies += [.package(url: "https://github.com/skiptools/skip", from: "0.0.0")]' >> Package.swift
 
-          # the failure seems to not affect the swift package command, though…
           swift package --disable-sandbox --allow-writing-to-package-directory skip version
 
           # also try to run the tool directly from the cache
@@ -38,11 +37,17 @@ jobs:
           cat Package.swift
           swift test
 
-          echo 'package.dependencies += [.package(url: "https://github.com/skiptools/skip.git", from: "0.0.0")]' >> Package.swift
-          swift package --allow-writing-to-package-directory skip version
+          echo 'package.dependencies += [.package(url: "https://github.com/skiptools/skip", from: "0.0.0")]' >> Package.swift
+          cat Package.swift
+          swift package --disable-sandbox --allow-writing-to-package-directory skip version
 
-          echo 'package.dependencies += [.package(url: "https://github.com/skiptools/skiphub.git", from: "0.0.0")]' >> Package.swift
-          swift package --allow-writing-to-package-directory skip version
+          echo 'package.dependencies += [.package(url: "https://github.com/skiptools/skiphub", from: "0.0.0")]' >> Package.swift
+          cat Package.swift
+          swift package --allow-writing-to-package-directory skip version || echo SKIP VERSION 2 FAILED
+
+          swift package resolve
+          cat Package.resolved | jq .
+
           echo "Creating scaffold" 
           swift package plugin --allow-writing-to-package-directory skip-init
 
