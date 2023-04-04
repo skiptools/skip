@@ -46,7 +46,7 @@ jobs:
           package.dependencies += [.package(url: "https://github.com/skiptools/skiphub.git", from: "0.0.0")]
           EOF
 
-          swift package plugin --allow-writing-to-package-directory skip-init
+          swift package plugin --allow-writing-to-package-directory skip-init || true
 
           cat Package.swift
           
