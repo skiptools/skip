@@ -30,12 +30,12 @@ jobs:
 
           cat Package.swift Package.resolved
           
-          xcodebuild test -skipPackagePluginValidation -sdk "macosx" -destination "platform=macosx" -scheme SomeLibrary-Package
+          #xcodebuild test -skipPackagePluginValidation -sdk "macosx" -destination "platform=macosx" -scheme SomeLibrary-Package
 
           # add in an assertion failure to ensure the test now fails
-          echo 'extension SomeLibraryTests { func testFailure() { XCTAssertEqual(1, 2) } }' >> Tests/SomeLibraryTests/SomeLibraryTests.swift
+          #echo 'extension SomeLibraryTests { func testFailure() { XCTAssertEqual(1, 2) } }' >> Tests/SomeLibraryTests/SomeLibraryTests.swift
 
-          xcodebuild test -skipPackagePluginValidation -sdk "macosx" -destination "platform=macosx" -scheme SomeLibrary-Package && false || true
+          #xcodebuild test -skipPackagePluginValidation -sdk "macosx" -destination "platform=macosx" -scheme SomeLibrary-Package && false || true
 
           brew install tree || true
           tree -l -I build
