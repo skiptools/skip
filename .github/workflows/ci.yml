@@ -6,6 +6,9 @@ on:
   schedule:
     - cron: '0 3,9,15,21 * * *'
 
+env:
+  DEVELOPER_DIR: /Applications/Xcode_14.2.app/Contents/Developer
+
 jobs:
   skip-init:
     # needs: https://github.com/actions/runner-images/issues/6426
@@ -32,8 +35,8 @@ jobs:
 
           cat Package.swift Package.resolved
           
-          xcodebuild test -skipPackagePluginValidation -sdk "macosx" -destination "platform=macosx" -scheme SomeLibraryKt
-          #xcodebuild test -skipPackagePluginValidation -sdk "macosx" -destination "platform=macosx" -scheme SomeLibrary-Package
+          #xcodebuild test -skipPackagePluginValidation -sdk "macosx" -destination "platform=macosx" -scheme SomeLibraryKt
+          xcodebuild test -skipPackagePluginValidation -sdk "macosx" -destination "platform=macosx" -scheme SomeLibrary-Package
 
           # add in an assertion failure to ensure the test now fails
           #echo 'extension SomeLibraryTests { func testFailure() { XCTAssertEqual(1, 2) } }' >> Tests/SomeLibraryTests/SomeLibraryTests.swift
