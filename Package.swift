@@ -23,19 +23,19 @@ let package = Package(
                     intent: .custom(verb: "skip-init",  description: "Show an introduction to Skip and how it can be added to this project."),
                     permissions: [
                         .writeToPackageDirectory(reason: """
-                        Skip: Swift Kotlin Interop”
+                        Skip: Swift Kotlin Interop (Technology Preview)”
 
-                        This plugin will setup the necessary files and folders to transpile your Swift SPM package into a Kotlin Gradle project.
+                        This operation will setup the necessary files and folders to transpile your Swift SPM package into a Kotlin Gradle project.
 
-                        • A “Skip” folder will be created at the root of your package with links to the generated Kotlin sources.
+                        1. A “Skip” folder will be created at the root of your package with a skip.yml configuration file and links to the eventual build output of your project.
 
-                        • A “TargetNameKt” peer target will be created for each library target in the package, which will use the Skip plugin to transpile the Swift code into Kotlin.
+                        2. The Package.swift file will be modified to add a “TargetNameKt” peer target for each pure-Swift library target, which will use the Skip transpile plugin to generate the Kotlin for its Swift counterpart.
 
-                        • Test cases that inherit `XCTest` will be transpiled to JUnit tests, and the Kotlin test cases can be run from the generated Gradle build files once it is manually installed with the command: `brew install gradle`
+                        3. Test cases that inherit «XCTest» will be transpiled to «JUnit» tests, and the Kotlin test cases can be run from the generated Gradle build files once it is manually installed with the homebrew command: `brew install gradle`
 
-                        • All Swift dependencies, either local or external, must each have their own Kt peer targets configured. Only Swift source targets are supported: no C, C++, Objective-C or binary targets will be transpiled.
+                        4. A “Skip/README.md” file will be created with the results of this command. Please continue reading this file for further instructions once this command completes.
 
-                        • A “Skip/README.md” file will be created with the results of this command. Please continue reading this file for further instructions once it has been generated.
+                        You should ensure your project folder is backed up before continuing. By proceeding you agree to abide by the terms and conditions of the Skip license.
 
                         “Happy Skipping!
                         """)
@@ -43,14 +43,14 @@ let package = Package(
                 dependencies: ["skiptool"],
                 path: "Plugins/HelloSkip"),
 
-        .plugin(name: "Run Kotlin Tests",
-                capability: .command(
-                    intent: .custom(verb: "skip-test",  description: "Add Kotlin Targets to the current Package.swift"),
-                    permissions: [
-                        .writeToPackageDirectory(reason: "Skip needs to create and update the Skip folder in the project."),
-                    ]),
-                dependencies: ["skiptool"],
-                path: "Plugins/RunGradleTests"),
+        //.plugin(name: "Run Kotlin Tests",
+        //        capability: .command(
+        //            intent: .custom(verb: "skip-test",  description: "Add Kotlin Targets to the current Package.swift"),
+        //            permissions: [
+        //                .writeToPackageDirectory(reason: "Skip needs to create and update the Skip folder in the project."),
+        //            ]),
+        //        dependencies: ["skiptool"],
+        //        path: "Plugins/RunGradleTests"),
 
         .plugin(name: "Skip Custom Command",
                 capability: .command(
@@ -61,14 +61,14 @@ let package = Package(
                 dependencies: ["skiptool"],
                 path: "Plugins/SkipCommand"),
 
-        .plugin(name: "Synchronize Gradle Project",
-                capability: .command(
-                    intent: .custom(verb: "skip-sync",  description: "Create local links to the transpiled gradle project(s)"),
-                    permissions: [
-                        .writeToPackageDirectory(reason: "Skip needs to create and update the Skip folder in the project."),
-                    ]),
-                dependencies: ["skiptool"],
-                path: "Plugins/SynchronizeGradle"),
+        //.plugin(name: "Synchronize Gradle Project",
+        //        capability: .command(
+        //            intent: .custom(verb: "skip-sync",  description: "Create local links to the transpiled gradle project(s)"),
+        //            permissions: [
+        //                .writeToPackageDirectory(reason: "Skip needs to create and update the Skip folder in the project."),
+        //            ]),
+        //        dependencies: ["skiptool"],
+        //        path: "Plugins/SynchronizeGradle"),
 
         .plugin(name: "skip-preflight",
                 capability: .buildTool(),
