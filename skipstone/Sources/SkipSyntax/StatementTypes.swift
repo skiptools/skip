@@ -930,8 +930,7 @@ class TypeDeclaration: Statement {
     private(set) var generics: Generics
     let members: [Statement]
     var signature: TypeSignature {
-        //~~~ How do we want to treat generics?
-        return _signature ?? TypeSignature.for(name: name, genericTypes: generics.entries.map { .named($0.name, []) })
+        return _signature ?? TypeSignature.for(name: name, genericTypes: generics.entries.map(\.namedType))
     }
     private var _signature: TypeSignature?
 

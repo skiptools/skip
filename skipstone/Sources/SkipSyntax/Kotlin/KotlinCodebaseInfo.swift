@@ -17,21 +17,6 @@ extension CodebaseInfo.Context {
         return typeInfos(forNamed: type).compactMap { $0.languageAdditions as? ExtensionDeclaration }
     }
 
-    /// Whether the given type is a class, struct, etc, optionally limiting results to this module.
-    func declarationType(of type: TypeSignature, mustBeInModule: Bool) -> StatementType? {
-        assert(global.kotlin != nil)
-        guard let typeInfo = primaryTypeInfo(forNamed: type) else {
-            guard let typealiasInfo = crossPlatformTypealias(forUnknownType: type) else {
-                return nil
-            }
-            return !mustBeInModule || typealiasInfo.moduleName == global.moduleName ? .classDeclaration : nil
-        }
-        if mustBeInModule && typeInfo.moduleName != global.moduleName {
-            return nil
-        }
-        return typeInfo.declarationType
-    }
-
     /// The signatures of all visible constructors of the given type.
     ///
     /// The type must be concrete - protocol constructors are excluded.
@@ -126,7 +111,7 @@ extension CodebaseInfo.Context {
             let type = type.asOptional(false)
             if case .named = type {
                 // Cross platform typealiases should not be treated as mutable structs
-                return crossPlatformTypealias(forUnknownType: type) == nil
+                return crossPlatformTypealias(forUnknownNamed: type) == nil
             } else if type == .any {
                 return true
             } else {
@@ -164,12 +149,6 @@ extension CodebaseInfo.Context {
         }
         let items = ranked(global.lookup(name: name))
         return items.contains { $0.declarationType == .functionDeclaration && $0.declaringType?.name == owningType?.name }
-    }
-
-    /// Cross platform library code may create typealiases to unknown types. Return any typealias for the given unknown type.
-    private func crossPlatformTypealias(forUnknownType type: TypeSignature) -> CodebaseInfo.TypealiasInfo? {
-        let members = ranked(global.lookup(name: type.name, qualifiedMatch: true))
-        return members.first(where: { $0.declarationType == .typealiasDeclaration }) as? CodebaseInfo.TypealiasInfo
     }
 
     private func hasMember(_ owningType: TypeSignature, name: String, type: TypeSignature?, isStatic: Bool, filterKotlinExtensions: Bool) -> Bool {

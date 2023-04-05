@@ -118,7 +118,7 @@ class KotlinConstructorPlugin: KotlinPlugin {
     }
 
     private func superclass(of classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) -> TypeSignature? {
-        guard let inherits = classDeclaration.inherits.first, translator.codebaseInfo?.declarationType(of: inherits, mustBeInModule: false) == .classDeclaration else {
+        guard let inherits = classDeclaration.inherits.first, translator.codebaseInfo?.declarationType(ofNamed: inherits) == .classDeclaration else {
             return nil
         }
         return inherits

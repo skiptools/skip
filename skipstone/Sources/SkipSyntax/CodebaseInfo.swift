@@ -64,7 +64,7 @@ public class CodebaseInfo: Codable {
     func prepareForUse() {
         isInUse = true
         buildItemsByName() // We use this for lookups in subsequent steps
-        fixupExtensionInfos()
+        fixupGenericsInfo()
         inferVariableTypes()
         addGeneratedConstructors()
         buildItemsByName() // Final mappings after updates
@@ -209,6 +209,27 @@ public class CodebaseInfo: Codable {
         /// Return the type info for the given type's primary declaration, omitting extensions.
         func primaryTypeInfo(forNamed type: TypeSignature) -> TypeInfo? {
             return typeInfos(forNamed: type).first { $0.declarationType != .extensionDeclaration }
+        }
+
+        /// Whether the given type is a class, struct, etc, optionally limiting results to this module.
+        func declarationType(ofNamed type: TypeSignature, unknownTypealiasFallback: StatementType = .classDeclaration, mustBeInModule: Bool = false) -> StatementType? {
+            assert(global.kotlin != nil)
+            guard let typeInfo = primaryTypeInfo(forNamed: type) else {
+                guard let typealiasInfo = crossPlatformTypealias(forUnknownNamed: type) else {
+                    return nil
+                }
+                return !mustBeInModule || typealiasInfo.moduleName == global.moduleName ? unknownTypealiasFallback : nil
+            }
+            if mustBeInModule && typeInfo.moduleName != global.moduleName {
+                return nil
+            }
+            return typeInfo.declarationType
+        }
+
+        /// Cross platform library code may create typealiases to unknown types. Return any typealias for the given unknown type.
+        func crossPlatformTypealias(forUnknownNamed type: TypeSignature) -> CodebaseInfo.TypealiasInfo? {
+            let members = ranked(global.lookup(name: type.name, qualifiedMatch: true))
+            return members.first(where: { $0.declarationType == .typealiasDeclaration }) as? CodebaseInfo.TypealiasInfo
         }
         
         /// Return the type of the given identifier.
@@ -596,7 +617,21 @@ public class CodebaseInfo: Codable {
         itemsByName[item.name] = itemsWithName
     }
 
-    private func fixupExtensionInfos() {
+    private func fixupGenericsInfo() {
+        // Update protocol info to add any generics to inherited protocols and collect their generic info in the generics object
+        for protocolInfo in rootTypes where protocolInfo.declarationType == .protocolDeclaration {
+            var protocolGenerics = Generics()
+            protocolInfo.inherits = protocolInfo.inherits.map { inherit in
+                guard let inheritProtocolGenerics = primaryTypeInfo(forNamed: inherit)?.generics else {
+                    return inherit
+                }
+                let inheritGenerics = inheritProtocolGenerics.merge(overrides: protocolInfo.generics)
+                protocolGenerics = protocolGenerics.merge(overrides: inheritProtocolGenerics, addNew: true)
+                return inherit.withGenerics(inheritGenerics.entries.map { $0.constrainedType(ifEqual: true) })
+            }
+            protocolInfo.generics = protocolGenerics.merge(overrides: protocolInfo.generics, addNew: true).filterWhereEqual()
+            protocolInfo.signature = protocolInfo.signature.withGenerics(protocolInfo.generics.entries.map(\.namedType))
+        }
         // Update extension info so that extensions have the same signature as the extended type, moving any generic info to the generics object
         for extensionInfo in rootTypes where extensionInfo.declarationType == .extensionDeclaration {
             guard let primaryInfo = primaryTypeInfo(forNamed: extensionInfo.signature) else {

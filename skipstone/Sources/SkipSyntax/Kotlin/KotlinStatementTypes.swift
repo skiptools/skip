@@ -969,7 +969,7 @@ struct KotlinExtensionDeclaration {
     static func translate(statement: ExtensionDeclaration, translator: KotlinTranslator) -> [KotlinStatement] {
         // If the extension can't move into its extended type or is on a type outside this module, use Kotlin extension
         // functions. Otherwise do not translate the extension - instead we'll move its members into the extended type
-        guard !statement.canMoveIntoExtendedType || translator.codebaseInfo?.declarationType(of: statement.extends, mustBeInModule: true) == nil else {
+        guard !statement.canMoveIntoExtendedType || translator.codebaseInfo?.declarationType(ofNamed: statement.extends, mustBeInModule: true) == nil else {
             return []
         }
 
@@ -1063,7 +1063,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         var owningDeclarationType: StatementType? = nil
         if let owningTypeDeclaration = statement.owningTypeDeclaration, owningTypeDeclaration === statement.parent {
             // Use codebaseInfo rather than .type directly so that extension API is also handled correctly
-            owningDeclarationType = translator.codebaseInfo?.declarationType(of: owningTypeDeclaration.signature, mustBeInModule: false) ?? owningTypeDeclaration.type
+            owningDeclarationType = translator.codebaseInfo?.declarationType(ofNamed: owningTypeDeclaration.signature) ?? owningTypeDeclaration.type
             if statement.type == .initDeclaration {
                 kstatement.isOpen = false
                 kstatement.modifiers.isOverride = false // Kotlin does not override constructors
@@ -1269,7 +1269,7 @@ class KotlinImportDeclaration: KotlinStatement {
 class KotlinInterfaceDeclaration: KotlinStatement {
     var name: String
     var signature: TypeSignature
-    var inherits: [(TypeSignature, Generics)] = []
+    var inherits: [TypeSignature] = []
     var modifiers = Modifiers()
     var generics = Generics()
     var members: [KotlinStatement] = []
@@ -1277,13 +1277,18 @@ class KotlinInterfaceDeclaration: KotlinStatement {
     static func translate(statement: TypeDeclaration, translator: KotlinTranslator) -> KotlinInterfaceDeclaration {
         let kstatement = KotlinInterfaceDeclaration(statement: statement)
         kstatement.modifiers = statement.modifiers
-        kstatement.inherits = statement.inherits.map { ($0, Generics()) }
+        kstatement.inherits = statement.inherits
         kstatement.generics = statement.generics
         kstatement.members = statement.members.flatMap { translator.translateStatement($0) }
-        kstatement.inherits.forEach { $0.0.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
-        guard let codebaseInfo = translator.codebaseInfo else {
+        kstatement.inherits.forEach { $0.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
+        guard let codebaseInfo = translator.codebaseInfo, let typeInfo = codebaseInfo.primaryTypeInfo(forNamed: statement.signature) else {
             return kstatement
         }
+
+        // Type info contains full resolved generics
+        kstatement.signature = typeInfo.signature
+        kstatement.inherits = typeInfo.inherits
+        kstatement.generics = typeInfo.generics
 
         // Move extensions of this type into the type itself rather than use Kotlin extension functions.
         // This allows us to replace API declarations with implementations. Also Kotlin extension functions
@@ -1291,7 +1296,7 @@ class KotlinInterfaceDeclaration: KotlinStatement {
         var originalMembers = kstatement.members
         var newMembers: [KotlinStatement] = []
         for ext in codebaseInfo.extensions(of: statement.signature) where ext.canMoveIntoExtendedType {
-            kstatement.inherits += ext.inherits.map { ($0, Generics()) }
+            kstatement.inherits += ext.inherits
             for extMember in ext.members.flatMap({ translator.translateStatement($0) }) {
                 if !replaceMember(in: &originalMembers, with: extMember) {
                     newMembers.append(extMember)
@@ -1299,18 +1304,6 @@ class KotlinInterfaceDeclaration: KotlinStatement {
             }
         }
         kstatement.members = originalMembers + newMembers
-
-        // Map correct generic constraints onto every declared protocol
-        var kstatementGenerics = Generics()
-        kstatement.inherits = kstatement.inherits.map { (inherit, generics) in
-            guard let inheritGenerics = codebaseInfo.primaryTypeInfo(forNamed: inherit)?.generics else {
-                return (inherit, generics)
-            }
-            let resultGenerics = inheritGenerics.merge(overrides: statement.generics)
-            kstatementGenerics = kstatementGenerics.merge(overrides: inheritGenerics, addNew: true)
-            return (inherit.withGenerics([]), resultGenerics)
-        }
-        kstatement.generics = kstatementGenerics.merge(overrides: statement.generics, addNew: true).filterWhereEqual()
         return kstatement
     }
 
@@ -1364,14 +1357,7 @@ class KotlinInterfaceDeclaration: KotlinStatement {
             output.append("interface ").append(name)
             generics.append(to: output, indentation: indentation)
             if !inherits.isEmpty {
-                output.append(": ")
-                for (index, inherit) in inherits.enumerated() {
-                    output.append(inherit.0.kotlin)
-                    inherit.1.append(to: output, indentation: indentation)
-                    if index != inherits.count - 1 {
-                        output.append(", ")
-                    }
-                }
+                output.append(": ").append(inherits.map(\.kotlin).joined(separator: ", "))
             }
             generics.appendWhere(to: output, indentation: indentation)
         }
@@ -1470,7 +1456,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         var owningDeclarationType: StatementType? = nil
         if let owningTypeDeclaration = statement.owningTypeDeclaration, owningTypeDeclaration === statement.parent {
             // Use codebaseInfo rather than .type directly so that extension API is also handled correctly
-            owningDeclarationType = translator.codebaseInfo?.declarationType(of: owningTypeDeclaration.signature, mustBeInModule: false) ?? owningTypeDeclaration.type
+            owningDeclarationType = translator.codebaseInfo?.declarationType(ofNamed: owningTypeDeclaration.signature) ?? owningTypeDeclaration.type
             kstatement.isProperty = true
             if owningDeclarationType == .protocolDeclaration {
                 // Kotlin uses default public visibility on all interface members

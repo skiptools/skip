@@ -424,19 +424,19 @@ struct Generics: Equatable, Codable {
 
     /// Return the constrained type of the given generic parameter.
     ///
-    /// - Returns: `.none` if the parameter is not found, `.composition(types)` for multiple constraints, `.any` for a recognized parameter name without constraints
-    func constrainedType(of name: String) -> TypeSignature {
-        return entries.first(where: { $0.name == name })?.constrainedType ?? .none
+    /// - Returns: `.none` if the parameter is not found, `.composition(types)` for multiple constraints. If there are no constraints, returns itself as a `.named` type or the given fallback.
+    func constrainedType(of name: String, ifEqual: Bool = false, fallback: TypeSignature? = nil) -> TypeSignature {
+        return entries.first(where: { $0.name == name })?.constrainedType(ifEqual: ifEqual, fallback: fallback) ?? .none
     }
 
     /// Return the constrained type of the given generic parameter.
     ///
     /// - Seealso: `type(of: String)`
-    func constrainedType(of signature: TypeSignature) -> TypeSignature {
+    func constrainedType(of signature: TypeSignature, ifEqual: Bool = false, fallback: TypeSignature? = nil) -> TypeSignature {
         guard case .named(let name, let genericTypes) = signature, genericTypes.isEmpty else {
-            return .none
+            return signature
         }
-        return constrainedType(of: name)
+        return constrainedType(of: name, ifEqual: ifEqual, fallback: fallback)
     }
 
     /// Merge the given constraints with these, allowing the given constraints to override our own.
@@ -505,15 +505,22 @@ struct Generic: Equatable, Codable {
     var inherits: [TypeSignature] = []
     var whereEqual: TypeSignature?
 
+    /// Return this generic as a named type, e.g. `.named(T, [])`.
+    var namedType: TypeSignature {
+        return .named(name, [])
+    }
+
     /// The constrained type of this generic.
     ///
-    /// - Returns: `.composition(types)` for multiple constraints, `.any` for no constraints.
-    var constrainedType: TypeSignature {
+    /// - Parameters:
+    ///   - whereEqual: If true, only equality constraints are considered.
+    /// - Returns: `.composition(types)` for multiple constraints. If there are no constraints, returns itself as a `.named` type or the given fallback.
+    func constrainedType(ifEqual: Bool = false, fallback: TypeSignature? = nil) -> TypeSignature {
         if let whereEqual {
             return whereEqual
         }
-        if inherits.isEmpty {
-            return .any
+        if ifEqual || inherits.isEmpty {
+            return fallback ?? .named(name, [])
         } else if inherits.count == 1 {
             return inherits[0]
         } else {
