@@ -19,6 +19,8 @@ jobs:
 
           swift package init 
 
+          xcodebuild test -skipPackagePluginValidation -sdk "macosx" -destination "platform=macosx" -scheme SomeLibrary
+
           echo 'package.dependencies += [.package(url: "https://github.com/skiptools/skip", from: "0.0.0")]' >> Package.swift
           echo 'package.dependencies += [.package(url: "https://github.com/skiptools/skiphub", from: "0.0.0")]' >> Package.swift
 
@@ -30,7 +32,8 @@ jobs:
 
           cat Package.swift Package.resolved
           
-          xcodebuild test -skipPackagePluginValidation -sdk "macosx" -destination "platform=macosx" -scheme SomeLibrary-Package
+          xcodebuild test -skipPackagePluginValidation -sdk "macosx" -destination "platform=macosx" -scheme SomeLibraryKt
+          #xcodebuild test -skipPackagePluginValidation -sdk "macosx" -destination "platform=macosx" -scheme SomeLibrary-Package
 
           # add in an assertion failure to ensure the test now fails
           #echo 'extension SomeLibraryTests { func testFailure() { XCTAssertEqual(1, 2) } }' >> Tests/SomeLibraryTests/SomeLibraryTests.swift
