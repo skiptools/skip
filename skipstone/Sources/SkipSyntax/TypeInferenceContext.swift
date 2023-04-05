@@ -1,9 +1,13 @@
 /// Contextual information used in type inference.
 struct TypeInferenceContext {
     private let codebaseInfo: CodebaseInfo.Context?
-    private var typePath: [(TypeDeclaration, Bool)] = []
-    private var blockPath: [[String: TypeSignature]] = [] // Each entry is map of additional identifier bindings
+    private var path: [PathEntry] = []
     private var localIdentifierTypes: [String: TypeSignature] = [:]
+    private struct PathEntry {
+        var typeDeclaration: TypeDeclaration? = nil
+        var isStatic = false
+        var identifiers: [String: TypeSignature] = [:]
+    }
 
     /// Context source.
     let source: Source
@@ -32,10 +36,14 @@ struct TypeInferenceContext {
     /// The type we're expecting to return from the current code block.
     private(set) var expectedReturn: TypeSignature = .none
 
+    /// The current generic constraints.
+    private(set) var generics = Generics()
+
     /// Return a context for evaluating members of the given type.
     func pushing(_ typeDeclaration: TypeDeclaration) -> TypeInferenceContext {
         var context = self
-        context.typePath.append((typeDeclaration, false))
+        context.path.append(PathEntry(typeDeclaration: typeDeclaration))
+        context.generics = context.generics.merge(overrides: typeDeclaration.generics, addNew: true)
         return context
     }
 
@@ -45,11 +53,12 @@ struct TypeInferenceContext {
         let parameterDictionary = functionDeclaration.parameters.reduce(into: [String: TypeSignature]()) { result, parameter in
             result[parameter.internalLabel] = parameter.declaredType
         }
-        context.blockPath.append(parameterDictionary)
         context.expectedReturn = functionDeclaration.returnType
-        if functionDeclaration.modifiers.isStatic, let lastTypePath = context.typePath.last {
-            context.typePath[context.typePath.count - 1] = (lastTypePath.0, true)
+        if functionDeclaration.modifiers.isStatic, let lastTypePathIndex = context.path.lastIndex(where: { $0.typeDeclaration != nil }) {
+            context.path[lastTypePathIndex].isStatic = true
         }
+        context.path.append(PathEntry(identifiers: parameterDictionary))
+        context.generics = context.generics.merge(overrides: functionDeclaration.generics, addNew: true)
         return context
     }
 
@@ -59,7 +68,7 @@ struct TypeInferenceContext {
         let parameterDictionary = closure.parameters.reduce(into: [String: TypeSignature]()) { result, parameter in
             result[parameter.internalLabel] = parameter.declaredType
         }
-        context.blockPath.append(parameterDictionary)
+        context.path.append(PathEntry(identifiers: parameterDictionary))
         context.expectedReturn = closure.returnType
         return context
     }
@@ -70,7 +79,7 @@ struct TypeInferenceContext {
             return self
         }
         var context = self
-        context.blockPath.append(identifiers)
+        context.path.append(PathEntry(identifiers: identifiers))
         return context
     }
 
@@ -110,24 +119,24 @@ struct TypeInferenceContext {
     func identifier(_ name: String) -> TypeSignature {
         // First check local identifiers
         if let identifierType = localIdentifierTypes[name] {
-            return identifierType
+            return identifierType.constrainedTypeWithGenerics(generics)
         }
         // Next check function / closure / block bindings
-        for identifierDictionary in blockPath.reversed() {
-            if let identifierType = identifierDictionary[name] {
-                return identifierType
+        for pathEntry in path.reversed() {
+            if let identifierType = pathEntry.identifiers[name] {
+                return identifierType.constrainedTypeWithGenerics(generics)
             }
         }
         if name == "self" || name == "Self" || name == "super" {
-            guard let (typeDeclaration, isStatic) = typePath.last else {
+            guard let pathEntry = path.last(where: { $0.typeDeclaration != nil }), let typeDeclaration = pathEntry.typeDeclaration else {
                 return .none
             }
             if name == "super" {
-                return typeDeclaration.inherits.first ?? .none
-            } else if name == "Self" || isStatic {
-                return .metaType(typeDeclaration.signature)
+                return typeDeclaration.inherits.first?.constrainedTypeWithGenerics(generics) ?? .none
+            } else if name == "Self" || pathEntry.isStatic {
+                return .metaType(typeDeclaration.signature.constrainedTypeWithGenerics(generics))
             } else {
-                return typeDeclaration.signature
+                return typeDeclaration.signature.constrainedTypeWithGenerics(generics)
             }
         }
 
@@ -135,10 +144,12 @@ struct TypeInferenceContext {
             return .none
         }
 
-        for (typeDeclaration, isStatic) in typePath.reversed() {
-            let signature: TypeSignature = isStatic ? .metaType(typeDeclaration.signature) : typeDeclaration.signature
-            //~~~
-            let type = codebaseInfo.identifierSignature(of: name, inConstrained: signature)
+        for pathEntry in path.reversed() {
+            guard let typeDeclaration = pathEntry.typeDeclaration else {
+                continue
+            }
+            let signature: TypeSignature = pathEntry.isStatic ? .metaType(typeDeclaration.signature) : typeDeclaration.signature
+            let type = codebaseInfo.identifierSignature(of: name, inConstrained: signature.constrainedTypeWithGenerics(generics))
             if type != .none {
                 return type
             }
@@ -151,8 +162,8 @@ struct TypeInferenceContext {
         if localIdentifierTypes.keys.contains(name) {
             return true
         }
-        for identifierDictionary in blockPath.reversed() {
-            if identifierDictionary.keys.contains(name) {
+        for pathEntry in path.reversed() {
+            if pathEntry.identifiers.keys.contains(name) {
                 return true
             }
         }
@@ -164,23 +175,22 @@ struct TypeInferenceContext {
         let type = type.asOptional(false)
         if case .tuple(let labels, let types) = type {
             if let labelIndex = labels.firstIndex(of: name) {
-                return types[labelIndex]
+                return types[labelIndex].constrainedTypeWithGenerics(generics)
             } else if let index = Int(name) {
-                return types[index]
+                return types[index].constrainedTypeWithGenerics(generics)
             }
         }
         if name == "self" || name == "Type" {
             if case .metaType = type {
-                return type
+                return type.constrainedTypeWithGenerics(generics)
             } else {
-                return .metaType(type)
+                return .metaType(type.constrainedTypeWithGenerics(generics))
             }
         }
         guard let codebaseInfo else {
             return .none
         }
-        //~~~
-        return codebaseInfo.identifierSignature(of: name, inConstrained: type)
+        return codebaseInfo.identifierSignature(of: name, inConstrained: type.constrainedTypeWithGenerics(generics))
     }
 
     /// Return the signatures of the functions matching the given parameters.
@@ -190,6 +200,7 @@ struct TypeInferenceContext {
     /// - Parameters:
     ///   - type: The function's owning type if this is a member function, or nil if not.
     func function(_ name: String, in type: TypeSignature?, parameters: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
+        //~~~ CONSTRAIN
         guard let codebaseInfo else {
             return []
         }
@@ -199,8 +210,11 @@ struct TypeInferenceContext {
         }
 
         // Not a known member function. Check functions that can be invoked without a target type
-        for (typeDeclaration, isStatic) in typePath.reversed() {
-            let signature: TypeSignature = isStatic ? .metaType(typeDeclaration.signature) : typeDeclaration.signature
+        for pathEntry in path.reversed() {
+            guard let typeDeclaration = pathEntry.typeDeclaration else {
+                continue
+            }
+            let signature: TypeSignature = pathEntry.isStatic ? .metaType(typeDeclaration.signature) : typeDeclaration.signature
             let results = codebaseInfo.functionSignature(of: name, in: signature, arguments: parameters)
             if !results.isEmpty {
                 return results
@@ -216,6 +230,7 @@ struct TypeInferenceContext {
     /// - Parameters:
     ///   - type: The subscript's owning type.
     func `subscript`(in type: TypeSignature, parameters: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
+        //~~~ CONSTRAIN
         guard let codebaseInfo else {
             return []
         }
@@ -224,6 +239,8 @@ struct TypeInferenceContext {
 
     /// For an operation on two types, return the probable result type.
     func operationResult(_ type1: TypeSignature, _ type2: TypeSignature) -> TypeSignature {
+        let type1 = type1.constrainedTypeWithGenerics(generics)
+        let type2 = type2.constrainedTypeWithGenerics(generics)
         if type1 == type2 {
             return type1
         }

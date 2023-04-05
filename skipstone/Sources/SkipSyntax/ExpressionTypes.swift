@@ -655,7 +655,11 @@ class Identifier: Expression {
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
-        identifierType = context.identifier(name).withGenerics(generics).or(expecting)
+        identifierType = context.identifier(name)
+        if !generics.isEmpty {
+            identifierType = identifierType.withGenerics(generics.map { $0.constrainedTypeWithGenerics(context.generics) })
+        }
+        identifierType = identifierType.or(expecting)
         if !isLocalIdentifier {
             isLocalIdentifier = context.isLocalIdentifier(name)
         }

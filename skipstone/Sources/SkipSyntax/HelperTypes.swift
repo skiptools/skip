@@ -434,7 +434,7 @@ struct Generics: Equatable, Codable {
     /// - Seealso: `type(of: String)`
     func constrainedType(of signature: TypeSignature, ifEqual: Bool = false, fallback: TypeSignature? = nil) -> TypeSignature {
         guard case .named(let name, let genericTypes) = signature, genericTypes.isEmpty else {
-            return signature
+            return .none
         }
         return constrainedType(of: name, ifEqual: ifEqual, fallback: fallback)
     }

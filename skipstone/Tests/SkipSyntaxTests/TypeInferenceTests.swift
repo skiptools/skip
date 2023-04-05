@@ -251,6 +251,54 @@ final class TypeInferenceTests: XCTestCase {
         """)
     }
 
+    func testGenericMemberIdentifier() async throws {
+        try await check(supportingSwift: """
+        class C<T> {
+            var v: T
+        }
+        extension Int {
+            static let myZero = 0
+        }
+        """, swift: """
+        func f(c: C<Int>) -> Bool {
+            return c.v == .myZero
+        }
+        """, kotlin: """
+        internal fun f(c: C<Int>): Boolean {
+            return c.v == Int.myZero
+        }
+        """)
+
+        try await check(supportingSwift: """
+        protocol P: AnyObject {
+            func pfunc() -> Int
+        }
+        extension Int {
+            static let myZero = 0
+        }
+        """, swift: """
+        class C<T: P> {
+            var v: T
+            func f() -> Boolean {
+                return v.pfunc() == .myZero
+            }
+        }
+        """, kotlin: """
+        internal open class C<T> where T: P {
+            internal var v: T
+                get() {
+                    return field.sref({ this.v = it })
+                }
+                set(newValue) {
+                    field = newValue.sref()
+                }
+            internal open fun f(): Boolean {
+                return v.pfunc() == Int.myZero
+            }
+        }
+        """)
+    }
+
     func testGenerics() throws {
         throw XCTSkip("Test all aspects of using generic paramters")
     }
