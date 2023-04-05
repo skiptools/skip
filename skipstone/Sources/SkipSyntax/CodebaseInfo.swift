@@ -619,18 +619,9 @@ public class CodebaseInfo: Codable {
 
     private func fixupGenericsInfo() {
         // Update protocol info to add any generics to inherited protocols and collect their generic info in the generics object
+        var fixedupProtocolNames: Set<String> = []
         for protocolInfo in rootTypes where protocolInfo.declarationType == .protocolDeclaration {
-            var protocolGenerics = Generics()
-            protocolInfo.inherits = protocolInfo.inherits.map { inherit in
-                guard let inheritProtocolGenerics = primaryTypeInfo(forNamed: inherit)?.generics else {
-                    return inherit
-                }
-                let inheritGenerics = inheritProtocolGenerics.merge(overrides: protocolInfo.generics)
-                protocolGenerics = protocolGenerics.merge(overrides: inheritProtocolGenerics, addNew: true)
-                return inherit.withGenerics(inheritGenerics.entries.map { $0.constrainedType(ifEqual: true) })
-            }
-            protocolInfo.generics = protocolGenerics.merge(overrides: protocolInfo.generics, addNew: true).filterWhereEqual()
-            protocolInfo.signature = protocolInfo.signature.withGenerics(protocolInfo.generics.entries.map(\.namedType))
+            fixupProtocolGenericsInfo(protocolInfo, fixedupProtocolNames: &fixedupProtocolNames)
         }
         // Update extension info so that extensions have the same signature as the extended type, moving any generic info to the generics object
         for extensionInfo in rootTypes where extensionInfo.declarationType == .extensionDeclaration {
@@ -640,6 +631,24 @@ public class CodebaseInfo: Codable {
             extensionInfo.generics = primaryInfo.generics.merge(extension: extensionInfo.signature, generics: extensionInfo.generics)
             extensionInfo.signature = primaryInfo.signature
         }
+    }
+
+    private func fixupProtocolGenericsInfo(_ protocolInfo: TypeInfo, fixedupProtocolNames: inout Set<String>) {
+        guard fixedupProtocolNames.insert(protocolInfo.signature.name).inserted else {
+            return
+        }
+        var protocolGenerics = Generics()
+        protocolInfo.inherits = protocolInfo.inherits.map { inherit in
+            guard let inheritInfo = primaryTypeInfo(forNamed: inherit) else {
+                return inherit
+            }
+            fixupProtocolGenericsInfo(inheritInfo, fixedupProtocolNames: &fixedupProtocolNames)
+            let inheritGenerics = inheritInfo.generics.merge(overrides: protocolInfo.generics)
+            protocolGenerics = protocolGenerics.merge(overrides: inheritInfo.generics, addNew: true)
+            return inherit.withGenerics(inheritGenerics.entries.map { $0.constrainedType(ifEqual: true) })
+        }
+        protocolInfo.generics = protocolGenerics.merge(overrides: protocolInfo.generics, addNew: true).filterWhereEqual()
+        protocolInfo.signature = protocolInfo.signature.withGenerics(protocolInfo.generics.entries.map(\.namedType))
     }
 
     private func inferVariableTypes() {
