@@ -1054,6 +1054,7 @@ class TypeDeclaration: Statement {
 class VariableDeclaration: Statement {
     let names: [String?]
     private(set) var declaredType: TypeSignature
+    private(set) var constrainedDeclaredType: TypeSignature
     let isLet: Bool
     let isAsync: Bool
     let isThrows: Bool
@@ -1071,6 +1072,7 @@ class VariableDeclaration: Statement {
     init(names: [String?], declaredType: TypeSignature = .none, isLet: Bool = false, isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), value: Expression?, getter: Accessor<CodeBlock>? = nil, setter: Accessor<CodeBlock>? = nil, willSet: Accessor<CodeBlock>? = nil, didSet: Accessor<CodeBlock>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.names = names
         self.declaredType = declaredType
+        self.constrainedDeclaredType = declaredType
         self.isLet = isLet
         self.isAsync = isAsync
         self.isThrows = isThrows
@@ -1176,6 +1178,7 @@ class VariableDeclaration: Statement {
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        constrainedDeclaredType = declaredType.constrainedTypeWithGenerics(context.generics)
         value?.inferTypes(context: context, expecting: declaredType)
         let type = TypeSignature.for(labels: names, types: variableTypes)
         if let body = getter?.body {

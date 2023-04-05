@@ -343,7 +343,6 @@ final class ConstructorTests: XCTestCase {
     }
 
     func testMemberwiseGenericConstructor() async throws {
-        //~~~ should not be sref()ing U: need to resolve generic upper bounds
         try await check(swift: """
         struct S<T, U: AnyObject> {
             let t: T
@@ -356,9 +355,6 @@ final class ConstructorTests: XCTestCase {
                     return field.sref()
                 }
             internal val u: U
-                get() {
-                    return field.sref()
-                }
 
             constructor(t: T, u: U) {
                 this.t = t

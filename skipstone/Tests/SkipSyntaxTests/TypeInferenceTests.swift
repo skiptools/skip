@@ -286,12 +286,6 @@ final class TypeInferenceTests: XCTestCase {
         """, kotlin: """
         internal open class C<T> where T: P {
             internal var v: T
-                get() {
-                    return field.sref({ this.v = it })
-                }
-                set(newValue) {
-                    field = newValue.sref()
-                }
             internal open fun f(): Boolean {
                 return v.pfunc() == Int.myZero
             }

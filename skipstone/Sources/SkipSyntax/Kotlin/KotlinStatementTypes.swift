@@ -1480,7 +1480,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
 
         kstatement.isReadOnly = statement.isLet || (statement.getter != nil && statement.setter == nil)
         if kstatement.declaredType != .none {
-            kstatement.mayBeSharedMutableStruct = kstatement.declaredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
+            kstatement.mayBeSharedMutableStruct = statement.constrainedDeclaredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
         } else if let kvalue = kstatement.value {
             kstatement.mayBeSharedMutableStruct = kvalue.mayBeSharedMutableStructExpression(orType: true)
         } else {
