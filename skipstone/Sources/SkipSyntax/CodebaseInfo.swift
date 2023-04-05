@@ -246,25 +246,12 @@ public class CodebaseInfo: Codable {
                 return .none
             }
             let type = topRanked.signature
-            return topRanked.declarationType == .variableDeclaration || topRanked.declarationType == .enumCaseDeclaration ? type : .metaType(type)
+            return type.asMetaType(topRanked.declarationType != .variableDeclaration && topRanked.declarationType != .enumCaseDeclaration)
         }
         
         /// Return the type of the given member.
         func identifierSignature(of member: String, inConstrained type: TypeSignature) -> TypeSignature {
-            if case .optional = type {
-                let type = type.asOptional(false)
-                let result = identifierSignature(of: member, inNonOptionalConstrained: type)
-                if case .optional = result {
-                    return result
-                } else {
-                    return .optional(result)
-                }
-            } else {
-                return identifierSignature(of: member, inNonOptionalConstrained: type)
-            }
-        }
-
-        private func identifierSignature(of member: String, inNonOptionalConstrained type: TypeSignature) -> TypeSignature {
+            var type = type.asOptional(false)
             if case .tuple(let labels, let types) = type {
                 for (index, label) in labels.enumerated() {
                     if member == label || member == "\(index)" {
@@ -273,16 +260,12 @@ public class CodebaseInfo: Codable {
                 }
                 return .none
             }
-            var type = type
-            var isStatic = false
-            if case .metaType(let base) = type {
-                type = base
-                isStatic = true
-            }
+            let isStatic = type.isMetaType
+            type = type.asMetaType(false)
             for typeInfo in typeInfos(forNamed: type) {
-                let type = identifierSignature(of: member, in: typeInfo, constrainedGenerics: type.generics, isStatic: isStatic)
-                if type != .none {
-                    return type
+                let signature = identifierSignature(of: member, in: typeInfo, constrainedGenerics: type.generics, isStatic: isStatic)
+                if signature != .none {
+                    return signature
                 }
             }
             return .none
@@ -315,7 +298,7 @@ public class CodebaseInfo: Codable {
         /// Return the signatures of the possible member functions being called with the given arguments.
         ///
         /// This function also works for the creation of an enum case with associated values.
-        func functionSignature(of name: String, in type: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
+        func functionSignature(of name: String, inConstrained type: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
             var type = type.asOptional(false)
             if case .tuple(let labels, let types) = type {
                 for (index, label) in labels.enumerated() {
@@ -326,15 +309,12 @@ public class CodebaseInfo: Codable {
                 }
                 return []
             }
-            var isStatic = false
-            if case .metaType(let base) = type {
-                type = base
-                isStatic = true
-            }
+            let isStatic = type.isMetaType
+            type = type.asMetaType(false)
 
             var candidates: Set<FunctionCandidate> = []
             for typeInfo in typeInfos(forNamed: type) {
-                functionCandidates(for: name, in: typeInfo, arguments: arguments, isStatic: isStatic).forEach { candidates.insert($0) }
+                functionCandidates(for: name, in: typeInfo, constrainedGenerics: type.generics, arguments: arguments, isStatic: isStatic).forEach { candidates.insert($0) }
             }
             let sortedCandidates = candidates.sorted { $0.score > $1.score }
             guard let topCandidate = sortedCandidates.first else {
@@ -345,22 +325,19 @@ public class CodebaseInfo: Codable {
         }
         
         /// Return the signatures of the possible subscripts being called with the given arguments.
-        func subscriptSignature(in type: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
+        func subscriptSignature(inConstrained type: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
             var type = type.asOptional(false)
             if case .array(let elementType) = type, arguments.count == 1 {
                 return [.function([TypeSignature.Parameter(type: .int)], elementType)]
             } else if case .dictionary(let keyType, let valueType) = type, arguments.count == 1 {
                 return [.function([TypeSignature.Parameter(type: keyType)], valueType)]
             }
-            var isStatic = false
-            if case .metaType(let base) = type {
-                type = base
-                isStatic = true
-            }
+            let isStatic = type.isMetaType
+            type = type.asMetaType(false)
 
             var candidates: Set<FunctionCandidate> = []
             for typeInfo in typeInfos(forNamed: type) {
-                functionCandidates(for: "subscript", in: typeInfo, arguments: arguments, isStatic: isStatic).forEach { candidates.insert($0) }
+                functionCandidates(for: "subscript", in: typeInfo, constrainedGenerics: type.generics, arguments: arguments, isStatic: isStatic).forEach { candidates.insert($0) }
             }
             let sortedCandidates = candidates.sorted { $0.score > $1.score }
             guard let topCandidate = sortedCandidates.first else {
@@ -371,10 +348,10 @@ public class CodebaseInfo: Codable {
         }
         
         /// Return the associated values of the given enum case.
-        func associatedValueSignatures(of member: String, in type: TypeSignature) -> [TypeSignature.Parameter] {
+        func associatedValueSignatures(of member: String, inConstrained type: TypeSignature) -> [TypeSignature.Parameter] {
             let type = type.asOptional(false)
             for typeInfo in typeInfos(forNamed: type) {
-                if let types = associatedValueSignatures(of: member, in: typeInfo) {
+                if let types = associatedValueSignatures(of: member, in: typeInfo, constrainedGenerics: type.generics) {
                     return types
                 }
             }
@@ -391,7 +368,7 @@ public class CodebaseInfo: Codable {
                 if memberInfo.declarationType == .enumCaseDeclaration {
                     return typeInfo.signature.mappingGenerics(to: constrainedGenerics)
                 } else if memberInfo is TypeInfo || memberInfo.declarationType == .typealiasDeclaration {
-                    return .metaType(memberInfo.signature.mappingGenerics(from: typeInfo.signature.generics, to: constrainedGenerics))
+                    return memberInfo.signature.mappingGenerics(from: typeInfo.signature.generics, to: constrainedGenerics).asMetaType(true)
                 } else {
                     return memberInfo.signature.mappingGenerics(from: typeInfo.signature.generics, to: constrainedGenerics)
                 }
@@ -410,17 +387,17 @@ public class CodebaseInfo: Codable {
         }
 
         /// - Note: Returns unsorted, un-deduped results.
-        private func functionCandidates(for name: String, in typeInfo: TypeInfo, arguments: [LabeledValue<TypeSignature>], isStatic: Bool) -> [FunctionCandidate] {
+        private func functionCandidates(for name: String, in typeInfo: TypeInfo, constrainedGenerics: [TypeSignature], arguments: [LabeledValue<TypeSignature>], isStatic: Bool) -> [FunctionCandidate] {
             var candidates = typeInfo.visibleMembers(context: self).flatMap { (member) -> [FunctionCandidate] in
                 // We allow .init to be used both as a static or instance member
                 guard member.name == name && (member.declarationType == .initDeclaration || member.isStatic == isStatic) else {
                     return []
                 }
                 if let memberTypeInfo = member as? TypeInfo {
-                    return initCandidates(for: [memberTypeInfo], arguments: arguments)
+                    return initCandidates(for: [memberTypeInfo], in: typeInfo, constrainedGenerics: constrainedGenerics, arguments: arguments)
                 } else if member.declarationType == .typealiasDeclaration {
-                    return initCandidates(for: typeInfos(forNamed: member.signature), arguments: arguments)
-                } else if let candidate = matchFunction(member, arguments: arguments) {
+                    return initCandidates(for: typeInfos(forNamed: member.signature), in: typeInfo, constrainedGenerics: constrainedGenerics, arguments: arguments)
+                } else if let candidate = matchFunction(member, in: typeInfo, constrainedGenerics: constrainedGenerics, arguments: arguments) {
                     return [candidate]
                 } else {
                     return []
@@ -428,18 +405,20 @@ public class CodebaseInfo: Codable {
             }
             for inherits in typeInfo.inherits {
                 for inheritsInfo in typeInfos(forNamed: inherits) {
-                    candidates += functionCandidates(for: name, in: inheritsInfo, arguments: arguments, isStatic: isStatic)
+                    let inheritsSignature = inheritsInfo.signature(forInheritsDeclaration: inherits, in: typeInfo, codebaseInfo: global)
+                    let inheritsConstraints = inheritsSignature.mappingGenerics(from: typeInfo.signature.generics, to: constrainedGenerics).generics
+                    candidates += functionCandidates(for: name, in: inheritsInfo, constrainedGenerics: inheritsConstraints, arguments: arguments, isStatic: isStatic)
                 }
             }
             return candidates
         }
 
         /// - Note: Returns unsorted, un-deduped results.
-        private func initCandidates(for typeInfos: [TypeInfo], arguments: [LabeledValue<TypeSignature>]) -> [FunctionCandidate] {
+        private func initCandidates(for typeInfos: [TypeInfo], in contextTypeInfo: TypeInfo? = nil, constrainedGenerics: [TypeSignature] = [], arguments: [LabeledValue<TypeSignature>]) -> [FunctionCandidate] {
             var initSignatures = typeInfos.flatMap { typeInfo in
                 let initInfos = typeInfo.visibleMembers(context: self).filter { $0.declarationType == .initDeclaration }
                 return initInfos.compactMap { (initInfo: CodebaseInfoItem) -> FunctionCandidate? in
-                    return matchFunction(initInfo, arguments: arguments)
+                    return matchFunction(initInfo, in: contextTypeInfo, constrainedGenerics: constrainedGenerics, arguments: arguments)
                 }
             }
             
@@ -452,14 +431,14 @@ public class CodebaseInfo: Codable {
             return initSignatures
         }
         
-        private func associatedValueSignatures(of member: String, in typeInfo: TypeInfo) -> [TypeSignature.Parameter]? {
+        private func associatedValueSignatures(of member: String, in typeInfo: TypeInfo, constrainedGenerics: [TypeSignature]) -> [TypeSignature.Parameter]? {
             guard let memberInfo = typeInfo.visibleMembers(context: self).first(where: { $0.name == member && $0.declarationType == .enumCaseDeclaration }) else {
                 return nil
             }
             guard case .function(let parameters, _) = memberInfo.signature else {
                 return nil
             }
-            return parameters
+            return parameters.map { $0.mappingGenerics(from: typeInfo.signature.generics, to: constrainedGenerics) }
         }
 
         private func matchTuple(_ signature: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> TypeSignature {
@@ -469,12 +448,16 @@ public class CodebaseInfo: Codable {
             return signature
         }
         
-        private func matchFunction(_ item: CodebaseInfoItem, arguments: [LabeledValue<TypeSignature>]) -> FunctionCandidate? {
-            guard case .function(let parameters, let returnType) = item.signature else {
+        private func matchFunction(_ item: CodebaseInfoItem, in typeInfo: TypeInfo? = nil, constrainedGenerics: [TypeSignature] = [], arguments: [LabeledValue<TypeSignature>]) -> FunctionCandidate? {
+            guard case .function(var parameters, var returnType) = item.signature else {
                 return nil
             }
             guard parameters.count >= arguments.count else {
                 return nil
+            }
+            if let typeInfo {
+                parameters = parameters.map { $0.mappingGenerics(from: typeInfo.signature.generics, to: constrainedGenerics) }
+                returnType = returnType.mappingGenerics(from: typeInfo.signature.generics, to: constrainedGenerics)
             }
             
             // Match each argument to a parameter
@@ -948,11 +931,7 @@ public class CodebaseInfo: Codable {
             self.generics = Generics()
             self.isReadOnly = statement.isLet || (statement.getter != nil && statement.setter == nil)
             self.isInitializable = !statement.modifiers.isStatic && statement.getter == nil && (!statement.isLet || statement.value == nil)
-            if case .optional = self.signature {
-                self.hasValue = true
-            } else {
-                self.hasValue = statement.value != nil
-            }
+            self.hasValue = self.signature.isOptional || statement.value != nil
             if !self.signature.isFullySpecified, self.sourceFile != nil {
                 // We'll try to infer the type after gathering all info
                 self.value = statement.value

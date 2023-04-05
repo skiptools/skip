@@ -250,6 +250,44 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         }
     }
 
+    /// Whether this is a meta type.
+    var isMetaType: Bool {
+        if case .metaType = self {
+            return true
+        } else {
+            return false
+        }
+    }
+
+    /// Convert this type to/from a meta type.
+    func asMetaType(_ meta: Bool) -> TypeSignature {
+        switch self {
+        case .metaType(let type):
+            return type.asMetaType(meta)
+        case .none:
+            return .none
+        case .optional(let type):
+            return .optional(type.asMetaType(meta))
+        case .unwrappedOptional(let type):
+            return .unwrappedOptional(type.asMetaType(meta))
+        default:
+            if meta {
+                return .metaType(self)
+            } else {
+                return self
+            }
+        }
+    }
+
+    /// Whether this is an optional type.
+    var isOptional: Bool {
+        if case .optional = self {
+            return true
+        } else {
+            return false
+        }
+    }
+
     /// Convert this type to/from an optional.
     func asOptional(_ optional: Bool) -> TypeSignature {
         switch self {

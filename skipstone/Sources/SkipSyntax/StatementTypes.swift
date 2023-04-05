@@ -774,10 +774,7 @@ class FunctionDeclaration: Statement {
             messages.append(.localFunctionsNotSupported(sourceDerived: self, source: syntaxTree.source))
         }
         if type == .initDeclaration, let owningTypeDeclaration {
-            returnType = owningTypeDeclaration.signature
-            if isOptionalInit {
-                returnType = .optional(returnType)
-            }
+            returnType = owningTypeDeclaration.signature.asOptional(isOptionalInit)
         } else {
             returnType = returnType.qualified(in: self)
         }

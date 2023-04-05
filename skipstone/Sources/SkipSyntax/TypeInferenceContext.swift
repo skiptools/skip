@@ -134,7 +134,7 @@ struct TypeInferenceContext {
             if name == "super" {
                 return typeDeclaration.inherits.first?.constrainedTypeWithGenerics(generics) ?? .none
             } else if name == "Self" || pathEntry.isStatic {
-                return .metaType(typeDeclaration.signature.constrainedTypeWithGenerics(generics))
+                return typeDeclaration.signature.constrainedTypeWithGenerics(generics).asMetaType(true)
             } else {
                 return typeDeclaration.signature.constrainedTypeWithGenerics(generics)
             }
@@ -148,7 +148,7 @@ struct TypeInferenceContext {
             guard let typeDeclaration = pathEntry.typeDeclaration else {
                 continue
             }
-            let signature: TypeSignature = pathEntry.isStatic ? .metaType(typeDeclaration.signature) : typeDeclaration.signature
+            let signature = typeDeclaration.signature.asMetaType(pathEntry.isStatic)
             let type = codebaseInfo.identifierSignature(of: name, inConstrained: signature.constrainedTypeWithGenerics(generics))
             if type != .none {
                 return type
@@ -172,7 +172,15 @@ struct TypeInferenceContext {
 
     /// Return the type of the given member.
     func member(_ name: String, in type: TypeSignature) -> TypeSignature {
-        let type = type.asOptional(false)
+        if type.isOptional {
+            let result = member(name, inNonOptional: type.asOptional(false))
+            return result.asOptional(true)
+        } else {
+            return member(name, inNonOptional: type)
+        }
+    }
+
+    private func member(_ name: String, inNonOptional type: TypeSignature) -> TypeSignature {
         if case .tuple(let labels, let types) = type {
             if let labelIndex = labels.firstIndex(of: name) {
                 return types[labelIndex].constrainedTypeWithGenerics(generics)
@@ -181,11 +189,7 @@ struct TypeInferenceContext {
             }
         }
         if name == "self" || name == "Type" {
-            if case .metaType = type {
-                return type.constrainedTypeWithGenerics(generics)
-            } else {
-                return .metaType(type.constrainedTypeWithGenerics(generics))
-            }
+            return type.constrainedTypeWithGenerics(generics).asMetaType(true)
         }
         guard let codebaseInfo else {
             return .none
@@ -200,13 +204,25 @@ struct TypeInferenceContext {
     /// - Parameters:
     ///   - type: The function's owning type if this is a member function, or nil if not.
     func function(_ name: String, in type: TypeSignature?, parameters: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
-        //~~~ CONSTRAIN
+        if let type, type.isOptional {
+            return function(name, inNonOptional: type.asOptional(false), parameters: parameters).map { signature in
+                guard case .function(let parameters, let returnType) = signature else {
+                    return signature
+                }
+                return .function(parameters, returnType.asOptional(true))
+            }
+        } else {
+            return function(name, inNonOptional: type, parameters: parameters)
+        }
+    }
+
+    private func function(_ name: String, inNonOptional type: TypeSignature?, parameters: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
         guard let codebaseInfo else {
             return []
         }
-        let type = type?.asOptional(false)
+        let constrainedArguments = parameters.map { LabeledValue(label: $0.label, value: $0.value.constrainedTypeWithGenerics(generics)) }
         if let type {
-            return codebaseInfo.functionSignature(of: name, in: type, arguments: parameters)
+            return codebaseInfo.functionSignature(of: name, inConstrained: type.constrainedTypeWithGenerics(generics), arguments: constrainedArguments)
         }
 
         // Not a known member function. Check functions that can be invoked without a target type
@@ -214,13 +230,13 @@ struct TypeInferenceContext {
             guard let typeDeclaration = pathEntry.typeDeclaration else {
                 continue
             }
-            let signature: TypeSignature = pathEntry.isStatic ? .metaType(typeDeclaration.signature) : typeDeclaration.signature
-            let results = codebaseInfo.functionSignature(of: name, in: signature, arguments: parameters)
+            let signature = typeDeclaration.signature.asMetaType(pathEntry.isStatic)
+            let results = codebaseInfo.functionSignature(of: name, inConstrained: signature.constrainedTypeWithGenerics(generics), arguments: constrainedArguments)
             if !results.isEmpty {
                 return results
             }
         }
-        return codebaseInfo.functionSignature(of: name, arguments: parameters)
+        return codebaseInfo.functionSignature(of: name, arguments: constrainedArguments)
     }
 
     /// Return the signatures of the subscripts matching the given parameters.
@@ -230,11 +246,24 @@ struct TypeInferenceContext {
     /// - Parameters:
     ///   - type: The subscript's owning type.
     func `subscript`(in type: TypeSignature, parameters: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
-        //~~~ CONSTRAIN
+        if case .optional = type {
+            return self.subscript(inNonOptional: type.asOptional(false), parameters: parameters).map { signature in
+                guard case .function(let parameters, let returnType) = signature else {
+                    return signature
+                }
+                return .function(parameters, returnType.asOptional(true))
+            }
+        } else {
+            return self.subscript(inNonOptional: type, parameters: parameters)
+        }
+    }
+
+    private func `subscript`(inNonOptional type: TypeSignature, parameters: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
         guard let codebaseInfo else {
             return []
         }
-        return codebaseInfo.subscriptSignature(in: type.asOptional(false), arguments: parameters)
+        let constrainedArguments = parameters.map { LabeledValue(label: $0.label, value: $0.value.constrainedTypeWithGenerics(generics)) }
+        return codebaseInfo.subscriptSignature(inConstrained: type.constrainedTypeWithGenerics(generics), arguments: constrainedArguments)
     }
 
     /// For an operation on two types, return the probable result type.

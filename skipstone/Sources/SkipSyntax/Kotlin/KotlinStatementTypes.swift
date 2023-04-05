@@ -1592,7 +1592,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 output.append(" = ").append(value, indentation: indentation)
             } else {
                 // In Swift an optional var defaults to nil, but not so in Kotlin
-                if (isProperty || isGlobal), case .optional = declaredType, !isLet, getter == nil {
+                if (isProperty || isGlobal), declaredType.isOptional, !isLet, getter == nil {
                     output.append(" = null")
                 }
             }

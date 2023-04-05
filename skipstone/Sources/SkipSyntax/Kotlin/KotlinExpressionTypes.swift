@@ -1022,15 +1022,11 @@ class KotlinMemberAccess: KotlinExpression {
             kexpression.baseKClass = kclass(for: base, accessingMember: expression.member, codebaseInfo: translator.codebaseInfo)
         } else if expression.baseType == .none && translator.codebaseInfo != nil {
             kexpression.messages.append(.kotlinMemberAccessUnknownBaseType(expression, source: translator.syntaxTree.source, member: expression.member))
-        } else if case .optional = expression.inferredType, expression.member == "none" || expression.member == "some" {
+        } else if expression.inferredType.isOptional, expression.member == "none" || expression.member == "some" {
             kexpression.messages.append(.kotlinOptionalNoneSome(expression, source: translator.syntaxTree.source))
         }
         kexpression.generics = expression.generics
-        if case .metaType(let type) = expression.baseType {
-            kexpression.baseType = type
-        } else {
-            kexpression.baseType = expression.baseType
-        }
+        kexpression.baseType = expression.baseType.asMetaType(false)
         kexpression.mayBeSharedMutableStruct = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
         return kexpression
     }

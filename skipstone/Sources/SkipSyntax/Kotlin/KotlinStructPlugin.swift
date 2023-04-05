@@ -116,7 +116,7 @@ class KotlinStructPlugin: KotlinPlugin {
             var defaultValue: KotlinExpression? = nil
             if let value = variableDeclaration.value {
                 defaultValue = KotlinSharedExpressionPointer(shared: value)
-            } else if case .optional = type {
+            } else if type.isOptional {
                 defaultValue = KotlinNullLiteral()
             }
             return Parameter(externalLabel: label, declaredType: type, isVariadic: false, defaultValue: defaultValue)
