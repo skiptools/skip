@@ -9,7 +9,7 @@ To add the Skip transpiler plugin and core library support to a Swift library
 project, add the following lines at the end of the `Package.swift` file:
 
 ```
-package.dependencies += [.package(url: "https://github.com/skiptools/skip", from: "0.3.13")]
+package.dependencies += [.package(url: "https://github.com/skiptools/skip", from: "0.3.14")]
 package.dependencies += [.package(url: "https://github.com/skiptools/skiphub", from: "0.1.1")]
 ```
 
