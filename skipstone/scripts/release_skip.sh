@@ -103,7 +103,7 @@ ARTIFACT_URL="https://github.com/skiptools/skip/releases/download/${SEMVER_NEXT}
 
 #gh release -R github.com/skiptools/skip delete "main-${RELNAME}" --yes || true
 
-cd -
+cd '-'
 
 # package.targets += [.binaryTarget(name: "${PRODUCT}", url: "${ARTIFACT_URL}", checksum: "${CHECKSUM}")]
 sed -I '' 's;package.targets += \[.binaryTarget.*;package.targets += [.binaryTarget(name: "'${ARTIFACT}'", url: "'${ARTIFACT_URL}'", checksum: "'${CHECKSUM}'")];g' ${SKIPPKG}
@@ -113,7 +113,12 @@ sed -I '' 's;package.targets += \[.binaryTarget.*;package.targets += [.binaryTar
 cd ${SKIPPKGDIR}
 
 README_PATH="README.md"
-sed -I '' 's;package.dependencies += .*;package.dependencies += [.package(url: "https://github.com/skiptools/skip.git", from: "'${SEMVER_NEXT}'")];g' ${README_PATH}
+sed -I '' 's;.package(url: "https://github.com/skiptools/skip", from: ".*");.package(url: "https://github.com/skiptools/skip", from: "'${SEMVER_NEXT}'");g' ${README_PATH}
+
+# also grab the latest skiphub version and update it in the README
+SKIPHUB_VERSION=`git ls-remote --tags https://github.com/skiptools/skiphub | awk -F/ '$NF ~ /^v?[0-9]+\.[0-9]+\.[0-9]+$/ {print $NF}' | sort -V | tail -n1`
+
+sed -I '' 's;.package(url: "https://github.com/skiptools/skiphub", from: ".*");.package(url: "https://github.com/skiptools/skiphub", from: "'${SKIPHUB_VERSION}'");g' ${README_PATH}
 
 git add Package.swift ${README_PATH}
 git add .
@@ -121,7 +126,7 @@ git commit -m "Release ${SEMVER_NEXT}"
 git tag --sign "${SEMVER_NEXT}" -m "Release ${SEMVER_NEXT}"
 git push --follow-tags
 
-cd -
+cd '-'
 
 # Now when we upload, it will be to the tag that corresponds to this download
 #echo "Creating release artifact: ${ARTIFACT_URL}"
@@ -134,7 +139,7 @@ sleep 15
 curl --location --fail --retry 5 --retry-all-errors --retry-max-time 120 -o /dev/null "${ARTIFACT_URL}"
 
 # now jump *back* to the package and make sure we can run the command
-cd -
+cd '-'
 if [ "${SKIPPKG}" != "/dev/null" ]; then        
     swift package --disable-sandbox --allow-writing-to-package-directory skip info
 fi

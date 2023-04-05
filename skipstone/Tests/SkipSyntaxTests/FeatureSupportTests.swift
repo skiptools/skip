@@ -83,7 +83,17 @@ final class FeatureSupportTests: XCTestCase {
     }
 
     func testCheckSwiftFib() async throws {
-        try await check(swiftCode: {
+        try await fibCheck(n: 2, expectFailure: false)
+        try await fibCheck(n: 40, expectFailure: false)
+
+        // 32-bit int overflow behavior
+        // XCTAssertEqual failed: ("12586269025") is not equal to ("-298632863")
+        //try await fibCheck(n: 50, expectFailure: true) // needs KOTLINC env variable set
+    }
+
+    func fibCheck(n fibIndex: Int, expectFailure: Bool) async throws {
+
+        try await check(expectFailure: expectFailure, swiftCode: {
             func fibonacci(_ n: Int) -> Int {
                 if n <= 1 {
                     return n
@@ -96,7 +106,7 @@ final class FeatureSupportTests: XCTestCase {
                 }
                 return b
             }
-            return "\(fibonacci(11))"
+            return "\(fibonacci(fibIndex))"
         }, kotlin: """
             fun fibonacci(n: Int): Int {
                 if (n <= 1) {
@@ -111,8 +121,9 @@ final class FeatureSupportTests: XCTestCase {
                 }
                 return b
             }
-            return "${fibonacci(11)}"
-            """)
+            return "${fibonacci(\(fibIndex))}"
+            """,
+        fixup: { $0.replacingOccurrences(of: "fibIndex", with: "\(fibIndex)") }) // needed for source code comparison
     }
 
     func testCheckDisambiguateFunc() async throws {
@@ -168,69 +179,24 @@ final class FeatureSupportTests: XCTestCase {
             """)
     }
 
-//    func testNestedSimpleEnumInFunction() async throws {
-//        // error: modifier 'enum' is not applicable to 'local class'
-//        try await check(swift: """
-//        class Foo {
-//            public func someFunction() {
-//                enum NestedEnum {
-//                    case case1, case2, case3
-//                }
-//            }
-//        }
-//        """, kotlin: """
-//        internal open class Foo {
-//            open fun someFunction() {
-//                internal enum class NestedEnum {
-//                    case1,
-//                    case2,
-//                    case3;
-//                }
-//            }
-//        }
-//        """)
-//    }
-//
-//    func testNestedComplexEnumInFunction() async throws {
-//        // error: modifier 'sealed' is not applicable to 'local class'
-//        try await check(swift: """
-//        class Foo {
-//            public func someFunction() {
-//                enum ComplexEnum {
-//                    case case1(String)
-//                    case case2(Int)
-//                    case case3(Bool)
-//                }
-//            }
-//        }
-//        """, kotlin: """
-//        internal open class Foo {
-//            open fun someFunction() {
-//                internal sealed class ComplexEnum {
-//                    class case1case(val associated0: String): ComplexEnum() {
-//                    }
-//                    class case2case(val associated0: Int): ComplexEnum() {
-//                    }
-//                    class case3case(val associated0: Boolean): ComplexEnum() {
-//                    }
-//
-//                    companion object {
-//                        fun case1(associated0: String): ComplexEnum {
-//                            return case1case(associated0)
-//                        }
-//                        fun case2(associated0: Int): ComplexEnum {
-//                            return case2case(associated0)
-//                        }
-//                        fun case3(associated0: Boolean): ComplexEnum {
-//                            return case3case(associated0)
-//                        }
-//                    }
-//                }
-//            }
-//        }
-//        """)
-//    }
+    func testNestedSimpleEnumInFunction() async throws {
+        // error: Skip does not support type declarations within functions. Consider making this an independent type
+        // error: modifier 'enum' is not applicable to 'local class'
+        try await check(expectFailure: true, swift: """
+        class Foo {
+            public func someFunction() {
+                enum NestedEnum {
+                    case case1, case2, case3
+                }
+            }
+        }
+        """, kotlin: """
+        """)
+    }
 }
+
+
+
 
 
 
