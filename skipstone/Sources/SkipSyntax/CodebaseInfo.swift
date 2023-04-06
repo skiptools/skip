@@ -426,11 +426,8 @@ public class CodebaseInfo: Codable {
             }
             // Transfer any contextual generic information to this member type
             var typeInfoGenerics = typeInfo.generics
-            if let contextTypeInfo, !constrainedGenerics.isEmpty, contextTypeInfo.signature.generics.count == constrainedGenerics.count {
-                let contextEntries = contextTypeInfo.signature.generics.enumerated().map { (index, generic) in
-                    return Generic(name: generic.name, whereEqual: constrainedGenerics[index])
-                }
-                typeInfoGenerics = typeInfoGenerics.merge(overrides: Generics(entries: contextEntries))
+            if let contextTypeInfo {
+                typeInfoGenerics = typeInfoGenerics.merge(overrides: Generics(contextTypeInfo.signature.generics, whereEqual: constrainedGenerics))
             }
             let typeInfoConstrainedGenerics = typeInfoGenerics.entries.map { $0.constrainedType(fallback: .any) }
             var initSignatures = typeInfos.flatMap { typeInfo in
@@ -482,9 +479,7 @@ public class CodebaseInfo: Codable {
             var generics = (item as? FunctionInfo)?.generics ?? Generics()
             if let typeInfo {
                 constrainedParameters = parameters.map { $0.mappingGenerics(from: typeInfo.signature.generics, to: constrainedGenerics) }
-                generics = typeInfo.generics.merge(overrides: generics, addNew: true)
-                let constrainedEntries = zip(typeInfo.signature.generics, constrainedGenerics).map { Generic(name: $0.0.name, whereEqual: $0.1) }
-                generics = generics.merge(overrides: Generics(entries: constrainedEntries))
+                generics = typeInfo.generics.merge(overrides: generics, addNew: true).merge(overrides: Generics(typeInfo.signature.generics, whereEqual: constrainedGenerics), addNew: true)
             }
             constrainedParameters = constrainedParameters.map { $0.constrainedTypeWithGenerics(generics) }
 

@@ -343,6 +343,10 @@ struct Generics: Equatable, Codable {
         self.entries = entries
     }
 
+    init(_ names: [TypeSignature], whereEqual: [TypeSignature]) {
+        self.entries = zip(names, whereEqual).map { Generic(name: $0.0.name, whereEqual: $0.1) }
+    }
+
     /// Decode the generics information in the given syntax.
     static func `for`(syntax: GenericParameterClauseSyntax?, associatedTypeSyntax: [AssociatedtypeDeclSyntax] = [], where whereSyntax: GenericWhereClauseSyntax? = nil, in syntaxTree: SyntaxTree) -> (Generics, [Message]) {
         if syntax == nil && associatedTypeSyntax.isEmpty && whereSyntax == nil {
