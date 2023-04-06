@@ -405,6 +405,9 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
     @OptionGroup(title: "Output Options")
     var outputOptions: OutputOptions
 
+    @OptionGroup(title: "License Options")
+    var licenseOptions: LicenseOptions
+
     struct Output : MessageConvertible {
         let transpilation: Transpilation
 
@@ -504,6 +507,8 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
         let codebaseInfo = try loadCodebaseInfo() // initialize the codebaseinfo and load DependentModuleName.skipcode.json
 
+        try await validateLicense(sourceURLs: sourceFiles.map(\.asURL))
+
         let transpiler = Transpiler(packageName: packageName, sourceFiles: sources, codebaseInfo: codebaseInfo, preprocessorSymbols: Set(preflightOptions.symbols), plugins: plugins)
         try await transpiler.transpile(handler: handleTranspilation)
         try saveCodebaseInfo() // save out the ModuleName.skipcode.json
@@ -546,7 +551,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
                 do {
                     let codebaseLoadStart = Date().timeIntervalSinceReferenceDate
-                    print("dependencyCodebaseInfo \(dependencyCodebaseInfo): exists \(fs.exists(dependencyCodebaseInfo))")
+                    trace("dependencyCodebaseInfo \(dependencyCodebaseInfo): exists \(fs.exists(dependencyCodebaseInfo))")
                     let cbdata = try inputSource(dependencyCodebaseInfo).withData { $0 }
                     let cbinfo = try decoder.decode(CodebaseInfo.self, from: cbdata)
                     dependentCodebaseInfos.append(cbinfo)
@@ -849,6 +854,51 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
         return plugins
     }
+
+    /// Validate the license key if it is present in the tool or environment; otherwise scan the sources above the given codebase threshold size for approved headers
+    func validateLicense(sourceURLs: [URL], against now: Date = Date.now) async throws {
+        // the total size of all input source files, below which we will not enforce either license key or valid header comments
+        // this is meant to be large enough to accomodate simple demos and experiments without requiring any license
+        let codebaseThresholdSize: Int = 10 * 1024
+
+        // the list of header match expressions that we permit for codebases above the given threshold
+        let validLicenseHeaders = [
+            try! NSRegularExpression(pattern: ".*GNU.*General Public License.*"),
+        ]
+
+        /// Loads the `.skip.yml` at the root of the project and checks for a "skip-license" key
+        func parseLicenseConfig() throws -> String? {
+            try YAML.parse(Data(contentsOf: URL(fileURLWithPath: ".skip.yml")))["skip-license"]?.string
+        }
+
+        let licenseString = licenseOptions.skipLicense ?? ProcessInfo.processInfo.environment["SKIP_LICENSE"] ?? (try? parseLicenseConfig())
+
+        do {
+            let license = try licenseString.flatMap { try LicenseKey(licenseString: $0) }
+
+            if let license = license {
+                let exp = DateFormatter.localizedString(from: license.expiration, dateStyle: .short, timeStyle: .none)
+                let daysLeft = Int(ceil(license.expiration.timeIntervalSince(now) / (12 * 60 * 60)))
+                if daysLeft < 0 {
+                    error("Skip license expired on \(exp)")
+                } else if daysLeft < 10 { // warn when the license is about to expire
+                    warn("Skip license will expire in \(daysLeft) day\(daysLeft == 1 ? "" : "s") on \(exp)")
+                } else {
+                    info("Skip license valid through \(exp)")
+                }
+            } else {
+                let scanSourceStart = Date().timeIntervalSinceReferenceDate
+                let (codebaseSize, validated) = try await SourceValidator.scanSources(from: sourceURLs, codebaseThreshold: codebaseThresholdSize, headerExpressions: validLicenseHeaders)
+                let scanSourceEnd = Date().timeIntervalSinceReferenceDate
+                info("Codebase (\(Self.byteCount(for: .init(codebaseSize)))) scanned in (\(Int64((scanSourceEnd - scanSourceStart) * 1000)) ms)" + (validated ? " for free software license headers" : ""))
+            }
+        } catch let e as LicenseError {
+            // issue an error with the offending file
+            error(e.localizedDescription, sourceFile: e.sourceFile)
+            throw e
+        }
+    }
+
 }
 
 extension Source.FilePath {
@@ -868,6 +918,11 @@ extension Transpilation {
     var kotlinFileName: String {
         outputFileBaseName + ".kt"
     }
+}
+
+struct LicenseOptions: ParsableArguments {
+    @Option(help: ArgumentHelp("The license key for transpiling non-free sources", valueName: "SKIP_LICENSE"))
+    var skipLicense: String? = nil // --skip-license SKP657AB7680CA6789F76ABB65975678CDCA34PKS
 }
 
 extension AbsolutePath {
