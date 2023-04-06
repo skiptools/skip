@@ -527,28 +527,27 @@ final class TypeDeclarationTests: XCTestCase {
         }
         """)
 
-        // ~~~ TODO: We need to apply generics to our calls to isImplementingUnconstrainedMember for this to work
-//        try await checkProducesMessage(swift: """
-//        class C<T> {
-//            func f(p: T) {
-//            }
-//        }
-//        extension C<Int> {
-//            func f(p: Int) {
-//            }
-//        }
-//        """)
-//
-//        try await checkProducesMessage(swift: """
-//        class C<T> {
-//            func f(p: T) {
-//            }
-//        }
-//        extension C where T == Int {
-//            func f(p: Int) {
-//            }
-//        }
-//        """)
+        try await checkProducesMessage(swift: """
+        class C<T> {
+            func f(p: T) {
+            }
+        }
+        extension C<Int> {
+            func f(p: Int) {
+            }
+        }
+        """)
+
+        try await checkProducesMessage(swift: """
+        class C<T> {
+            func f(p: T) {
+            }
+        }
+        extension C where T == Int {
+            func f(p: Int) {
+            }
+        }
+        """)
     }
 
     func testGenericTypealias() async throws {

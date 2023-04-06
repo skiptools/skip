@@ -51,29 +51,23 @@ extension CodebaseInfo.Context {
     }
 
     /// Whether this declaration is implementing a property of the given type, excluding Kotlin extension properties and functions.
-    func isImplementingMember(declaration: VariableDeclaration, in type: TypeSignature) -> Bool {
+    func isImplementingMember(declaration: VariableDeclaration, inExtension type: TypeSignature, with generics: Generics) -> Bool {
+        assert(global.kotlin != nil)
         guard !declaration.names.isEmpty, let name = declaration.names[0] else {
             return false
         }
-        return isMember(name: name, type: nil, isStatic: declaration.modifiers.isStatic, in: type)
+        return identifierSignature(of: name, inConstrained: type.constrainedTypeWithGenerics(generics), excludeConstrainedExtensions: true) != .none
     }
 
     /// Whether this declaration is implementing a function of the given type, excluding Kotlin extension properties and functions.
-    func isImplementingMember(declaration: FunctionDeclaration, in type: TypeSignature) -> Bool {
-        return isMember(name: declaration.name, type: declaration.functionType, isStatic: declaration.modifiers.isStatic, in: type)
-    }
-
-    /// Whether the given member is declared by the given type, excluding Kotlin extension properties and functions.
-    func isMember(name: String, type: TypeSignature?, isStatic: Bool, in owningType: TypeSignature) -> Bool {
+    func isImplementingMember(declaration: FunctionDeclaration, inExtension type: TypeSignature, with generics: Generics) -> Bool {
         assert(global.kotlin != nil)
-        //~~~ Need to map generics
-        let concreteSignatures = global.inheritanceChainSignatures(forNamed: owningType)
-        if !concreteSignatures.isEmpty {
-            return concreteSignatures.contains { hasMember($0, name: name, type: type, isStatic: isStatic, filterKotlinExtensions: true) }
-        } else {
-            let protocolSignatures = global.protocolSignatures(forNamed: owningType)
-            return protocolSignatures.contains { hasMember($0, name: name, type: type, isStatic: isStatic, filterKotlinExtensions: true) }
+        let constrainedSignature = declaration.functionType.constrainedTypeWithGenerics(generics)
+        guard case .function(let parameters, _) = constrainedSignature else {
+            return false
         }
+        let arguments = parameters.map { LabeledValue(label: $0.label, value: $0.type) }
+        return !functionSignature(of: declaration.name, inConstrained: type.constrainedTypeWithGenerics(generics), arguments: arguments, excludeConstrainedExtensions: true).isEmpty
     }
 
     /// Whether this declaration is implementing a protocol property.

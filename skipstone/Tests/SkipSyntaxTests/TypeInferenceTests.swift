@@ -416,6 +416,29 @@ final class TypeInferenceTests: XCTestCase {
         """)
     }
 
+    func testGenericFunction() async throws {
+        try await check(supportingSwift: """
+        func max<T>(_ a: T, _ b: T) -> T {
+        }
+        extension Int {
+            static let myValue = 0
+        }
+        extension String {
+            static let myValue = ""
+        }
+        """, swift: """
+        {
+            let b1 = max(1, 2) == .myValue
+            let b2 = max("a", "b") == .myValue
+        }
+        """, kotlin: """
+        {
+            val b1 = max(1, 2) == Int.myValue
+            val b2 = max("a", "b") == String.myValue
+        }
+        """)
+    }
+
     func testGenericsWhereEqualExtension() throws {
         throw XCTSkip("Test that we incorporate generics where clauses on extensions")
     }

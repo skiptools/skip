@@ -986,15 +986,19 @@ struct KotlinExtensionDeclaration {
         var extends = statement.extends
         var generics = statement.generics
         if let extendedTypeInfo = translator.codebaseInfo?.primaryTypeInfo(forNamed: statement.extends) {
-            // Strip the generics from the extended type and put the complete set of constraints into the generics object
-            extends = statement.extends.withGenerics([])
+            // Set the extended type to match its primary type and put the complete set of constraints into the generics object
+            extends = extendedTypeInfo.signature
             generics = extendedTypeInfo.generics.merge(extension: statement.extends, generics: statement.generics)
         }
         for member in statement.members {
-            if let variableDeclaration = member as? VariableDeclaration, translator.codebaseInfo?.isImplementingMember(declaration: variableDeclaration, in: extends) == true {
-                kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionImplementMember(member, source: translator.syntaxTree.source)))
-            } else if let functionDeclaration = member as? FunctionDeclaration, translator.codebaseInfo?.isImplementingMember(declaration: functionDeclaration, in: extends) == true {
-                kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionImplementMember(member, source: translator.syntaxTree.source)))
+            if !statement.canMoveIntoExtendedType {
+                // Check that an extension that will be implemented as extension functions because it has generic constraints, etc is not
+                // attempting to override member functions. Kotlin extension functions can never override members
+                if let variableDeclaration = member as? VariableDeclaration, translator.codebaseInfo?.isImplementingMember(declaration: variableDeclaration, inExtension: extends, with: generics) == true {
+                    kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionImplementMember(member, source: translator.syntaxTree.source)))
+                } else if let functionDeclaration = member as? FunctionDeclaration, translator.codebaseInfo?.isImplementingMember(declaration: functionDeclaration, inExtension: extends, with: generics) == true {
+                    kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionImplementMember(member, source: translator.syntaxTree.source)))
+                }
             }
             for kmember in translator.translateStatement(member) {
                 guard let memberDeclaration = kmember as? KotlinMemberDeclaration else {

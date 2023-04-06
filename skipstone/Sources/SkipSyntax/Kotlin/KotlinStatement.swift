@@ -36,7 +36,7 @@ extension KotlinMemberDeclaration {
         guard let extends else {
             return
         }
-        output.append(extends.0.kotlin)
+        output.append(extends.0.withGenerics([]).kotlin)
         extends.1.append(to: output, indentation: indentation)
         output.append(".")
         if isStatic {

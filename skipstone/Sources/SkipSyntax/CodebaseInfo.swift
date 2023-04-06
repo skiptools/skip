@@ -250,7 +250,7 @@ public class CodebaseInfo: Codable {
         }
         
         /// Return the type of the given member.
-        func identifierSignature(of member: String, inConstrained type: TypeSignature) -> TypeSignature {
+        func identifierSignature(of member: String, inConstrained type: TypeSignature, excludeConstrainedExtensions: Bool = false) -> TypeSignature {
             var type = type.asOptional(false)
             if case .tuple(let labels, let types) = type {
                 for (index, label) in labels.enumerated() {
@@ -262,7 +262,13 @@ public class CodebaseInfo: Codable {
             }
             let isStatic = type.isMetaType
             type = type.asMetaType(false)
-            for typeInfo in typeInfos(forNamed: type) {
+
+            let typeInfos = typeInfos(forNamed: type)
+            let primaryTypeInfo = typeInfos.first { $0.declarationType != .extensionDeclaration }
+            for typeInfo in typeInfos {
+                if excludeConstrainedExtensions && typeInfo.declarationType == .extensionDeclaration, let primaryTypeInfo, typeInfo.generics != primaryTypeInfo.generics {
+                    continue
+                }
                 let signature = identifierSignature(of: member, in: typeInfo, constrainedGenerics: type.generics, isStatic: isStatic)
                 if signature != .none {
                     return signature
@@ -298,7 +304,7 @@ public class CodebaseInfo: Codable {
         /// Return the signatures of the possible member functions being called with the given arguments.
         ///
         /// This function also works for the creation of an enum case with associated values.
-        func functionSignature(of name: String, inConstrained type: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
+        func functionSignature(of name: String, inConstrained type: TypeSignature, arguments: [LabeledValue<TypeSignature>], excludeConstrainedExtensions: Bool = false) -> [TypeSignature] {
             var type = type.asOptional(false)
             if case .tuple(let labels, let types) = type {
                 for (index, label) in labels.enumerated() {
@@ -313,7 +319,12 @@ public class CodebaseInfo: Codable {
             type = type.asMetaType(false)
 
             var candidates: Set<FunctionCandidate> = []
-            for typeInfo in typeInfos(forNamed: type) {
+            let typeInfos = typeInfos(forNamed: type)
+            let primaryTypeInfo = typeInfos.first { $0.declarationType != .extensionDeclaration }
+            for typeInfo in typeInfos {
+                if excludeConstrainedExtensions && typeInfo.declarationType == .extensionDeclaration, let primaryTypeInfo, typeInfo.generics != primaryTypeInfo.generics {
+                    continue
+                }
                 functionCandidates(for: name, in: typeInfo, constrainedGenerics: type.generics, arguments: arguments, isStatic: isStatic).forEach { candidates.insert($0) }
             }
             let sortedCandidates = candidates.sorted { $0.score > $1.score }
