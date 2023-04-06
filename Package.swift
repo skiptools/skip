@@ -5,9 +5,7 @@ let package = Package(
     name: "skip",
     defaultLocalization: "en",
     products: [
-        .plugin(name: "hello-skip", targets: ["Hello Skip"]),
-        .plugin(name: "run-kotlin-tests", targets: ["Run Kotlin Tests"]),
-        .plugin(name: "synchronize-gradle", targets: ["Synchronize Gradle Project"]),
+        .plugin(name: "skip-init", targets: ["Hello Skip"]),
         .plugin(name: "skip", targets: ["Skip Custom Command"]),
 
         .plugin(name: "preflight", targets: ["skip-preflight"]),
@@ -41,16 +39,7 @@ let package = Package(
                         """)
                     ]),
                 dependencies: ["skiptool"],
-                path: "Plugins/HelloSkip"),
-
-        //.plugin(name: "Run Kotlin Tests",
-        //        capability: .command(
-        //            intent: .custom(verb: "skip-test",  description: "Add Kotlin Targets to the current Package.swift"),
-        //            permissions: [
-        //                .writeToPackageDirectory(reason: "Skip needs to create and update the Skip folder in the project."),
-        //            ]),
-        //        dependencies: ["skiptool"],
-        //        path: "Plugins/RunGradleTests"),
+                path: "Plugins/SkipInit"),
 
         .plugin(name: "Skip Custom Command",
                 capability: .command(
@@ -60,15 +49,6 @@ let package = Package(
                     ]),
                 dependencies: ["skiptool"],
                 path: "Plugins/SkipCommand"),
-
-        //.plugin(name: "Synchronize Gradle Project",
-        //        capability: .command(
-        //            intent: .custom(verb: "skip-sync",  description: "Create local links to the transpiled gradle project(s)"),
-        //            permissions: [
-        //                .writeToPackageDirectory(reason: "Skip needs to create and update the Skip folder in the project."),
-        //            ]),
-        //        dependencies: ["skiptool"],
-        //        path: "Plugins/SynchronizeGradle"),
 
         .plugin(name: "skip-preflight",
                 capability: .buildTool(),
