@@ -177,7 +177,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
 
     /// Apply the given generic types to form a constrained type with generics replaced by their constraints.
     func constrainedTypeWithGenerics(_ generics: Generics) -> TypeSignature {
-        let generic = generics.constrainedType(of: self)
+        let generic = generics.constrainedType(of: self, fallback: .any)
         if generic != .none {
             return generic
         }
@@ -247,6 +247,78 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return .unwrappedOptional(type.mappingGenerics(from: from, to: to))
         default:
             return self
+        }
+    }
+
+    /// Return the generic mappings that were made from this type to the given type.
+    func mergeGenericMappings(in target: TypeSignature, with generics: Generics) -> Generics {
+        var generics = generics
+        addGenericMappings(to: target, into: &generics)
+        return generics
+    }
+
+    private func addGenericMappings(to: TypeSignature, into generics: inout Generics) {
+        guard to != self else {
+            return
+        }
+        if case .named(let name, []) = self, let index = generics.entries.firstIndex(where: { $0.name == name }) {
+            generics.entries[index].whereEqual = to
+            return
+        }
+        switch self {
+        case .array(let element):
+            if case .array(let element2) = to {
+                element.addGenericMappings(to: element2, into: &generics)
+            }
+        case .composition(let types):
+            if case .composition(let types2) = to, types.count == types2.count {
+                zip(types, types2).forEach { $0.0.addGenericMappings(to: $0.1, into: &generics) }
+            }
+        case .dictionary(let key, let value):
+            if case .dictionary(let key2, let value2) = to {
+                key.addGenericMappings(to: key2, into: &generics)
+                value.addGenericMappings(to: value2, into: &generics)
+            }
+        case .function(let parameters, let returnType):
+            if case .function(let parameters2, let returnType2) = to, parameters.count == parameters2.count {
+                zip(parameters, parameters2).forEach { $0.0.type.addGenericMappings(to: $0.1.type, into: &generics) }
+                returnType.addGenericMappings(to: returnType2, into: &generics)
+            }
+        case .member(let base, let type):
+            if case .member(let base2, let type2) = to {
+                base.addGenericMappings(to: base2, into: &generics)
+                type.addGenericMappings(to: type2, into: &generics)
+            }
+        case .metaType(let base):
+            if case .metaType(let base2) = to {
+                base.addGenericMappings(to: base2, into: &generics)
+            }
+        case .named(let name, let genericTypes):
+            if case .named(let name2, let genericTypes2) = to, name == name2, genericTypes.count == genericTypes2.count {
+                zip(genericTypes, genericTypes2).forEach { $0.0.addGenericMappings(to: $0.1, into: &generics) }
+            }
+        case .optional(let type):
+            if case .optional(let type2) = to {
+                type.addGenericMappings(to: type2, into: &generics)
+            }
+        case .range(let element):
+            if case .range(let element2) = to {
+                element.addGenericMappings(to: element2, into: &generics)
+            }
+        case .set(let element):
+            if case .set(let element2) = to {
+                element.addGenericMappings(to: element2, into: &generics)
+            }
+        case .tuple(_, let types):
+            if case .tuple(_, let types2) = to, types.count == types2.count {
+                zip(types, types2).forEach { $0.0.addGenericMappings(to: $0.1, into: &generics) }
+            }
+        case .unwrappedOptional(let type):
+            if case .unwrappedOptional(let type2) = to {
+                type.addGenericMappings(to: type2, into: &generics)
+            }
+        default:
+            break
         }
     }
 

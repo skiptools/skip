@@ -567,11 +567,16 @@ class FunctionCall: Expression {
         let name: String
         switch function.type {
         case .identifier:
-            //~~~ This won't work when identifier is specialized type name and we're calling constructor, e.g. C<Int>(...)
             let identifier = function as! Identifier
             identifier.isCalledAsFunction = true
-            baseType = nil
-            name = identifier.name
+            if identifier.generics.isEmpty {
+                baseType = nil
+                name = identifier.name
+            } else {
+                // If generics are specified, assume the identifier is a type name and this call is a constructor
+                baseType = TypeSignature.for(name: identifier.name, genericTypes: identifier.generics)
+                name = "init"
+            }
         case .memberAccess:
             let memberAccess = function as! MemberAccess
             memberAccess.isCalledAsFunction = true

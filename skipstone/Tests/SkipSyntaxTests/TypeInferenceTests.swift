@@ -291,14 +291,129 @@ final class TypeInferenceTests: XCTestCase {
             }
         }
         """)
+
+        try await check(supportingSwift: """
+        class C<T> {
+            var v: T
+        }
+        extension Int {
+            static let myZero = 0
+        }
+        """, swift: """
+        func f(c: C<Array<Int>>) -> Bool {
+            return c.v[1] == .myZero
+        }
+        """, kotlin: """
+        internal fun f(c: C<Array<Int>>): Boolean {
+            return c.v[1] == Int.myZero
+        }
+        """)
     }
 
-    func testGenerics() throws {
-        throw XCTSkip("Test all aspects of using generic paramters")
+    func testInheritedGenericMemberIdentifier() async throws {
+        try await check(supportingSwift: """
+        class Base<T, U> {
+            var v: T
+            var u: U
+        }
+        class C<X>: Base<Int, X> {
+        }
+        extension Int {
+            static let myZero = 0
+        }
+        extension String {
+            static let myEmpty = ""
+        }
+        """, swift: """
+        func f(c: C<String>) -> Bool {
+            return c.v == .myZero && c.u == .myEmpty
+        }
+        """, kotlin: """
+        internal fun f(c: C<String>): Boolean {
+            return c.v == Int.myZero && c.u == String.myEmpty
+        }
+        """)
     }
 
-    func testGenericsUpperBounds() throws {
-        throw XCTSkip("Test that we use the upper bounds on generics")
+    func testGenericMemberFunction() async throws {
+        try await check(supportingSwift: """
+        class C<T> {
+            func f() -> T {
+            }
+            func g(p: String) -> String {
+            }
+            func g(p: T) -> T {
+            }
+        }
+        extension Int {
+            static let myValue = 0
+        }
+        extension String {
+            static let myValue = ""
+        }
+        """, swift: """
+        func f(c: C<Int>) -> Bool {
+            let b1 = c.f() == .myValue
+            let b2 = c.g(p: 1) == .myValue
+            let b3 = c.g(p: "1") == .myValue
+        }
+        """, kotlin: """
+        internal fun f(c: C<Int>): Boolean {
+            val b1 = c.f() == Int.myValue
+            val b2 = c.g(p = 1) == Int.myValue
+            val b3 = c.g(p = "1") == String.myValue
+        }
+        """)
+    }
+
+    func testGenericConstructor() async throws {
+        try await check(supportingSwift: """
+        class C<T> {
+            var v: T
+            init(v: T) {
+                self.v = v
+            }
+        }
+        extension Int {
+            static let myZero = 0
+        }
+        """, swift: """
+        {
+            let c1 = C(v: 1)
+            let b1 = c1.v == .myZero
+            let c2 = C<Int>(v: 2)
+            let b2 = c2.v == .myZero
+        }
+        """, kotlin: """
+        {
+            val c1 = C(v = 1)
+            val b1 = c1.v == Int.myZero
+            val c2 = C<Int>(v = 2)
+            val b2 = c2.v == Int.myZero
+        }
+        """)
+
+        try await check(supportingSwift: """
+        class C<T> {
+            var single: T
+            init(array: [T]) {
+                self.single = array[0]
+            }
+        }
+        extension Int {
+            static let myZero = 0
+        }
+        """, swift: """
+        {
+            let c = C(array: [1, 2, 3])
+            let b = c.single == .myZero
+        }
+        """, kotlin: """
+        {
+            val c = C(array = arrayOf(1, 2, 3))
+            val b = c.single == Int.myZero
+        }
+        """)
     }
 
     func testGenericsWhereEqualExtension() throws {
