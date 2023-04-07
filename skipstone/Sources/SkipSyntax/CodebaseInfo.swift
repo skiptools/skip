@@ -370,7 +370,7 @@ public class CodebaseInfo: Codable {
         }
         
         private func identifierSignature(of member: String, in typeInfo: TypeInfo, constrainedGenerics: [TypeSignature], isStatic: Bool) -> TypeSignature {
-            guard typeInfo.isApplicable(toConstrainedGenerics: constrainedGenerics, codebaseInfo: global) else {
+            guard typeInfo.isApplicable(toConstrainedGenerics: constrainedGenerics, codebaseInfo: self) else {
                 return .none
             }
             // We allow .init to be used both as a static or instance member
@@ -399,7 +399,7 @@ public class CodebaseInfo: Codable {
 
         /// - Note: Returns unsorted, un-deduped results.
         private func functionCandidates(for name: String, in typeInfo: TypeInfo, constrainedGenerics: [TypeSignature], arguments: [LabeledValue<TypeSignature>], isStatic: Bool) -> [FunctionCandidate] {
-            guard typeInfo.isApplicable(toConstrainedGenerics: constrainedGenerics, codebaseInfo: global) else {
+            guard typeInfo.isApplicable(toConstrainedGenerics: constrainedGenerics, codebaseInfo: self) else {
                 return []
             }
             var candidates = typeInfo.visibleMembers(context: self).flatMap { (member) -> [FunctionCandidate] in
@@ -458,7 +458,7 @@ public class CodebaseInfo: Codable {
         }
         
         private func associatedValueSignatures(of member: String, in typeInfo: TypeInfo, constrainedGenerics: [TypeSignature]) -> [TypeSignature.Parameter]? {
-            guard typeInfo.isApplicable(toConstrainedGenerics: constrainedGenerics, codebaseInfo: global) else {
+            guard typeInfo.isApplicable(toConstrainedGenerics: constrainedGenerics, codebaseInfo: self) else {
                 return nil
             }
             guard let memberInfo = typeInfo.visibleMembers(context: self).first(where: { $0.name == member && $0.declarationType == .enumCaseDeclaration }) else {
@@ -664,7 +664,7 @@ public class CodebaseInfo: Codable {
             fixupProtocolGenericsInfo(protocolInfo, fixedupProtocolNames: &fixedupProtocolNames)
         }
         // Update extension info so that extensions have the same signature as the extended type, moving any generic info to the generics object
-        for extensionInfo in rootTypes where extensionInfo.declarationType == .extensionDeclaration {
+        for extensionInfo in rootExtensions {
             guard let primaryInfo = primaryTypeInfo(forNamed: extensionInfo.signature) else {
                 continue
             }
@@ -836,8 +836,8 @@ public class CodebaseInfo: Codable {
         }
 
         /// Return whether this extension info applies when we have the given generics values.
-        fileprivate func isApplicable(toConstrainedGenerics constrainedGenerics: [TypeSignature], codebaseInfo: CodebaseInfo) -> Bool {
-            guard declarationType == .extensionDeclaration else {
+        fileprivate func isApplicable(toConstrainedGenerics constrainedGenerics: [TypeSignature], codebaseInfo: CodebaseInfo.Context) -> Bool {
+            guard declarationType == .extensionDeclaration, !constrainedGenerics.isEmpty else {
                 return true
             }
             guard let primaryInfo = codebaseInfo.primaryTypeInfo(forNamed: signature) else {
@@ -846,8 +846,17 @@ public class CodebaseInfo: Codable {
             guard generics != primaryInfo.generics else {
                 return true
             }
-            // TODO: Figure out if this is compatible
-            return false
+            let names = primaryInfo.signature.generics
+            guard names.count == constrainedGenerics.count else {
+                return true
+            }
+            for (index, name) in names.enumerated() {
+                let constrainedType = generics.constrainedType(of: name.name)
+                guard constrainedGenerics[index].compatibilityScore(target: constrainedType, codebaseInfo: codebaseInfo) != nil else {
+                    return false
+                }
+            }
+            return true
         }
 
         fileprivate func signature(forInheritsDeclaration inherits: TypeSignature, in declaringTypeInfo: TypeInfo, codebaseInfo: CodebaseInfo) -> TypeSignature {

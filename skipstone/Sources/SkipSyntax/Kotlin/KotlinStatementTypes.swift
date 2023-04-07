@@ -767,7 +767,6 @@ class KotlinClassDeclaration: KotlinStatement {
                         output.append(", ")
                     }
                 }
-                //~~~ Interfaces need generic types specified
                 output.append(inherits.map({ $0.kotlin }).joined(separator: ", "))
             }
             generics.appendWhere(to: output, indentation: indentation)

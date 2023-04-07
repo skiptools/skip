@@ -439,8 +439,61 @@ final class TypeInferenceTests: XCTestCase {
         """)
     }
 
-    func testGenericsWhereEqualExtension() throws {
-        throw XCTSkip("Test that we incorporate generics where clauses on extensions")
+    func testGenericExtension() async throws {
+        try await check(supportingSwift: """
+        class C<T> {
+            init(t: T) {
+            }
+        }
+        extension C {
+            func f() -> T {
+            }
+        }
+        extension Int {
+            static let myZero = 0
+        }
+        """, swift: """
+        {
+            let b = C(t: 1).f() == .myZero
+        }
+        """, kotlin: """
+        {
+            val b = C(t = 1).f() == Int.myZero
+        }
+        """)
+    }
+
+    func testGenericsConstrainedExtension() async throws {
+        try await check(supportingSwift: """
+        class C<T> {
+            init(t: T) {
+            }
+        }
+        extension C where T == Int {
+            func f() -> Int {
+            }
+        }
+        extension C where T == String {
+            func f() -> String {
+            }
+        }
+        extension Int {
+            static let myValue = 0
+        }
+        extension String {
+            static let myValue = ""
+        }
+        """, swift: """
+        {
+            let b1 = C(t: 1).f() == .myValue
+            let b2 = C(t: "1").f() == .myValue
+        }
+        """, kotlin: """
+        {
+            val b1 = C(t = 1).f() == Int.myValue
+            val b2 = C(t = "1").f() == String.myValue
+        }
+        """)
     }
 
     func testTypealias() throws {

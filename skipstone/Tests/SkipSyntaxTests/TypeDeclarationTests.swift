@@ -397,6 +397,10 @@ final class TypeDeclarationTests: XCTestCase {
         """)
     }
 
+    func testGenericProtocolConformance() async throws {
+        //~~~
+    }
+
     func testGenericInheritance() async throws {
         try await check(swift: """
         class Base<T> {
