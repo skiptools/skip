@@ -120,7 +120,7 @@ extension Message {
 
     // Idea: for typealiases that are internal, create a new top-level alias or just replace use cases with original type
     static func kotlinTypeAliasNested(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "Kotlin does not support typealias declarations within types. Consider moving this to a top level declaration", sourceDerived: sourceDerived, source: source)
+        return Message(kind: .error, message: "Kotlin does not support typealias declarations within functions and types. Consider moving this to a top level declaration", sourceDerived: sourceDerived, source: source)
     }
 
     static func kotlinTypeAliasConstrainedGenerics(_ sourceDerived: SourceDerived, source: Source) -> Message {

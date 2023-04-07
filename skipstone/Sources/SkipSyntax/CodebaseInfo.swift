@@ -64,8 +64,8 @@ public class CodebaseInfo: Codable {
     func prepareForUse() {
         isInUse = true
         buildItemsByName() // We use this for lookups in subsequent steps
+        inferVariableTypes() // May need variable types to match signatures to protocol generics
         fixupGenericsInfo()
-        inferVariableTypes()
         addGeneratedConstructors()
         buildItemsByName() // Final mappings after updates
         languageAdditions?.prepareForUse(codebaseInfo: self)
@@ -243,7 +243,7 @@ public class CodebaseInfo: Codable {
                 }
             }
             guard let topRanked else {
-                return .none
+                return TypeSignature.for(name: identifier, genericTypes: [], allowNamed: false).asMetaType(true)
             }
             let type = topRanked.signature
             return type.asMetaType(topRanked.declarationType != .variableDeclaration && topRanked.declarationType != .enumCaseDeclaration)
@@ -386,8 +386,7 @@ public class CodebaseInfo: Codable {
             }
             for inherits in typeInfo.inherits {
                 for inheritsInfo in typeInfos(forNamed: inherits) {
-                    let inheritsSignature = inheritsInfo.signature(forInheritsDeclaration: inherits, in: typeInfo, codebaseInfo: global)
-                    let inheritsConstraints = inheritsSignature.mappingGenerics(from: typeInfo.signature.generics, to: constrainedGenerics).generics
+                    let inheritsConstraints = inherits.mappingGenerics(from: typeInfo.signature.generics, to: constrainedGenerics).generics
                     let signature = identifierSignature(of: member, in: inheritsInfo, constrainedGenerics: inheritsConstraints, isStatic: isStatic)
                     if signature != .none {
                         return signature
@@ -422,8 +421,7 @@ public class CodebaseInfo: Codable {
             }
             for inherits in typeInfo.inherits {
                 for inheritsInfo in typeInfos(forNamed: inherits) {
-                    let inheritsSignature = inheritsInfo.signature(forInheritsDeclaration: inherits, in: typeInfo, codebaseInfo: global)
-                    let inheritsConstraints = inheritsSignature.mappingGenerics(from: typeInfo.signature.generics, to: constrainedGenerics).generics
+                    let inheritsConstraints = inherits.mappingGenerics(from: typeInfo.signature.generics, to: constrainedGenerics).generics
                     candidates += functionCandidates(for: name, in: inheritsInfo, constrainedGenerics: inheritsConstraints, arguments: arguments, isStatic: isStatic)
                 }
             }
@@ -671,6 +669,11 @@ public class CodebaseInfo: Codable {
             extensionInfo.generics = primaryInfo.generics.merge(extension: extensionInfo.signature, generics: extensionInfo.generics)
             extensionInfo.signature = primaryInfo.signature
         }
+        // Update concrete types' inherits lists to include the generic types used for each implemented protocol
+        for typeInfo in rootTypes where typeInfo.declarationType != .protocolDeclaration {
+            fixupProtocolConformanceGenerics(in: typeInfo)
+        }
+        rootExtensions.forEach { fixupProtocolConformanceGenerics(in: $0) }
     }
 
     private func fixupProtocolGenericsInfo(_ protocolInfo: TypeInfo, fixedupProtocolNames: inout Set<String>) {
@@ -689,6 +692,65 @@ public class CodebaseInfo: Codable {
         }
         protocolInfo.generics = protocolGenerics.merge(overrides: protocolInfo.generics, addNew: true).filterWhereEqual()
         protocolInfo.signature = protocolInfo.signature.withGenerics(protocolInfo.generics.entries.map(\.namedType))
+    }
+
+    private func fixupProtocolConformanceGenerics(in typeInfo: TypeInfo) {
+        typeInfo.inherits = typeInfo.inherits.map { inherit in
+            guard let inheritInfo = primaryTypeInfo(forNamed: inherit), inheritInfo.declarationType == .protocolDeclaration, !inheritInfo.generics.isEmpty else {
+                return inherit
+            }
+            return inherit.withGenerics(protocolGenerics(for: inheritInfo, in: typeInfo))
+        }
+        for member in typeInfo.members {
+            if let memberTypeInfo = member as? TypeInfo {
+                fixupProtocolConformanceGenerics(in: memberTypeInfo)
+            }
+        }
+    }
+
+    private func protocolGenerics(for protocolInfo: TypeInfo, in typeInfo: TypeInfo) -> [TypeSignature] {
+        var mappings = protocolInfo.signature.generics.reduce(into: [TypeSignature: TypeSignature]()) { result, generic in
+            result[generic] = generic
+        }
+        for typealiasInfo in typeInfo.typealiases {
+            let generic: TypeSignature = .named(typealiasInfo.name, [])
+            if mappings.keys.contains(generic) {
+                mappings[generic] = typealiasInfo.signature
+            }
+        }
+        let unmapped = mappings.keys.filter { mappings[$0] == $0 }
+        if !unmapped.isEmpty {
+            // Use the type's members to collection generic mappings
+            var generics = Generics(unmapped)
+            for protocolInfo in protocolSignatures(forNamed: protocolInfo.signature).compactMap({ primaryTypeInfo(forNamed: $0) }) {
+                for protocolMember in protocolInfo.members {
+                    if let typeMember = findImplementingMember(in: typeInfo, for: protocolMember) {
+                        generics = protocolMember.signature.mergeGenericMappings(in: typeMember.signature, with: generics)
+                    }
+                }
+            }
+            for entry in generics.entries {
+                if let whereEqual = entry.whereEqual {
+                    mappings[.named(entry.name, [])] = whereEqual
+                }
+            }
+        }
+        return protocolInfo.signature.generics.map { mappings[$0] ?? $0 }
+    }
+
+    private func findImplementingMember(in typeInfo: TypeInfo, for protocolMember: CodebaseInfoItem) -> CodebaseInfoItem? {
+        if let variableInfo = protocolMember as? VariableInfo {
+            return typeInfo.variables.first { $0.name == variableInfo.name }
+        } else if let functionInfo = protocolMember as? FunctionInfo {
+            return typeInfo.functions.first {
+                guard functionInfo.name == $0.name else {
+                    return false
+                }
+                return functionInfo.signature.parameters.map(\.label) == $0.signature.parameters.map(\.label)
+            }
+        } else {
+            return nil
+        }
     }
 
     private func inferVariableTypes() {
@@ -857,18 +919,6 @@ public class CodebaseInfo: Codable {
                 }
             }
             return true
-        }
-
-        fileprivate func signature(forInheritsDeclaration inherits: TypeSignature, in declaringTypeInfo: TypeInfo, codebaseInfo: CodebaseInfo) -> TypeSignature {
-            guard declarationType == .protocolDeclaration, !generics.isEmpty else {
-                return inherits
-            }
-            // TODO: protocol support
-            return inherits
-//            let genericTypes = generics.entries.map {
-//
-//            }
-//            return .named(signature.name, genericTypes)
         }
 
         private enum CodingKeys: String, CodingKey {

@@ -12,9 +12,14 @@ extension CodebaseInfo {
 
 extension CodebaseInfo.Context {
     /// Return all extensions of a given type.
-    func extensions(of type: TypeSignature) -> [ExtensionDeclaration] {
+    func extensions(of type: TypeSignature) -> [(CodebaseInfo.TypeInfo, ExtensionDeclaration)] {
         assert(global.kotlin != nil)
-        return typeInfos(forNamed: type).compactMap { $0.languageAdditions as? ExtensionDeclaration }
+        return typeInfos(forNamed: type).compactMap { typeInfo in
+            guard let extensionDeclaration = typeInfo.languageAdditions as? ExtensionDeclaration else {
+                return nil
+            }
+            return (typeInfo, extensionDeclaration)
+        }
     }
 
     /// The signatures of all visible constructors of the given type.
@@ -31,10 +36,11 @@ extension CodebaseInfo.Context {
             return typeInfo.visibleMembers(context: self).filter { $0.declarationType == .initDeclaration }
         }
         return inits.compactMap { (initInfo) -> [Parameter<Expression>]? in
-            guard let functionInfo = initInfo as? CodebaseInfo.FunctionInfo, case .function(let parameters, _) = functionInfo.signature else {
+            guard let functionInfo = initInfo as? CodebaseInfo.FunctionInfo else {
                 return nil
             }
             // Filter out generated default constructor
+            let parameters = functionInfo.signature.parameters
             guard parameters.count > 0 || !functionInfo.isGenerated || inits.count > 1 else {
                 return nil
             }
@@ -63,9 +69,7 @@ extension CodebaseInfo.Context {
     func isImplementingMember(declaration: FunctionDeclaration, inExtension type: TypeSignature, with generics: Generics) -> Bool {
         assert(global.kotlin != nil)
         let constrainedSignature = declaration.functionType.constrainedTypeWithGenerics(generics)
-        guard case .function(let parameters, _) = constrainedSignature else {
-            return false
-        }
+        let parameters = constrainedSignature.parameters
         let arguments = parameters.map { LabeledValue(label: $0.label, value: $0.type) }
         return !functionSignature(of: declaration.name, inConstrained: type.constrainedTypeWithGenerics(generics), arguments: arguments, excludeConstrainedExtensions: true).isEmpty
     }
@@ -75,20 +79,30 @@ extension CodebaseInfo.Context {
         guard !declaration.names.isEmpty, let name = declaration.names[0] else {
             return false
         }
-        return isProtocolMember(name: name, type: nil, isStatic: declaration.modifiers.isStatic, in: type)
+        return isProtocolMember(name: name, parameters: nil, isStatic: declaration.modifiers.isStatic, in: type)
     }
 
     /// Whether this declaration is implementing a protocol function.
     func isImplementingProtocolMember(declaration: FunctionDeclaration, in type: TypeSignature) -> Bool {
-        return isProtocolMember(name: declaration.name, type: declaration.functionType, isStatic: declaration.modifiers.isStatic, in: type)
+        return isProtocolMember(name: declaration.name, parameters: declaration.functionType.parameters, isStatic: declaration.modifiers.isStatic, in: type)
     }
 
     /// Whether the given member is declared by a protocol of the given type.
-    func isProtocolMember(name: String, type: TypeSignature?, isStatic: Bool, in owningType: TypeSignature) -> Bool {
+    func isProtocolMember(name: String, parameters: [TypeSignature.Parameter]?, isStatic: Bool, in owningType: TypeSignature) -> Bool {
         assert(global.kotlin != nil)
-        //~~~ Need to map generics
         let protocolSignatures = global.protocolSignatures(forNamed: owningType)
-        return protocolSignatures.contains { hasMember($0, name: name, type: type, isStatic: isStatic, filterKotlinExtensions: false) }
+        for protocolSignature in protocolSignatures {
+            for protocolInfo in typeInfos(forNamed: protocolSignature) {
+                if let parameters {
+                    if protocolInfo.functions.contains(where: { $0.name == name && $0.signature.parameters.map(\.label) == parameters.map(\.label) }) {
+                        return true
+                    }
+                } else if protocolInfo.variables.contains(where: { $0.name == name }) {
+                    return true
+                }
+            }
+        }
+        return false
     }
 
     /// Whether the given type may be a mutable struct.
@@ -145,17 +159,8 @@ extension CodebaseInfo.Context {
         return items.contains { $0.declarationType == .functionDeclaration && $0.declaringType?.name == owningType?.name }
     }
 
-    private func hasMember(_ owningType: TypeSignature, name: String, type: TypeSignature?, isStatic: Bool, filterKotlinExtensions: Bool) -> Bool {
+    private func hasMember(_ owningType: TypeSignature, name: String, type: TypeSignature?, isStatic: Bool) -> Bool {
         for typeInfo in typeInfos(forNamed: owningType) {
-            if filterKotlinExtensions && typeInfo.declarationType == .extensionDeclaration {
-                if let extensionDeclaration = typeInfo.languageAdditions as? ExtensionDeclaration {
-                    if !extensionDeclaration.canMoveIntoExtendedType {
-                        continue // Will use Kotlin extensions
-                    }
-                } else {
-                    continue // Outside type will use Kotlin extensions
-                }
-            }
             if typeInfo.visibleMembers(context: self).contains(where: { $0.name == name && $0.isStatic == isStatic && (type == nil || $0.signature == type) }) {
                 return true
             }

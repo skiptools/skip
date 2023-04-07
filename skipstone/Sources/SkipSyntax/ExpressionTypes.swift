@@ -566,6 +566,24 @@ class FunctionCall: Expression {
         let baseType: TypeSignature?
         let name: String
         switch function.type {
+        case .arrayLiteral:
+            // Must be a constructor call, e.g. [String]()
+            function.inferTypes(context: context, expecting: expecting)
+            if case .array(let element) = function.inferredType {
+                returnType = .array(element.asMetaType(false))
+            } else {
+                returnType = function.inferredType.or(expecting)
+            }
+            return context
+        case .dictionaryLiteral:
+            // Must be a constructor call, e.g. [String: Int]()
+            function.inferTypes(context: context, expecting: expecting)
+            if case .dictionary(let keyType, let valueType) = function.inferredType {
+                returnType = .dictionary(keyType.asMetaType(false), valueType.asMetaType(false))
+            } else {
+                returnType = function.inferredType.or(expecting)
+            }
+            return context
         case .identifier:
             let identifier = function as! Identifier
             identifier.isCalledAsFunction = true
@@ -574,8 +592,8 @@ class FunctionCall: Expression {
                 name = identifier.name
             } else {
                 // If generics are specified, assume the identifier is a type name and this call is a constructor
-                baseType = TypeSignature.for(name: identifier.name, genericTypes: identifier.generics)
-                name = "init"
+                returnType = TypeSignature.for(name: identifier.name, genericTypes: identifier.generics)
+                return context
             }
         case .memberAccess:
             let memberAccess = function as! MemberAccess

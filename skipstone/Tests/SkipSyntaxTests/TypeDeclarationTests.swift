@@ -398,7 +398,95 @@ final class TypeDeclarationTests: XCTestCase {
     }
 
     func testGenericProtocolConformance() async throws {
-        //~~~
+        try await check(swift: """
+        protocol P {
+            associatedtype T
+        }
+        class C: P {
+            typealias T = Int
+        }
+        """, kotlin: """
+        internal interface P<T> {
+        }
+        internal open class C: P<Int> {
+        }
+        """)
+
+        try await check(swift: """
+        protocol P {
+            associatedtype T
+            func add(t: T)
+            func get() -> T
+        }
+        class C: P {
+            func add(t: Int) {
+            }
+            func get() -> Int {
+                return 0
+            }
+        }
+        """, kotlin: """
+        internal interface P<T> {
+            fun add(t: T)
+            fun get(): T
+        }
+        internal open class C: P<Int> {
+            override fun add(t: Int) {
+            }
+            override fun get(): Int {
+                return 0
+            }
+        }
+        """)
+
+        try await check(swift: """
+        protocol P {
+            associatedtype T
+            func add(t: [T])
+        }
+        protocol U: P {
+            associatedtype K
+            associatedtype V
+            var map: [K: V] { get }
+        }
+        class C: U {
+            var map = [String: Double]()
+            func add(t: [Int]) {
+            }
+            func add(x: Double) {
+            }
+        }
+        """, kotlin: """
+        internal interface P<T> {
+            fun add(t: Array<T>)
+        }
+        internal interface U<T, K, V>: P<T> {
+            val map: Dictionary<K, V>
+        }
+        internal open class C: U<Int, String, Double> {
+            override var map = Dictionary<String, Double>()
+                get() {
+                    return field.sref({ this.map = it })
+                }
+                set(newValue) {
+                    field = newValue.sref()
+                }
+            override fun add(t: Array<Int>) {
+            }
+            internal open fun add(x: Double) {
+            }
+        }
+        """)
+
+        try await checkProducesMessage(swift: """
+        protocol P {
+        }
+        class C: P {
+            typealias T = Int
+            func f(t: [T]) {
+            }
+        }
+        """)
     }
 
     func testGenericInheritance() async throws {
@@ -566,9 +654,8 @@ final class TypeDeclarationTests: XCTestCase {
         """)
     }
 
-    func testGenerics() async throws {
-        throw XCTSkip("TODO: Generics in classes, structs, extensions, typealiases. Generic where clauses. Members of generic types, including types constrained so we know they're not mutable structs")
-        //~~~ inner classes can use types from outer classes in Swift, but Kotlin has to declare the inner class generic
+    func testGenericInnerClasses() async throws {
+        throw XCTSkip("TODO: Inner classes can use types from outer classes in Swift, but Kotlin has to declare the inner class generic")
         /*
          class Dict<K, V> {
              struct Entry {
@@ -584,19 +671,6 @@ final class TypeDeclarationTests: XCTestCase {
              return Dict<Int, String>.Entry(key: 1, value: "s")
          }
          */
-        //~~~ Swift determines implemented protocol types, but in Kotlin you must declare them
-        /*
-         protocol P {
-             associatedtype T
-             func f() -> T
-         }
-         class C: P {
-             func f() -> Int {
-                 return 0
-             }
-         }
-         */
-         // Test enums and extensions
     }
 
     func testLocalTypes() async throws {

@@ -893,55 +893,58 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         }
     }
 
-    static func `for`(name: String, genericTypes: [TypeSignature]) -> TypeSignature {
+    static func `for`(name: String, genericTypes: [TypeSignature], allowNamed: Bool = true) -> TypeSignature {
         switch name {
         case "Any":
-            return genericTypes.isEmpty ? .any : .named(name, genericTypes)
+            return genericTypes.isEmpty ? .any : allowNamed ? .named(name, genericTypes) : .none
         case "AnyObject":
-            return genericTypes.isEmpty ? .anyObject : .named(name, genericTypes)
+            return genericTypes.isEmpty ? .anyObject : allowNamed ? .named(name, genericTypes) : .none
         case "AnyType":
             return .metaType(.any)
         case "Array":
-            return genericTypes.isEmpty ? .array(.any) : genericTypes.count == 1 ? .array(genericTypes[0]) : .named(name, genericTypes)
+            return genericTypes.isEmpty ? .array(.any) : allowNamed ? genericTypes.count == 1 ? .array(genericTypes[0]) : .named(name, genericTypes) : .none
         case "Bool":
-            return genericTypes.isEmpty ? .bool : .named(name, genericTypes)
+            return genericTypes.isEmpty ? .bool : allowNamed ? .named(name, genericTypes) : .none
         case "Character":
-            return genericTypes.isEmpty ? .character : .named(name, genericTypes)
+            return genericTypes.isEmpty ? .character : allowNamed ? .named(name, genericTypes) : .none
         case "Dictionary":
-            return genericTypes.isEmpty ? .dictionary(.any, .any) : genericTypes.count == 2 ? .dictionary(genericTypes[0], genericTypes[1]) : .named(name, genericTypes)
+            return genericTypes.isEmpty ? .dictionary(.any, .any) : genericTypes.count == 2 ? .dictionary(genericTypes[0], genericTypes[1]) : allowNamed ? .named(name, genericTypes) : .none
         case "Double":
-            return genericTypes.isEmpty ? .double : .named(name, genericTypes)
+            return genericTypes.isEmpty ? .double : allowNamed ? .named(name, genericTypes) : .none
         case "Float":
-            return genericTypes.isEmpty ? .float : .named(name, genericTypes)
+            return genericTypes.isEmpty ? .float : allowNamed ? .named(name, genericTypes) : .none
         case "Int":
-            return genericTypes.isEmpty ? .int : .named(name, genericTypes)
+            return genericTypes.isEmpty ? .int : allowNamed ? .named(name, genericTypes) : .none
         case "Int8":
-            return genericTypes.isEmpty ? .int8 : .named(name, genericTypes)
+            return genericTypes.isEmpty ? .int8 : allowNamed ? .named(name, genericTypes) : .none
         case "Int16":
-            return genericTypes.isEmpty ? .int16 : .named(name, genericTypes)
+            return genericTypes.isEmpty ? .int16 : allowNamed ? .named(name, genericTypes) : .none
         case "Int32":
-            return genericTypes.isEmpty ? .int32 : .named(name, genericTypes)
+            return genericTypes.isEmpty ? .int32 : allowNamed ? .named(name, genericTypes) : .none
         case "Int64":
-            return genericTypes.isEmpty ? .int64 : .named(name, genericTypes)
+            return genericTypes.isEmpty ? .int64 : allowNamed ? .named(name, genericTypes) : .none
         case "Range":
-            return genericTypes.isEmpty ? .range(.any) : genericTypes.count == 1 ? .range(genericTypes[0]) : .named(name, genericTypes)
+            return genericTypes.isEmpty ? .range(.any) : genericTypes.count == 1 ? .range(genericTypes[0]) : allowNamed ? .named(name, genericTypes) : .none
         case "Set":
-            return genericTypes.isEmpty ? .set(.any) : genericTypes.count == 1 ? .set(genericTypes[0]) : .named(name, genericTypes)
+            return genericTypes.isEmpty ? .set(.any) : genericTypes.count == 1 ? .set(genericTypes[0]) : allowNamed ? .named(name, genericTypes) : .none
         case "String":
-            return genericTypes.isEmpty ? .string : .named(name, genericTypes)
+            return genericTypes.isEmpty ? .string : allowNamed ? .named(name, genericTypes) : .none
         case "UInt":
-            return genericTypes.isEmpty ? .uint : .named(name, genericTypes)
+            return genericTypes.isEmpty ? .uint : allowNamed ? .named(name, genericTypes) : .none
         case "UInt8":
-            return genericTypes.isEmpty ? .uint8 : .named(name, genericTypes)
+            return genericTypes.isEmpty ? .uint8 : allowNamed ? .named(name, genericTypes) : .none
         case "UInt16":
-            return genericTypes.isEmpty ? .uint16 : .named(name, genericTypes)
+            return genericTypes.isEmpty ? .uint16 : allowNamed ? .named(name, genericTypes) : .none
         case "UInt32":
-            return genericTypes.isEmpty ? .uint32 : .named(name, genericTypes)
+            return genericTypes.isEmpty ? .uint32 : allowNamed ? .named(name, genericTypes) : .none
         case "UInt64":
-            return genericTypes.isEmpty ? .uint64 : .named(name, genericTypes)
+            return genericTypes.isEmpty ? .uint64 : allowNamed ? .named(name, genericTypes) : .none
         case "Void":
-            return genericTypes.isEmpty ? .void : .named(name, genericTypes)
+            return genericTypes.isEmpty ? .void : allowNamed ? .named(name, genericTypes) : .none
         default:
+            if !allowNamed {
+                return .none
+            }
             if let lastSeparator = name.lastIndex(of: "."), lastSeparator != name.index(before: name.endIndex) {
                 let firstPart = String(name[..<lastSeparator])
                 let lastName = String(name[name.index(after: lastSeparator)...])

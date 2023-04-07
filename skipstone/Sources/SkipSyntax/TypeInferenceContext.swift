@@ -141,7 +141,7 @@ struct TypeInferenceContext {
         }
 
         guard let codebaseInfo else {
-            return .none
+            return TypeSignature.for(name: name, genericTypes: [], allowNamed: false).asMetaType(true)
         }
 
         for pathEntry in path.reversed() {
@@ -205,11 +205,8 @@ struct TypeInferenceContext {
     ///   - type: The function's owning type if this is a member function, or nil if not.
     func function(_ name: String, in type: TypeSignature?, parameters: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
         if let type, type.isOptional {
-            return function(name, inNonOptional: type.asOptional(false), parameters: parameters).map { signature in
-                guard case .function(let parameters, let returnType) = signature else {
-                    return signature
-                }
-                return .function(parameters, returnType.asOptional(true))
+            return function(name, inNonOptional: type.asOptional(false), parameters: parameters).map {
+                .function($0.parameters, $0.returnType.asOptional(true))
             }
         } else {
             return function(name, inNonOptional: type, parameters: parameters)
@@ -247,11 +244,8 @@ struct TypeInferenceContext {
     ///   - type: The subscript's owning type.
     func `subscript`(in type: TypeSignature, parameters: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
         if case .optional = type {
-            return self.subscript(inNonOptional: type.asOptional(false), parameters: parameters).map { signature in
-                guard case .function(let parameters, let returnType) = signature else {
-                    return signature
-                }
-                return .function(parameters, returnType.asOptional(true))
+            return self.subscript(inNonOptional: type.asOptional(false), parameters: parameters).map {
+                .function($0.parameters, $0.returnType.asOptional(true))
             }
         } else {
             return self.subscript(inNonOptional: type, parameters: parameters)

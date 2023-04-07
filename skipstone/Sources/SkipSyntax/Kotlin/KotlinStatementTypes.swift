@@ -676,16 +676,25 @@ class KotlinClassDeclaration: KotlinStatement {
         kstatement.inherits = statement.inherits
         kstatement.modifiers = statement.modifiers
         kstatement.generics = statement.generics
+
         var members = statement.members.flatMap { translator.translateStatement($0) }
-        // Move extensions of this type into the type itself rather than use Kotlin extension functions.
-        // Kotlin extension functions act like static functions, which can lead to different behavior
         if let codebaseInfo = translator.codebaseInfo {
-            for ext in codebaseInfo.extensions(of: statement.signature) where ext.canMoveIntoExtendedType {
-                kstatement.inherits += ext.inherits
-                members += ext.members.flatMap { translator.translateStatement($0) }
+            if let typeInfo = codebaseInfo.primaryTypeInfo(forNamed: statement.signature) {
+                // Type info contains full resolved generics
+                kstatement.signature = typeInfo.signature
+                kstatement.inherits = typeInfo.inherits
+                kstatement.generics = typeInfo.generics
+            }
+
+            // Move extensions of this type into the type itself rather than use Kotlin extension functions.
+            // Kotlin extension functions act like static functions, which can lead to different behavior
+            for (extInfo, extDeclaration) in codebaseInfo.extensions(of: statement.signature) where extDeclaration.canMoveIntoExtendedType {
+                kstatement.inherits += extInfo.inherits
+                members += extDeclaration.members.flatMap { translator.translateStatement($0) }
             }
         }
         kstatement.members = members
+
         kstatement.processEnumCaseDeclarations()
         kstatement.inherits.forEach { $0.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
         if statement.attributes.attributes.contains(where: { !isIgnorable(attribute: $0) }) {
@@ -1284,23 +1293,25 @@ class KotlinInterfaceDeclaration: KotlinStatement {
         kstatement.generics = statement.generics
         kstatement.members = statement.members.flatMap { translator.translateStatement($0) }
         kstatement.inherits.forEach { $0.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
-        guard let codebaseInfo = translator.codebaseInfo, let typeInfo = codebaseInfo.primaryTypeInfo(forNamed: statement.signature) else {
+        guard let codebaseInfo = translator.codebaseInfo else {
             return kstatement
         }
 
-        // Type info contains full resolved generics
-        kstatement.signature = typeInfo.signature
-        kstatement.inherits = typeInfo.inherits
-        kstatement.generics = typeInfo.generics
+        if let typeInfo = codebaseInfo.primaryTypeInfo(forNamed: statement.signature) {
+            // Type info contains full resolved generics
+            kstatement.signature = typeInfo.signature
+            kstatement.inherits = typeInfo.inherits
+            kstatement.generics = typeInfo.generics
+        }
 
         // Move extensions of this type into the type itself rather than use Kotlin extension functions.
         // This allows us to replace API declarations with implementations. Also Kotlin extension functions
         // act like static functions, which can lead to different behavior
         var originalMembers = kstatement.members
         var newMembers: [KotlinStatement] = []
-        for ext in codebaseInfo.extensions(of: statement.signature) where ext.canMoveIntoExtendedType {
-            kstatement.inherits += ext.inherits
-            for extMember in ext.members.flatMap({ translator.translateStatement($0) }) {
+        for (extInfo, extDeclaration) in codebaseInfo.extensions(of: statement.signature) where extDeclaration.canMoveIntoExtendedType {
+            kstatement.inherits += extInfo.inherits
+            for extMember in extDeclaration.members.flatMap({ translator.translateStatement($0) }) {
                 if !replaceMember(in: &originalMembers, with: extMember) {
                     newMembers.append(extMember)
                 }
@@ -1382,18 +1393,59 @@ class KotlinTypealiasDeclaration: KotlinStatement, KotlinMemberDeclaration {
         return false
     }
 
-    static func translate(statement: TypealiasDeclaration, translator: KotlinTranslator) -> KotlinTypealiasDeclaration {
+    static func translate(statement: TypealiasDeclaration, translator: KotlinTranslator) -> KotlinTypealiasDeclaration? {
         let kstatement = KotlinTypealiasDeclaration(statement: statement)
         kstatement.modifiers = statement.modifiers
         kstatement.generics = statement.generics
         kstatement.aliasedType = statement.aliasedType
-        if statement.owningTypeDeclaration != nil {
+
+        var isNested = false
+        if statement.owningFunctionDeclaration != nil {
+            isNested = true
+        } else if let owningTypeDeclaration = statement.owningTypeDeclaration {
+            // This might be a typealias that specifies one of our protocol's associatedtypes. But we can only detect that case if we have full
+            // codebase info, which we don't have during pre-checks. Compromise and warn if the typealias is used anywhere in our API
+            if owningTypeDeclaration.type == .protocolDeclaration || owningTypeDeclaration.inherits.isEmpty {
+                isNested = true
+            } else if let codebaseInfo = translator.codebaseInfo {
+                let protocolSignatures = codebaseInfo.global.protocolSignatures(forNamed: owningTypeDeclaration.signature)
+                if protocolSignatures.contains(where: { $0.generics.contains { $0.name == statement.name } }) {
+                    return nil
+                } else {
+                    isNested = true
+                }
+            } else {
+                for member in owningTypeDeclaration.members {
+                    if memberDeclaration(member, usesTypealias: statement.name) {
+                        isNested = true
+                        break
+                    }
+                }
+            }
+        }
+        if isNested {
             kstatement.messages.append(.kotlinTypeAliasNested(statement, source: translator.syntaxTree.source))
         }
         if statement.generics.entries.contains(where: { !$0.inherits.isEmpty || $0.whereEqual != nil }) {
             kstatement.messages.append(.kotlinTypeAliasConstrainedGenerics(statement, source: translator.syntaxTree.source))
         }
         return kstatement
+    }
+
+    /// Check whether the given member uses the given type.
+    ///
+    /// - Note: This is not a comprehensive check.
+    private static func memberDeclaration(_ member: Statement, usesTypealias aliasName: String) -> Bool {
+        // Map the typealias to a marker target and if the mapping changes the type, we know the typealias was found and replaced
+        let from: [TypeSignature] = [.named(aliasName, [])]
+        let marker: [TypeSignature] = [.named("marker_type", [])]
+        if let variableDeclaration = member as? VariableDeclaration {
+            return variableDeclaration.variableTypes.map { $0.mappingGenerics(from: from, to: marker) } != variableDeclaration.variableTypes
+        } else if let functionDeclaration = member as? FunctionDeclaration {
+            return functionDeclaration.functionType.mappingGenerics(from: from, to: marker) != functionDeclaration.functionType
+        } else {
+            return false
+        }
     }
 
     private init(statement: TypealiasDeclaration) {
@@ -1423,6 +1475,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var isLet = false
     var isAsync = false
     var isProperty = false
+    var isProtocolProperty = false
     var isGlobal = false
     var isOpen = false
     var modifiers = Modifiers()
@@ -1462,6 +1515,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             owningDeclarationType = translator.codebaseInfo?.declarationType(ofNamed: owningTypeDeclaration.signature) ?? owningTypeDeclaration.type
             kstatement.isProperty = true
             if owningDeclarationType == .protocolDeclaration {
+                kstatement.isProtocolProperty = true
                 // Kotlin uses default public visibility on all interface members
                 kstatement.modifiers.visibility = .public
             } else {
@@ -1595,7 +1649,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 output.append(" = ").append(value, indentation: indentation)
             } else {
                 // In Swift an optional var defaults to nil, but not so in Kotlin
-                if (isProperty || isGlobal), declaredType.isOptional, !isLet, getter == nil {
+                if (isProperty || isGlobal), !isProtocolProperty, declaredType.isOptional, !isLet, getter == nil {
                     output.append(" = null")
                 }
             }
@@ -1608,7 +1662,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             output.append(getterIndentation).append("get() {\n")
             output.append(getterBody, indentation: getterIndentation.inc())
             output.append(getterIndentation).append("}\n")
-        } else if mayBeSharedMutableStruct && (isProperty || isGlobal) {
+        } else if mayBeSharedMutableStruct && (isProperty || isGlobal) && !isProtocolProperty {
             let getterIndentation = indentation.inc()
             output.append(getterIndentation).append("get() {\n")
             output.append(getterIndentation.inc()).append("return field.sref(\(onUpdate ?? ""))\n")
@@ -1680,7 +1734,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 }
             }
             output.append(setterIndentation).append("}\n")
-        } else if !isReadOnly && mayBeSharedMutableStruct && (isProperty || isGlobal) {
+        } else if !isReadOnly && mayBeSharedMutableStruct && (isProperty || isGlobal) && !isProtocolProperty {
             let setterIndentation = indentation.inc()
             output.append(setterIndentation).append("set(newValue) {\n")
             output.append(setterIndentation.inc()).append("field = newValue.sref()\n")

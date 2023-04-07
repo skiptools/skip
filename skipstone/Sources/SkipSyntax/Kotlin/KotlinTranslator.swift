@@ -127,7 +127,11 @@ public class KotlinTranslator {
             case .structDeclaration:
                 return [KotlinClassDeclaration.translate(statement: statement as! TypeDeclaration, translator: self)]
             case .typealiasDeclaration:
-                return [KotlinTypealiasDeclaration.translate(statement: statement as! TypealiasDeclaration, translator: self)]
+                if let typealiasDeclaration = KotlinTypealiasDeclaration.translate(statement: statement as! TypealiasDeclaration, translator: self) {
+                    return [typealiasDeclaration]
+                } else {
+                    return []
+                }
             case .variableDeclaration:
                 return [KotlinVariableDeclaration.translate(statement: statement as! VariableDeclaration, translator: self)]
             case .raw:

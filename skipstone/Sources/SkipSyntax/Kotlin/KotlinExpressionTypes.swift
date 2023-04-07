@@ -1052,7 +1052,14 @@ class KotlinMemberAccess: KotlinExpression {
         guard identifier.name != "Self" && identifier.name != "self" else {
             return nil
         }
-        // For an Identifier, check if it's a declared type
+        // For an Identifier, check if it's a type
+        guard identifier.generics.isEmpty else {
+            return nil
+        }
+        guard TypeSignature.for(name: identifier.name, genericTypes: [], allowNamed: false) == .none else {
+            return nil
+        }
+
         guard let codebaseInfo else {
             return nil
         }

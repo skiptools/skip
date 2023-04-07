@@ -343,8 +343,12 @@ struct Generics: Equatable, Codable {
         self.entries = entries
     }
 
-    init(_ names: [TypeSignature], whereEqual: [TypeSignature]) {
-        self.entries = zip(names, whereEqual).map { Generic(name: $0.0.name, whereEqual: $0.1) }
+    init(_ names: [TypeSignature], whereEqual: [TypeSignature]? = nil) {
+        if let whereEqual {
+            self.entries = zip(names, whereEqual).map { Generic(name: $0.0.name, whereEqual: $0.1) }
+        } else {
+            self.entries = names.map { Generic(name: $0.name) }
+        }
     }
 
     /// Decode the generics information in the given syntax.
