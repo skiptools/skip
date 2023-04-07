@@ -4,7 +4,7 @@ The Skip plugin for Xcode transpiles Swift SPM packages into Kotlin Gradle proje
 
 1. Create a new Swift package from Xcode.app 14.3+ with `File -> New -> Package`.
     <details><summary>Creating a new Multiplatform Swift Package</summary><img width="1512" alt="skip-onboard-01" src="https://user-images.githubusercontent.com/659086/230632488-8bf87042-59ba-48aa-9108-71efdea5d9bb.png"></details>
-    This example name the new package “MyLibrary” and save it to the Desktop, but the package can be named anything.
+    This example names the package “MyLibrary” and saves it to the Desktop.
 
 1. Select the new `Package.swift` file in Xcode and add the following lines to activate the Skip transpiler plugin:
     ```swift
@@ -31,7 +31,7 @@ The Skip plugin for Xcode transpiles Swift SPM packages into Kotlin Gradle proje
 You can run the test cases by selecting `MyLibrary-Package` running on `My Mac`.
 Successful transpilation and test case runs will show up in the log.
     <details><summary>Running the transpiled Kotlin test cases</summary><img width="1412" alt="skip-init-screenshot-2" src="https://user-images.githubusercontent.com/659086/229834667-f2939738-d21a-4814-94a1-63e316ca2dc5.png"></details>
-    Note: the Kotlin test case must be run against the macOS (rather than iOS), and Gradle must be installed on the machine with the homebrew (https://brew.sh) command: `brew install gradle`
+    Note: the Kotlin test case must be run against the macOS platform (rather than iOS) and Gradle must be installed on the machine with the homebrew (https://brew.sh) command: `brew install gradle`
 
 1. Test failures will be reported for both the failed Swift test cases, as well as the transpiled Kotlin JUnit tests.
 For example, if we change the assertion from "*Hello* World" to "*Goodbye* World", the two failed Swift XCTest and Kotlin JUnit tests can each be seen.
