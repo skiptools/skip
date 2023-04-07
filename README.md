@@ -9,7 +9,7 @@ and name it "MyLibrary".
 
 1. Select the `Package.swift` file and append the following lines to activate the Skip transpiler plugin:
     ```swift
-    package.dependencies += [.package(url: "https://github.com/skiptools/skip", from: "0.3.15")]
+    package.dependencies += [.package(url: "https://github.com/skiptools/skip", from: "0.3.16")]
     package.dependencies += [.package(url: "https://github.com/skiptools/skiphub", from: "0.1.2")]
     ```
     After saving the file, Xcode will download and install the Skip packages so they appear in the project navigator.
