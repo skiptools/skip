@@ -149,8 +149,8 @@ public class CodebaseInfo: Codable {
         let type = type.asOptional(false)
         let typeInfos = typeInfos(forNamed: type)
         var signatures = typeInfos.flatMap { $0.inherits.flatMap { protocolSignatures(forNamed: $0) } }
-        // TODO: Remove special case for Error when we add SkipLib codebase info dependency
-        if type == .anyObject || type == .named("Error", []) {
+        // TODO: Remove special cases when we add SkipLib codebase info dependency
+        if type == .anyObject || type == .named("Error", []) || type == .named("Hashable", []) {
             signatures.insert(type, at: 0)
         } else if let protocolInfo = typeInfos.first(where: { $0.declarationType == .protocolDeclaration }) {
             signatures.insert(protocolInfo.signature, at: 0)

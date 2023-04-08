@@ -764,6 +764,42 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """)
     }
+
+    func testCustomHash() async throws {
+        try await check(swift: """
+        class C<T>: Hashable where T: AnyObject, T: Hashable {
+            var t: T
+            init(t: T) {
+                self.t = t
+            }
+            func f() -> Int {
+                return 1
+            }
+            func hash(into hasher: inout Hasher) {
+                hasher.combine(t)
+                hasher.combine(f())
+            }
+        }
+        """, kotlin: """
+        internal open class C<T>: Hashable where T: Any, T: Hashable {
+            internal var t: T
+            internal constructor(t: T) {
+                this.t = t
+            }
+            internal open fun f(): Int {
+                return 1
+            }
+            override fun hash(into: InOut<Hasher>) {
+                val hasher = into
+                hasher.value.combine(t)
+                hasher.value.combine(f())
+            }
+            override fun hashCode(): Int {
+                return hashValue
+            }
+        }
+        """)
+    }
 }
 
 var sideEffectOrdering: [String] = []

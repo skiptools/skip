@@ -1048,6 +1048,9 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var isEqualImplementation: Bool {
         return name == "==" && modifiers.isStatic && parameters.count == 2
     }
+    var isHashImplementation: Bool {
+        return name == "hash" && !modifiers.isStatic && parameters.count == 1 && parameters[0].isInOut && parameters[0].declaredType == .named("Hasher", [])
+    }
 
     // KotlinMemberDeclaration
     var extends: (TypeSignature, Generics)? {
@@ -1094,7 +1097,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                     // Kotlin uses default public visibility on all interface members
                     kstatement.modifiers.visibility = .public
                 } else {
-                    if !kstatement.modifiers.isOverride && translator.codebaseInfo?.isImplementingProtocolMember(declaration: statement, in: owningTypeDeclaration.signature) == true {
+                    if !kstatement.modifiers.isOverride && (kstatement.isHashImplementation || translator.codebaseInfo?.isImplementingProtocolMember(declaration: statement, in: owningTypeDeclaration.signature) == true) {
                         kstatement.modifiers.isOverride = true
                     }
                     kstatement.isOpen = !kstatement.modifiers.isOverride && !statement.modifiers.isFinal && statement.modifiers.visibility != .private && owningDeclarationType == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
@@ -1206,6 +1209,12 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             output.append(indentation).append("}\n")
         } else {
             output.append("\n")
+        }
+
+        if isHashImplementation {
+            output.append(indentation).append("override fun hashCode(): Int {\n")
+            output.append(indentation.inc()).append("return hashValue\n")
+            output.append(indentation).append("}\n")
         }
     }
 
