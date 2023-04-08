@@ -689,6 +689,28 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """)
     }
+
+    func testCustomSubscript() async throws {
+        try await checkProducesMessage(swift: """
+        class C {
+            subscript(index: Int) -> String {
+                return ""
+            }
+        }
+        """)
+    }
+
+    func testCustomOperator() async throws {
+        try await checkProducesMessage(swift: """
+        class C {
+        }
+        extension C {
+            static func + (lhs: C: rhs: C) -> C {
+                return lhs
+            }
+        }
+        """)
+    }
 }
 
 var sideEffectOrdering: [String] = []

@@ -1089,7 +1089,7 @@ public class CodebaseInfo: Codable {
             }
             if let sourceFile {
                 var fileMessages = messages[sourceFile, default: []]
-                fileMessages.append(.variableNeedsTypeDeclaration(sourceDerived: value!, source: source))
+                fileMessages.append(.variableNeedsTypeDeclaration(value!, source: source))
                 messages[sourceFile] = fileMessages
             }
             var v = self

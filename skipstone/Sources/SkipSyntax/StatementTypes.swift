@@ -771,7 +771,7 @@ class FunctionDeclaration: Statement {
 
     override func resolveAttributes(in syntaxTree: SyntaxTree) {
         if parent?.owningFunctionDeclaration != nil {
-            messages.append(.localFunctionsNotSupported(sourceDerived: self, source: syntaxTree.source))
+            messages.append(.localFunctionsNotSupported(self, source: syntaxTree.source))
         }
         if type == .initDeclaration, let owningTypeDeclaration {
             returnType = owningTypeDeclaration.signature.asOptional(isOptionalInit)
@@ -1007,7 +1007,7 @@ class TypeDeclaration: Statement {
 
     override func resolveAttributes(in syntaxTree: SyntaxTree) {
         if parent?.owningFunctionDeclaration != nil {
-            messages.append(.localTypesNotSupported(sourceDerived: self, source: syntaxTree.source))
+            messages.append(.localTypesNotSupported(self, source: syntaxTree.source))
         }
         if _signature == nil {
             _signature = qualifyDeclaredType(signature)

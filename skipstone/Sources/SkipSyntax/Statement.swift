@@ -50,6 +50,9 @@ struct  StatementDecoder {
         }
 
         // Unsupported
+        if message == nil, syntax.kind == .subscriptDecl {
+            message = .subscriptNotSupported(syntax, source: syntaxTree.source)
+        }
         statements.append(RawStatement(syntax: syntax, message: message, extras: extras, in: syntaxTree))
         return statements
     }
