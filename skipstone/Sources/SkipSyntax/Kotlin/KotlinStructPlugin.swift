@@ -14,12 +14,12 @@ class KotlinStructPlugin: KotlinPlugin {
                 updateStructDeclaration(classDeclaration, translator: translator)
             }
         } else if let variableDeclaration = node as? KotlinVariableDeclaration {
-            if !variableDeclaration.isStatic, !variableDeclaration.isReadOnly, let extends = variableDeclaration.extends, translator.codebaseInfo?.declarationType(ofNamed: extends.0) == .structDeclaration {
+            if !variableDeclaration.isStatic, !variableDeclaration.isReadOnly, let extends = variableDeclaration.extends, translator.codebaseInfo?.declarationType(forNamed: extends.0) == .structDeclaration {
                 variableDeclaration.mutationFunctionNames = mutationFunctionNames
             }
             return .skip
         } else if let functionDeclaration = node as? KotlinFunctionDeclaration {
-            if functionDeclaration.modifiers.isMutating, let extends = functionDeclaration.extends, translator.codebaseInfo?.declarationType(ofNamed: extends.0) == .structDeclaration {
+            if functionDeclaration.modifiers.isMutating, let extends = functionDeclaration.extends, translator.codebaseInfo?.declarationType(forNamed: extends.0) == .structDeclaration {
                 functionDeclaration.mutationFunctionNames = mutationFunctionNames
             }
         }

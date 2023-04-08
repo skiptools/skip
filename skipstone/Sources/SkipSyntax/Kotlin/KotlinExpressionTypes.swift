@@ -1063,7 +1063,7 @@ class KotlinMemberAccess: KotlinExpression {
         guard let codebaseInfo else {
             return nil
         }
-        return codebaseInfo.declarationType(ofNamed: .named(identifier.name, [])) == nil ? type : nil
+        return codebaseInfo.declarationType(forNamed: .named(identifier.name, [])) == nil ? type : nil
     }
 
     init(base: KotlinExpression, member: String) {

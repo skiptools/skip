@@ -979,7 +979,7 @@ struct KotlinExtensionDeclaration {
     static func translate(statement: ExtensionDeclaration, translator: KotlinTranslator) -> [KotlinStatement] {
         // If the extension can't move into its extended type or is on a type outside this module, use Kotlin extension
         // functions. Otherwise do not translate the extension - instead we'll move its members into the extended type
-        guard !statement.canMoveIntoExtendedType || translator.codebaseInfo?.declarationType(ofNamed: statement.extends, mustBeInModule: true) == nil else {
+        guard !statement.canMoveIntoExtendedType || translator.codebaseInfo?.declarationType(forNamed: statement.extends, mustBeInModule: true) == nil else {
             return []
         }
 
@@ -1045,6 +1045,9 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var functionType: TypeSignature {
         return .function(parameters.map(\.signature), returnType)
     }
+    var isEqualImplementation: Bool {
+        return name == "==" && modifiers.isStatic && parameters.count == 2
+    }
 
     // KotlinMemberDeclaration
     var extends: (TypeSignature, Generics)? {
@@ -1064,7 +1067,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         return extendsGenerics.merge(overrides: generics, addNew: true)
     }
     var isStatic: Bool {
-        return modifiers.isStatic
+        return modifiers.isStatic && !isEqualImplementation
     }
 
     static func translate(statement: FunctionDeclaration, translator: KotlinTranslator) -> KotlinFunctionDeclaration {
@@ -1077,7 +1080,9 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         var owningDeclarationType: StatementType? = nil
         if let owningTypeDeclaration = statement.owningTypeDeclaration, owningTypeDeclaration === statement.parent {
             // Use codebaseInfo rather than .type directly so that extension API is also handled correctly
-            owningDeclarationType = translator.codebaseInfo?.declarationType(ofNamed: owningTypeDeclaration.signature) ?? owningTypeDeclaration.type
+            owningDeclarationType = translator.codebaseInfo?.declarationType(forNamed: owningTypeDeclaration.signature) ?? owningTypeDeclaration.type
+            let owningSignature = translator.codebaseInfo?.primaryTypeInfo(forNamed: owningTypeDeclaration.signature)?.signature ?? owningTypeDeclaration.signature
+
             if statement.type == .initDeclaration {
                 kstatement.isOpen = false
                 kstatement.modifiers.isOverride = false // Kotlin does not override constructors
@@ -1099,6 +1104,16 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                     kstatement.modifiers.visibility = .public
                 }
             }
+            // Kotlin does not allow a generic type to refer to itself without constraints
+            if !owningSignature.generics.isEmpty {
+                let withoutGenerics: TypeSignature = .named(owningTypeDeclaration.name, [])
+                kstatement.returnType = kstatement.returnType.mappingTypes(from: [withoutGenerics], to: [owningSignature])
+                kstatement.parameters = kstatement.parameters.map {
+                    var parameter = $0
+                    parameter.declaredType = parameter.declaredType.mappingTypes(from: [withoutGenerics], to: [owningSignature])
+                    return parameter
+                }
+            }
         } else if statement.isGlobal {
             kstatement.isGlobal = true
         }
@@ -1113,7 +1128,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         kstatement.parameters.forEach { $0.declaredType.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
 
         // Warnings and fixups
-        if let firstCharacter = kstatement.name.first, firstCharacter != "_" && firstCharacter != "$" && !firstCharacter.isLetter && !firstCharacter.isNumber {
+        if !kstatement.isEqualImplementation, let firstCharacter = kstatement.name.first, firstCharacter != "_" && firstCharacter != "$" && !firstCharacter.isLetter && !firstCharacter.isNumber {
             kstatement.messages.append(.kotlinOperatorFunction(statement, source: translator.syntaxTree.source))
         }
         if owningDeclarationType == .protocolDeclaration {
@@ -1173,84 +1188,113 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             for annotation in annotations {
                 output.append(annotation + " ")
             }
-            output.append(modifiers.kotlinMemberString(isOpen: isOpen, suffix: " "))
-            if isAsync {
-                output.append("suspend ")
+            if isEqualImplementation {
+                appendEqualsDeclaration(to: output, indentation: indentation)
+            } else {
+                appendFunctionDeclaration(to: output, indentation: indentation)
             }
-
-            if type != .constructorDeclaration {
-                output.append("fun ")
-            }
-            let generics = extendsCombinedGenerics.filterWhereEqual()
-            if !generics.isEmpty {
-                generics.append(to: output, indentation: indentation)
-                output.append(" ")
-            }
-            appendExtends(to: output, indentation: indentation)
-            output.append(name).append("(")
-            for (index, parameter) in parameters.enumerated() {
-                if parameter.isVariadic {
-                    output.append("varargs ")
-                }
-                let label = parameter.externalLabel ?? parameter.internalLabel
-                output.append(label)
-                output.append(": ")
-                if parameter.isInOut {
-                    output.append("InOut<")
-                }
-                output.append(parameter.declaredType.or(.any).kotlin)
-                if parameter.isInOut {
-                    output.append(">")
-                }
-                // Kotlin does not allow default values to override functions
-                if let defaultValue = parameter.defaultValue, !modifiers.isOverride {
-                    output.append(" = ").append(defaultValue, indentation: indentation)
-                }
-                if index != parameters.count - 1 || disambiguatingParameterCount > 0 {
-                    output.append(", ")
-                }
-            }
-            for i in 0..<disambiguatingParameterCount {
-                output.append("unusedp_\(i): Nothing?")
-                if !modifiers.isOverride {
-                    output.append(" = null")
-                }
-                if i != disambiguatingParameterCount - 1 {
-                    output.append(", ")
-                }
-            }
-            output.append(")")
-            if type != .constructorDeclaration {
-                if returnType != .void && type != .constructorDeclaration {
-                    output.append(": ").append(returnType.kotlin)
-                }
-            } else if let delegatingConstructorCall {
-                output.append(": ").append(delegatingConstructorCall, indentation: indentation)
-            }
-            extendsCombinedGenerics.appendWhere(to: output, indentation: indentation)
         }
         if let body {
             output.append(" {\n")
             if !body.statements.isEmpty {
-                let bodyIndentation = indentation.inc()
-                for parameter in parameters {
-                    if let externalLabel = parameter.externalLabel, parameter.internalLabel != parameter.externalLabel {
-                        output.append(bodyIndentation).append("val \(parameter.internalLabel) = \(externalLabel)\n")
-                    }
+                if isEqualImplementation {
+                    appendEqualsBody(body, to: output, indentation: indentation.inc())
+                } else {
+                    appendFunctionBody(body, to: output, indentation: indentation.inc())
                 }
-                if type == .constructorDeclaration, let isConstructingPropertyName = (parent as? KotlinClassDeclaration)?.isConstructingPropertyName {
-                    output.append(bodyIndentation).append("\(isConstructingPropertyName) = true\n")
-                    body.syntheticFinally = "\(isConstructingPropertyName) = false"
-                } else if let mutationFunctionNames {
-                    output.append(bodyIndentation).append("\(mutationFunctionNames.willMutate)()\n")
-                    body.syntheticFinally = "\(mutationFunctionNames.didMutate)()"
-                }
-                output.append(body, indentation: bodyIndentation)
             }
             output.append(indentation).append("}\n")
         } else {
             output.append("\n")
         }
+    }
+
+    private func appendFunctionDeclaration(to output: OutputGenerator, indentation: Indentation) {
+        output.append(modifiers.kotlinMemberString(isOpen: isOpen, suffix: " "))
+        if isAsync {
+            output.append("suspend ")
+        }
+
+        if type != .constructorDeclaration {
+            output.append("fun ")
+        }
+        let generics = extendsCombinedGenerics.filterWhereEqual()
+        if !generics.isEmpty {
+            generics.append(to: output, indentation: indentation)
+            output.append(" ")
+        }
+        appendExtends(to: output, indentation: indentation)
+        output.append(name).append("(")
+        for (index, parameter) in parameters.enumerated() {
+            if parameter.isVariadic {
+                output.append("varargs ")
+            }
+            let label = parameter.externalLabel ?? parameter.internalLabel
+            output.append(label)
+            output.append(": ")
+            if parameter.isInOut {
+                output.append("InOut<")
+            }
+            output.append(parameter.declaredType.or(.any).kotlin)
+            if parameter.isInOut {
+                output.append(">")
+            }
+            // Kotlin does not allow default values to override functions
+            if let defaultValue = parameter.defaultValue, !modifiers.isOverride {
+                output.append(" = ").append(defaultValue, indentation: indentation)
+            }
+            if index != parameters.count - 1 || disambiguatingParameterCount > 0 {
+                output.append(", ")
+            }
+        }
+        for i in 0..<disambiguatingParameterCount {
+            output.append("unusedp_\(i): Nothing?")
+            if !modifiers.isOverride {
+                output.append(" = null")
+            }
+            if i != disambiguatingParameterCount - 1 {
+                output.append(", ")
+            }
+        }
+        output.append(")")
+        if type != .constructorDeclaration {
+            if returnType != .void && type != .constructorDeclaration {
+                output.append(": ").append(returnType.kotlin)
+            }
+        } else if let delegatingConstructorCall {
+            output.append(": ").append(delegatingConstructorCall, indentation: indentation)
+        }
+        extendsCombinedGenerics.appendWhere(to: output, indentation: indentation)
+    }
+
+    private func appendFunctionBody(_ body: KotlinCodeBlock, to output: OutputGenerator, indentation: Indentation) {
+        for parameter in parameters {
+            if let externalLabel = parameter.externalLabel, parameter.internalLabel != parameter.externalLabel {
+                output.append(indentation).append("val \(parameter.internalLabel) = \(externalLabel)\n")
+            }
+        }
+        if type == .constructorDeclaration, let isConstructingPropertyName = (parent as? KotlinClassDeclaration)?.isConstructingPropertyName {
+            output.append(indentation).append("\(isConstructingPropertyName) = true\n")
+            body.syntheticFinally = "\(isConstructingPropertyName) = false"
+        } else if let mutationFunctionNames {
+            output.append(indentation).append("\(mutationFunctionNames.willMutate)()\n")
+            body.syntheticFinally = "\(mutationFunctionNames.didMutate)()"
+        }
+        output.append(body, indentation: indentation)
+    }
+
+    private func appendEqualsDeclaration(to output: OutputGenerator, indentation: Indentation) {
+        output.append("override fun equals(other: Any?): Boolean")
+    }
+
+    private func appendEqualsBody(_ body: KotlinCodeBlock, to output: OutputGenerator, indentation: Indentation) {
+        let anyGenerics = parameters[1].declaredType.generics.map { _ in TypeSignature.named("*", []) }
+        output.append(indentation).append("if (other !is \(parameters[1].declaredType.withGenerics(anyGenerics).kotlin)) {\n")
+        output.append(indentation.inc()).append("return false\n")
+        output.append(indentation).append("}\n")
+        output.append(indentation).append("val \(parameters[0].internalLabel) = this\n")
+        output.append(indentation).append("val \(parameters[1].internalLabel) = other\n")
+        output.append(body, indentation: indentation)
     }
 }
 
@@ -1445,9 +1489,9 @@ class KotlinTypealiasDeclaration: KotlinStatement, KotlinMemberDeclaration {
         let from: [TypeSignature] = [.named(aliasName, [])]
         let marker: [TypeSignature] = [.named("marker_type", [])]
         if let variableDeclaration = member as? VariableDeclaration {
-            return variableDeclaration.variableTypes.map { $0.mappingGenerics(from: from, to: marker) } != variableDeclaration.variableTypes
+            return variableDeclaration.variableTypes.map { $0.mappingTypes(from: from, to: marker) } != variableDeclaration.variableTypes
         } else if let functionDeclaration = member as? FunctionDeclaration {
-            return functionDeclaration.functionType.mappingGenerics(from: from, to: marker) != functionDeclaration.functionType
+            return functionDeclaration.functionType.mappingTypes(from: from, to: marker) != functionDeclaration.functionType
         } else {
             return false
         }
@@ -1517,7 +1561,9 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         var owningDeclarationType: StatementType? = nil
         if let owningTypeDeclaration = statement.owningTypeDeclaration, owningTypeDeclaration === statement.parent {
             // Use codebaseInfo rather than .type directly so that extension API is also handled correctly
-            owningDeclarationType = translator.codebaseInfo?.declarationType(ofNamed: owningTypeDeclaration.signature) ?? owningTypeDeclaration.type
+            owningDeclarationType = translator.codebaseInfo?.declarationType(forNamed: owningTypeDeclaration.signature) ?? owningTypeDeclaration.type
+            let owningSignature = translator.codebaseInfo?.primaryTypeInfo(forNamed: owningTypeDeclaration.signature)?.signature ?? owningTypeDeclaration.signature
+
             kstatement.isProperty = true
             if owningDeclarationType == .protocolDeclaration {
                 kstatement.isProtocolProperty = true
@@ -1532,6 +1578,11 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             // Kotlin does not all you to decrease visibility when overriding a member, so we simply make all overrides public to prevent errors
             if kstatement.modifiers.isOverride {
                 kstatement.modifiers.visibility = .public
+            }
+            // Kotlin does not allow a generic type to refer to itself without constraints
+            if !owningSignature.generics.isEmpty {
+                let withoutGenerics: TypeSignature = .named(owningTypeDeclaration.name, [])
+                kstatement.declaredType = kstatement.declaredType.mappingTypes(from: [withoutGenerics], to: [owningSignature])
             }
         } else if statement.isGlobal {
             kstatement.isGlobal = true

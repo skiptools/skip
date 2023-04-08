@@ -212,7 +212,7 @@ public class CodebaseInfo: Codable {
         }
 
         /// Whether the given type is a class, struct, etc, optionally limiting results to this module.
-        func declarationType(ofNamed type: TypeSignature, unknownTypealiasFallback: StatementType = .classDeclaration, mustBeInModule: Bool = false) -> StatementType? {
+        func declarationType(forNamed type: TypeSignature, unknownTypealiasFallback: StatementType = .classDeclaration, mustBeInModule: Bool = false) -> StatementType? {
             assert(global.kotlin != nil)
             guard let typeInfo = primaryTypeInfo(forNamed: type) else {
                 guard let typealiasInfo = crossPlatformTypealias(forUnknownNamed: type) else {
@@ -385,16 +385,16 @@ public class CodebaseInfo: Codable {
             if let memberInfo = typeInfo.visibleMembers(context: self).first(where: { $0.name == member && ($0.declarationType == .initDeclaration || $0.isStatic == isStatic) }) {
                 // Enum cases with associated values are modeled as functions, but can also be used as identifiers
                 if memberInfo.declarationType == .enumCaseDeclaration {
-                    return typeInfo.signature.mappingGenerics(to: constrainedGenerics)
+                    return typeInfo.signature.mappingTypes(from: typeInfo.signature.generics, to: constrainedGenerics)
                 } else if memberInfo is TypeInfo || memberInfo.declarationType == .typealiasDeclaration {
-                    return memberInfo.signature.mappingGenerics(from: typeInfo.signature.generics, to: constrainedGenerics).asMetaType(true)
+                    return memberInfo.signature.mappingTypes(from: typeInfo.signature.generics, to: constrainedGenerics).asMetaType(true)
                 } else {
-                    return memberInfo.signature.mappingGenerics(from: typeInfo.signature.generics, to: constrainedGenerics)
+                    return memberInfo.signature.mappingTypes(from: typeInfo.signature.generics, to: constrainedGenerics)
                 }
             }
             for inherits in typeInfo.inherits {
                 for inheritsInfo in typeInfos(forNamed: inherits) {
-                    let inheritsConstraints = inherits.mappingGenerics(from: typeInfo.signature.generics, to: constrainedGenerics).generics
+                    let inheritsConstraints = inherits.mappingTypes(from: typeInfo.signature.generics, to: constrainedGenerics).generics
                     let signature = identifierSignature(of: member, in: inheritsInfo, constrainedGenerics: inheritsConstraints, isStatic: isStatic)
                     if signature != .none {
                         return signature
@@ -429,7 +429,7 @@ public class CodebaseInfo: Codable {
             }
             for inherits in typeInfo.inherits {
                 for inheritsInfo in typeInfos(forNamed: inherits) {
-                    let inheritsConstraints = inherits.mappingGenerics(from: typeInfo.signature.generics, to: constrainedGenerics).generics
+                    let inheritsConstraints = inherits.mappingTypes(from: typeInfo.signature.generics, to: constrainedGenerics).generics
                     candidates += functionCandidates(for: name, in: inheritsInfo, constrainedGenerics: inheritsConstraints, arguments: arguments, isStatic: isStatic)
                 }
             }
@@ -478,7 +478,7 @@ public class CodebaseInfo: Codable {
             guard case .function(let parameters, _) = memberInfo.signature else {
                 return nil
             }
-            return parameters.map { $0.mappingGenerics(from: typeInfo.signature.generics, to: constrainedGenerics) }
+            return parameters.map { $0.mappingTypes(from: typeInfo.signature.generics, to: constrainedGenerics) }
         }
 
         private func matchTuple(_ signature: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> TypeSignature {
@@ -500,7 +500,7 @@ public class CodebaseInfo: Codable {
             var constrainedParameters = parameters
             var generics = (item as? FunctionInfo)?.generics ?? Generics()
             if let typeInfo {
-                constrainedParameters = parameters.map { $0.mappingGenerics(from: typeInfo.signature.generics, to: constrainedGenerics) }
+                constrainedParameters = parameters.map { $0.mappingTypes(from: typeInfo.signature.generics, to: constrainedGenerics) }
                 generics = typeInfo.generics.merge(overrides: generics, addNew: true).merge(overrides: Generics(typeInfo.signature.generics, whereEqual: constrainedGenerics), addNew: true)
             }
             constrainedParameters = constrainedParameters.map { $0.constrainedTypeWithGenerics(generics) }
@@ -858,7 +858,7 @@ public class CodebaseInfo: Codable {
                 inheritInit.moduleName = typeInfo.moduleName
                 inheritInit.sourceFile = typeInfo.sourceFile
                 inheritInit.declaringType = typeInfo.signature
-                inheritInit.signature = inheritInit.signature.mappingGenerics(from: inheritGenerics, to: targetGenerics)
+                inheritInit.signature = inheritInit.signature.mappingTypes(from: inheritGenerics, to: targetGenerics)
                 inheritInit.isGenerated = true
                 typeInfo.functions.append(inheritInit)
             }

@@ -211,45 +211,6 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         }
     }
 
-    /// Map uses of generic parameters.
-    func mappingGenerics(from: [TypeSignature]? = nil, to: [TypeSignature]) -> TypeSignature {
-        let from = from ?? self.generics
-        guard !from.isEmpty, from.count == to.count else {
-            return self
-        }
-        switch self {
-        case .array(let element):
-            return .array(element.mappingGenerics(from: from, to: to))
-        case .composition(let types):
-            return .composition(types.map { $0.mappingGenerics(from: from, to: to) })
-        case .dictionary(let key, let value):
-            return .dictionary(key.mappingGenerics(from: from, to: to), value.mappingGenerics(from: from, to: to))
-        case .function(let parameters, let returnType):
-            return .function(parameters.map { $0.mappingGenerics(from: from, to: to) }, returnType.mappingGenerics(from: from, to: to))
-        case .member(let base, let type):
-            return .member(base.mappingGenerics(from: from, to: to), type.mappingGenerics(from: from, to: to))
-        case .metaType(let type):
-            return .metaType(type.mappingGenerics(from: from, to: to))
-        case .named(let name, let generics):
-            if generics.isEmpty, let fromIndex = from.firstIndex(of: self) {
-                return to[fromIndex]
-            }
-            return .named(name, generics.map { $0.mappingGenerics(from: from, to: to) })
-        case .optional(let type):
-            return .optional(type.mappingGenerics(from: from, to: to))
-        case .range(let element):
-            return .range(element.mappingGenerics(from: from, to: to))
-        case .set(let element):
-            return .set(element.mappingGenerics(from: from, to: to))
-        case .tuple(let labels, let types):
-            return .tuple(labels, types.map { $0.mappingGenerics(from: from, to: to) })
-        case .unwrappedOptional(let type):
-            return .unwrappedOptional(type.mappingGenerics(from: from, to: to))
-        default:
-            return self
-        }
-    }
-
     /// Return the generic mappings that were made from this type to the given type.
     func mergeGenericMappings(in target: TypeSignature, with generics: Generics) -> Generics {
         var generics = generics
@@ -379,6 +340,52 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             }
         default:
             return optional ? .optional(self) : self
+        }
+    }
+
+    /// Map uses of one set of types to another.
+    func mappingTypes(from: [TypeSignature], to: [TypeSignature]) -> TypeSignature {
+        guard !from.isEmpty, from.count == to.count else {
+            return self
+        }
+        return mappingTypes(with: Dictionary(uniqueKeysWithValues: zip(from, to)))
+    }
+
+    /// Map uses of one set of types to another.
+    func mappingTypes(with map: [TypeSignature: TypeSignature]) -> TypeSignature {
+        guard !map.isEmpty else {
+            return self
+        }
+        if let mapped = map[self] {
+            return mapped
+        }
+        switch self {
+        case .array(let element):
+            return .array(element.mappingTypes(with: map))
+        case .composition(let types):
+            return .composition(types.map { $0.mappingTypes(with: map) })
+        case .dictionary(let key, let value):
+            return .dictionary(key.mappingTypes(with: map), value.mappingTypes(with: map))
+        case .function(let parameters, let returnType):
+            return .function(parameters.map { $0.mappingTypes(with: map) }, returnType.mappingTypes(with: map))
+        case .member(let base, let type):
+            return .member(base.mappingTypes(with: map), type.mappingTypes(with: map))
+        case .metaType(let type):
+            return .metaType(type.mappingTypes(with: map))
+        case .named(let name, let generics):
+            return .named(name, generics.map { $0.mappingTypes(with: map) })
+        case .optional(let type):
+            return .optional(type.mappingTypes(with: map))
+        case .range(let element):
+            return .range(element.mappingTypes(with: map))
+        case .set(let element):
+            return .set(element.mappingTypes(with: map))
+        case .tuple(let labels, let types):
+            return .tuple(labels, types.map { $0.mappingTypes(with: map) })
+        case .unwrappedOptional(let type):
+            return .unwrappedOptional(type.mappingTypes(with: map))
+        default:
+            return self
         }
     }
 
@@ -1082,9 +1089,15 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return parameter
         }
 
-        func mappingGenerics(from: [TypeSignature], to: [TypeSignature]) -> Parameter {
+        func mappingTypes(from: [TypeSignature], to: [TypeSignature]) -> Parameter {
             var parameter = self
-            parameter.type = parameter.type.mappingGenerics(from: from, to: to)
+            parameter.type = parameter.type.mappingTypes(from: from, to: to)
+            return parameter
+        }
+
+        func mappingTypes(with map: [TypeSignature: TypeSignature]) -> Parameter {
+            var parameter = self
+            parameter.type = parameter.type.mappingTypes(with: map)
             return parameter
         }
 

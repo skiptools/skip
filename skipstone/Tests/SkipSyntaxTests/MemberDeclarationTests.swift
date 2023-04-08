@@ -690,6 +690,24 @@ final class MemberDeclarationTests: XCTestCase {
         """)
     }
 
+    func testMissingGenericsAddedToMembers() async throws {
+        try await check(swift: """
+        class C<T> {
+            var v: C
+            func f(p: [C]) -> C? {
+                return nil
+            }
+        }
+        """, kotlin: """
+        internal open class C<T> {
+            internal var v: C<T>
+            internal open fun f(p: Array<C<T>>): C<T>? {
+                return null
+            }
+        }
+        """)
+    }
+
     func testCustomSubscript() async throws {
         try await checkProducesMessage(swift: """
         class C {
@@ -707,6 +725,41 @@ final class MemberDeclarationTests: XCTestCase {
         extension C {
             static func + (lhs: C: rhs: C) -> C {
                 return lhs
+            }
+        }
+        """)
+    }
+
+    func testCustomEquals() async throws {
+        try await check(swift: """
+        class C<T> where T: AnyObject, T: Equatable {
+            var t: T
+            init(t: T) {
+                self.t = t
+            }
+            func f() -> Int {
+                return 1
+            }
+            static func == (lhs: C, rhs: C) -> Bool {
+                return lhs.t == rhs.t && lhs.f() == rhs.f()
+            }
+        }
+        """, kotlin: """
+        internal open class C<T> where T: Any, T: Equatable {
+            internal var t: T
+            internal constructor(t: T) {
+                this.t = t
+            }
+            internal open fun f(): Int {
+                return 1
+            }
+            override fun equals(other: Any?): Boolean {
+                if (other !is C<*>) {
+                    return false
+                }
+                val lhs = this
+                val rhs = other
+                return lhs.t == rhs.t && lhs.f() == rhs.f()
             }
         }
         """)

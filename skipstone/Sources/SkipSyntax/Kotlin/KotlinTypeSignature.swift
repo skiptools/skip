@@ -181,8 +181,8 @@ extension TypeSignature {
             return false
         case .character:
             return false
-        case .composition:
-            return true
+        case .composition(let types):
+            return !types.contains { $0.kotlinMayBeSharedMutableStruct(codebaseInfo: codebaseInfo) == false }
         case .dictionary:
             return true
         case .double:
