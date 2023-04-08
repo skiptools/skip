@@ -246,7 +246,11 @@ public class CodebaseInfo: Codable {
                 return TypeSignature.for(name: identifier, genericTypes: [], allowNamed: false).asMetaType(true)
             }
             let type = topRanked.signature
-            return type.asMetaType(topRanked.declarationType != .variableDeclaration && topRanked.declarationType != .enumCaseDeclaration)
+            if let typeInfo = topRanked as? TypeInfo {
+                return type.constrainedTypeWithGenerics(typeInfo.generics).asMetaType(true)
+            } else {
+                return type.asMetaType(topRanked.declarationType != .variableDeclaration && topRanked.declarationType != .enumCaseDeclaration)
+            }
         }
         
         /// Return the type of the given member.
@@ -321,11 +325,15 @@ public class CodebaseInfo: Codable {
             var candidates: Set<FunctionCandidate> = []
             let typeInfos = typeInfos(forNamed: type)
             let primaryTypeInfo = typeInfos.first { $0.declarationType != .extensionDeclaration }
-            for typeInfo in typeInfos {
-                if excludeConstrainedExtensions && typeInfo.declarationType == .extensionDeclaration, let primaryTypeInfo, typeInfo.generics != primaryTypeInfo.generics {
-                    continue
+            if name == "init" {
+                initCandidates(for: typeInfos, in: primaryTypeInfo, constrainedGenerics: type.generics, arguments: arguments).forEach { candidates.insert($0) }
+            } else {
+                for typeInfo in typeInfos {
+                    if excludeConstrainedExtensions && typeInfo.declarationType == .extensionDeclaration, let primaryTypeInfo, typeInfo.generics != primaryTypeInfo.generics {
+                        continue
+                    }
+                    functionCandidates(for: name, in: typeInfo, constrainedGenerics: type.generics, arguments: arguments, isStatic: isStatic).forEach { candidates.insert($0) }
                 }
-                functionCandidates(for: name, in: typeInfo, constrainedGenerics: type.generics, arguments: arguments, isStatic: isStatic).forEach { candidates.insert($0) }
             }
             let sortedCandidates = candidates.sorted { $0.score > $1.score }
             guard let topCandidate = sortedCandidates.first else {
@@ -430,15 +438,20 @@ public class CodebaseInfo: Codable {
 
         /// - Note: Returns unsorted, un-deduped results.
         private func initCandidates(for typeInfos: [TypeInfo], in contextTypeInfo: TypeInfo? = nil, constrainedGenerics: [TypeSignature] = [], arguments: [LabeledValue<TypeSignature>]) -> [FunctionCandidate] {
-            guard let typeInfo = typeInfos.first else {
+            guard let primaryTypeInfo = typeInfos.first(where: { $0.declarationType != .extensionDeclaration }) else {
                 return []
             }
             // Transfer any contextual generic information to this member type
-            var typeInfoGenerics = typeInfo.generics
-            if let contextTypeInfo {
-                typeInfoGenerics = typeInfoGenerics.merge(overrides: Generics(contextTypeInfo.signature.generics, whereEqual: constrainedGenerics))
+            let typeInfoConstrainedGenerics: [TypeSignature]
+            if contextTypeInfo?.signature == primaryTypeInfo.signature {
+                typeInfoConstrainedGenerics = constrainedGenerics
+            } else {
+                var typeInfoGenerics = primaryTypeInfo.generics
+                if let contextTypeInfo {
+                    typeInfoGenerics = typeInfoGenerics.merge(overrides: Generics(contextTypeInfo.signature.generics, whereEqual: constrainedGenerics))
+                }
+                typeInfoConstrainedGenerics = typeInfoGenerics.entries.map { $0.constrainedType(fallback: .any) }
             }
-            let typeInfoConstrainedGenerics = typeInfoGenerics.entries.map { $0.constrainedType(fallback: .any) }
             var initSignatures = typeInfos.flatMap { typeInfo in
                 let initInfos = typeInfo.visibleMembers(context: self).filter { $0.declarationType == .initDeclaration }
                 return initInfos.compactMap { (initInfo: CodebaseInfoItem) -> FunctionCandidate? in
@@ -448,9 +461,9 @@ public class CodebaseInfo: Codable {
             
             // If we don't have any matches and this appears to be a constructor, treat it as one. We take advantage of this
             // while inferring the types of variable values in prepareForUse(), before we've called generateConstructors()
-            if initSignatures.isEmpty && !typeInfos.isEmpty {
+            if initSignatures.isEmpty {
                 let initParameters = arguments.map { TypeSignature.Parameter(label: $0.label, type: $0.value, isVariadic: false, hasDefaultValue: false) }
-                initSignatures.append(FunctionCandidate(signature: .function(initParameters, typeInfos[0].signature), score: 0.0))
+                initSignatures.append(FunctionCandidate(signature: .function(initParameters, primaryTypeInfo.signature), score: 0.0))
             }
             return initSignatures
         }

@@ -587,7 +587,13 @@ class FunctionCall: Expression {
         case .identifier:
             let identifier = function as! Identifier
             identifier.isCalledAsFunction = true
-            if identifier.generics.isEmpty {
+            let _ = identifier.inferTypes(context: context, expecting: .none)
+            if identifier.inferredType.isMetaType {
+                // Assume the call is a constructor. Do not assume return type is the same, however, as we might use the
+                // constructor params to resolve generics
+                baseType = identifier.inferredType.asMetaType(false)
+                name = "init"
+            } else if identifier.generics.isEmpty {
                 baseType = nil
                 name = identifier.name
             } else {
