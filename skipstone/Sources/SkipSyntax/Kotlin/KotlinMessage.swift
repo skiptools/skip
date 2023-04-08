@@ -74,6 +74,10 @@ extension Message {
         return Message(kind: .warning, message: message, sourceFile: sourceFile)
     }
 
+    static func kotlinGenericTypeNested(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Swift and Kotlin treat types nested within generic types in incompatible ways, and Skip cannot translate between the two. Consider moving this type out of its generic outer type", sourceDerived: sourceDerived, source: source)
+    }
+
     static func kotlinInOutParameterAssignment(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .warning, message: "Shadowing an inout parameter with a variable of the same name may produce incorrect Kotlin. Consider using a different variable name", sourceDerived: sourceDerived, source: source)
     }

@@ -282,16 +282,4 @@ final class CodebaseInfoTests: XCTestCase {
         let info = try JSONDecoder().decode(CodebaseInfo.self, from: encoded.utf8Data)
         XCTAssertEqual("SkipUnit", info.moduleName)
     }
-
-    func testInheritedConstructors() throws {
-        throw XCTSkip("TODO: Test custom superclass constructors called on a subclass and general constructor inheritance")
-    }
-
-    func testCustomSubscript() throws {
-        throw XCTSkip("TODO: Test custom subscript operators")
-    }
-
-    func testGenerics() throws {
-        throw XCTSkip("TODO: Test generics symbols, including standard type declarations like Dictionary<String, Int>")
-    }
 }

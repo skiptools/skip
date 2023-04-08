@@ -495,20 +495,4 @@ final class TypeInferenceTests: XCTestCase {
         }
         """)
     }
-
-    func testTypealias() throws {
-        throw XCTSkip("TODO: Test that we can match typealiases to types")
-    }
-
-    func testTypeDeclaredWithinFunction() throws {
-        throw XCTSkip("TODO: Test declaring a type within a function. This includes making sure our plugins process in-function types correctly")
-    }
-
-    func testNestedTypes() throws {
-        throw XCTSkip("TODO: Test nested type symbols")
-    }
-
-    func testScoredMatching() throws {
-        throw XCTSkip("TODO: We should score parameter matches for functions. Exact matches, inheritance matches for named types, fall back to looking for matching symbols when we don't know the type and using TypeSignature.isCompatible to match")
-    }
 }

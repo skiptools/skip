@@ -193,7 +193,6 @@ class KotlinCodeBlock: KotlinStatement {
     /// Perform any updates to handle references to the given `inout` parameter.
     func updateWithInOutParameter(name: String, source: Source) {
         visit { node in
-            // TODO: We could attempt to identify more re-bindings of the identifier
             if let identifier = node as? KotlinIdentifier {
                 if identifier.name == name {
                     identifier.isInOut = true
@@ -676,6 +675,9 @@ class KotlinClassDeclaration: KotlinStatement {
         kstatement.inherits = statement.inherits
         kstatement.modifiers = statement.modifiers
         kstatement.generics = statement.generics
+        if let owningTypeDeclaration = statement.parent?.owningTypeDeclaration, !owningTypeDeclaration.generics.isEmpty {
+            kstatement.messages.append(.kotlinGenericTypeNested(statement, source: translator.syntaxTree.source))
+        }
 
         var members = statement.members.flatMap { translator.translateStatement($0) }
         if let codebaseInfo = translator.codebaseInfo {

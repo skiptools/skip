@@ -327,6 +327,21 @@ final class TypeDeclarationTests: XCTestCase {
         internal open class C<T, U>: Base() where T: I, U: A, U: B {
         }
         """)
+
+        try await checkProducesMessage(swift: """
+        class Dict<K, V> {
+            var entries: [Entry] = []
+
+            class Entry {
+                let key: K
+                let value: V
+                init(key: K, value: V) {
+                    self.key = key
+                    self.value = value
+                }
+            }
+        }
+        """)
     }
 
     func testGenericProtocol() async throws {
@@ -652,25 +667,6 @@ final class TypeDeclarationTests: XCTestCase {
         try await checkProducesMessage(swift: """
         private typealias EArray<E> = Array<E> where E: Comparable
         """)
-    }
-
-    func testGenericInnerClasses() async throws {
-        throw XCTSkip("TODO: Inner classes can use types from outer classes in Swift, but Kotlin has to declare the inner class generic")
-        /*
-         class Dict<K, V> {
-             struct Entry {
-                 var key: K
-                 var value: V
-             }
-             var entries: [Entry] = []
-             func put(key: K, value: V) {
-                 entries.append(Entry(key: key, value: value))
-             }
-         }
-         func makeEntry() -> Dict<Int, String>.Entry {
-             return Dict<Int, String>.Entry(key: 1, value: "s")
-         }
-         */
     }
 
     func testLocalTypes() async throws {
