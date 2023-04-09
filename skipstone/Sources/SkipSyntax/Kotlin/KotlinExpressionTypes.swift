@@ -684,7 +684,7 @@ class KotlinIdentifier: KotlinExpression {
     }
 }
 
-/// - Seealso: ``KotlinIfPlugin``
+/// - Seealso: ``KotlinIfTransformer``
 class KotlinIf: KotlinExpression {
     var conditionSets: [ConditionSet]
     var isGuard = false

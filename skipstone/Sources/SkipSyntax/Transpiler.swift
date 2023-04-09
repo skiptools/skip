@@ -8,21 +8,21 @@ public struct Transpiler {
     private let sourceFiles: [Source.FilePath]
     private let codebaseInfo: CodebaseInfo
     public var preprocessorSymbols: Set<String>
-    public var plugins: [KotlinPlugin]
+    public var transformers: [KotlinTransformer]
 
     /// Supply files to transpile.
-    public init(packageName: String? = nil, sourceFiles: [Source.FilePath], codebaseInfo: CodebaseInfo, preprocessorSymbols: Set<String> = [], plugins: [KotlinPlugin] = []) {
+    public init(packageName: String? = nil, sourceFiles: [Source.FilePath], codebaseInfo: CodebaseInfo, preprocessorSymbols: Set<String> = [], transformers: [KotlinTransformer] = []) {
         self.packageName = packageName
         self.sourceFiles = sourceFiles
         self.codebaseInfo = codebaseInfo
         self.preprocessorSymbols = preprocessorSymbols
-        self.plugins = plugins
+        self.transformers = transformers
     }
 
     /// Perform transpilation, feeding results to the given handler.
     public func transpile(handler: (Transpilation) throws -> Void) async throws {
         // First create syntax trees used to populate codebase info
-        codebaseInfo.kotlin = KotlinCodebaseInfo(packageName: packageName, plugins: plugins)
+        codebaseInfo.kotlin = KotlinCodebaseInfo(packageName: packageName, transformers: transformers)
         try await withThrowingTaskGroup(of: SyntaxTree.self) { group in
             for sourceFile in sourceFiles {
                 group.addTask {

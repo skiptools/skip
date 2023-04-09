@@ -1,5 +1,5 @@
 /// Migrate Swift constructors to Kotlin constructors.
-class KotlinConstructorPlugin: KotlinPlugin {
+class KotlinConstructorTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
         syntaxTree.root.visit { visit($0, translator: translator) }
     }

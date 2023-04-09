@@ -53,8 +53,8 @@ public class KotlinTranslator {
         self.packageName = codebaseInfo.kotlin?.packageName
 
         let kotlinSyntaxTree = translateSyntaxTree()
-        if let plugins = codebaseInfo.kotlin?.plugins {
-            plugins.forEach { $0.apply(to: kotlinSyntaxTree, translator: self) }
+        if let transformers = codebaseInfo.kotlin?.transformers {
+            transformers.forEach { $0.apply(to: kotlinSyntaxTree, translator: self) }
         }
 
         let messages = codebaseInfo.messages(for: syntaxTree.source.file) + kotlinSyntaxTree.messages

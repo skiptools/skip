@@ -174,36 +174,36 @@ public class KotlinCodebaseInfo: CodebaseInfoLanguageAdditions, CodebaseInfoLang
     /// The package being generated.
     public let packageName: String?
 
-    /// Plugins being applied to the translation.
-    public private(set) var plugins: [KotlinPlugin] = []
+    /// Transformers being applied to the translation.
+    public private(set) var transformers: [KotlinTransformer] = []
 
-    init(packageName: String? = nil, plugins: [KotlinPlugin] = []) {
+    init(packageName: String? = nil, transformers: [KotlinTransformer] = []) {
         self.packageName = packageName
-        // Idea: Track which plugins we might need when we come across relevant code during initial translation and save traversing the tree for unnecessary plugins
-        self.plugins = [
-            // NOTE: Keep the struct plugin first because it adds members that may need processing by subsequent plugins
-            KotlinStructPlugin(),
-            KotlinErrorToThrowablePlugin(),
-            KotlinConstructorPlugin(),
-            KotlinIfWhenPlugin(),
+        // Idea: Track which transformers we might need when we come across relevant code during initial translation and save traversing the tree for unnecessary plugins
+        self.transformers = [
+            // NOTE: Keep the struct transformer first because it adds members that may need processing by subsequent transformers
+            KotlinStructTransformer(),
+            KotlinErrorToThrowableTransformer(),
+            KotlinConstructorTransformer(),
+            KotlinIfWhenTransformer(),
             KotlinDeferPlugin(),
-            KotlinDisambiguateFunctionsPlugin(),
-            //KotlinSwiftUIPlugin(),
-            KotlinImportMapPlugin(),
-            KotlinTestAnnotationPlugin(),
-        ] + plugins
+            KotlinDisambiguateFunctionsTransformer(),
+            //KotlinSwiftUITransformer(),
+            KotlinImportMapTransformer(),
+            KotlinTestAnnotationTransformer(),
+        ] + transformers
     }
 
     func messages(for sourceFile: Source.FilePath) -> [Message] {
-        return plugins.flatMap { $0.messages(for: sourceFile) }
+        return transformers.flatMap { $0.messages(for: sourceFile) }
     }
 
     func prepareForUse(codebaseInfo: CodebaseInfo) {
-        plugins.forEach { $0.prepareForUse(codebaseInfo: codebaseInfo) }
+        transformers.forEach { $0.prepareForUse(codebaseInfo: codebaseInfo) }
     }
 
     func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGatherFrom syntaxTree: SyntaxTree) {
-        plugins.forEach { $0.gather(from: syntaxTree) }
+        transformers.forEach { $0.gather(from: syntaxTree) }
     }
 
     func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather typeInfo: CodebaseInfo.TypeInfo, from statement: ExtensionDeclaration) {

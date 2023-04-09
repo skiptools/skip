@@ -1,5 +1,5 @@
 /// Disambiguate Kotlin functions translated from Swift functions that are only differentkated on their parameter labels.
-class KotlinDisambiguateFunctionsPlugin: KotlinPlugin {
+class KotlinDisambiguateFunctionsTransformer: KotlinTransformer {
     func prepareForUse(codebaseInfo: CodebaseInfo) {
         for functionInfo in codebaseInfo.rootFunctions {
             initializeDisambiguatingParameterCounts(for: functionInfo, codebaseInfo: codebaseInfo)

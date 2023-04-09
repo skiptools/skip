@@ -1,5 +1,5 @@
 /// Update types that conform to the `Error` protocol to extend from `Throwable`.
-class KotlinErrorToThrowablePlugin: KotlinPlugin {
+class KotlinErrorToThrowableTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
         guard let codebaseInfo = translator.codebaseInfo else {
             return

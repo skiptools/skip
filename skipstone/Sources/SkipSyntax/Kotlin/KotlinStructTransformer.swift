@@ -1,7 +1,7 @@
 /// Give struct semantics to Kotlin classes translated from Swift structs.
 ///
 /// - Seealso: `SkipLib/Struct.kt`
-class KotlinStructPlugin: KotlinPlugin {
+class KotlinStructTransformer: KotlinTransformer {
     private let mutationFunctionNames = ("willmutate", "didmutate")
 
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {

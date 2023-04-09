@@ -1,7 +1,7 @@
 /// Translate SwiftUI to syntactically correct Kotlin.
 ///
 /// We rely on our Kotlin UI libraries to provide the implementation of the SwiftUI-like API that this translation will result in.
-class KotlinSwiftUIPlugin: KotlinPlugin {
+class KotlinSwiftUITransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
         // Does this file need translation?
         var needsTranslation = false

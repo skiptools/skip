@@ -1027,7 +1027,7 @@ struct KotlinExtensionDeclaration {
     }
 }
 
-/// - Seealso: ``KotlinConstructorPlugin``
+/// - Seealso: ``KotlinConstructorTransformer``
 class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var name: String
     var returnType: TypeSignature = .void

@@ -494,7 +494,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
         // load and merge each of the skip.yml files for the dependent modules
         let (baseSkipConfig, mergedSkipConfig, configMap) = try loadSkipConfig(merge: true)
-        let plugins: [KotlinPlugin] = try createPlugins(for: baseSkipConfig, with: configMap)
+        let transformers: [KotlinTransformer] = try createTransformers(for: baseSkipConfig, with: configMap)
 
         var dependentCodebaseInfos: [CodebaseInfo] = []
 
@@ -509,7 +509,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
         try await validateLicense(sourceURLs: sourceFiles.map(\.asURL))
 
-        let transpiler = Transpiler(packageName: packageName, sourceFiles: sources, codebaseInfo: codebaseInfo, preprocessorSymbols: Set(preflightOptions.symbols), plugins: plugins)
+        let transpiler = Transpiler(packageName: packageName, sourceFiles: sources, codebaseInfo: codebaseInfo, preprocessorSymbols: Set(preflightOptions.symbols), transformers: transformers)
         try await transpiler.transpile(handler: handleTranspilation)
         try saveCodebaseInfo() // save out the ModuleName.skipcode.json
 
@@ -844,15 +844,15 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         }
     }
 
-    /// Generate transpiler plug-ins from the given skip config
-    func createPlugins(for config: SkipConfig, with moduleMap: [String: SkipConfig]) throws -> [KotlinPlugin] {
-        let plugins: [KotlinPlugin] = []
+    /// Generate transpiler transformers from the given skip config
+    func createTransformers(for config: SkipConfig, with moduleMap: [String: SkipConfig]) throws -> [KotlinTransformer] {
+        let transformers: [KotlinTransformer] = []
 
         //if let packageName = config.skip?.package {
             // TODO: throw error("implement package/module map plugin")
         //}
 
-        return plugins
+        return transformers
     }
 
     /// Validate the license key if it is present in the tool or environment; otherwise scan the sources above the given codebase threshold size for approved headers
