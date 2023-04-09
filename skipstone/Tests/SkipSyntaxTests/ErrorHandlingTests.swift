@@ -347,6 +347,7 @@ final class ErrorHandlingTests: XCTestCase {
         """)
     }
 
+    //~~~ Need to implement equals and hashCode using rawValue
     func testErrorEnum() async throws {
         try await check(swift: """
         enum E: Error {
@@ -354,7 +355,7 @@ final class ErrorHandlingTests: XCTestCase {
             case error2
         }
         """, kotlin: """
-        internal sealed class E: Throwable(), Error {
+        internal sealed class E: Throwable(), Error, Hashable {
             class error1case: E() {
             }
             class error2case: E() {
@@ -371,13 +372,14 @@ final class ErrorHandlingTests: XCTestCase {
         }
         """)
 
+        //~~~ Need to implement equals and hashCode using rawValue
         try await check(swift: """
         enum E: Int, Error {
             case error1 = 2
             case error2
         }
         """, kotlin: """
-        internal sealed class E(val rawValue: Int): Throwable(), Error {
+        internal sealed class E(val rawValue: Int): Throwable(), Error, Hashable {
             class error1case: E(2) {
             }
             class error2case: E(3) {

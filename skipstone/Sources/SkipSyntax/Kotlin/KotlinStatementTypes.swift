@@ -697,7 +697,17 @@ class KotlinClassDeclaration: KotlinStatement {
         }
         kstatement.members = members
 
-        kstatement.processEnumCaseDeclarations()
+        if statement.type == .enumDeclaration {
+            kstatement.processEnumCaseDeclarations()
+            // Swift enums without associated values are automatically Hashable
+            if !kstatement.isSealedClassesEnum {
+                let hashableSignature: TypeSignature = .named("Hashable", [])
+                if !kstatement.inherits.contains(hashableSignature) {
+                    kstatement.inherits.append(hashableSignature)
+                }
+            }
+        }
+
         kstatement.inherits.forEach { $0.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
         if statement.attributes.attributes.contains(where: { !isIgnorable(attribute: $0) }) {
             kstatement.messages.append(.kotlinAttributeUnsupported(statement, source: translator.syntaxTree.source))
@@ -1097,7 +1107,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                     // Kotlin uses default public visibility on all interface members
                     kstatement.modifiers.visibility = .public
                 } else {
-                    if !kstatement.modifiers.isOverride && (kstatement.isHashImplementation || translator.codebaseInfo?.isImplementingProtocolMember(declaration: statement, in: owningTypeDeclaration.signature) == true) {
+                    if !kstatement.modifiers.isOverride && translator.codebaseInfo?.isImplementingProtocolMember(declaration: statement, in: owningTypeDeclaration.signature) == true {
                         kstatement.modifiers.isOverride = true
                     }
                     kstatement.isOpen = !kstatement.modifiers.isOverride && !statement.modifiers.isFinal && statement.modifiers.visibility != .private && owningDeclarationType == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
@@ -1184,6 +1194,9 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
+        if isHashImplementation {
+            appendHashCode(to: output, indentation: indentation)
+        }
         output.append(indentation)
         if let declaration = extras?.declaration {
             output.append(declaration)
@@ -1209,12 +1222,6 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             output.append(indentation).append("}\n")
         } else {
             output.append("\n")
-        }
-
-        if isHashImplementation {
-            output.append(indentation).append("override fun hashCode(): Int {\n")
-            output.append(indentation.inc()).append("return hashValue\n")
-            output.append(indentation).append("}\n")
         }
     }
 
@@ -1304,6 +1311,15 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         output.append(indentation).append("val \(parameters[0].internalLabel) = this\n")
         output.append(indentation).append("val \(parameters[1].internalLabel) = other\n")
         output.append(body, indentation: indentation)
+    }
+
+    private func appendHashCode(to output: OutputGenerator, indentation: Indentation) {
+        output.append(indentation).append("override fun hashCode(): Int {\n")
+        let bodyIndentation = indentation.inc()
+        output.append(bodyIndentation).append("var hasher = Hasher()\n")
+        output.append(bodyIndentation).append("hash(into = InOut<Hasher>({ hasher }, { hasher = it }))\n")
+        output.append(bodyIndentation).append("return hasher.finalize()\n")
+        output.append(indentation).append("}\n")
     }
 }
 

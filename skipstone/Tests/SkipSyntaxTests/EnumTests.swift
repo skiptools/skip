@@ -9,7 +9,7 @@ final class EnumTests: XCTestCase {
             case b
         }
         """, kotlin: """
-        internal enum class E {
+        internal enum class E: Hashable {
             a,
             b;
         }
@@ -25,7 +25,7 @@ final class EnumTests: XCTestCase {
             case d
         }
         """, kotlin: """
-        internal enum class E(val rawValue: Int) {
+        internal enum class E(val rawValue: Int): Hashable {
             a(0),
             b(1),
             c(100),
@@ -40,7 +40,7 @@ final class EnumTests: XCTestCase {
             case c
         }
         """, kotlin: """
-        internal enum class E(val rawValue: String) {
+        internal enum class E(val rawValue: String): Hashable {
             a("a"),
             b("B"),
             c("c");
@@ -59,7 +59,7 @@ final class EnumTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal enum class E(val rawValue: Int) {
+        internal enum class E(val rawValue: Int): Hashable {
             a(0),
             b(1);
 
@@ -80,7 +80,7 @@ final class EnumTests: XCTestCase {
             case b
         }
         """, kotlin: """
-        internal enum class E(val rawValue: Int) {
+        internal enum class E(val rawValue: Int): Hashable {
             a(0),
 
             b(1);

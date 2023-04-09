@@ -789,13 +789,15 @@ final class MemberDeclarationTests: XCTestCase {
             internal open fun f(): Int {
                 return 1
             }
-            override fun hash(into: InOut<Hasher>) {
+            override fun hashCode(): Int {
+                var hasher = Hasher()
+                hash(into = InOut<Hasher>({ hasher }, { hasher = it }))
+                return hasher.finalize()
+            }
+            internal open fun hash(into: InOut<Hasher>) {
                 val hasher = into
                 hasher.value.combine(t)
                 hasher.value.combine(f())
-            }
-            override fun hashCode(): Int {
-                return hashValue
             }
         }
         """)
