@@ -1131,7 +1131,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         kstatement.parameters.forEach { $0.declaredType.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
 
         // Warnings and fixups
-        if !kstatement.isEqualImplementation, let firstCharacter = kstatement.name.first, firstCharacter != "_" && firstCharacter != "$" && !firstCharacter.isLetter && !firstCharacter.isNumber {
+        if !kstatement.isEqualImplementation, let firstCharacter = kstatement.name.first, firstCharacter != "_" && firstCharacter != "$" && firstCharacter != "`" && !firstCharacter.isLetter && !firstCharacter.isNumber {
             kstatement.messages.append(.kotlinOperatorFunction(statement, source: translator.syntaxTree.source))
         }
         if owningDeclarationType == .protocolDeclaration {
