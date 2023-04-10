@@ -33,6 +33,11 @@ extension XCTestCase {
                     .replacingOccurrences(of: "\ninternal ", with: "\n")
                     .replacingOccurrences(of: " internal ", with: " ")
                     .trimmingCharacters(in: .newlines)
+
+                // various fixes to be able to compile without SkipLibKt
+                code = code
+                    .replacingOccurrences(of: ": Hashable", with: "") // remove Hashable conformance
+                    .replacingOccurrences(of: ".sref()", with: "") // remove sref() calls
             }
             return code
         }

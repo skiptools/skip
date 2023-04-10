@@ -191,6 +191,7 @@ public class KotlinCodebaseInfo: CodebaseInfoLanguageAdditions, CodebaseInfoLang
             //KotlinSwiftUITransformer(),
             KotlinImportMapTransformer(),
             KotlinTestAnnotationTransformer(),
+            KotlinEscapeKeywordsTransformer(),
         ] + transformers
     }
 

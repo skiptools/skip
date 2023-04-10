@@ -73,7 +73,7 @@ final class FeatureSupportTests: XCTestCase {
             }
             return nil
         }, kotlin: """
-            enum class EnumType: Hashable {
+            enum class EnumType {
                 a,
                 b,
                 c;
@@ -166,7 +166,7 @@ final class FeatureSupportTests: XCTestCase {
             }
             return enumStuff()
         }, kotlin: """
-            enum class SomeEnum: Hashable {
+            enum class SomeEnum {
                 case1,
                 case2;
             }
@@ -194,6 +194,7 @@ final class FeatureSupportTests: XCTestCase {
         """)
     }
 }
+
 
 
 
