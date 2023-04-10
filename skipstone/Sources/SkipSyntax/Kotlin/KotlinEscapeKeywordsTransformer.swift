@@ -18,7 +18,9 @@ private class EscapeKeywordsVisitor {
         if name.hasPrefix("`") && name .hasSuffix("`") {
             name = name.dropFirst().dropLast().description
         }
-        if Self.hardKeywords.contains(name) {
+        // check against already suffixed keywords, e.g. turn: `null` into `null_`, but also turn `null_` into `null__`
+        let unsuffixedName = String(name.reversed().drop(while: { $0 == "_" }).reversed())
+        if Self.hardKeywords.contains(unsuffixedName) {
             name = name + "_"
         }
         return name

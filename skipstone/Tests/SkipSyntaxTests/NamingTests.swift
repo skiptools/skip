@@ -16,6 +16,7 @@ final class NamingTests: XCTestCase {
         try await check(swiftCode: {
             class KeywordHolder {
                 let null = "ABC"
+                let null_ = "DEF"
                 var interface: Int = 2
                 var this = 1.234
                 var `enum`: EnumType = EnumType.null
@@ -40,6 +41,7 @@ final class NamingTests: XCTestCase {
         }, kotlin: """
             open class KeywordHolder {
                 val null_ = "ABC"
+                val null__ = "DEF"
                 var interface_: Int = 2
                 var this_ = 1.234
                 var enum: EnumType = EnumType.null_
