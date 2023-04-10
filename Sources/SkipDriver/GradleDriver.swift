@@ -112,6 +112,7 @@ public struct GradleDriver {
     /// Invokes the tests for the given gradle project.
     /// - Parameters:
     ///   - check: whether to run "grade check" or "gradle test"
+    ///   - daemon: whether the enable the forking of a persistent gradle daemon that will make subsequent runs faster (e.g., 5 secs vs. 15 secs)
     ///   - failFast: whether to pass the "--fail-fast" flag
     ///   - continue: whether to permit failing tests to complete with the "--continue" flag
     ///   - offline: whether to pass the "--offline" flag
@@ -121,7 +122,7 @@ public struct GradleDriver {
     ///   - testResultPath: the relative path for the test output XML files
     ///   - exitHandler: the exit handler, which may want to permit a process failure in order to have time to parse the tests
     /// - Returns: an array of parsed test suites containing information about the test run
-    public func runTests(in workingDirectory: URL, module: String, check: Bool = false, info infoFlag: Bool = false, plain plainFlag: Bool = true, maxTestMemory: UInt64? = nil, failFast failFastFlag: Bool = false, continue continueFlag: Bool = false, offline offlineFlag: Bool = false, rerunTasks rerunTasksFlag: Bool = true, testResultPath: String = "build/test-results", exitHandler: @escaping (ProcessResult) throws -> ()) async throws -> (output: Process.AsyncLineOutput, result: () throws -> [TestSuite]) {
+    public func runTests(in workingDirectory: URL, module: String, check: Bool = false, daemon enableDaemon: Bool = true, info infoFlag: Bool = false, plain plainFlag: Bool = true, maxTestMemory: UInt64? = nil, failFast failFastFlag: Bool = false, continue continueFlag: Bool = false, offline offlineFlag: Bool = false, rerunTasks rerunTasksFlag: Bool = true, testResultPath: String = "build/test-results", exitHandler: @escaping (ProcessResult) throws -> ()) async throws -> (output: Process.AsyncLineOutput, result: () throws -> [TestSuite]) {
         var args = [
             check ? "check" : "test" // check will run the @Test funcs regardless of @Ignore, as well as other checks
         ]
@@ -159,9 +160,12 @@ public struct GradleDriver {
             args += ["--console=plain"]
         }
 
+        // attempt to run in the same process without forking the daemon
+        if enableDaemon == false {
+            args += ["--no-daemon"]
+        }
+
         if let maxTestMemory = maxTestMemory {
-            // attempt to run in the same process without forking the daemon
-            //args += ["--no-daemon"]
 
             // also need to add in JVM flags, lest we be countermanded with: “To honour the JVM settings for this build a single-use Daemon process will be forked. See https://docs.gradle.org/8.0.2/userguide/gradle_daemon.html#sec:disabling_the_daemon.”
             // these seem to be quite specific to the gradle version being used, so disabling the daemon in future gradle versions might require tweaking these args (which can be seen by enabling the info flag):
