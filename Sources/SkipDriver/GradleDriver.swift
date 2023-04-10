@@ -161,7 +161,7 @@ public struct GradleDriver {
 
         if let maxTestMemory = maxTestMemory {
             // attempt to run in the same process without forking the daemon
-            args += ["--no-daemon"]
+            //args += ["--no-daemon"]
 
             // also need to add in JVM flags, lest we be countermanded with: “To honour the JVM settings for this build a single-use Daemon process will be forked. See https://docs.gradle.org/8.0.2/userguide/gradle_daemon.html#sec:disabling_the_daemon.”
             // these seem to be quite specific to the gradle version being used, so disabling the daemon in future gradle versions might require tweaking these args (which can be seen by enabling the info flag):
