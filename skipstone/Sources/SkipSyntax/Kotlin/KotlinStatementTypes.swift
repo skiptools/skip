@@ -863,9 +863,11 @@ class KotlinClassDeclaration: KotlinStatement {
 
 class KotlinEnumCaseDeclaration: KotlinStatement {
     var name: String
+    var generics: Generics = Generics()
     var associatedValues: [Parameter<KotlinExpression>] = []
     var rawValue: KotlinExpression?
     var isLastDeclaration = false
+    var members: [KotlinStatement] = []
 
     /// Return the name of the sealed class we create for the given enum case name in an enum with associated values.
     static func sealedClassName(for caseName: String) -> String {
@@ -899,7 +901,7 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
         if let rawValue {
             children.append(rawValue)
         }
-        return children
+        return children + members
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
@@ -921,6 +923,10 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
                 if let label = value.externalLabel {
                     output.append(indentation.inc()).append("val \(label) = associated\(index)\n")
                 }
+            }
+            if !members.isEmpty {
+                output.append("\n")
+                members.forEach { $0.append(to: output, indentation: indentation.inc()) }
             }
             output.append(indentation).append("}\n")
         } else {
@@ -1564,6 +1570,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var onUpdate: String?
     var isConstructingPropertyName: String?
     var mutationFunctionNames: (willMutate: String, didMutate: String)?
+    var isGenerated = false
 
     // KotlinMemberDeclaration
     var extends: (TypeSignature, Generics)? {

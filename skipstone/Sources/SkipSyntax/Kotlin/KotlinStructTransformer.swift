@@ -68,6 +68,7 @@ class KotlinStructTransformer: KotlinTransformer {
         let supdate = KotlinVariableDeclaration(names: ["supdate"], variableTypes: [supdateType])
         supdate.declaredType = supdateType
         supdate.isProperty = true
+        supdate.isGenerated = true
         supdate.modifiers = Modifiers(visibility: .public, isOverride: true)
         supdate.extras = .singleNewline
         supdate.parent = classDeclaration
@@ -77,6 +78,7 @@ class KotlinStructTransformer: KotlinTransformer {
         let scount = KotlinVariableDeclaration(names: ["smutatingcount"], variableTypes: [.int])
         scount.value = KotlinNumericLiteral(literal: "0")
         scount.isProperty = true
+        scount.isGenerated = true
         scount.modifiers = Modifiers(visibility: .public, isOverride: true)
         scount.parent = classDeclaration
         scount.assignParentReferences()

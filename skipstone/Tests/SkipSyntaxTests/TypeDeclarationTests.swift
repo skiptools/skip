@@ -680,6 +680,177 @@ final class TypeDeclarationTests: XCTestCase {
         """)
     }
 
+    func testSynthesizedStructEqualsHash() async throws {
+        try await check(swift: """
+        struct S: Equatable
+            var i: Int
+            var j: String {
+                return 1
+            }
+        }
+        """, kotlin: """
+        internal class S: Equatable, MutableStruct {
+            internal var i: Int
+                set(newValue) {
+                    willmutate()
+                    field = newValue
+                    didmutate()
+                }
+            internal val j: String
+                get() {
+                    return 1
+                }
+
+            constructor(i: Int) {
+                this.i = i
+            }
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct {
+                return S(i)
+            }
+
+            override fun equals(other: Any?): Boolean {
+                if (other !is S) return false
+                return i == other.i
+            }
+        }
+        """)
+
+        try await check(swift: """
+        struct S: Equatable
+            let i: Int
+            let j: String
+
+            init(i: Int, j: String) {
+                self.i = i
+                self.j = j
+            }
+        }
+        """, kotlin: """
+        internal class S: Equatable {
+            internal val i: Int
+            internal val j: String
+
+            internal constructor(i: Int, j: String) {
+                this.i = i
+                this.j = j
+            }
+
+            override fun equals(other: Any?): Boolean {
+                if (other !is S) return false
+                return i == other.i && j == other.j
+            }
+        }
+        """)
+
+        try await check(swift: """
+        struct S: Equatable
+            let i: Int
+            let j: String
+
+            init(i: Int, j: String) {
+                self.i = i
+                self.j = j
+            }
+
+            static func == (lhs: S, rhs: S) -> Bool {
+                return true
+            }
+        }
+        """, kotlin: """
+        internal class S: Equatable {
+            internal val i: Int
+            internal val j: String
+
+            internal constructor(i: Int, j: String) {
+                this.i = i
+                this.j = j
+            }
+
+            override fun equals(other: Any?): Boolean {
+                if (other !is S) {
+                    return false
+                }
+                val lhs = this
+                val rhs = other
+                return true
+            }
+        }
+        """)
+
+        try await check(swift: """
+        struct S: Hashable
+            var i: Int
+        }
+        """, kotlin: """
+        internal class S: Hashable, MutableStruct {
+            internal var i: Int
+                set(newValue) {
+                    willmutate()
+                    field = newValue
+                    didmutate()
+                }
+
+            constructor(i: Int) {
+                this.i = i
+            }
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct {
+                return S(i)
+            }
+
+            override fun equals(other: Any?): Boolean {
+                if (other !is S) return false
+                return i == other.i
+            }
+
+            override fun hashCode(): Int {
+                var result = 1
+                result = Hasher.combine(result, i)
+                return result
+            }
+        }
+        """)
+
+        try await check(swift: """
+        struct S: Hashable
+            let i: Int
+            let j: String
+
+            init(i: Int, j: String) {
+                self.i = i
+                self.j = j
+            }
+        }
+        """, kotlin: """
+        internal class S: Hashable {
+            internal val i: Int
+            internal val j: String
+
+            internal constructor(i: Int, j: String) {
+                this.i = i
+                this.j = j
+            }
+
+            override fun equals(other: Any?): Boolean {
+                if (other !is S) return false
+                return i == other.i && j == other.j
+            }
+
+            override fun hashCode(): Int {
+                var result = 1
+                result = Hasher.combine(result, i)
+                result = Hasher.combine(result, j)
+                return result
+            }
+        }
+        """)
+    }
+
     func testTypeDeclaredWithinExtension() throws {
         throw XCTSkip("TODO: Test declaring a type within an extension. We need to move it to the original type extended type definition if in module, error if not")
     }

@@ -145,14 +145,15 @@ public class CodebaseInfo: Codable {
     ///
     /// If the type itself is a protocol, it is included.
     func protocolSignatures(forNamed type: TypeSignature) -> [TypeSignature] {
-        // Gather inherited signatures, then insert the given type at the front if it is also a protocol
         let type = type.asOptional(false)
+        // TODO: Remove special cases when we add SkipLib codebase info dependency
+        if type == .anyObject || type == .named("Error", []) || type == .named("Equatable", []) || type == .named("Hashable", []) {
+            return [type]
+        }
+        // Gather inherited signatures, then insert the given type at the front if it is also a protocol
         let typeInfos = typeInfos(forNamed: type)
         var signatures = typeInfos.flatMap { $0.inherits.flatMap { protocolSignatures(forNamed: $0) } }
-        // TODO: Remove special cases when we add SkipLib codebase info dependency
-        if type == .anyObject || type == .named("Error", []) || type == .named("Hashable", []) {
-            signatures.insert(type, at: 0)
-        } else if let protocolInfo = typeInfos.first(where: { $0.declarationType == .protocolDeclaration }) {
+        if let protocolInfo = typeInfos.first(where: { $0.declarationType == .protocolDeclaration }) {
             signatures.insert(protocolInfo.signature, at: 0)
         }
         return signatures

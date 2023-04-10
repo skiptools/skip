@@ -139,6 +139,30 @@ final class EnumTests: XCTestCase {
         """)
     }
 
+    //~~~
+//    func testGenericAssociatedValue() async throws {
+//        try await check(swift: """
+//        enum E<T> {
+//            case a
+//            case b(Int = 1, T)
+//        }
+//        """, kotlin: """
+//        internal sealed class E {
+//            class acase: E() {
+//            }
+//            class bcase<T>(val associated0: Int, val associated1: T): E() {
+//            }
+//
+//            companion object {
+//                val a: E = acase()
+//                fun <T> b(associated0: Int = 1, associated1: T): E {
+//                    return bcase(associated0, associated1)
+//                }
+//            }
+//        }
+//        """)
+//    }
+
     func testEnumUse() async throws {
         try await check(supportingSwift: """
         enum E {
