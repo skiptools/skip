@@ -8,7 +8,7 @@ The Skip plugin for Xcode transpiles Swift libraries and test targets into Kotli
 
 1. Select the new `Package.swift` file in Xcode and add the following lines to activate the Skip transpiler plugin:
     ```swift
-    package.dependencies += [.package(url: "https://github.com/skiptools/skip", from: "0.3.19")]
+    package.dependencies += [.package(url: "https://github.com/skiptools/skip", from: "0.3.20")]
     package.dependencies += [.package(url: "https://github.com/skiptools/skiphub", from: "0.1.4")]
     ```
     <details><summary>Adding the Skip plugin to Xcode</summary><img src="https://user-images.githubusercontent.com/659086/230633291-e14e5687-a88d-4bc9-abbd-b78e9fa73c61.png"></details>
