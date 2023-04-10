@@ -19,6 +19,9 @@ final class NamingTests: XCTestCase {
                 var interface: Int = 2
                 var this = 1.234
                 var `enum`: EnumType = EnumType.null
+
+                func packageFunction(package: String) { }
+                func objectArgFunction(object o: EnumType) { }
             }
             enum EnumType {
                 case null,
@@ -31,6 +34,8 @@ final class NamingTests: XCTestCase {
             holder.enum = EnumType.this
             holder.this += holder.this
             assert(holder.this == 2.468)
+            holder.packageFunction(package: "ABC")
+            holder.objectArgFunction(object: EnumType.this)
             return holder.null
         }, kotlin: """
             open class KeywordHolder {
@@ -38,6 +43,10 @@ final class NamingTests: XCTestCase {
                 var interface_: Int = 2
                 var this_ = 1.234
                 var enum: EnumType = EnumType.null_
+                fun packageFunction(package_: String) {
+                }
+                fun objectArgFunction(object_: EnumType) {
+                }
             }
             enum class EnumType {
                 null_,
@@ -50,7 +59,14 @@ final class NamingTests: XCTestCase {
             holder.enum = EnumType.this_
             holder.this_ += holder.this_
             assert(holder.this_ == 2.468)
+            holder.packageFunction(package_ = "ABC")
+            holder.objectArgFunction(object_ = EnumType.this_)
             return holder.null_
             """)
     }
 }
+
+
+
+
+

@@ -124,7 +124,7 @@ struct Parameter<V>: Hashable {
     var internalLabel: String {
         return _internalLabel ?? externalLabel ?? "_"
     }
-    private let _internalLabel: String?
+    internal var _internalLabel: String?
     var declaredType: TypeSignature
     var isVariadic: Bool
     var isInOut: Bool

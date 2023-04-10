@@ -24,6 +24,19 @@ private class EscapeKeywordsVisitor {
         return name
     }
 
+    func fixParameter(param: Parameter<KotlinExpression>) -> Parameter<KotlinExpression> {
+        var p = param
+        p.externalLabel = p.externalLabel.map(fixKeyword)
+        p._internalLabel = p._internalLabel.map(fixKeyword)
+        return p
+    }
+
+    func fixArgument(arg: LabeledValue<KotlinExpression>) -> LabeledValue<KotlinExpression> {
+        var a = arg
+        a.label = a.label.map(fixKeyword)
+        return a
+    }
+
     func visit(_ node: KotlinSyntaxNode) -> VisitResult<KotlinSyntaxNode> {
         if let node = node as? KotlinEnumCaseDeclaration {
             node.name = fixKeyword(name: node.name)
@@ -31,6 +44,10 @@ private class EscapeKeywordsVisitor {
             node.name = fixKeyword(name: node.name)
         } else if let node = node as? KotlinMemberAccess {
             node.member = fixKeyword(name: node.member)
+        } else if let node = node as? KotlinFunctionDeclaration {
+            node.parameters = node.parameters.map(fixParameter)
+        } else if let node = node as? KotlinFunctionCall {
+            node.arguments = node.arguments.map(fixArgument)
         } else if let node = node as? KotlinVariableDeclaration {
             node.names = node.names.map {
                 $0.map(fixKeyword)

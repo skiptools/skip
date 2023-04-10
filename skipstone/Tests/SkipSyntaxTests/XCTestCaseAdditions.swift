@@ -32,6 +32,7 @@ extension XCTestCase {
                 code = ("\n" + code)
                     .replacingOccurrences(of: "\ninternal ", with: "\n")
                     .replacingOccurrences(of: " internal ", with: " ")
+                    .replacingOccurrences(of: "open fun ", with: "fun ")
                     .trimmingCharacters(in: .newlines)
 
                 // various fixes to be able to compile without SkipLibKt
