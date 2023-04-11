@@ -193,6 +193,67 @@ final class SwitchTests: XCTestCase {
         """)
     }
 
+    func testGenericEnum() async throws {
+        try await check(supportingSwift: """
+        extension Double {
+            var zero: Double {
+                return 0.0
+            }
+        }
+        """, swift: """
+        enum E<T> {
+            case case1
+            case case2(T, String)
+        }
+        func enumFactory() -> E<Double> {
+            return .case2(100.0, "abc")
+        }
+        func g() {
+            let e = enumFactory()
+            switch e {
+            case E<Double>.case1:
+                print("case1")
+            case .case2(let d, var s):
+                let b = d == .zero
+                s += "..."
+                print(s + b)
+            }
+        }
+        """, kotlin: """
+        internal sealed class E<out T> {
+            class case1case: E<Nothing>() {
+            }
+            class case2case<T>(val associated0: T, val associated1: String): E<T>() {
+            }
+
+            companion object {
+                val case1: E<Nothing> = case1case()
+                fun <T> case2(associated0: T, associated1: String): E<T> {
+                    return case2case(associated0, associated1)
+                }
+            }
+        }
+        internal fun enumFactory(): E<Double> {
+            return E.case2(100.0, "abc")
+        }
+        internal fun g() {
+            val e = enumFactory()
+            when (e) {
+                is E.case1case -> {
+                    print("case1")
+                }
+                is E.case2case -> {
+                    val d = e.associated0
+                    var s = e.associated1
+                    val b = d == Double.zero
+                    s += "..."
+                    print(s + b)
+                }
+            }
+        }
+        """)
+    }
+
     func testRange() async throws {
         try await check(swift: """
         let i = 100

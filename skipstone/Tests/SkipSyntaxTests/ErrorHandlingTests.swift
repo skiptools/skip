@@ -347,7 +347,6 @@ final class ErrorHandlingTests: XCTestCase {
         """)
     }
 
-    //~~~ Need to implement equals and hashCode using rawValue
     func testErrorEnum() async throws {
         try await check(swift: """
         enum E: Error {
@@ -372,7 +371,6 @@ final class ErrorHandlingTests: XCTestCase {
         }
         """)
 
-        //~~~ Need to implement equals and hashCode using rawValue
         try await check(swift: """
         enum E: Int, Error {
             case error1 = 2
@@ -383,6 +381,86 @@ final class ErrorHandlingTests: XCTestCase {
             class error1case: E(2) {
             }
             class error2case: E(3) {
+            }
+
+            companion object {
+                fun error1(): E {
+                    return error1case()
+                }
+                fun error2(): E {
+                    return error2case()
+                }
+            }
+        }
+        """)
+    }
+
+    func testErrorEnumSynthesizedEqualsHash() async throws {
+        try await check(swift: """
+        enum E: Error, Hashable {
+            case error1
+            case error2
+        }
+        """, kotlin: """
+        internal sealed class E: Throwable(), Error, Hashable {
+            class error1case: E() {
+
+                override fun equals(other: Any?): Boolean {
+                    if (other !is error1case) return false
+                    return true
+                }
+                override fun hashCode(): Int {
+                    return "error1case".hashCode()
+                }
+            }
+            class error2case: E() {
+
+                override fun equals(other: Any?): Boolean {
+                    if (other !is error2case) return false
+                    return true
+                }
+                override fun hashCode(): Int {
+                    return "error2case".hashCode()
+                }
+            }
+
+            companion object {
+                fun error1(): E {
+                    return error1case()
+                }
+                fun error2(): E {
+                    return error2case()
+                }
+            }
+        }
+        """)
+
+        try await check(swift: """
+        enum E: Int, Error, Hashable {
+            case error1 = 2
+            case error2
+        }
+        """, kotlin: """
+        internal sealed class E(val rawValue: Int): Throwable(), Error, Hashable {
+            class error1case: E(2) {
+
+                override fun equals(other: Any?): Boolean {
+                    if (other !is error1case) return false
+                    return true
+                }
+                override fun hashCode(): Int {
+                    return "error1case".hashCode()
+                }
+            }
+            class error2case: E(3) {
+
+                override fun equals(other: Any?): Boolean {
+                    if (other !is error2case) return false
+                    return true
+                }
+                override fun hashCode(): Int {
+                    return "error2case".hashCode()
+                }
             }
 
             companion object {

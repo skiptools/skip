@@ -74,8 +74,8 @@ final class BuiltinTypeTests: XCTestCase {
             var mis: Dictionary<Int, String>
             var mis2: Dictionary<Int, String>
             var mis3 = Dictionary<Int, String>()
-            var mkis = Dictionary<Int, String>.Key()
-            var mkis2 = Dictionary<Int, String>.Key<Int, String>()
+            var mkis = Dictionary.Key()
+            var mkis2 = Dictionary.Key<Int, String>()
             var tis: Pair<Int, String>
             var tis2: Triple<Int, String, Double>
         }

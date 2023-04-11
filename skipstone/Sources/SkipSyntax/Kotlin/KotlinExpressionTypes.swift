@@ -1028,6 +1028,14 @@ class KotlinMemberAccess: KotlinExpression {
         kexpression.generics = expression.generics
         kexpression.baseType = expression.baseType.asMetaType(false)
         kexpression.mayBeSharedMutableStruct = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
+
+        // Kotlin member access never includes generics on the owning type unless we're referencing the class or a function
+        if !kexpression.isFunctionReference && kexpression.member != "self" {
+            kexpression.baseType = kexpression.baseType.withGenerics([])
+            if let baseIdentifier = kexpression.base as? KotlinIdentifier {
+                baseIdentifier.generics = []
+            }
+        }
         return kexpression
     }
 

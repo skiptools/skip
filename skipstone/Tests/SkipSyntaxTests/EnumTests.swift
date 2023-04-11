@@ -139,7 +139,6 @@ final class EnumTests: XCTestCase {
         """)
     }
 
-    //~~~ also need to test switches, synthesized equals and hashcode
     func testGenericEnum() async throws {
         try await check(swift: """
         enum E<T> {
@@ -181,6 +180,65 @@ final class EnumTests: XCTestCase {
                 fun <U> b(associated0: U): E<Nothing, U> where U: Equatable {
                     return bcase(associated0)
                 }
+            }
+        }
+        """)
+    }
+
+    func testAssociatedValueEnumSynthesizedEqualsHash() async throws {
+        try await check(swift: """
+        enum E<T, U>: Hashable {
+            case a(T, U)
+            case b(U, String)
+            case c
+        }
+        """, kotlin: """
+        internal sealed class E<out T, out U>: Hashable {
+            class acase<T, U>(val associated0: T, val associated1: U): E<T, U>() {
+
+                override fun equals(other: Any?): Boolean {
+                    if (other !is acase<*, *>) return false
+                    return associated0 == other.associated0 && associated1 == other.associated1
+                }
+                override fun hashCode(): Int {
+                    var result = 1
+                    result = Hasher.combine(result, associated0)
+                    result = Hasher.combine(result, associated1)
+                    return result
+                }
+            }
+            class bcase<U>(val associated0: U, val associated1: String): E<Nothing, U>() {
+
+                override fun equals(other: Any?): Boolean {
+                    if (other !is bcase<*>) return false
+                    return associated0 == other.associated0 && associated1 == other.associated1
+                }
+                override fun hashCode(): Int {
+                    var result = 1
+                    result = Hasher.combine(result, associated0)
+                    result = Hasher.combine(result, associated1)
+                    return result
+                }
+            }
+            class ccase: E<Nothing, Nothing>() {
+
+                override fun equals(other: Any?): Boolean {
+                    if (other !is ccase) return false
+                    return true
+                }
+                override fun hashCode(): Int {
+                    return "ccase".hashCode()
+                }
+            }
+
+            companion object {
+                fun <T, U> a(associated0: T, associated1: U): E<T, U> {
+                    return acase(associated0, associated1)
+                }
+                fun <U> b(associated0: U, associated1: String): E<Nothing, U> {
+                    return bcase(associated0, associated1)
+                }
+                val c: E<Nothing, Nothing> = ccase()
             }
         }
         """)
