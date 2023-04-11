@@ -343,6 +343,41 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         }
     }
 
+    /// Whether this signature uses the given type.
+    func referencesType(_ target: TypeSignature) -> Bool {
+        if target == self {
+            return true
+        }
+        switch self {
+        case .array(let element):
+            return element.referencesType(target)
+        case .composition(let types):
+            return types.contains { $0.referencesType(target) }
+        case .dictionary(let key, let value):
+            return key.referencesType(target) || value.referencesType(target)
+        case .function(let parameters, let returnType):
+            return returnType.referencesType(target) || parameters.contains { $0.type.referencesType(target) }
+        case .member(let base, let type):
+            return base.referencesType(type) || type.referencesType(target)
+        case .metaType(let type):
+            return type.referencesType(target)
+        case .named(_, let generics):
+            return generics.contains { $0.referencesType(target) }
+        case .optional(let type):
+            return type.referencesType(target)
+        case .range(let element):
+            return element.referencesType(target)
+        case .set(let element):
+            return element.referencesType(target)
+        case .tuple(_, let types):
+            return types.contains { $0.referencesType(target) }
+        case .unwrappedOptional(let type):
+            return type.referencesType(target)
+        default:
+            return false
+        }
+    }
+
     /// Map uses of one set of types to another.
     func mappingTypes(from: [TypeSignature], to: [TypeSignature]) -> TypeSignature {
         guard !from.isEmpty, from.count == to.count else {

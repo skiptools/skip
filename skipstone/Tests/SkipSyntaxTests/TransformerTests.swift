@@ -1,8 +1,8 @@
 @testable import SkipSyntax
 import XCTest
 
-final class PluginTests: XCTestCase {
-    func testTestPlugin() async throws {
+final class TransformerTests: XCTestCase {
+    func testTestTransformer() async throws {
         try await check(swift: """
         import XCTest
 

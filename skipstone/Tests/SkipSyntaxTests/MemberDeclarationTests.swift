@@ -45,6 +45,118 @@ final class MemberDeclarationTests: XCTestCase {
             }
         }
         """)
+
+        try await check(swift: """
+        class A<T: Equatable> {
+            static let staticLet = 1
+
+            static func staticFunc() -> Int {
+                return 20
+            }
+
+            static func staticFunc2(p: T) -> T {
+            }
+
+            static func staticFunc3<U>(p1: T, p2: U) -> T {
+            }
+
+            func f() -> T {
+            }
+        }
+        """, kotlin: """
+        internal open class A<T> where T: Equatable {
+
+            internal open fun f(): T {
+            }
+
+            companion object {
+                internal val staticLet = 1
+
+                internal fun staticFunc(): Int {
+                    return 20
+                }
+
+                internal fun <T> staticFunc2(p: T): T where T: Equatable {
+                }
+
+                internal fun <T, U> staticFunc3(p1: T, p2: U): T where T: Equatable {
+                }
+            }
+        }
+        """)
+
+        try await checkProducesMessage(swift: """
+        class A<T> {
+            static var staticVar: T
+
+            func f() -> T {
+            }
+        }
+        """)
+
+        try await checkProducesMessage(swift: """
+        class A<T> {
+            static func staticFunc() -> T {
+            }
+
+            func f() -> T {
+            }
+        }
+        """)
+    }
+
+    func testStaticExtensionMembers() async throws {
+        // Intentionally do not define the type we're extending so simulate a type in another module
+        try await check(swift: """
+        extension C {
+            static var staticVar: Int {
+                return 10
+            }
+            static func staticFunc() -> Int {
+                return 20
+            }
+        }
+        """, kotlin: """
+        internal val C.Companion.staticVar: Int
+            get() {
+                return 10
+            }
+        internal fun C.Companion.staticFunc(): Int {
+            return 20
+        }
+        """)
+
+        try await checkProducesMessage(swift: """
+        class C<T> {
+        }
+        extension C where T: Equatable {
+            static var staticVar: Int {
+                return 1
+            }
+        }
+        """)
+
+        try await checkProducesMessage(swift: """
+        class C<T> {
+        }
+        extension C where T: Equatable {
+            static func staticFunc() {
+            }
+        }
+        """)
+
+        try await check(supportingSwift: """
+        class C<T, U> {
+        }
+        """, swift: """
+        extension C where T: Equatable {
+            static func staticFunc(p: T) -> T {
+            }
+        }
+        """, kotlin: """
+        internal fun <T> C.Companion.staticFunc(p: T): T where T: Equatable {
+        }
+        """)
     }
 
     func testComputedVariableGetSet() async throws {

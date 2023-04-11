@@ -139,8 +139,7 @@ final class EnumTests: XCTestCase {
         """)
     }
 
-    //~~~
-//    func testGenericAssociatedValue() async throws {
+//    func testGenericEnum() async throws {
 //        try await check(swift: """
 //        enum E<T> {
 //            case a

@@ -37,7 +37,9 @@ extension KotlinMemberDeclaration {
             return
         }
         output.append(extends.0.withGenerics([]).kotlin)
-        extends.1.append(to: output, indentation: indentation)
+        if !isStatic {
+            extends.1.append(to: output, indentation: indentation)
+        }
         output.append(".")
         if isStatic {
             output.append("Companion.")

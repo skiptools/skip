@@ -74,6 +74,14 @@ extension Message {
         return Message(kind: .warning, message: message, sourceFile: sourceFile)
     }
 
+    static func kotlinGenericExtensionStaticMember(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Kotlin companion objects (static members) do not have access to their declaring type's generics. This prohibits extensions with generic constraints from adding static members apart from functions with parameters of the constrained type(s)", sourceDerived: sourceDerived, source: source)
+    }
+
+    static func kotlinGenericStaticMember(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Kotlin companion objects (static members) do not have access to their declaring type's generics", sourceDerived: sourceDerived, source: source)
+    }
+
     static func kotlinGenericTypeNested(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Swift and Kotlin treat types nested within generic types in incompatible ways, and Skip cannot translate between the two. Consider moving this type out of its generic outer type", sourceDerived: sourceDerived, source: source)
     }

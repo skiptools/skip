@@ -1061,6 +1061,24 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var functionType: TypeSignature {
         return .function(parameters.map(\.signature), returnType)
     }
+    var functionGenerics: Generics {
+        get {
+            if let _functionGenerics {
+                return _functionGenerics
+            }
+            guard let extendsGenerics = extends?.1, !extendsGenerics.isEmpty else {
+                return generics
+            }
+            guard !generics.isEmpty else {
+                return extendsGenerics
+            }
+            return extendsGenerics.merge(overrides: generics, addNew: true)
+        }
+        set {
+            _functionGenerics = newValue
+        }
+    }
+    private var _functionGenerics: Generics? = nil
     var isEqualImplementation: Bool {
         return name == "==" && modifiers.isStatic && parameters.count == 2
     }
@@ -1075,15 +1093,6 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 isOpen = false
             }
         }
-    }
-    var extendsCombinedGenerics: Generics {
-        guard let extendsGenerics = extends?.1, !extendsGenerics.isEmpty else {
-            return generics
-        }
-        guard !generics.isEmpty else {
-            return extendsGenerics
-        }
-        return extendsGenerics.merge(overrides: generics, addNew: true)
     }
     var isStatic: Bool {
         return modifiers.isStatic && !isEqualImplementation
@@ -1123,8 +1132,13 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                     kstatement.modifiers.visibility = .public
                 }
             }
-            // Kotlin does not allow a generic type to refer to itself without constraints
             if !owningSignature.generics.isEmpty {
+                // Kotlin companion objects do not have access to their type's generics, but we can create a generic function so long as the generic
+                // is on a parameter rather than in the return type
+                if kstatement.isStatic {
+                    kstatement.convertToGenericFunction(owningTypeDeclaration, generics: owningSignature.generics, translator: translator)
+                }
+                // Kotlin does not allow a generic type to refer to itself without constraints
                 let withoutGenerics: TypeSignature = .named(owningTypeDeclaration.name, [])
                 kstatement.returnType = kstatement.returnType.mappingTypes(from: [withoutGenerics], to: [owningSignature])
                 kstatement.parameters = kstatement.parameters.map {
@@ -1240,7 +1254,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if type != .constructorDeclaration {
             output.append("fun ")
         }
-        let generics = extendsCombinedGenerics.filterWhereEqual()
+        let generics = functionGenerics.filterWhereEqual()
         if !generics.isEmpty {
             generics.append(to: output, indentation: indentation)
             output.append(" ")
@@ -1286,7 +1300,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         } else if let delegatingConstructorCall {
             output.append(": ").append(delegatingConstructorCall, indentation: indentation)
         }
-        extendsCombinedGenerics.appendWhere(to: output, indentation: indentation)
+        functionGenerics.appendWhere(to: output, indentation: indentation)
     }
 
     private func appendFunctionBody(_ body: KotlinCodeBlock, to output: OutputGenerator, indentation: Indentation) {
@@ -1326,6 +1340,37 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         output.append(bodyIndentation).append("hash(into = InOut<Hasher>({ hasher }, { hasher = it }))\n")
         output.append(bodyIndentation).append("return hasher.finalize()\n")
         output.append(indentation).append("}\n")
+    }
+
+    private func convertToGenericFunction(_ owningTypeDeclaration: TypeDeclaration, generics genericTypes: [TypeSignature], translator: KotlinTranslator) {
+        var genericsUsedInParameters: [TypeSignature] = []
+        var remainingGenerics: [TypeSignature] = []
+        for genericType in genericTypes {
+            if parameters.contains(where: { $0.declaredType.referencesType(genericType) }) {
+                genericsUsedInParameters.append(genericType)
+            } else {
+                remainingGenerics.append(genericType)
+            }
+        }
+        if remainingGenerics.contains(where: { returnType.referencesType($0) }) {
+            messages.append(.kotlinGenericStaticMember(self, source: translator.syntaxTree.source))
+        } else if owningTypeDeclaration.type == .extensionDeclaration && !owningTypeDeclaration.generics.entries.allSatisfy({ genericsUsedInParameters.contains($0.namedType) }) {
+            messages.append(.kotlinGenericExtensionStaticMember(self, source: translator.syntaxTree.source))
+        }
+        guard !genericsUsedInParameters.isEmpty else {
+            return
+        }
+
+        var functionGenerics: Generics
+        if extends != nil {
+            functionGenerics = self.functionGenerics
+        } else if let typeInfo = translator.codebaseInfo?.primaryTypeInfo(forNamed: owningTypeDeclaration.signature) {
+            functionGenerics = typeInfo.generics.merge(overrides: owningTypeDeclaration.generics)
+        } else {
+            functionGenerics = owningTypeDeclaration.generics
+        }
+        functionGenerics.entries = functionGenerics.entries.filter { genericsUsedInParameters.contains(.named($0.name, [])) }
+        self.functionGenerics = functionGenerics.merge(overrides: generics, addNew: true)
     }
 }
 
@@ -1516,13 +1561,11 @@ class KotlinTypealiasDeclaration: KotlinStatement, KotlinMemberDeclaration {
     ///
     /// - Note: This is not a comprehensive check.
     private static func memberDeclaration(_ member: Statement, usesTypealias aliasName: String) -> Bool {
-        // Map the typealias to a marker target and if the mapping changes the type, we know the typealias was found and replaced
-        let from: [TypeSignature] = [.named(aliasName, [])]
-        let marker: [TypeSignature] = [.named("marker_type", [])]
+        let aliasType: TypeSignature = .named(aliasName, [])
         if let variableDeclaration = member as? VariableDeclaration {
-            return variableDeclaration.variableTypes.map { $0.mappingTypes(from: from, to: marker) } != variableDeclaration.variableTypes
+            return variableDeclaration.variableTypes.contains { $0.referencesType(aliasType) }
         } else if let functionDeclaration = member as? FunctionDeclaration {
-            return functionDeclaration.functionType.mappingTypes(from: from, to: marker) != functionDeclaration.functionType
+            return functionDeclaration.functionType.referencesType(aliasType)
         } else {
             return false
         }
@@ -1611,8 +1654,13 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             if kstatement.modifiers.isOverride {
                 kstatement.modifiers.visibility = .public
             }
-            // Kotlin does not allow a generic type to refer to itself without constraints
             if !owningSignature.generics.isEmpty {
+                if kstatement.isStatic && owningSignature.generics.contains(where: { kstatement.declaredType.referencesType($0) }) {
+                    kstatement.messages.append(.kotlinGenericStaticMember(kstatement, source: translator.syntaxTree.source))
+                } else if kstatement.isStatic && owningTypeDeclaration.type == .extensionDeclaration && !owningTypeDeclaration.generics.isEmpty {
+                    kstatement.messages.append(.kotlinGenericExtensionStaticMember(kstatement, source: translator.syntaxTree.source))
+                }
+                // Kotlin does not allow a generic type to refer to itself without constraints
                 let withoutGenerics: TypeSignature = .named(owningTypeDeclaration.name, [])
                 kstatement.declaredType = kstatement.declaredType.mappingTypes(from: [withoutGenerics], to: [owningSignature])
             }
