@@ -14,6 +14,13 @@ import PackagePlugin
     func createBuildCommands(context: PluginContext, target: Target) async throws -> [Command] {
         let skiptool = try context.tool(named: "skiptool")
         let outputFolder = context.pluginWorkDirectory
+
+        // In SPM the per-module outputs has no suffix, but in Xcode it is "ModuleName.output" below DerivedData/
+        // We determine we are in Xcode by checking for environment variables that should only be present for Xcode
+        let env = ProcessInfo.processInfo.environment
+        let xcodeBuildFolder = env["__XCODE_BUILT_PRODUCTS_DIR_PATHS"] ?? env["BUILT_PRODUCTS_DIR"]
+        let packageFolderExtension = xcodeBuildFolder == nil ? "" : ".output"
+
         //print("createBuildCommands:", context.package.id)
         guard let sourceTarget = target as? SourceModuleTarget else {
             throw TranspilePlugInError("Target «\(target.name)» was not a source module")
@@ -93,7 +100,7 @@ import PackagePlugin
             // FIXME: the inserted "../" is needed because LocalFileSystem.createSymbolicLink will resolve the relative path against the destinations *parent* for some reason (SPM bug?)
             let targetLink: String
             if let packageID = packageID { // go further up to the external package name
-                targetLink = "../../../../" + packageID + ".output/" + target.name + "/" + pluginFolderName + "/" + peerTargetName
+                targetLink = "../../../../" + packageID + packageFolderExtension + "/" + target.name + "/" + pluginFolderName + "/" + peerTargetName
             } else {
                 targetLink = "../../../" + target.name + "/" + pluginFolderName + "/" + peerTargetName
             }
@@ -141,11 +148,9 @@ import PackagePlugin
         let markerFile = outputURL.appendingPathComponent(".skipbuild")
 
         // the input files consist of all the swift, kotlin, and .yml files in all of the sources
-        //let inputFiles = sourceTarget.sourceFiles(withSuffix: "").map({ $0 }) + swiftSourceTarget.sourceFiles(withSuffix: "").map({ $0 })
-
-        //let outputFiles = [Path(markerFile.path)]
-        //print("inputFiles:", inputFiles.map(\.path))
-        //print("outputFiles:", outputFiles)
+        // having no inputs or outputs in Xcode seems to result in the command running *every* time, but in SPM is appears to have the opposite effect: it never seems to run when there are no inputs or outputs
+        let inputFiles = sourceTarget.sourceFiles(withSuffix: "").map({ $0 }) + swiftSourceTarget.sourceFiles(withSuffix: "").map({ $0 })
+        let outputFiles = [Path(markerFile.path)]
 
         let outputFile = outputURL.appendingPathComponent(".skipbuild.out") // save output log
 
@@ -161,9 +166,7 @@ import PackagePlugin
                 //"-v",
                 ]
                 + buildModuleArgs
-                + sourceFilePaths
-                //, inputFiles: inputFiles.map(\.path), outputFiles: outputFiles
-            )
+                + sourceFilePaths, inputFiles: inputFiles.map(\.path), outputFiles: outputFiles)
 
 //            .buildCommand(displayName: "Skip Info", executable: skiptool.path, arguments: [
 //                "info",
