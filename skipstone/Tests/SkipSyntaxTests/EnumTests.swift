@@ -139,28 +139,52 @@ final class EnumTests: XCTestCase {
         """)
     }
 
-//    func testGenericEnum() async throws {
-//        try await check(swift: """
-//        enum E<T> {
-//            case a
-//            case b(Int = 1, T)
-//        }
-//        """, kotlin: """
-//        internal sealed class E {
-//            class acase: E() {
-//            }
-//            class bcase<T>(val associated0: Int, val associated1: T): E() {
-//            }
-//
-//            companion object {
-//                val a: E = acase()
-//                fun <T> b(associated0: Int = 1, associated1: T): E {
-//                    return bcase(associated0, associated1)
-//                }
-//            }
-//        }
-//        """)
-//    }
+    //~~~ also need to test switches, synthesized equals and hashcode
+    func testGenericEnum() async throws {
+        try await check(swift: """
+        enum E<T> {
+            case a
+            case b(Int = 1, T)
+        }
+        """, kotlin: """
+        internal sealed class E<out T> {
+            class acase: E<Nothing>() {
+            }
+            class bcase<T>(val associated0: Int, val associated1: T): E<T>() {
+            }
+
+            companion object {
+                val a: E<Nothing> = acase()
+                fun <T> b(associated0: Int = 1, associated1: T): E<T> {
+                    return bcase(associated0, associated1)
+                }
+            }
+        }
+        """)
+
+        try await check(swift: """
+        enum E<T, U: Equatable> {
+            case a(T)
+            case b(U)
+        }
+        """, kotlin: """
+        internal sealed class E<out T, out U> where U: Equatable {
+            class acase<T>(val associated0: T): E<T, Nothing>() {
+            }
+            class bcase<U>(val associated0: U): E<Nothing, U>() where U: Equatable {
+            }
+
+            companion object {
+                fun <T> a(associated0: T): E<T, Nothing> {
+                    return acase(associated0)
+                }
+                fun <U> b(associated0: U): E<Nothing, U> where U: Equatable {
+                    return bcase(associated0)
+                }
+            }
+        }
+        """)
+    }
 
     func testEnumUse() async throws {
         try await check(supportingSwift: """

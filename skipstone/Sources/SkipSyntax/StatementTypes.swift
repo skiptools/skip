@@ -864,7 +864,7 @@ class TypealiasDeclaration: Statement {
     private(set) var generics: Generics
     private(set) var aliasedType: TypeSignature
     var signature: TypeSignature {
-        return _signature ?? .named(name, generics.entries.map { .named($0.name, []) })
+        return _signature ?? .named(name, generics.entries.map(\.namedType))
     }
     private var _signature: TypeSignature?
 

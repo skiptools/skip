@@ -131,12 +131,12 @@ extension Generics {
         return generics
     }
 
-    func append(to output: OutputGenerator, indentation: Indentation) {
+    func append(to output: OutputGenerator, indentation: Indentation, outParameters: Bool = false) {
         if entries.isEmpty {
             return
         }
         output.append("<")
-        output.append(entries.map { $0.whereEqual?.kotlin ?? $0.name }.joined(separator: ", "))
+        output.append(entries.map { $0.whereEqual?.kotlin ?? (outParameters ? "out \($0.name)" : $0.name) }.joined(separator: ", "))
         output.append(">")
     }
 

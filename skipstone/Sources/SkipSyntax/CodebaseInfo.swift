@@ -745,7 +745,7 @@ public class CodebaseInfo: Codable {
             }
             for entry in generics.entries {
                 if let whereEqual = entry.whereEqual {
-                    mappings[.named(entry.name, [])] = whereEqual
+                    mappings[entry.namedType] = whereEqual
                 }
             }
         }

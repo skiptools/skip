@@ -774,7 +774,7 @@ class KotlinClassDeclaration: KotlinStatement {
             } else {
                 output.append("class ").append(name)
             }
-            generics.append(to: output, indentation: indentation)
+            generics.append(to: output, indentation: indentation, outParameters: isSealedClassesEnum)
             if let inheritedRawValueType = enumInheritedRawValueType {
                 inherits = Array(inherits.dropFirst())
                 output.append("(val rawValue: \(inheritedRawValueType.kotlin))")
@@ -864,6 +864,7 @@ class KotlinClassDeclaration: KotlinStatement {
 class KotlinEnumCaseDeclaration: KotlinStatement {
     var name: String
     var generics: Generics = Generics()
+    var enumGenerics: Generics = Generics()
     var associatedValues: [Parameter<KotlinExpression>] = []
     var rawValue: KotlinExpression?
     var isLastDeclaration = false
@@ -879,6 +880,17 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
         kstatement.associatedValues = statement.associatedValues.map { $0.translate(translator: translator) }
         kstatement.associatedValues.forEach { $0.declaredType.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
         kstatement.rawValue = statement.rawValue.map { translator.translateExpression($0) }
+        if let owningTypeDeclaration = statement.owningTypeDeclaration {
+            let genericsEntries = owningTypeDeclaration.generics.entries.map { entry in
+                if kstatement.associatedValues.contains(where: { $0.declaredType.referencesType(entry.namedType) }) {
+                    return entry
+                } else {
+                    return Generic(name: entry.name, whereEqual: .named("Nothing", []))
+                }
+            }
+            kstatement.enumGenerics = Generics(entries: genericsEntries)
+            kstatement.generics = kstatement.enumGenerics.filterWhereEqual()
+        }
         if !statement.attributes.isEmpty {
             kstatement.messages.append(.kotlinAttributeUnsupported(statement, source: translator.syntaxTree.source))
         }
@@ -910,15 +922,19 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
             output.append(declaration)
         } else if let owningClassDeclaration = parent as? KotlinClassDeclaration, owningClassDeclaration.isSealedClassesEnum {
             output.append("class \(Self.sealedClassName(for: name))")
+            generics.append(to: output, indentation: indentation)
             if !associatedValues.isEmpty {
                 appendAssociatedValueArguments(to: output, asConstructor: true, indentation: indentation)
             }
             output.append(": \(owningClassDeclaration.name)")
+            enumGenerics.append(to: output, indentation: indentation)
             if let rawValue {
-                output.append("(").append(rawValue, indentation: indentation).append(") {\n")
+                output.append("(").append(rawValue, indentation: indentation).append(")")
             } else {
-                output.append("() {\n")
+                output.append("()")
             }
+            generics.appendWhere(to: output, indentation: indentation)
+            output.append(" {\n")
             for (index, value) in associatedValues.enumerated() {
                 if let label = value.externalLabel {
                     output.append(indentation.inc()).append("val \(label) = associated\(index)\n")
@@ -947,11 +963,23 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
         // For cases where the sealed class enum is forced, we always create a new instance b/c we assume some transient state may be added,
         // e.g. the stack trace in the case of Error enums
         if associatedValues.isEmpty && !forced {
-            output.append("val \(name): \(forEnum) = \(Self.sealedClassName(for: name))()\n")
+            output.append("val \(name): \(forEnum)")
+            enumGenerics.append(to: output, indentation: indentation)
+            output.append(" = \(Self.sealedClassName(for: name))")
+            generics.appendWhere(to: output, indentation: indentation)
+            output.append("()\n")
         } else {
-            output.append("fun \(name)")
+            output.append("fun ")
+            if !generics.isEmpty {
+                generics.append(to: output, indentation: indentation)
+                output.append(" ")
+            }
+            output.append(name)
             appendAssociatedValueArguments(to: output, asConstructor: false, indentation: indentation)
-            output.append(": \(forEnum) {\n")
+            output.append(": \(forEnum)")
+            enumGenerics.append(to: output, indentation: indentation)
+            generics.appendWhere(to: output, indentation: indentation)
+            output.append(" {\n")
             output.append(indentation.inc()).append("return \(Self.sealedClassName(for: name))(")
             for (index, value) in associatedValues.enumerated() {
                 if let label = value.externalLabel {
@@ -1369,7 +1397,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         } else {
             functionGenerics = owningTypeDeclaration.generics
         }
-        functionGenerics.entries = functionGenerics.entries.filter { genericsUsedInParameters.contains(.named($0.name, [])) }
+        functionGenerics.entries = functionGenerics.entries.filter { genericsUsedInParameters.contains($0.namedType) }
         self.functionGenerics = functionGenerics.merge(overrides: generics, addNew: true)
     }
 }
