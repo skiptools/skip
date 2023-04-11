@@ -17,9 +17,9 @@ jobs:
     steps:
       - name: Create New Skip Package (Release)
         run: |
-          mkdir release
-          cd release
-          swift package init --name SomeLibrary
+          mkdir SomeLibrary
+          cd SomeLibrary
+          swift package init
 
           echo 'package.dependencies += [.package(url: "https://github.com/skiptools/skip", from: "0.0.0")]' >> Package.swift
           echo 'package.dependencies += [.package(url: "https://github.com/skiptools/skiphub", from: "0.0.0")]' >> Package.swift
@@ -32,9 +32,9 @@ jobs:
 
       - name: Create New Skip Package (Debug)
         run: |
-          mkdir debug
-          cd debug
-          swift package init --name SomeOtherLibrary
+          mkdir SomeOtherLibrary
+          cd SomeOtherLibrary
+          swift package init
 
           echo 'package.dependencies += [.package(url: "https://github.com/skiptools/skip", branch: "main")]' >> Package.swift
           echo 'package.dependencies += [.package(url: "https://github.com/skiptools/skiphub", branch: "main")]' >> Package.swift
@@ -44,3 +44,4 @@ jobs:
           swift test --configuration debug
           brew install tree || true
           tree -l -I build
+
