@@ -117,6 +117,7 @@ class ArrayLiteral: Expression {
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        var elementType = collectionType.elementType
         if expecting.elementType != .none {
             elementType = expecting.elementType
             elements.forEach { $0.inferTypes(context: context, expecting: elementType) }
@@ -126,13 +127,19 @@ class ArrayLiteral: Expression {
                 elementType = elementType.or(element.inferredType)
             }
         }
+        // We support initializing Sets from array literals
+        if case .set = expecting {
+            collectionType = .set(elementType)
+        } else {
+            collectionType = .array(elementType)
+        }
         return context
     }
 
-    private var elementType: TypeSignature = .none
+    private var collectionType: TypeSignature = .none
 
     override var inferredType: TypeSignature {
-        return .array(elementType)
+        return collectionType
     }
 
     override var children: [SyntaxNode] {

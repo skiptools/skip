@@ -61,6 +61,9 @@ final class BuiltinTypeTests: XCTestCase {
             var mis3 = Dictionary<Int, String>()
             var mkis = Dictionary<Int, String>.Key()
             var mkis2 = Dictionary<Int, String>.Key<Int, String>()
+            var s: Set<Any>
+            var si: Set<Int>
+            var si3 = Set<Int>()
             var tis: (Int, String)
             var tis2: (Int, String, Double)
         }
@@ -76,6 +79,9 @@ final class BuiltinTypeTests: XCTestCase {
             var mis3 = Dictionary<Int, String>()
             var mkis = Dictionary.Key()
             var mkis2 = Dictionary.Key<Int, String>()
+            var s: Set<Any>
+            var si: Set<Int>
+            var si3 = Set<Int>()
             var tis: Pair<Int, String>
             var tis2: Triple<Int, String, Double>
         }
@@ -147,6 +153,25 @@ final class BuiltinTypeTests: XCTestCase {
         UShort.max
         UInt.min
         ULong.max
+        """)
+    }
+
+    func testArrayLiteralToSetMapping() async throws {
+        try await check(supportingSwift: """
+        func setf(set: Set<Int>) {
+        }
+        """, swift: """
+        {
+            let s: Set<Int> = [1, 2, 3]
+            setf(set: s)
+            setf(set: [1, 2, 3])
+        }
+        """, kotlin: """
+        {
+            val s: Set<Int> = setOf(1, 2, 3)
+            setf(set = s.sref())
+            setf(set = setOf(1, 2, 3))
+        }
         """)
     }
 }

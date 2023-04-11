@@ -32,11 +32,13 @@ enum KotlinExpressionType {
 
 class KotlinArrayLiteral: KotlinExpression {
     var elements: [KotlinExpression] = []
+    var inferredType: TypeSignature = .none
     var useMultilineFormatting = false
 
     static func translate(expression: ArrayLiteral, translator: KotlinTranslator) -> KotlinArrayLiteral {
         let kexpression = KotlinArrayLiteral(expression: expression)
         kexpression.elements = expression.elements.map { translator.translateExpression($0) }
+        kexpression.inferredType = expression.inferredType
         return kexpression
     }
 
@@ -58,7 +60,11 @@ class KotlinArrayLiteral: KotlinExpression {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
-        output.append("arrayOf(")
+        if case .set = inferredType {
+            output.append("setOf(")
+        } else {
+            output.append("arrayOf(")
+        }
         let elementIndentation = useMultilineFormatting ? indentation.inc() : indentation
         for (index, element) in elements.enumerated() {
             if (useMultilineFormatting) {
