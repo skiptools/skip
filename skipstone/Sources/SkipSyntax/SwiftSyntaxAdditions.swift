@@ -54,6 +54,52 @@ extension FunctionSignatureSyntax {
     }
 }
 
+extension ReturnClauseSyntax {
+    fileprivate func typeSignature(in syntaxTree: SyntaxTree, messages: inout [Message]) -> TypeSignature {
+        var signature = TypeSignature.for(syntax: returnType)
+        if signature == .none {
+            signature = .void
+            messages.append(.unsupportedTypeSignature(returnType, source: syntaxTree.source))
+        }
+        return signature
+    }
+}
+
+extension Parameter<Expression> {
+    fileprivate init(firstName: String?, secondName: String?, typeSyntax: TypeSyntax?, ellipses: String? = nil, defaultArgument: InitializerClauseSyntax? = nil, in syntaxTree: SyntaxTree, messages: inout [Message]) {
+        var type: TypeSignature = .none
+        var isInOut = false
+        if let typeSyntax {
+            type = TypeSignature.for(syntax: typeSyntax)
+            if type == .none {
+                type = .any
+                messages.append(.unsupportedTypeSignature(typeSyntax, source: syntaxTree.source))
+            }
+            isInOut = TypeSignature.isInOut(syntax: typeSyntax)
+        }
+        let isVariadic = ellipses == "..."
+        var defaultValue: Expression? = nil
+        if let defaultArgument {
+            defaultValue = ExpressionDecoder.decode(syntax: defaultArgument.value, in: syntaxTree)
+        }
+        self = Parameter<Expression>(externalLabel: firstName, internalLabel: secondName, declaredType: type, isVariadic: isVariadic, isInOut: isInOut, defaultValue: defaultValue)
+    }
+}
+
+extension ParameterClauseSyntax {
+    func parameters(in syntaxTree: SyntaxTree) -> ([Parameter<Expression>], [Message]) {
+        var messages: [Message] = []
+        let parameters = parameters(in: syntaxTree, messages: &messages)
+        return (parameters, messages)
+    }
+
+    fileprivate func parameters(in syntaxTree: SyntaxTree, messages: inout [Message]) -> [Parameter<Expression>] {
+        return parameterList.map { parameterSyntax in
+            Parameter<Expression>(firstName: parameterSyntax.firstName.text, secondName: parameterSyntax.secondName?.text, typeSyntax: parameterSyntax.type, ellipses: parameterSyntax.ellipsis?.text, defaultArgument: parameterSyntax.defaultArgument, in: syntaxTree, messages: &messages)
+        }
+    }
+}
+
 extension ClosureSignatureSyntax {
     /// The return type and parameters in this signature, and optional messages warning of any issues.
     func typeSignatures(in syntaxTree: SyntaxTree) -> (TypeSignature, [Parameter<Void>], [Message]) {
@@ -74,18 +120,15 @@ extension ClosureSignatureSyntax {
     }
 }
 
-extension ReturnClauseSyntax {
-    fileprivate func typeSignature(in syntaxTree: SyntaxTree, messages: inout [Message]) -> TypeSignature {
-        var signature = TypeSignature.for(syntax: returnType)
-        if signature == .none {
-            signature = .void
-            messages.append(.unsupportedTypeSignature(returnType, source: syntaxTree.source))
+extension ClosureParameterClauseSyntax {
+    fileprivate func parameters(in syntaxTree: SyntaxTree, messages: inout [Message]) -> [Parameter<Expression>] {
+        return parameterList.map { parameterSyntax in
+            Parameter<Expression>(firstName: parameterSyntax.firstName.text, secondName: parameterSyntax.secondName?.text, typeSyntax: parameterSyntax.type, ellipses: parameterSyntax.ellipsis?.text, in: syntaxTree, messages: &messages)
         }
-        return signature
     }
 }
 
-extension ParameterClauseSyntax {
+extension EnumCaseParameterClauseSyntax {
     func parameters(in syntaxTree: SyntaxTree) -> ([Parameter<Expression>], [Message]) {
         var messages: [Message] = []
         let parameters = parameters(in: syntaxTree, messages: &messages)
@@ -94,22 +137,7 @@ extension ParameterClauseSyntax {
 
     fileprivate func parameters(in syntaxTree: SyntaxTree, messages: inout [Message]) -> [Parameter<Expression>] {
         return parameterList.map { parameterSyntax in
-            var type: TypeSignature = .none
-            var isInOut = false
-            if let typeSyntax = parameterSyntax.type {
-                type = TypeSignature.for(syntax: typeSyntax)
-                if type == .none {
-                    type = .any
-                    messages.append(.unsupportedTypeSignature(typeSyntax, source: syntaxTree.source))
-                }
-                isInOut = TypeSignature.isInOut(syntax: typeSyntax)
-            }
-            let isVariadic = parameterSyntax.ellipsis?.text == "..."
-            var defaultValue: Expression? = nil
-            if let defaultArgument = parameterSyntax.defaultArgument {
-                defaultValue = ExpressionDecoder.decode(syntax: defaultArgument.value, in: syntaxTree)
-            }
-            return Parameter<Expression>(externalLabel: parameterSyntax.firstName?.text, internalLabel: parameterSyntax.secondName?.text, declaredType: type, isVariadic: isVariadic, isInOut: isInOut, defaultValue: defaultValue)
+            Parameter<Expression>(firstName: parameterSyntax.firstName?.text, secondName: parameterSyntax.secondName?.text, typeSyntax: parameterSyntax.type, defaultArgument: parameterSyntax.defaultArgument, in: syntaxTree, messages: &messages)
         }
     }
 }
