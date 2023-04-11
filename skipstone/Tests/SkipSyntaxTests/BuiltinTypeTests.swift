@@ -119,4 +119,34 @@ final class BuiltinTypeTests: XCTestCase {
             }
         """)
     }
+
+    func testNumericMinMax() async throws {
+        try await check(swift: """
+        Double.min
+        Float.max
+        Int.min
+        Int8.max
+        Int16.min
+        Int32.max
+        Int64.min
+        UInt.max
+        UInt8.min
+        UInt16.max
+        UInt32.min
+        UInt64.max
+        """, kotlin: """
+        Double.min
+        Float.max
+        Int.min
+        Byte.max
+        Short.min
+        Int.max
+        Long.min
+        UInt.max
+        UByte.min
+        UShort.max
+        UInt.min
+        ULong.max
+        """)
+    }
 }

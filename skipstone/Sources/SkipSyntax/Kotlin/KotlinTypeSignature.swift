@@ -7,6 +7,9 @@ extension TypeSignature {
         case .anyObject:
             return "Any"
         case .array(let elementType):
+            if elementType == .none {
+                return "Array"
+            }
             return "Array<\(elementType.kotlin)>"
         case .bool:
             return "Boolean"
@@ -15,7 +18,10 @@ extension TypeSignature {
         case .composition:
             return "Any"
         case .dictionary(let keyType, let valueType):
-            return "Dictionary<\(keyType.kotlin), \(valueType.kotlin)>"
+            if keyType == .none && valueType == .none {
+                return "Dictionary"
+            }
+            return "Dictionary<\(keyType.or(.any).kotlin), \(valueType.or(.any).kotlin)>"
         case .double:
             return "Double"
         case .float:
@@ -37,7 +43,7 @@ extension TypeSignature {
         case .metaType(let baseType):
             return "KClass<\(baseType.kotlin)>"
         case .named(let name, let generics):
-            guard !generics.isEmpty else {
+            guard !generics.isEmpty && generics.contains(where: { $0 != .none }) else {
                 return name
             }
             return "\(name)<\(generics.map { $0.kotlin }.joined(separator: ", "))>"
@@ -59,8 +65,11 @@ extension TypeSignature {
             default:
                 return "IntRange"
             }
-        case .set:
-            return description
+        case .set(let elementType):
+            if elementType == .none {
+                return "Set"
+            }
+            return "Set<\(elementType.kotlin)>"
         case .string:
             return "String"
         case .tuple(_, let types):

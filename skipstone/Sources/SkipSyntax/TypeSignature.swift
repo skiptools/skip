@@ -944,13 +944,13 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case "AnyType":
             return .metaType(.any)
         case "Array":
-            return genericTypes.isEmpty ? .array(.any) : allowNamed ? genericTypes.count == 1 ? .array(genericTypes[0]) : .named(name, genericTypes) : .none
+            return genericTypes.isEmpty ? .array(.none) : allowNamed ? genericTypes.count == 1 ? .array(genericTypes[0]) : .named(name, genericTypes) : .none
         case "Bool":
             return genericTypes.isEmpty ? .bool : allowNamed ? .named(name, genericTypes) : .none
         case "Character":
             return genericTypes.isEmpty ? .character : allowNamed ? .named(name, genericTypes) : .none
         case "Dictionary":
-            return genericTypes.isEmpty ? .dictionary(.any, .any) : genericTypes.count == 2 ? .dictionary(genericTypes[0], genericTypes[1]) : allowNamed ? .named(name, genericTypes) : .none
+            return genericTypes.isEmpty ? .dictionary(.none, .none) : genericTypes.count == 2 ? .dictionary(genericTypes[0], genericTypes[1]) : allowNamed ? .named(name, genericTypes) : .none
         case "Double":
             return genericTypes.isEmpty ? .double : allowNamed ? .named(name, genericTypes) : .none
         case "Float":
@@ -966,9 +966,9 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case "Int64":
             return genericTypes.isEmpty ? .int64 : allowNamed ? .named(name, genericTypes) : .none
         case "Range":
-            return genericTypes.isEmpty ? .range(.any) : genericTypes.count == 1 ? .range(genericTypes[0]) : allowNamed ? .named(name, genericTypes) : .none
+            return genericTypes.isEmpty ? .range(.none) : genericTypes.count == 1 ? .range(genericTypes[0]) : allowNamed ? .named(name, genericTypes) : .none
         case "Set":
-            return genericTypes.isEmpty ? .set(.any) : genericTypes.count == 1 ? .set(genericTypes[0]) : allowNamed ? .named(name, genericTypes) : .none
+            return genericTypes.isEmpty ? .set(.none) : genericTypes.count == 1 ? .set(genericTypes[0]) : allowNamed ? .named(name, genericTypes) : .none
         case "String":
             return genericTypes.isEmpty ? .string : allowNamed ? .named(name, genericTypes) : .none
         case "UInt":

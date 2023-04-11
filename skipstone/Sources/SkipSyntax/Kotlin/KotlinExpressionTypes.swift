@@ -673,12 +673,17 @@ class KotlinIdentifier: KotlinExpression {
                 // To refer to a function rather than call it, Kotlin uses ::
                 output.append("::")
             }
-            output.append(Self.translateName(name))
-            if !generics.isEmpty {
-                output.append("<\(generics.map(\.kotlin).joined(separator: ", "))>")
-            }
-            if isInOut {
-                output.append(".value")
+            let builtinType = TypeSignature.for(name: name, genericTypes: generics, allowNamed: false)
+            if builtinType != .none {
+                output.append(builtinType.kotlin)
+            } else {
+                output.append(Self.translateName(name))
+                if !generics.isEmpty {
+                    output.append("<\(generics.map(\.kotlin).joined(separator: ", "))>")
+                }
+                if isInOut {
+                    output.append(".value")
+                }
             }
         }
     }
