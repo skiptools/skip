@@ -807,7 +807,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
                     // skip over anything that is not a destination folder
                     // if it doesn't exist at all, then it is an error
                     if !fs.exists(destPath) {
-                        throw error("Expected destination path did not exist: \(destPath)")
+                        warn("Expected destination path did not exist: \(destPath)")
                     }
                     return
                 }
@@ -823,8 +823,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
                         // bump up all the relative links to account for the folder we just recursed into.
                         // e.g.: ../SomeSharedRoot/OtherModule/
                         // becomes: ../../SomeSharedRoot/OtherModule/someFolder/
-                        let toRelativePath = "../" + relative + "/" + fsEntry
-                        try createMergedLinkTree(from: fromSubPath, to: toRelativePath)
+                        try createMergedLinkTree(from: fromSubPath, to: "../" + relative + "/" + fsEntry)
                     }
                 } else {
                     try fs.createSymbolicLink(fromPath, pointingAt: destPath, relative: true)
