@@ -148,4 +148,40 @@ final class ExpressionTests: XCTestCase {
         return Foo.Bar.Baz.prop
         """)
     }
+
+
+    func testAvailableAttributeIgnored() async throws {
+        try await check(swift: """
+        class C {
+            @available(iOS 13, *)
+            func f() {
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal open fun f() {
+            }
+        }
+        """)
+    }
+
+    func testIfAvailableIsTrue() async throws {
+        try await check(swift: """
+        func f() {
+            if #available(iOS 13, *) {
+                print("ok")
+            } else {
+                print("nope")
+            }
+        }
+        """, kotlin: """
+        internal fun f() {
+            if (true) {
+                print("ok")
+            } else {
+                print("nope")
+            }
+        }
+        """)
+    }
 }

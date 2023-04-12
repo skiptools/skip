@@ -3,6 +3,7 @@ import SwiftSyntax
 /// Supported Swift expression types.
 enum ExpressionType: CaseIterable {
     case arrayLiteral
+    case available
     case binaryOperator
     case binding
     case booleanLiteral
@@ -38,6 +39,8 @@ enum ExpressionType: CaseIterable {
         switch self {
         case .arrayLiteral:
             return ArrayLiteral.self
+        case .available:
+            return Available.self
         case .binaryOperator:
             return BinaryOperator.self
         case .binding:
@@ -144,6 +147,24 @@ class ArrayLiteral: Expression {
 
     override var children: [SyntaxNode] {
         return elements
+    }
+}
+
+/// `#available(...)`
+class Available: Expression {
+    init(syntax: SyntaxProtocol?, sourceFile: Source.FilePath?, sourceRange: Source.Range? = nil) {
+        super.init(type: .available, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
+        guard syntax.kind == .availabilityCondition else {
+            return nil
+        }
+        return Available(syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+    }
+
+    override var inferredType: TypeSignature {
+        return .bool
     }
 }
 

@@ -124,6 +124,17 @@ extension Parameter where V: Expression {
     }
 }
 
+extension Attribute {
+    var isIgnorable: Bool {
+        switch signature {
+        case .named(let name, _):
+            return name == "available" || name == "discardableResult" || name == "indirect"
+        default:
+            return false
+        }
+    }
+}
+
 extension Generics {
     func filterWhereEqual() -> Generics {
         var generics = self

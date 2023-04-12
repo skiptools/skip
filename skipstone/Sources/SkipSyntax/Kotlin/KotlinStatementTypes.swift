@@ -702,19 +702,10 @@ class KotlinClassDeclaration: KotlinStatement {
         }
 
         kstatement.inherits.forEach { $0.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
-        if statement.attributes.attributes.contains(where: { !isIgnorable(attribute: $0) }) {
+        if statement.attributes.attributes.contains(where: { !$0.isIgnorable }) {
             kstatement.messages.append(.kotlinAttributeUnsupported(statement, source: translator.syntaxTree.source))
         }
         return kstatement
-    }
-
-    private static func isIgnorable(attribute: Attribute) -> Bool {
-        switch attribute.signature {
-        case .named(let name, _):
-            return name == "indirect"
-        default:
-            return false
-        }
     }
 
     private init(statement: TypeDeclaration) {
@@ -885,7 +876,7 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
             kstatement.enumGenerics = Generics(entries: genericsEntries)
             kstatement.generics = kstatement.enumGenerics.filterWhereEqual()
         }
-        if !statement.attributes.isEmpty {
+        if statement.attributes.attributes.contains(where: { !$0.isIgnorable }) {
             kstatement.messages.append(.kotlinAttributeUnsupported(statement, source: translator.syntaxTree.source))
         }
         return kstatement
@@ -1192,19 +1183,10 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 kstatement.messages.append(.kotlinProtocolStaticMember(statement, source: translator.syntaxTree.source))
             }
         }
-        if statement.attributes.attributes.contains(where: { !isIgnorable(attribute: $0) }) {
+        if statement.attributes.attributes.contains(where: { !$0.isIgnorable }) {
             kstatement.messages.append(.kotlinAttributeUnsupported(statement, source: translator.syntaxTree.source))
         }
         return kstatement
-    }
-
-    private static func isIgnorable(attribute: Attribute) -> Bool {
-        switch attribute.signature {
-        case .named(let name, _):
-            return name == "discardableResult"
-        default:
-            return false
-        }
     }
 
     init(name: String, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
@@ -1734,7 +1716,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 kstatement.messages.append(.kotlinProtocolStaticMember(statement, source: translator.syntaxTree.source))
             }
         }
-        if !statement.attributes.isEmpty {
+        if statement.attributes.attributes.contains(where: { !$0.isIgnorable }) {
             kstatement.messages.append(.kotlinAttributeUnsupported(statement, source: translator.syntaxTree.source))
         }
         return kstatement

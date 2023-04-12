@@ -157,6 +157,8 @@ public class KotlinTranslator {
             switch expression.type {
             case .arrayLiteral:
                 return KotlinArrayLiteral.translate(expression: expression as! ArrayLiteral, translator: self)
+            case .available:
+                return KotlinBooleanLiteral(literal: true, sourceFile: expression.sourceFile, sourceRange: expression.sourceRange)
             case .binaryOperator:
                 return KotlinBinaryOperator.translate(expression: expression as! BinaryOperator, translator: self)
             case .binding:
