@@ -505,7 +505,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             RelativePath(moduleName + ".skipcode.json")
         }
 
-        let codebaseInfo = try loadCodebaseInfo() // initialize the codebaseinfo and load DependentModuleName.skipcode.json
+        let codebaseInfo = try await loadCodebaseInfo() // initialize the codebaseinfo and load DependentModuleName.skipcode.json
 
         try await validateLicense(sourceURLs: sourceFiles.map(\.asURL))
 
@@ -539,7 +539,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             info("\(skipBuildMarkerFile.basename) marker file date: \(mostRecentInputSourceLoad)")
         }
 
-        func loadCodebaseInfo() throws -> CodebaseInfo {
+        func loadCodebaseInfo() async throws -> CodebaseInfo {
             let decoder = JSONDecoder()
 
             // go through the '--link modulename:../../some/path' arguments and try to load the modulename.skipcode.json symbols from the previous module's transpilation output
@@ -551,14 +551,14 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
                 do {
                     let codebaseLoadStart = Date().timeIntervalSinceReferenceDate
-                    trace("dependencyCodebaseInfo \(dependencyCodebaseInfo): exists \(fs.exists(dependencyCodebaseInfo))")
-                    let cbdata = try inputSource(dependencyCodebaseInfo).withData { $0 }
+                    let cbdata = try inputSource(dependencyCodebaseInfo).withData { Data($0) }
+                    trace("dependencyCodebaseInfo \(dependencyCodebaseInfo): exists \(fs.exists(dependencyCodebaseInfo)) data: \(cbdata.count)")
                     let cbinfo = try decoder.decode(CodebaseInfo.self, from: cbdata)
                     dependentCodebaseInfos.append(cbinfo)
                     let codebaseLoadEnd = Date().timeIntervalSinceReferenceDate
                     info("\(dependencyCodebaseInfo.basename) codebase (\(Self.byteCount(for: .init(cbdata.count)))) loaded (\(Int64((codebaseLoadEnd - codebaseLoadStart) * 1000)) ms) for \(linkModuleName)", sourceFile: dependencyCodebaseInfo.sourceFile)
-                } catch {
-                    warn("error loading codebase for linkModuleName: \(linkModuleName) from: \(dependencyCodebaseInfo.pathString) error: \(error.localizedDescription)", sourceFile: dependencyCodebaseInfo.sourceFile)
+                } catch let e {
+                    throw error("error loading codebase for linkModuleName: \(linkModuleName) from: \(dependencyCodebaseInfo.pathString) error: \(e.localizedDescription)", sourceFile: dependencyCodebaseInfo.sourceFile)
                 }
             }
 
