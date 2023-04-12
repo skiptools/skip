@@ -37,6 +37,11 @@ extension Message {
         return Message(kind: .error, message: "Kotlin does not support constructors that return nil. Consider creating a factory function", sourceDerived: sourceDerived, source: source)
     }
 
+    // Idea: generate an internal ordinal member var and synthesize code to use it and associated values to conform
+    static func kotlinEnumSealedClassComparableConformance(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Skip does not support automatic Comparable conformance for enums that translate into Kotlin sealed classes. Consider writing your own < operator function", sourceDerived: sourceDerived, source: source)
+    }
+
     static func kotlinErrorCannotExtendClass(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "An Error type cannot extend another class because it will be translated to extend Throwable in Kotlin", sourceDerived: sourceDerived, source: source)
     }
@@ -102,6 +107,7 @@ extension Message {
         return Message(kind: .error, message: "Skip is unable to determine the owning type for member '\(member)'. Add the owning type (e.g. MyType.\(member))", sourceDerived: sourceDerived, source: source)
     }
 
+    // Idea: translate to equivalent Kotlin operator functions
     static func kotlinOperatorFunction(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Skip does not support custom operators. Consider using a standard function", sourceDerived: sourceDerived, source: source)
     }

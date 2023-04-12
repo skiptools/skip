@@ -65,17 +65,31 @@ class KotlinEquatableHashableComparableTransformer: KotlinTransformer {
     }
 
     private func synthesizeConformances(for classDeclaration: KotlinClassDeclaration, codebaseInfo: CodebaseInfo.Context) {
+        // Kotlin enums have built-in non-overridable ordering, so we have to convert regular enums to use sealed
+        // classes if they want custom ordering
+        let isEnum = classDeclaration.declarationType == .enumDeclaration
+        let isEnumWithLessThan = isEnum && codebaseInfo.typeInfos(forNamed: classDeclaration.signature).contains(where: { $0.members.contains { $0.isLessThanFunction } })
+        if isEnumWithLessThan && !classDeclaration.isSealedClassesEnum {
+            classDeclaration.isSealedClassesEnum = true
+        }
+
+        // Nothing to do for classes - which never get automatic conformance - or for non-sealed-classes enums -
+        // which have builtin conformances already
         guard classDeclaration.declarationType == .structDeclaration || classDeclaration.isSealedClassesEnum else {
-            // We don't check for non-sealed-classes enums because they will automatically be singletons with appropriate == and hash behavior
             return
         }
+
         let protocols = codebaseInfo.global.protocolSignatures(forNamed: classDeclaration.signature)
-        let isEnumWithoutAssociatedValues = classDeclaration.declarationType == .enumDeclaration && !classDeclaration.members.contains { ($0 as? KotlinEnumCaseDeclaration)?.associatedValues.isEmpty == false }
-        if isEnumWithoutAssociatedValues || protocols.contains(.named("Hashable", [])) {
+        let isEnumWithoutAssociatedValues = isEnum && !classDeclaration.members.contains { ($0 as? KotlinEnumCaseDeclaration)?.associatedValues.isEmpty == false }
+        if isEnumWithoutAssociatedValues || protocols.contains(where: { $0.isHashable }) {
             ensureHasEquals(for: classDeclaration, codebaseInfo: codebaseInfo)
             ensureHasHash(for: classDeclaration, codebaseInfo: codebaseInfo)
-        } else if isEnumWithoutAssociatedValues || protocols.contains(.named("Equatable", [])) {
+        } else if isEnumWithoutAssociatedValues || protocols.contains(where: { $0.isEquatable }) {
             ensureHasEquals(for: classDeclaration, codebaseInfo: codebaseInfo)
+        }
+
+        if isEnum && !isEnumWithLessThan && protocols.contains(where: { $0.isComparable }) {
+            classDeclaration.messages.append(.kotlinEnumSealedClassComparableConformance(classDeclaration, source: codebaseInfo.source))
         }
     }
 
@@ -91,6 +105,9 @@ class KotlinEquatableHashableComparableTransformer: KotlinTransformer {
             equalsFunction.assignParentReferences()
         } else if classDeclaration.isSealedClassesEnum {
             for enumCase in classDeclaration.members.compactMap({ $0 as? KotlinEnumCaseDeclaration }) {
+                guard classDeclaration.alwaysCreateNewSealedClassInstances || !enumCase.associatedValues.isEmpty else {
+                    continue
+                }
                 let equalsFunction = equalsFunction(for: KotlinEnumCaseDeclaration.sealedClassName(for: enumCase.name), generics: enumCase.generics, properties: (0..<enumCase.associatedValues.count).map { "associated\($0)" })
                 enumCase.members.append(equalsFunction)
                 equalsFunction.parent = enumCase
@@ -111,6 +128,9 @@ class KotlinEquatableHashableComparableTransformer: KotlinTransformer {
             hashCodeFunction.assignParentReferences()
         } else if classDeclaration.isSealedClassesEnum {
             for enumCase in classDeclaration.members.compactMap({ $0 as? KotlinEnumCaseDeclaration }) {
+                guard classDeclaration.alwaysCreateNewSealedClassInstances || !enumCase.associatedValues.isEmpty else {
+                    continue
+                }
                 let hashCodeFunction = hashCodeFunction(for: KotlinEnumCaseDeclaration.sealedClassName(for: enumCase.name), properties: (0..<enumCase.associatedValues.count).map { "associated\($0)" })
                 enumCase.members.append(hashCodeFunction)
                 hashCodeFunction.parent = enumCase
@@ -185,6 +205,10 @@ private extension CodebaseInfoItem {
         }
         let parameters = signature.parameters
         return parameters.count == 1 && parameters[0].label == "into" && parameters[0].type == .named("Hasher", [])
+    }
+
+    var isLessThanFunction: Bool {
+        return declarationType == .functionDeclaration && name == "<" && modifiers.isStatic && signature.parameters.count == 2
     }
 }
 

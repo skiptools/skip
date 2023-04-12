@@ -187,11 +187,11 @@ public class KotlinCodebaseInfo: CodebaseInfoLanguageAdditions, CodebaseInfoLang
             KotlinStructTransformer(),
             // May alter superclasses and change enums to use sealed classes
             KotlinErrorToThrowableTransformer(),
+            // May *remove* information about protocol conformances and requires knowledge of sealed vs. unsealed enums.
+            // May also change enums to use sealed classes. Take care with placement in transformers list
+            KotlinEquatableHashableComparableTransformer(),
             // May add constructors
             KotlinConstructorTransformer(),
-            // May *remove* information about protocol conformances and requires knowledge of sealed vs. unsealed enums,
-            // so place after other relevant transformers
-            KotlinEquatableHashableComparableTransformer(),
             KotlinIfWhenTransformer(),
             KotlinDeferPlugin(),
             KotlinDisambiguateFunctionsTransformer(),

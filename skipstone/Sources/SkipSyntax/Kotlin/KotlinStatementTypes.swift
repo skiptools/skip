@@ -669,6 +669,7 @@ class KotlinClassDeclaration: KotlinStatement {
         }
     }
     private var forceSealedClassesEnum = false
+    var alwaysCreateNewSealedClassInstances = false
 
     static func translate(statement: TypeDeclaration, translator: KotlinTranslator) -> KotlinClassDeclaration {
         let kstatement = KotlinClassDeclaration(statement: statement)
@@ -815,7 +816,7 @@ class KotlinClassDeclaration: KotlinStatement {
             output.append(memberIndentation).append("companion object {\n")
             let companionMemberIndentation = memberIndentation.inc()
             if isSealedClassesEnum {
-                enumCases.forEach { $0.appendSealedClassFactory(to: output, forEnum: name, forced: forceSealedClassesEnum, indentation: companionMemberIndentation) }
+                enumCases.forEach { $0.appendSealedClassFactory(to: output, forEnum: name, alwaysCreateNewInstances: alwaysCreateNewSealedClassInstances, indentation: companionMemberIndentation) }
                 if !staticMembers.isEmpty {
                     output.append("\n")
                 }
@@ -951,11 +952,9 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
         }
     }
 
-    func appendSealedClassFactory(to output: OutputGenerator, forEnum: String, forced: Bool, indentation: Indentation) {
+    func appendSealedClassFactory(to output: OutputGenerator, forEnum: String, alwaysCreateNewInstances: Bool, indentation: Indentation) {
         output.append(indentation)
-        // For cases where the sealed class enum is forced, we always create a new instance b/c we assume some transient state may be added,
-        // e.g. the stack trace in the case of Error enums
-        if associatedValues.isEmpty && !forced {
+        if associatedValues.isEmpty && !alwaysCreateNewInstances {
             output.append("val \(name): \(forEnum)")
             enumGenerics.append(to: output, indentation: indentation)
             output.append(" = \(Self.sealedClassName(for: name))")

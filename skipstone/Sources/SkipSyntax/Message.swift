@@ -98,14 +98,17 @@ extension Message {
         return Message(kind: .error, message: "Skip does not support the referenced type as a generic constraint", source: source, sourceRange: range)
     }
 
+    // Idea: we need to update TypeInferenceEngine to support local type inference
     static func localFunctionsNotSupported(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Skip does not support nested functions. Consider making this an independent function", sourceDerived: sourceDerived, source: source)
     }
 
+    // Idea: we need to update TypeInferenceEngine to support local type inference
     static func localTypesNotSupported(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Skip does not support type declarations within functions. Consider making this an independent type", sourceDerived: sourceDerived, source: source)
     }
 
+    // Idea: translate subscripts to Kotlin get/set operator functions
     static func subscriptNotSupported(_ syntax: SyntaxProtocol, source: Source) -> Message {
         let range = syntax.range(in: source)
         return Message(kind: .error, message: "Skip does not support custom subscripts. Consider using a standard function", source: source, sourceRange: range)

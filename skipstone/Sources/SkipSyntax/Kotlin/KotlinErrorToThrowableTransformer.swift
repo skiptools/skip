@@ -36,8 +36,9 @@ class KotlinErrorToThrowableTransformer: KotlinTransformer {
 
         var throwableInheritsIndex = 0
         if classDeclaration.declarationType == .enumDeclaration {
-            // To extend throwable, an enum must be modeled as a sealed class
+            // To extend throwable, an enum must be modeled as a sealed class, and we cannot create singleton case instances
             classDeclaration.isSealedClassesEnum = true
+            classDeclaration.alwaysCreateNewSealedClassInstances = true
             // Leave the enum raw type extension first
             throwableInheritsIndex = classDeclaration.enumInheritedRawValueType != nil ? 1 : 0
         }

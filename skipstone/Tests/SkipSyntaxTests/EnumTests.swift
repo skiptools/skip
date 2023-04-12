@@ -221,14 +221,6 @@ final class EnumTests: XCTestCase {
                 }
             }
             class ccase: E<Nothing, Nothing>() {
-
-                override fun equals(other: Any?): Boolean {
-                    if (other !is ccase) return false
-                    return true
-                }
-                override fun hashCode(): Int {
-                    return "ccase".hashCode()
-                }
             }
 
             companion object {
@@ -240,6 +232,113 @@ final class EnumTests: XCTestCase {
                 }
                 val c: E<Nothing, Nothing> = ccase()
             }
+        }
+        """)
+    }
+
+    func testEnumComparable() async throws {
+        try await check(swift: """
+        enum E: Comparable {
+            case one
+            case two
+        }
+        """, kotlin: """
+        internal enum class E: Comparable<E> {
+            one,
+            two;
+        }
+        """)
+
+        try await check(swift: """
+        enum E: Comparable {
+            case one
+            case two
+
+            static func < (lhs: E, rhs: E) -> Bool {
+                return lhs == .one && rhs == .two
+            }
+        }
+        """, kotlin: """
+        internal sealed class E: Comparable<E> {
+            class onecase: E() {
+            }
+            class twocase: E() {
+            }
+
+            override fun compareTo(other: E): Int {
+                if (this == other) return 0
+                fun islessthan(lhs: E, rhs: E): Boolean {
+                    return lhs == E.one && rhs == E.two
+                }
+                return if (islessthan(this, other)) -1 else 1
+            }
+
+            companion object {
+                val one: E = onecase()
+                val two: E = twocase()
+            }
+        }
+        """)
+
+        try await check(swift: """
+        enum E {
+            case one
+            case two(String)
+        }
+
+        extension E: Comparable {
+            static func < (lhs: E, rhs: E) -> Bool {
+                if lhs == .one && rhs != .one {
+                    return true
+                }
+                if case .two(let ls) = lhs, case .two(let rs) = rhs {
+                    return ls < rs
+                }
+                return false
+            }
+        }
+        """, kotlin: """
+        internal sealed class E: Comparable<E> {
+            class onecase: E() {
+            }
+            class twocase(val associated0: String): E() {
+
+                override fun equals(other: Any?): Boolean {
+                    if (other !is twocase) return false
+                    return associated0 == other.associated0
+                }
+            }
+            override fun compareTo(other: E): Int {
+                if (this == other) return 0
+                fun islessthan(lhs: E, rhs: E): Boolean {
+                    if (lhs == E.one && rhs != E.one) {
+                        return true
+                    }
+                    if (lhs is E.twocase) {
+                        val ls = lhs.associated0
+                        if (rhs is E.twocase) {
+                            val rs = rhs.associated0
+                            return ls < rs
+                        }
+                    }
+                    return false
+                }
+                return if (islessthan(this, other)) -1 else 1
+            }
+
+            companion object {
+                val one: E = onecase()
+                fun two(associated0: String): E {
+                    return twocase(associated0)
+                }
+            }
+        }
+        """)
+
+        try await checkProducesMessage(swift: """
+        enum E: Comparable {
+            case one
+            case two(String)
         }
         """)
     }
@@ -275,4 +374,20 @@ final class EnumTests: XCTestCase {
         efunc(e = E.b)
         """)
     }
+}
+
+//~~~
+enum EE: Comparable {
+    case one
+    case two
+
+    static func < (lhs: EE, rhs: EE) -> Bool {
+        return lhs == .one && rhs == .two
+    }
+}
+
+func islessEE(lhs: EE, rhs: EE) -> Bool {
+    var dict = [EE: String]()
+    dict[.one] = "one"
+    return lhs < rhs
 }
