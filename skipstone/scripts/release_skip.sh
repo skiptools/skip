@@ -112,8 +112,7 @@ sed -I '' 's;package.targets += \[.binaryTarget.*;package.targets += [.binaryTar
 # this aligns the 
 cd ${SKIPPKGDIR}
 
-README_PATH="README.md"
-sed -I '' 's;.package(url: "https://github.com/skiptools/skip", from: ".*");.package(url: "https://github.com/skiptools/skip", from: "'${SEMVER_NEXT}'");g' ${README_PATH}
+sed -I '' 's;.package(url: "https://github.com/skiptools/skip", from: ".*");.package(url: "https://github.com/skiptools/skip", from: "'${SEMVER_NEXT}'");g' README.md ../skiphub/Package.swift
 
 # also grab the latest skiphub version and update it in the README
 SKIPHUB_VERSION=`git ls-remote --tags https://github.com/skiptools/skiphub | awk -F/ '$NF ~ /^v?[0-9]+\.[0-9]+\.[0-9]+$/ {print $NF}' | sort -V | tail -n1`
