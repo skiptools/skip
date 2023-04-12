@@ -79,7 +79,7 @@ final class MemberDeclarationTests: XCTestCase {
                 internal fun <T> staticFunc2(p: T): T where T: Equatable {
                 }
 
-                internal fun <T, U> staticFunc3(p1: T, p2: U): T where T: Equatable {
+                internal fun <T, U> staticFunc3(p1: T, p2: U): T where T: Equatable, U: Any {
                 }
             }
         }
@@ -786,10 +786,10 @@ final class MemberDeclarationTests: XCTestCase {
 
     func testGenericFunction() async throws {
         try await check(swift: """
-        func f<T, U>(a: T, b: U) -> T {
+        func f<T, U>(a: T, b: U) -> T? {
         }
         """, kotlin: """
-        internal fun <T, U> f(a: T, b: U): T {
+        internal fun <T, U> f(a: T, b: U): T? where T: Any, U: Any {
         }
         """)
 
@@ -811,7 +811,7 @@ final class MemberDeclarationTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal open class C<T> {
+        internal open class C<T> where T: Any {
             internal var v: C<T>
             internal open fun f(p: Array<C<T>>): C<T>? {
                 return null

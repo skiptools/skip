@@ -1638,9 +1638,7 @@ class KotlinTypealiasDeclaration: KotlinStatement, KotlinMemberDeclaration {
         output.append(indentation).append(modifiers.kotlinMemberString(isOpen: false, suffix: " "))
         output.append("typealias ").append(name)
         generics.append(to: output, indentation: indentation)
-        output.append(" = ").append(aliasedType.kotlin)
-        generics.appendWhere(to: output, indentation: indentation)
-        output.append("\n")
+        output.append(" = ").append(aliasedType.kotlin).append("\n")
     }
 }
 

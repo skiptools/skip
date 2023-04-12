@@ -312,7 +312,7 @@ final class TypeDeclarationTests: XCTestCase {
         class C<T, U> {
         }
         """, kotlin: """
-        internal open class C<T, U> {
+        internal open class C<T, U> where T: Any, U: Any {
         }
         """)
 
@@ -351,7 +351,7 @@ final class TypeDeclarationTests: XCTestCase {
             associatedtype U
         }
         """, kotlin: """
-        internal interface P<T, U> {
+        internal interface P<T, U> where T: Any, U: Any {
         }
         """)
 
@@ -391,9 +391,9 @@ final class TypeDeclarationTests: XCTestCase {
             associatedtype U
         }
         """, kotlin: """
-        internal interface Base<T> {
+        internal interface Base<T> where T: Any {
         }
-        internal interface P<U>: Base<Int> {
+        internal interface P<U>: Base<Int> where U: Any {
         }
         """)
 
@@ -405,9 +405,9 @@ final class TypeDeclarationTests: XCTestCase {
             associatedtype U where U == T
         }
         """, kotlin: """
-        internal interface Base<T> {
+        internal interface Base<T> where T: Any {
         }
-        internal interface P<U>: Base<U> {
+        internal interface P<U>: Base<U> where U: Any {
         }
         """)
     }
@@ -421,7 +421,7 @@ final class TypeDeclarationTests: XCTestCase {
             typealias T = Int
         }
         """, kotlin: """
-        internal interface P<T> {
+        internal interface P<T> where T: Any {
         }
         internal open class C: P<Int> {
         }
@@ -441,7 +441,7 @@ final class TypeDeclarationTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal interface P<T> {
+        internal interface P<T> where T: Any {
             fun add(t: T)
             fun get(): T
         }
@@ -472,10 +472,10 @@ final class TypeDeclarationTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal interface P<T> {
+        internal interface P<T> where T: Any {
             fun add(t: Array<T>)
         }
-        internal interface U<T, K, V>: P<T> {
+        internal interface U<T, K, V>: P<T> where T: Any, K: Any, V: Any {
             val map: Dictionary<K, V>
         }
         internal open class C: U<Int, String, Double> {
@@ -518,9 +518,9 @@ final class TypeDeclarationTests: XCTestCase {
         class E: Base<Array<Custom<Bool>>> {
         }
         """, kotlin: """
-        internal open class Base<T> {
+        internal open class Base<T> where T: Any {
         }
-        internal open class C<U>: Base<U>() {
+        internal open class C<U>: Base<U>() where U: Any {
             internal open fun f(): U? {
                 return null
             }
@@ -548,7 +548,7 @@ final class TypeDeclarationTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal open class C<T> {
+        internal open class C<T> where T: Any {
             internal open fun f(): T? {
                 return null
             }
@@ -577,7 +577,7 @@ final class TypeDeclarationTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal open class C<T> {
+        internal open class C<T> where T: Any {
             internal open fun f(): T? {
                 return null
             }
@@ -602,9 +602,9 @@ final class TypeDeclarationTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal open class C<T, U> {
+        internal open class C<T, U> where T: Any, U: Any {
         }
-        internal fun <T, U> C<T, U>.f(p: T) where T: P {
+        internal fun <T, U> C<T, U>.f(p: T) where T: P, U: Any {
         }
         """)
 
@@ -623,7 +623,7 @@ final class TypeDeclarationTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal open class C<T, U> {
+        internal open class C<T, U> where T: Any, U: Any {
         }
         internal val <U> C<Int, U>.v: U? where U: P
             get() {

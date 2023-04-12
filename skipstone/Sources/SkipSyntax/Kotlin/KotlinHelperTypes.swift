@@ -141,9 +141,14 @@ extension Generics {
     }
 
     func appendWhere(to output: OutputGenerator, indentation: Indentation) {
-        let constraints = entries.flatMap { entry in
-            entry.inherits.map {
-                (entry.name, $0)
+        let constraints = entries.flatMap { (entry: Generic) -> [(String, TypeSignature)] in
+            if entry.whereEqual != nil {
+                return []
+            } else if entry.inherits.isEmpty {
+                // Kotlin generics allow nil values by default. Constrain to Any to disallow like Swift
+                return [(entry.name, .any)]
+            } else {
+                return entry.inherits.map { (entry.name, $0) }
             }
         }
         guard !constraints.isEmpty else {

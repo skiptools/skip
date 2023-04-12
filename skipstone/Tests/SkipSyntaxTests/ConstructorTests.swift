@@ -349,7 +349,7 @@ final class ConstructorTests: XCTestCase {
             let u: U
         }
         """, kotlin: """
-        internal class S<T, U> where U: Any {
+        internal class S<T, U> where T: Any, U: Any {
             internal val t: T
                 get() {
                     return field.sref()
@@ -375,11 +375,11 @@ final class ConstructorTests: XCTestCase {
         class D: C<String> {
         }
         """, kotlin: """
-        internal open class Base<T, U> {
+        internal open class Base<T, U> where T: Any, U: Any {
             internal constructor(t: T, u: U) {
             }
         }
-        internal open class C<X>: Base<Int, X> {
+        internal open class C<X>: Base<Int, X> where X: Any {
 
             internal constructor(t: Int, u: X): super(t, u) {
             }
