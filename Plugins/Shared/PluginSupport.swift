@@ -210,7 +210,7 @@ extension CommandPlugin {
 
                     if !FileManager.default.fileExists(atPath: testSource) {
                         try """
-                        import SkipFoundation
+                        import Foundation
 
                         /// A link to the \(moduleClass) module
                         public extension Bundle {
