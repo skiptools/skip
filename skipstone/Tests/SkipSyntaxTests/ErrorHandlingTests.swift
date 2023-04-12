@@ -356,8 +356,24 @@ final class ErrorHandlingTests: XCTestCase {
         """, kotlin: """
         internal sealed class E: Throwable(), Error {
             class error1case: E() {
+
+                override fun equals(other: Any?): Boolean {
+                    if (other !is error1case) return false
+                    return true
+                }
+                override fun hashCode(): Int {
+                    return "error1case".hashCode()
+                }
             }
             class error2case: E() {
+
+                override fun equals(other: Any?): Boolean {
+                    if (other !is error2case) return false
+                    return true
+                }
+                override fun hashCode(): Int {
+                    return "error2case".hashCode()
+                }
             }
 
             companion object {

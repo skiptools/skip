@@ -66,13 +66,15 @@ class KotlinEquatableHashableComparableTransformer: KotlinTransformer {
 
     private func synthesizeConformances(for classDeclaration: KotlinClassDeclaration, codebaseInfo: CodebaseInfo.Context) {
         guard classDeclaration.declarationType == .structDeclaration || classDeclaration.isSealedClassesEnum else {
+            // We don't check for non-sealed-classes enums because they will automatically be singletons with appropriate == and hash behavior
             return
         }
         let protocols = codebaseInfo.global.protocolSignatures(forNamed: classDeclaration.signature)
-        if classDeclaration.enumInheritedRawValueType != nil || protocols.contains(.named("Hashable", [])) {
+        let isEnumWithoutAssociatedValues = classDeclaration.declarationType == .enumDeclaration && !classDeclaration.members.contains { ($0 as? KotlinEnumCaseDeclaration)?.associatedValues.isEmpty == false }
+        if isEnumWithoutAssociatedValues || protocols.contains(.named("Hashable", [])) {
             ensureHasEquals(for: classDeclaration, codebaseInfo: codebaseInfo)
             ensureHasHash(for: classDeclaration, codebaseInfo: codebaseInfo)
-        } else if protocols.contains(.named("Equatable", [])) {
+        } else if isEnumWithoutAssociatedValues || protocols.contains(.named("Equatable", [])) {
             ensureHasEquals(for: classDeclaration, codebaseInfo: codebaseInfo)
         }
     }
