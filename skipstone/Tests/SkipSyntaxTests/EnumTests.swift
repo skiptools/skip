@@ -9,7 +9,7 @@ final class EnumTests: XCTestCase {
             case b
         }
         """, kotlin: """
-        internal enum class E: Hashable {
+        internal enum class E {
             a,
             b;
         }
@@ -25,7 +25,7 @@ final class EnumTests: XCTestCase {
             case d
         }
         """, kotlin: """
-        internal enum class E(val rawValue: Int): Hashable {
+        internal enum class E(val rawValue: Int) {
             a(0),
             b(1),
             c(100),
@@ -40,7 +40,7 @@ final class EnumTests: XCTestCase {
             case c
         }
         """, kotlin: """
-        internal enum class E(val rawValue: String): Hashable {
+        internal enum class E(val rawValue: String) {
             a("a"),
             b("B"),
             c("c");
@@ -59,7 +59,7 @@ final class EnumTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal enum class E(val rawValue: Int): Hashable {
+        internal enum class E(val rawValue: Int) {
             a(0),
             b(1);
 
@@ -80,7 +80,7 @@ final class EnumTests: XCTestCase {
             case b
         }
         """, kotlin: """
-        internal enum class E(val rawValue: Int): Hashable {
+        internal enum class E(val rawValue: Int) {
             a(0),
 
             b(1);
@@ -193,7 +193,7 @@ final class EnumTests: XCTestCase {
             case c
         }
         """, kotlin: """
-        internal sealed class E<out T, out U>: Hashable where T: Any, U: Any {
+        internal sealed class E<out T, out U> where T: Any, U: Any {
             class acase<T, U>(val associated0: T, val associated1: U): E<T, U>() where T: Any, U: Any {
 
                 override fun equals(other: Any?): Boolean {

@@ -893,7 +893,7 @@ final class MemberDeclarationTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal open class C<T>: Hashable where T: Any, T: Hashable {
+        internal open class C<T> where T: Any, T: Hashable {
             internal var t: T
             internal constructor(t: T) {
                 this.t = t

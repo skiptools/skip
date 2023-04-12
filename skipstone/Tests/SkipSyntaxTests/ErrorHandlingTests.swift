@@ -354,7 +354,7 @@ final class ErrorHandlingTests: XCTestCase {
             case error2
         }
         """, kotlin: """
-        internal sealed class E: Throwable(), Error, Hashable {
+        internal sealed class E: Throwable(), Error {
             class error1case: E() {
             }
             class error2case: E() {
@@ -371,13 +371,14 @@ final class ErrorHandlingTests: XCTestCase {
         }
         """)
 
+        //~~~ Fix: Should have equals and hashcode
         try await check(swift: """
         enum E: Int, Error {
             case error1 = 2
             case error2
         }
         """, kotlin: """
-        internal sealed class E(val rawValue: Int): Throwable(), Error, Hashable {
+        internal sealed class E(val rawValue: Int): Throwable(), Error {
             class error1case: E(2) {
             }
             class error2case: E(3) {
@@ -402,7 +403,7 @@ final class ErrorHandlingTests: XCTestCase {
             case error2
         }
         """, kotlin: """
-        internal sealed class E: Throwable(), Error, Hashable {
+        internal sealed class E: Throwable(), Error {
             class error1case: E() {
 
                 override fun equals(other: Any?): Boolean {
@@ -441,7 +442,7 @@ final class ErrorHandlingTests: XCTestCase {
             case error2
         }
         """, kotlin: """
-        internal sealed class E(val rawValue: Int): Throwable(), Error, Hashable {
+        internal sealed class E(val rawValue: Int): Throwable(), Error {
             class error1case: E(2) {
 
                 override fun equals(other: Any?): Boolean {

@@ -689,7 +689,7 @@ final class TypeDeclarationTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal class S: Equatable, MutableStruct {
+        internal class S: MutableStruct {
             internal var i: Int
                 set(newValue) {
                     willmutate()
@@ -729,7 +729,7 @@ final class TypeDeclarationTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal class S: Equatable {
+        internal class S {
             internal val i: Int
             internal val j: String
 
@@ -760,7 +760,7 @@ final class TypeDeclarationTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal class S: Equatable {
+        internal class S {
             internal val i: Int
             internal val j: String
 
@@ -785,7 +785,7 @@ final class TypeDeclarationTests: XCTestCase {
             var i: Int
         }
         """, kotlin: """
-        internal class S: Hashable, MutableStruct {
+        internal class S: MutableStruct {
             internal var i: Int
                 set(newValue) {
                     willmutate()
@@ -827,7 +827,7 @@ final class TypeDeclarationTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal class S: Hashable {
+        internal class S {
             internal val i: Int
             internal val j: String
 

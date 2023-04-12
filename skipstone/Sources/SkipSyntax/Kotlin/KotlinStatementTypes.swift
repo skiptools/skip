@@ -696,16 +696,8 @@ class KotlinClassDeclaration: KotlinStatement {
             }
         }
         kstatement.members = members
-
         if statement.type == .enumDeclaration {
             kstatement.processEnumCaseDeclarations()
-            // Swift enums without associated values are automatically Hashable
-            if !kstatement.isSealedClassesEnum {
-                let hashableSignature: TypeSignature = .named("Hashable", [])
-                if !kstatement.inherits.contains(hashableSignature) {
-                    kstatement.inherits.append(hashableSignature)
-                }
-            }
         }
 
         kstatement.inherits.forEach { $0.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
@@ -775,7 +767,8 @@ class KotlinClassDeclaration: KotlinStatement {
             }
             generics.append(to: output, indentation: indentation, outParameters: isSealedClassesEnum)
 
-            var inherits = inherits
+            // Do not include types that SkipLib aliases to Any
+            var inherits = inherits.filter { $0 != .named("Equatable", []) && $0 != .named("Hashable", []) }
             if let inheritedRawValueType = enumInheritedRawValueType {
                 inherits = Array(inherits.dropFirst())
                 output.append("(val rawValue: \(inheritedRawValueType.kotlin))")
