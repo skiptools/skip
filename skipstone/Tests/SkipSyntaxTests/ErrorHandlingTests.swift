@@ -371,7 +371,6 @@ final class ErrorHandlingTests: XCTestCase {
         }
         """)
 
-        //~~~ Fix: Should have equals and hashcode
         try await check(swift: """
         enum E: Int, Error {
             case error1 = 2
@@ -380,8 +379,24 @@ final class ErrorHandlingTests: XCTestCase {
         """, kotlin: """
         internal sealed class E(val rawValue: Int): Throwable(), Error {
             class error1case: E(2) {
+
+                override fun equals(other: Any?): Boolean {
+                    if (other !is error1case) return false
+                    return true
+                }
+                override fun hashCode(): Int {
+                    return "error1case".hashCode()
+                }
             }
             class error2case: E(3) {
+
+                override fun equals(other: Any?): Boolean {
+                    if (other !is error2case) return false
+                    return true
+                }
+                override fun hashCode(): Int {
+                    return "error2case".hashCode()
+                }
             }
 
             companion object {

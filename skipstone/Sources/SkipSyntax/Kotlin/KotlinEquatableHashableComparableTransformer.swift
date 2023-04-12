@@ -69,7 +69,7 @@ class KotlinEquatableHashableComparableTransformer: KotlinTransformer {
             return
         }
         let protocols = codebaseInfo.global.protocolSignatures(forNamed: classDeclaration.signature)
-        if protocols.contains(.named("Hashable", [])) {
+        if classDeclaration.enumInheritedRawValueType != nil || protocols.contains(.named("Hashable", [])) {
             ensureHasEquals(for: classDeclaration, codebaseInfo: codebaseInfo)
             ensureHasHash(for: classDeclaration, codebaseInfo: codebaseInfo)
         } else if protocols.contains(.named("Equatable", [])) {
