@@ -379,6 +379,8 @@ struct TranspilePhaseOptions: ParsableArguments {
     @Option(name: [.long], help: ArgumentHelp("Output directory", valueName: "dir"))
     var outputFolder: String? = nil
 
+    @Option(name: [.long], help: ArgumentHelp("The time to wait for dependency builds", valueName: "seconds"))
+    var dependencyWait: Int = 30
 }
 
 struct TranspileResult {
@@ -550,6 +552,16 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
                     .appending(codebaseInfoPath(forModule: linkModuleName))
 
                 do {
+                    // SPM may start building a module before the dependencies have been build
+                    // wait up to 30 seconds for the expected dependency file to appear
+                    for _ in 1...transpileOptions.dependencyWait {
+                        if fs.exists(dependencyCodebaseInfo) {
+                            break
+                        } else {
+                            info("waiting for expected dependency file \(dependencyCodebaseInfo.basename) to appear")
+                            try await Task.sleep(nanoseconds: 1 * 1_000_000_000)
+                        }
+                    }
                     let codebaseLoadStart = Date().timeIntervalSinceReferenceDate
                     let cbdata = try inputSource(dependencyCodebaseInfo).withData { Data($0) }
                     trace("dependencyCodebaseInfo \(dependencyCodebaseInfo): exists \(fs.exists(dependencyCodebaseInfo)) data: \(cbdata.count)")
