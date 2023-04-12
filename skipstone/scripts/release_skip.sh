@@ -40,6 +40,7 @@ GITREF="$(git rev-parse HEAD)"
 # the relative path to the repo that hosts the plug-in code and referebce to the binary executable
 SKIPPKG="../skip/Package.swift"
 SKIPPKGDIR=$(dirname ${SKIPPKG})
+SKIPHUBPKG="../skiphub/Package.swift"
 
 # once we get this repo sync'd, we can rely on both tags being the same
 cd ${SKIPPKGDIR}
@@ -113,12 +114,12 @@ sed -I '' 's;package.targets += \[.binaryTarget.*;package.targets += [.binaryTar
 cd ${SKIPPKGDIR}
 
 sed -I '' 's;.package(url: "https://github.com/skiptools/skip", from: ".*");.package(url: "https://github.com/skiptools/skip", from: "'${SEMVER_NEXT}'");g' "README.md"
-sed -I '' 's;.package(url: "https://github.com/skiptools/skip", from: ".*");.package(url: "https://github.com/skiptools/skip", from: "'${SEMVER_NEXT}'");g' ../skiphub/Package.swift
+#sed -I '' 's;.package(url: "https://github.com/skiptools/skip", from: ".*");.package(url: "https://github.com/skiptools/skip", from: "'${SEMVER_NEXT}'");g' "${SKIPHUBPKG}"
 
 # also grab the latest skiphub version and update it in the README
 SKIPHUB_VERSION=`git ls-remote --tags https://github.com/skiptools/skiphub | awk -F/ '$NF ~ /^v?[0-9]+\.[0-9]+\.[0-9]+$/ {print $NF}' | sort -V | tail -n1`
 
-sed -I '' 's;.package(url: "https://github.com/skiptools/skiphub", from: ".*");.package(url: "https://github.com/skiptools/skiphub", from: "'${SKIPHUB_VERSION}'");g' ${README_PATH}
+sed -I '' 's;.package(url: "https://github.com/skiptools/skiphub", from: ".*");.package(url: "https://github.com/skiptools/skiphub", from: "'${SKIPHUB_VERSION}'");g' "README.md"
 
 git add Package.swift ${README_PATH}
 git add .
