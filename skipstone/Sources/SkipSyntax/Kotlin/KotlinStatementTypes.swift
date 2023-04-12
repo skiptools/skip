@@ -767,8 +767,7 @@ class KotlinClassDeclaration: KotlinStatement {
             }
             generics.append(to: output, indentation: indentation, outParameters: isSealedClassesEnum)
 
-            // Do not include types that SkipLib aliases to Any
-            var inherits = inherits.filter { $0 != .named("Equatable", []) && $0 != .named("Hashable", []) }
+            var inherits = inherits
             if let inheritedRawValueType = enumInheritedRawValueType {
                 inherits = Array(inherits.dropFirst())
                 output.append("(val rawValue: \(inheritedRawValueType.kotlin))")
@@ -783,10 +782,6 @@ class KotlinClassDeclaration: KotlinStatement {
                     }
                 }
                 output.append(inherits.map({ $0.kotlin }).joined(separator: ", "))
-                if inherits.contains(.named("Comparable", [])) {
-                    // We add Kotlin's native Comparable conformance to use native collection sorting, etc
-                    output.append(", kotlin.Comparable<\(signature.kotlin)>")
-                }
             }
             generics.appendWhere(to: output, indentation: indentation)
         }
@@ -1080,17 +1075,19 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var annotations: [String] = []
     var modifiers = Modifiers()
     var generics = Generics()
+    var convertedGenerics: Generics? = nil
     var body: KotlinCodeBlock?
     var delegatingConstructorCall: KotlinExpression?
     var mutationFunctionNames: (willMutate: String, didMutate: String)?
     var disambiguatingParameterCount = 0
+    var isGenerated = false
     var functionType: TypeSignature {
         return .function(parameters.map(\.signature), returnType)
     }
     var functionGenerics: Generics {
         get {
-            if let _functionGenerics {
-                return _functionGenerics
+            if let convertedGenerics {
+                return convertedGenerics
             }
             guard let extendsGenerics = extends?.1, !extendsGenerics.isEmpty else {
                 return generics
@@ -1100,11 +1097,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             }
             return extendsGenerics.merge(overrides: generics, addNew: true)
         }
-        set {
-            _functionGenerics = newValue
-        }
     }
-    private var _functionGenerics: Generics? = nil
     var isEqualImplementation: Bool {
         return name == "==" && modifiers.isStatic && parameters.count == 2
     }
@@ -1406,16 +1399,16 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             return
         }
 
-        var functionGenerics: Generics
+        var convertedGenerics: Generics
         if extends != nil {
-            functionGenerics = self.functionGenerics
+            convertedGenerics = self.functionGenerics
         } else if let typeInfo = translator.codebaseInfo?.primaryTypeInfo(forNamed: owningTypeDeclaration.signature) {
-            functionGenerics = typeInfo.generics.merge(overrides: owningTypeDeclaration.generics)
+            convertedGenerics = typeInfo.generics.merge(overrides: owningTypeDeclaration.generics)
         } else {
-            functionGenerics = owningTypeDeclaration.generics
+            convertedGenerics = owningTypeDeclaration.generics
         }
-        functionGenerics.entries = functionGenerics.entries.filter { genericsUsedInParameters.contains($0.namedType) }
-        self.functionGenerics = functionGenerics.merge(overrides: generics, addNew: true)
+        convertedGenerics.entries = convertedGenerics.entries.filter { genericsUsedInParameters.contains($0.namedType) }
+        self.convertedGenerics = convertedGenerics.merge(overrides: generics, addNew: true)
     }
 }
 

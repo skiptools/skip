@@ -47,6 +47,7 @@ class KotlinConstructorTransformer: KotlinTransformer {
         let constructor = KotlinFunctionDeclaration(name: "constructor")
         constructor.modifiers = classDeclaration.modifiers
         constructor.extras = .singleNewline
+        constructor.isGenerated = true
         constructor.returnType = classDeclaration.signature
 
         var superCall = "super("

@@ -64,7 +64,7 @@ final class MemberDeclarationTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal open class A<T> where T: Equatable {
+        internal open class A<T> where T: Any {
 
             internal open fun f(): T {
             }
@@ -76,10 +76,10 @@ final class MemberDeclarationTests: XCTestCase {
                     return 20
                 }
 
-                internal fun <T> staticFunc2(p: T): T where T: Equatable {
+                internal fun <T> staticFunc2(p: T): T where T: Any {
                 }
 
-                internal fun <T, U> staticFunc3(p1: T, p2: U): T where T: Equatable, U: Any {
+                internal fun <T, U> staticFunc3(p1: T, p2: U): T where T: Any, U: Any {
                 }
             }
         }
@@ -154,7 +154,7 @@ final class MemberDeclarationTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal fun <T> C.Companion.staticFunc(p: T): T where T: Equatable {
+        internal fun <T> C.Companion.staticFunc(p: T): T where T: Any {
         }
         """)
     }
@@ -857,7 +857,7 @@ final class MemberDeclarationTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal open class C<T> where T: Any, T: Equatable {
+        internal open class C<T> where T: Any {
             internal var t: T
             internal constructor(t: T) {
                 this.t = t
@@ -893,7 +893,7 @@ final class MemberDeclarationTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal open class C<T> where T: Any, T: Hashable {
+        internal open class C<T> where T: Any {
             internal var t: T
             internal constructor(t: T) {
                 this.t = t
@@ -930,7 +930,7 @@ final class MemberDeclarationTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal open class C<T>: Comparable, kotlin.Comparable<C<T>> where T: Any, T: Comparable {
+        internal open class C<T>: Comparable<C<T>> where T: Any, T: Comparable<T> {
             internal var t: T
             internal constructor(t: T) {
                 this.t = t

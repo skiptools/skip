@@ -37,7 +37,6 @@ extension XCTestCase {
 
                 // various fixes to be able to compile without SkipLibKt
                 code = code
-                    .replacingOccurrences(of: ": Hashable", with: "") // remove Hashable conformance
                     .replacingOccurrences(of: ".sref()", with: "") // remove sref() calls
             }
             return code

@@ -167,17 +167,17 @@ final class EnumTests: XCTestCase {
             case b(U)
         }
         """, kotlin: """
-        internal sealed class E<out T, out U> where T: Any, U: Equatable {
+        internal sealed class E<out T, out U> where T: Any, U: Any {
             class acase<T>(val associated0: T): E<T, Nothing>() where T: Any {
             }
-            class bcase<U>(val associated0: U): E<Nothing, U>() where U: Equatable {
+            class bcase<U>(val associated0: U): E<Nothing, U>() where U: Any {
             }
 
             companion object {
                 fun <T> a(associated0: T): E<T, Nothing> where T: Any {
                     return acase(associated0)
                 }
-                fun <U> b(associated0: U): E<Nothing, U> where U: Equatable {
+                fun <U> b(associated0: U): E<Nothing, U> where U: Any {
                     return bcase(associated0)
                 }
             }

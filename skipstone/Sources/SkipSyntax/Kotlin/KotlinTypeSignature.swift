@@ -44,7 +44,11 @@ extension TypeSignature {
             return "KClass<\(baseType.kotlin)>"
         case .named(let name, let generics):
             guard !generics.isEmpty && generics.contains(where: { $0 != .none }) else {
-                return name
+                if name == "Comparable" {
+                    return "Comparable<*>"
+                } else {
+                    return name
+                }
             }
             return "\(name)<\(generics.map { $0.kotlin }.joined(separator: ", "))>"
         case .none:

@@ -38,6 +38,7 @@ class KotlinSwiftUITransformer: KotlinTransformer {
         let bodyMethod = KotlinFunctionDeclaration(name: "body", sourceFile: statement.sourceFile, sourceRange: statement.sourceRange)
         bodyMethod.modifiers = statement.modifiers
         bodyMethod.modifiers.isOverride = true
+        bodyMethod.isGenerated = true
         bodyMethod.returnType = statement.declaredType
         bodyMethod.body = statement.getter?.body
         view.members[memberIndex] = bodyMethod

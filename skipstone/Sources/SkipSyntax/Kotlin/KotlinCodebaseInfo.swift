@@ -181,11 +181,17 @@ public class KotlinCodebaseInfo: CodebaseInfoLanguageAdditions, CodebaseInfoLang
         self.packageName = packageName
         // Idea: Track which transformers we might need when we come across relevant code during initial translation and save traversing the tree for unnecessary plugins
         self.transformers = [
-            KotlinEscapeKeywordsTransformer(), // May change the names of members
-            KotlinStructTransformer(), // May add members that affect later transformers
-            KotlinErrorToThrowableTransformer(), // Changes superclass and forces some enums to be sealed
+            // May change the names of members, so place it before transformers that could use those names in generated code
+            KotlinEscapeKeywordsTransformer(),
+            // May add members, so place it before transformers that could manipulate those members
+            KotlinStructTransformer(),
+            // May alter superclasses and change enums to use sealed classes
+            KotlinErrorToThrowableTransformer(),
+            // May add constructors
             KotlinConstructorTransformer(),
-            KotlinEqualsHashCodeTransformer(), // Depends on knowing sealed vs. unsealed enums
+            // May *remove* information about protocol conformances and requires knowledge of sealed vs. unsealed enums,
+            // so place after other relevant transformers
+            KotlinEquatableHashableComparableTransformer(),
             KotlinIfWhenTransformer(),
             KotlinDeferPlugin(),
             KotlinDisambiguateFunctionsTransformer(),

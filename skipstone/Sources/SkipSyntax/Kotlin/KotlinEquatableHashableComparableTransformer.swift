@@ -1,5 +1,9 @@
-/// Synthesize `equals` and `hashCode` members in cases where the Swift compiler synthesizes `Equatable` and `Hashable`.
-class KotlinEqualsHashCodeTransformer: KotlinTransformer {
+/// Perform synthesis and fixups related to `Equatable`, `Hashable`, and `Comparable` implementations.
+///
+///   1. Synthesize `equals` and `hashCode` members in cases where the Swift compiler synthesizes `Equatable` and `Hashable`.
+///   2. Remove references to `Equatable` and `Hashable` in inherits lists and generic constraints, because they are just aliases for `Any` in Kotlin.
+///   3. Change references to `Comparable` in inherits lists and generic constraints to Kotlin's `Comparable<T>`.
+class KotlinEquatableHashableComparableTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
         guard let codebaseInfo = translator.codebaseInfo else {
             return
@@ -9,18 +13,68 @@ class KotlinEqualsHashCodeTransformer: KotlinTransformer {
 
     private func visit(_ node: KotlinSyntaxNode, codebaseInfo: CodebaseInfo.Context) -> VisitResult<KotlinSyntaxNode> {
         if let classDeclaration = node as? KotlinClassDeclaration {
-            if classDeclaration.declarationType == .structDeclaration || classDeclaration.isSealedClassesEnum {
-                let protocols = codebaseInfo.global.protocolSignatures(forNamed: classDeclaration.signature)
-                if protocols.contains(.named("Hashable", [])) {
-                    ensureHasEquals(for: classDeclaration, codebaseInfo: codebaseInfo)
-                    ensureHasHash(for: classDeclaration, codebaseInfo: codebaseInfo)
-                } else if protocols.contains(.named("Equatable", [])) {
-                    ensureHasEquals(for: classDeclaration, codebaseInfo: codebaseInfo)
-                }
+            synthesizeConformances(for: classDeclaration, codebaseInfo: codebaseInfo)
+            classDeclaration.inherits = fixupInherits(classDeclaration.inherits, for: classDeclaration.signature)
+            classDeclaration.generics = fixupGenerics(classDeclaration.generics)
+        } else if let interfaceDeclaration = node as? KotlinInterfaceDeclaration {
+            interfaceDeclaration.inherits = fixupInherits(interfaceDeclaration.inherits, for: interfaceDeclaration.signature)
+            interfaceDeclaration.generics = fixupGenerics(interfaceDeclaration.generics)
+        } else if let functionDeclaration = node as? KotlinFunctionDeclaration {
+            functionDeclaration.generics = fixupGenerics(functionDeclaration.generics)
+            if let convertedGenerics = functionDeclaration.convertedGenerics {
+                functionDeclaration.convertedGenerics = fixupGenerics(convertedGenerics)
+            }
+        } else if let enumCaseDeclaration = node as? KotlinEnumCaseDeclaration {
+            enumCaseDeclaration.generics = fixupGenerics(enumCaseDeclaration.generics)
+            enumCaseDeclaration.enumGenerics = fixupGenerics(enumCaseDeclaration.enumGenerics)
+        }
+        if let memberDeclaration = node as? KotlinMemberDeclaration, let extends = memberDeclaration.extends {
+            memberDeclaration.extends = (extends.0, fixupGenerics(extends.1))
+        }
+        return .recurse(nil)
+    }
+
+    private func fixupInherits(_ inherits: [TypeSignature], for type: TypeSignature) -> [TypeSignature] {
+        return inherits.compactMap {
+            // Filter types that are aliased to Kotlin Any
+            guard !$0.isEquatable && !$0.isHashable else {
+                return nil
+            }
+            // Map Comparable to Kotlin's Comparable<T>
+            if $0.isComparable {
+                return .kotlinComparable(for: type)
+            } else {
+                return $0
             }
         }
-        // Recurse to find nested declarations
-        return .recurse(nil)
+    }
+
+    private func fixupGenerics(_ generics: Generics) -> Generics {
+        guard !generics.isEmpty else {
+            return generics
+        }
+        let entries = generics.entries.map {
+            guard !$0.inherits.isEmpty else {
+                return $0
+            }
+            var generic = $0
+            generic.inherits = fixupInherits(generic.inherits, for: .named(generic.name, []))
+            return generic
+        }
+        return Generics(entries: entries)
+    }
+
+    private func synthesizeConformances(for classDeclaration: KotlinClassDeclaration, codebaseInfo: CodebaseInfo.Context) {
+        guard classDeclaration.declarationType == .structDeclaration || classDeclaration.isSealedClassesEnum else {
+            return
+        }
+        let protocols = codebaseInfo.global.protocolSignatures(forNamed: classDeclaration.signature)
+        if protocols.contains(.named("Hashable", [])) {
+            ensureHasEquals(for: classDeclaration, codebaseInfo: codebaseInfo)
+            ensureHasHash(for: classDeclaration, codebaseInfo: codebaseInfo)
+        } else if protocols.contains(.named("Equatable", [])) {
+            ensureHasEquals(for: classDeclaration, codebaseInfo: codebaseInfo)
+        }
     }
 
     private func ensureHasEquals(for classDeclaration: KotlinClassDeclaration, codebaseInfo: CodebaseInfo.Context) {
@@ -69,6 +123,7 @@ class KotlinEqualsHashCodeTransformer: KotlinTransformer {
         hashCodeFunction.modifiers.visibility = .public
         hashCodeFunction.modifiers.isOverride = true
         hashCodeFunction.extras = .singleNewline
+        hashCodeFunction.isGenerated = true
 
         var statements: [KotlinStatement] = []
         if properties.isEmpty {
@@ -89,6 +144,7 @@ class KotlinEqualsHashCodeTransformer: KotlinTransformer {
         equalsFunction.modifiers.visibility = .public
         equalsFunction.modifiers.isOverride = true
         equalsFunction.extras = .singleNewline
+        equalsFunction.isGenerated = true
 
         var typeName = className
         if !generics.entries.isEmpty {
@@ -127,5 +183,23 @@ private extension CodebaseInfoItem {
         }
         let parameters = signature.parameters
         return parameters.count == 1 && parameters[0].label == "into" && parameters[0].type == .named("Hasher", [])
+    }
+}
+
+private extension TypeSignature {
+    var isEquatable: Bool {
+        return self == .named("Equatable", [])
+    }
+
+    var isHashable: Bool {
+        return self == .named("Hashable", [])
+    }
+
+    var isComparable: Bool {
+        return self == .named("Comparable", [])
+    }
+
+    static func kotlinComparable(for type: TypeSignature) -> TypeSignature {
+        return .named("Comparable", [type])
     }
 }

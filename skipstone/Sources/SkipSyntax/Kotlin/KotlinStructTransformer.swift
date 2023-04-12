@@ -85,8 +85,9 @@ class KotlinStructTransformer: KotlinTransformer {
         classDeclaration.members.append(scount)
 
         let scopy = KotlinFunctionDeclaration(name: "scopy")
-        scopy.returnType = .named("MutableStruct", [])
         scopy.modifiers = Modifiers(visibility: .public, isOverride: true)
+        scopy.isGenerated = true
+        scopy.returnType = .named("MutableStruct", [])
 
         let constructorCall: KotlinExpression
         if useMemberwiseConstructor {
@@ -109,6 +110,10 @@ class KotlinStructTransformer: KotlinTransformer {
 
     private func addMemberwiseConstructor(to classDeclaration: KotlinClassDeclaration, variableDeclarations: [KotlinVariableDeclaration], translator: KotlinTranslator) {
         let constructor = KotlinFunctionDeclaration(name: "constructor")
+        constructor.modifiers = Modifiers(visibility: .public)
+        constructor.extras = .singleNewline
+        constructor.isGenerated = true
+
         constructor.parameters = variableDeclarations.map { variableDeclaration in
             let label = variableDeclaration.names[0]
             let type = variableDeclaration.variableTypes[0]
@@ -123,8 +128,6 @@ class KotlinStructTransformer: KotlinTransformer {
             }
             return Parameter(externalLabel: label, declaredType: type, isVariadic: false, defaultValue: defaultValue)
         }
-        constructor.modifiers = Modifiers(visibility: .public)
-        constructor.extras = .singleNewline
 
         var bodyStatements: [KotlinStatement] = []
         bodyStatements += variableDeclarations.map { variableDeclaration in
@@ -142,6 +145,7 @@ class KotlinStructTransformer: KotlinTransformer {
         constructor.parameters = [Parameter(externalLabel: "copy", declaredType: .named("MutableStruct", []))]
         constructor.modifiers = Modifiers(visibility: .private)
         constructor.extras = .singleNewline
+        constructor.isGenerated = true
 
         var bodyStatements: [KotlinStatement] = []
         bodyStatements.append(KotlinRawStatement(sourceCode: "val copy = copy as \(classDeclaration.name)"))
