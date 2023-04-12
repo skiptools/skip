@@ -764,7 +764,6 @@ class KotlinClassDeclaration: KotlinStatement {
                 }
             }
 
-            var inherits = inherits
             if declarationType == .enumDeclaration {
                 if isSealedClassesEnum {
                     output.append("sealed class ").append(name)
@@ -775,6 +774,8 @@ class KotlinClassDeclaration: KotlinStatement {
                 output.append("class ").append(name)
             }
             generics.append(to: output, indentation: indentation, outParameters: isSealedClassesEnum)
+
+            var inherits = inherits
             if let inheritedRawValueType = enumInheritedRawValueType {
                 inherits = Array(inherits.dropFirst())
                 output.append("(val rawValue: \(inheritedRawValueType.kotlin))")
@@ -789,6 +790,10 @@ class KotlinClassDeclaration: KotlinStatement {
                     }
                 }
                 output.append(inherits.map({ $0.kotlin }).joined(separator: ", "))
+                if inherits.contains(.named("Comparable", [])) {
+                    // We add Kotlin's native Comparable conformance to use native collection sorting, etc
+                    output.append(", kotlin.Comparable<\(signature.kotlin)>")
+                }
             }
             generics.appendWhere(to: output, indentation: indentation)
         }
@@ -1113,6 +1118,9 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var isHashImplementation: Bool {
         return name == "hash" && !modifiers.isStatic && parameters.count == 1 && parameters[0].isInOut && parameters[0].declaredType == .named("Hasher", [])
     }
+    var isLessThanImplementation: Bool {
+        return name == "<" && modifiers.isStatic && parameters.count == 2
+    }
 
     // KotlinMemberDeclaration
     var extends: (TypeSignature, Generics)? {
@@ -1123,7 +1131,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         }
     }
     var isStatic: Bool {
-        return modifiers.isStatic && !isEqualImplementation
+        return modifiers.isStatic && !isEqualImplementation && !isLessThanImplementation
     }
 
     static func translate(statement: FunctionDeclaration, translator: KotlinTranslator) -> KotlinFunctionDeclaration {
@@ -1189,7 +1197,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         kstatement.parameters.forEach { $0.declaredType.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
 
         // Warnings and fixups
-        if !kstatement.isEqualImplementation, let firstCharacter = kstatement.name.first, firstCharacter != "_" && firstCharacter != "$" && firstCharacter != "`" && !firstCharacter.isLetter && !firstCharacter.isNumber {
+        if let firstCharacter = kstatement.name.first, firstCharacter != "_" && firstCharacter != "$" && firstCharacter != "`" && !firstCharacter.isLetter && !firstCharacter.isNumber && !kstatement.isEqualImplementation && !kstatement.isLessThanImplementation {
             kstatement.messages.append(.kotlinOperatorFunction(statement, source: translator.syntaxTree.source))
         }
         if owningDeclarationType == .protocolDeclaration {
@@ -1254,6 +1262,8 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             }
             if isEqualImplementation {
                 appendEqualsDeclaration(to: output, indentation: indentation)
+            } else if isLessThanImplementation {
+                appendLessThanDeclaration(to: output, indentation: indentation)
             } else {
                 appendFunctionDeclaration(to: output, indentation: indentation)
             }
@@ -1263,6 +1273,8 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             if !body.statements.isEmpty {
                 if isEqualImplementation {
                     appendEqualsBody(body, to: output, indentation: indentation.inc())
+                } else if isLessThanImplementation {
+                    appendLessThanBody(body, to: output, indentation: indentation.inc())
                 } else {
                     appendFunctionBody(body, to: output, indentation: indentation.inc())
                 }
@@ -1359,6 +1371,18 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         output.append(indentation).append("val \(parameters[0].internalLabel) = this\n")
         output.append(indentation).append("val \(parameters[1].internalLabel) = other\n")
         output.append(body, indentation: indentation)
+    }
+
+    private func appendLessThanDeclaration(to output: OutputGenerator, indentation: Indentation) {
+        output.append("override fun compareTo(other: \(parameters[0].declaredType.kotlin)): Int")
+    }
+
+    private func appendLessThanBody(_ body: KotlinCodeBlock, to output: OutputGenerator, indentation: Indentation) {
+        output.append(indentation).append("if (this == other) return 0\n")
+        output.append(indentation).append("fun islessthan(\(parameters[0].internalLabel): \(parameters[0].declaredType.kotlin), \(parameters[1].internalLabel): \(parameters[1].declaredType.kotlin)): Boolean {\n")
+        output.append(body, indentation: indentation.inc())
+        output.append(indentation).append("}\n")
+        output.append(indentation).append("return if (islessthan(this, other)) -1 else 1\n")
     }
 
     private func appendHashCode(to output: OutputGenerator, indentation: Indentation) {

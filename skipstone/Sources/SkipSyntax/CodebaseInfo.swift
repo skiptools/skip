@@ -147,8 +147,10 @@ public class CodebaseInfo: Codable {
     func protocolSignatures(forNamed type: TypeSignature) -> [TypeSignature] {
         let type = type.asOptional(false)
         // TODO: Remove special cases when we add SkipLib codebase info dependency
-        if type == .anyObject || type == .named("Error", []) || type == .named("Equatable", []) || type == .named("Hashable", []) {
+        if type == .anyObject || type == .named("Error", []) || type == .named("Equatable", []) {
             return [type]
+        } else if type == .named("Hashable", []) || type == .named("Comparable", []) {
+            return [type, .named("Equatable", [])]
         }
         // Gather inherited signatures, then insert the given type at the front if it is also a protocol
         let typeInfos = typeInfos(forNamed: type)

@@ -914,6 +914,45 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """)
     }
+
+    func testCustomComparable() async throws {
+        try await check(swift: """
+        class C<T>: Comparable where T: AnyObject, T: Comparable {
+            var t: T
+            init(t: T) {
+                self.t = t
+            }
+            static func == (lhs: C, rhs: C) -> Bool {
+                return lhs.t == rhs.t
+            }
+            static func < (lhs: C, rhs: C) -> Bool {
+                return lhs.t < rhs.t
+            }
+        }
+        """, kotlin: """
+        internal open class C<T>: Comparable, kotlin.Comparable<C<T>> where T: Any, T: Comparable {
+            internal var t: T
+            internal constructor(t: T) {
+                this.t = t
+            }
+            override fun equals(other: Any?): Boolean {
+                if (other !is C<*>) {
+                    return false
+                }
+                val lhs = this
+                val rhs = other
+                return lhs.t == rhs.t
+            }
+            override fun compareTo(other: C<T>): Int {
+                if (this == other) return 0
+                fun islessthan(lhs: C<T>, rhs: C<T>): Boolean {
+                    return lhs.t < rhs.t
+                }
+                return if (islessthan(this, other)) -1 else 1
+            }
+        }
+        """)
+    }
 }
 
 var sideEffectOrdering: [String] = []
