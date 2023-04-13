@@ -93,6 +93,10 @@ extension Message {
         return Message(kind: .error, message: "Skip only supports #if between code block statements or member declarations", source: source, sourceRange: range)
     }
 
+    static func internalError(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Internal error. Please report to Skip support", sourceDerived: sourceDerived, source: source)
+    }
+
     static func genericUnsupportedWhereType(_ syntax: SyntaxProtocol, source: Source) -> Message {
         let range = syntax.range(in: source)
         return Message(kind: .error, message: "Skip does not support the referenced type as a generic constraint", source: source, sourceRange: range)

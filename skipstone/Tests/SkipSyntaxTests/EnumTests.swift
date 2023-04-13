@@ -25,11 +25,31 @@ final class EnumTests: XCTestCase {
             case d
         }
         """, kotlin: """
-        internal enum class E(val rawValue: Int) {
+        internal enum class E(val rawValue: Int, unusedp: Nothing? = null): RawRepresentable {
             a(0),
             b(1),
             c(100),
             d(101);
+        }
+
+        internal fun E(rawValue: Int): E? {
+            return when (rawValue) {
+                0 -> {
+                    E.a
+                }
+                1 -> {
+                    E.b
+                }
+                100 -> {
+                    E.c
+                }
+                101 -> {
+                    E.d
+                }
+                else -> {
+                    null
+                }
+            }
         }
         """)
 
@@ -40,10 +60,27 @@ final class EnumTests: XCTestCase {
             case c
         }
         """, kotlin: """
-        internal enum class E(val rawValue: String) {
+        internal enum class E(val rawValue: String, unusedp: Nothing? = null): RawRepresentable {
             a("a"),
             b("B"),
             c("c");
+        }
+
+        internal fun E(rawValue: String): E? {
+            return when (rawValue) {
+                "a" -> {
+                    E.a
+                }
+                "B" -> {
+                    E.b
+                }
+                "c" -> {
+                    E.c
+                }
+                else -> {
+                    null
+                }
+            }
         }
         """)
     }
@@ -59,12 +96,26 @@ final class EnumTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal enum class E(val rawValue: Int) {
+        internal enum class E(val rawValue: Int, unusedp: Nothing? = null): RawRepresentable {
             a(0),
             b(1);
 
             internal fun plusOne(): Int {
                 return rawValue + 1
+            }
+        }
+
+        internal fun E(rawValue: Int): E? {
+            return when (rawValue) {
+                0 -> {
+                    E.a
+                }
+                1 -> {
+                    E.b
+                }
+                else -> {
+                    null
+                }
             }
         }
         """)
@@ -80,13 +131,27 @@ final class EnumTests: XCTestCase {
             case b
         }
         """, kotlin: """
-        internal enum class E(val rawValue: Int) {
+        internal enum class E(val rawValue: Int, unusedp: Nothing? = null): RawRepresentable {
             a(0),
 
             b(1);
 
             internal fun plusOne(): Int {
                 return rawValue + 1
+            }
+        }
+
+        internal fun E(rawValue: Int): E? {
+            return when (rawValue) {
+                0 -> {
+                    E.a
+                }
+                1 -> {
+                    E.b
+                }
+                else -> {
+                    null
+                }
             }
         }
         """)

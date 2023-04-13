@@ -33,6 +33,7 @@ extension Message {
     }
 
     // Idea: factory callable on companion object? Factory function with class name?
+    // Or constructor that throws exception and we catch at call site
     static func kotlinConstructorNullReturn(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Kotlin does not support constructors that return nil. Consider creating a factory function", sourceDerived: sourceDerived, source: source)
     }

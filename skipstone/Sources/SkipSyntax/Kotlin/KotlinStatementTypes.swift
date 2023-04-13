@@ -206,8 +206,36 @@ class KotlinCodeBlock: KotlinStatement {
         }
     }
 
+    /// Add warning messages for attempts to assign to self.
+    func addSelfAssignmentMessages(source: Source) {
+        visit { node in
+            if let binaryOperator = node as? KotlinBinaryOperator, binaryOperator.op.symbol == "=", let lhs = binaryOperator.lhs as? KotlinIdentifier, lhs.name == "self" {
+                binaryOperator.messages.append(.kotlinSelfAssignment(binaryOperator, source: source))
+                return .skip
+            } else {
+                return .recurse(nil)
+            }
+        }
+    }
+
     override var children: [KotlinSyntaxNode] {
         return statements + catches.flatMap { $0.children }
+    }
+
+    override func insert(statements: [KotlinStatement], after statement: KotlinSyntaxNode, source: Source) {
+        guard let index = self.statements.firstIndex(where: { $0 === statement }) else {
+            super.insert(statements: statements, after: statement, source: source)
+            return
+        }
+        self.statements.insert(contentsOf: statements, at: index + 1)
+        for statement in statements {
+            statement.parent = self
+            statement.assignParentReferences()
+        }
+    }
+
+    override func remove(statement: KotlinStatement, source: Source) {
+        statements = statements.filter { $0 !== statement }
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
@@ -698,6 +726,9 @@ class KotlinClassDeclaration: KotlinStatement {
         }
         kstatement.members = members
         if statement.type == .enumDeclaration {
+            if kstatement.enumInheritedRawValueType != nil, !kstatement.inherits.contains(.named("RawRepresentable", [])) {
+                kstatement.inherits.append(.named("RawRepresentable", []))
+            }
             kstatement.processEnumCaseDeclarations()
         }
 
@@ -717,6 +748,22 @@ class KotlinClassDeclaration: KotlinStatement {
 
     override var children: [KotlinSyntaxNode] {
         return members
+    }
+
+    override func insert(statements: [KotlinStatement], after statement: KotlinSyntaxNode, source: Source) {
+        guard let index = members.firstIndex(where: { $0 === statement }) else {
+            super.insert(statements: statements, after: statement, source: source)
+            return
+        }
+        members.insert(contentsOf: statements, at: index + 1)
+        for statement in statements {
+            statement.parent = self
+            statement.assignParentReferences()
+        }
+    }
+
+    override func remove(statement: KotlinStatement, source: Source) {
+        members = members.filter { $0 !== statement }
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
@@ -762,7 +809,8 @@ class KotlinClassDeclaration: KotlinStatement {
             var inherits = inherits
             if let inheritedRawValueType = enumInheritedRawValueType {
                 inherits = Array(inherits.dropFirst())
-                output.append("(val rawValue: \(inheritedRawValueType.kotlin))")
+                // Add an unused parameter to disambiguate from the RawRepresentable constructor
+                output.append("(val rawValue: \(inheritedRawValueType.kotlin), unusedp: Nothing? = null)")
             }
             if !inherits.isEmpty {
                 output.append(": ")
@@ -1121,7 +1169,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         kstatement.returnType = statement.returnType
         kstatement.parameters = statement.parameters.map { $0.translate(translator: translator) }
         var owningDeclarationType: StatementType? = nil
-        if let owningTypeDeclaration = statement.owningTypeDeclaration, owningTypeDeclaration === statement.parent {
+        if let owningTypeDeclaration = statement.parent as? TypeDeclaration {
             // Use codebaseInfo rather than .type directly so that extension API is also handled correctly
             owningDeclarationType = translator.codebaseInfo?.declarationType(forNamed: owningTypeDeclaration.signature) ?? owningTypeDeclaration.type
             let owningSignature = translator.codebaseInfo?.primaryTypeInfo(forNamed: owningTypeDeclaration.signature)?.signature ?? owningTypeDeclaration.signature
@@ -1129,7 +1177,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             if statement.type == .initDeclaration {
                 kstatement.isOpen = false
                 kstatement.modifiers.isOverride = false // Kotlin does not override constructors
-                if statement.isOptionalInit {
+                if statement.isOptionalInit, owningTypeDeclaration.type != .enumDeclaration {
                     kstatement.messages.append(.kotlinConstructorNullReturn(statement, source: translator.syntaxTree.source))
                 }
             } else {
@@ -1498,6 +1546,22 @@ class KotlinInterfaceDeclaration: KotlinStatement {
         return members
     }
 
+    override func insert(statements: [KotlinStatement], after statement: KotlinSyntaxNode, source: Source) {
+        guard let index = members.firstIndex(where: { $0 === statement }) else {
+            super.insert(statements: statements, after: statement, source: source)
+            return
+        }
+        members.insert(contentsOf: statements, at: index + 1)
+        for statement in statements {
+            statement.parent = self
+            statement.assignParentReferences()
+        }
+    }
+
+    override func remove(statement: KotlinStatement, source: Source) {
+        members = members.filter { $0 !== statement }
+    }
+
     override func append(to output: OutputGenerator, indentation: Indentation) {
         output.append(indentation)
         if let declaration = extras?.declaration {
@@ -1654,7 +1718,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         kstatement.modifiers = statement.modifiers
         kstatement.declaredType = statement.declaredType
         var owningDeclarationType: StatementType? = nil
-        if let owningTypeDeclaration = statement.owningTypeDeclaration, owningTypeDeclaration === statement.parent {
+        if let owningTypeDeclaration = statement.parent as? TypeDeclaration {
             // Use codebaseInfo rather than .type directly so that extension API is also handled correctly
             owningDeclarationType = translator.codebaseInfo?.declarationType(forNamed: owningTypeDeclaration.signature) ?? owningTypeDeclaration.type
             let owningSignature = translator.codebaseInfo?.primaryTypeInfo(forNamed: owningTypeDeclaration.signature)?.signature ?? owningTypeDeclaration.signature

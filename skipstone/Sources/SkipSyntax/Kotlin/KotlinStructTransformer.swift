@@ -19,8 +19,13 @@ class KotlinStructTransformer: KotlinTransformer {
             }
             return .skip
         } else if let functionDeclaration = node as? KotlinFunctionDeclaration {
-            if functionDeclaration.modifiers.isMutating, let extends = functionDeclaration.extends, translator.codebaseInfo?.declarationType(forNamed: extends.0) == .structDeclaration {
-                functionDeclaration.mutationFunctionNames = mutationFunctionNames
+            if functionDeclaration.modifiers.isMutating {
+                functionDeclaration.body?.addSelfAssignmentMessages(source: translator.syntaxTree.source)
+                if let extends = functionDeclaration.extends, translator.codebaseInfo?.declarationType(forNamed: extends.0) == .structDeclaration {
+                    functionDeclaration.mutationFunctionNames = mutationFunctionNames
+                }
+            } else if functionDeclaration.type == .constructorDeclaration {
+                functionDeclaration.body?.addSelfAssignmentMessages(source: translator.syntaxTree.source)
             }
         }
         // Recurse to find nested declarations

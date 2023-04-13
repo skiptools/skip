@@ -96,9 +96,6 @@ class KotlinBinaryOperator: KotlinExpression {
         // This won't catch implicit members, however (i.e. 'x' in place of 'self.x')
         if expression.op.precedence == .assignment && !(klhs is KotlinMemberDeclaration) {
             krhs = krhs.sref()
-            if let identifier = klhs as? KotlinIdentifier, identifier.name == "self" {
-                klhs.messages.append(.kotlinSelfAssignment(klhs, source: translator.syntaxTree.source))
-            }
         }
         let kexpression = KotlinBinaryOperator(expression: expression, lhs: klhs, rhs: krhs)
         kexpression.mayBeSharedMutableStruct = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
@@ -195,7 +192,7 @@ class KotlinBooleanLiteral: KotlinExpression {
 /// - Note: This type is used to translate the ``SwitchCase`` expression, but is not itself a `KotlinExpression`.
 struct KotlinCase {
     var patterns: [KotlinExpression]
-    var caseBindingVariables: [KotlinBindingVariable]
+    var caseBindingVariables: [KotlinBindingVariable] = []
     var body: KotlinCodeBlock
 
     static func translate(expression: SwitchCase, matchingOn: KotlinExpression, isSealedClassesEnum: Bool, caseTargetVariable: inout KotlinCaseTargetVariable?, translator: KotlinTranslator) -> (KotlinCase, [Message]) {
@@ -1778,6 +1775,12 @@ class KotlinWhen: KotlinExpression {
         kexpression.hasBreakLabel = hasBreakLabel
         kexpression.messages = messages
         return kexpression
+    }
+
+    init(on: KotlinExpression, cases: [KotlinCase], sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
+        self.on = on
+        self.cases = cases
+        super.init(type: .when, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
     private init(expression: Switch, on: KotlinExpression, cases: [KotlinCase]) {

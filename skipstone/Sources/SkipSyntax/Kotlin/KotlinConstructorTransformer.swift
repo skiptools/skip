@@ -5,10 +5,32 @@ class KotlinConstructorTransformer: KotlinTransformer {
     }
 
     private func visit(_ node: KotlinSyntaxNode, translator: KotlinTranslator) -> VisitResult<KotlinSyntaxNode> {
-        guard let classDeclaration = node as? KotlinClassDeclaration, classDeclaration.declarationType != .enumDeclaration else {
+        guard let classDeclaration = node as? KotlinClassDeclaration else {
             // Recurse to find nested declarations
             return .recurse(nil)
         }
+        if classDeclaration.declarationType == .enumDeclaration {
+            fixupEnumConstructors(for: classDeclaration, translator: translator)
+        } else {
+            fixupClassConstructors(for: classDeclaration, translator: translator)
+        }
+        return .recurse(nil)
+    }
+
+    private func fixupEnumConstructors(for classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) {
+        let constructors = classDeclaration.members.compactMap { (member: KotlinStatement) -> KotlinFunctionDeclaration? in
+            guard member.type == .constructorDeclaration else {
+                return nil
+            }
+            return member as? KotlinFunctionDeclaration
+        }
+        constructors.forEach { fixupEnumConstructor($0, for: classDeclaration) }
+        if classDeclaration.enumInheritedRawValueType != nil, !constructors.contains(where: { $0.parameters.count == 1 && $0.parameters[0].externalLabel == "rawValue" }) {
+            addRawValueConstructor(to: classDeclaration, translator: translator)
+        }
+    }
+
+    private func fixupClassConstructors(for classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) {
         let constructors = classDeclaration.members.filter { $0.type == .constructorDeclaration }
         let superclass = superclass(of: classDeclaration, translator: translator)
         if constructors.isEmpty {
@@ -19,7 +41,7 @@ class KotlinConstructorTransformer: KotlinTransformer {
             var hasNonEmptyConstructor = false
             for constructor in constructors {
                 if let constructor = constructor as? KotlinFunctionDeclaration {
-                    fixupConstructor(constructor, isSubclass: superclass != nil, translator: translator)
+                    fixupClassConstructor(constructor, isSubclass: superclass != nil, translator: translator)
                     if constructor.body?.statements.isEmpty == false {
                         hasNonEmptyConstructor = true
                     }
@@ -29,7 +51,6 @@ class KotlinConstructorTransformer: KotlinTransformer {
                 addIsConstructingProperty(to: classDeclaration)
             }
         }
-        return .recurse(nil)
     }
 
     private func addInheritedConstructors(to classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) -> Bool {
@@ -73,7 +94,7 @@ class KotlinConstructorTransformer: KotlinTransformer {
         classDeclaration.members.append(constructor)
     }
 
-    private func fixupConstructor(_ constructor: KotlinFunctionDeclaration, isSubclass: Bool, translator: KotlinTranslator) {
+    private func fixupClassConstructor(_ constructor: KotlinFunctionDeclaration, isSubclass: Bool, translator: KotlinTranslator) {
         guard constructor.delegatingConstructorCall == nil, let body = constructor.body else {
             return
         }
@@ -136,5 +157,40 @@ class KotlinConstructorTransformer: KotlinTransformer {
                 variableDeclaration.isConstructingPropertyName = "isconstructing"
             }
         }
+    }
+
+    private func fixupEnumConstructor(_ constructor: KotlinFunctionDeclaration, for classDeclaration: KotlinClassDeclaration) {
+        //~~~
+    }
+
+    private func addRawValueConstructor(to classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) {
+        guard let rawValueType = classDeclaration.enumInheritedRawValueType else {
+            return
+        }
+        let factory = KotlinFunctionDeclaration(name: classDeclaration.name)
+        factory.modifiers = classDeclaration.modifiers
+        factory.generics = classDeclaration.generics
+        factory.extras = .singleNewline
+        factory.isGenerated = true
+        factory.returnType = classDeclaration.signature.asOptional(true)
+        factory.parameters = [Parameter<KotlinExpression>(externalLabel: "rawValue", declaredType: rawValueType)]
+
+        // We create structured expressions rather than raw source because our enum case raw values are stored as expressions
+        let callString = classDeclaration.alwaysCreateNewSealedClassInstances ? "()" : ""
+        var cases = classDeclaration.members
+            .compactMap { $0 as? KotlinEnumCaseDeclaration }
+            .compactMap { (enumCase: KotlinEnumCaseDeclaration) -> KotlinCase? in
+                guard let rawValue = enumCase.rawValue else {
+                    return nil
+                }
+                let statement = KotlinRawStatement(sourceCode: "\(classDeclaration.name).\(enumCase.name)\(callString)")
+                return KotlinCase(patterns: [rawValue], body: KotlinCodeBlock(statements: [statement]))
+            }
+        cases.append(KotlinCase(patterns: [KotlinRawExpression(sourceCode: "else")], body: KotlinCodeBlock(statements: [KotlinRawStatement(sourceCode: "null")])))
+        let when = KotlinWhen(on: KotlinIdentifier(name: "rawValue"), cases: cases)
+        let ret = KotlinReturn(expression: when)
+        factory.body = KotlinCodeBlock(statements: [ret])
+
+        (classDeclaration.parent as? KotlinStatement)?.insert(statements: [factory], after: classDeclaration, source: translator.syntaxTree.source)
     }
 }
