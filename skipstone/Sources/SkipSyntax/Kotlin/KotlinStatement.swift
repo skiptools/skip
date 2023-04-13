@@ -19,15 +19,15 @@ class KotlinStatement: KotlinSyntaxNode {
     /// Insert child statements.
     ///
     /// Must be overridden by supporting statement types.
-    func insert(statements: [KotlinStatement], after statement: KotlinSyntaxNode, source: Source) {
-        messages.append(.internalError(self, source: source))
+    func insert(statements: [KotlinStatement], after statement: KotlinSyntaxNode) {
+        messages.append(.internalError(self))
     }
 
     /// Remove child statements.
     ///
     /// Must be overridden by supporting statement types.
-    func remove(statement: KotlinStatement, source: Source) {
-        messages.append(.internalError(self, source: source))
+    func remove(statement: KotlinStatement) {
+        messages.append(.internalError(self))
     }
 
     final override func leadingTrivia(indentation: Indentation) -> String {

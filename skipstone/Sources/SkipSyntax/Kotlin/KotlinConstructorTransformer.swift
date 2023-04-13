@@ -24,9 +24,9 @@ class KotlinConstructorTransformer: KotlinTransformer {
             }
             return member as? KotlinFunctionDeclaration
         }
-        constructors.forEach { fixupEnumConstructor($0, for: classDeclaration) }
+        constructors.forEach { fixupEnumConstructor($0, for: classDeclaration, translator: translator) }
         if classDeclaration.enumInheritedRawValueType != nil, !constructors.contains(where: { $0.parameters.count == 1 && $0.parameters[0].externalLabel == "rawValue" }) {
-            addRawValueConstructor(to: classDeclaration, translator: translator)
+            addRawValueConstructor(to: classDeclaration)
         }
     }
 
@@ -159,11 +159,24 @@ class KotlinConstructorTransformer: KotlinTransformer {
         }
     }
 
-    private func fixupEnumConstructor(_ constructor: KotlinFunctionDeclaration, for classDeclaration: KotlinClassDeclaration) {
-        //~~~
+    private func fixupEnumConstructor(_ constructor: KotlinFunctionDeclaration, for classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) {
+        let factory = KotlinFunctionDeclaration(name: classDeclaration.name, sourceFile: constructor.sourceFile, sourceRange: constructor.sourceRange)
+        factory.modifiers = classDeclaration.modifiers
+        factory.generics = classDeclaration.generics.merge(overrides: constructor.generics, addNew: true)
+        factory.annotations = constructor.annotations
+        factory.extras = constructor.extras
+        factory.returnType = classDeclaration.signature.asOptional(constructor.isOptionalInit)
+        factory.parameters = constructor.parameters
+        factory.disambiguatingParameterCount = constructor.disambiguatingParameterCount
+        factory.isGenerated = constructor.isGenerated
+        factory.body = constructor.body
+        factory.body?.updateWithExpectedReturn(.assignToSelf)
+
+        classDeclaration.remove(statement: constructor)
+        (classDeclaration.parent as? KotlinStatement)?.insert(statements: [factory], after: classDeclaration)
     }
 
-    private func addRawValueConstructor(to classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) {
+    private func addRawValueConstructor(to classDeclaration: KotlinClassDeclaration) {
         guard let rawValueType = classDeclaration.enumInheritedRawValueType else {
             return
         }
@@ -191,6 +204,6 @@ class KotlinConstructorTransformer: KotlinTransformer {
         let ret = KotlinReturn(expression: when)
         factory.body = KotlinCodeBlock(statements: [ret])
 
-        (classDeclaration.parent as? KotlinStatement)?.insert(statements: [factory], after: classDeclaration, source: translator.syntaxTree.source)
+        (classDeclaration.parent as? KotlinStatement)?.insert(statements: [factory], after: classDeclaration)
     }
 }

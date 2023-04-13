@@ -4,6 +4,8 @@ enum KotlinExpectedReturn {
     case no
     /// A return is required.
     case yes
+    /// Convert any assignment to self to a return.
+    case assignToSelf
     /// If any returns are present, given them the given label.
     case labelIfPresent(String)
     /// Convert break statements to returns with the given label.

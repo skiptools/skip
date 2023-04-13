@@ -109,6 +109,7 @@ class KotlinCodeBlock: KotlinStatement {
     /// - Returns: Whether any return statements were found.
     @discardableResult func updateWithExpectedReturn(_ expectedReturn: KotlinExpectedReturn) -> Bool {
         var label: String?
+        var assignToSelf = false
         var sref = false
         var returnRequired = false
         var onUpdate: String? = nil
@@ -119,6 +120,8 @@ class KotlinCodeBlock: KotlinStatement {
             break
         case .yes:
             returnRequired = true
+        case .assignToSelf:
+            assignToSelf = true
         case .labelIfPresent(let l):
             label = l
         case .labelIfBreak(let l):
@@ -134,6 +137,20 @@ class KotlinCodeBlock: KotlinStatement {
         visit { node in
             if let statement = node as? KotlinStatement {
                 switch statement.type {
+                case .expression:
+                    if assignToSelf, let binaryOperator = (statement as? KotlinExpressionStatement)?.expression as? KotlinBinaryOperator {
+                        if (binaryOperator.lhs as? KotlinIdentifier)?.name == "self" {
+                            let returnStatement = KotlinReturn(expression: binaryOperator.rhs)
+                            if let parent = statement.parent as? KotlinStatement {
+                                parent.insert(statements: [returnStatement], after: statement)
+                                parent.remove(statement: statement)
+                            } else {
+                                statement.messages.append(.internalError(statement))
+                            }
+                            didFindReturn = true
+                        }
+                        return .skip
+                    }
                 case .return:
                     if !convertBreak {
                         let returnStatement = statement as! KotlinReturn
@@ -222,9 +239,9 @@ class KotlinCodeBlock: KotlinStatement {
         return statements + catches.flatMap { $0.children }
     }
 
-    override func insert(statements: [KotlinStatement], after statement: KotlinSyntaxNode, source: Source) {
+    override func insert(statements: [KotlinStatement], after statement: KotlinSyntaxNode) {
         guard let index = self.statements.firstIndex(where: { $0 === statement }) else {
-            super.insert(statements: statements, after: statement, source: source)
+            super.insert(statements: statements, after: statement)
             return
         }
         self.statements.insert(contentsOf: statements, at: index + 1)
@@ -234,7 +251,7 @@ class KotlinCodeBlock: KotlinStatement {
         }
     }
 
-    override func remove(statement: KotlinStatement, source: Source) {
+    override func remove(statement: KotlinStatement) {
         statements = statements.filter { $0 !== statement }
     }
 
@@ -750,9 +767,9 @@ class KotlinClassDeclaration: KotlinStatement {
         return members
     }
 
-    override func insert(statements: [KotlinStatement], after statement: KotlinSyntaxNode, source: Source) {
+    override func insert(statements: [KotlinStatement], after statement: KotlinSyntaxNode) {
         guard let index = members.firstIndex(where: { $0 === statement }) else {
-            super.insert(statements: statements, after: statement, source: source)
+            super.insert(statements: statements, after: statement)
             return
         }
         members.insert(contentsOf: statements, at: index + 1)
@@ -762,7 +779,7 @@ class KotlinClassDeclaration: KotlinStatement {
         }
     }
 
-    override func remove(statement: KotlinStatement, source: Source) {
+    override func remove(statement: KotlinStatement) {
         members = members.filter { $0 !== statement }
     }
 
@@ -1113,6 +1130,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var isAsync = false
     var isOpen = false
     var isGlobal = false
+    var isOptionalInit = false
     var annotations: [String] = []
     var modifiers = Modifiers()
     var generics = Generics()
@@ -1164,6 +1182,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     static func translate(statement: FunctionDeclaration, translator: KotlinTranslator) -> KotlinFunctionDeclaration {
         let kstatement = KotlinFunctionDeclaration(statement: statement)
         kstatement.isAsync = statement.isAsync
+        kstatement.isOptionalInit = statement.isOptionalInit
         kstatement.modifiers = statement.modifiers
         kstatement.generics = statement.generics
         kstatement.returnType = statement.returnType
@@ -1546,9 +1565,9 @@ class KotlinInterfaceDeclaration: KotlinStatement {
         return members
     }
 
-    override func insert(statements: [KotlinStatement], after statement: KotlinSyntaxNode, source: Source) {
+    override func insert(statements: [KotlinStatement], after statement: KotlinSyntaxNode) {
         guard let index = members.firstIndex(where: { $0 === statement }) else {
-            super.insert(statements: statements, after: statement, source: source)
+            super.insert(statements: statements, after: statement)
             return
         }
         members.insert(contentsOf: statements, at: index + 1)
@@ -1558,7 +1577,7 @@ class KotlinInterfaceDeclaration: KotlinStatement {
         }
     }
 
-    override func remove(statement: KotlinStatement, source: Source) {
+    override func remove(statement: KotlinStatement) {
         members = members.filter { $0 !== statement }
     }
 

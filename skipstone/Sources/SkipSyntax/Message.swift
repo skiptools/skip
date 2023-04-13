@@ -93,7 +93,7 @@ extension Message {
         return Message(kind: .error, message: "Skip only supports #if between code block statements or member declarations", source: source, sourceRange: range)
     }
 
-    static func internalError(_ sourceDerived: SourceDerived, source: Source) -> Message {
+    static func internalError(_ sourceDerived: SourceDerived, source: Source? = nil) -> Message {
         return Message(kind: .error, message: "Internal error. Please report to Skip support", sourceDerived: sourceDerived, source: source)
     }
 

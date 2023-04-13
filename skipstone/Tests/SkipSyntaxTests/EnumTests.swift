@@ -439,4 +439,72 @@ final class EnumTests: XCTestCase {
         efunc(e = E.b)
         """)
     }
+
+    func testCustomConstructor() async throws {
+        try await check(swift: """
+        enum E: Int, RawRepresentable {
+            case one
+            case two
+
+            init?(rawValue: Int) {
+                switch rawValue {
+                case 1:
+                    self = .one
+                case 2:
+                    self = .two
+                default:
+                    return nil
+                }
+            }
+        }
+        """, kotlin: """
+        internal enum class E(val rawValue: Int, unusedp: Nothing? = null): RawRepresentable {
+            one(0),
+            two(1);
+        }
+
+        internal fun E(rawValue: Int): E? {
+            when (rawValue) {
+                1 -> {
+                    return E.one
+                }
+                2 -> {
+                    return E.two
+                }
+                else -> {
+                    return null
+                }
+            }
+        }
+        """)
+
+        try await check(swift: """
+        enum E {
+            case one
+            case other(Int)
+
+            init(value: Int) {
+                self = value == 1 ? .one : .other(value)
+            }
+        }
+        """, kotlin: """
+        internal sealed class E {
+            class One: E() {
+            }
+            class Other(val associated0: Int): E() {
+            }
+
+            companion object {
+                val one: E = One()
+                fun other(associated0: Int): E {
+                    return Other(associated0)
+                }
+            }
+        }
+
+        internal fun E(value: Int): E {
+            return if (value == 1) E.one else E.other(value)
+        }
+        """)
+    }
 }
