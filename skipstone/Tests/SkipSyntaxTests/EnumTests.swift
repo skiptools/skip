@@ -375,19 +375,3 @@ final class EnumTests: XCTestCase {
         """)
     }
 }
-
-//~~~
-enum EE: Comparable {
-    case one
-    case two
-
-    static func < (lhs: EE, rhs: EE) -> Bool {
-        return lhs == .one && rhs == .two
-    }
-}
-
-func islessEE(lhs: EE, rhs: EE) -> Bool {
-    var dict = [EE: String]()
-    dict[.one] = "one"
-    return lhs < rhs
-}
