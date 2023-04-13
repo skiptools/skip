@@ -184,4 +184,15 @@ final class ExpressionTests: XCTestCase {
         }
         """)
     }
+
+    func testSelfAssignment() async throws {
+        try await checkProducesMessage(swift: """
+        struct S {
+            var i = 1
+            init(copy: S) {
+                self = copy
+            }
+        }
+        """)
+    }
 }

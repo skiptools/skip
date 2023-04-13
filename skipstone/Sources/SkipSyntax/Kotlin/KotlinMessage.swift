@@ -124,6 +124,11 @@ extension Message {
         return Message(kind: .error, message: "Kotlin does not support static members in protocols", sourceDerived: sourceDerived, source: source)
     }
 
+    // Idea: expand self assignment to merging all state from the given instance
+    static func kotlinSelfAssignment(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Kotlin does not support assigning a new value to self", sourceDerived: sourceDerived, source: source)
+    }
+
     // Idea: duplicate body that we're falling through to (and the following if that too does a fallthrough, etc)
     static func kotlinSwitchFallthrough(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Kotlin does not support fallthrough. Consider restructuring your switch statement", sourceDerived: sourceDerived, source: source)

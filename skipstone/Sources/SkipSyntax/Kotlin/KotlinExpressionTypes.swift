@@ -96,6 +96,9 @@ class KotlinBinaryOperator: KotlinExpression {
         // This won't catch implicit members, however (i.e. 'x' in place of 'self.x')
         if expression.op.precedence == .assignment && !(klhs is KotlinMemberDeclaration) {
             krhs = krhs.sref()
+            if let identifier = klhs as? KotlinIdentifier, identifier.name == "self" {
+                klhs.messages.append(.kotlinSelfAssignment(klhs, source: translator.syntaxTree.source))
+            }
         }
         let kexpression = KotlinBinaryOperator(expression: expression, lhs: klhs, rhs: krhs)
         kexpression.mayBeSharedMutableStruct = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
