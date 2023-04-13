@@ -512,14 +512,14 @@ final class ConditionalTests: XCTestCase {
         }
         """, kotlin: """
         internal fun f(e: E) {
-            if (e is E.case2case) {
+            if (e is E.Case2) {
                 print("A")
             }
-            if (e is E.case2case) {
+            if (e is E.Case2) {
                 val s = e.associated1
                 print(s)
             }
-            if (e is E.case1case) {
+            if (e is E.Case1) {
                 var num = e.d
                 print(num)
             }
@@ -547,12 +547,12 @@ final class ConditionalTests: XCTestCase {
         }
         """, kotlin: """
         // No target variable needed if no bindings
-        if (enumFactory() is E.case2case) {
+        if (enumFactory() is E.Case2) {
             print("case2")
         }
 
         val matchtarget_0 = enumFactory()
-        if (matchtarget_0 is E.case2case) {
+        if (matchtarget_0 is E.Case2) {
             val i = matchtarget_0.associated0
             print(i)
         }
@@ -580,7 +580,7 @@ final class ConditionalTests: XCTestCase {
         internal val e: E
         if (i != null) {
             print(i)
-        } else if (e is E.case2case) {
+        } else if (e is E.Case2) {
             val s = e.associated1
             print(s)
         } else {
@@ -612,7 +612,7 @@ final class ConditionalTests: XCTestCase {
         } else {
             var letexec_0 = false
             val matchtarget_0 = enumFactory()
-            if (matchtarget_0 is E.case2case) {
+            if (matchtarget_0 is E.Case2) {
                 val i = matchtarget_0.associated0
                 val s = matchtarget_0.associated1
                 if (i > 1) {
@@ -646,7 +646,7 @@ final class ConditionalTests: XCTestCase {
         var letexec_0 = false
         i?.let { x ->
             val matchtarget_0 = enumFactory()
-            if (matchtarget_0 is E.case2case) {
+            if (matchtarget_0 is E.Case2) {
                 val i = matchtarget_0.associated0
                 letexec_0 = true
                 print(x + i)
@@ -909,7 +909,7 @@ final class ConditionalTests: XCTestCase {
         print(s)
         """, kotlin: """
         val matchtarget_0 = enumFactory()
-        if (matchtarget_0 !is E.case2case) {
+        if (matchtarget_0 !is E.Case2) {
             print("no")
             return
         }
@@ -935,7 +935,7 @@ final class ConditionalTests: XCTestCase {
         print(s)
         """, kotlin: """
         val matchtarget_0 = enumFactory()
-        if (matchtarget_0 !is E.case2case) {
+        if (matchtarget_0 !is E.Case2) {
             print("no")
             return
         }

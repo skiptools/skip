@@ -156,11 +156,11 @@ final class SwitchTests: XCTestCase {
         """, kotlin: """
         internal val e = enumFactory()
         when (e) {
-            is E.case1case -> {
+            is E.Case1 -> {
                 val dvalue = e.d
                 print(dvalue == Double.zero)
             }
-            is E.case2case -> {
+            is E.Case2 -> {
                 var s = e.associated1
                 s += "..."
                 print(s)
@@ -180,11 +180,11 @@ final class SwitchTests: XCTestCase {
         """, kotlin: """
         val matchtarget_0 = enumFactory()
         when (matchtarget_0) {
-            is E.case1case -> {
+            is E.Case1 -> {
                 val dvalue = matchtarget_0.d
                 print(dvalue == Double.zero)
             }
-            is E.case2case -> {
+            is E.Case2 -> {
                 var s = matchtarget_0.associated1
                 s += "..."
                 print(s)
@@ -221,15 +221,15 @@ final class SwitchTests: XCTestCase {
         }
         """, kotlin: """
         internal sealed class E<out T> where T: Any {
-            class case1case: E<Nothing>() {
+            class Case1: E<Nothing>() {
             }
-            class case2case<T>(val associated0: T, val associated1: String): E<T>() where T: Any {
+            class Case2<T>(val associated0: T, val associated1: String): E<T>() where T: Any {
             }
 
             companion object {
-                val case1: E<Nothing> = case1case()
+                val case1: E<Nothing> = Case1()
                 fun <T> case2(associated0: T, associated1: String): E<T> where T: Any {
-                    return case2case(associated0, associated1)
+                    return Case2(associated0, associated1)
                 }
             }
         }
@@ -239,10 +239,10 @@ final class SwitchTests: XCTestCase {
         internal fun g() {
             val e = enumFactory()
             when (e) {
-                is E.case1case -> {
+                is E.Case1 -> {
                     print("case1")
                 }
-                is E.case2case -> {
+                is E.Case2 -> {
                     val d = e.associated0
                     var s = e.associated1
                     val b = d == Double.zero
