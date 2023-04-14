@@ -1214,9 +1214,6 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             if statement.type == .initDeclaration {
                 kstatement.isOpen = false
                 kstatement.modifiers.isOverride = false // Kotlin does not override constructors
-                if statement.isOptionalInit, owningTypeDeclaration.type != .enumDeclaration {
-                    kstatement.messages.append(.kotlinConstructorNullReturn(statement, source: translator.syntaxTree.source))
-                }
             } else {
                 if owningDeclarationType == .protocolDeclaration {
                     // Kotlin uses default public visibility on all interface members

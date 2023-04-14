@@ -31,7 +31,12 @@ class KotlinConstructorTransformer: KotlinTransformer {
     }
 
     private func fixupClassConstructors(for classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) {
-        let constructors = classDeclaration.members.filter { $0.type == .constructorDeclaration }
+        let constructors = classDeclaration.members.compactMap { (member: KotlinStatement) -> KotlinFunctionDeclaration? in
+            guard member.type == .constructorDeclaration else {
+                return nil
+            }
+            return member as? KotlinFunctionDeclaration
+        }
         let superclass = superclass(of: classDeclaration, translator: translator)
         if constructors.isEmpty {
             if classDeclaration.declarationType != .structDeclaration, let superclass, !addInheritedConstructors(to: classDeclaration, translator: translator) {
@@ -40,11 +45,9 @@ class KotlinConstructorTransformer: KotlinTransformer {
         } else {
             var hasNonEmptyConstructor = false
             for constructor in constructors {
-                if let constructor = constructor as? KotlinFunctionDeclaration {
-                    fixupClassConstructor(constructor, isSubclass: superclass != nil, translator: translator)
-                    if constructor.body?.statements.isEmpty == false {
-                        hasNonEmptyConstructor = true
-                    }
+                fixupClassConstructor(constructor, isSubclass: superclass != nil, translator: translator)
+                if constructor.body?.statements.isEmpty == false {
+                    hasNonEmptyConstructor = true
                 }
             }
             if hasNonEmptyConstructor {
@@ -95,6 +98,9 @@ class KotlinConstructorTransformer: KotlinTransformer {
     }
 
     private func fixupClassConstructor(_ constructor: KotlinFunctionDeclaration, isSubclass: Bool, translator: KotlinTranslator) {
+        if constructor.isOptionalInit {
+            constructor.messages.append(.kotlinConstructorNullReturn(constructor, source: translator.syntaxTree.source))
+        }
         guard constructor.delegatingConstructorCall == nil, let body = constructor.body else {
             return
         }

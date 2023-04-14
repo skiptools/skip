@@ -143,7 +143,7 @@ extension Message {
     // Idea: generate extensions on Pair and Triple for custom labels
     // Problem: where to define extensions and how to avoid duplicate definitions
     static func kotlinTupleLabels(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "Kotlin uses Pair for 2-tuples and Triple for 3-tuples. It does not support custom tuple element labels. Consider creating a struct instead", sourceDerived: sourceDerived, source: source)
+        return Message(kind: .error, message: "Skip does not support custom tuple element labels. Consider creating a struct instead", sourceDerived: sourceDerived, source: source)
     }
 
     // Idea: for typealiases that are internal, create a new top-level alias or just replace use cases with original type
