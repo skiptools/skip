@@ -102,9 +102,8 @@ extension Message {
         return Message(kind: .error, message: "Skip does not support the referenced type as a generic constraint", source: source, sourceRange: range)
     }
 
-    // Idea: we need to update TypeInferenceEngine to support local type inference
-    static func localFunctionsNotSupported(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "Skip does not support nested functions. Consider making this an independent function", sourceDerived: sourceDerived, source: source)
+    static func localFunctionsUniqueIdentifiers(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .warning, message: "Skip requires that nested functions have names which do not conflict with other identifiers within the local scope. Consider giving this function a unique name", sourceDerived: sourceDerived, source: source)
     }
 
     // Idea: we need to update TypeInferenceEngine to support local type inference

@@ -773,17 +773,6 @@ final class MemberDeclarationTests: XCTestCase {
         """)
     }
 
-    func testLocalFunctions() async throws {
-        try await checkProducesMessage(swift: """
-        func f() -> Int {
-            func g() -> Int {
-                return 1
-            }
-            return g() + 1
-        }
-        """)
-    }
-
     func testGenericFunction() async throws {
         try await check(swift: """
         func f<T, U>(a: T, b: U) -> T? {
@@ -949,6 +938,59 @@ final class MemberDeclarationTests: XCTestCase {
                     return lhs.t < rhs.t
                 }
                 return if (islessthan(this, other)) -1 else 1
+            }
+        }
+        """)
+    }
+
+    func testLocalFunction() async throws {
+        try await check(supportingSwift: """
+        extension Int {
+            static let myValue = 0
+        }
+        extension String {
+            static let myValue = ""
+        }
+        """, swift: """
+        class C {
+            var i: Int
+
+            func f(s: String) {
+                func doSomething(with: String) -> String {
+                    return .myValue
+                }
+                print(doSomething(with: i) == .myValue)
+                print(doSomething(with: s) == .myValue)
+            }
+
+            func doSomething(with: Int) -> Int {
+                return .myValue
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal var i: Int
+
+            internal open fun f(s: String) {
+                fun doSomething(with: String): String {
+                    return String.myValue
+                }
+                print(doSomething(with = i) == Int.myValue)
+                print(doSomething(with = s) == String.myValue)
+            }
+
+            internal open fun doSomething(with: Int): Int {
+                return Int.myValue
+            }
+        }
+        """)
+
+        try await checkProducesMessage(swift: """
+        func f() {
+            func g(x: Int) {
+            }
+            g(1)
+            func g(y: Double) {
             }
         }
         """)

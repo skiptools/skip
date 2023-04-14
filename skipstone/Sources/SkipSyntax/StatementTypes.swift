@@ -770,9 +770,6 @@ class FunctionDeclaration: Statement {
     }
 
     override func resolveAttributes(in syntaxTree: SyntaxTree) {
-        if parent?.owningFunctionDeclaration != nil {
-            messages.append(.localFunctionsNotSupported(self, source: syntaxTree.source))
-        }
         if type == .initDeclaration, let owningTypeDeclaration {
             returnType = owningTypeDeclaration.signature.asOptional(isOptionalInit)
         } else {
@@ -795,6 +792,10 @@ class FunctionDeclaration: Statement {
         if let body {
             let bodyContext = context.pushing(self)
             let _ = body.inferTypes(context: bodyContext, expecting: .none)
+        }
+        if parent?.owningFunctionDeclaration != nil {
+            // Add identifier if local function
+            return context.addingLocalFunction(self)
         }
         return context
     }

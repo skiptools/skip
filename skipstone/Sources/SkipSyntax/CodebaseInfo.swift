@@ -345,6 +345,11 @@ public class CodebaseInfo: Codable {
             // Return all matches with the top score
             return sortedCandidates.filter { $0.score >= topCandidate.score }.map(\.signature)
         }
+
+        /// If the given function signature can be called with the given arguments, return the call signature.
+        func callableSignature(of functionSignature: TypeSignature, generics: Generics? = nil, arguments: [LabeledValue<TypeSignature>]) -> TypeSignature? {
+            return matchFunction(signature: functionSignature, generics: generics, arguments: arguments)?.signature
+        }
         
         /// Return the signatures of the possible subscripts being called with the given arguments.
         func subscriptSignature(inConstrained type: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
@@ -492,7 +497,12 @@ public class CodebaseInfo: Codable {
         }
         
         private func matchFunction(_ item: CodebaseInfoItem, in typeInfo: TypeInfo? = nil, constrainedGenerics: [TypeSignature] = [], arguments: [LabeledValue<TypeSignature>]) -> FunctionCandidate? {
-            guard case .function(let parameters, let returnType) = item.signature else {
+            let generics = (item as? FunctionInfo)?.generics
+            return matchFunction(signature: item.signature, generics: generics, in: typeInfo, constrainedGenerics: constrainedGenerics, arguments: arguments)
+        }
+
+        private func matchFunction(signature: TypeSignature, generics: Generics? = nil, in typeInfo: TypeInfo? = nil, constrainedGenerics: [TypeSignature] = [], arguments: [LabeledValue<TypeSignature>]) -> FunctionCandidate? {
+            guard case .function(let parameters, let returnType) = signature else {
                 return nil
             }
             guard parameters.count >= arguments.count else {
@@ -501,7 +511,7 @@ public class CodebaseInfo: Codable {
 
             // Constrain the parameters using available generic information so that we can match against them
             var constrainedParameters = parameters
-            var generics = (item as? FunctionInfo)?.generics ?? Generics()
+            var generics = generics ?? Generics()
             if let typeInfo {
                 constrainedParameters = parameters.map { $0.mappingTypes(from: typeInfo.signature.generics, to: constrainedGenerics) }
                 generics = typeInfo.generics.merge(overrides: generics, addNew: true).merge(overrides: Generics(typeInfo.signature.generics, whereEqual: constrainedGenerics), addNew: true)
@@ -539,7 +549,7 @@ public class CodebaseInfo: Codable {
             }
 
             // Apply the generic types we determined from parameter matching and the given constraint information to the return type
-            let matchingGenerics = item.signature.mergeGenericMappings(in: .function(matchingParameters, returnType), with: generics)
+            let matchingGenerics = signature.mergeGenericMappings(in: .function(matchingParameters, returnType), with: generics)
             let constrainedReturnType = returnType.constrainedTypeWithGenerics(matchingGenerics)
             return FunctionCandidate(signature: .function(matchingParameters, constrainedReturnType), score: totalScore)
         }

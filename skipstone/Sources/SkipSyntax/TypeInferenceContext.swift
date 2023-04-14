@@ -115,6 +115,15 @@ struct TypeInferenceContext {
         return context
     }
 
+    /// Return a context that includes the given local function.
+    func addingLocalFunction(_ function: FunctionDeclaration) -> TypeInferenceContext {
+        // Warn for duplicated local functions
+        if localIdentifierTypes[function.name] != nil {
+            function.messages.append(.localFunctionsUniqueIdentifiers(function, source: source))
+        }
+        return addingIdentifier(function.name, type: function.functionType)
+    }
+
     /// Return the type of the given identifier.
     func identifier(_ name: String) -> TypeSignature {
         // First check local identifiers
@@ -226,6 +235,9 @@ struct TypeInferenceContext {
         }
 
         // Not a known member function. Check functions that can be invoked without a target type
+        if let localFunction = localIdentifierTypes[name], case .function = localFunction, let callSignature = codebaseInfo.callableSignature(of: localFunction, generics: generics, arguments: constrainedArguments) {
+            return [callSignature]
+        }
         for pathEntry in path.reversed() {
             guard let typeDeclaration = pathEntry.typeDeclaration else {
                 continue

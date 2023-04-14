@@ -1148,6 +1148,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var isAsync = false
     var isOpen = false
     var isGlobal = false
+    var isLocal = false
     var isOptionalInit = false
     var annotations: [String] = []
     var modifiers = Modifiers()
@@ -1206,7 +1207,9 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         kstatement.returnType = statement.returnType
         kstatement.parameters = statement.parameters.map { $0.translate(translator: translator) }
         var owningDeclarationType: StatementType? = nil
-        if let owningTypeDeclaration = statement.parent as? TypeDeclaration {
+        if statement.parent?.owningFunctionDeclaration != nil {
+            kstatement.isLocal = true
+        } else if let owningTypeDeclaration = statement.parent as? TypeDeclaration {
             // Use codebaseInfo rather than .type directly so that extension API is also handled correctly
             owningDeclarationType = translator.codebaseInfo?.declarationType(forNamed: owningTypeDeclaration.signature) ?? owningTypeDeclaration.type
             let owningSignature = translator.codebaseInfo?.primaryTypeInfo(forNamed: owningTypeDeclaration.signature)?.signature ?? owningTypeDeclaration.signature
@@ -1338,7 +1341,9 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
 
     private func appendFunctionDeclaration(to output: OutputGenerator, indentation: Indentation) {
-        output.append(modifiers.kotlinMemberString(isOpen: isOpen, suffix: " "))
+        if !isLocal {
+            output.append(modifiers.kotlinMemberString(isOpen: isOpen, suffix: " "))
+        }
         if isAsync {
             output.append("suspend ")
         }
