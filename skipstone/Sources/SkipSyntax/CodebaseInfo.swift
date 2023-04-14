@@ -1256,6 +1256,9 @@ extension CodebaseInfoLanguageAdditionsGatherDelegate {
         return []
     }
 
+    func prepareForUse(codebaseInfo: CodebaseInfo) {
+    }
+
     func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGatherFrom syntaxTree: SyntaxTree) {
     }
 

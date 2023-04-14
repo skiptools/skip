@@ -325,9 +325,15 @@ struct PreflightAction: AsyncParsableCommand, CheckPhase {
         for sourceFile in sourceFiles {
             let source = try Source(file: sourceFile)
             let syntaxTree = SyntaxTree(source: source, preprocessorSymbols: Set(options.symbols))
+            let transformers = builtinKotlinTransformers()
+            transformers.forEach { $0.gather(from: syntaxTree) }
+            transformers.forEach { $0.prepareForUse(codebaseInfo: nil) }
             let translator = KotlinTranslator(syntaxTree: syntaxTree)
             let kotlinTree = translator.translateSyntaxTree()
-            kotlinTree.messages.forEach { print($0) }
+            transformers.forEach { $0.apply(to: kotlinTree, translator: translator) }
+
+            let messages = kotlinTree.messages + transformers.flatMap { $0.messages(for: sourceFile) }
+            messages.forEach { print($0) }
 
             if let outputDir = options.directory {
                 let outputFileURL = outputFileURL(for: sourceFile, in: URL(fileURLWithPath: outputDir))
@@ -844,7 +850,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
     /// Generate transpiler transformers from the given skip config
     func createTransformers(for config: SkipConfig, with moduleMap: [String: SkipConfig]) throws -> [KotlinTransformer] {
-        let transformers: [KotlinTransformer] = []
+        let transformers: [KotlinTransformer] = builtinKotlinTransformers()
 
         //if let packageName = config.skip?.package {
             // TODO: throw error("implement package/module map plugin")

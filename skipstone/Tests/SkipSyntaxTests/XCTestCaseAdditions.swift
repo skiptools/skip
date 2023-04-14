@@ -23,7 +23,7 @@ extension XCTestCase {
     ///   - kotlin: the expected kotlin, or the literal `// SKIPME` when the
     ///   - file: the file of the call site, expected to be `#file`
     ///   - line: the line of the call site, expected to be `#line`
-    public func check(expectFailure: Bool = false, compiler: String? = ProcessInfo.processInfo.environment["KOTLINC"], replaceInlineSKIPME: Int? = 1, supportingSwift: String? = nil, swift: StaticString? = nil, swiftCode: (() throws -> String?)? = nil, kotlin: String, fixup fixupKotlinBlock: ((String) -> (String)) = { $0 }, transformers: [KotlinTransformer] = [], file: StaticString = #file, line: UInt = #line) async throws {
+    public func check(expectFailure: Bool = false, compiler: String? = ProcessInfo.processInfo.environment["KOTLINC"], replaceInlineSKIPME: Int? = 1, supportingSwift: String? = nil, swift: StaticString? = nil, swiftCode: (() throws -> String?)? = nil, kotlin: String, fixup fixupKotlinBlock: ((String) -> (String)) = { $0 }, transformers: [KotlinTransformer] = builtinKotlinTransformers(), file: StaticString = #file, line: UInt = #line) async throws {
 
         func fixup(code: String) -> String {
             var code = fixupKotlinBlock(code)
@@ -165,7 +165,7 @@ extension XCTestCase {
     public func checkProducesMessage(swift: String, file: StaticString = #file, line: UInt = #line) async throws {
         let srcFile = try tmpFile(named: "Source.swift", contents: swift)
         let codebaseInfo = CodebaseInfo()
-        let tp = Transpiler(sourceFiles: [Source.FilePath(path: srcFile.path)], codebaseInfo: codebaseInfo)
+        let tp = Transpiler(sourceFiles: [Source.FilePath(path: srcFile.path)], codebaseInfo: codebaseInfo, transformers: builtinKotlinTransformers())
         try await tp.transpile { transpilation in
             XCTAssertTrue(!transpilation.messages.isEmpty, trimmedContent(transpilation: transpilation))
             transpilation.messages.forEach { print("Received expected message: \($0)") }

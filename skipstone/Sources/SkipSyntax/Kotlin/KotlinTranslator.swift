@@ -41,7 +41,7 @@ public class KotlinTranslator {
     }
 
     /// Translate and transpile to source code.
-    public func transpile(codebaseInfo: CodebaseInfo, startTime: TimeInterval) -> Transpilation {
+    public func transpile(codebaseInfo: CodebaseInfo, transformers: [KotlinTransformer], startTime: TimeInterval) -> Transpilation {
         let importedModuleNames: [String] = syntaxTree.root.statements.compactMap { statement in
             guard statement.type == .importDeclaration, let importDeclaration = statement as? ImportDeclaration else {
                 return nil
@@ -53,11 +53,9 @@ public class KotlinTranslator {
         self.packageName = codebaseInfo.kotlin?.packageName
 
         let kotlinSyntaxTree = translateSyntaxTree()
-        if let transformers = codebaseInfo.kotlin?.transformers {
-            transformers.forEach { $0.apply(to: kotlinSyntaxTree, translator: self) }
-        }
+        transformers.forEach { $0.apply(to: kotlinSyntaxTree, translator: self) }
 
-        let messages = codebaseInfo.messages(for: syntaxTree.source.file) + kotlinSyntaxTree.messages
+        let messages = kotlinSyntaxTree.messages + codebaseInfo.messages(for: syntaxTree.source.file) + transformers.flatMap { $0.messages(for: syntaxTree.source.file) }
         let outputFile = syntaxTree.source.file.outputFile(withExtension: "kt")
         let outputGenerator = OutputGenerator(root: kotlinSyntaxTree.root)
         let (output, outputMap) = outputGenerator.generateOutput(file: outputFile)

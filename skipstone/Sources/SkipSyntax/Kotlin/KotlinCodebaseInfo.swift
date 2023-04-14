@@ -174,43 +174,8 @@ public class KotlinCodebaseInfo: CodebaseInfoLanguageAdditions, CodebaseInfoLang
     /// The package being generated.
     public let packageName: String?
 
-    /// Transformers being applied to the translation.
-    public private(set) var transformers: [KotlinTransformer] = []
-
-    init(packageName: String? = nil, transformers: [KotlinTransformer] = []) {
+    init(packageName: String? = nil) {
         self.packageName = packageName
-        // Idea: Track which transformers we might need when we come across relevant code during initial translation and save traversing the tree for unnecessary plugins
-        self.transformers = [
-            // May change the names of members, so place it before transformers that could use those names in generated code
-            KotlinEscapeKeywordsTransformer(),
-            // May add members, so place it before transformers that could manipulate those members
-            KotlinStructTransformer(),
-            // May alter superclasses and change enums to use sealed classes
-            KotlinErrorToThrowableTransformer(),
-            // May *remove* information about protocol conformances. May change enums to use sealed classes. Requires knowledge of
-            // sealed vs. unsealed enums. Take care with placement in transformers list
-            KotlinEquatableHashableComparableTransformer(),
-            // May add constructors
-            KotlinConstructorTransformer(),
-            KotlinIfWhenTransformer(),
-            KotlinDeferPlugin(),
-            KotlinDisambiguateFunctionsTransformer(),
-            //KotlinSwiftUITransformer(),
-            KotlinImportMapTransformer(),
-            KotlinTestAnnotationTransformer(),
-        ] + transformers
-    }
-
-    func messages(for sourceFile: Source.FilePath) -> [Message] {
-        return transformers.flatMap { $0.messages(for: sourceFile) }
-    }
-
-    func prepareForUse(codebaseInfo: CodebaseInfo) {
-        transformers.forEach { $0.prepareForUse(codebaseInfo: codebaseInfo) }
-    }
-
-    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGatherFrom syntaxTree: SyntaxTree) {
-        transformers.forEach { $0.gather(from: syntaxTree) }
     }
 
     func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather typeInfo: CodebaseInfo.TypeInfo, from statement: ExtensionDeclaration) {

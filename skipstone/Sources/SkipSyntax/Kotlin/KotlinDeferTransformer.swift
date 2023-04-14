@@ -1,5 +1,5 @@
 /// Update variables used to track `defer` actions to prevent collisions.
-class KotlinDeferPlugin: KotlinTransformer {
+class KotlinDeferTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
         let visitor = DeferSuffixVisitor()
         syntaxTree.root.visit(perform: visitor.visit)
