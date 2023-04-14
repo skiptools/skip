@@ -25,7 +25,7 @@ let package = Package(
     targets: [
         .target(name: "SkipSyntax", dependencies: [
             .product(name: "SwiftSyntax", package: "swift-syntax"),
-            .product(name: "SwiftSyntaxParser", package: "swift-syntax"),
+            .product(name: "SwiftParser", package: "swift-syntax"),
         ]),
         .testTarget(name: "SkipSyntaxTests", dependencies: [
             "SkipSyntax",
@@ -35,7 +35,7 @@ let package = Package(
 
         .target(name: "SkipBuild", dependencies: [
             "SkipSyntax",
-            .product(name: "SwiftSyntaxParser", package: "swift-syntax"),
+            .product(name: "SwiftParser", package: "swift-syntax"),
             .product(name: "ArgumentParser", package: "swift-argument-parser"),
             .product(name: "TSCBasic", package: "swift-tools-support-core"),
             .product(name: "Universal", package: "universal"),
