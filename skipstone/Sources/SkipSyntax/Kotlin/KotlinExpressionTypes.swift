@@ -231,7 +231,7 @@ struct KotlinCasePattern {
             }
             // If we have bindings and our target is not a simple local identifier, create a new target variable so
             // that re-evaluating the target for our binding values won't cause side effects
-            if targetVariable == nil, (target as? KotlinIdentifier)?.isLocalIdentifier != true {
+            if targetVariable == nil, (target as? KotlinIdentifier)?.isLocalOrSelfIdentifier != true {
                 targetVariable = KotlinCaseTargetVariable(value: target)
             }
             let bindingBase = targetVariable.map { KotlinSharedExpressionPointer(shared: $0.identifier) } ?? target
@@ -633,7 +633,7 @@ class KotlinIdentifier: KotlinExpression {
     var name: String
     var generics: [TypeSignature] = []
     var mayBeSharedMutableStruct = false
-    var isLocalIdentifier = false
+    var isLocalOrSelfIdentifier = false
     var isInOut = false
     var isFunctionReference = false
 
@@ -641,9 +641,9 @@ class KotlinIdentifier: KotlinExpression {
         let kexpression = KotlinIdentifier(expression: expression)
         kexpression.generics = expression.generics
         kexpression.mayBeSharedMutableStruct = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
-        kexpression.isLocalIdentifier = expression.isLocalIdentifier
+        kexpression.isLocalOrSelfIdentifier = expression.isLocalOrSelfIdentifier
         if case .function = expression.inferredType {
-            kexpression.isFunctionReference = !expression.isLocalIdentifier && !expression.isCalledAsFunction && translator.codebaseInfo?.isFunctionName(expression.name, in: expression.owningTypeDeclaration?.signature) == true
+            kexpression.isFunctionReference = !expression.isLocalOrSelfIdentifier && !expression.isCalledAsFunction && translator.codebaseInfo?.isFunctionName(expression.name, in: expression.owningTypeDeclaration?.signature) == true
         }
         return kexpression
     }
@@ -1223,7 +1223,7 @@ struct KotlinOptionalBinding {
             }
             // x != null
             let identifier = KotlinIdentifier(name: name)
-            identifier.isLocalIdentifier = true
+            identifier.isLocalOrSelfIdentifier = true
             let nullLiteral = KotlinNullLiteral()
             return KotlinBinaryOperator(op: .with(symbol: "!="), lhs: identifier, rhs: nullLiteral, sourceFile: expression.sourceFile, sourceRange: expression.sourceRange)
         }
@@ -1243,7 +1243,7 @@ struct KotlinOptionalBinding {
         } else if let name = expression.names[0] {
             let identifier = KotlinIdentifier(name: name)
             identifier.mayBeSharedMutableStruct = expression.variableTypes.first?.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo) ?? false
-            identifier.isLocalIdentifier = true
+            identifier.isLocalOrSelfIdentifier = true
             kvalue = identifier.sref()
         } else {
             return nil
@@ -1719,7 +1719,7 @@ class KotlinWhen: KotlinExpression {
         var caseTargetVariable: KotlinCaseTargetVariable? = nil
         let hasNonNilMatches = expression.cases.contains { $0.patterns.contains { $0.pattern.isNonNilMatch } }
         // When we have to compare the switch expression to nil we'll be executing it repeatedly, so store it in a var
-        if hasNonNilMatches && (kon as? KotlinIdentifier)?.isLocalIdentifier != true {
+        if hasNonNilMatches && (kon as? KotlinIdentifier)?.isLocalOrSelfIdentifier != true {
             caseTargetVariable = KotlinCaseTargetVariable(value: kon)
         }
 

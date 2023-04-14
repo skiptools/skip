@@ -158,7 +158,7 @@ struct TypeInferenceContext {
     }
 
     /// Whether the given name maps to a local identifier or parameter.
-    func isLocalIdentifier(_ name: String) -> Bool {
+    func isLocalOrSelfIdentifier(_ name: String) -> Bool {
         if name == "self" {
             return true
         }

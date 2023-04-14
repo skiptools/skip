@@ -41,7 +41,7 @@ struct KotlinCaseTargetVariable {
 
     init(value: KotlinExpression) {
         self.identifier = KotlinIdentifier(name: "matchtarget")
-        self.identifier.isLocalIdentifier = true
+        self.identifier.isLocalOrSelfIdentifier = true
         self.value = value
     }
 

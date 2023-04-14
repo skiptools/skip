@@ -682,13 +682,13 @@ class Identifier: Expression {
     let name: String
     private(set) var generics: [TypeSignature]
     /// Whether this appears to be a local variable or parameter.
-    private(set) var isLocalIdentifier: Bool
+    private(set) var isLocalOrSelfIdentifier: Bool
     var isCalledAsFunction = false
 
-    init(name: String, generics: [TypeSignature] = [], isLocalIdentifier: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
+    init(name: String, generics: [TypeSignature] = [], isLocalOrSelfIdentifier: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.name = name
         self.generics = generics
-        self.isLocalIdentifier = isLocalIdentifier
+        self.isLocalOrSelfIdentifier = isLocalOrSelfIdentifier
         super.init(type: .identifier, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
@@ -718,8 +718,8 @@ class Identifier: Expression {
             identifierType = identifierType.withGenerics(generics.map { $0.constrainedTypeWithGenerics(context.generics) })
         }
         identifierType = identifierType.or(expecting)
-        if !isLocalIdentifier {
-            isLocalIdentifier = context.isLocalIdentifier(name)
+        if !isLocalOrSelfIdentifier {
+            isLocalOrSelfIdentifier = context.isLocalOrSelfIdentifier(name)
         }
         return context
     }

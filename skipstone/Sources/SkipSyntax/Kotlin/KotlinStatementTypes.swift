@@ -567,7 +567,7 @@ class KotlinTryCatch: KotlinStatement {
 
     static func translate(statement: DoCatch, translator: KotlinTranslator) -> KotlinTryCatch {
         let matchOn = KotlinIdentifier(name: "error")
-        matchOn.isLocalIdentifier = true
+        matchOn.isLocalOrSelfIdentifier = true
         var kcatches: [KotlinCase] = []
         var messages: [Message] = []
         var caseTargetVariable: KotlinCaseTargetVariable? = nil
