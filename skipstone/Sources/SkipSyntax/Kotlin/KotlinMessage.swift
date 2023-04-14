@@ -137,7 +137,7 @@ extension Message {
 
     // Idea: generate custom Kotlin data classes for additional tuple arities
     static func kotlinTupleArity(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "Kotlin uses Pair for 2-tuples and Triple for 3-tuples. It does not support tuples of arity > 3. Consider creating a struct instead", sourceDerived: sourceDerived, source: source)
+        return Message(kind: .error, message: "Skip does not support tuples of arity > 5. Consider creating a struct instead", sourceDerived: sourceDerived, source: source)
     }
 
     // Idea: generate extensions on Pair and Triple for custom labels

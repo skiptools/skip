@@ -145,7 +145,7 @@ final class TypeInferenceTests: XCTestCase {
         """, kotlin: """
         {
             val holder = DictionaryHolder()
-            holder.dictionaryOfDictionaries["a"] = dictionaryOf(Pair("a", 1), Pair("b", 2), Pair("c", 3))
+            holder.dictionaryOfDictionaries["a"] = dictionaryOf(Tuple2("a", 1), Tuple2("b", 2), Tuple2("c", 3))
             val b = holder.dictionaryOfDictionaries["a"]!!["b"] == Int.myZero
         }
         """)

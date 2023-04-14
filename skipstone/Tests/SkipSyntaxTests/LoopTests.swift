@@ -137,7 +137,7 @@ final class LoopTests: XCTestCase {
         }
         """, kotlin: """
         {
-            val d = dictionaryOf(Pair(1, "a"), Pair(2, "b"), Pair(3, "c"))
+            val d = dictionaryOf(Tuple2(1, "a"), Tuple2(2, "b"), Tuple2(3, "c"))
             for ((key, value) in d.sref()) {
                 print(key)
                 print(value)
@@ -165,7 +165,7 @@ final class LoopTests: XCTestCase {
             print(s)
         }
         """, kotlin: """
-        for ((i, s) in arrayOf(Pair(1, "a"), Pair(2, "b"), Pair(3, "c"))) {
+        for ((i, s) in arrayOf(Tuple2(1, "a"), Tuple2(2, "b"), Tuple2(3, "c"))) {
             print(i)
             print(s)
         }

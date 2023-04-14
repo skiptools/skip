@@ -81,10 +81,8 @@ extension TypeSignature {
                 return "Unit"
             }
             let generics = types.map { $0.kotlin }.joined(separator: ", ")
-            if types.count == 2 {
-                return "Pair<\(generics)>"
-            } else if types.count == 3 {
-                return "Triple<\(generics)>"
+            if types.count < 6 {
+                return "Tuple\(types.count)<\(generics)>"
             } else {
                 return "Any"
             }

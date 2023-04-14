@@ -82,8 +82,8 @@ final class BuiltinTypeTests: XCTestCase {
             var s: Set<Any>
             var si: Set<Int>
             var si3 = Set<Int>()
-            var tis: Pair<Int, String>
-            var tis2: Triple<Int, String, Double>
+            var tis: Tuple2<Int, String>
+            var tis2: Tuple3<Int, String, Double>
         }
         """)
     }

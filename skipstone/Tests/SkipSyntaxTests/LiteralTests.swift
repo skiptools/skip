@@ -87,7 +87,7 @@ final class LiteralTests: XCTestCase {
         }
         """, kotlin: """
         {
-            val d = dictionaryOf(Pair(1, "a"), Pair(2, "b"), Pair(3, "c"))
+            val d = dictionaryOf(Tuple2(1, "a"), Tuple2(2, "b"), Tuple2(3, "c"))
         }
         """)
 
@@ -97,7 +97,7 @@ final class LiteralTests: XCTestCase {
         }
         """, kotlin: """
         {
-            val d: Dictionary<Int, String> = dictionaryOf(Pair(x, a), Pair(y, b), Pair(z, c))
+            val d: Dictionary<Int, String> = dictionaryOf(Tuple2(x, a), Tuple2(y, b), Tuple2(z, c))
         }
         """)
 

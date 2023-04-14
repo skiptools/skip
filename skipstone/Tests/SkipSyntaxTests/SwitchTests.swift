@@ -413,14 +413,14 @@ final class SwitchTests: XCTestCase {
             print(s)
         }
         """, kotlin: """
-        internal val t = Pair(1, "s")
+        internal val t = Tuple2(1, "s")
         when (t) {
-            Pair(0, "") -> {
+            Tuple2(0, "") -> {
                 print(0)
             }
             else -> {
-                val i = t.first
-                val s = t.second
+                val i = t.element0
+                val s = t.element1
                 print(i)
                 print(s)
             }
@@ -438,14 +438,14 @@ final class SwitchTests: XCTestCase {
             print(s)
         }
         """, kotlin: """
-        internal val t = Pair(1, "s")
+        internal val t = Tuple2(1, "s")
         when (t) {
-            Pair(0, "") -> {
+            Tuple2(0, "") -> {
                 print(0)
             }
             else -> {
-                var i = t.first
-                val s = t.second
+                var i = t.element0
+                val s = t.element1
                 i += 1
                 print(i)
                 print(s)
@@ -463,13 +463,13 @@ final class SwitchTests: XCTestCase {
             print(i)
         }
         """, kotlin: """
-        internal val t = Pair(1, "s")
+        internal val t = Tuple2(1, "s")
         when (t) {
-            Pair(0, "") -> {
+            Tuple2(0, "") -> {
                 print(0)
             }
             else -> {
-                var i = t.first
+                var i = t.element0
                 i += 1
                 print(i)
             }

@@ -525,7 +525,7 @@ class KotlinDictionaryLiteral: KotlinExpression {
         output.append("dictionaryOf(")
         for (index, entry) in entries.enumerated() {
             // No need to sref() because the dictionary already does
-            output.append("Pair(")
+            output.append("Tuple2(")
             output.append(entry.key, indentation: indentation)
             output.append(", ")
             output.append(entry.value, indentation: indentation)
@@ -1635,23 +1635,14 @@ class KotlinTupleLiteral: KotlinExpression {
 
     /// Return the member name for the given tuple index.
     static func member(index: Int) -> String {
-        switch index {
-        case 0:
-            return "first"
-        case 1:
-            return "second"
-        case 2:
-            return "third"
-        default:
-            return String(describing: index)
-        }
+        return "element\(index)"
     }
 
     static func translate(expression: TupleLiteral, translator: KotlinTranslator) throws -> KotlinTupleLiteral {
         guard !expression.labels.contains(where: { $0 != nil }) else {
             throw Message.kotlinTupleLabels(expression, source: translator.syntaxTree.source)
         }
-        guard expression.values.count <= 3 else {
+        guard expression.values.count <= 6 else {
             throw Message.kotlinTupleArity(expression, source: translator.syntaxTree.source)
         }
         let kvalues = expression.values.map { translator.translateExpression($0) }
@@ -1681,11 +1672,7 @@ class KotlinTupleLiteral: KotlinExpression {
         if values.isEmpty {
             output.append("Unit")
         } else {
-            if values.count == 2 {
-                output.append("Pair")
-            } else {
-                output.append("Triple")
-            }
+            output.append("Tuple\(values.count)")
             output.append("(")
             for (index, value) in values.enumerated() {
                 output.append(value, indentation: indentation)

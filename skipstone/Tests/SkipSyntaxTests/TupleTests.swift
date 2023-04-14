@@ -12,13 +12,13 @@ final class TupleTests: XCTestCase {
         try await check(swift: """
         var pair: (Int, String) = (1, "s")
         """, kotlin: """
-        internal var pair: Pair<Int, String> = Pair(1, "s")
+        internal var pair: Tuple2<Int, String> = Tuple2(1, "s")
         """)
 
         try await check(swift: """
         var triple: (Int, String, Double) = (1, "s", 0.5)
         """, kotlin: """
-        internal var triple: Triple<Int, String, Double> = Triple(1, "s", 0.5)
+        internal var triple: Tuple3<Int, String, Double> = Tuple3(1, "s", 0.5)
         """)
 
         try await check(swift: """
@@ -26,8 +26,8 @@ final class TupleTests: XCTestCase {
             return (1, "s")
         }
         """, kotlin: """
-        internal fun f(): Pair<Int, String> {
-            return Pair(1, "s")
+        internal fun f(): Tuple2<Int, String> {
+            return Tuple2(1, "s")
         }
         """)
     }
@@ -39,8 +39,8 @@ final class TupleTests: XCTestCase {
             return (A(), B())
         }
         """, kotlin: """
-        internal fun f(): Pair<A, B> {
-            return Pair(A(), B())
+        internal fun f(): Tuple2<A, B> {
+            return Tuple2(A(), B())
         }
         """)
 
@@ -49,8 +49,8 @@ final class TupleTests: XCTestCase {
             return (a, b)
         }
         """, kotlin: """
-        internal fun f(a: A, b: B): Pair<A, B> {
-            return Pair(a.sref(), b.sref())
+        internal fun f(a: A, b: B): Tuple2<A, B> {
+            return Tuple2(a.sref(), b.sref())
         }
         """)
     }
@@ -64,7 +64,7 @@ final class TupleTests: XCTestCase {
         }
         """, kotlin: """
         {
-            val (a, b) = Pair(1, 2)
+            val (a, b) = Tuple2(1, 2)
             print(a)
             print(b)
         }
@@ -79,7 +79,7 @@ final class TupleTests: XCTestCase {
         }
         """, kotlin: """
         {
-            val t = Pair(1, 2)
+            val t = Tuple2(1, 2)
             val (a, b) = t
             print(a)
             print(b)
@@ -94,7 +94,7 @@ final class TupleTests: XCTestCase {
         }
         """, kotlin: """
         {
-            val t = Pair(1, 2)
+            val t = Tuple2(1, 2)
             val (a, _) = t
             print(a)
         }
@@ -110,7 +110,7 @@ final class TupleTests: XCTestCase {
         }
         """, kotlin: """
         {
-            val (a, b) = Pair(x.sref(), y.sref())
+            val (a, b) = Tuple2(x.sref(), y.sref())
             print(a.sref())
             print(b.sref())
         }
@@ -139,7 +139,7 @@ final class TupleTests: XCTestCase {
             print(s)
         }
         """, kotlin: """
-        internal var t: Pair<Int, String>? = null
+        internal var t: Tuple2<Int, String>? = null
         t?.let { (i, s) ->
             print(i)
             print(s)
@@ -152,7 +152,7 @@ final class TupleTests: XCTestCase {
             print(s)
         }
         """, kotlin: """
-        internal var t: Pair<Int, String>? = null
+        internal var t: Tuple2<Int, String>? = null
         t?.let { (_, s) ->
             print(s)
         }
@@ -183,10 +183,10 @@ final class TupleTests: XCTestCase {
         }
         """, kotlin: """
         {
-            val t = Triple(1, "s", 0.5)
-            val i = t.first
-            val s = t.second
-            val d = t.third
+            val t = Tuple3(1, "s", 0.5)
+            val i = t.element0
+            val s = t.element1
+            val d = t.element2
         }
         """)
     }
@@ -200,9 +200,9 @@ final class TupleTests: XCTestCase {
         }
         """, kotlin: """
         {
-            val i = t.first.sref()
-            val s = t.second.sref()
-            val d = t.third.sref()
+            val i = t.element0.sref()
+            val s = t.element1.sref()
+            val d = t.element2.sref()
         }
         """)
     }
