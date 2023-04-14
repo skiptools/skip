@@ -214,3 +214,12 @@ extension Array where Element == KotlinExpression {
         return KotlinBinaryOperator(op: .with(symbol: "&&"), lhs: Array(self[0..<(count - 1)]).asLogicalExpression(), rhs: self[count - 1])
     }
 }
+
+extension Source.FilePath {
+    /// Synthetic source that will be translated to a file appropriate for package-level support code.
+    var kotlinPackageSupport: Source.FilePath {
+        var filePath = self
+        filePath.name = "KotlinSupport.swift"
+        return filePath
+    }
+}

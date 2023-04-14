@@ -54,13 +54,24 @@ public class KotlinTranslator {
 
         let kotlinSyntaxTree = translateSyntaxTree()
         transformers.forEach { $0.apply(to: kotlinSyntaxTree, translator: self) }
+        return transpilation(for: kotlinSyntaxTree, codebaseInfo: codebaseInfo, transformers: transformers, startTime: startTime)
+    }
 
-        let messages = kotlinSyntaxTree.messages + codebaseInfo.messages(for: syntaxTree.source.file) + transformers.flatMap { $0.messages(for: syntaxTree.source.file) }
-        let outputFile = syntaxTree.source.file.outputFile(withExtension: "kt")
-        let outputGenerator = OutputGenerator(root: kotlinSyntaxTree.root)
-        let (output, outputMap) = outputGenerator.generateOutput(file: outputFile)
-        let endTime = Date().timeIntervalSinceReferenceDate // track the duration for logging
-        return Transpilation(sourceFile: syntaxTree.source.file, output: output, outputMap: outputMap, messages: messages, duration: endTime - startTime)
+    /// Transpile the package support file containing any needed package-level code.
+    public static func transpilePackageSupport(sourceFile: Source.FilePath, codebaseInfo: CodebaseInfo, transformers: [KotlinTransformer]) -> Transpilation? {
+        let startTime = Date().timeIntervalSinceReferenceDate
+        let syntaxTree = SyntaxTree(source: Source(file: sourceFile, content: ""))
+        let translator = KotlinTranslator(syntaxTree: syntaxTree)
+        let codebaseInfoContext = codebaseInfo.context(source: syntaxTree.source)
+        translator.codebaseInfo = codebaseInfoContext
+        translator.packageName = codebaseInfo.kotlin?.packageName
+
+        let kotlinSyntaxTree = translator.translateSyntaxTree()
+        let results = transformers.map { $0.apply(toPackage: kotlinSyntaxTree, translator: translator) }
+        guard results.contains(true) else {
+            return nil
+        }
+        return translator.transpilation(for: kotlinSyntaxTree, codebaseInfo: codebaseInfo, transformers: transformers, startTime: startTime)
     }
 
     /// Translate syntax trees only.
@@ -223,6 +234,15 @@ public class KotlinTranslator {
             }
             return KotlinRawExpression(expression: rawExpression)
         }
+    }
+
+    private func transpilation(for kotlinSyntaxTree: KotlinSyntaxTree, codebaseInfo: CodebaseInfo, transformers: [KotlinTransformer], startTime: TimeInterval) -> Transpilation {
+        let messages = kotlinSyntaxTree.messages + codebaseInfo.messages(for: syntaxTree.source.file) + transformers.flatMap { $0.messages(for: syntaxTree.source.file) }
+        let outputFile = syntaxTree.source.file.outputFile(withExtension: "kt")
+        let outputGenerator = OutputGenerator(root: kotlinSyntaxTree.root)
+        let (output, outputMap) = outputGenerator.generateOutput(file: outputFile)
+        let endTime = Date().timeIntervalSinceReferenceDate // track the duration for logging
+        return Transpilation(sourceFile: kotlinSyntaxTree.sourceFile, output: output, outputMap: outputMap, messages: messages, duration: endTime - startTime)
     }
 
     private func gatherDependencies(from translatedStatements: [KotlinStatement]) -> KotlinDependencies {

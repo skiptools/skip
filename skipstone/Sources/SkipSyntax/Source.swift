@@ -73,17 +73,23 @@ public struct Source : Encodable {
     ///
     /// - Note: `Codable` for use in `CodebaseInfo`.
     public struct FilePath: Hashable, Codable {
-        public let path: String
+        public private(set) var path: String
 
         public init(path: String) {
             self.path = path
         }
 
         public var name: String {
-            guard path.last != "/", let lastDirIndex = path.lastIndex(of: "/") else {
-                return path
+            get {
+                guard path.last != "/", let lastDirIndex = path.lastIndex(of: "/") else {
+                    return path
+                }
+                return String(path[path.index(after: lastDirIndex)...])
             }
-            return String(path[path.index(after: lastDirIndex)...])
+            set {
+                let withoutName = path.dropLast(name.count)
+                path = withoutName + newValue
+            }
         }
 
         public var isSwift: Bool {

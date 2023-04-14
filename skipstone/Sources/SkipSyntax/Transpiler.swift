@@ -21,6 +21,10 @@ public struct Transpiler {
 
     /// Perform transpilation, feeding results to the given handler.
     public func transpile(handler: (Transpilation) throws -> Void) async throws {
+        guard !sourceFiles.isEmpty else {
+            return
+        }
+
         // First create syntax trees used to populate codebase info
         codebaseInfo.kotlin = KotlinCodebaseInfo(packageName: packageName)
         try await withThrowingTaskGroup(of: SyntaxTree.self) { group in
@@ -49,6 +53,11 @@ public struct Transpiler {
             for try await transpilation in group {
                 try handler(transpilation)
             }
+        }
+        // Finally create an additional source file for any package-level code
+        // Synthetic source file that we use to generate PackageSupport.kt for package-level generated code
+        if let packageSupportTranspilation = KotlinTranslator.transpilePackageSupport(sourceFile: sourceFiles[0].kotlinPackageSupport, codebaseInfo: codebaseInfo, transformers: transformers) {
+            try handler(packageSupportTranspilation)
         }
     }
 }
