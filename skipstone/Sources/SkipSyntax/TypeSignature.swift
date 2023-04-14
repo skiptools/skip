@@ -941,7 +941,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return genericTypes.isEmpty ? .any : allowNamed ? .named(name, genericTypes) : .none
         case "AnyObject":
             return genericTypes.isEmpty ? .anyObject : allowNamed ? .named(name, genericTypes) : .none
-        case "AnyType":
+        case "Any.Type":
             return .metaType(.any)
         case "Array":
             return genericTypes.isEmpty ? .array(.none) : allowNamed ? genericTypes.count == 1 ? .array(genericTypes[0]) : .named(name, genericTypes) : .none
@@ -1054,7 +1054,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .metaType(let baseType):
             switch baseType {
             case .any:
-                return "AnyType"
+                return "Any.Type"
             case .function:
                 return "(\(baseType[keyPath: keyPath])).Type"
             default:

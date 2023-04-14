@@ -304,9 +304,11 @@ class KotlinCodeBlock: KotlinStatement {
     }
 
     private func appendCatch(_ kcatch: KotlinCase, to output: OutputGenerator, indentation: Indentation) {
+        let bodyIndentation = indentation.inc()
         if kcatch.patterns.isEmpty {
             output.append(indentation).append("} catch (error: Throwable) {\n")
-            appendCatchBody(kcatch, to: output, indentation: indentation.inc())
+            output.append(bodyIndentation).append("val error = error.aserror()\n")
+            appendCatchBody(kcatch, to: output, indentation: bodyIndentation)
         } else {
             for pattern in kcatch.patterns {
                 output.append(indentation).append("} catch (")
@@ -317,7 +319,7 @@ class KotlinCodeBlock: KotlinStatement {
                     output.append(pattern, indentation: indentation)
                 }
                 output.append(indentation).append(") {\n")
-                appendCatchBody(kcatch, to: output, indentation: indentation.inc())
+                appendCatchBody(kcatch, to: output, indentation: bodyIndentation)
             }
         }
     }
@@ -524,10 +526,15 @@ class KotlinReturn: KotlinExpressionStatement {
 
 class KotlinThrow: KotlinStatement {
     var error: KotlinExpression
+    var errorIsThrowable = false
 
     static func translate(statement: Throw, translator: KotlinTranslator) -> KotlinThrow {
         let kerror = translator.translateExpression(statement.error)
-        return KotlinThrow(statement: statement, error: kerror)
+        let kstatement = KotlinThrow(statement: statement, error: kerror)
+        if let errorDeclarationType = translator.codebaseInfo?.declarationType(forNamed: statement.error.inferredType) {
+            kstatement.errorIsThrowable = errorDeclarationType != .protocolDeclaration
+        }
+        return kstatement
     }
 
     private init(statement: Throw, error: KotlinExpression) {
@@ -540,7 +547,18 @@ class KotlinThrow: KotlinStatement {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
-        output.append(indentation).append("throw ").append(error, indentation: indentation).append("\n")
+        output.append(indentation).append("throw ")
+        if !errorIsThrowable && error.isCompoundExpression {
+            output.append("(")
+        }
+        output.append(error, indentation: indentation)
+        if !errorIsThrowable {
+            if error.isCompoundExpression {
+                output.append(")")
+            }
+            output.append(" as Throwable")
+        }
+        output.append("\n")
     }
 }
 

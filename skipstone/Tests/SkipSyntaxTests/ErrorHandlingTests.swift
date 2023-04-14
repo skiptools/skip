@@ -54,6 +54,7 @@ final class ErrorHandlingTests: XCTestCase {
             action2()
             throw S()
         } catch (error: Throwable) {
+            val error = error.aserror()
             print("Caught error: ${error}")
         }
         """)
@@ -79,6 +80,7 @@ final class ErrorHandlingTests: XCTestCase {
         } catch (error: S) {
             print("Caught error: ${error}")
         } catch (error: Throwable) {
+            val error = error.aserror()
         }
         """)
     }
@@ -103,6 +105,7 @@ final class ErrorHandlingTests: XCTestCase {
         } catch (e: S) {
             print("Caught error: ${e}")
         } catch (error: Throwable) {
+            val error = error.aserror()
         }
         """)
 
@@ -255,6 +258,7 @@ final class ErrorHandlingTests: XCTestCase {
             }
             action2()
         } catch (error: Throwable) {
+            val error = error.aserror()
             print("Caught error: ${error}")
         } finally {
             deferaction_0?.invoke()
@@ -295,6 +299,7 @@ final class ErrorHandlingTests: XCTestCase {
                 try {
                     i += 1
                 } catch (error: Throwable) {
+                    val error = error.aserror()
                     print("Caught error ${error}")
                 } finally {
                     didmutate()
@@ -307,6 +312,7 @@ final class ErrorHandlingTests: XCTestCase {
                     try {
                         i += 1
                     } catch (error: Throwable) {
+                        val error = error.aserror()
                         print("Caught error ${error}")
                     }
                 } finally {
@@ -531,6 +537,32 @@ final class ErrorHandlingTests: XCTestCase {
                     null
                 }
             }
+        }
+        """)
+    }
+
+    func testThrowUnknownError() async throws {
+        try await check(swift: """
+        func throwit(error: Error) throws {
+            throw error
+        }
+        """, kotlin: """
+        internal fun throwit(error: Error) {
+            throw error as Throwable
+        }
+        """)
+
+        try await check(swift: """
+        protocol MyError: Error {
+        }
+        func throwit(error: MyError) throws {
+            throw error
+        }
+        """, kotlin: """
+        internal interface MyError: Error {
+        }
+        internal fun throwit(error: MyError) {
+            throw error as Throwable
         }
         """)
     }
