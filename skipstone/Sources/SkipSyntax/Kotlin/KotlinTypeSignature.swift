@@ -105,78 +105,21 @@ extension TypeSignature {
 
     /// Add appropriate messages if this type is not supported.
     func appendKotlinMessages(to node: KotlinSyntaxNode, source: Source) {
-        switch self {
-        case .any:
-            break
-        case .anyObject:
-            break
-        case .array(let elementType):
-            elementType.appendKotlinMessages(to: node, source: source)
-        case .bool:
-            break
-        case .character:
-            break
-        case .composition:
-            node.messages.append(.kotlinComposedTypes(node, source: source))
-        case .dictionary(let keyType, let valueType):
-            keyType.appendKotlinMessages(to: node, source: source)
-            valueType.appendKotlinMessages(to: node, source: source)
-        case .double:
-            break
-        case .float:
-            break
-        case .function(let parameters, let returnType):
-            parameters.forEach { $0.type.appendKotlinMessages(to: node, source: source) }
-            returnType.appendKotlinMessages(to: node, source: source)
-        case .int:
-            break
-        case .int8:
-            break
-        case .int16:
-            break
-        case .int32:
-            break
-        case .int64:
-            break
-        case .member(_, let type):
-            type.appendKotlinMessages(to: node, source: source)
-        case .metaType(let type):
-            type.appendKotlinMessages(to: node, source: source)
-        case .named(_, let generics):
-            generics.forEach { $0.appendKotlinMessages(to: node, source: source) }
-        case .none:
-            break
-        case .optional(let type):
-            type.appendKotlinMessages(to: node, source: source)
-        case .range(let elementType):
-            elementType.appendKotlinMessages(to: node, source: source)
-        case .set(let elementType):
-            elementType.appendKotlinMessages(to: node, source: source)
-        case .string:
-            break
-        case .tuple(let labels, let types):
-            if labels.contains(where: { $0 != nil }) {
-                node.messages.append(.kotlinTupleLabels(node, source: source))
+        var messages: [Message] = []
+        visit {
+            switch $0 {
+            case .composition:
+                messages.append(.kotlinComposedTypes(node, source: source))
+            case .tuple(let labels, _):
+                if labels.count > KotlinTupleLiteral.maximumArity {
+                    messages.append(.kotlinTupleArity(node, source: source))
+                }
+            default:
+                break
             }
-            if types.count > 3 {
-                node.messages.append(.kotlinTupleArity(node, source: source))
-            }
-            types.forEach { $0.appendKotlinMessages(to: node, source: source) }
-        case .uint:
-            break
-        case .uint8:
-            break
-        case .uint16:
-            break
-        case .uint32:
-            break
-        case .uint64:
-            break
-        case .unwrappedOptional(let type):
-            type.appendKotlinMessages(to: node, source: source)
-        case .void:
-            break
+            return .recurse(nil)
         }
+        node.messages += messages
     }
 
     /// Whether this type might represent a shared mutable struct.
@@ -265,34 +208,17 @@ extension TypeSignature {
 
     /// Whether this type uses `KClass`, which requires additional imports.
     var kotlinReferencesKClass: Bool {
-        switch self {
-        case .array(let elementType):
-            return elementType.kotlinReferencesKClass
-        case .composition(let types):
-            return types.contains { $0.kotlinReferencesKClass }
-        case .dictionary(let keyType, let valueType):
-            return keyType.kotlinReferencesKClass || valueType.kotlinReferencesKClass
-        case .function(let parameters, let returnType):
-            return returnType.kotlinReferencesKClass || parameters.contains { $0.type.kotlinReferencesKClass }
-        case .named(_, let genericTypes):
-            return genericTypes.contains { $0.kotlinReferencesKClass }
-        case .optional(let type):
-            return type.kotlinReferencesKClass
-        case .member(let base, let type):
-            return base.kotlinReferencesKClass || type.kotlinReferencesKClass
-        case .metaType:
-            return true
-        case .range(let elementType):
-            return elementType.kotlinReferencesKClass
-        case .set(let elementType):
-            return elementType.kotlinReferencesKClass
-        case .tuple(_, let types):
-            return types.contains { $0.kotlinReferencesKClass }
-        case .unwrappedOptional(let type):
-            return type.kotlinReferencesKClass
-        default:
-            return false
+        var references = false
+        visit {
+            if references {
+                return .skip
+            } else if case .metaType = $0 {
+                references = true
+                return .skip
+            }
+            return .recurse(nil)
         }
+        return references
     }
 }
 

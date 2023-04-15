@@ -239,12 +239,17 @@ class KotlinCodeBlock: KotlinStatement {
         return statements + catches.flatMap { $0.children }
     }
 
-    override func insert(statements: [KotlinStatement], after statement: KotlinSyntaxNode) {
-        guard let index = self.statements.firstIndex(where: { $0 === statement }) else {
-            super.insert(statements: statements, after: statement)
-            return
+    override func insert(statements: [KotlinStatement], after statement: KotlinStatement?) {
+        var index = 0
+        if let statement {
+            if let statementIndex = self.statements.firstIndex(where: { $0 === statement }) {
+                index = statementIndex + 1
+            } else {
+                super.insert(statements: statements, after: statement)
+                return
+            }
         }
-        self.statements.insert(contentsOf: statements, at: index + 1)
+        self.statements.insert(contentsOf: statements, at: index)
         for statement in statements {
             statement.parent = self
             statement.assignParentReferences()
@@ -785,12 +790,17 @@ class KotlinClassDeclaration: KotlinStatement {
         return members
     }
 
-    override func insert(statements: [KotlinStatement], after statement: KotlinSyntaxNode) {
-        guard let index = members.firstIndex(where: { $0 === statement }) else {
-            super.insert(statements: statements, after: statement)
-            return
+    override func insert(statements: [KotlinStatement], after statement: KotlinStatement?) {
+        var index = 0
+        if let statement {
+            if let statementIndex = members.firstIndex(where: { $0 === statement }) {
+                index = statementIndex + 1
+            } else {
+                super.insert(statements: statements, after: statement)
+                return
+            }
         }
-        members.insert(contentsOf: statements, at: index + 1)
+        members.insert(contentsOf: statements, at: index)
         for statement in statements {
             statement.parent = self
             statement.assignParentReferences()
@@ -1585,12 +1595,17 @@ class KotlinInterfaceDeclaration: KotlinStatement {
         return members
     }
 
-    override func insert(statements: [KotlinStatement], after statement: KotlinSyntaxNode) {
-        guard let index = members.firstIndex(where: { $0 === statement }) else {
-            super.insert(statements: statements, after: statement)
-            return
+    override func insert(statements: [KotlinStatement], after statement: KotlinStatement?) {
+        var index = 0
+        if let statement {
+            if let statementIndex = members.firstIndex(where: { $0 === statement }) {
+                index = statementIndex + 1
+            } else {
+                super.insert(statements: statements, after: statement)
+                return
+            }
         }
-        members.insert(contentsOf: statements, at: index + 1)
+        members.insert(contentsOf: statements, at: index)
         for statement in statements {
             statement.parent = self
             statement.assignParentReferences()

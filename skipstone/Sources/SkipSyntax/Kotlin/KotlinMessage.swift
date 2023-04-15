@@ -137,13 +137,11 @@ extension Message {
 
     // Idea: generate custom Kotlin data classes for additional tuple arities
     static func kotlinTupleArity(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "Skip does not support tuples of arity > 5. Consider creating a struct instead", sourceDerived: sourceDerived, source: source)
+        return Message(kind: .error, message: "Skip does not support tuples of arity > \(KotlinTupleLiteral.maximumArity). Consider creating a struct instead", sourceDerived: sourceDerived, source: source)
     }
 
-    // Idea: generate extensions on Pair and Triple for custom labels
-    // Problem: where to define extensions and how to avoid duplicate definitions
-    static func kotlinTupleLabels(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "Skip does not support custom tuple element labels. Consider creating a struct instead", sourceDerived: sourceDerived, source: source)
+    static func kotlinTupleConflictingLabel(label: String, arity: Int, sourceFile: Source.FilePath) -> Message {
+        return Message(kind: .error, message: "This module uses tuple label '\(label)' at different positions in different \(arity)-tuples. Kotlin does not have native tuples, and Skip's solution requires that each label is only used in one position in any tuple arity. Consider changing your label names or using positional element access", sourceFile: sourceFile)
     }
 
     // Idea: for typealiases that are internal, create a new top-level alias or just replace use cases with original type

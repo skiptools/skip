@@ -20,10 +20,11 @@ extension XCTestCase {
     ///   - swiftCode: a Swift block, whose string contents will be used as the source of transpilation and which can return a validation string
     ///   - compiler: the compiler to fork to evaluate the transpiled Kotlin; configured with the `KOTLINC` environment variable as a default
     ///   - replaceInlineSKIPME: when the kotlin source is set to `// SKIPME`, the generated Kotlin will be replaced in the project's source code file
-    ///   - kotlin: the expected kotlin, or the literal `// SKIPME` when the
+    ///   - kotlin: the expected kotlin, or the literal `// SKIPME`
+    ///   - packageSupportKotlin: the expected kotlin in the generated package support source file
     ///   - file: the file of the call site, expected to be `#file`
     ///   - line: the line of the call site, expected to be `#line`
-    public func check(expectFailure: Bool = false, compiler: String? = ProcessInfo.processInfo.environment["KOTLINC"], replaceInlineSKIPME: Int? = 1, supportingSwift: String? = nil, swift: StaticString? = nil, swiftCode: (() throws -> String?)? = nil, kotlin: String, fixup fixupKotlinBlock: ((String) -> (String)) = { $0 }, transformers: [KotlinTransformer] = builtinKotlinTransformers(), file: StaticString = #file, line: UInt = #line) async throws {
+    public func check(expectFailure: Bool = false, compiler: String? = ProcessInfo.processInfo.environment["KOTLINC"], replaceInlineSKIPME: Int? = 1, supportingSwift: String? = nil, swift: StaticString? = nil, swiftCode: (() throws -> String?)? = nil, kotlin: String, fixup fixupKotlinBlock: ((String) -> (String)) = { $0 }, packageSupportKotlin: String? = nil, transformers: [KotlinTransformer] = builtinKotlinTransformers(), file: StaticString = #file, line: UInt = #line) async throws {
 
         func fixup(code: String) -> String {
             var code = fixupKotlinBlock(code)
@@ -137,6 +138,14 @@ extension XCTestCase {
                 } else {
                     XCTAssertEqual(kotlinCode, content.trimmingCharacters(in: .whitespacesAndNewlines), messagesString, file: file, line: line)
                 }
+            } else if transpilation.sourceFile == srcFiles.first?.kotlinPackageSupport {
+                if let packageSupportKotlin {
+                    let content = fixup(code: trimmedContent(transpilation: transpilation))
+                    let kotlinCode = packageSupportKotlin.trimmingCharacters(in: .whitespacesAndNewlines)
+                    XCTAssertEqual(kotlinCode, content.trimmingCharacters(in: .whitespacesAndNewlines), messagesString, file: file, line: line)
+                } else {
+                    XCTFail("Transpilation produced unexpected package support content: \(transpilation.output.content)", file: file, line: line)
+                }
             }
         }
 
@@ -166,10 +175,12 @@ extension XCTestCase {
         let srcFile = try tmpFile(named: "Source.swift", contents: swift)
         let codebaseInfo = CodebaseInfo()
         let tp = Transpiler(sourceFiles: [Source.FilePath(path: srcFile.path)], codebaseInfo: codebaseInfo, transformers: builtinKotlinTransformers())
+        var messages: [Message] = []
         try await tp.transpile { transpilation in
-            XCTAssertTrue(!transpilation.messages.isEmpty, trimmedContent(transpilation: transpilation))
-            transpilation.messages.forEach { print("Received expected message: \($0)") }
+            messages += transpilation.messages
         }
+        XCTAssertTrue(!messages.isEmpty)
+        messages.forEach { print("Received expected message: \($0)") }
     }
 
     private func trimmedContent(transpilation: Transpilation) -> String {

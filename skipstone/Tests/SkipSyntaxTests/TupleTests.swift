@@ -32,6 +32,44 @@ final class TupleTests: XCTestCase {
         """)
     }
 
+    func testLabels() async throws {
+        try await check(swift: """
+        let pair = (i: 1, s: "a")
+        """, kotlin: """
+        internal val pair = Tuple2(1, "a")
+        """, packageSupportKotlin: """
+        internal val <E0, E1> Tuple2.i: E0
+            get() = element0
+
+        internal val <E0, E1> Tuple2.s: E1
+            get() = element1
+        """)
+
+        try await check(swift: """
+        func f(p: (String, Int)) -> [(x: Int, y: Int, z: Double)] {
+            return [(1, 2, 3.0)]
+        }
+        """, kotlin: """
+        internal fun f(p: Tuple2<String, Int>): Array<Tuple3<Int, Int, Double>> {
+            return arrayOf(Tuple3(1, 2, 3.0))
+        }
+        """, packageSupportKotlin: """
+        internal val <E0, E1, E2> Tuple3.x: E0
+            get() = element0
+
+        internal val <E0, E1, E2> Tuple3.y: E1
+            get() = element1
+
+        internal val <E0, E1, E2> Tuple3.z: E2
+            get() = element2
+        """)
+
+        try await checkProducesMessage(swift: """
+        let pair1 = (i: 1, s: "a")
+        let pair2 = (d: 1.0, i: 1)
+        """)
+    }
+
     func testReturnSharedMutableStruct() async throws {
         // Newly-constructed instances do not need sref call
         try await check(swift: """

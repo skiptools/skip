@@ -343,39 +343,60 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         }
     }
 
-    /// Whether this signature uses the given type.
-    func referencesType(_ target: TypeSignature) -> Bool {
-        if target == self {
-            return true
+    /// Visit this type and all contained types (e.g. the element type if this is an array).
+    func visit(_ visitor: (TypeSignature) -> VisitResult<TypeSignature>) {
+        var onExit: ((TypeSignature) -> Void)? = nil
+        switch visitor(self) {
+        case .skip:
+            return
+        case .recurse(let exit):
+            onExit = exit
         }
         switch self {
         case .array(let element):
-            return element.referencesType(target)
+            element.visit(visitor)
         case .composition(let types):
-            return types.contains { $0.referencesType(target) }
+            types.forEach { $0.visit(visitor) }
         case .dictionary(let key, let value):
-            return key.referencesType(target) || value.referencesType(target)
+            key.visit(visitor)
+            value.visit(visitor)
         case .function(let parameters, let returnType):
-            return returnType.referencesType(target) || parameters.contains { $0.type.referencesType(target) }
+            parameters.forEach { $0.type.visit(visitor) }
+            returnType.visit(visitor)
         case .member(let base, let type):
-            return base.referencesType(type) || type.referencesType(target)
+            base.visit(visitor)
+            type.visit(visitor)
         case .metaType(let type):
-            return type.referencesType(target)
+            type.visit(visitor)
         case .named(_, let generics):
-            return generics.contains { $0.referencesType(target) }
+            generics.forEach { $0.visit(visitor) }
         case .optional(let type):
-            return type.referencesType(target)
+            type.visit(visitor)
         case .range(let element):
-            return element.referencesType(target)
+            element.visit(visitor)
         case .set(let element):
-            return element.referencesType(target)
+            element.visit(visitor)
         case .tuple(_, let types):
-            return types.contains { $0.referencesType(target) }
+            types.forEach { $0.visit(visitor) }
         case .unwrappedOptional(let type):
-            return type.referencesType(target)
+            type.visit(visitor)
         default:
-            return false
+            break
         }
+        onExit?(self)
+    }
+
+    /// Whether this signature uses the given type.
+    func referencesType(_ target: TypeSignature) -> Bool {
+        var references = false
+        visit {
+            if references || $0 == target {
+                references = true
+                return .skip
+            }
+            return .recurse(nil)
+        }
+        return references
     }
 
     /// Map uses of one set of types to another.
@@ -744,36 +765,15 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
 
     /// Whether this type signature does not have any `.none` values.
     var isFullySpecified: Bool {
-        switch self {
-        case .array(let element):
-            return element.isFullySpecified
-        case .composition(let types):
-            return !types.contains { !$0.isFullySpecified }
-        case .dictionary(let key, let value):
-            return key.isFullySpecified && value.isFullySpecified
-        case .function(let parameters, let returnType):
-            return !parameters.contains(where: { !$0.type.isFullySpecified }) && returnType.isFullySpecified
-        case .member(let base, let type):
-            return base.isFullySpecified && type.isFullySpecified
-        case .metaType(let type):
-            return type.isFullySpecified
-        case .named(_, let generics):
-            return !generics.contains { !$0.isFullySpecified }
-        case .none:
-            return false
-        case .optional(let type):
-            return type.isFullySpecified
-        case .range(let element):
-            return element.isFullySpecified
-        case .set(let element):
-            return element.isFullySpecified
-        case .tuple(_, let types):
-            return !types.contains { !$0.isFullySpecified }
-        case .unwrappedOptional(let type):
-            return type.isFullySpecified
-        default:
-            return true
+        var isSpecified = true
+        visit {
+            if !isSpecified || $0 == .none {
+                isSpecified = false
+                return .skip
+            }
+            return .recurse(nil)
         }
+        return isSpecified
     }
 
     /// Whether the given syntax is an inout value.

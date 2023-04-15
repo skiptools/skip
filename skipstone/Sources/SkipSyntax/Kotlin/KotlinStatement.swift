@@ -19,7 +19,7 @@ class KotlinStatement: KotlinSyntaxNode {
     /// Insert child statements.
     ///
     /// Must be overridden by supporting statement types.
-    func insert(statements: [KotlinStatement], after statement: KotlinSyntaxNode) {
+    func insert(statements: [KotlinStatement], after statement: KotlinStatement?) {
         messages.append(.internalError(self))
     }
 

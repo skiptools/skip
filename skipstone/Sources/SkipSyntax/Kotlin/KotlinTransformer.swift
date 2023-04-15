@@ -39,6 +39,7 @@ public func builtinKotlinTransformers() -> [KotlinTransformer] {
         KotlinIfWhenTransformer(),
         KotlinDeferTransformer(),
         KotlinDisambiguateFunctionsTransformer(),
+        KotlinTupleLabelTransformer(),
         //KotlinSwiftUITransformer(),
         KotlinImportMapTransformer(),
         KotlinTestAnnotationTransformer(),

@@ -1633,16 +1633,16 @@ class KotlinTry: KotlinExpression {
 class KotlinTupleLiteral: KotlinExpression {
     var values: [KotlinExpression]
 
+    /// Maximum support tuple elements.
+    static let maximumArity = 5
+
     /// Return the member name for the given tuple index.
     static func member(index: Int) -> String {
         return "element\(index)"
     }
 
     static func translate(expression: TupleLiteral, translator: KotlinTranslator) throws -> KotlinTupleLiteral {
-        guard !expression.labels.contains(where: { $0 != nil }) else {
-            throw Message.kotlinTupleLabels(expression, source: translator.syntaxTree.source)
-        }
-        guard expression.values.count <= 6 else {
+        guard expression.values.count <= maximumArity else {
             throw Message.kotlinTupleArity(expression, source: translator.syntaxTree.source)
         }
         let kvalues = expression.values.map { translator.translateExpression($0) }

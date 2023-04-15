@@ -55,7 +55,6 @@ public struct Transpiler {
             }
         }
         // Finally create an additional source file for any package-level code
-        // Synthetic source file that we use to generate PackageSupport.kt for package-level generated code
         if let packageSupportTranspilation = KotlinTranslator.transpilePackageSupport(sourceFile: sourceFiles[0].kotlinPackageSupport, codebaseInfo: codebaseInfo, transformers: transformers) {
             try handler(packageSupportTranspilation)
         }
