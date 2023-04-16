@@ -48,6 +48,14 @@ final class LiteralTests: XCTestCase {
         """)
     }
 
+    func testRawStringLiteral() async throws {
+        try await check(swift: """
+        #"{"name":"John Smith","isEmployed":true,"age":30}"#
+        """, kotlin: """
+        \"""{"name":"John Smith","isEmployed":true,"age":30}""\"
+        """)
+    }
+
     func testArrayLiteral() async throws {
         try await check(swift: """
         {

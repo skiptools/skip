@@ -1253,7 +1253,7 @@ class StringLiteral: Expression {
         guard syntax.kind == .stringLiteralExpr, let stringLiteralExpr = syntax.as(StringLiteralExprSyntax.self) else {
             return nil
         }
-        let isMultiline = stringLiteralExpr.openQuote.tokenKind == .multilineStringQuote
+        let isMultiline = stringLiteralExpr.openDelimiter != nil || stringLiteralExpr.openQuote.tokenKind == .multilineStringQuote
         var segments: [StringLiteralSegment<Expression>] = []
         for segmentSyntax in stringLiteralExpr.segments {
             switch segmentSyntax {
