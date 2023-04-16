@@ -438,7 +438,7 @@ final class MemberDeclarationTests: XCTestCase {
     }
 
     func testSubscript() async throws {
-        try await check(expectFailure: true, swift: """
+        try await checkProducesMessage(swift: """
         class C {
             subscript(index: Int) -> Int {
                 get {
@@ -448,17 +448,6 @@ final class MemberDeclarationTests: XCTestCase {
                 }
             }
             subscript(key: String, defaultValue: Int) -> Int {
-                return defaultValue
-            }
-        }
-        """, kotlin: """
-        internal open class C {
-            internal operator fun get(index: Int): Int {
-                return 0
-            }
-            internal operator fun set(index: Int, newValue: Int) {
-            }
-            internal operator fun get(key: String, defaultValue: Int): Int {
                 return defaultValue
             }
         }
