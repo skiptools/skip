@@ -31,16 +31,18 @@ import PackagePlugin
 
         // the peer for the current target
         // e.g.: SkipLibKotlin -> SkipLib
-        // e.g.: SkipLibTestsKt -> SkipLibTests
+        // e.g.: SkipLibKtTests -> SkipLibTests
         let peerTarget: Target
 
-        let testSuffix = "Tests"
         let kotlinSuffix = "Kt"
-        let isTest = target.name.hasSuffix(testSuffix + kotlinSuffix)
-        let kotlinModule = String(target.name.dropLast(isTest ? (testSuffix + kotlinSuffix).count : kotlinSuffix.count))
+        let testSuffix = "Tests"
+        //let kotlinTestSuffix = testSuffix + kotlinSuffix // ModuleNameTestsKt
+        let kotlinTestSuffix = kotlinSuffix + testSuffix // ModuleNameKtTests
+        let isTest = target.name.hasSuffix(kotlinTestSuffix)
+        let kotlinModule = String(target.name.dropLast(isTest ? kotlinTestSuffix.count : kotlinSuffix.count))
         if isTest {
-            if !target.name.hasSuffix(testSuffix + kotlinSuffix) {
-                throw TranspilePlugInError("Target «\(target.name)» must have suffix «\(testSuffix + kotlinSuffix)»")
+            if !target.name.hasSuffix(kotlinTestSuffix) {
+                throw TranspilePlugInError("Target «\(target.name)» must have suffix «\(kotlinTestSuffix)»")
             }
 
             // convert ModuleKotlinTests -> ModuleTests
@@ -85,26 +87,26 @@ import PackagePlugin
             peerTarget.name + ":" + peerTarget.directory.string,
         ]
 
-        func addModuleLinkFlag(_ target: Target, packageID: String?) throws {
+        @discardableResult func addModuleLinkFlag(_ target: Target, packageID: String?) throws -> String? {
             let targetName = target.name
             if !targetName.hasSuffix(kotlinSuffix) {
                 //print("peer target had invalid name: \(targetName)")
-                return
+                return nil
             }
             let peerTargetName = targetName.dropLast(kotlinSuffix.count).description
 
             // build up a relative link path to the related module based on the plug-in output directory structure
             buildModuleArgs += ["--module", peerTargetName + ":" + target.directory.string]
-            // e.g. ../../SkipFoundationKotlin/skip-transpiler/SkipFoundation
             // e.g. ../../../skiphub.output/SkipFoundationKotlin/skip-transpiler/SkipFoundation
-            // FIXME: the inserted "../" is needed because LocalFileSystem.createSymbolicLink will resolve the relative path against the destinations *parent* for some reason (SPM bug?)
+            // e.g. ../../SkipFoundationKotlin/skip-transpiler/SkipFoundation
             let targetLink: String
             if let packageID = packageID { // go further up to the external package name
-                targetLink = "../../../../" + packageID + packageFolderExtension + "/" + target.name + "/" + pluginFolderName + "/" + peerTargetName
+                targetLink = "../../../" + packageID + packageFolderExtension + "/" + target.name + "/" + pluginFolderName + "/" + peerTargetName
             } else {
-                targetLink = "../../../" + target.name + "/" + pluginFolderName + "/" + peerTargetName
+                targetLink = "../../" + target.name + "/" + pluginFolderName + "/" + peerTargetName
             }
             buildModuleArgs += ["--link", peerTargetName + ":" + targetLink]
+            return targetLink
         }
 
         func addModuleLinkDependency(_ targetDependent: TargetDependency) throws {
@@ -131,11 +133,22 @@ import PackagePlugin
             }
         }
 
-        for (product, target) in target.recursiveTargetProductDependencies {
-            if target.name.hasSuffix(kotlinSuffix) { // only link in if the module is named "*Kotlin"
+
+        // the input files consist of all the swift, kotlin, and .yml files in all of the sources
+        // having no inputs or outputs in Xcode seems to result in the command running *every* time, but in SPM is appears to have the opposite effect: it never seems to run when there are no inputs or outputs
+        let inputFiles: [Path] = sourceTarget.sourceFiles.map(\.path) + swiftSourceTarget.sourceFiles.map(\.path)
+
+        for (product, depTarget) in target.recursiveTargetProductDependencies {
+            if depTarget.name.hasSuffix(kotlinSuffix) { // only link in if the module is named "*Kotlin"
                 // lookup the correct package name that contains this product (whose id will be an arbtrary number like "32")
-                //print("TRANSITIVE: product: \(product?.id ?? "NONE") target: \(target.name) targetPackage: \(targetPackage?.package.id ?? "NONE")")
-                try addModuleLinkFlag(target, packageID: productIDPackages[product?.id]?.id)
+                if let _ = try addModuleLinkFlag(depTarget, packageID: productIDPackages[product?.id]?.id) {
+                    // doesn't work with SPM due to: error: couldn't build /opt/src/github/skiptools/skiphub/.build/plugins/outputs/skiphub/SkipUnitKt/skip-transpiler/.skipbuild because of missing inputs: /opt/src/github/skiptools/skiphub/.build/plugins/outputs/skiphub/SkipLibKt/skip-transpiler/SkipLib.skipcode.json
+
+                    // adds an input file dependency on all the .skipcode.json files output from the dependent targets
+                    //let dependentSkipcode = outputFolder.appending(subpath: linkTargetFolder + ".skipcode.json")
+                    //Diagnostics.remark("modile dependency from \(target.name) to \(depTarget.name) file: \(dependentSkipcode)")
+                    //inputFiles.append(dependentSkipcode)
+                }
             }
         }
 
@@ -145,12 +158,10 @@ import PackagePlugin
         let sourceOutputPath = URL(fileURLWithPath: isTest ? "src/test/kotlin" : "src/main/kotlin", isDirectory: true, relativeTo: outputBase)
 
         // the marker file with the most recent input source file, either explicitly as the transpilation args, or any configuration files that are loaded as a side-effect
-        let markerFile = outputURL.appendingPathComponent(".skipbuild")
+        let markerFileName = ".skipbuild"
+        let markerFile = outputURL.appendingPathComponent(markerFileName)
 
-        // the input files consist of all the swift, kotlin, and .yml files in all of the sources
-        // having no inputs or outputs in Xcode seems to result in the command running *every* time, but in SPM is appears to have the opposite effect: it never seems to run when there are no inputs or outputs
-        let inputFiles = sourceTarget.sourceFiles(withSuffix: "").map({ $0 }) + swiftSourceTarget.sourceFiles(withSuffix: "").map({ $0 })
-        let outputFiles = [Path(markerFile.path)]
+        let outputFiles: [Path] = [Path(markerFile.path)]
 
         let outputFile = outputURL.appendingPathComponent(".skipbuild.out") // save output log
 
@@ -166,7 +177,7 @@ import PackagePlugin
                 //"-v",
                 ]
                 + buildModuleArgs
-                + sourceFilePaths, inputFiles: inputFiles.map(\.path), outputFiles: outputFiles)
+                + sourceFilePaths, inputFiles: inputFiles, outputFiles: outputFiles)
 
 //            .buildCommand(displayName: "Skip Info", executable: skiptool.path, arguments: [
 //                "info",
