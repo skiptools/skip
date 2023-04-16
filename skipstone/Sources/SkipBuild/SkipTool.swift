@@ -661,7 +661,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
             for (moduleName, modulePath) in moduleNamePaths {
                 trace("moduleName: \(moduleName) modulePath: \(modulePath)")
-                let moduleSkipBasePath = try AbsolutePath(validating: modulePath, relativeTo: moduleRootPath)
+                let moduleSkipBasePath = try AbsolutePath(validating: modulePath, relativeTo: moduleRootPath.parentDirectory)
                     .appending(components: ["Skip"])
 
                 let moduleSkipConfigPath = moduleSkipBasePath.appending(component: configFileName)
