@@ -34,7 +34,7 @@ class KotlinCaseIterableTransformer: KotlinTransformer {
             .compactMap { $0 as? KotlinEnumCaseDeclaration }
             .map { $0.name + caseSuffix }
             .joined(separator: ", ")
-        let statement = KotlinRawStatement(sourceCode: "return arrayOf(\(allCasesList)")
+        let statement = KotlinRawStatement(sourceCode: "return arrayOf(\(allCasesList))")
         allCasesVar.getter = Accessor(body: KotlinCodeBlock(statements: [statement]))
         
         classDeclaration.members.append(allCasesVar)

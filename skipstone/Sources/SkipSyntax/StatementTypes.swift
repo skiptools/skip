@@ -688,7 +688,7 @@ class ExtensionDeclaration: TypeDeclaration {
         let attributes = Attributes.for(syntax: extensionDecl.attributes)
         let modifiers = Modifiers.for(syntax: extensionDecl.modifiers)
         let (generics, genericsMessages) = Generics.for(syntax: nil, where: extensionDecl.genericWhereClause, in: syntaxTree)
-        let members = StatementDecoder.decode(syntaxListContainer: extensionDecl.members, in: syntaxTree)
+        let members = StatementDecoder.decode(syntaxListContainer: extensionDecl.memberBlock, in: syntaxTree)
         let statement = ExtensionDeclaration(extends: extends, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
         statement.messages = inheritsMessages + genericsMessages
         return [statement]
@@ -962,7 +962,7 @@ class TypeDeclaration: Statement {
         let attributes = Attributes.for(syntax: classDecl.attributes)
         let modifiers = Modifiers.for(syntax: classDecl.modifiers)
         let (generics, genericsMessages) = Generics.for(syntax: classDecl.genericParameterClause, where: classDecl.genericWhereClause, in: syntaxTree)
-        let members = StatementDecoder.decode(syntaxListContainer: classDecl.members, in: syntaxTree)
+        let members = StatementDecoder.decode(syntaxListContainer: classDecl.memberBlock, in: syntaxTree)
         let statement = TypeDeclaration(type: .classDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: classDecl, sourceFile: syntaxTree.source.file, sourceRange: classDecl.range(in: syntaxTree.source), extras: extras)
         statement.messages = inheritsMessages + genericsMessages
         return statement
@@ -974,7 +974,7 @@ class TypeDeclaration: Statement {
         let attributes = Attributes.for(syntax: structDecl.attributes)
         let modifiers = Modifiers.for(syntax: structDecl.modifiers)
         let (generics, genericsMessages) = Generics.for(syntax: structDecl.genericParameterClause, where: structDecl.genericWhereClause, in: syntaxTree)
-        let members = StatementDecoder.decode(syntaxListContainer: structDecl.members, in: syntaxTree)
+        let members = StatementDecoder.decode(syntaxListContainer: structDecl.memberBlock, in: syntaxTree)
         let statement = TypeDeclaration(type: .structDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: structDecl, sourceFile: syntaxTree.source.file, sourceRange: structDecl.range(in: syntaxTree.source), extras: extras)
         statement.messages = inheritsMessages + genericsMessages
         return statement
@@ -985,8 +985,8 @@ class TypeDeclaration: Statement {
         let (inherits, inheritsMessages) = protocolDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], [])
         let attributes = Attributes.for(syntax: protocolDecl.attributes)
         let modifiers = Modifiers.for(syntax: protocolDecl.modifiers)
-        let associatedTypeDecls = protocolDecl.members.members.compactMap { $0.decl.kind == .associatedtypeDecl ? $0.decl.as(AssociatedtypeDeclSyntax.self) : nil }
-        let memberDecls = protocolDecl.members.members.compactMap { $0.decl.kind != .associatedtypeDecl ? $0.decl : nil }
+        let associatedTypeDecls = protocolDecl.memberBlock.members.compactMap { $0.decl.kind == .associatedtypeDecl ? $0.decl.as(AssociatedtypeDeclSyntax.self) : nil }
+        let memberDecls = protocolDecl.memberBlock.members.compactMap { $0.decl.kind != .associatedtypeDecl ? $0.decl : nil }
         let (generics, genericsMessages) = Generics.for(syntax: nil, associatedTypeSyntax: associatedTypeDecls, where: protocolDecl.genericWhereClause, in: syntaxTree)
         let members = memberDecls.flatMap { StatementDecoder.decode(syntax: $0, in: syntaxTree) }
         let statement = TypeDeclaration(type: .protocolDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: protocolDecl, sourceFile: syntaxTree.source.file, sourceRange: protocolDecl.range(in: syntaxTree.source), extras: extras)
@@ -1000,7 +1000,7 @@ class TypeDeclaration: Statement {
         let attributes = Attributes.for(syntax: enumDecl.attributes)
         let modifiers = Modifiers.for(syntax: enumDecl.modifiers)
         let (generics, genericsMessages) = Generics.for(syntax: enumDecl.genericParameters, where: enumDecl.genericWhereClause, in: syntaxTree)
-        let members = StatementDecoder.decode(syntaxListContainer: enumDecl.members, in: syntaxTree)
+        let members = StatementDecoder.decode(syntaxListContainer: enumDecl.memberBlock, in: syntaxTree)
         let statement = TypeDeclaration(type: .enumDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: enumDecl, sourceFile: syntaxTree.source.file, sourceRange: enumDecl.range(in: syntaxTree.source), extras: extras)
         statement.messages = inheritsMessages + genericsMessages
         return statement
