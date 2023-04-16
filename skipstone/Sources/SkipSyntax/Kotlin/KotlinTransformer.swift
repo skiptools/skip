@@ -36,6 +36,8 @@ public func builtinKotlinTransformers() -> [KotlinTransformer] {
         KotlinEquatableHashableComparableTransformer(),
         // May add constructors
         KotlinConstructorTransformer(),
+        // May add static allCases function
+        KotlinCaseIterableTransformer(),
         KotlinIfWhenTransformer(),
         KotlinDeferTransformer(),
         KotlinDisambiguateFunctionsTransformer(),

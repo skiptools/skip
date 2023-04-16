@@ -507,4 +507,27 @@ final class EnumTests: XCTestCase {
         }
         """)
     }
+
+    func testCaseIterable() async throws {
+        try await check(swift: """
+        enum E: CaseIterable {
+            case one
+            case two
+            case three
+        }
+        """, kotlin: """
+        internal enum class E: CaseIterable {
+            one,
+            two,
+            three;
+
+            companion object {
+                val allCases: Array<E>
+                    get() {
+                        return arrayOf(one, two, three)
+                    }
+            }
+        }
+        """)
+    }
 }

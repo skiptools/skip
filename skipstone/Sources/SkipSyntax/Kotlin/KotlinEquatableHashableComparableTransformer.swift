@@ -4,10 +4,6 @@
 ///   2. Remove references to `Equatable` and `Hashable` in inherits lists and generic constraints, because they are just aliases for `Any` in Kotlin.
 ///   3. Change references to `Comparable` in inherits lists and generic constraints to Kotlin's `Comparable<T>`.
 class KotlinEquatableHashableComparableTransformer: KotlinTransformer {
-    func gather(from syntaxTree: SyntaxTree) {
-        //~~~ do rough messages
-    }
-
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
         guard let codebaseInfo = translator.codebaseInfo else {
             return

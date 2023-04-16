@@ -206,9 +206,9 @@ struct Modifiers: PrettyPrintable, Codable {
     }
 
     var visibility: Visibility
-    let isStatic: Bool
-    let isMutating: Bool
-    let isFinal: Bool
+    var isStatic: Bool
+    var isMutating: Bool
+    var isFinal: Bool
     var isOverride: Bool
 
     init(visibility: Visibility = .default, isStatic: Bool = false, isMutating: Bool = false, isFinal: Bool = false, isOverride: Bool = false) {

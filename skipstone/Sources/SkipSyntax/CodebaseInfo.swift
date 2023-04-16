@@ -141,15 +141,22 @@ public class CodebaseInfo: Codable {
         return [concreteTypeInfo.signature] + inheritanceChainSignatures(forNamed: firstInherits)
     }
 
+    private static let builtinProtocols: Set<TypeSignature> = [
+        .named("CaseIterable", []), .named("Equatable", []), .named("Error", [])
+    ]
+    private static let builtinEquatableSubprotocols: Set<TypeSignature> = [
+        .named("Comparable", []), .named("Hashable", [])
+    ]
+
     /// Return the protocols the given type conforms to, including inherited protocols.
     ///
     /// If the type itself is a protocol, it is included.
     func protocolSignatures(forNamed type: TypeSignature) -> [TypeSignature] {
         let type = type.asOptional(false)
         // TODO: Remove special cases if we add SkipLib codebase info dependency
-        if type == .anyObject || type == .named("Equatable", []) || type == .named("Error", []) {
+        if type == .anyObject || Self.builtinProtocols.contains(type) {
             return [type]
-        } else if type == .named("Comparable", []) || type == .named("Hashable", []) {
+        } else if Self.builtinEquatableSubprotocols.contains(type) {
             return [type, .named("Equatable", [])]
         }
         // Gather inherited signatures, then insert the given type at the front if it is also a protocol
