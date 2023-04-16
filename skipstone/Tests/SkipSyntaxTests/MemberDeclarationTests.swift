@@ -393,7 +393,7 @@ final class MemberDeclarationTests: XCTestCase {
             val s = param
             s.value.member = Struct()
             var s2 = s.value.sref()
-            s2.member = s.value.member.sref()
+            s2.member = s.value.member
             return s2.sref()
         }
         internal fun f2() {

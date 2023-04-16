@@ -65,7 +65,7 @@ extension Message {
     }
 
     static func kotlinExtensionUnsupportedMember(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "This declaration is not supported in a Kotlin extension", sourceDerived: sourceDerived, source: source)
+        return Message(kind: .error, message: "The declaring extension cannot be merged into its extended Kotlin type definition. Therefore the extension can only include properties and functions", sourceDerived: sourceDerived, source: source)
     }
 
     static func kotlinFunctionDisambiguateImplementable(name: String, parameters: [TypeSignature], in type: TypeSignature?, sourceFile: Source.FilePath) -> Message {

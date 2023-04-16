@@ -851,7 +851,28 @@ final class TypeDeclarationTests: XCTestCase {
         """)
     }
 
-    func testTypeDeclaredWithinExtension() throws {
-        throw XCTSkip("TODO: Test declaring a type within an extension. We need to move it to the original type extended type definition if in module, error if not")
+    func testTypeDeclaredWithinExtension() async throws {
+        try await check(swift: """
+        class C {
+        }
+        extension C {
+            class Sub {
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal open class Sub {
+            }
+        }
+        """)
+
+        try await checkProducesMessage(swift: """
+        class C<T> {
+        }
+        extension C where T: Equatable {
+            class Sub {
+            }
+        }
+        """)
     }
 }
