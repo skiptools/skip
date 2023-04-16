@@ -509,7 +509,10 @@ final class EnumTests: XCTestCase {
     }
 
     func testCaseIterable() async throws {
-        try await check(swift: """
+        // Tests don't have access to SkipLib protocols
+        let supportingSwift = "protocol CaseIterable {}"
+
+        try await check(supportingSwift: supportingSwift, swift: """
         enum E: CaseIterable {
             case one
             case two
@@ -526,6 +529,107 @@ final class EnumTests: XCTestCase {
                     get() {
                         return arrayOf(one, two, three)
                     }
+            }
+        }
+        """)
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        enum E {
+            case one
+            case two
+            case three
+        }
+        extension E: CaseIterable {
+            static var allCases: [E] {
+                return [.one, .two, .three]
+            }
+        }
+        """, kotlin: """
+        internal enum class E: CaseIterable {
+            one,
+            two,
+            three;
+
+            companion object {
+                internal val allCases: Array<E>
+                    get() {
+                        return arrayOf(E.one, E.two, E.three)
+                    }
+            }
+        }
+        """)
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        enum E: CaseIterable, Error {
+            case one
+            case two
+        }
+        """, kotlin: """
+        internal sealed class E: Throwable(), CaseIterable, Error {
+            class One: E() {
+
+                override fun equals(other: Any?): Boolean {
+                    if (other !is One) return false
+                    return true
+                }
+                override fun hashCode(): Int {
+                    return "One".hashCode()
+                }
+            }
+            class Two: E() {
+
+                override fun equals(other: Any?): Boolean {
+                    if (other !is Two) return false
+                    return true
+                }
+                override fun hashCode(): Int {
+                    return "Two".hashCode()
+                }
+            }
+
+            companion object {
+                fun one(): E {
+                    return One()
+                }
+                fun two(): E {
+                    return Two()
+                }
+
+                val allCases: Array<E>
+                    get() {
+                        return arrayOf(one(), two())
+                    }
+            }
+        }
+        """)
+    }
+
+    func testCaseIterableTypeInference() async throws {
+        // Make CaseIterable part of supportSwift because we don't have access to SkipLib in tests
+        try await check(supportingSwift: """
+        protocol CaseIterable {
+            // SKIP NOWARN
+            static var allCases: [Self] { get }
+        }
+        enum E: CaseIterable {
+            case one
+            case two
+            case three
+        }
+        """, swift: """
+        func f() {
+            for e in E.allCases {
+                if e == .two {
+                    print("TWO")
+                }
+            }
+        }
+        """, kotlin: """
+        internal fun f() {
+            for (e in E.allCases.sref()) {
+                if (e == E.two) {
+                    print("TWO")
+                }
             }
         }
         """)

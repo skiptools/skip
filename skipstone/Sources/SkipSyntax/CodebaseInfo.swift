@@ -141,8 +141,9 @@ public class CodebaseInfo: Codable {
         return [concreteTypeInfo.signature] + inheritanceChainSignatures(forNamed: firstInherits)
     }
 
+    // We need these in testing because SkipLib isn't available
     private static let builtinProtocols: Set<TypeSignature> = [
-        .named("CaseIterable", []), .named("Equatable", []), .named("Error", [])
+        .named("Equatable", []), .named("Error", [])
     ]
     private static let builtinEquatableSubprotocols: Set<TypeSignature> = [
         .named("Comparable", []), .named("Hashable", [])
@@ -153,7 +154,6 @@ public class CodebaseInfo: Codable {
     /// If the type itself is a protocol, it is included.
     func protocolSignatures(forNamed type: TypeSignature) -> [TypeSignature] {
         let type = type.asOptional(false)
-        // TODO: Remove special cases if we add SkipLib codebase info dependency
         if type == .anyObject || Self.builtinProtocols.contains(type) {
             return [type]
         } else if Self.builtinEquatableSubprotocols.contains(type) {
@@ -285,7 +285,7 @@ public class CodebaseInfo: Codable {
                 }
                 let signature = identifierSignature(of: member, in: typeInfo, constrainedGenerics: type.generics, isStatic: isStatic)
                 if signature != .none {
-                    return signature
+                    return signature.mappingSelf(to: type)
                 }
             }
             return .none
@@ -350,7 +350,7 @@ public class CodebaseInfo: Codable {
                 return []
             }
             // Return all matches with the top score
-            return sortedCandidates.filter { $0.score >= topCandidate.score }.map(\.signature)
+            return sortedCandidates.filter { $0.score >= topCandidate.score }.map { $0.signature.mappingSelf(to: type) }
         }
 
         /// If the given function signature can be called with the given arguments, return the call signature.
@@ -362,9 +362,9 @@ public class CodebaseInfo: Codable {
         func subscriptSignature(inConstrained type: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
             var type = type.asOptional(false)
             if case .array(let elementType) = type, arguments.count == 1 {
-                return [.function([TypeSignature.Parameter(type: .int)], elementType)]
+                return [.function([TypeSignature.Parameter(type: .int)], elementType.mappingSelf(to: type))]
             } else if case .dictionary(let keyType, let valueType) = type, arguments.count == 1 {
-                return [.function([TypeSignature.Parameter(type: keyType)], valueType)]
+                return [.function([TypeSignature.Parameter(type: keyType)], valueType.mappingSelf(to: type))]
             }
             let isStatic = type.isMetaType
             type = type.asMetaType(false)

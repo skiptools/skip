@@ -30,6 +30,11 @@ class KotlinStatement: KotlinSyntaxNode {
         messages.append(.internalError(self))
     }
 
+    final override var subtreeMessages: [Message] {
+        let messages: [Message] = extras?.suppressMessages == true ? [] : messages
+        return messages + children.flatMap { $0.subtreeMessages }
+    }
+
     final override func leadingTrivia(indentation: Indentation) -> String {
         return extras?.leadingTrivia(indentation: indentation) ?? ""
     }

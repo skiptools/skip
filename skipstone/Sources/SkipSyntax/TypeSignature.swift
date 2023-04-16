@@ -399,6 +399,11 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         return references
     }
 
+    /// Map `Self` constraints to the given type.
+    func mappingSelf(to type: TypeSignature) -> TypeSignature {
+        return mappingTypes(with: [.named("Self", []): type])
+    }
+
     /// Map uses of one set of types to another.
     func mappingTypes(from: [TypeSignature], to: [TypeSignature]) -> TypeSignature {
         guard !from.isEmpty, from.count == to.count else {
