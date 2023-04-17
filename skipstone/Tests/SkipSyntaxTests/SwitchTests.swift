@@ -220,15 +220,15 @@ final class SwitchTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal sealed class E<out T> where T: Any {
+        internal sealed class E<out T> {
             class Case1: E<Nothing>() {
             }
-            class Case2<T>(val associated0: T, val associated1: String): E<T>() where T: Any {
+            class Case2<T>(val associated0: T, val associated1: String): E<T>() {
             }
 
             companion object {
                 val case1: E<Nothing> = Case1()
-                fun <T> case2(associated0: T, associated1: String): E<T> where T: Any {
+                fun <T> case2(associated0: T, associated1: String): E<T> {
                     return Case2(associated0, associated1)
                 }
             }

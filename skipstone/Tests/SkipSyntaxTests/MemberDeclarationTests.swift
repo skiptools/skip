@@ -64,7 +64,7 @@ final class MemberDeclarationTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal open class A<T> where T: Any {
+        internal open class A<T> {
 
             internal open fun f(): T {
             }
@@ -76,10 +76,10 @@ final class MemberDeclarationTests: XCTestCase {
                     return 20
                 }
 
-                internal fun <T> staticFunc2(p: T): T where T: Any {
+                internal fun <T> staticFunc2(p: T): T {
                 }
 
-                internal fun <T, U> staticFunc3(p1: T, p2: U): T where T: Any, U: Any {
+                internal fun <T, U> staticFunc3(p1: T, p2: U): T {
                 }
             }
         }
@@ -154,7 +154,7 @@ final class MemberDeclarationTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal fun <T> C.Companion.staticFunc(p: T): T where T: Any {
+        internal fun <T> C.Companion.staticFunc(p: T): T {
         }
         """)
     }
@@ -767,7 +767,7 @@ final class MemberDeclarationTests: XCTestCase {
         func f<T, U>(a: T, b: U) -> T? {
         }
         """, kotlin: """
-        internal fun <T, U> f(a: T, b: U): T? where T: Any, U: Any {
+        internal fun <T, U> f(a: T, b: U): T? {
         }
         """)
 
@@ -789,7 +789,7 @@ final class MemberDeclarationTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal open class C<T> where T: Any {
+        internal open class C<T> {
             internal var v: C<T>
             internal open fun f(p: Array<C<T>>): C<T>? {
                 return null

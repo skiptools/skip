@@ -211,15 +211,15 @@ final class EnumTests: XCTestCase {
             case b(Int = 1, T)
         }
         """, kotlin: """
-        internal sealed class E<out T> where T: Any {
+        internal sealed class E<out T> {
             class A: E<Nothing>() {
             }
-            class B<T>(val associated0: Int, val associated1: T): E<T>() where T: Any {
+            class B<T>(val associated0: Int, val associated1: T): E<T>() {
             }
 
             companion object {
                 val a: E<Nothing> = A()
-                fun <T> b(associated0: Int = 1, associated1: T): E<T> where T: Any {
+                fun <T> b(associated0: Int = 1, associated1: T): E<T> {
                     return B(associated0, associated1)
                 }
             }
@@ -232,17 +232,17 @@ final class EnumTests: XCTestCase {
             case b(U)
         }
         """, kotlin: """
-        internal sealed class E<out T, out U> where T: Any, U: Any {
-            class A<T>(val associated0: T): E<T, Nothing>() where T: Any {
+        internal sealed class E<out T, out U> {
+            class A<T>(val associated0: T): E<T, Nothing>() {
             }
-            class B<U>(val associated0: U): E<Nothing, U>() where U: Any {
+            class B<U>(val associated0: U): E<Nothing, U>() {
             }
 
             companion object {
-                fun <T> a(associated0: T): E<T, Nothing> where T: Any {
+                fun <T> a(associated0: T): E<T, Nothing> {
                     return A(associated0)
                 }
-                fun <U> b(associated0: U): E<Nothing, U> where U: Any {
+                fun <U> b(associated0: U): E<Nothing, U> {
                     return B(associated0)
                 }
             }
@@ -258,8 +258,8 @@ final class EnumTests: XCTestCase {
             case c
         }
         """, kotlin: """
-        internal sealed class E<out T, out U> where T: Any, U: Any {
-            class A<T, U>(val associated0: T, val associated1: U): E<T, U>() where T: Any, U: Any {
+        internal sealed class E<out T, out U> {
+            class A<T, U>(val associated0: T, val associated1: U): E<T, U>() {
 
                 override fun equals(other: Any?): Boolean {
                     if (other !is A<*, *>) return false
@@ -272,7 +272,7 @@ final class EnumTests: XCTestCase {
                     return result
                 }
             }
-            class B<U>(val associated0: U, val associated1: String): E<Nothing, U>() where U: Any {
+            class B<U>(val associated0: U, val associated1: String): E<Nothing, U>() {
 
                 override fun equals(other: Any?): Boolean {
                     if (other !is B<*>) return false
@@ -289,10 +289,10 @@ final class EnumTests: XCTestCase {
             }
 
             companion object {
-                fun <T, U> a(associated0: T, associated1: U): E<T, U> where T: Any, U: Any {
+                fun <T, U> a(associated0: T, associated1: U): E<T, U> {
                     return A(associated0, associated1)
                 }
-                fun <U> b(associated0: U, associated1: String): E<Nothing, U> where U: Any {
+                fun <U> b(associated0: U, associated1: String): E<Nothing, U> {
                     return B(associated0, associated1)
                 }
                 val c: E<Nothing, Nothing> = C()
