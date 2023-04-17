@@ -5,6 +5,7 @@ on:
     branches: [ main ]
   schedule:
     - cron: '0 3,9,15,21 * * *'
+  workflow_dispatch:
 
 env:
   DEVELOPER_DIR: /Applications/Xcode_14.2.app/Contents/Developer
