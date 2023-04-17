@@ -57,7 +57,6 @@ extension CommandPlugin {
         let sourceTargets = targets
             .compactMap { $0 as? SwiftSourceModuleTarget }
             .filter { !$0.name.hasSuffix("Kt") } // ignore any "Kt" targets
-        let targetNames = sourceTargets.map(\.moduleName)
 
         var contents = """
         ███████╗██╗  ██╗██╗██████╗
@@ -87,7 +86,6 @@ extension CommandPlugin {
 
         for target in allSourceTargets {
             let targetName = target.name
-            let targetDir = target.directory
 
             func addTargetDependencies() {
                 for targetDep in target.dependencies {
