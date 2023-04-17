@@ -101,7 +101,7 @@ public class KotlinTranslator {
             case .expression:
                 return [KotlinExpressionStatement.translate(statement: statement as! ExpressionStatement, translator: self)]
             case .fallthrough:
-                return [KotlinMessageStatement(message: .kotlinSwitchFallthrough(statement, source: syntaxTree.source))]
+                return [KotlinMessageStatement(message: .kotlinSwitchFallthrough(statement, source: syntaxTree.source), statement: statement)]
             case .forLoop:
                 return [KotlinForLoop.translate(statement: statement as! ForLoop, translator: self)]
             case .guard:

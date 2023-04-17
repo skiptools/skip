@@ -472,7 +472,7 @@ class KotlinLabeledStatement: KotlinStatement {
     var target: KotlinStatement
 
     static func translate(statement: LabeledStatement, translator: KotlinTranslator) -> KotlinLabeledStatement {
-        let ktarget = translator.translateStatement(statement.target).first ?? KotlinMessageStatement(message: .kotlinUntranslatable(statement, source: translator.syntaxTree.source))
+        let ktarget = translator.translateStatement(statement.target).first ?? KotlinMessageStatement(message: .kotlinUntranslatable(statement, source: translator.syntaxTree.source), statement: statement)
         return KotlinLabeledStatement(statement: statement, target: ktarget)
     }
 
@@ -1114,7 +1114,7 @@ struct KotlinExtensionDeclaration {
             } else {
                 message = Message.kotlinExtensionAddProtocolsToOutsideType(statement, source: translator.syntaxTree.source)
             }
-            kotlinStatements.append(KotlinMessageStatement(message: message))
+            kotlinStatements.append(KotlinMessageStatement(message: message, statement: statement))
         }
         var extends = statement.extends
         var generics = statement.generics
@@ -1128,18 +1128,18 @@ struct KotlinExtensionDeclaration {
                 // Check that an extension that will be implemented as extension functions because it has generic constraints, etc is not
                 // attempting to override member functions. Kotlin extension functions can never override members
                 if let variableDeclaration = member as? VariableDeclaration, translator.codebaseInfo?.isImplementingMember(declaration: variableDeclaration, inExtension: extends, with: generics) == true {
-                    kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionImplementMember(member, source: translator.syntaxTree.source)))
+                    kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionImplementMember(member, source: translator.syntaxTree.source), statement: member))
                 } else if let functionDeclaration = member as? FunctionDeclaration, translator.codebaseInfo?.isImplementingMember(declaration: functionDeclaration, inExtension: extends, with: generics) == true {
-                    kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionImplementMember(member, source: translator.syntaxTree.source)))
+                    kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionImplementMember(member, source: translator.syntaxTree.source), statement: member))
                 }
             }
             for kmember in translator.translateStatement(member) {
                 guard let memberDeclaration = kmember as? KotlinMemberDeclaration else {
-                    kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionUnsupportedMember(member, source: translator.syntaxTree.source)))
+                    kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionUnsupportedMember(member, source: translator.syntaxTree.source), statement: member))
                     continue
                 }
                 guard kmember.type != .constructorDeclaration else {
-                    kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionAddConstructorsToOutsideType(member, source: translator.syntaxTree.source)))
+                    kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionAddConstructorsToOutsideType(member, source: translator.syntaxTree.source), statement: member))
                     continue
                 }
                 memberDeclaration.extends = (extends, generics)

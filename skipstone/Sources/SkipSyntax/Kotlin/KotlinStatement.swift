@@ -97,9 +97,9 @@ class KotlinExpressionStatement: KotlinStatement {
 }
 
 class KotlinMessageStatement: KotlinStatement {
-    init(message: Message) {
-        super.init(type: .message)
-        self.messages = [message]
+    init(message: Message, statement: Statement? = nil) {
+        super.init(type: .message, sourceFile: statement?.sourceFile, sourceRange: statement?.sourceRange, extras: statement?.extras)
+        self.messages.append(message)
     }
 
     init(statement: Statement) {
