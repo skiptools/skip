@@ -160,7 +160,7 @@ extension CommandPlugin {
 
             if options.contains(.scaffold) {
                 // create the directory and test case stub
-                let targetNameKt = target.kind == .test ? (target.name.dropLast("Tests".count) + "KtTests") : (targetDir.string + "Kt")
+                let targetNameKt = target.kind == .test ? (target.name.dropLast("Tests".count) + "KtTests") : (target.name + "Kt")
                 let targetDirKt = target.directory.removingLastComponent().appending(subpath: targetNameKt)
 
                 let targetDirKtSkip = targetNameKt + "/Skip"
