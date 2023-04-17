@@ -34,3 +34,9 @@ jobs:
         if: false
         run: swift test -v --configuration release -Xswiftc -enable-testing --parallel
 
+      - name: Dispatch skip ci.yml
+        run: gh workflow run -R skiptools/skip 'ci.yml'
+
+      - name: Dispatch skiphub ci.yml
+        run: gh workflow run -R skiptools/skiphub 'ci.yml'
+
