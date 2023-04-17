@@ -59,15 +59,6 @@ extension CommandPlugin {
             .filter { !$0.name.hasSuffix("Kt") } // ignore any "Kt" targets
         let targetNames = sourceTargets.map(\.moduleName)
 
-        Diagnostics.remark("targets: \(targetNames)")
-        Diagnostics.remark("package.displayName: \(context.package.displayName)")
-        Diagnostics.remark("package.id: \(context.package.id)")
-        Diagnostics.remark("package.origin: \(context.package.origin)")
-        Diagnostics.remark("target ids: \(sourceTargets.map(\.id))")
-        Diagnostics.remark("target ids: \(sourceTargets.map(\.recursiveTargetDependencies))")
-        Diagnostics.remark("package.directory: \(context.package.directory)")
-        Diagnostics.remark("pluginWorkDirectory: \(context.pluginWorkDirectory)") // 
-
         var contents = """
         ███████╗██╗  ██╗██╗██████╗
         ██╔════╝██║ ██╔╝██║██╔══██╗
@@ -81,11 +72,6 @@ extension CommandPlugin {
         The Skip build plugin will transform your Swift package
         targets and tests into Kotlin and generate Gradle build
         files for each of the targets.
-
-        To add support for Skip to your project, each target `TargetName`
-        that is to be transpiled must have a corresponding `TargetNameKt`
-        target, which is associated with a source folder that contains a
-        skip/skip.yml configuration file.
 
 
         """
@@ -126,7 +112,7 @@ extension CommandPlugin {
             if target.kind == .test {
                 packageAddition += """
                 package.targets += [
-                    .testTarget(name: "\(targetName)Kt", dependencies: [
+                    .testTarget(name: "\(targetName.dropLast("Tests".count))KtTests", dependencies: [
 
                 """
                 addTargetDependencies()
@@ -174,8 +160,8 @@ extension CommandPlugin {
 
             if options.contains(.scaffold) {
                 // create the directory and test case stub
-                let targetDirKt = targetDir.string + "Kt"
-                let targetDirKtSkip = targetDirKt + "/Skip"
+                let targetNameKt = target.kind == .test ? (target.name.dropLast("Tests".count) + "KtTests") : (targetDir.string + "Kt")
+                let targetDirKtSkip = targetNameKt + "/Skip"
                 Diagnostics.remark("creating target folder: \(targetDirKtSkip)")
                 try FileManager.default.createDirectory(atPath: targetDirKtSkip, withIntermediateDirectories: true)
 
@@ -189,8 +175,8 @@ extension CommandPlugin {
 
                 // create a test case stub
                 if target.kind == .test {
-                    let testClass = target.name + "Kt"
-                    let testSource = targetDirKt + "/\(testClass).swift"
+                    let testClass = targetNameKt // class name is same as target name
+                    let testSource = targetNameKt + "/\(testClass).swift"
 
                     if !FileManager.default.fileExists(atPath: testSource) {
                         try """
@@ -206,7 +192,7 @@ extension CommandPlugin {
 
                 if target.kind != .test {
                     let moduleClass = target.name + "ModuleKt"
-                    let testSource = targetDirKt + "/\(moduleClass).swift"
+                    let testSource = targetNameKt + "/\(moduleClass).swift"
 
                     if !FileManager.default.fileExists(atPath: testSource) {
                         try """
@@ -273,7 +259,7 @@ extension CommandPlugin {
         try contents.write(toFile: outputPath.string, atomically: true, encoding: .utf8)
 
 
-        // In the Skip folder, create links to all the output targets that will contain the transpiled Pradle projects
+        // In the Skip folder, create links to all the output targets that will contain the transpiled Gradle projects
         // e.g. ~/Library/Developer/Xcode/DerivedData/PACKAGE-ID/SourcePackages/plugins/Hello Skip.output/../skip-template.output
         let ext = context.pluginWorkDirectory.extension ?? "output"
         let packageOutput = context.pluginWorkDirectory.removingLastComponent().appending(subpath: context.package.id + "." + ext)
