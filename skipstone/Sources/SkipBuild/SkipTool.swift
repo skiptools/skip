@@ -807,7 +807,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             /// Attempts to make a link from the `fromPath` to the given relative path.
             /// If `fromPath` already exists and is a directory, attempt to create links for each of the contents of the directory to the updated relative folder
             func createMergedLinkTree(from fromPath: AbsolutePath, to relative: String) throws {
-                let destPath = try AbsolutePath(validating: relative, relativeTo: fromPath)
+                let destPath = try AbsolutePath(validating: relative, relativeTo: fromPath.parentDirectory)
                 if !fs.isDirectory(destPath) {
                     // skip over anything that is not a destination folder
                     // if it doesn't exist at all, then it is an error
