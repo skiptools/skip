@@ -550,6 +550,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             // go through the '--link modulename:../../some/path' arguments and try to load the modulename.skipcode.json symbols from the previous module's transpilation output
             for (linkModuleName, relativeLinkPath) in linkNamePaths {
                 let dependencyCodebaseInfo = moduleRootPath
+                    .parentDirectory
                     .appending(RelativePath(relativeLinkPath))
                     .parentDirectory
                     .appending(codebaseInfoPath(forModule: linkModuleName))
