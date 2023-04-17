@@ -161,6 +161,8 @@ extension CommandPlugin {
             if options.contains(.scaffold) {
                 // create the directory and test case stub
                 let targetNameKt = target.kind == .test ? (target.name.dropLast("Tests".count) + "KtTests") : (targetDir.string + "Kt")
+                let targetDirKt = target.directory.removingLastComponent().appending(subpath: targetNameKt)
+
                 let targetDirKtSkip = targetNameKt + "/Skip"
                 Diagnostics.remark("creating target folder: \(targetDirKtSkip)")
                 try FileManager.default.createDirectory(atPath: targetDirKtSkip, withIntermediateDirectories: true)
@@ -176,9 +178,9 @@ extension CommandPlugin {
                 // create a test case stub
                 if target.kind == .test {
                     let testClass = targetNameKt // class name is same as target name
-                    let testSource = targetNameKt + "/\(testClass).swift"
+                    let testSource = targetDirKt.appending(subpath: testClass + ".swift")
 
-                    if !FileManager.default.fileExists(atPath: testSource) {
+                    if !FileManager.default.fileExists(atPath: testSource.string) {
                         try """
                         import SkipUnit
 
@@ -186,15 +188,15 @@ extension CommandPlugin {
                         class \(testClass): JUnitTestCase {
                         }
 
-                        """.write(toFile: testSource, atomically: true, encoding: .utf8)
+                        """.write(toFile: testSource.string, atomically: true, encoding: .utf8)
                     }
                 }
 
                 if target.kind != .test {
                     let moduleClass = target.name + "ModuleKt"
-                    let testSource = targetNameKt + "/\(moduleClass).swift"
+                    let testSource = targetDirKt.appending(subpath: moduleClass + ".swift")
 
-                    if !FileManager.default.fileExists(atPath: testSource) {
+                    if !FileManager.default.fileExists(atPath: testSource.string) {
                         try """
                         import Foundation
 
@@ -202,7 +204,7 @@ extension CommandPlugin {
                         public extension Bundle {
                             static let \(moduleClass) = Bundle.module
                         }
-                        """.write(toFile: testSource, atomically: true, encoding: .utf8)
+                        """.write(toFile: testSource.string, atomically: true, encoding: .utf8)
                     }
                 }
 
