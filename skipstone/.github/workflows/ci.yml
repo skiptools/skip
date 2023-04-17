@@ -20,6 +20,16 @@ jobs:
     timeout-minutes: 30
 
     steps:
+      - name: Dispatch skip ci.yml
+        run: gh workflow run -R skiptools/skip 'ci.yml'
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Dispatch skiphub ci.yml
+        run: gh workflow run -R skiptools/skiphub 'ci.yml'
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
       - name: Checkout
         uses: actions/checkout@v3
 
@@ -33,10 +43,4 @@ jobs:
         # disabled for CI speed (release build of dependencies is slow)
         if: false
         run: swift test -v --configuration release -Xswiftc -enable-testing --parallel
-
-      - name: Dispatch skip ci.yml
-        run: gh workflow run -R skiptools/skip 'ci.yml'
-
-      - name: Dispatch skiphub ci.yml
-        run: gh workflow run -R skiptools/skiphub 'ci.yml'
 
