@@ -186,6 +186,7 @@ extension CommandPlugin {
                         import SkipUnit
 
                         /// This test case will run the transpiled tests for the \(target.name) module using the `JUnitTestCase.testProjectGradle()` harness.
+                        /// New tests should be added to that module; this file does not need to be modified.
                         class \(testClass): JUnitTestCase {
                         }
 
@@ -211,13 +212,13 @@ extension CommandPlugin {
 
                 // include a sample Kotlin file as an extension point for the user
                 if target.kind != .test {
-                    let kotlinSource = targetDirKtSkip + "/\(target.name)KotlinSupport.kt"
-                    if !FileManager.default.fileExists(atPath: kotlinSource) {
+                    let kotlinSource = targetDirKtSkip.appending(subpath: target.name + "KtSupport.kt")
+                    if !FileManager.default.fileExists(atPath: kotlinSource.string) {
                         try """
                         // Kotlin included in this file will be included in the transpiled package for \(target.name)
-                        // This can be used to provide support shims for Android equivalent files
+                        // This can be used to provide support functions for any Kotlin-specific Swift
 
-                        """.write(toFile: kotlinSource, atomically: true, encoding: .utf8)
+                        """.write(toFile: kotlinSource.string, atomically: true, encoding: .utf8)
                     }
                 }
             }
