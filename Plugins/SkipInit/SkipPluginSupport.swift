@@ -163,16 +163,17 @@ extension CommandPlugin {
                 let targetNameKt = target.kind == .test ? (target.name.dropLast("Tests".count) + "KtTests") : (target.name + "Kt")
                 let targetDirKt = target.directory.removingLastComponent().appending(subpath: targetNameKt)
 
-                let targetDirKtSkip = targetNameKt + "/Skip"
-                Diagnostics.remark("creating target folder: \(targetDirKtSkip)")
-                try FileManager.default.createDirectory(atPath: targetDirKtSkip, withIntermediateDirectories: true)
+                let targetDirKtSkip = targetDirKt.appending(subpath: "Skip")
 
-                let skipConfig = targetDirKtSkip + "/skip.yml"
-                if !FileManager.default.fileExists(atPath: skipConfig) {
+                Diagnostics.remark("creating target folder: \(targetDirKtSkip)")
+                try FileManager.default.createDirectory(atPath: targetDirKtSkip.string, withIntermediateDirectories: true)
+
+                let skipConfig = targetDirKtSkip.appending(subpath: "/skip.yml")
+                if !FileManager.default.fileExists(atPath: skipConfig.string) {
                     try """
                     # Skip configuration file for \(target.name)
 
-                    """.write(toFile: skipConfig, atomically: true, encoding: .utf8)
+                    """.write(toFile: skipConfig.string, atomically: true, encoding: .utf8)
                 }
 
                 // create a test case stub
