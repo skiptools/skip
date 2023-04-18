@@ -19,7 +19,10 @@ import PackagePlugin
         // We determine we are in Xcode by checking for environment variables that should only be present for Xcode
         let env = ProcessInfo.processInfo.environment
         let xcodeBuildFolder = env["__XCODE_BUILT_PRODUCTS_DIR_PATHS"] ?? env["BUILT_PRODUCTS_DIR"]
-        let packageFolderExtension = xcodeBuildFolder == nil ? "" : ".output"
+        let isXcode = env["__CFBundleIdentifier"] == "com.apple.dt.Xcode" || xcodeBuildFolder != nil
+
+        // Diagnostics.warning("ENVIRONMENT: \(env)")
+        let packageFolderExtension = isXcode ? ".output" : ""
 
         //print("createBuildCommands:", context.package.id)
         guard let sourceTarget = target as? SourceModuleTarget else {
