@@ -9,28 +9,14 @@ class KotlinConstructorTransformer: KotlinTransformer {
             // Recurse to find nested declarations
             return .recurse(nil)
         }
-        if classDeclaration.declarationType == .enumDeclaration {
-            fixupEnumConstructors(for: classDeclaration, translator: translator)
-        } else {
-            fixupClassConstructors(for: classDeclaration, translator: translator)
+        // Enums are handled in the EnumTransformer
+        if classDeclaration.declarationType != .enumDeclaration {
+            fixupConstructors(for: classDeclaration, translator: translator)
         }
         return .recurse(nil)
     }
 
-    private func fixupEnumConstructors(for classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) {
-        let constructors = classDeclaration.members.compactMap { (member: KotlinStatement) -> KotlinFunctionDeclaration? in
-            guard member.type == .constructorDeclaration else {
-                return nil
-            }
-            return member as? KotlinFunctionDeclaration
-        }
-        constructors.forEach { fixupEnumConstructor($0, for: classDeclaration, translator: translator) }
-        if classDeclaration.enumInheritedRawValueType != nil, !constructors.contains(where: { $0.parameters.count == 1 && $0.parameters[0].externalLabel == "rawValue" }) {
-            addRawValueConstructor(to: classDeclaration)
-        }
-    }
-
-    private func fixupClassConstructors(for classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) {
+    private func fixupConstructors(for classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) {
         let constructors = classDeclaration.members.compactMap { (member: KotlinStatement) -> KotlinFunctionDeclaration? in
             guard member.type == .constructorDeclaration else {
                 return nil
@@ -163,53 +149,5 @@ class KotlinConstructorTransformer: KotlinTransformer {
                 variableDeclaration.isConstructingPropertyName = "isconstructing"
             }
         }
-    }
-
-    private func fixupEnumConstructor(_ constructor: KotlinFunctionDeclaration, for classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) {
-        let factory = KotlinFunctionDeclaration(name: classDeclaration.name, sourceFile: constructor.sourceFile, sourceRange: constructor.sourceRange)
-        factory.modifiers = classDeclaration.modifiers
-        factory.generics = classDeclaration.generics.merge(overrides: constructor.generics, addNew: true)
-        factory.annotations = constructor.annotations
-        factory.extras = constructor.extras
-        factory.returnType = classDeclaration.signature.asOptional(constructor.isOptionalInit)
-        factory.parameters = constructor.parameters
-        factory.disambiguatingParameterCount = constructor.disambiguatingParameterCount
-        factory.isGenerated = constructor.isGenerated
-        factory.body = constructor.body
-        factory.body?.updateWithExpectedReturn(.assignToSelf)
-
-        classDeclaration.remove(statement: constructor)
-        (classDeclaration.parent as? KotlinStatement)?.insert(statements: [factory], after: classDeclaration)
-    }
-
-    private func addRawValueConstructor(to classDeclaration: KotlinClassDeclaration) {
-        guard let rawValueType = classDeclaration.enumInheritedRawValueType else {
-            return
-        }
-        let factory = KotlinFunctionDeclaration(name: classDeclaration.name)
-        factory.modifiers = classDeclaration.modifiers
-        factory.generics = classDeclaration.generics
-        factory.extras = .singleNewline
-        factory.isGenerated = true
-        factory.returnType = classDeclaration.signature.asOptional(true)
-        factory.parameters = [Parameter<KotlinExpression>(externalLabel: "rawValue", declaredType: rawValueType)]
-
-        // We create structured expressions rather than raw source because our enum case raw values are stored as expressions
-        let callString = classDeclaration.alwaysCreateNewSealedClassInstances ? "()" : ""
-        var cases = classDeclaration.members
-            .compactMap { $0 as? KotlinEnumCaseDeclaration }
-            .compactMap { (enumCase: KotlinEnumCaseDeclaration) -> KotlinCase? in
-                guard let rawValue = enumCase.rawValue else {
-                    return nil
-                }
-                let statement = KotlinRawStatement(sourceCode: "\(classDeclaration.name).\(enumCase.name)\(callString)")
-                return KotlinCase(patterns: [rawValue], body: KotlinCodeBlock(statements: [statement]))
-            }
-        cases.append(KotlinCase(patterns: [KotlinRawExpression(sourceCode: "else")], body: KotlinCodeBlock(statements: [KotlinRawStatement(sourceCode: "null")])))
-        let when = KotlinWhen(on: KotlinIdentifier(name: "rawValue"), cases: cases)
-        let ret = KotlinReturn(expression: when)
-        factory.body = KotlinCodeBlock(statements: [ret])
-
-        (classDeclaration.parent as? KotlinStatement)?.insert(statements: [factory], after: classDeclaration)
     }
 }

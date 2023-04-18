@@ -399,7 +399,7 @@ final class ErrorHandlingTests: XCTestCase {
             case error2
         }
         """, kotlin: """
-        internal sealed class E(val rawValue: Int, unusedp: Nothing? = null): Throwable(), Error, RawRepresentable {
+        internal sealed class E(override val rawValue: Int, unusedp: Nothing? = null): Throwable(), Error, RawRepresentable<Int> {
             class Error1: E(2) {
 
                 override fun equals(other: Any?): Boolean {
@@ -493,7 +493,7 @@ final class ErrorHandlingTests: XCTestCase {
             case error2
         }
         """, kotlin: """
-        internal sealed class E(val rawValue: Int, unusedp: Nothing? = null): Throwable(), Error, RawRepresentable {
+        internal sealed class E(override val rawValue: Int, unusedp: Nothing? = null): Throwable(), Error, RawRepresentable<Int> {
             class Error1: E(2) {
 
                 override fun equals(other: Any?): Boolean {

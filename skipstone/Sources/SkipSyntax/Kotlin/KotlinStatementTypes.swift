@@ -766,9 +766,6 @@ class KotlinClassDeclaration: KotlinStatement {
         }
         kstatement.members = members
         if statement.type == .enumDeclaration {
-            if kstatement.enumInheritedRawValueType != nil, !kstatement.inherits.contains(.named("RawRepresentable", [])) {
-                kstatement.inherits.append(.named("RawRepresentable", []))
-            }
             kstatement.processEnumCaseDeclarations()
         }
 
@@ -855,7 +852,7 @@ class KotlinClassDeclaration: KotlinStatement {
             if let inheritedRawValueType = enumInheritedRawValueType {
                 inherits = Array(inherits.dropFirst())
                 // Add an unused parameter to disambiguate from the RawRepresentable constructor
-                output.append("(val rawValue: \(inheritedRawValueType.kotlin), unusedp: Nothing? = null)")
+                output.append("(override val rawValue: \(inheritedRawValueType.kotlin), unusedp: Nothing? = null)")
             }
             if !inherits.isEmpty {
                 output.append(": ")
