@@ -35,7 +35,7 @@ class KotlinEnumTransformer: KotlinTransformer {
             let inherit: TypeSignature = .named("RawRepresentable", [rawValueType])
             if let rawRepresentableIndex = classDeclaration.inherits.firstIndex(of: .named("RawRepresentable", [])) {
                 classDeclaration.inherits[rawRepresentableIndex] = inherit
-            } else {
+            } else if classDeclaration.enumInheritedRawValueType != nil {
                 classDeclaration.inherits.append(inherit)
             }
         }

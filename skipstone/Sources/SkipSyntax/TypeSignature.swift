@@ -230,6 +230,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .array(let element):
             if case .array(let element2) = to {
                 element.addGenericMappings(to: element2, into: &generics)
+            } else if case .set(let element2) = to {
+                element.addGenericMappings(to: element2, into: &generics)
             }
         case .composition(let types):
             if case .composition(let types2) = to, types.count == types2.count {
@@ -261,6 +263,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .optional(let type):
             if case .optional(let type2) = to {
                 type.addGenericMappings(to: type2, into: &generics)
+            } else {
+                type.addGenericMappings(to: to, into: &generics)
             }
         case .range(let element):
             if case .range(let element2) = to {
@@ -268,6 +272,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             }
         case .set(let element):
             if case .set(let element2) = to {
+                element.addGenericMappings(to: element2, into: &generics)
+            } else if case .array(let element2) = to {
                 element.addGenericMappings(to: element2, into: &generics)
             }
         case .tuple(_, let types):
@@ -277,6 +283,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .unwrappedOptional(let type):
             if case .unwrappedOptional(let type2) = to {
                 type.addGenericMappings(to: type2, into: &generics)
+            } else {
+                type.addGenericMappings(to: to, into: &generics)
             }
         default:
             break
