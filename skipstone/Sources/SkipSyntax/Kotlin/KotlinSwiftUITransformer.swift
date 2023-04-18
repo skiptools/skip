@@ -2,7 +2,16 @@
 ///
 /// We rely on our Kotlin UI libraries to provide the implementation of the SwiftUI-like API that this translation will result in.
 class KotlinSwiftUITransformer: KotlinTransformer {
+    private var sourceFile: Source.FilePath? = nil
+    private var messages: [Message] = []
+
+    func messages(for sourceFile: Source.FilePath) -> [Message] {
+        return sourceFile == self.sourceFile ? messages : []
+    }
+
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
+        sourceFile = syntaxTree.sourceFile
+
         // Does this file need translation?
         var needsTranslation = false
         for importDeclaration in syntaxTree.root.statements.compactMap({ $0 as? KotlinImportDeclaration }) {
@@ -48,7 +57,11 @@ class KotlinSwiftUITransformer: KotlinTransformer {
     }
 
     private func translateFunctionCall(_ functionCall: KotlinFunctionCall, source: Source) {
-        for viewBuilder in viewBuilderParameters(in: functionCall) {
+        guard let viewBuilderParams = viewBuilderParameters(in: functionCall, source: source) else {
+            // not a result builder
+            return
+        }
+        for viewBuilder in viewBuilderParams {
             translateViewBuilder(viewBuilder.body, source: source)
             viewBuilder.body.assignParentReferences()
         }
@@ -97,8 +110,18 @@ class KotlinSwiftUITransformer: KotlinTransformer {
         return owningClass
     }
 
-    private func viewBuilderParameters(in functionCall: KotlinFunctionCall) -> [KotlinClosure] {
+    private func viewBuilderParameters(in functionCall: KotlinFunctionCall, source: Source) -> [KotlinClosure]? {
         // TODO: Match up this function call to available API calls and see which params are view builders
+        // for now, we just translate anything that looks like a View initializer; i.e., a capitalized function name
+
+        guard let functionName = (functionCall.function as? KotlinIdentifier)?.name else {
+            // function name was not an identifier
+            return nil
+        }
+        if functionName.first?.isUppercase != true {
+            // we only consider uppercase names, like view initialiers, for special result builder treatment
+            return nil
+        }
         return functionCall.arguments.compactMap { $0.value as? KotlinClosure }
     }
 
