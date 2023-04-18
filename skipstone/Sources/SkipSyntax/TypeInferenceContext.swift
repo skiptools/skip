@@ -65,11 +65,18 @@ struct TypeInferenceContext {
     /// Return a context for evaluating the code of the given closure.
     func pushing(_ closure: Closure) -> TypeInferenceContext {
         var context = self
-        let parameterDictionary = closure.parameters.reduce(into: [String: TypeSignature]()) { result, parameter in
-            result[parameter.internalLabel] = parameter.declaredType
+        var parameterDictionary: [String: TypeSignature] = [:]
+        if !closure.parameters.isEmpty {
+            parameterDictionary = closure.parameters.reduce(into: parameterDictionary) { result, parameter in
+                result[parameter.internalLabel] = parameter.declaredType
+            }
+        } else if !closure.inferredType.parameters.isEmpty {
+            parameterDictionary = closure.inferredType.parameters.enumerated().reduce(into: parameterDictionary) { result, indexedParameter in
+                result["$\(indexedParameter.0)"] = indexedParameter.1.type
+            }
         }
         context.path.append(PathEntry(identifiers: parameterDictionary))
-        context.expectedReturn = closure.returnType
+        context.expectedReturn = closure.returnType.or(closure.inferredType.returnType)
         return context
     }
 

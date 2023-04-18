@@ -129,6 +129,32 @@ class CodeBlock: Statement {
         super.init(type: .codeBlock)
     }
 
+    /// Return the inferred type of the return statements in the block.
+    var returnType: TypeSignature {
+        guard !statements.isEmpty else {
+            return .none
+        }
+        guard statements.count > 1 else {
+            return statements[0].inferredType
+        }
+        var returnType: TypeSignature = .none
+        var isOptional = false
+        visit { node in
+            if node is Closure || node is FunctionDeclaration {
+                return .skip
+            }
+            if let expression = (node as? Return)?.expression {
+                if expression.type == .nilLiteral {
+                    isOptional = true
+                } else {
+                    returnType = returnType.or(expression.inferredType)
+                }
+            }
+            return .recurse(nil)
+        }
+        return returnType.asOptional(isOptional || returnType.isOptional)
+    }
+
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
         var blockContext = context
         statements.forEach { blockContext = $0.inferTypes(context: blockContext, expecting: .none) }

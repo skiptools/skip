@@ -664,14 +664,13 @@ public class CodebaseInfo: Codable {
     
     private static func addTypeInfo(_ typeInfo: TypeInfo, to itemsByName: inout [String: [CodebaseInfoItem]], publicOnly: Bool) {
         if publicOnly {
-            guard typeInfo.modifiers.visibility == .public || typeInfo.modifiers.visibility == .open else {
+            guard typeInfo.modifiers.visibility == .public || typeInfo.modifiers.visibility == .open || typeInfo.declarationType == .extensionDeclaration else {
                 return
             }
             typeInfo.types = typeInfo.types.filter { $0.modifiers.visibility == .public || $0.modifiers.visibility == .open }
             typeInfo.typealiases = typeInfo.typealiases.filter { $0.modifiers.visibility == .public || $0.modifiers.visibility == .open }
             typeInfo.variables = typeInfo.variables.filter { $0.modifiers.visibility == .public || $0.modifiers.visibility == .open }
             typeInfo.functions = typeInfo.functions.filter { $0.modifiers.visibility == .public || $0.modifiers.visibility == .open }
-            typeInfo.cases = typeInfo.cases.filter { $0.modifiers.visibility == .public || $0.modifiers.visibility == .open }
         }
         addItem(typeInfo, to: &itemsByName, publicOnly: publicOnly)
         typeInfo.types.forEach { addTypeInfo($0, to: &itemsByName, publicOnly: publicOnly) }

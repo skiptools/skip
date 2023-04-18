@@ -495,4 +495,77 @@ final class TypeInferenceTests: XCTestCase {
         }
         """)
     }
+
+    func testMap() async throws {
+        let supportingSwift = """
+        extension Int {
+            static let myValue = 0
+        }
+        extension String {
+            static let myValue = ""
+            var length: Int {
+                return 0
+            }
+        }
+        class Container<T> {
+            func map<R>(_ transform: (T) -> R) -> [R] {
+                return []
+            }
+        }
+        struct Element {
+            var id: Int?
+        }
+        enum ElementEnum: String {
+            case one, two, three
+        }
+        """
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        {
+            let c = Container<String>()
+            let a = c.map { $0.length }
+            let b = a[0] == .myValue
+        }
+        """, kotlin: """
+        {
+            val c = Container<String>()
+            val a = c.map {
+                it.length
+            }
+            val b = a[0] == Int.myValue
+        }
+        """)
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        {
+            let c = Container<String>()
+            let a = c.map {
+                return Element(id: $0)
+            }
+            let b = a[0].id == .myValue
+        }
+        """, kotlin: """
+        {
+            val c = Container<String>()
+            val a = c.map llabel@{
+                return@llabel Element(id = it)
+            }
+            val b = a[0].id == Int.myValue
+        }
+        """)
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        {
+            let enums = Container<String>().map { ElementEnum(rawValue: $0) }
+            let b = enums[1] == .two
+        }
+        """, kotlin: """
+        {
+            val enums = Container<String>().map {
+                ElementEnum(rawValue = it)
+            }
+            val b = enums[1] == ElementEnum.two
+        }
+        """)
+    }
 }

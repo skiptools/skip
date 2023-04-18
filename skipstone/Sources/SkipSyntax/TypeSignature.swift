@@ -491,17 +491,21 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     }
 
     /// Attempt to replace `.none` cases in this type signature with information from the given signature.
-    func or(_ typeSignature: TypeSignature) -> TypeSignature {
+    func or(_ typeSignature: TypeSignature, replaceAny: Bool = false) -> TypeSignature {
         switch self {
+        case .any:
+            if replaceAny && typeSignature.isFullySpecified {
+                return typeSignature
+            }
         case .array(let elementType):
             if case .array(let elementType2) = typeSignature {
-                let resolvedElementType = elementType.or(elementType2)
+                let resolvedElementType = elementType.or(elementType2, replaceAny: replaceAny)
                 return .array(resolvedElementType)
             }
         case .dictionary(let keyType, let valueType):
             if case .dictionary(let keyType2, let valueType2) = typeSignature {
-                let resolvedKeyType = keyType.or(keyType2)
-                let resolvedValueType = valueType.or(valueType2)
+                let resolvedKeyType = keyType.or(keyType2, replaceAny: replaceAny)
+                let resolvedValueType = valueType.or(valueType2, replaceAny: replaceAny)
                 return .dictionary(resolvedKeyType, resolvedValueType)
             }
         case .function(let parameters, let returnType):
@@ -511,50 +515,50 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                 if parameters.isEmpty {
                     resolvedParameters = parameters2
                 } else if parameters.count == parameters2.count {
-                    resolvedParameters = zip(parameters, parameters2).map { $0.0.or($0.1.type) }
+                    resolvedParameters = zip(parameters, parameters2).map { $0.0.or($0.1.type, replaceAny: replaceAny) }
                 }
-                return .function(resolvedParameters, returnType.or(returnType2))
+                return .function(resolvedParameters, returnType.or(returnType2, replaceAny: replaceAny))
             }
         case .member(let base, let type):
             if case .member(let base2, let type2) = typeSignature {
                 if base == base2 {
-                    return .member(base, type.or(type2))
+                    return .member(base, type.or(type2, replaceAny: replaceAny))
                 }
             }
         case .metaType(let type):
             if case .metaType(let type2) = typeSignature {
-                return .metaType(type.or(type2))
+                return .metaType(type.or(type2, replaceAny: replaceAny))
             }
         case .none:
             return typeSignature
         case .optional(let type):
             if case .optional(let type2) = typeSignature {
-                return .optional(type.or(type2))
+                return .optional(type.or(type2, replaceAny: replaceAny))
             }
             if case .unwrappedOptional(let type2) = typeSignature {
-                return .optional(type.or(type2))
+                return .optional(type.or(type2, replaceAny: replaceAny))
             }
         case .range(let elementType):
             if case .range(let elementType2) = typeSignature {
-                let resolvedElementType = elementType.or(elementType2)
+                let resolvedElementType = elementType.or(elementType2, replaceAny: replaceAny)
                 return .range(resolvedElementType)
             }
         case .set(let elementType):
             if case .set(let elementType2) = typeSignature {
-                let resolvedElementType = elementType.or(elementType2)
+                let resolvedElementType = elementType.or(elementType2, replaceAny: replaceAny)
                 return .set(resolvedElementType)
             }
         case .tuple(let labels, let types):
             if case .tuple(_, let types2) = typeSignature, types.count == types2.count {
-                let resolvedTypes = zip(types, types2).map { $0.0.or($0.1) }
+                let resolvedTypes = zip(types, types2).map { $0.0.or($0.1, replaceAny: replaceAny) }
                 return .tuple(labels, resolvedTypes)
             }
         case .unwrappedOptional(let type):
             if case .unwrappedOptional(let type2) = typeSignature {
-                return .unwrappedOptional(type.or(type2))
+                return .unwrappedOptional(type.or(type2, replaceAny: replaceAny))
             }
             if case .optional(let type2) = typeSignature {
-                return .unwrappedOptional(type.or(type2))
+                return .unwrappedOptional(type.or(type2, replaceAny: replaceAny))
             }
         default:
             break
@@ -1123,9 +1127,9 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         var isVariadic = false
         var hasDefaultValue = false
 
-        func or(_ typeSignature: TypeSignature) -> Parameter {
+        func or(_ typeSignature: TypeSignature, replaceAny: Bool) -> Parameter {
             var parameter = self
-            parameter.type = parameter.type.or(typeSignature)
+            parameter.type = parameter.type.or(typeSignature, replaceAny: replaceAny)
             return parameter
         }
 

@@ -469,6 +469,8 @@ class Closure: Expression {
 
         let bodyContext = context.pushing(self)
         let _ = body.inferTypes(context: bodyContext, expecting: .none)
+        // Use any type information we can glean from return statements in the body
+        functionType = .function(functionType.parameters, functionType.returnType.or(body.returnType, replaceAny: true))
         return context
     }
 
@@ -648,22 +650,36 @@ class FunctionCall: Expression {
 
         // First we infer argument types without knowing the function, so we expect .none
         arguments.forEach { $0.value.inferTypes(context: context, expecting: .none) }
-        let parameters = arguments.map { LabeledValue<TypeSignature>(label: $0.label, value: $0.value.inferredType) }
-        let candidateFunctions = context.function(name, in: baseType, parameters: parameters)
-        if !candidateFunctions.isEmpty {
-            if candidateFunctions.count > 1 {
-                messages.append(.ambiguousFunctionCall(sourceDerived: self, source: context.source))
-            }
-            let function = candidateFunctions.first { $0.returnType == expecting } ?? candidateFunctions[0]
+        let argumentTypes = arguments.map { $0.value.inferredType }
+        if var function = candidateFunction(name: name, arguments: arguments, in: baseType, context: context, expecting: expecting, message: true) {
             // Re-infer arguments now that we know the parameter types
             for (index, argument) in arguments.enumerated() {
                 argument.value.inferTypes(context: context, expecting: function.parameters[index].type)
+            }
+            // If any argument types changed, it could affect the return type of a generic function
+            let refinedArgumentTypes = arguments.map({ $0.value.inferredType })
+            if argumentTypes != refinedArgumentTypes {
+                if let refinedFunction = candidateFunction(name: name, arguments: arguments, in: baseType, context: context, expecting: expecting, message: false) {
+                    function = refinedFunction
+                }
             }
             returnType = function.returnType.or(expecting)
         } else {
             returnType = expecting
         }
         return context
+    }
+
+    private func candidateFunction(name: String, arguments: [LabeledValue<Expression>], in baseType: TypeSignature?, context: TypeInferenceContext, expecting: TypeSignature, message: Bool) -> TypeSignature? {
+        let parameters = arguments.map { LabeledValue<TypeSignature>(label: $0.label, value: $0.value.inferredType) }
+        let candidateFunctions = context.function(name, in: baseType, parameters: parameters)
+        guard !candidateFunctions.isEmpty else {
+            return nil
+        }
+        if candidateFunctions.count > 1 {
+            messages.append(.ambiguousFunctionCall(sourceDerived: self, source: context.source))
+        }
+        return candidateFunctions.first { $0.returnType == expecting } ?? candidateFunctions[0]
     }
 
     private var returnType: TypeSignature = .none
