@@ -463,6 +463,9 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             throw error("Folder specified by --skip-folder did not exist: \(skipFolderPath)")
         }
 
+        let skipFolderPathContents = try fs.getDirectoryContents(skipFolderPath)
+            .map { AbsolutePath(skipFolderPath, $0) }
+
         guard let outputFolder = transpileOptions.outputFolder else {
             throw error("Must specify --output-folder")
         }
@@ -512,7 +515,16 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
         let codebaseInfo = try await loadCodebaseInfo() // initialize the codebaseinfo and load DependentModuleName.skipcode.json
 
-        try await validateLicense(sourceURLs: sourceFiles.map(\.asURL))
+        var sourceURLs = sourceFiles.map(\.asURL)
+
+        // also check any Kotlin files in the skipFolderFile
+        for kotlinFile in skipFolderPathContents {
+            if kotlinFile.extension == "kt" {
+                sourceURLs += [kotlinFile.asURL]
+            }
+        }
+
+        try await validateLicense(sourceURLs: sourceURLs)
 
         let transpiler = Transpiler(packageName: packageName, sourceFiles: sources, codebaseInfo: codebaseInfo, preprocessorSymbols: Set(preflightOptions.symbols), transformers: transformers)
         try await transpiler.transpile(handler: handleTranspilation)
@@ -721,24 +733,21 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         /// Any Kotlin files that are overridden will not be transpiled.
         func copyKotlinOverrides(makeLinks: Bool = true) throws -> Set<AbsolutePath> {
             var copiedFiles: Set<AbsolutePath> = []
-            for file in try fs.getDirectoryContents(skipFolderPath) {
-                if file.hasSuffix(".kt") {
-                    let sourcePath = AbsolutePath(skipFolderPath, file)
-                    let outputFilePath = kotlinOutputPath(for: file)
-                    if makeLinks {
-                        // we make links instead of copying so the file can be edited from the gradle project structure without needing to be manually synchronized
-                        try? fs.removeFileTree(outputFilePath)
-                        try fs.createDirectory(outputFilePath.parentDirectory, recursive: true) // ensure parent exists
-                        try fs.createSymbolicLink(outputFilePath, pointingAt: sourcePath, relative: false)
-                        trace("linked overridden source: \(sourcePath.pathString) to: \(outputFilePath.pathString)", sourceFile: sourcePath.sourceFile)
-                        info("\(outputFilePath.basename) override linked from project", sourceFile: sourcePath.sourceFile)
-                    } else {
-                        try fs.writeChanges(path: outputFilePath, checkSize: true, bytes: inputSource(sourcePath))
-                        trace("copied overridden source: \(sourcePath.pathString) to: \(outputFilePath.pathString)", sourceFile: sourcePath.sourceFile)
-                        info("\(outputFilePath.basename) copied from project", sourceFile: sourcePath.sourceFile)
-                    }
-                    copiedFiles.insert(outputFilePath)
+            for sourcePath in skipFolderPathContents {
+                let outputFilePath = kotlinOutputPath(for: sourcePath.basename)
+                if makeLinks {
+                    // we make links instead of copying so the file can be edited from the gradle project structure without needing to be manually synchronized
+                    try? fs.removeFileTree(outputFilePath)
+                    try fs.createDirectory(outputFilePath.parentDirectory, recursive: true) // ensure parent exists
+                    try fs.createSymbolicLink(outputFilePath, pointingAt: sourcePath, relative: false)
+                    trace("linked overridden source: \(sourcePath.pathString) to: \(outputFilePath.pathString)", sourceFile: sourcePath.sourceFile)
+                    info("\(outputFilePath.basename) override linked from project", sourceFile: sourcePath.sourceFile)
+                } else {
+                    try fs.writeChanges(path: outputFilePath, checkSize: true, bytes: inputSource(sourcePath))
+                    trace("copied overridden source: \(sourcePath.pathString) to: \(outputFilePath.pathString)", sourceFile: sourcePath.sourceFile)
+                    info("\(outputFilePath.basename) copied from project", sourceFile: sourcePath.sourceFile)
                 }
+                copiedFiles.insert(outputFilePath)
             }
             return copiedFiles
         }
@@ -884,7 +893,9 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             if let license = license {
                 let exp = DateFormatter.localizedString(from: license.expiration, dateStyle: .short, timeStyle: .none)
                 let daysLeft = Int(ceil(license.expiration.timeIntervalSince(now) / (12 * 60 * 60)))
-                if daysLeft < 0 {
+
+                // allow padding the license expiration for up to 14 days
+                if daysLeft + min(licenseOptions.skipGracePeriod ?? 0, 14) < 0 {
                     error("Skip license expired on \(exp)")
                 } else if daysLeft < 10 { // warn when the license is about to expire
                     warn("Skip license will expire in \(daysLeft) day\(daysLeft == 1 ? "" : "s") on \(exp)")
@@ -895,7 +906,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
                 let scanSourceStart = Date().timeIntervalSinceReferenceDate
                 let (codebaseSize, validated) = try await SourceValidator.scanSources(from: sourceURLs, codebaseThreshold: codebaseThresholdSize, headerExpressions: validLicenseHeaders)
                 let scanSourceEnd = Date().timeIntervalSinceReferenceDate
-                info("Codebase (\(Self.byteCount(for: .init(codebaseSize)))) scanned in (\(Int64((scanSourceEnd - scanSourceStart) * 1000)) ms)" + (validated ? " for free software license headers" : ""))
+                info("Codebase (\(Self.byteCount(for: .init(codebaseSize)))) \(validated ? " scanned for non-commercial license headers" : " scanned") in (\(Int64((scanSourceEnd - scanSourceStart) * 1000)) ms)")
             }
         } catch let e as LicenseError {
             // issue an error with the offending file
@@ -928,6 +939,10 @@ extension Transpilation {
 struct LicenseOptions: ParsableArguments {
     @Option(help: ArgumentHelp("The license key for transpiling non-free sources", valueName: "SKIP_LICENSE"))
     var skipLicense: String? = nil // --skip-license SKP657AB7680CA6789F76ABB65975678CDCA34PKS
+
+    /// A license flag that lets someone with an expired license add a few more days in order to confinue developing while the license is being renewed.
+    @Option(help: ArgumentHelp("Grace period", valueName: "days"))
+    var skipGracePeriod: Int? = nil // --skip-grace-period 7
 }
 
 extension AbsolutePath {

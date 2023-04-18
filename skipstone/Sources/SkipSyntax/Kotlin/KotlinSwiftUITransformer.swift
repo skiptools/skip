@@ -99,7 +99,7 @@ class KotlinSwiftUITransformer: KotlinTransformer {
 
     private func viewBuilderParameters(in functionCall: KotlinFunctionCall) -> [KotlinClosure] {
         // TODO: Match up this function call to available API calls and see which params are view builders
-        return []//functionCall.arguments.compactMap { $0.value as? KotlinClosure }
+        return functionCall.arguments.compactMap { $0.value as? KotlinClosure }
     }
 
     private func hasExplicitReturn(_ codeBlock: KotlinCodeBlock) -> Bool {

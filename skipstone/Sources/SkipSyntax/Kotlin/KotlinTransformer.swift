@@ -42,7 +42,7 @@ public func builtinKotlinTransformers() -> [KotlinTransformer] {
         KotlinDeferTransformer(),
         KotlinDisambiguateFunctionsTransformer(),
         KotlinTupleLabelTransformer(),
-        //KotlinSwiftUITransformer(),
+        KotlinSwiftUITransformer(),
         KotlinImportMapTransformer(),
         KotlinTestAnnotationTransformer(),
     ]
