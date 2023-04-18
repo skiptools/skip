@@ -205,7 +205,7 @@ public class CodebaseInfo: Codable {
                     // Favor a symbol in this module
                     score += 2
                 }
-            } else if let itemModuleName = item.moduleName, importedModuleNames.contains(itemModuleName) && (item.modifiers.visibility == .public || item.modifiers.visibility == .open) {
+            } else if let itemModuleName = item.moduleName, importedModuleNames.contains(itemModuleName) {
                 score += 1
             }
             return score
@@ -671,11 +671,15 @@ public class CodebaseInfo: Codable {
             typeInfo.typealiases = typeInfo.typealiases.filter { $0.modifiers.visibility == .public || $0.modifiers.visibility == .open }
             typeInfo.variables = typeInfo.variables.filter { $0.modifiers.visibility == .public || $0.modifiers.visibility == .open }
             typeInfo.functions = typeInfo.functions.filter { $0.modifiers.visibility == .public || $0.modifiers.visibility == .open }
+            // If this was an extension that is now empty, don't add it
+            guard typeInfo.declarationType != .extensionDeclaration || !typeInfo.types.isEmpty || !typeInfo.typealiases.isEmpty || !typeInfo.variables.isEmpty || !typeInfo.functions.isEmpty else {
+                return
+            }
         }
-        addItem(typeInfo, to: &itemsByName, publicOnly: publicOnly)
+        addItem(typeInfo, to: &itemsByName, publicOnly: false) // Already filtered
         typeInfo.types.forEach { addTypeInfo($0, to: &itemsByName, publicOnly: publicOnly) }
         let items: [CodebaseInfoItem] = typeInfo.typealiases + typeInfo.cases + typeInfo.variables + typeInfo.functions
-        items.forEach { addItem($0, to: &itemsByName, publicOnly: publicOnly) }
+        items.forEach { addItem($0, to: &itemsByName, publicOnly: false) } // Already filtered
     }
     
     private static func addItem(_ item: CodebaseInfoItem, to itemsByName: inout [String: [CodebaseInfoItem]], publicOnly: Bool) {
