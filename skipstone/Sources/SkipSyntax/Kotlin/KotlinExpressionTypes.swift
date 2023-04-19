@@ -579,6 +579,7 @@ class KotlinFunctionCall: KotlinExpression {
         var arguments = arguments
         var trailingClosure: KotlinExpression? = nil
         var forceParentheses = false
+        var isReduceFunction = false
         if let closure = function as? KotlinClosure, closure.hasReturnLabel {
             // Kotlin does not allow return labels in immediately-executed lambdas. Convert to a call to our special closure-running functions
             output.append("linvoke")
@@ -597,6 +598,11 @@ class KotlinFunctionCall: KotlinExpression {
                 if (function as? KotlinPostfixOperator)?.operatorSymbol == "?" {
                     output.append(".invoke")
                 }
+                if let identifier = function as? KotlinIdentifier {
+                    isReduceFunction = identifier.name == "reduce"
+                } else if let memberAccess = function as? KotlinMemberAccess {
+                    isReduceFunction = memberAccess.member == "reduce"
+                }
             }
             let hasTrailingClosure = useTrailingClosureFormatting && arguments.last?.value.type == .closure && (arguments.last?.value as? KotlinClosure)?.isAnonymousFunction == false
             if hasTrailingClosure {
@@ -614,9 +620,13 @@ class KotlinFunctionCall: KotlinExpression {
         for (index, argument) in arguments.enumerated() {
             if let label = argument.label {
                 output.append(label).append(" = ")
+            } else if isReduceFunction, index == 0, self.arguments.count == 2 {
+                // The Kotlin compiler can't differentiate calls to the two reduce() versions without labels.
+                // reduce(into:...) is always labeled, so insert a label for reduce(_ initialResult:...)
+                output.append("initialResult = ")
             }
             // Handle binary operators used in place of closures
-            if let identifier = argument.value as? KotlinIdentifier, !Operator.with(symbol: identifier.name).isUnknown {
+            if let identifier = argument.value as? KotlinIdentifier, identifier.isOperatorIdentifier {
                 output.append("{ it, it_1 -> it \(identifier.name) it_1 }")
             } else {
                 output.append(argument.value, indentation: indentation)
@@ -639,13 +649,15 @@ class KotlinIdentifier: KotlinExpression {
     var generics: [TypeSignature] = []
     var mayBeSharedMutableStruct = false
     var isLocalOrSelfIdentifier = false
+    var isOperatorIdentifier = false
     var isInOut = false
     var isFunctionReference = false
 
     static func translate(expression: Identifier, translator: KotlinTranslator) -> KotlinIdentifier {
         let kexpression = KotlinIdentifier(expression: expression)
         kexpression.generics = expression.generics
-        kexpression.mayBeSharedMutableStruct = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
+        kexpression.isOperatorIdentifier = !Operator.with(symbol: expression.name).isUnknown
+        kexpression.mayBeSharedMutableStruct = !kexpression.isOperatorIdentifier && expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
         kexpression.isLocalOrSelfIdentifier = expression.isLocalOrSelfIdentifier
         if case .function = expression.inferredType {
             kexpression.isFunctionReference = !expression.isLocalOrSelfIdentifier && !expression.isCalledAsFunction && translator.codebaseInfo?.isFunctionName(expression.name, in: expression.owningTypeDeclaration?.signature) == true

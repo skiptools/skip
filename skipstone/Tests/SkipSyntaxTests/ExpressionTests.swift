@@ -211,4 +211,18 @@ final class ExpressionTests: XCTestCase {
         }
         """)
     }
+
+    func testReduceParameterLabel() async throws {
+        try await check(swift: """
+        {
+            let arr = [1, 2, 3]
+            let result = arr.reduce(0, +)
+        }
+        """, kotlin: """
+        {
+            val arr = arrayOf(1, 2, 3)
+            val result = arr.reduce(initialResult = 0, { it, it_1 -> it + it_1 })
+        }
+        """)
+    }
 }
