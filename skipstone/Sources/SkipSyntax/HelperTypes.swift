@@ -479,7 +479,9 @@ struct Generics: Equatable, Codable {
         var result = self
         if extensionGenerics.count == entries.count {
             for i in 0..<entries.count {
-                result.entries[i].whereEqual = extensionGenerics[i]
+                if extensionGenerics[i].isFullySpecified {
+                    result.entries[i].whereEqual = extensionGenerics[i]
+                }
             }
         } else {
             result = result.merge(overrides: generics, addNew: true)

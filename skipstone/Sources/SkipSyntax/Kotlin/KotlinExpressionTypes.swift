@@ -646,7 +646,7 @@ class KotlinFunctionCall: KotlinExpression {
 
 class KotlinIdentifier: KotlinExpression {
     var name: String
-    var generics: [TypeSignature] = []
+    var generics: [TypeSignature]?
     var mayBeSharedMutableStruct = false
     var isLocalOrSelfIdentifier = false
     var isOperatorIdentifier = false
@@ -696,12 +696,12 @@ class KotlinIdentifier: KotlinExpression {
                 // To refer to a function rather than call it, Kotlin uses ::
                 output.append("::")
             }
-            let builtinType = TypeSignature.for(name: name, genericTypes: generics, allowNamed: false)
+            let builtinType = TypeSignature.for(name: name, genericTypes: generics ?? [], allowNamed: false)
             if builtinType != .none {
                 output.append(builtinType.kotlin)
             } else {
                 output.append(Self.translateName(name))
-                if !generics.isEmpty {
+                if let generics, !generics.isEmpty {
                     output.append("<\(generics.map(\.kotlin).joined(separator: ", "))>")
                 }
                 if isInOut {
@@ -1033,7 +1033,7 @@ class KotlinMemberAccess: KotlinExpression {
     var base: KotlinExpression?
     var baseKClass: TypeSignature?
     var member: String
-    var generics: [TypeSignature] = []
+    var generics: [TypeSignature]?
     var useMultlineFormatting = false
     var baseType: TypeSignature = .none
     var mayBeSharedMutableStruct = false
@@ -1089,7 +1089,7 @@ class KotlinMemberAccess: KotlinExpression {
             return nil
         }
         // For an Identifier, check if it's a type
-        guard identifier.generics.isEmpty else {
+        guard identifier.generics?.isEmpty != false else {
             return nil
         }
         guard TypeSignature.for(name: identifier.name, genericTypes: [], allowNamed: false) == .none else {
@@ -1190,7 +1190,7 @@ class KotlinMemberAccess: KotlinExpression {
         } else {
             output.append(member)
         }
-        if !generics.isEmpty {
+        if let generics, !generics.isEmpty {
             output.append("<\(generics.map(\.kotlin).joined(separator: ", "))>")
         }
     }

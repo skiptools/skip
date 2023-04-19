@@ -114,9 +114,9 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     var generics: [TypeSignature] {
         switch self {
         case .array(let element):
-            return [element]
+            return element == .none ? [] : [element]
         case .dictionary(let key, let value):
-            return [key, value]
+            return key == .none && value == .none ? [] : [key, value]
         case .member(_, let type):
             return type.generics
         case .metaType(let type):
@@ -126,9 +126,9 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .optional(let type):
             return type.generics
         case .range(let element):
-            return [element]
+            return element == .none ? [] : [element]
         case .set(let element):
-            return [element]
+            return element == .none ? [] : [element]
         case .unwrappedOptional(let type):
             return type.generics
         default:
@@ -140,11 +140,15 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     func withGenerics(_ generics: [TypeSignature]) -> TypeSignature {
         switch self {
         case .array:
-            if generics.count == 1 {
+            if generics.isEmpty {
+                return .array(.none)
+            } else if generics.count == 1 {
                 return .array(generics[0])
             }
         case .dictionary:
-            if generics.count == 2 {
+            if generics.isEmpty {
+                return .dictionary(.none, .none)
+            } else if generics.count == 2 {
                 return .dictionary(generics[0], generics[1])
             }
         case .member(let base, let type):
@@ -160,11 +164,15 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .optional(let type):
             return .optional(type.withGenerics(generics))
         case .range:
-            if generics.count == 1 {
+            if generics.isEmpty {
+                return .set(.none)
+            } else if generics.count == 1 {
                 return .range(generics[0])
             }
         case .set:
-            if generics.count == 1 {
+            if generics.isEmpty {
+                return .set(.none)
+            } else if generics.count == 1 {
                 return .set(generics[0])
             }
         case .unwrappedOptional(let type):

@@ -54,7 +54,7 @@ struct KotlinCaseTargetVariable {
 extension ExtensionDeclaration {
     /// Whether this extension's members can be moved into the extended type definition.
     var canMoveIntoExtendedType: Bool {
-        return extends.generics.isEmpty && generics.isEmpty
+        return extends.generics.isEmpty && !generics.entries.contains { $0.whereEqual != nil || !$0.inherits.isEmpty }
     }
 }
 

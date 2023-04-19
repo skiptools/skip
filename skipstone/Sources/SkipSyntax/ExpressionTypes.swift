@@ -623,13 +623,13 @@ class FunctionCall: Expression {
                 // constructor params to resolve generics
                 baseType = identifier.inferredType.asMetaType(false)
                 name = "init"
-            } else if identifier.generics.isEmpty {
+            } else if let generics = identifier.generics, !generics.isEmpty {
+                // If generics are specified, assume the identifier is a type name and this call is a constructor
+                returnType = TypeSignature.for(name: identifier.name, genericTypes: generics)
+                return context
+            } else {
                 baseType = nil
                 name = identifier.name
-            } else {
-                // If generics are specified, assume the identifier is a type name and this call is a constructor
-                returnType = TypeSignature.for(name: identifier.name, genericTypes: identifier.generics)
-                return context
             }
         case .memberAccess:
             let memberAccess = function as! MemberAccess
@@ -696,12 +696,12 @@ class FunctionCall: Expression {
 /// `x`, also `this` or `super`
 class Identifier: Expression {
     let name: String
-    private(set) var generics: [TypeSignature]
+    private(set) var generics: [TypeSignature]?
     /// Whether this appears to be a local variable or parameter.
     private(set) var isLocalOrSelfIdentifier: Bool
     var isCalledAsFunction = false
 
-    init(name: String, generics: [TypeSignature] = [], isLocalOrSelfIdentifier: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
+    init(name: String, generics: [TypeSignature]? = nil, isLocalOrSelfIdentifier: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.name = name
         self.generics = generics
         self.isLocalOrSelfIdentifier = isLocalOrSelfIdentifier
@@ -710,7 +710,7 @@ class Identifier: Expression {
 
     override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
         let name: String
-        var generics: [TypeSignature] = []
+        var generics: [TypeSignature]? = nil
         if syntax.kind == .identifierExpr, let identifierExpr = syntax.as(IdentifierExprSyntax.self) {
             name = identifierExpr.identifier.text
         } else if syntax.kind == .superRefExpr {
@@ -725,12 +725,12 @@ class Identifier: Expression {
     }
 
     override func resolveAttributes(in syntaxTree: SyntaxTree) {
-        generics = generics.map { $0.qualified(in: self) }
+        generics = generics?.map { $0.qualified(in: self) }
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
         identifierType = context.identifier(name)
-        if !generics.isEmpty {
+        if let generics, !generics.isEmpty {
             identifierType = identifierType.withGenerics(generics.map { $0.constrainedTypeWithGenerics(context.generics) })
         }
         identifierType = identifierType.or(expecting)
@@ -747,7 +747,10 @@ class Identifier: Expression {
     }
 
     override var prettyPrintAttributes: [PrettyPrintTree] {
-        let children = generics.isEmpty ? [] : [PrettyPrintTree(root: "<\(generics.map(\.description).joined(separator: ", "))>" )]
+        var children: [PrettyPrintTree] = []
+        if let generics, !generics.isEmpty {
+            children = [PrettyPrintTree(root: "<\(generics.map(\.description).joined(separator: ", "))>" )]
+        }
         return [PrettyPrintTree(root: name, children: children)]
     }
 }
@@ -908,11 +911,11 @@ class MemberAccess: Expression {
     let base: Expression?
     private(set) var baseType: TypeSignature
     let member: String
-    private(set) var generics: [TypeSignature]
+    private(set) var generics: [TypeSignature]?
     let useMultlineFormatting: Bool
     var isCalledAsFunction = false
 
-    init(base: Expression?, baseType: TypeSignature = .none, member: String, generics: [TypeSignature], useMultlineFormatting: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
+    init(base: Expression?, baseType: TypeSignature = .none, member: String, generics: [TypeSignature]? = nil, useMultlineFormatting: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.base = base
         self.baseType = baseType
         self.member = member
@@ -923,7 +926,7 @@ class MemberAccess: Expression {
 
     override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
         var syntax = syntax
-        var generics: [TypeSignature] = []
+        var generics: [TypeSignature]? = nil
         if syntax.kind == .specializeExpr, let specializeExpr = syntax.as(SpecializeExprSyntax.self), specializeExpr.expression.kind == .memberAccessExpr {
             syntax = specializeExpr.expression
             generics = specializeExpr.genericArgumentClause.arguments.map { TypeSignature.for(syntax: $0.argumentType) }
@@ -949,7 +952,7 @@ class MemberAccess: Expression {
 
     override func resolveAttributes(in syntaxTree: SyntaxTree) {
         baseType = baseType.qualified(in: self)
-        generics = generics.map { $0.qualified(in: self) }
+        generics = generics?.map { $0.qualified(in: self) }
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
@@ -960,7 +963,11 @@ class MemberAccess: Expression {
         } else {
             baseType = baseType.or(expecting.asMetaType(true).asOptional(false))
         }
-        memberType = context.member(member, in: baseType).withGenerics(generics).or(expecting)
+        memberType = context.member(member, in: baseType)
+        if let generics {
+            memberType = memberType.withGenerics(generics)
+        }
+        memberType = memberType.or(expecting)
         return context
     }
 
