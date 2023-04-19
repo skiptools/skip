@@ -232,6 +232,10 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                 element.addGenericMappings(to: element2, into: &generics)
             } else if case .set(let element2) = to {
                 element.addGenericMappings(to: element2, into: &generics)
+            } else if case .range(let element2) = to {
+                element.addGenericMappings(to: element2, into: &generics)
+            } else if case .named(_, let genericTypes) = to, genericTypes.count == 1 {
+                element.addGenericMappings(to: genericTypes[0], into: &generics)
             }
         case .composition(let types):
             if case .composition(let types2) = to, types.count == types2.count {
@@ -259,6 +263,14 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .named(let name, let genericTypes):
             if case .named(let name2, let genericTypes2) = to, name == name2, genericTypes.count == genericTypes2.count {
                 zip(genericTypes, genericTypes2).forEach { $0.0.addGenericMappings(to: $0.1, into: &generics) }
+            } else if genericTypes.count == 1 {
+                if case .array(let element) = to {
+                    genericTypes[0].addGenericMappings(to: element, into: &generics)
+                } else if case .set(let element) = to {
+                    genericTypes[0].addGenericMappings(to: element, into: &generics)
+                } else if case .range(let element) = to {
+                    genericTypes[0].addGenericMappings(to: element, into: &generics)
+                }
             }
         case .optional(let type):
             if case .optional(let type2) = to {
@@ -269,6 +281,12 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .range(let element):
             if case .range(let element2) = to {
                 element.addGenericMappings(to: element2, into: &generics)
+            } else if case .array(let element2) = to {
+                element.addGenericMappings(to: element2, into: &generics)
+            } else if case .set(let element2) = to {
+                element.addGenericMappings(to: element2, into: &generics)
+            } else if case .named(_, let genericTypes) = to, genericTypes.count == 1 {
+                element.addGenericMappings(to: genericTypes[0], into: &generics)
             }
         case .set(let element):
             if case .set(let element2) = to {
