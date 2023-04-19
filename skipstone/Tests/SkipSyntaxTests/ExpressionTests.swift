@@ -165,6 +165,36 @@ final class ExpressionTests: XCTestCase {
         """)
     }
 
+    func testAvailableFunctionDeprecated() async throws {
+        try await check(expectFailure: true, swift: """
+        class C {
+            @available(*, deprecated, message: "this function is deprecated")
+            func f() {
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            @Deprecated(message = "this function is deprecated", level = DeprecationLevel.WARNING) internal open fun f() {
+            }
+        }
+        """)
+    }
+
+    func testAvailableFunctionUnavailable() async throws {
+        try await check(expectFailure: true, swift: """
+        class C {
+            @available(*, unavailable, message: "this function is unavailable")
+            func f() {
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            @Deprecated(message = "this function is unavailable", level = DeprecationLevel.ERROR) internal open fun f() {
+            }
+        }
+        """)
+    }
+
     func testIfAvailableIsTrue() async throws {
         try await check(swift: """
         func f() {

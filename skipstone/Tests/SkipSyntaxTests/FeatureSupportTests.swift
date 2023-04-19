@@ -3,11 +3,54 @@ import XCTest
 
 /// A test case that verifies that transpilation are *not* working as hoped.
 final class FeatureSupportTests: XCTestCase {
+
     func testCheckSwiftCompiledSource() async throws {
         try await check(swiftCode: {
             return "\(1 + 2)"
         }, kotlin: """
             return "${1 + 2}"
+            """)
+    }
+
+    func testAssignToUnderscore() async throws {
+        // error: error: Skip cannot translate this statement to Kotlin [binding]
+        try await check(expectFailure: true, swiftCode: {
+            _ = "abc"
+            return ""
+        }, kotlin: """
+            "abc"
+            return ""
+            """)
+    }
+
+    func testCheckUnavailableFunctions() async throws {
+        try await check(expectFailure: true, swiftCode: {
+            @available(*, unavailable, message: "this function is unimplemented")
+            func someOldFunction() -> String {
+                return ""
+            }
+            return ""
+        }, kotlin: """
+            @Deprecated(message = "this function is unimplemented", level = DeprecationLevel.ERROR)
+            fun someOldFunction(): String {
+                return ""
+            }
+            return ""
+            """)
+    }
+
+    func testCheckDeprecatedFunctions() async throws {
+        try await check(expectFailure: true, swiftCode: {
+            @available(*, deprecated, message: "this function is deprecated")
+            func someDepFunction() -> String {
+                return ""
+            }
+            return ""
+        }, kotlin: """
+            @Deprecated(message = "this function is deprecated", level = DeprecationLevel.WARNING) fun someDepFunction(): String {
+                return ""
+            }
+            return ""
             """)
     }
 
@@ -194,21 +237,3 @@ final class FeatureSupportTests: XCTestCase {
         """)
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
