@@ -33,6 +33,10 @@ struct Operator: Equatable {
         return Operator(symbol: symbol, associativity: .left, precedence: .unknown)
     }
 
+    var isUnknown: Bool {
+        return precedence == .unknown
+    }
+
     enum Precedence: Int {
         case assignment = 0
         case ternary

@@ -195,4 +195,20 @@ final class ExpressionTests: XCTestCase {
         }
         """)
     }
+
+    func testOperatorAsParameter() async throws {
+        try await check(supportingSwift: """
+        func perform(on: Int, operation: (Int, Int) -> Int) -> Int {
+            return operation(on, on)
+        }
+        """, swift: """
+        {
+            perform(on: 10, +)
+        }
+        """, kotlin: """
+        {
+            perform(on = 10, { it, it_1 -> it + it_1 })
+        }
+        """)
+    }
 }

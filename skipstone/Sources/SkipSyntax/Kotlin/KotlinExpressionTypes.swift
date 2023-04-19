@@ -615,7 +615,12 @@ class KotlinFunctionCall: KotlinExpression {
             if let label = argument.label {
                 output.append(label).append(" = ")
             }
-            output.append(argument.value, indentation: indentation)
+            // Handle binary operators used in place of closures
+            if let identifier = argument.value as? KotlinIdentifier, !Operator.with(symbol: identifier.name).isUnknown {
+                output.append("{ it, it_1 -> it \(identifier.name) it_1 }")
+            } else {
+                output.append(argument.value, indentation: indentation)
+            }
             if index < arguments.count - 1 {
                 output.append(", ")
             }
