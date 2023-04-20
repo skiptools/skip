@@ -44,7 +44,7 @@ public struct GradleDriver {
 
         guard let gradleVersionString = self.gradleInfo["Gradle"],
               let gradleVersion = Version(gradleVersionString) else {
-            throw GradleDriverError.noGradleVersion(gradle: self.gradlePath)
+            throw GradleDriverError.noGradleVersion(gradle: self.gradlePath, props: self.gradleInfo)
         }
 
         self.gradleVersion = gradleVersion
@@ -510,12 +510,14 @@ public enum GradleDriverError : Error, LocalizedError {
     case commandNoResult(String)
 
     /// The Gradle version could not be parsed from the output of `gradle --version`
-    case noGradleVersion(gradle: URL)
+    case noGradleVersion(gradle: URL, props: [String: String])
+
     /// The Gradle version is unsupported
     case gradleVersionTooLow(gradle: URL, version: Version, minimum: Version)
 
     /// The Kotlin version could not be parsed from the output of `gradle --version`
     case noKotlinVersion(gradle: URL)
+
     /// The Gradle version is unsupported
     case kotlinVersionTooLow(gradle: URL, version: Version, minimum: Version)
 
@@ -528,8 +530,8 @@ public enum GradleDriverError : Error, LocalizedError {
             return "Could not locate tool: «\(string)»"
         case .commandNoResult(let string):
             return "The command «\(string)» returned no result."
-        case .noGradleVersion(let gradle):
-            return "The instaled Gradle version from \(gradle.path) could not be parsed at \(gradle.path). Install with the command: brew install gradle."
+        case .noGradleVersion(let gradle, let props):
+            return "The installed Gradle version from \(gradle.path) could not be parsed from \(props). Install with the command: brew install gradle."
         case .gradleVersionTooLow(let gradle, let version, let minimum):
             return "The Gradle version \(version) is below the minimum supported version \(minimum) at \(gradle.path). Update with the command: brew upgrade gradle."
         case .noKotlinVersion(let gradle):
