@@ -589,7 +589,7 @@ class FunctionCall: Expression {
                 return LabeledValue(label: label, value: expression)
             }
         }
-        return FunctionCall(function: function, arguments: labeledExpressions)
+        return FunctionCall(function: function, arguments: labeledExpressions, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
@@ -672,12 +672,9 @@ class FunctionCall: Expression {
 
     private func candidateFunction(name: String, arguments: [LabeledValue<Expression>], in baseType: TypeSignature?, context: TypeInferenceContext, expecting: TypeSignature, message: Bool) -> TypeSignature? {
         let parameters = arguments.map { LabeledValue<TypeSignature>(label: $0.label, value: $0.value.inferredType) }
-        let candidateFunctions = context.function(name, in: baseType, parameters: parameters)
+        let candidateFunctions = context.function(name, in: baseType, parameters: parameters, messagesNode: message ? self : nil)
         guard !candidateFunctions.isEmpty else {
             return nil
-        }
-        if candidateFunctions.count > 1 {
-            messages.append(.ambiguousFunctionCall(sourceDerived: self, source: context.source))
         }
         return candidateFunctions.first { $0.returnType == expecting } ?? candidateFunctions[0]
     }
@@ -729,7 +726,7 @@ class Identifier: Expression {
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
-        identifierType = context.identifier(name)
+        identifierType = context.identifier(name, messagesNode: self)
         if let generics, !generics.isEmpty {
             identifierType = identifierType.withGenerics(generics.map { $0.constrainedTypeWithGenerics(context.generics) })
         }
@@ -963,7 +960,7 @@ class MemberAccess: Expression {
         } else {
             baseType = baseType.or(expecting.asMetaType(true).asOptional(false))
         }
-        memberType = context.member(member, in: baseType)
+        memberType = context.member(member, in: baseType, messagesNode: self)
         if let generics {
             memberType = memberType.withGenerics(generics)
         }
@@ -1103,7 +1100,7 @@ class OptionalBinding: Expression, BindingExpression {
             if let value {
                 variableType = value.inferredType
             } else {
-                variableType = TypeSignature.for(labels: names, types: names.map { $0.map { context.identifier($0) } ?? .none })
+                variableType = TypeSignature.for(labels: names, types: names.map { $0.map { context.identifier($0, messagesNode: self) } ?? .none })
             }
         }
         // Flow will only continue when the value is non-optional
@@ -1379,11 +1376,8 @@ class Subscript: Expression {
         // First we infer argument types without knowing the function, so we expect .none
         arguments.forEach { $0.value.inferTypes(context: context, expecting: .none) }
         let parameters = arguments.map { LabeledValue<TypeSignature>(label: $0.label, value: $0.value.inferredType) }
-        let candidateFunctions = context.subscript(in: base.inferredType, parameters: parameters)
+        let candidateFunctions = context.subscript(in: base.inferredType, parameters: parameters, messagesNode: self)
         if !candidateFunctions.isEmpty {
-            if candidateFunctions.count > 1 {
-                messages.append(.ambiguousFunctionCall(sourceDerived: self, source: context.source))
-            }
             let function = candidateFunctions.first { $0.returnType == expecting } ?? candidateFunctions[0]
             // Re-infer arguments now that we know the parameter types
             for (index, argument) in arguments.enumerated() {

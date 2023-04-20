@@ -1643,6 +1643,7 @@ class KotlinInterfaceDeclaration: KotlinStatement {
 
 class KotlinTypealiasDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var name: String
+    var attributes = Attributes()
     var modifiers = Modifiers()
     var generics = Generics()
     var aliasedType: TypeSignature = .none
@@ -1658,6 +1659,7 @@ class KotlinTypealiasDeclaration: KotlinStatement, KotlinMemberDeclaration {
         kstatement.modifiers = statement.modifiers
         kstatement.generics = statement.generics
         kstatement.aliasedType = statement.aliasedType
+        kstatement.attributes = kstatement.processAttributes(statement.attributes, translator: translator)
 
         var isNested = false
         if statement.owningFunctionDeclaration != nil {
@@ -1718,10 +1720,15 @@ class KotlinTypealiasDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
-        output.append(indentation).append(modifiers.kotlinMemberString(isOpen: false, suffix: " "))
-        output.append("typealias ").append(name)
-        generics.append(to: output, indentation: indentation)
-        output.append(" = ").append(aliasedType.kotlin).append("\n")
+        if let declaration = extras?.declaration {
+            output.append(indentation).append(declaration).append("\n")
+        } else {
+            attributes.append(to: output, indentation: indentation)
+            output.append(indentation).append(modifiers.kotlinMemberString(isOpen: false, suffix: " "))
+            output.append("typealias ").append(name)
+            generics.append(to: output, indentation: indentation)
+            output.append(" = ").append(aliasedType.kotlin).append("\n")
+        }
     }
 }
 

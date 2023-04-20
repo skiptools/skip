@@ -887,6 +887,7 @@ class ImportDeclaration: Statement {
 /// `typealias ...`
 class TypealiasDeclaration: Statement {
     let name: String
+    let attributes: Attributes
     private(set) var modifiers: Modifiers
     private(set) var generics: Generics
     private(set) var aliasedType: TypeSignature
@@ -895,8 +896,9 @@ class TypealiasDeclaration: Statement {
     }
     private var _signature: TypeSignature?
 
-    init(name: String, modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), aliasedType: TypeSignature, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(name: String, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), aliasedType: TypeSignature, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.name = name
+        self.attributes = attributes
         self.modifiers = modifiers
         self.generics = generics
         self.aliasedType = aliasedType
@@ -908,6 +910,7 @@ class TypealiasDeclaration: Statement {
             return nil
         }
         let name = typealiasDecl.identifier.text
+        let attributes = Attributes.for(syntax: typealiasDecl.attributes, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: typealiasDecl.modifiers)
         let (generics, messages) = Generics.for(syntax: typealiasDecl.genericParameterClause, where: typealiasDecl.genericWhereClause, in: syntaxTree)
         let aliasedType = TypeSignature.for(syntax: typealiasDecl.initializer.value)

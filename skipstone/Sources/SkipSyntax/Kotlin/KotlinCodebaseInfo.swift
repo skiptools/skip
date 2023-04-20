@@ -62,7 +62,8 @@ extension CodebaseInfo.Context {
         guard !declaration.names.isEmpty, let name = declaration.names[0] else {
             return false
         }
-        return identifierSignature(of: name, inConstrained: type.constrainedTypeWithGenerics(generics), excludeConstrainedExtensions: true) != .none
+        let (signature, _) = identifierSignature(of: name, inConstrained: type.constrainedTypeWithGenerics(generics), excludeConstrainedExtensions: true)
+        return signature != .none
     }
 
     /// Whether this declaration is implementing a function of the given type, excluding Kotlin extension properties and functions.
@@ -71,7 +72,8 @@ extension CodebaseInfo.Context {
         let constrainedSignature = declaration.functionType.constrainedTypeWithGenerics(generics)
         let parameters = constrainedSignature.parameters
         let arguments = parameters.map { LabeledValue(label: $0.label, value: $0.type) }
-        return !functionSignature(of: declaration.name, inConstrained: type.constrainedTypeWithGenerics(generics), arguments: arguments, excludeConstrainedExtensions: true).isEmpty
+        let signatures = functionSignature(of: declaration.name, inConstrained: type.constrainedTypeWithGenerics(generics), arguments: arguments, excludeConstrainedExtensions: true)
+        return !signatures.isEmpty
     }
 
     /// Whether this declaration is implementing a protocol property.

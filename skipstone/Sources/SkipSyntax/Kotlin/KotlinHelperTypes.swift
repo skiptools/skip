@@ -133,56 +133,30 @@ extension Attributes {
 }
 
 extension Attribute {
-    var kotlinIsSupported: Bool {
-        switch signature {
-        case .named(let name, _):
-            return name == "available"
-        default:
-            return false
-        }
-    }
-
-    var kotlinIsIgnorable: Bool {
-        switch signature {
-        case .named(let name, _):
-            return name == "discardableResult" || name == "indirect"
-        default:
-            return false
-        }
-    }
-
     func append(to output: OutputGenerator, indentation: Indentation) {
-        guard case .named(let name, _) = signature, name == "available" else {
-            return
-        }
-        guard let messageToken = tokens.first(where: { $0.hasPrefix("message: ") }) else {
-            return
-        }
-        let message = messageToken.dropFirst("message: ".count)
-        if tokens.contains("deprecated") {
-            output.append(indentation).append("@Deprecated(\(message))\n")
-        } else if tokens.contains("unavailable") {
-            output.append(indentation).append("@Deprecated(\(message), level = DeprecationLevel.ERROR)\n")
+        switch kind {
+        case .deprecated:
+            let message = self.message ?? Message.deprecatedLabel
+            output.append(indentation).append("@Deprecated(\"\(message)\")\n")
+        case .unavailable:
+            let message = self.message ?? Message.unavailableLabel
+            output.append(indentation).append("@Deprecated(\"\(message)\", level = DeprecationLevel.ERROR)\n")
+        default:
+            break
         }
     }
 }
 
 extension KotlinStatement {
-    /// Return supported messages and add warnings for unsupported messages.
+    /// Return supported attributes and add warnings for unsupported attributes.
     func processAttributes(_ attributes: Attributes, translator: KotlinTranslator) -> Attributes {
-        var supported: [Attribute] = []
-        var hasUnsupported = false
-        for attribute in attributes.attributes {
-            if attribute.kotlinIsSupported {
-                supported.append(attribute)
-            } else if !attribute.kotlinIsIgnorable {
-                hasUnsupported = true
-            }
-        }
-        if hasUnsupported {
+        let supported: [Attribute] = attributes.attributes.filter { $0.kind != .unknown }
+        if supported.count == attributes.attributes.count {
+            return attributes
+        } else {
             messages.append(.kotlinAttributeUnsupported(self, source: translator.syntaxTree.source))
+            return Attributes(attributes: supported)
         }
-        return Attributes(attributes: supported)
     }
 }
 

@@ -74,6 +74,9 @@ public struct Message: Error, CustomStringConvertible, Encodable {
 }
 
 extension Message {
+    static let deprecatedLabel = "This API is deprecated"
+    static let unavailableLabel = "This API is not available in Skip"
+
     static func unsupportedSyntax(_ syntax: SyntaxProtocol, source: Source) -> Message {
         let range = syntax.range(in: source)
         return Message(kind: .error, message: "Skip does not support this Swift syntax [\(syntax.kind)]", source: source, sourceRange: range)
@@ -84,8 +87,16 @@ extension Message {
         return Message(kind: .error, message: "Skip does not support this Swift type syntax [\(syntax.kind)]", source: source, sourceRange: range)
     }
 
-    static func ambiguousFunctionCall(sourceDerived: SourceDerived, source: Source) -> Message {
+    static func ambiguousFunctionCall(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .warning, message: "Skip is unable to disambiguate this function call. Consider differentiating your functions with unique parameter labels", sourceDerived: sourceDerived, source: source)
+    }
+
+    static func availabilityUnavailable(message: String?, sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: message ?? unavailableLabel, sourceDerived: sourceDerived, source: source)
+    }
+
+    static func availabilityDeprecated(message: String?, sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .warning, message: message ?? deprecatedLabel, sourceDerived: sourceDerived, source: source)
     }
 
     static func ifDeclPlacement(_ syntax: SyntaxProtocol, source: Source) -> Message {

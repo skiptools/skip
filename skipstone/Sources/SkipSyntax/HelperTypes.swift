@@ -351,6 +351,52 @@ struct Attribute {
             return Attribute(signature: signature)
         }
     }
+
+    /// The attribute kind, if it is recognized.
+    enum Kind {
+        case available
+        case deprecated
+        case discardableResult
+        case indirect
+        case unavailable
+        case unknown
+    }
+
+    /// The attribute kind, if it is recognized.
+    var kind: Kind {
+        guard case .named(let name, _) = signature else {
+            return .unknown
+        }
+        switch name {
+        case "available":
+            if tokens.contains("unavailable") {
+                return .unavailable
+            } else if tokens.contains("deprecated") {
+                return .deprecated
+            } else {
+                return .available
+            }
+        case "discardableResult":
+            return .discardableResult
+        case "indirect":
+            return .indirect
+        default:
+            return .unknown
+        }
+    }
+
+    /// The string contained in any `message: "..."` token.
+    var message: String? {
+        guard let messageToken = tokens.first(where: { $0.hasPrefix("message: ") }) else {
+            return nil
+        }
+        let message = messageToken.dropFirst("message: ".count)
+        if message.hasPrefix("\"") && message.hasSuffix("\"") {
+            return String(message.dropFirst().dropLast())
+        } else {
+            return String(message)
+        }
+    }
 }
 
 /// Generic information for a type or API.

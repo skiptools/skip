@@ -134,7 +134,7 @@ struct TypeInferenceContext {
     }
 
     /// Return the type of the given identifier.
-    func identifier(_ name: String) -> TypeSignature {
+    func identifier(_ name: String, messagesNode: SyntaxNode?) -> TypeSignature {
         // First check local identifiers
         if let identifierType = localIdentifierTypes[name] {
             return identifierType.constrainedTypeWithGenerics(generics)
@@ -167,12 +167,15 @@ struct TypeInferenceContext {
                 continue
             }
             let signature = typeDeclaration.signature.asMetaType(pathEntry.isStatic)
-            let type = codebaseInfo.identifierSignature(of: name, inConstrained: signature.constrainedTypeWithGenerics(generics))
+            let (type, availability) = codebaseInfo.identifierSignature(of: name, inConstrained: signature.constrainedTypeWithGenerics(generics))
             if type != .none {
+                addMessages(to: messagesNode, for: [availability])
                 return type
             }
         }
-        return codebaseInfo.identifierSignature(of: name)
+        let (type, availability) = codebaseInfo.identifierSignature(of: name)
+        addMessages(to: messagesNode, for: [availability])
+        return type
     }
 
     /// Whether the given name maps to a local identifier or parameter.
@@ -192,16 +195,16 @@ struct TypeInferenceContext {
     }
 
     /// Return the type of the given member.
-    func member(_ name: String, in type: TypeSignature) -> TypeSignature {
+    func member(_ name: String, in type: TypeSignature, messagesNode: SyntaxNode?) -> TypeSignature {
         if type.isOptional {
-            let result = member(name, inNonOptional: type.asOptional(false))
+            let result = member(name, inNonOptional: type.asOptional(false), messagesNode: messagesNode)
             return result.asOptional(true)
         } else {
-            return member(name, inNonOptional: type)
+            return member(name, inNonOptional: type, messagesNode: messagesNode)
         }
     }
 
-    private func member(_ name: String, inNonOptional type: TypeSignature) -> TypeSignature {
+    private func member(_ name: String, inNonOptional type: TypeSignature, messagesNode: SyntaxNode?) -> TypeSignature {
         if case .tuple(let labels, let types) = type {
             if let labelIndex = labels.firstIndex(of: name) {
                 return types[labelIndex].constrainedTypeWithGenerics(generics)
@@ -215,7 +218,9 @@ struct TypeInferenceContext {
         guard let codebaseInfo else {
             return .none
         }
-        return codebaseInfo.identifierSignature(of: name, inConstrained: type.constrainedTypeWithGenerics(generics))
+        let (member, availability) = codebaseInfo.identifierSignature(of: name, inConstrained: type.constrainedTypeWithGenerics(generics))
+        addMessages(to: messagesNode, for: [availability])
+        return member
     }
 
     /// Return the signatures of the functions matching the given parameters.
@@ -224,23 +229,25 @@ struct TypeInferenceContext {
     ///
     /// - Parameters:
     ///   - type: The function's owning type if this is a member function, or nil if not.
-    func function(_ name: String, in type: TypeSignature?, parameters: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
+    func function(_ name: String, in type: TypeSignature?, parameters: [LabeledValue<TypeSignature>], messagesNode: SyntaxNode?) -> [TypeSignature] {
         if let type, type.isOptional {
-            return function(name, inNonOptional: type.asOptional(false), parameters: parameters).map {
+            return function(name, inNonOptional: type.asOptional(false), parameters: parameters, messagesNode: messagesNode).map {
                 .function($0.parameters, $0.returnType.asOptional(true))
             }
         } else {
-            return function(name, inNonOptional: type, parameters: parameters)
+            return function(name, inNonOptional: type, parameters: parameters, messagesNode: messagesNode)
         }
     }
 
-    private func function(_ name: String, inNonOptional type: TypeSignature?, parameters: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
+    private func function(_ name: String, inNonOptional type: TypeSignature?, parameters: [LabeledValue<TypeSignature>], messagesNode: SyntaxNode?) -> [TypeSignature] {
         guard let codebaseInfo else {
             return []
         }
         let constrainedArguments = parameters.map { LabeledValue(label: $0.label, value: $0.value.constrainedTypeWithGenerics(generics)) }
         if let type {
-            return codebaseInfo.functionSignature(of: name, inConstrained: type.constrainedTypeWithGenerics(generics), arguments: constrainedArguments)
+            let candidates = codebaseInfo.functionSignature(of: name, inConstrained: type.constrainedTypeWithGenerics(generics), arguments: constrainedArguments)
+            addMessages(to: messagesNode, for: candidates.map(\.1))
+            return candidates.map(\.0)
         }
 
         // Not a known member function. Check functions that can be invoked without a target type
@@ -252,12 +259,33 @@ struct TypeInferenceContext {
                 continue
             }
             let signature = typeDeclaration.signature.asMetaType(pathEntry.isStatic)
-            let results = codebaseInfo.functionSignature(of: name, inConstrained: signature.constrainedTypeWithGenerics(generics), arguments: constrainedArguments)
-            if !results.isEmpty {
-                return results
+            let candidates = codebaseInfo.functionSignature(of: name, inConstrained: signature.constrainedTypeWithGenerics(generics), arguments: constrainedArguments)
+            if !candidates.isEmpty {
+                addMessages(to: messagesNode, for: candidates.map(\.1))
+                return candidates.map(\.0)
             }
         }
-        return codebaseInfo.functionSignature(of: name, arguments: constrainedArguments)
+        let candidates = codebaseInfo.functionSignature(of: name, arguments: constrainedArguments)
+        addMessages(to: messagesNode, for: candidates.map(\.1))
+        return candidates.map(\.0)
+    }
+
+    private func addMessages(to messagesNode: SyntaxNode?, for availability: [CodebaseInfo.Availability]) {
+        guard let messagesNode, !availability.isEmpty else {
+            return
+        }
+        if availability.allSatisfy({ if case .unavailable = $0 { return true } else { return false } }) {
+            if case .unavailable(let message) = availability[0] {
+                messagesNode.messages.append(.availabilityUnavailable(message: message, sourceDerived: messagesNode, source: source))
+            }
+        } else if availability.allSatisfy({ if case .deprecated = $0 { return true } else { return false } }) {
+            if case .deprecated(let message) = availability[0] {
+                messagesNode.messages.append(.availabilityDeprecated(message: message, sourceDerived: messagesNode, source: source))
+            }
+        }
+        if availability.count > 1 {
+            messagesNode.messages.append(.ambiguousFunctionCall(messagesNode, source: source))
+        }
     }
 
     /// Return the signatures of the subscripts matching the given parameters.
@@ -266,22 +294,24 @@ struct TypeInferenceContext {
     ///
     /// - Parameters:
     ///   - type: The subscript's owning type.
-    func `subscript`(in type: TypeSignature, parameters: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
+    func `subscript`(in type: TypeSignature, parameters: [LabeledValue<TypeSignature>], messagesNode: SyntaxNode?) -> [TypeSignature] {
         if case .optional = type {
-            return self.subscript(inNonOptional: type.asOptional(false), parameters: parameters).map {
+            return self.subscript(inNonOptional: type.asOptional(false), parameters: parameters, messagesNode: messagesNode).map {
                 .function($0.parameters, $0.returnType.asOptional(true))
             }
         } else {
-            return self.subscript(inNonOptional: type, parameters: parameters)
+            return self.subscript(inNonOptional: type, parameters: parameters, messagesNode: messagesNode)
         }
     }
 
-    private func `subscript`(inNonOptional type: TypeSignature, parameters: [LabeledValue<TypeSignature>]) -> [TypeSignature] {
+    private func `subscript`(inNonOptional type: TypeSignature, parameters: [LabeledValue<TypeSignature>], messagesNode: SyntaxNode?) -> [TypeSignature] {
         guard let codebaseInfo else {
             return []
         }
         let constrainedArguments = parameters.map { LabeledValue(label: $0.label, value: $0.value.constrainedTypeWithGenerics(generics)) }
-        return codebaseInfo.subscriptSignature(inConstrained: type.constrainedTypeWithGenerics(generics), arguments: constrainedArguments)
+        let candidates = codebaseInfo.subscriptSignature(inConstrained: type.constrainedTypeWithGenerics(generics), arguments: constrainedArguments)
+        addMessages(to: messagesNode, for: candidates.map(\.1))
+        return candidates.map(\.0)
     }
 
     /// For an operation on two types, return the probable result type.

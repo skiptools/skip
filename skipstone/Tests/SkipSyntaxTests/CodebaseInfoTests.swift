@@ -27,14 +27,14 @@ final class CodebaseInfoTests: XCTestCase {
         }
         """)
 
-        XCTAssertEqual(.string, context.identifierSignature(of: "stringVar"))
-        XCTAssertEqual(.array(.int), context.identifierSignature(of: "arrayVar"))
-        XCTAssertEqual(.dictionary(.string, .int), context.identifierSignature(of: "dictionaryVar"))
-        XCTAssertEqual(.dictionary(.string, .dictionary(.string, .int)), context.identifierSignature(of: "dictionaryOfDictionariesVar"))
-        XCTAssertEqual(.named("TestClass", []), context.identifierSignature(of: "namedVar"))
-        XCTAssertEqual(.member(.named("TestClass", []), .named("Nested", [])), context.identifierSignature(of: "nestedVar"))
-        XCTAssertEqual(.metaType(.named("TestClass", [])), context.identifierSignature(of: "TestClass"))
-        XCTAssertEqual(.metaType(.member(.named("TestClass", []), .named("Nested", []))), context.identifierSignature(of: "TestClass.Nested"))
+        XCTAssertEqual(.string, context.identifierSignature(of: "stringVar").0)
+        XCTAssertEqual(.array(.int), context.identifierSignature(of: "arrayVar").0)
+        XCTAssertEqual(.dictionary(.string, .int), context.identifierSignature(of: "dictionaryVar").0)
+        XCTAssertEqual(.dictionary(.string, .dictionary(.string, .int)), context.identifierSignature(of: "dictionaryOfDictionariesVar").0)
+        XCTAssertEqual(.named("TestClass", []), context.identifierSignature(of: "namedVar").0)
+        XCTAssertEqual(.member(.named("TestClass", []), .named("Nested", [])), context.identifierSignature(of: "nestedVar").0)
+        XCTAssertEqual(.metaType(.named("TestClass", [])), context.identifierSignature(of: "TestClass").0)
+        XCTAssertEqual(.metaType(.member(.named("TestClass", []), .named("Nested", []))), context.identifierSignature(of: "TestClass.Nested").0)
     }
 
     func testMemberType() async throws {
@@ -51,13 +51,13 @@ final class CodebaseInfoTests: XCTestCase {
         }
         """)
 
-        XCTAssertEqual(.int, context.identifierSignature(of: "letVar", inConstrained: .named("TestStruct", [])))
-        XCTAssertEqual(.int, context.identifierSignature(of: "computedVar", inConstrained: .named("TestStruct", [])))
+        XCTAssertEqual(.int, context.identifierSignature(of: "letVar", inConstrained: .named("TestStruct", [])).0)
+        XCTAssertEqual(.int, context.identifierSignature(of: "computedVar", inConstrained: .named("TestStruct", [])).0)
 
-        XCTAssertEqual(.function([.init(label: "p", type: .string)], .int), context.identifierSignature(of: "f", inConstrained: .named("TestStruct", [])))
+        XCTAssertEqual(.function([.init(label: "p", type: .string)], .int), context.identifierSignature(of: "f", inConstrained: .named("TestStruct", [])).0)
 
-        XCTAssertEqual(.string, context.identifierSignature(of: "1", inConstrained: .tuple(["i", "s"], [.int, .string])))
-        XCTAssertEqual(.string, context.identifierSignature(of: "s", inConstrained: .tuple(["i", "s"], [.int, .string])))
+        XCTAssertEqual(.string, context.identifierSignature(of: "1", inConstrained: .tuple(["i", "s"], [.int, .string])).0)
+        XCTAssertEqual(.string, context.identifierSignature(of: "s", inConstrained: .tuple(["i", "s"], [.int, .string])).0)
     }
 
     func testVariableTypeResolution() async throws {
@@ -71,9 +71,9 @@ final class CodebaseInfoTests: XCTestCase {
         }
         """)
 
-        XCTAssertEqual(.int, context.identifierSignature(of: "v", inConstrained: .metaType(.named("TestStruct1", []))))
-        XCTAssertEqual(.int, context.identifierSignature(of: "v2", inConstrained: .metaType(.named("TestStruct1", []))))
-        XCTAssertEqual(.int, context.identifierSignature(of: "v2", inConstrained: .metaType(.named("TestStruct2", []))))
+        XCTAssertEqual(.int, context.identifierSignature(of: "v", inConstrained: .metaType(.named("TestStruct1", []))).0)
+        XCTAssertEqual(.int, context.identifierSignature(of: "v2", inConstrained: .metaType(.named("TestStruct1", []))).0)
+        XCTAssertEqual(.int, context.identifierSignature(of: "v2", inConstrained: .metaType(.named("TestStruct2", []))).0)
     }
 
     func testFailedVariableTypeResolutionProducesMessage() async throws {
@@ -93,14 +93,14 @@ final class CodebaseInfoTests: XCTestCase {
         }
         """)
 
-        XCTAssertEqual(.int, context.identifierSignature(of: "n", inConstrained: .named("TestClass.Nested", [])))
-        XCTAssertEqual(.int, context.identifierSignature(of: "n", inConstrained: .member(.named("TestClass", []), .named("Nested", []))))
+        XCTAssertEqual(.int, context.identifierSignature(of: "n", inConstrained: .named("TestClass.Nested", [])).0)
+        XCTAssertEqual(.int, context.identifierSignature(of: "n", inConstrained: .member(.named("TestClass", []), .named("Nested", []))).0)
     }
 
     func testSubscript() async throws {
         let context = try await setUpContext(swift: "")
-        XCTAssertEqual([.function([.init(type: .int)], .int)], context.subscriptSignature(inConstrained: .array(.int), arguments: [LabeledValue<TypeSignature>(label: nil, value: .int)]))
-        XCTAssertEqual([.function([.init(type: .string)], .int)], context.subscriptSignature(inConstrained: .dictionary(.string, .int), arguments: [LabeledValue<TypeSignature>(label: nil, value: .int)]))
+        XCTAssertEqual([.function([.init(type: .int)], .int)], context.subscriptSignature(inConstrained: .array(.int), arguments: [LabeledValue<TypeSignature>(label: nil, value: .int)]).map(\.0))
+        XCTAssertEqual([.function([.init(type: .string)], .int)], context.subscriptSignature(inConstrained: .dictionary(.string, .int), arguments: [LabeledValue<TypeSignature>(label: nil, value: .int)]).map(\.0))
     }
 
     func testFunction() async throws {
@@ -116,10 +116,10 @@ final class CodebaseInfoTests: XCTestCase {
         }
         """)
 
-        XCTAssertEqual([.function([], .void)], context.functionSignature(of: "voidF", inConstrained: .named("TestClass", []), arguments: []))
+        XCTAssertEqual([.function([], .void)], context.functionSignature(of: "voidF", inConstrained: .named("TestClass", []), arguments: []).map(\.0))
 
-        XCTAssertEqual([.function([.init(type: .int), .init(label: "p2", type: .string, hasDefaultValue: true)], .int)], context.functionSignature(of: "baseF", inConstrained: .named("TestClass", []), arguments: [LabeledValue<TypeSignature>(label: nil, value: .none), LabeledValue<TypeSignature>(label: "p2", value: .none)]))
-        XCTAssertEqual([.function([.init(type: .int)], .int)], context.functionSignature(of: "baseF", inConstrained: .named("TestClass", []), arguments: [LabeledValue<TypeSignature>(label: nil, value: .none)]))
+        XCTAssertEqual([.function([.init(type: .int), .init(label: "p2", type: .string, hasDefaultValue: true)], .int)], context.functionSignature(of: "baseF", inConstrained: .named("TestClass", []), arguments: [LabeledValue<TypeSignature>(label: nil, value: .none), LabeledValue<TypeSignature>(label: "p2", value: .none)]).map(\.0))
+        XCTAssertEqual([.function([.init(type: .int)], .int)], context.functionSignature(of: "baseF", inConstrained: .named("TestClass", []), arguments: [LabeledValue<TypeSignature>(label: nil, value: .none)]).map(\.0))
     }
 
     func testTrailingClosures() async throws {
@@ -142,17 +142,17 @@ final class CodebaseInfoTests: XCTestCase {
         }
         """)
 
-        XCTAssertEqual([.function([.init(label: "p1", type: .int), .init(label: "tc1", type: .function([.init(type: .string)], .int))], .string)], context.functionSignature(of: "trailingClosureF1", inConstrained: .named("TestClass", []), arguments: [LabeledValue<TypeSignature>(label: "p1", value: .none), LabeledValue<TypeSignature>(label: "tc1", value: .none)]))
+        XCTAssertEqual([.function([.init(label: "p1", type: .int), .init(label: "tc1", type: .function([.init(type: .string)], .int))], .string)], context.functionSignature(of: "trailingClosureF1", inConstrained: .named("TestClass", []), arguments: [LabeledValue<TypeSignature>(label: "p1", value: .none), LabeledValue<TypeSignature>(label: "tc1", value: .none)]).map(\.0))
 
         let f2Type: TypeSignature = .function([.init(label: "p1", type: .string, hasDefaultValue: true), .init(label: "tc1", type: .function([.init(type: .string), .init(type: .string)], .int), hasDefaultValue: true), .init(label: "tc2", type: .function([], .void), hasDefaultValue: true)], .void)
-        XCTAssertEqual([f2Type], context.functionSignature(of: "trailingClosureF2", inConstrained: .named("TestClass", []), arguments: [LabeledValue<TypeSignature>(label: "p1", value: .none), LabeledValue<TypeSignature>(label: "tc1", value: .none), LabeledValue<TypeSignature>(label: "tc2", value: .none)]))
-        XCTAssertEqual([f2Type], context.functionSignature(of: "trailingClosureF2", inConstrained: .named("TestClass", []), arguments: [LabeledValue<TypeSignature>(label: "p1", value: .none), LabeledValue<TypeSignature>(label: nil, value: .none), LabeledValue<TypeSignature>(label: "tc2", value: .none)]))
-        XCTAssertEqual([.function([], .void)], context.functionSignature(of: "trailingClosureF2", inConstrained: .named("TestClass", []), arguments: []))
+        XCTAssertEqual([f2Type], context.functionSignature(of: "trailingClosureF2", inConstrained: .named("TestClass", []), arguments: [LabeledValue<TypeSignature>(label: "p1", value: .none), LabeledValue<TypeSignature>(label: "tc1", value: .none), LabeledValue<TypeSignature>(label: "tc2", value: .none)]).map(\.0))
+        XCTAssertEqual([f2Type], context.functionSignature(of: "trailingClosureF2", inConstrained: .named("TestClass", []), arguments: [LabeledValue<TypeSignature>(label: "p1", value: .none), LabeledValue<TypeSignature>(label: nil, value: .none), LabeledValue<TypeSignature>(label: "tc2", value: .none)]).map(\.0))
+        XCTAssertEqual([.function([], .void)], context.functionSignature(of: "trailingClosureF2", inConstrained: .named("TestClass", []), arguments: []).map(\.0))
 
         let f3Type: TypeSignature = .function([.init(type: .optional(.dictionary(.int, .string)), hasDefaultValue: true), .init(label: "tc1", type: .function([], .array(.int)))], .function([.init(type: .named("TestEnum", []))], .int))
-        XCTAssertEqual([f3Type], context.functionSignature(of: "trailingClosureF3", inConstrained: .named("TestClass", []), arguments: [LabeledValue<TypeSignature>(label: nil, value: .none), LabeledValue<TypeSignature>(label: "tc1", value: .none)]))
-        XCTAssertEqual([f3Type], context.functionSignature(of: "trailingClosureF3", inConstrained: .named("TestClass", []), arguments: [LabeledValue<TypeSignature>(label: nil, value: .none), LabeledValue<TypeSignature>(label: nil, value: .none)]))
-        XCTAssertEqual([.function([.init(label: "tc1", type: .function([], .array(.int)))], .function([.init(type: .named("TestEnum", []))], .int))], context.functionSignature(of: "trailingClosureF3", inConstrained: .named("TestClass", []), arguments: [LabeledValue<TypeSignature>(label: nil, value: .function([], .none))]))
+        XCTAssertEqual([f3Type], context.functionSignature(of: "trailingClosureF3", inConstrained: .named("TestClass", []), arguments: [LabeledValue<TypeSignature>(label: nil, value: .none), LabeledValue<TypeSignature>(label: "tc1", value: .none)]).map(\.0))
+        XCTAssertEqual([f3Type], context.functionSignature(of: "trailingClosureF3", inConstrained: .named("TestClass", []), arguments: [LabeledValue<TypeSignature>(label: nil, value: .none), LabeledValue<TypeSignature>(label: nil, value: .none)]).map(\.0))
+        XCTAssertEqual([.function([.init(label: "tc1", type: .function([], .array(.int)))], .function([.init(type: .named("TestEnum", []))], .int))], context.functionSignature(of: "trailingClosureF3", inConstrained: .named("TestClass", []), arguments: [LabeledValue<TypeSignature>(label: nil, value: .function([], .none))]).map(\.0))
     }
 
     func testFunctionOverload() async throws {
@@ -171,10 +171,10 @@ final class CodebaseInfoTests: XCTestCase {
         }
         """)
 
-        XCTAssertEqual([.function([.init(label: "p", type: .int32)], .int32)], context.functionSignature(of: "f", arguments: [.init(label: "p", value: .int)]))
-        XCTAssertEqual([.function([.init(label: "p", type: .float)], .float)], context.functionSignature(of: "f", arguments: [.init(label: "p", value: .double)]))
-        XCTAssertEqual([.function([.init(label: "p", type: .string)], .string)], context.functionSignature(of: "f", arguments: [.init(label: "p", value: .string)]))
-        XCTAssertEqual([.function([.init(label: "p", type: .any)], .any)], context.functionSignature(of: "f", arguments: [.init(label: "p", value: .array(.int))]))
+        XCTAssertEqual([.function([.init(label: "p", type: .int32)], .int32)], context.functionSignature(of: "f", arguments: [.init(label: "p", value: .int)]).map(\.0))
+        XCTAssertEqual([.function([.init(label: "p", type: .float)], .float)], context.functionSignature(of: "f", arguments: [.init(label: "p", value: .double)]).map(\.0))
+        XCTAssertEqual([.function([.init(label: "p", type: .string)], .string)], context.functionSignature(of: "f", arguments: [.init(label: "p", value: .string)]).map(\.0))
+        XCTAssertEqual([.function([.init(label: "p", type: .any)], .any)], context.functionSignature(of: "f", arguments: [.init(label: "p", value: .array(.int))]).map(\.0))
         XCTAssertEqual(4, context.functionSignature(of: "f", arguments: [.init(label: "p", value: .none)]).count)
     }
 
@@ -194,10 +194,10 @@ final class CodebaseInfoTests: XCTestCase {
         }
         """)
 
-        XCTAssertEqual([.function([.init(label: "p", type: .named("P", []))], .void)], context.functionSignature(of: "f", arguments: [.init(label: "p", value: .named("P", []))]))
-        XCTAssertEqual([.function([.init(label: "p", type: .named("P", []))], .void)], context.functionSignature(of: "f", arguments: [.init(label: "p", value: .named("A", []))]))
-        XCTAssertEqual([.function([.init(label: "p", type: .named("B", []))], .void)], context.functionSignature(of: "f", arguments: [.init(label: "p", value: .named("B", []))]))
-        XCTAssertEqual([.function([.init(label: "p", type: .any)], .void)], context.functionSignature(of: "f", arguments: [.init(label: "p", value: .named("D", []))]))
+        XCTAssertEqual([.function([.init(label: "p", type: .named("P", []))], .void)], context.functionSignature(of: "f", arguments: [.init(label: "p", value: .named("P", []))]).map(\.0))
+        XCTAssertEqual([.function([.init(label: "p", type: .named("P", []))], .void)], context.functionSignature(of: "f", arguments: [.init(label: "p", value: .named("A", []))]).map(\.0))
+        XCTAssertEqual([.function([.init(label: "p", type: .named("B", []))], .void)], context.functionSignature(of: "f", arguments: [.init(label: "p", value: .named("B", []))]).map(\.0))
+        XCTAssertEqual([.function([.init(label: "p", type: .any)], .void)], context.functionSignature(of: "f", arguments: [.init(label: "p", value: .named("D", []))]).map(\.0))
     }
 
     func testConstructor() async throws {
@@ -215,8 +215,8 @@ final class CodebaseInfoTests: XCTestCase {
         }
         """)
 
-        XCTAssertEqual([.function([.init(label: "v", type: .int, hasDefaultValue: true)], .named("TestStruct", []))], context.functionSignature(of: "TestStruct", arguments: [LabeledValue<TypeSignature>(label: "v", value: .none)]))
-        XCTAssertEqual([.function([.init(label: "v", type: .int, hasDefaultValue: true), .init(label: "o", type: .optional(.int), hasDefaultValue: true)], .named("TestStruct", []))], context.functionSignature(of: "TestStruct", arguments: [LabeledValue<TypeSignature>(label: "v", value: .none), LabeledValue<TypeSignature>(label: "o", value: .none)]))
+        XCTAssertEqual([.function([.init(label: "v", type: .int, hasDefaultValue: true)], .named("TestStruct", []))], context.functionSignature(of: "TestStruct", arguments: [LabeledValue<TypeSignature>(label: "v", value: .none)]).map(\.0))
+        XCTAssertEqual([.function([.init(label: "v", type: .int, hasDefaultValue: true), .init(label: "o", type: .optional(.int), hasDefaultValue: true)], .named("TestStruct", []))], context.functionSignature(of: "TestStruct", arguments: [LabeledValue<TypeSignature>(label: "v", value: .none), LabeledValue<TypeSignature>(label: "o", value: .none)]).map(\.0))
     }
 
     func testEnums() async throws {
@@ -233,17 +233,17 @@ final class CodebaseInfoTests: XCTestCase {
         """)
 
         let enumSignature: TypeSignature = .named("TestEnum", [])
-        XCTAssertEqual(enumSignature, context.identifierSignature(of: "case1", inConstrained: .metaType(enumSignature)))
+        XCTAssertEqual(enumSignature, context.identifierSignature(of: "case1", inConstrained: .metaType(enumSignature)).0)
         XCTAssertEqual([], context.associatedValueSignatures(of: "case1", inConstrained: .metaType(enumSignature)))
 
         let enumAssociatedValueSignature: TypeSignature = .named("AssociatedValueEnum", [])
-        XCTAssertEqual(enumAssociatedValueSignature, context.identifierSignature(of: "case2", inConstrained: .metaType(enumAssociatedValueSignature)))
+        XCTAssertEqual(enumAssociatedValueSignature, context.identifierSignature(of: "case2", inConstrained: .metaType(enumAssociatedValueSignature)).0)
         XCTAssertEqual([], context.associatedValueSignatures(of: "case1", inConstrained: .metaType(enumAssociatedValueSignature)))
         XCTAssertEqual([.init(type: .int)], context.associatedValueSignatures(of: "case2", inConstrained: .metaType(enumAssociatedValueSignature)))
         XCTAssertEqual([.init(label: "d", type: .double), .init(label: "s", type: .string)], context.associatedValueSignatures(of: "case3", inConstrained: .metaType(enumAssociatedValueSignature)))
 
-        XCTAssertEqual([.function([.init(type: .int)], enumAssociatedValueSignature)], context.functionSignature(of: "case2", inConstrained: .metaType(enumAssociatedValueSignature), arguments: [LabeledValue<TypeSignature>(value: .int)]))
-        XCTAssertEqual([.function([.init(label: "d", type: .double), .init(label: "s", type: .string)], enumAssociatedValueSignature)], context.functionSignature(of: "case3", inConstrained: .metaType(enumAssociatedValueSignature), arguments: [LabeledValue<TypeSignature>(label: "d", value: .double), LabeledValue<TypeSignature>(label: "s", value: .string)]))
+        XCTAssertEqual([.function([.init(type: .int)], enumAssociatedValueSignature)], context.functionSignature(of: "case2", inConstrained: .metaType(enumAssociatedValueSignature), arguments: [LabeledValue<TypeSignature>(value: .int)]).map(\.0))
+        XCTAssertEqual([.function([.init(label: "d", type: .double), .init(label: "s", type: .string)], enumAssociatedValueSignature)], context.functionSignature(of: "case3", inConstrained: .metaType(enumAssociatedValueSignature), arguments: [LabeledValue<TypeSignature>(label: "d", value: .double), LabeledValue<TypeSignature>(label: "s", value: .string)]).map(\.0))
     }
 
     func testTuples() async throws {
@@ -260,7 +260,7 @@ final class CodebaseInfoTests: XCTestCase {
         """)
 
         let tupleSignature: TypeSignature = .tuple([nil, nil], [.named("TestEnum", []), .int])
-        XCTAssertEqual([.function([], tupleSignature)], context.functionSignature(of: "tupleReturn", inConstrained: .named("TestClass", []), arguments: []))
+        XCTAssertEqual([.function([], tupleSignature)], context.functionSignature(of: "tupleReturn", inConstrained: .named("TestClass", []), arguments: []).map(\.0))
     }
 
     func testTypealiasResolution() async throws {
