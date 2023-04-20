@@ -298,14 +298,14 @@ struct Attributes: PrettyPrintable {
     }
 
     /// Decode the attribute information in the given syntax.
-    static func `for`(syntax: AttributeListSyntax?) -> Attributes {
+    static func `for`(syntax: AttributeListSyntax?, in syntaxTree: SyntaxTree) -> Attributes {
         guard let syntax else {
             return Attributes()
         }
         let attributes = syntax.compactMap {
             switch $0 {
             case .attribute(let syntax):
-                return Attribute.for(syntax: syntax)
+                return Attribute.for(syntax: syntax, in: syntaxTree)
             case .ifConfigDecl:
                 return nil
             }
@@ -319,7 +319,7 @@ struct Attributes: PrettyPrintable {
 
     var prettyPrintTree: PrettyPrintTree {
         let children = attributes.map {
-            return PrettyPrintTree(root: "@\($0.signature)")
+            return PrettyPrintTree(root: "@\($0.signature)\($0.tokens)")
         }
         return PrettyPrintTree(root: "attributes", children: children)
     }
@@ -328,11 +328,28 @@ struct Attributes: PrettyPrintable {
 /// @Attribute on a declaration.
 struct Attribute {
     let signature: TypeSignature
+    var tokens: [String] = []
 
     /// Decode the attribute information in the given syntax.
-    static func `for`(syntax: AttributeSyntax) -> Attribute? {
+    static func `for`(syntax: AttributeSyntax, in syntaxTree: SyntaxTree) -> Attribute? {
         let signature = TypeSignature.for(syntax: syntax.attributeName)
-        return signature == .none ? nil : Attribute(signature: signature)
+        guard signature != .none else {
+            return nil
+        }
+        switch syntax.argument {
+        case .availability(let availabilitySyntax):
+            let tokens = availabilitySyntax.map {
+                let str = $0.sourceCode(in: syntaxTree.source)
+                if str.hasSuffix(",") {
+                    return String(str.dropLast())
+                } else {
+                    return str
+                }
+            }
+            return Attribute(signature: signature, tokens: tokens)
+        default:
+            return Attribute(signature: signature)
+        }
     }
 }
 

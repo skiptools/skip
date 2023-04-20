@@ -167,34 +167,36 @@ final class ExpressionTests: XCTestCase {
         """)
     }
 
-    func testAvailableFunctionDeprecated() async throws {
-        try await check(expectFailure: true, swift: """
-        class C {
-            @available(*, deprecated, message: "this function is deprecated")
-            func f() {
+    func testUnavailableAttribute() async throws {
+        try await check(swiftCode: {
+            @available(*, unavailable, message: "this function is unimplemented")
+            func someOldFunction() -> String {
+                return ""
             }
-        }
-        """, kotlin: """
-        internal open class C {
-            @Deprecated(message = "this function is deprecated", level = DeprecationLevel.WARNING) internal open fun f() {
+            return ""
+        }, kotlin: """
+            @Deprecated("this function is unimplemented", level = DeprecationLevel.ERROR)
+            fun someOldFunction(): String {
+                return ""
             }
-        }
-        """)
+            return ""
+            """)
     }
 
-    func testAvailableFunctionUnavailable() async throws {
-        try await check(expectFailure: true, swift: """
-        class C {
-            @available(*, unavailable, message: "this function is unavailable")
-            func f() {
+    func testDeprecatedAttribute() async throws {
+        try await check(swiftCode: {
+            @available(*, deprecated, message: "this function is deprecated")
+            func someDepFunction() -> String {
+                return ""
             }
-        }
-        """, kotlin: """
-        internal open class C {
-            @Deprecated(message = "this function is unavailable", level = DeprecationLevel.ERROR) internal open fun f() {
+            return ""
+        }, kotlin: """
+            @Deprecated("this function is deprecated")
+            fun someDepFunction(): String {
+                return ""
             }
-        }
-        """)
+            return ""
+            """)
     }
 
     func testIfAvailableIsTrue() async throws {

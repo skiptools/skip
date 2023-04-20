@@ -717,6 +717,7 @@ class KotlinClassDeclaration: KotlinStatement {
     var signature: TypeSignature
     var inherits: [TypeSignature] = []
     var superclassCall: String?
+    var attributes = Attributes()
     var modifiers = Modifiers()
     var generics = Generics()
     var declarationType: StatementType
@@ -747,6 +748,7 @@ class KotlinClassDeclaration: KotlinStatement {
         if let owningTypeDeclaration = statement.parent?.owningTypeDeclaration, !owningTypeDeclaration.generics.isEmpty {
             kstatement.messages.append(.kotlinGenericTypeNested(statement, source: translator.syntaxTree.source))
         }
+        kstatement.attributes = kstatement.processAttributes(statement.attributes, translator: translator)
 
         var members = statement.members.flatMap { translator.translateStatement($0) }
         if let codebaseInfo = translator.codebaseInfo {
@@ -770,9 +772,6 @@ class KotlinClassDeclaration: KotlinStatement {
         }
 
         kstatement.inherits.forEach { $0.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
-        if statement.attributes.attributes.contains(where: { !$0.isIgnorable }) {
-            kstatement.messages.append(.kotlinAttributeUnsupported(statement, source: translator.syntaxTree.source))
-        }
         return kstatement
     }
 
@@ -810,10 +809,11 @@ class KotlinClassDeclaration: KotlinStatement {
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
         let isSealedClassesEnum = isSealedClassesEnum
-        output.append(indentation)
         if let declaration = extras?.declaration {
-            output.append(declaration)
+            output.append(indentation).append(declaration)
         } else {
+            attributes.append(to: output, indentation: indentation)
+            output.append(indentation)
             switch modifiers.visibility {
             case .default:
                 fallthrough
@@ -969,9 +969,7 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
             kstatement.enumGenerics = Generics(entries: genericsEntries)
             kstatement.generics = kstatement.enumGenerics.filterWhereEqual()
         }
-        if statement.attributes.attributes.contains(where: { !$0.isIgnorable }) {
-            kstatement.messages.append(.kotlinAttributeUnsupported(statement, source: translator.syntaxTree.source))
-        }
+        let _ = kstatement.processAttributes(statement.attributes, translator: translator)
         return kstatement
     }
 
@@ -1158,6 +1156,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var isLocal = false
     var isOptionalInit = false
     var annotations: [String] = []
+    var attributes = Attributes()
     var modifiers = Modifiers()
     var generics = Generics()
     var convertedGenerics: Generics? = nil
@@ -1213,6 +1212,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         kstatement.generics = statement.generics
         kstatement.returnType = statement.returnType
         kstatement.parameters = statement.parameters.map { $0.translate(translator: translator) }
+        kstatement.attributes = kstatement.processAttributes(statement.attributes, translator: translator)
         var owningDeclarationType: StatementType? = nil
         if statement.parent?.owningFunctionDeclaration != nil {
             kstatement.isLocal = true
@@ -1278,9 +1278,6 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 kstatement.messages.append(.kotlinProtocolStaticMember(statement, source: translator.syntaxTree.source))
             }
         }
-        if statement.attributes.attributes.contains(where: { !$0.isIgnorable }) {
-            kstatement.messages.append(.kotlinAttributeUnsupported(statement, source: translator.syntaxTree.source))
-        }
         return kstatement
     }
 
@@ -1315,10 +1312,11 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if isHashImplementation {
             appendHashCode(to: output, indentation: indentation)
         }
-        output.append(indentation)
         if let declaration = extras?.declaration {
-            output.append(declaration)
+            output.append(indentation).append(declaration)
         } else {
+            attributes.append(to: output, indentation: indentation)
+            output.append(indentation)
             for annotation in annotations {
                 output.append(annotation + " ")
             }
@@ -1737,6 +1735,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var isGlobal = false
     var isOpen = false
     var modifiers = Modifiers()
+    var attributes = Attributes()
     var value: KotlinExpression?
     var getter: Accessor<KotlinCodeBlock>?
     var setter: Accessor<KotlinCodeBlock>?
@@ -1806,6 +1805,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             kstatement.value = translator.translateExpression(value).sref()
         }
 
+        kstatement.attributes = kstatement.processAttributes(statement.attributes, translator: translator)
         kstatement.isReadOnly = statement.isLet || (statement.getter != nil && statement.setter == nil)
         if kstatement.declaredType != .none {
             kstatement.mayBeSharedMutableStruct = statement.constrainedDeclaredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
@@ -1833,9 +1833,6 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             if statement.modifiers.isStatic {
                 kstatement.messages.append(.kotlinProtocolStaticMember(statement, source: translator.syntaxTree.source))
             }
-        }
-        if statement.attributes.attributes.contains(where: { !$0.isIgnorable }) {
-            kstatement.messages.append(.kotlinAttributeUnsupported(statement, source: translator.syntaxTree.source))
         }
         return kstatement
     }
@@ -1879,15 +1876,16 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
-        output.append(indentation)
         if let declaration = extras?.declaration {
-            output.append(declaration)
+            output.append(indentation).append(declaration)
         } else if names.count == 1 && names[0] == nil {
             // Kotlin doesn't support assignment to wildcard
             if let value {
-                output.append(value, indentation: indentation)
+                output.append(indentation).append(value, indentation: indentation)
             }
         } else {
+            attributes.append(to: output, indentation: indentation)
+            output.append(indentation)
             if isProperty || isGlobal {
                 // We can't override stored properties in Swift, so only need to mark open if computed
                 output.append(modifiers.kotlinMemberString(isOpen: isOpen && getter != nil, suffix: " "))

@@ -12,37 +12,6 @@ final class FeatureSupportTests: XCTestCase {
             """)
     }
 
-    func testCheckUnavailableFunctions() async throws {
-        try await check(expectFailure: true, swiftCode: {
-            @available(*, unavailable, message: "this function is unimplemented")
-            func someOldFunction() -> String {
-                return ""
-            }
-            return ""
-        }, kotlin: """
-            @Deprecated(message = "this function is unimplemented", level = DeprecationLevel.ERROR)
-            fun someOldFunction(): String {
-                return ""
-            }
-            return ""
-            """)
-    }
-
-    func testCheckDeprecatedFunctions() async throws {
-        try await check(expectFailure: true, swiftCode: {
-            @available(*, deprecated, message: "this function is deprecated")
-            func someDepFunction() -> String {
-                return ""
-            }
-            return ""
-        }, kotlin: """
-            @Deprecated(message = "this function is deprecated", level = DeprecationLevel.WARNING) fun someDepFunction(): String {
-                return ""
-            }
-            return ""
-            """)
-    }
-
     func testTranspilePrimeCheck() async throws {
         try await check(swiftCode: {
             func isPrime(_ number: Int) -> Bool {
