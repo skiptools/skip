@@ -55,9 +55,11 @@ final class ExpressionTests: XCTestCase {
         try await check(swift: """
         func f() -> Int {
             let _ = f()
+            _ = f()
         }
         """, kotlin: """
         internal fun f(): Int {
+            f()
             f()
         }
         """)

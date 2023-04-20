@@ -89,7 +89,12 @@ class KotlinBinaryOperator: KotlinExpression {
     var rhs: KotlinExpression
     var mayBeSharedMutableStruct = false
 
-    static func translate(expression: BinaryOperator, translator: KotlinTranslator) -> KotlinBinaryOperator {
+    static func translate(expression: BinaryOperator, translator: KotlinTranslator) -> KotlinExpression {
+        // Special case when assigning to _
+        if expression.op.symbol == "=", let binding = expression.lhs as? Binding, binding.identifierPatterns.allSatisfy({ $0.name == nil }) {
+            return translator.translateExpression(expression.rhs)
+        }
+        
         let klhs = translator.translateExpression(expression.lhs)
         var krhs = translator.translateExpression(expression.rhs)
         // We need to sref() on assigning to a local var, but members sref() on assignment already.

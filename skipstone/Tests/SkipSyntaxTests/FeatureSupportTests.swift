@@ -12,17 +12,6 @@ final class FeatureSupportTests: XCTestCase {
             """)
     }
 
-    func testAssignToUnderscore() async throws {
-        // error: error: Skip cannot translate this statement to Kotlin [binding]
-        try await check(expectFailure: true, swiftCode: {
-            _ = "abc"
-            return ""
-        }, kotlin: """
-            "abc"
-            return ""
-            """)
-    }
-
     func testCheckUnavailableFunctions() async throws {
         try await check(expectFailure: true, swiftCode: {
             @available(*, unavailable, message: "this function is unimplemented")
