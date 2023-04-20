@@ -10,8 +10,6 @@ let package = Package(
 
         .plugin(name: "preflight", targets: ["skip-preflight"]),
         .plugin(name: "transpile", targets: ["skip-transpiler"]),
-
-        .library(name: "SkipDriver", targets: ["SkipDriver"])
     ],
     dependencies: [
     ],
@@ -23,6 +21,7 @@ let package = Package(
                         .writeToPackageDirectory(reason: """
                         Skip: Swift Kotlin Interop (Technology Preview)”
 
+                        This operation will setup the necessary files and folders to transpile your Swift SPM package into a Kotlin Gradle project.
                         This operation will setup the necessary files and folders to transpile your Swift SPM package into a Kotlin Gradle project.
 
                         1. A “Skip” folder will be created at the root of your package with a skip.yml configuration file and links to the eventual build output of your project.
@@ -57,12 +56,8 @@ let package = Package(
 
         .plugin(name: "skip-transpiler",
                 capability: .buildTool(),
-                // dependencies: ["SkipDriver"], // plugin 'skip-transpiler' cannot depend on 'SkipDriver' of type 'library'; this dependency is unsupported
                 dependencies: ["skiptool"],
                 path: "Plugins/SkipTranspilePlugIn"),
-
-        .target(name: "SkipDriver", dependencies: ["skiptool"]),
-        .testTarget(name: "SkipDriverTests", dependencies: ["SkipDriver"]),
     ]
 )
 
