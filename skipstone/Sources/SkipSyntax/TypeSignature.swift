@@ -231,7 +231,11 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return
         }
         if case .named(let name, []) = self, let index = generics.entries.firstIndex(where: { $0.name == name }) {
-            generics.entries[index].whereEqual = to
+            if let whereEqual = generics.entries[index].whereEqual {
+                generics.entries[index].whereEqual = whereEqual.or(to, replaceAny: true)
+            } else {
+                generics.entries[index].whereEqual = to
+            }
             return
         }
         switch self {
@@ -494,7 +498,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .dictionary(let keyType, let valueType):
             return .dictionary(keyType.qualified(in: node), valueType.qualified(in: node))
         case .function(let parameters, let returnType):
-            let qualifiedParameters = parameters.map { Parameter(label: $0.label, type: $0.type.qualified(in: node), isVariadic: $0.isVariadic, hasDefaultValue: $0.hasDefaultValue) }
+            let qualifiedParameters = parameters.map { Parameter(label: $0.label, type: $0.type.qualified(in: node), isInOut: $0.isInOut, isVariadic: $0.isVariadic, hasDefaultValue: $0.hasDefaultValue) }
             return .function(qualifiedParameters, returnType.qualified(in: node))
         case .member(let baseType, let type):
             let base = baseType.qualified(in: node)
@@ -549,7 +553,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                 if parameters.isEmpty {
                     resolvedParameters = parameters2
                 } else if parameters.count == parameters2.count {
-                    resolvedParameters = zip(parameters, parameters2).map { $0.0.or($0.1.type, replaceAny: replaceAny) }
+                    resolvedParameters = zip(parameters, parameters2).map { $0.0.or($0.1, replaceAny: replaceAny) }
                 }
                 return .function(resolvedParameters, returnType.or(returnType2, replaceAny: replaceAny))
             }
@@ -891,9 +895,10 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             for argumentSyntax in functionType.arguments {
                 let label = argumentSyntax.name?.text
                 let type = self.for(syntax: argumentSyntax.type)
+                let isInOut = isInOut(syntax: argumentSyntax.type)
                 let isVariadic = argumentSyntax.ellipsis != nil
                 let hasDefaultValue = argumentSyntax.initializer != nil
-                parameters.append(Parameter(label: label, type: type, isVariadic: isVariadic, hasDefaultValue: hasDefaultValue))
+                parameters.append(Parameter(label: label, type: type, isInOut: isInOut, isVariadic: isVariadic, hasDefaultValue: hasDefaultValue))
             }
             let returnType = self.for(syntax: functionType.output.returnType)
             guard !parameters.contains(where: { $0.type == .none }) && returnType != .none else {
@@ -1158,13 +1163,17 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     struct Parameter: CustomStringConvertible, Hashable, Codable {
         var label: String?
         var type: TypeSignature
+        var isInOut = false
         var isVariadic = false
         var hasDefaultValue = false
 
-        func or(_ typeSignature: TypeSignature, replaceAny: Bool) -> Parameter {
-            var parameter = self
-            parameter.type = parameter.type.or(typeSignature, replaceAny: replaceAny)
-            return parameter
+        func or(_ parameter: Parameter, replaceAny: Bool) -> Parameter {
+            var resolved = self
+            resolved.type = parameter.type.or(resolved.type, replaceAny: replaceAny)
+            if parameter.isInOut {
+                resolved.isInOut = true
+            }
+            return resolved
         }
 
         func mappingTypes(from: [TypeSignature], to: [TypeSignature]) -> Parameter {
@@ -1194,6 +1203,9 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             if let label {
                 description += "\(label): "
             }
+            if isInOut {
+                description += "inout "
+            }
             description += type[keyPath: keyPath]
             if isVariadic {
                 description += "..."
@@ -1204,12 +1216,13 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         // Leave default values out of equality and hash values, just as Swift does not include default values in type comparisons
 
         static func ==(lhs: Parameter, rhs: Parameter) -> Bool {
-            return lhs.label == rhs.label && lhs.type == rhs.type && lhs.isVariadic == rhs.isVariadic
+            return lhs.label == rhs.label && lhs.type == rhs.type && lhs.isInOut == rhs.isInOut && lhs.isVariadic == rhs.isVariadic
         }
 
         func hash(into hasher: inout Hasher) {
             hasher.combine(label)
             hasher.combine(type)
+            hasher.combine(isInOut)
             hasher.combine(isVariadic)
         }
     }

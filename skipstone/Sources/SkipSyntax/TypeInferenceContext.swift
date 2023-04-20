@@ -66,13 +66,15 @@ struct TypeInferenceContext {
     func pushing(_ closure: Closure) -> TypeInferenceContext {
         var context = self
         var parameterDictionary: [String: TypeSignature] = [:]
-        if !closure.parameters.isEmpty {
-            parameterDictionary = closure.parameters.reduce(into: parameterDictionary) { result, parameter in
-                result[parameter.internalLabel] = parameter.declaredType
-            }
-        } else if !closure.inferredType.parameters.isEmpty {
+        // Use the inferred type because we'll already have done our best if the parameter types are not declared
+        if !closure.inferredType.parameters.isEmpty {
+            let declaredParameters = closure.parameters
             parameterDictionary = closure.inferredType.parameters.enumerated().reduce(into: parameterDictionary) { result, indexedParameter in
-                result["$\(indexedParameter.0)"] = indexedParameter.1.type
+                if declaredParameters.count > indexedParameter.0 {
+                    result[declaredParameters[indexedParameter.0].internalLabel] = indexedParameter.1.type
+                } else {
+                    result["$\(indexedParameter.0)"] = indexedParameter.1.type
+                }
             }
         }
         context.path.append(PathEntry(identifiers: parameterDictionary))

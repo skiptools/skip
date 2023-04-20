@@ -407,6 +407,17 @@ class KotlinClosure: KotlinExpression {
                 implicitParameterLabels = handleImplicitParameters(in: kbody, inferredType: expression.inferredType)
             }
         }
+        // Inferred type parameters include explicit parameter info already, so use them for inout info
+        let inferredParameters = expression.inferredType.parameters
+        for (index, parameter) in inferredParameters.enumerated() {
+            guard parameter.isInOut else {
+                continue
+            }
+            let name = index < implicitParameterLabels.count ? implicitParameterLabels[index] : parameter.label
+            if let name {
+                kbody.updateWithInOutParameter(name: name, source: translator.syntaxTree.source)
+            }
+        }
         let kexpression = KotlinClosure(expression: expression, body: kbody)
         kexpression.returnType = expression.returnType
         kexpression.parameters = expression.parameters
@@ -433,9 +444,7 @@ class KotlinClosure: KotlinExpression {
         }
 
         // The closure might have more parameters than were used
-        if case .function(let parameters, _) = inferredType {
-            highestParameter = max(highestParameter, parameters.count - 1)
-        }
+        highestParameter = max(highestParameter, inferredType.parameters.count - 1)
 
         // $0 can use the special 'it' built-in, so no need to return it
         guard highestParameter > 0 else {

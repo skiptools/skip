@@ -538,17 +538,17 @@ final class TypeInferenceTests: XCTestCase {
 
         try await check(supportingSwift: supportingSwift, swift: """
         {
-            let c = Container<String>()
-            let a = c.map {
-                return Element(id: $0)
+            let c = Container<Int>()
+            let a = c.map { i in
+                return Element(id: i)
             }
             let b = a[0].id == .myValue
         }
         """, kotlin: """
         {
-            val c = Container<String>()
-            val a = c.map llabel@{
-                return@llabel Element(id = it)
+            val c = Container<Int>()
+            val a = c.map llabel@{ i ->
+                return@llabel Element(id = i)
             }
             val b = a[0].id == Int.myValue
         }
@@ -565,6 +565,42 @@ final class TypeInferenceTests: XCTestCase {
                 ElementEnum(rawValue = it)
             }
             val b = enums[1] == ElementEnum.two
+        }
+        """)
+    }
+
+    func testReduce() async throws {
+        let supportingSwift = """
+        extension Int {
+            static let myValue = 0
+        }
+        extension String {
+            static let myValue = ""
+            var length: Int {
+                return 0
+            }
+        }
+        class Container<T> {
+            func reduce<R>(into: R, perform: (inout R, T) -> Void) -> R {
+            }
+        }
+        """
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        {
+            let c = Container<Int>()
+            let result = c.reduce(into: [Int: String]()) { result, i in
+                result[i] = "\\(i)"
+            }
+            let b = result[1] == .myValue
+        }
+        """, kotlin: """
+        {
+            val c = Container<Int>()
+            val result = c.reduce(into = Dictionary<Int, String>()) { result, i ->
+                result.value[i] = "${i}"
+            }
+            val b = result[1] == String.myValue
         }
         """)
     }

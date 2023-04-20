@@ -72,7 +72,7 @@ class KotlinConstructorTransformer: KotlinTransformer {
             if let defaultValue = parameter.defaultValue {
                 kdefaultValue = translator.translateExpression(defaultValue)
             }
-            return Parameter(externalLabel: label, declaredType: parameter.declaredType, isVariadic: parameter.isVariadic, defaultValue: kdefaultValue)
+            return Parameter(externalLabel: label, declaredType: parameter.declaredType, isInOut: parameter.isInOut, isVariadic: parameter.isVariadic, defaultValue: kdefaultValue)
         }
         superCall += ")"
         constructor.delegatingConstructorCall = KotlinRawExpression(sourceCode: superCall)

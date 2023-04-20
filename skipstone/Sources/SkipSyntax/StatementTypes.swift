@@ -617,7 +617,7 @@ class EnumCaseDeclaration: Statement {
             return owningTypeDeclaration.signature
         }
         let parameters = associatedValues.map {
-            TypeSignature.Parameter(label: $0.externalLabel, type: $0.declaredType, isVariadic: $0.isVariadic, hasDefaultValue: $0.defaultValue != nil)
+            TypeSignature.Parameter(label: $0.externalLabel, type: $0.declaredType, isInOut: $0.isInOut, isVariadic: $0.isVariadic, hasDefaultValue: $0.defaultValue != nil)
         }
         return .function(parameters, owningTypeDeclaration.signature)
     }

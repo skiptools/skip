@@ -82,7 +82,7 @@ extension Parameter<Expression> {
         if let defaultArgument {
             defaultValue = ExpressionDecoder.decode(syntax: defaultArgument.value, in: syntaxTree)
         }
-        self = Parameter<Expression>(externalLabel: firstName, internalLabel: secondName, declaredType: type, isVariadic: isVariadic, isInOut: isInOut, defaultValue: defaultValue)
+        self = Parameter<Expression>(externalLabel: firstName, internalLabel: secondName, declaredType: type, isInOut: isInOut, isVariadic: isVariadic, defaultValue: defaultValue)
     }
 }
 

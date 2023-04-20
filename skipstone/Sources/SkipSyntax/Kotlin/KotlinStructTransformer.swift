@@ -131,7 +131,7 @@ class KotlinStructTransformer: KotlinTransformer {
             } else if type.isOptional {
                 defaultValue = KotlinNullLiteral()
             }
-            return Parameter(externalLabel: label, declaredType: type, isVariadic: false, defaultValue: defaultValue)
+            return Parameter(externalLabel: label, declaredType: type, defaultValue: defaultValue)
         }
 
         var bodyStatements: [KotlinStatement] = []

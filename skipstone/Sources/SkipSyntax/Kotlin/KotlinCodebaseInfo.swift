@@ -51,7 +51,7 @@ extension CodebaseInfo.Context {
                 defaultValues = Array<Expression?>(repeating: nil, count: parameters.count)
             }
             return parameters.enumerated().map { (index, parameter) in
-                Parameter<Expression>(externalLabel: parameter.label, declaredType: parameter.type, isVariadic: parameter.isVariadic, isInOut: false, defaultValue: defaultValues[index])
+                Parameter<Expression>(externalLabel: parameter.label, declaredType: parameter.type, isVariadic: parameter.isVariadic, defaultValue: defaultValues[index])
             }
         }
     }

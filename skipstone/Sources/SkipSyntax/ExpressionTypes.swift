@@ -463,7 +463,7 @@ class Closure: Expression {
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
         let parameterSignatures = parameters.map { parameter in
-            TypeSignature.Parameter(label: parameter.externalLabel, type: parameter.declaredType, isVariadic: parameter.isVariadic, hasDefaultValue: parameter.defaultValue != nil )
+            TypeSignature.Parameter(label: parameter.externalLabel, type: parameter.declaredType, isInOut: parameter.isInOut, isVariadic: parameter.isVariadic, hasDefaultValue: parameter.defaultValue != nil )
         }
         functionType = .function(parameterSignatures, returnType).or(expecting)
 

@@ -477,7 +477,7 @@ public class CodebaseInfo: Codable {
             // If we don't have any matches and this appears to be a constructor, treat it as one. We take advantage of this
             // while inferring the types of variable values in prepareForUse(), before we've called generateConstructors()
             if initSignatures.isEmpty {
-                let initParameters = arguments.map { TypeSignature.Parameter(label: $0.label, type: $0.value, isVariadic: false, hasDefaultValue: false) }
+                let initParameters = arguments.map { TypeSignature.Parameter(label: $0.label, type: $0.value) }
                 initSignatures.append(FunctionCandidate(signature: .function(initParameters, primaryTypeInfo.signature), score: 0.0))
             }
             return initSignatures
@@ -893,7 +893,7 @@ public class CodebaseInfo: Codable {
             guard variable.isInitializable else {
                 return nil
             }
-            return TypeSignature.Parameter(label: variable.name, type: variable.signature, isVariadic: false, hasDefaultValue: variable.hasValue)
+            return TypeSignature.Parameter(label: variable.name, type: variable.signature, hasDefaultValue: variable.hasValue)
         }
         let initSignature: TypeSignature = .function(parameters, typeInfo.signature)
         var initInfo = FunctionInfo(name: "init", declarationType: .initDeclaration, signature: initSignature, moduleName: typeInfo.moduleName, sourceFile: typeInfo.sourceFile, declaringType: typeInfo.signature, modifiers: typeInfo.modifiers)
