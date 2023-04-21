@@ -8,7 +8,8 @@ public class SyntaxTree: PrettyPrintable {
     let preprocessorSymbols: Set<String>
     private(set) var root: CodeBlock = CodeBlock(statements: [])
 
-    public init(source: Source, preprocessorSymbols: Set<String> = [], codebaseInfo: CodebaseInfo? = nil) {
+    /// - Note: `unavailableAPI` is not used when `codebaseInfo` is available
+    public init(source: Source, preprocessorSymbols: Set<String> = [], codebaseInfo: CodebaseInfo? = nil, unavailableAPI: UnavailableAPI? = nil) {
         self.source = source
         self.preprocessorSymbols = preprocessorSymbols
         self.syntax = Parser.parse(source: source.content)
@@ -23,7 +24,7 @@ public class SyntaxTree: PrettyPrintable {
             resolveQueue += node.children
         }
 
-        let context = TypeInferenceContext(codebaseInfo: codebaseInfo, source: source, statements: root.statements)
+        let context = TypeInferenceContext(codebaseInfo: codebaseInfo, unavailableAPI: unavailableAPI, source: source, statements: root.statements)
         let _ = root.inferTypes(context: context, expecting: .none)
     }
 

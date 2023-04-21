@@ -812,7 +812,7 @@ public class CodebaseInfo: Codable {
                 if let existingContext = typeInferenceContexts[sourceFile] {
                     context = existingContext
                 } else {
-                    context = TypeInferenceContext(codebaseInfo: self, source: syntaxTree.source, statements: syntaxTree.root.statements)
+                    context = TypeInferenceContext(codebaseInfo: self, unavailableAPI: nil, source: syntaxTree.source, statements: syntaxTree.root.statements)
                     typeInferenceContexts[sourceFile] = context
                 }
                 for i in 0..<rootVariables.count {

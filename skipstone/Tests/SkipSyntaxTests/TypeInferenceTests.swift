@@ -604,4 +604,13 @@ final class TypeInferenceTests: XCTestCase {
         }
         """)
     }
+
+    func testKnownUnavailableAPI() async throws {
+        try await checkProducesMessage(preflight: true, swift: """
+        {
+            var s = "this is a string"
+            s.append("foo")
+        }
+        """)
+    }
 }

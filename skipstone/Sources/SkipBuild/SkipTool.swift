@@ -324,7 +324,7 @@ struct PreflightAction: AsyncParsableCommand, CheckPhase {
     func perform(on sourceFiles: [Source.FilePath], options: CheckPhaseOptions) async throws {
         for sourceFile in sourceFiles {
             let source = try Source(file: sourceFile)
-            let syntaxTree = SyntaxTree(source: source, preprocessorSymbols: Set(options.symbols))
+            let syntaxTree = SyntaxTree(source: source, preprocessorSymbols: Set(options.symbols), unavailableAPI: KotlinUnavailableAPI())
             let transformers = builtinKotlinTransformers()
             transformers.forEach { $0.gather(from: syntaxTree) }
             transformers.forEach { $0.prepareForUse(codebaseInfo: nil) }

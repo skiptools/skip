@@ -914,7 +914,7 @@ class TypealiasDeclaration: Statement {
         let modifiers = Modifiers.for(syntax: typealiasDecl.modifiers)
         let (generics, messages) = Generics.for(syntax: typealiasDecl.genericParameterClause, where: typealiasDecl.genericWhereClause, in: syntaxTree)
         let aliasedType = TypeSignature.for(syntax: typealiasDecl.initializer.value)
-        let statement = TypealiasDeclaration(name: name, modifiers: modifiers, generics: generics, aliasedType: aliasedType, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
+        let statement = TypealiasDeclaration(name: name, attributes: attributes, modifiers: modifiers, generics: generics, aliasedType: aliasedType, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
         statement.messages = messages
         return [statement]
     }

@@ -76,6 +76,7 @@ public struct Message: Error, CustomStringConvertible, Encodable {
 extension Message {
     static let deprecatedLabel = "This API is deprecated"
     static let unavailableLabel = "This API is not available in Skip"
+    static let maybeUnavailableLabel = "Detected possible use of API that is not available in Skip. This may cause errors when converting to Kotlin"
 
     static func unsupportedSyntax(_ syntax: SyntaxProtocol, source: Source) -> Message {
         let range = syntax.range(in: source)
@@ -89,6 +90,10 @@ extension Message {
 
     static func ambiguousFunctionCall(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .warning, message: "Skip is unable to disambiguate this function call. Consider differentiating your functions with unique parameter labels", sourceDerived: sourceDerived, source: source)
+    }
+
+    static func availabilityMaybeUnavailable(message: String?, sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .warning, message: message ?? maybeUnavailableLabel, sourceDerived: sourceDerived, source: source)
     }
 
     static func availabilityUnavailable(message: String?, sourceDerived: SourceDerived, source: Source) -> Message {

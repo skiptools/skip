@@ -6,6 +6,9 @@ extension Message {
 
     // List of specific untranslatable errors. This will be helpful in maintaining documentation
 
+    // Idea: convert string mutation to re-assigning the string value
+    static let kotlinStringMutation = "Detected possible string mutation. This may cause errors when converting to Kotlin, which does not have mutable strings"
+
     // Idea: auto-translate to function?
     static func kotlinAsyncProperties(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Kotlin does not support async properties. Consider using a function", sourceDerived: sourceDerived, source: source)

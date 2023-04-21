@@ -171,13 +171,26 @@ extension XCTestCase {
     }
 
     /// Checks that the given Swift generates a message when transpiled.
-    public func checkProducesMessage(swift: String, file: StaticString = #file, line: UInt = #line) async throws {
-        let srcFile = try tmpFile(named: "Source.swift", contents: swift)
-        let codebaseInfo = CodebaseInfo()
-        let tp = Transpiler(sourceFiles: [Source.FilePath(path: srcFile.path)], codebaseInfo: codebaseInfo, transformers: builtinKotlinTransformers())
+    public func checkProducesMessage(preflight: Bool = false, swift: String, file: StaticString = #file, line: UInt = #line) async throws {
+        let tmpFile = try tmpFile(named: "Source.swift", contents: swift)
+        let srcFile = Source.FilePath(path: tmpFile.path)
         var messages: [Message] = []
-        try await tp.transpile { transpilation in
-            messages += transpilation.messages
+        if preflight {
+            let source = try Source(file: srcFile)
+            let syntaxTree = SyntaxTree(source: source, unavailableAPI: KotlinUnavailableAPI())
+            let transformers = builtinKotlinTransformers()
+            transformers.forEach { $0.gather(from: syntaxTree) }
+            transformers.forEach { $0.prepareForUse(codebaseInfo: nil) }
+            let translator = KotlinTranslator(syntaxTree: syntaxTree)
+            let kotlinTree = translator.translateSyntaxTree()
+            transformers.forEach { $0.apply(to: kotlinTree, translator: translator) }
+            messages += kotlinTree.messages + transformers.flatMap { $0.messages(for: srcFile) }
+        } else {
+            let codebaseInfo = CodebaseInfo()
+            let tp = Transpiler(sourceFiles: [srcFile], codebaseInfo: codebaseInfo, transformers: builtinKotlinTransformers())
+            try await tp.transpile { transpilation in
+                messages += transpilation.messages
+            }
         }
         XCTAssertTrue(!messages.isEmpty)
         messages.forEach { print("Received expected message: \($0)") }
