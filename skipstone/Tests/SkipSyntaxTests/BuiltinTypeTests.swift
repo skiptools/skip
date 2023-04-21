@@ -287,7 +287,7 @@ final class BuiltinTypeTests: XCTestCase {
         """, kotlin: """
         {
             val s: Set<Int> = setOf(1, 2, 3)
-            setf(set = s.sref())
+            setf(set = s)
             setf(set = setOf(1, 2, 3))
         }
         """)

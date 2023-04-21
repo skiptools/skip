@@ -575,7 +575,7 @@ class KotlinDictionaryLiteral: KotlinExpression {
 class KotlinFunctionCall: KotlinExpression {
     var function: KotlinExpression
     var arguments: [LabeledValue<KotlinExpression>] = []
-    var mayBeSharedMutableStruct = false
+    var mayBeSharedMutableStructType = false
     var useTrailingClosureFormatting = true
 
     static func translate(expression: FunctionCall, translator: KotlinTranslator) -> KotlinFunctionCall {
@@ -585,7 +585,7 @@ class KotlinFunctionCall: KotlinExpression {
             let kargumentExpression = translator.translateExpression($0.value)
             return LabeledValue(label: $0.label, value: kargumentExpression)
         }
-        kexpression.mayBeSharedMutableStruct = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
+        kexpression.mayBeSharedMutableStructType = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
         return kexpression
     }
 
@@ -607,7 +607,8 @@ class KotlinFunctionCall: KotlinExpression {
     }
 
     override func mayBeSharedMutableStructExpression(orType: Bool) -> Bool {
-        return mayBeSharedMutableStruct
+        // The result of a function call is never a shared value because we always sref() on return
+        return orType && mayBeSharedMutableStructType
     }
 
     override var children: [KotlinSyntaxNode] {
@@ -1701,7 +1702,8 @@ class KotlinTupleLiteral: KotlinExpression {
         guard expression.values.count <= maximumArity else {
             throw Message.kotlinTupleArity(expression, source: translator.syntaxTree.source)
         }
-        let kvalues = expression.values.map { translator.translateExpression($0) }
+        // Our Kotlin Tuples are data classes which do not sref() their constructor arguments
+        let kvalues = expression.values.map { translator.translateExpression($0).sref() }
         return KotlinTupleLiteral(expression: expression, values: kvalues)
     }
 

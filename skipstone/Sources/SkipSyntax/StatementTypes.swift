@@ -134,16 +134,15 @@ class CodeBlock: Statement {
         guard !statements.isEmpty else {
             return .none
         }
-        guard statements.count > 1 else {
-            return statements[0].inferredType
-        }
         var returnType: TypeSignature = .none
         var isOptional = false
+        var foundReturn = false
         visit { node in
             if node is Closure || node is FunctionDeclaration {
                 return .skip
             }
             if let expression = (node as? Return)?.expression {
+                foundReturn = true
                 if expression.type == .nilLiteral {
                     isOptional = true
                 } else {
@@ -151,6 +150,9 @@ class CodeBlock: Statement {
                 }
             }
             return .recurse(nil)
+        }
+        if !foundReturn {
+            returnType = statements.last!.inferredType
         }
         return returnType.asOptional(isOptional || returnType.isOptional)
     }

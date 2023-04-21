@@ -149,8 +149,8 @@ final class TupleTests: XCTestCase {
         """, kotlin: """
         {
             val (a, b) = Tuple2(x.sref(), y.sref())
-            print(a.sref())
-            print(b.sref())
+            print(a)
+            print(b)
         }
         """)
 
@@ -163,8 +163,8 @@ final class TupleTests: XCTestCase {
         """, kotlin: """
         {
             val (a, b) = t.sref()
-            print(a.sref())
-            print(b.sref())
+            print(a)
+            print(b)
         }
         """)
     }
@@ -205,8 +205,8 @@ final class TupleTests: XCTestCase {
         }
         """, kotlin: """
         t.sref()?.let { (i, s) ->
-            print(i.sref())
-            print(s.sref())
+            print(i)
+            print(s)
         }
         """)
     }

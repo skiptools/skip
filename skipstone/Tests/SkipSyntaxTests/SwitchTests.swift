@@ -351,7 +351,7 @@ final class SwitchTests: XCTestCase {
                 }
                 is SomeStruct -> {
                     val s = a.sref()
-                    print(s.sref())
+                    print(s)
                 }
                 else -> {
                     print("default")

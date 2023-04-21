@@ -678,7 +678,14 @@ class FunctionCall: Expression {
             name = memberAccess.member
         default:
             function.inferTypes(context: context, expecting: .none)
-            returnType = expecting
+            if case .function(_, var returnType) = function.inferredType.asOptional(false) {
+                if function.inferredType.isOptional {
+                    returnType = returnType.asOptional(true)
+                }
+                self.returnType = returnType.or(expecting)
+            } else {
+                returnType = expecting
+            }
             return context
         }
 

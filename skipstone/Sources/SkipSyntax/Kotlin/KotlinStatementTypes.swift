@@ -1259,9 +1259,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         }
         if let body = statement.body {
             kstatement.body = KotlinCodeBlock.translate(statement: body, translator: translator)
-            if statement.returnType != .void && statement.type != .initDeclaration {
-                kstatement.body?.updateWithExpectedReturn(.yes)
-            }
+            kstatement.body?.updateWithExpectedReturn(statement.returnType == .void || statement.type == .initDeclaration ? .no : .sref(nil))
             for parameter in kstatement.parameters where parameter.isInOut {
                 kstatement.body?.updateWithInOutParameter(name: parameter.internalLabel, source: translator.syntaxTree.source)
             }

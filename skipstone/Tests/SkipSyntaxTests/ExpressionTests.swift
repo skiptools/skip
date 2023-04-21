@@ -199,7 +199,7 @@ final class ExpressionTests: XCTestCase {
         }
         """, kotlin: """
         {
-            val result = calculation(with = arg.sref()).sref()
+            val result = calculation(with = arg.sref())
         }
         """)
 
@@ -209,7 +209,7 @@ final class ExpressionTests: XCTestCase {
         }
         """, kotlin: """
         {
-            val result = dosomething(with = calculation(with = arg.sref()).sref(), and = arg.sref()).sref()
+            val result = dosomething(with = calculation(with = arg.sref()), and = arg.sref())
         }
         """)
 
@@ -221,7 +221,7 @@ final class ExpressionTests: XCTestCase {
         """, kotlin: """
         {
             val arg = 1
-            val result = dosomething(with = calculation(with = arg).sref(), and = arg).sref()
+            val result = dosomething(with = calculation(with = arg), and = arg)
         }
         """)
     }

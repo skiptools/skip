@@ -150,7 +150,7 @@ final class ConditionalTests: XCTestCase {
         }
         """, kotlin: """
         if (i != null) {
-            print(i.sref())
+            print(i)
         }
         """)
 
@@ -784,10 +784,10 @@ final class ConditionalTests: XCTestCase {
         print(i)
         """, kotlin: """
         if (i == null) {
-            print(i.sref())
+            print(i)
             return
         }
-        print(i.sref())
+        print(i)
         """)
 
         try await check(swift: """
@@ -799,10 +799,10 @@ final class ConditionalTests: XCTestCase {
         """, kotlin: """
         val x_0 = i.sref()
         if (x_0 == null) {
-            print(i.sref())
+            print(i)
             return
         }
-        print(x_0.sref())
+        print(x_0)
         """)
     }
 
@@ -865,7 +865,7 @@ final class ConditionalTests: XCTestCase {
             print(i_0)
             return
         }
-        print(i_1.sref())
+        print(i_1)
         """)
     }
 
