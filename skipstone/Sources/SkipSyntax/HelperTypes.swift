@@ -358,6 +358,7 @@ struct Attribute {
         case deprecated
         case discardableResult
         case indirect
+        case inlinable
         case unavailable
         case unknown
     }
@@ -380,6 +381,8 @@ struct Attribute {
             return .discardableResult
         case "indirect":
             return .indirect
+        case "inlinable":
+            return .inlinable
         default:
             return .unknown
         }
