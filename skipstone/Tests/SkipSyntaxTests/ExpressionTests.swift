@@ -191,4 +191,38 @@ final class ExpressionTests: XCTestCase {
         }
         """)
     }
+
+    func testAsyncInvocationStructCopy() async throws {
+        try await check(swift: """
+        {
+            let result = await calculation(with: arg)
+        }
+        """, kotlin: """
+        {
+            val result = calculation(with = arg.sref()).sref()
+        }
+        """)
+
+        try await check(swift: """
+        {
+            let result = await dosomething(with: calculation(with: arg), and: arg)
+        }
+        """, kotlin: """
+        {
+            val result = dosomething(with = calculation(with = arg.sref()).sref(), and = arg.sref()).sref()
+        }
+        """)
+
+        try await check(swift: """
+        {
+            let arg = 1
+            let result = await dosomething(with: calculation(with: arg), and: arg)
+        }
+        """, kotlin: """
+        {
+            val arg = 1
+            val result = dosomething(with = calculation(with = arg).sref(), and = arg).sref()
+        }
+        """)
+    }
 }

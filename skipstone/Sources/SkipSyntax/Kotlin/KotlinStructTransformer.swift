@@ -100,7 +100,7 @@ class KotlinStructTransformer: KotlinTransformer {
             let arguments = variableDeclarations.map {
                 let argumentValue = KotlinIdentifier(name: $0.names[0] ?? "")
                 argumentValue.mayBeSharedMutableStruct = $0.mayBeSharedMutableStruct
-                return LabeledValue<KotlinExpression>(value: argumentValue.sref())
+                return LabeledValue<KotlinExpression>(value: argumentValue)
             }
             constructorCall = KotlinFunctionCall(function: initFunction, arguments: arguments)
         } else {

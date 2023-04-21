@@ -4,6 +4,7 @@ import SwiftSyntax
 enum ExpressionType: CaseIterable {
     case arrayLiteral
     case available
+    case await
     case binaryOperator
     case binding
     case booleanLiteral
@@ -41,6 +42,8 @@ enum ExpressionType: CaseIterable {
             return ArrayLiteral.self
         case .available:
             return Available.self
+        case .await:
+            return Await.self
         case .binaryOperator:
             return BinaryOperator.self
         case .binding:
@@ -165,6 +168,37 @@ class Available: Expression {
 
     override var inferredType: TypeSignature {
         return .bool
+    }
+}
+
+/// `await ...`
+class Await: Expression {
+    let target: Expression
+
+    init(target: Expression, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
+        self.target = target
+        super.init(type: .await, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
+        guard syntax.kind == .awaitExpr, let awaitExpr = syntax.as(AwaitExprSyntax.self) else {
+            return nil
+        }
+        let target = ExpressionDecoder.decode(syntax: awaitExpr.expression, in: syntaxTree)
+        return Await(target: target, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        target.inferTypes(context: context, expecting: expecting)
+        return context
+    }
+
+    override var inferredType: TypeSignature {
+        return target.inferredType
+    }
+
+    override var children: [SyntaxNode] {
+        return [target]
     }
 }
 

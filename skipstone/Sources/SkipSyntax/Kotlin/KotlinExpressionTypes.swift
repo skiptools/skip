@@ -1,6 +1,7 @@
 /// Types of Kotlin expressions.
 enum KotlinExpressionType {
     case arrayLiteral
+    case await
     case binaryOperator
     case booleanLiteral
     case casePattern
@@ -80,6 +81,25 @@ class KotlinArrayLiteral: KotlinExpression {
             output.append("\n").append(indentation)
         }
         output.append(")")
+    }
+}
+
+/// - Note: This type is used to translate the ``Await`` expression, but is not itself a `KotlinExpression`.
+struct KotlinAwait {
+    static func translate(expression: Await, translator: KotlinTranslator) -> KotlinExpression {
+        let ktarget = translator.translateExpression(expression.target)
+        ktarget.visit { node in
+            if let functionCall = node as? KotlinFunctionCall {
+                functionCall.setIsAsynchronous()
+                return .recurse(nil)
+            } else if node is KotlinClosure {
+                // Async outer call doesn't affect code within a closure
+                return .skip
+            } else {
+                return .recurse(nil)
+            }
+        }
+        return ktarget
     }
 }
 
@@ -555,17 +575,17 @@ class KotlinDictionaryLiteral: KotlinExpression {
 class KotlinFunctionCall: KotlinExpression {
     var function: KotlinExpression
     var arguments: [LabeledValue<KotlinExpression>] = []
-    var mayBeSharedMutableStructType = false
+    var mayBeSharedMutableStruct = false
     var useTrailingClosureFormatting = true
 
     static func translate(expression: FunctionCall, translator: KotlinTranslator) -> KotlinFunctionCall {
         let kfunction = translator.translateExpression(expression.function)
         let kexpression = KotlinFunctionCall(expression: expression, function: kfunction)
         kexpression.arguments = expression.arguments.map {
-            let kargumentExpression = translator.translateExpression($0.value).sref()
+            let kargumentExpression = translator.translateExpression($0.value)
             return LabeledValue(label: $0.label, value: kargumentExpression)
         }
-        kexpression.mayBeSharedMutableStructType = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
+        kexpression.mayBeSharedMutableStruct = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
         return kexpression
     }
 
@@ -580,9 +600,14 @@ class KotlinFunctionCall: KotlinExpression {
         super.init(type: .functionCall, expression: expression)
     }
 
+    /// Adjust our behavior for an asynchronous call.
+    func setIsAsynchronous() {
+        // Copy all structs when passing to an async context
+        arguments = arguments.map { LabeledValue(label: $0.label, value: $0.value.sref()) }
+    }
+
     override func mayBeSharedMutableStructExpression(orType: Bool) -> Bool {
-        // The result of a function call is never a shared value because we always sref() on return
-        return orType && mayBeSharedMutableStructType
+        return mayBeSharedMutableStruct
     }
 
     override var children: [KotlinSyntaxNode] {
@@ -1545,7 +1570,7 @@ class KotlinSubscript: KotlinExpression {
         let kbase = translator.translateExpression(expression.base)
         let kexpression = KotlinSubscript(expression: expression, base: kbase)
         kexpression.arguments = expression.arguments.map {
-            let kargumentExpression = translator.translateExpression($0.value).sref()
+            let kargumentExpression = translator.translateExpression($0.value)
             return LabeledValue(label: $0.label, value: kargumentExpression)
         }
         kexpression.mayBeSharedMutableStruct = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)

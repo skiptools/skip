@@ -1259,7 +1259,9 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         }
         if let body = statement.body {
             kstatement.body = KotlinCodeBlock.translate(statement: body, translator: translator)
-            kstatement.body?.updateWithExpectedReturn(statement.returnType == .void || statement.type == .initDeclaration ? .no : .sref(nil))
+            if statement.returnType != .void && statement.type != .initDeclaration {
+                kstatement.body?.updateWithExpectedReturn(.yes)
+            }
             for parameter in kstatement.parameters where parameter.isInOut {
                 kstatement.body?.updateWithInOutParameter(name: parameter.internalLabel, source: translator.syntaxTree.source)
             }
@@ -1809,6 +1811,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             kstatement.isGlobal = true
         }
         if let value = statement.value {
+            // Kotlin does not call the setter for the assigned initial value, so sref() ourselves
             kstatement.value = translator.translateExpression(value).sref()
         }
 

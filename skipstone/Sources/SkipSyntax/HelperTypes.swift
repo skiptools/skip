@@ -357,6 +357,7 @@ struct Attribute {
         case available
         case deprecated
         case discardableResult
+        case frozen
         case indirect
         case inlinable
         case unavailable
@@ -379,6 +380,8 @@ struct Attribute {
             }
         case "discardableResult":
             return .discardableResult
+        case "frozen":
+            return .frozen
         case "indirect":
             return .indirect
         case "inlinable":
