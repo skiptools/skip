@@ -413,6 +413,9 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
     @OptionGroup(title: "License Options")
     var licenseOptions: LicenseOptions
 
+    /// The lock file to prevent concurrent builds from reading from an output folder before it has been completed
+    private static var skipLockFile = RelativePath(".skiplock")
+
     struct Output : MessageConvertible {
         let transpilation: Transpilation
 
@@ -491,6 +494,17 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
         let _ = primaryModulePath
 
+        let skiplock = moduleRootPath.appending(Self.skipLockFile)
+        info("Using lock file: \(skiplock)")
+
+        // if the lock file already exists, that means another process is currently building (or that the transpiler crashed last time, in which case the lock needs to be manually deleted)
+        if fs.exists(skiplock) {
+            throw error("Lock file exists at \(skiplock)", sourceFile: skiplock.sourceFile)
+        }
+        // touch the lock file and then delete it when we are done
+        try fs.writeFileContents(skiplock, bytes: ByteString(), atomically: true)
+        defer { try? fs.removeFileTree(skiplock) }
+
         // track the most recent input change, and touch a file with the modified date to signify the most recent input source date that triggered a build; we first seed it with the most recent input source file, and the we also check out inputs (such as skip.yml) for changes
         var mostRecentInputSourceLoad: Date = try sourceFiles.map({ try fs.getFileInfo($0).modTime }).max() ?? .distantPast
 
@@ -507,11 +521,6 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         var dependentCodebaseInfos: [CodebaseInfo] = []
 
         let moduleBasePath = moduleRootPath.parentDirectory
-
-        /// The relative path for cached codebase info JSON
-        func codebaseInfoPath(forModule moduleName: String) -> RelativePath {
-            RelativePath(moduleName + ".skipcode.json")
-        }
 
         let codebaseInfo = try await loadCodebaseInfo() // initialize the codebaseinfo and load DependentModuleName.skipcode.json
 
@@ -556,14 +565,35 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             info("\(skipBuildMarkerFile.basename) marker file date: \(mostRecentInputSourceLoad)")
         }
 
+        /// The relative path for cached codebase info JSON
+        func codebaseInfoPath(forModule moduleName: String) -> RelativePath {
+            RelativePath(moduleName + ".skipcode.json")
+        }
+
         func loadCodebaseInfo() async throws -> CodebaseInfo {
             let decoder = JSONDecoder()
 
             // go through the '--link modulename:../../some/path' arguments and try to load the modulename.skipcode.json symbols from the previous module's transpilation output
             for (linkModuleName, relativeLinkPath) in linkNamePaths {
-                let dependencyCodebaseInfo = moduleRootPath
+                let linkModuleRoot = moduleRootPath
                     .parentDirectory
                     .appending(RelativePath(relativeLinkPath))
+
+                let lockFile = linkModuleRoot.appending(Self.skipLockFile)
+
+                for backoff in 1... {
+                    if !fs.exists(lockFile) {
+                        break
+                    } else if backoff >= 20 {
+                        // give up after around 20 seconds
+                        throw error("Stale lock file detected: \(lockFile)")
+                    } else {
+                        info("Waiting on lock file: \(lockFile)")
+                        // backoff for N milliseconds
+                        try await Task.sleep(nanoseconds: .init(backoff) * 100_000_000)
+                    }
+                }
+                let dependencyCodebaseInfo = linkModuleRoot
                     .parentDirectory
                     .appending(codebaseInfoPath(forModule: linkModuleName))
 
