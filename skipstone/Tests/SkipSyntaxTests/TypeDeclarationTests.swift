@@ -875,4 +875,16 @@ final class TypeDeclarationTests: XCTestCase {
         }
         """)
     }
+
+    func testStringEncoding() async throws {
+        try await check(swift: """
+        let encoding: String.Encoding = String.Encoding.utf8
+        let whatever: String.Whatever = String.Whatever.abcd
+        let strindex: String.Index = 0
+        """, kotlin: """
+        internal val encoding: StringEncoding = StringEncoding.utf8
+        internal val whatever: String.Whatever = String.Whatever.abcd
+        internal val strindex: StringIndex = 0
+        """)
+    }
 }

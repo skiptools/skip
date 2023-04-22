@@ -1211,7 +1211,12 @@ class KotlinMemberAccess: KotlinExpression {
                     if useMultlineFormatting {
                         output.append("\n").append(indentation.inc())
                     }
-                    output.append(".")
+                    if let id = base as? SkipSyntax.KotlinIdentifier,
+                       TypeSignature.innerExtensions.contains(id.name + "." + member) {
+                        output.append("") // String.Encoding to StringEncoding
+                    } else {
+                        output.append(".")
+                    }
                 }
                 if let memberIndex = Int(member) {
                     output.append(KotlinTupleLiteral.member(index: memberIndex))

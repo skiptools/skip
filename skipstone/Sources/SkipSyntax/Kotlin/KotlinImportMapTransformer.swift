@@ -16,11 +16,7 @@ class KotlinImportMapTransformer: KotlinTransformer {
                 //importDeclaration.modulePath[0...0] = ["skip", "unit"]
             }
             if importDeclaration.modulePath.first == "OSLog" {
-                importDeclaration.modulePath[0] = "SkipFoundation"
-                //importDeclaration.modulePath[0...0] = ["skip", "foundation", "Logger"]
-                //importDeclaration.modulePath = ["skip", "foundation"]
-                //importDeclaration.modulePath = ["skip.foundation.Logger"]
-                //importDeclaration.kotlinImportOverride = "skip.log"
+                importDeclaration.modulePath[0] = "SkipKit"
             }
         }
     }
