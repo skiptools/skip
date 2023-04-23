@@ -1296,8 +1296,9 @@ private extension AbsolutePath {
     }
 }
 
+#if canImport(Darwin)
 extension ProcessInfo {
-    /// Get the list of all running process IDs
+    /// Get the list of all running process IDs, which we check against the contents of a `.skiplock` file
     static func getRunningProcessIDs() -> [pid_t] {
         // return NSWorkspace.shared.runningApplications.map { $0.processIdentifier }
         var mib = [CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0]
@@ -1310,6 +1311,5 @@ extension ProcessInfo {
         }
         return buffer.map { $0.kp_proc.p_pid }
     }
-
-
 }
+#endif

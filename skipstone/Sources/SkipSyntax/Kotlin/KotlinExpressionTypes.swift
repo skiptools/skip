@@ -1216,8 +1216,8 @@ class KotlinMemberAccess: KotlinExpression {
                     if useMultlineFormatting {
                         output.append("\n").append(indentation.inc())
                     }
-                    if let id = base as? SkipSyntax.KotlinIdentifier,
-                       TypeSignature.innerExtensions.contains(id.name + "." + member) {
+                    if let id = base as? KotlinIdentifier,
+                       TypeSignature.innerExtensions.keys.contains(id.name + "." + member) {
                         output.append("") // String.Encoding to StringEncoding
                     } else {
                         output.append(".")

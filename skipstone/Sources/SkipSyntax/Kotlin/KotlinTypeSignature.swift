@@ -1,11 +1,10 @@
 extension TypeSignature {
     /// The types from the standard library that should be re-mapped to a joined form of the name.
     /// For example, Swift references to `String.Encoding.utf8` will be converted to `StringEncoding.utf8`.
-    static let innerExtensions: Set<String> = [
-        "String.Encoding",
-        "String.Index",
+    static let innerExtensions: [String: String] = [
+        "String.Encoding" : "StringEncoding",
+        "String.Index" : "StringIndex",
     ]
-
 
     /// Kotlin description of this type.
     var kotlin: String {
@@ -48,12 +47,7 @@ extension TypeSignature {
             return "Long"
         case .member(let baseType, let type):
             let typeName = "\(baseType.kotlin).\(type.kotlin)"
-            if Self.innerExtensions.contains(typeName) {
-                // substitute Type.Name with TypeName
-                return "\(baseType.kotlin)\(type.kotlin)"
-            } else {
-                return typeName
-            }
+            return Self.innerExtensions[typeName] ?? typeName
         case .metaType(let baseType):
             return "KClass<\(baseType.kotlin)>"
         case .named(let name, let generics):
