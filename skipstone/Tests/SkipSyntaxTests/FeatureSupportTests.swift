@@ -1,6 +1,11 @@
 @testable import SkipSyntax
 import XCTest
 
+fileprivate extension String {
+    /// Parity with Kotlin's `String.length`
+    var length: Int { count }
+}
+
 /// A test case that verifies that transpilation are *not* working as hoped.
 final class FeatureSupportTests: XCTestCase {
 
@@ -11,6 +16,101 @@ final class FeatureSupportTests: XCTestCase {
             return "${1 + 2}"
             """)
     }
+
+    /// 0.096 seconds
+    func testInferPerf11() async throws {
+        try await check(swiftCode: {
+            func f(_ number: Int) -> String { "\(number)" }
+            func f(_ string: String) -> Int { string.length }
+            let x = f(f(f(f(f(f(f(f(f(f(f(99999999)))))))))))
+            return x + x
+        }, kotlin: """
+            fun f(number: Int): String {
+                return "${number}"
+            }
+            fun f(string: String): Int {
+                return string.length
+            }
+            val x = f(f(f(f(f(f(f(f(f(f(f(99999999)))))))))))
+            return x + x
+            """)
+    }
+
+    /// 0.715 seconds
+    func testInferPerf14() async throws {
+        try await check(swiftCode: {
+            func f(_ number: Int) -> String { "\(number)" }
+            func f(_ string: String) -> Int { string.length }
+            let x = f(f(f(f(f(f(f(f(f(f(f(f(f(f("QQQQQ"))))))))))))))
+            return x
+        }, kotlin: """
+            fun f(number: Int): String {
+                return "${number}"
+            }
+            fun f(string: String): Int {
+                return string.length
+            }
+            val x = f(f(f(f(f(f(f(f(f(f(f(f(f(f("QQQQQ"))))))))))))))
+            return x
+            """)
+    }
+
+    /// 1.406 seconds
+    func testInferPerf15() async throws {
+        try await check(swiftCode: {
+            func f(_ number: Int) -> String { "\(number)" }
+            func f(_ string: String) -> Int { string.length }
+            let x = f(f(f(f(f(f(f(f(f(f(f(f(f(f(f(88888888)))))))))))))))
+            return x
+        }, kotlin: """
+            fun f(number: Int): String {
+                return "${number}"
+            }
+            fun f(string: String): Int {
+                return string.length
+            }
+            val x = f(f(f(f(f(f(f(f(f(f(f(f(f(f(f(88888888)))))))))))))))
+            return x
+            """)
+    }
+
+    ///// 11.213 seconds
+    //func testInferPerf18() async throws {
+    //    try await check(swiftCode: {
+    //        func f(_ number: Int) -> String { "\(number)" }
+    //        func f(_ string: String) -> Int { string.length }
+    //        let x = f(f(f(f(f(f(f(f(f(f(f(f(f(f(f(f(f(f("ZZZZZZZZZZ"))))))))))))))))))
+    //        return x
+    //    }, kotlin: """
+    //        fun f(number: Int): String {
+    //            return "${number}"
+    //        }
+    //        fun f(string: String): Int {
+    //            return string.length
+    //        }
+    //        val x = f(f(f(f(f(f(f(f(f(f(f(f(f(f(f(f(f(f("ZZZZZZZZZZ"))))))))))))))))))
+    //        return x
+    //        """)
+    //}
+    //
+    ///// 22.243 seconds
+    //func testInferPerf19() async throws {
+    //    try await check(swiftCode: {
+    //        func f(_ number: Int) -> String { "\(number)" }
+    //        func f(_ string: String) -> Int { string.length }
+    //        let x = f(f(f(f(f(f(f(f(f(f(f(f(f(f(f(f(f(f(f(111)))))))))))))))))))
+    //        return x
+    //    }, kotlin: """
+    //        fun f(number: Int): String {
+    //            return "${number}"
+    //        }
+    //        fun f(string: String): Int {
+    //            return string.length
+    //        }
+    //        val x = f(f(f(f(f(f(f(f(f(f(f(f(f(f(f(f(f(f(f(111)))))))))))))))))))
+    //        return x
+    //        """)
+    //}
 
     func testTranspilePrimeCheck() async throws {
         try await check(swiftCode: {
@@ -195,3 +295,5 @@ final class FeatureSupportTests: XCTestCase {
         """)
     }
 }
+
+
