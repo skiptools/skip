@@ -224,5 +224,15 @@ final class ExpressionTests: XCTestCase {
             val result = dosomething(with = calculation(with = arg), and = arg)
         }
         """)
+
+        try await check(swift: """
+        for await i in sequenceGenerator(arg1, arg2Generator(arg3)) {
+            doSomething(with: i)
+        }
+        """, kotlin: """
+        for (i in sequenceGenerator(arg1.sref(), arg2Generator(arg3.sref()))) {
+            doSomething(with = i)
+        }
+        """)
     }
 }

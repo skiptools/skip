@@ -389,6 +389,9 @@ class KotlinForLoop: KotlinStatement {
 
     static func translate(statement: ForLoop, translator: KotlinTranslator) -> KotlinForLoop {
         let ksequence = translator.translateExpression(statement.sequence)
+        if statement.isAwait {
+            KotlinAwait.setIsAsynchronous(ksequence)
+        }
         let kbody = KotlinCodeBlock.translate(statement: statement.body, translator: translator)
         let kstatement = KotlinForLoop(statement: statement, sequence: ksequence, body: kbody)
         kstatement.declaredType = statement.declaredType

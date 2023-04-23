@@ -86,9 +86,9 @@ class KotlinArrayLiteral: KotlinExpression {
 
 /// - Note: This type is used to translate the ``Await`` expression, but is not itself a `KotlinExpression`.
 struct KotlinAwait {
-    static func translate(expression: Await, translator: KotlinTranslator) -> KotlinExpression {
-        let ktarget = translator.translateExpression(expression.target)
-        ktarget.visit { node in
+    /// Adjust the given Kotlin syntax for an asynchronous call.
+    static func setIsAsynchronous(_ node: KotlinSyntaxNode) {
+        node.visit { node in
             if let functionCall = node as? KotlinFunctionCall {
                 functionCall.setIsAsynchronous()
                 return .recurse(nil)
@@ -99,6 +99,11 @@ struct KotlinAwait {
                 return .recurse(nil)
             }
         }
+    }
+
+    static func translate(expression: Await, translator: KotlinTranslator) -> KotlinExpression {
+        let ktarget = translator.translateExpression(expression.target)
+        setIsAsynchronous(ktarget)
         return ktarget
     }
 }
