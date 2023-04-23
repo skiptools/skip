@@ -497,6 +497,9 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         let skiplock = moduleRootPath.appending(Self.skipLockFile)
         info("Using lock file: \(skiplock)")
 
+
+        // FIXME: when a build is stopped in Xcode, it kills any transpiler processes, which leave stale lock files lying around
+        #if false
         // if the lock file already exists, that means another process is currently building (or that the transpiler crashed last time, in which case the lock needs to be manually deleted)
         if fs.exists(skiplock) {
             throw error("Lock file exists at \(skiplock)", sourceFile: skiplock.sourceFile)
@@ -504,6 +507,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         // touch the lock file and then delete it when we are done
         try fs.writeFileContents(skiplock, bytes: ByteString(), atomically: true)
         defer { try? fs.removeFileTree(skiplock) }
+        #endif
 
         // track the most recent input change, and touch a file with the modified date to signify the most recent input source date that triggered a build; we first seed it with the most recent input source file, and the we also check out inputs (such as skip.yml) for changes
         var mostRecentInputSourceLoad: Date = try sourceFiles.map({ try fs.getFileInfo($0).modTime }).max() ?? .distantPast
