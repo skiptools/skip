@@ -501,7 +501,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         let pid = ProcessInfo.processInfo.processIdentifier
         if let lockFileContents = try? fs.readFileContents(skiplock),
            let lockFileProcess = pid_t(lockFileContents.description) {
-            if ProcessInfo.getRunningProcessIDs().contains(lockFileProcess) {
+            if try? ProcessInfo.getRunningProcessIDs().contains(lockFileProcess) == true {
                 throw error("Lock file exists for running process \(lockFileProcess) at \(skiplock)", sourceFile: skiplock.sourceFile)
             } else {
                 info("Removing stale pid \(lockFileProcess) lock file: \(skiplock)", sourceFile: skiplock.sourceFile)
@@ -1296,10 +1296,13 @@ private extension AbsolutePath {
     }
 }
 
-#if canImport(Darwin)
 extension ProcessInfo {
     /// Get the list of all running process IDs, which we check against the contents of a `.skiplock` file
-    static func getRunningProcessIDs() -> [pid_t] {
+    static func getRunningProcessIDs() throws -> [Int32] {
+        #if !canImport(Darwin)
+        struct ProcessListUnsupportedPlatformError : Error { }
+        throw ProcessListUnsupportedPlatformError()
+        #else
         // return NSWorkspace.shared.runningApplications.map { $0.processIdentifier }
         var mib = [CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0]
         var size = 0
@@ -1310,6 +1313,6 @@ extension ProcessInfo {
             return []
         }
         return buffer.map { $0.kp_proc.p_pid }
+        #endif
     }
 }
-#endif
