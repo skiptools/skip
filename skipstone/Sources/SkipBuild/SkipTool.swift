@@ -497,17 +497,22 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         let skiplock = moduleRootPath.appending(Self.skipLockFile)
         info("Using lock file: \(skiplock)")
 
-
-        // FIXME: when a build is stopped in Xcode, it kills any transpiler processes, which leave stale lock files lying around
-        #if false
         // if the lock file already exists, that means another process is currently building (or that the transpiler crashed last time, in which case the lock needs to be manually deleted)
-        if fs.exists(skiplock) {
-            throw error("Lock file exists at \(skiplock)", sourceFile: skiplock.sourceFile)
+        let pid = ProcessInfo.processInfo.processIdentifier
+        if let lockFileContents = try? fs.readFileContents(skiplock),
+           let lockFileProcess = pid_t(lockFileContents.description) {
+            if ProcessInfo.getRunningProcessIDs().contains(lockFileProcess) {
+                throw error("Lock file exists for running process \(lockFileProcess) at \(skiplock)", sourceFile: skiplock.sourceFile)
+            } else {
+                info("Removing stale pid \(lockFileProcess) lock file: \(skiplock)", sourceFile: skiplock.sourceFile)
+                try? fs.removeFileTree(skiplock)
+            }
         }
+
         // touch the lock file and then delete it when we are done
-        try fs.writeFileContents(skiplock, bytes: ByteString(), atomically: true)
+        try fs.writeFileContents(skiplock, bytes: ByteString(stringLiteral: pid.description), atomically: true)
+        // clean up the lock file; note this won't happen when Xcode kills the transpiler due to use user halting a build
         defer { try? fs.removeFileTree(skiplock) }
-        #endif
 
         // track the most recent input change, and touch a file with the modified date to signify the most recent input source date that triggered a build; we first seed it with the most recent input source file, and the we also check out inputs (such as skip.yml) for changes
         var mostRecentInputSourceLoad: Date = try sourceFiles.map({ try fs.getFileInfo($0).modTime }).max() ?? .distantPast
@@ -586,13 +591,17 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
                 let lockFile = linkModuleRoot.appending(Self.skipLockFile)
 
                 for backoff in 1... {
-                    if !fs.exists(lockFile) {
+                    // read the process id integer from the .skiplock file
+                    guard let lockFileContents = try? fs.readFileContents(lockFile),
+                          let pid = UInt32(lockFileContents.description) else {
                         break
-                    } else if backoff >= 20 {
+                    }
+
+                    if backoff >= 20 {
                         // give up after around 20 seconds
-                        throw error("Stale lock file detected: \(lockFile)")
+                        throw error("Stale pid \(pid) lock file detected: \(lockFile)")
                     } else {
-                        info("Waiting on lock file: \(lockFile)")
+                        info("Waiting on pid \(pid) lock file: \(lockFile)")
                         // backoff for N milliseconds
                         try await Task.sleep(nanoseconds: .init(backoff) * 100_000_000)
                     }
@@ -1285,4 +1294,22 @@ private extension AbsolutePath {
     func appendingPathExtension(_ ext: String) -> AbsolutePath {
         parentDirectory.appending(component: basenameWithoutExt + "." + ext)
     }
+}
+
+extension ProcessInfo {
+    /// Get the list of all running process IDs
+    static func getRunningProcessIDs() -> [pid_t] {
+        // return NSWorkspace.shared.runningApplications.map { $0.processIdentifier }
+        var mib = [CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0]
+        var size = 0
+        sysctl(&mib, 4, nil, &size, nil, 0)
+        var buffer = [kinfo_proc](repeating: kinfo_proc(), count: Int(size) / MemoryLayout<kinfo_proc>.size)
+        let count = sysctl(&mib, 4, &buffer, &size, nil, 0)
+        guard count >= 0 else {
+            return []
+        }
+        return buffer.map { $0.kp_proc.p_pid }
+    }
+
+
 }
