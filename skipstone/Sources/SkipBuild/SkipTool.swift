@@ -501,7 +501,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         let pid = ProcessInfo.processInfo.processIdentifier
         if let lockFileContents = try? fs.readFileContents(skiplock),
            let lockFileProcess = pid_t(lockFileContents.description) {
-            if try? ProcessInfo.getRunningProcessIDs().contains(lockFileProcess) == true {
+            if (try? ProcessInfo.getRunningProcessIDs().contains(lockFileProcess)) == true {
                 throw error("Lock file exists for running process \(lockFileProcess) at \(skiplock)", sourceFile: skiplock.sourceFile)
             } else {
                 info("Removing stale pid \(lockFileProcess) lock file: \(skiplock)", sourceFile: skiplock.sourceFile)
