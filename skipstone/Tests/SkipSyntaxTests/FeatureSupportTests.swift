@@ -17,6 +17,39 @@ final class FeatureSupportTests: XCTestCase {
             """)
     }
 
+
+    func testUnsignedEnumConstants() async throws {
+        // compile error: conversion of signed constants to unsigned ones is prohibited ten(10), twenty(20)
+        try await check(compiler: nil, swiftCode: {
+            enum UnsignedEnum : UInt32, Equatable {
+                case ten = 10
+                case twenty = 20
+            }
+            return ""
+        }, kotlin: """
+            enum class UnsignedEnum(override val rawValue: UInt, unusedp: Nothing? = null): RawRepresentable<UInt> {
+                ten(10),
+                twenty(20);
+            }
+
+            fun UnsignedEnum(rawValue: UInt): UnsignedEnum? {
+                return when (rawValue) {
+                    10 -> {
+                        UnsignedEnum.ten
+                    }
+                    20 -> {
+                        UnsignedEnum.twenty
+                    }
+                    else -> {
+                        null
+                    }
+                }
+            }
+            return ""
+            """)
+    }
+
+
     /// 0.096 seconds
     func testInferPerf11() async throws {
         try await check(swiftCode: {
