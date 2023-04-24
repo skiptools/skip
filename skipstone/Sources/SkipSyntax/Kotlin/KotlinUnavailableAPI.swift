@@ -12,7 +12,6 @@ public class KotlinUnavailableAPI: UnavailableAPI {
     }
 
     override func knownUnavailableFunction(_ name: String, in type: TypeSignature?, parameters: [LabeledValue<TypeSignature>]) -> (TypeSignature, String?)? {
-        print("IN IMPL: \(name) ======================================") //~~~
         // String mutation
         if type == .string {
             if name == "append" || name == "insert" || name == "remove" || name == "removeAll" || name == "removeFirst" || name == "removeLast" || name == "removeSubrange" || name == "replaceSubrange" {
