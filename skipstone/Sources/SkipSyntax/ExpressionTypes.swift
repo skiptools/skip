@@ -1001,7 +1001,9 @@ class MemberAccess: Expression {
         } else {
             baseType = baseType.or(expecting.asMetaType(true).asOptional(false))
         }
-        memberType = context.member(member, in: baseType, messagesNode: self)
+        // Don't output unavailable messages here if this is part of a function call. There could be other
+        // member matches. The function call node will have more type information
+        memberType = context.member(member, in: baseType, messagesNode: isCalledAsFunction ? nil : self)
         if let generics {
             memberType = memberType.withGenerics(generics)
         }

@@ -230,7 +230,7 @@ final class ExpressionTests: XCTestCase {
             doSomething(with: i)
         }
         """, kotlin: """
-        for (i in sequenceGenerator(arg1.sref(), arg2Generator(arg3.sref()))) {
+        for (i in sequenceGenerator(arg1.sref(), arg2Generator(arg3.sref())).asiterable()) {
             doSomething(with = i)
         }
         """)

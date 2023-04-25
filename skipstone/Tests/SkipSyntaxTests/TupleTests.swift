@@ -230,17 +230,20 @@ final class TupleTests: XCTestCase {
     }
 
     func testMemberAccessSharedMutableStruct() async throws {
+        // No need to sref() on member access
         try await check(swift: """
         {
+            let t = (a, b, c)
             let i = t.0
             let s = t.1
             let d = t.2
         }
         """, kotlin: """
         {
-            val i = t.element0.sref()
-            val s = t.element1.sref()
-            val d = t.element2.sref()
+            val t = Tuple3(a.sref(), b.sref(), c.sref())
+            val i = t.element0
+            val s = t.element1
+            val d = t.element2
         }
         """)
     }

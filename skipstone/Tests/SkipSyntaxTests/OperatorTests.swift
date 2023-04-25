@@ -76,7 +76,7 @@ final class OperatorTests: XCTestCase {
             print(b)
         }
         """, kotlin: """
-        for (i in Int.min until 10) {
+        for (i in (Int.min until 10).asiterable()) {
             val b = i == Int.myZero
             print(b)
         }
@@ -88,7 +88,7 @@ final class OperatorTests: XCTestCase {
             print(b)
         }
         """, kotlin: """
-        for (i in 10 .. Int.max) {
+        for (i in (10 .. Int.max).asiterable()) {
             val b = i == Int.myZero
             print(b)
         }

@@ -1100,7 +1100,12 @@ class KotlinMemberAccess: KotlinExpression {
         }
         kexpression.generics = expression.generics
         kexpression.baseType = expression.baseType.asMetaType(false)
-        kexpression.mayBeSharedMutableStruct = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
+        if case .tuple = expression.baseType {
+            // Tuples sref() their members on the way out and do not set an onUpdate block, so no need to sref() again
+            kexpression.mayBeSharedMutableStruct = false
+        } else {
+            kexpression.mayBeSharedMutableStruct = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
+        }
 
         // Kotlin member access never includes generics on the owning type unless we're referencing the class or a function
         if !kexpression.isFunctionReference && kexpression.member != "self" {
@@ -1183,6 +1188,8 @@ class KotlinMemberAccess: KotlinExpression {
     }
 
     override func mayBeSharedMutableStructExpression(orType: Bool) -> Bool {
+        // Though we sref() when returning property values, any returned mutable struct may have its onUpdate block
+        // set, and we need to sref() again on assignment to get an unowned copy
         return mayBeSharedMutableStruct
     }
 
@@ -1394,6 +1401,10 @@ class KotlinPostfixOperator: KotlinExpression {
 
     override func mayBeSharedMutableStructExpression(orType: Bool) -> Bool {
         return target.mayBeSharedMutableStructExpression(orType: orType)
+    }
+
+    override var isCompoundExpression: Bool {
+        return operatorSymbol == "..."
     }
 
     override var children: [KotlinSyntaxNode] {
