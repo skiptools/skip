@@ -7,7 +7,7 @@ import SkipBuild
 
 /// Command-line runner for the transpiler.
 ///
-/// This is only built for local `SkipSource` imported through `SKIPLOCAL` (see `Package.swift`).
+/// This is only built for local `skiptool` imported through `SKIPLOCAL` (see `Package.swift`).
 @main public struct SkipToolMain {
     static func main() async throws {
         await SkipCommandExecutor.main()

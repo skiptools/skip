@@ -66,8 +66,8 @@ if let localPath = ProcessInfo.processInfo.environment["SKIPLOCAL"] {
     // locally linking SwiftSyntax requires min platform targets
     package.platforms = [.iOS(.v15), .macOS(.v12), .tvOS(.v15), .watchOS(.v8), .macCatalyst(.v15)]
     // build against the local relative packages in the peer folders by running: SKIPLOCAL=.. xed Skip.xcworkspace
-    package.dependencies += [.package(path: localPath + "/SkipSource")]
-    package.targets += [.executableTarget(name: "skiptool", dependencies: [.product(name: "SkipBuild", package: "SkipSource")], path: "Sources/SkipTool", sources: ["skiptool.swift"])]
+    package.dependencies += [.package(path: localPath + "/skiptool")]
+    package.targets += [.executableTarget(name: "skiptool", dependencies: [.product(name: "SkipBuild", package: "skiptool")], path: "Sources/SkipTool", sources: ["skiptool.swift"])]
 } else {
     // default to using the latest binary skiptool release
     package.targets += [.binaryTarget(name: "skiptool", url: "https://github.com/skiptools/skip/releases/download/0.4.0/skiptool.artifactbundle.zip", checksum: "71b14c2900ca28e29837d191ed2e43c53f0f62a2b1e2e87f294816e4b7195596")]
