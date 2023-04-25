@@ -57,7 +57,7 @@ extension CodebaseInfo.Context {
     }
 
     /// Whether this declaration is implementing a property of the given type, excluding Kotlin extension properties and functions.
-    func isImplementingMember(declaration: VariableDeclaration, inExtension type: TypeSignature, with generics: Generics) -> Bool {
+    func isImplementingKotlinMember(declaration: VariableDeclaration, inExtension type: TypeSignature, with generics: Generics) -> Bool {
         assert(global.kotlin != nil)
         guard !declaration.names.isEmpty, let name = declaration.names[0] else {
             return false
@@ -67,7 +67,7 @@ extension CodebaseInfo.Context {
     }
 
     /// Whether this declaration is implementing a function of the given type, excluding Kotlin extension properties and functions.
-    func isImplementingMember(declaration: FunctionDeclaration, inExtension type: TypeSignature, with generics: Generics) -> Bool {
+    func isImplementingKotlinMember(declaration: FunctionDeclaration, inExtension type: TypeSignature, with generics: Generics) -> Bool {
         assert(global.kotlin != nil)
         let constrainedSignature = declaration.functionType.constrainedTypeWithGenerics(generics)
         let parameters = constrainedSignature.parameters
@@ -77,23 +77,27 @@ extension CodebaseInfo.Context {
     }
 
     /// Whether this declaration is implementing a protocol property.
-    func isImplementingProtocolMember(declaration: VariableDeclaration, in type: TypeSignature) -> Bool {
+    func isImplementingKotlinInterfaceMember(declaration: VariableDeclaration, in type: TypeSignature) -> Bool {
         guard !declaration.names.isEmpty, let name = declaration.names[0] else {
             return false
         }
-        return isProtocolMember(name: name, parameters: nil, isStatic: declaration.modifiers.isStatic, in: type)
+        return isKotlinInterfaceMember(name: name, parameters: nil, isStatic: declaration.modifiers.isStatic, in: type)
     }
 
     /// Whether this declaration is implementing a protocol function.
-    func isImplementingProtocolMember(declaration: FunctionDeclaration, in type: TypeSignature) -> Bool {
-        return isProtocolMember(name: declaration.name, parameters: declaration.functionType.parameters, isStatic: declaration.modifiers.isStatic, in: type)
+    func isImplementingKotlinInterfaceMember(declaration: FunctionDeclaration, in type: TypeSignature) -> Bool {
+        return isKotlinInterfaceMember(name: declaration.name, parameters: declaration.functionType.parameters, isStatic: declaration.modifiers.isStatic, in: type)
     }
 
     /// Whether the given member is declared by a protocol of the given type.
-    func isProtocolMember(name: String, parameters: [TypeSignature.Parameter]?, isStatic: Bool, in owningType: TypeSignature) -> Bool {
+    func isKotlinInterfaceMember(name: String, parameters: [TypeSignature.Parameter]?, isStatic: Bool, in owningType: TypeSignature) -> Bool {
         assert(global.kotlin != nil)
         let protocolSignatures = global.protocolSignatures(forNamed: owningType)
         for protocolSignature in protocolSignatures {
+            // Exclude protocols that do not translate into Kotlin interfaces
+            guard !protocolSignature.isCustomStringConvertible && !protocolSignature.isEquatable && !protocolSignature.isHashable else {
+                continue
+            }
             for protocolInfo in typeInfos(forNamed: protocolSignature) {
                 if let parameters {
                     if protocolInfo.functions.contains(where: { $0.name == name && $0.signature.parameters.map(\.label) == parameters.map(\.label) }) {

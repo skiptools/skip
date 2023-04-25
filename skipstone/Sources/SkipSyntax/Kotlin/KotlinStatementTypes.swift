@@ -1125,9 +1125,9 @@ struct KotlinExtensionDeclaration {
             if !statement.canMoveIntoExtendedType {
                 // Check that an extension that will be implemented as extension functions because it has generic constraints, etc is not
                 // attempting to override member functions. Kotlin extension functions can never override members
-                if let variableDeclaration = member as? VariableDeclaration, translator.codebaseInfo?.isImplementingMember(declaration: variableDeclaration, inExtension: extends, with: generics) == true {
+                if let variableDeclaration = member as? VariableDeclaration, translator.codebaseInfo?.isImplementingKotlinMember(declaration: variableDeclaration, inExtension: extends, with: generics) == true {
                     kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionImplementMember(member, source: translator.syntaxTree.source), statement: member))
-                } else if let functionDeclaration = member as? FunctionDeclaration, translator.codebaseInfo?.isImplementingMember(declaration: functionDeclaration, inExtension: extends, with: generics) == true {
+                } else if let functionDeclaration = member as? FunctionDeclaration, translator.codebaseInfo?.isImplementingKotlinMember(declaration: functionDeclaration, inExtension: extends, with: generics) == true {
                     kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionImplementMember(member, source: translator.syntaxTree.source), statement: member))
                 }
             }
@@ -1232,7 +1232,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                     // Kotlin uses default public visibility on all interface members
                     kstatement.modifiers.visibility = .public
                 } else {
-                    if !kstatement.modifiers.isOverride && translator.codebaseInfo?.isImplementingProtocolMember(declaration: statement, in: owningTypeDeclaration.signature) == true {
+                    if !kstatement.modifiers.isOverride && translator.codebaseInfo?.isImplementingKotlinInterfaceMember(declaration: statement, in: owningTypeDeclaration.signature) == true {
                         kstatement.modifiers.isOverride = true
                     }
                     kstatement.isOpen = !kstatement.modifiers.isOverride && !statement.modifiers.isFinal && statement.modifiers.visibility != .private && owningDeclarationType == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
@@ -1792,7 +1792,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 // Kotlin uses default public visibility on all interface members
                 kstatement.modifiers.visibility = .public
             } else {
-                if !kstatement.modifiers.isOverride && translator.codebaseInfo?.isImplementingProtocolMember(declaration: statement, in: owningTypeDeclaration.signature) == true {
+                if !kstatement.modifiers.isOverride && translator.codebaseInfo?.isImplementingKotlinInterfaceMember(declaration: statement, in: owningTypeDeclaration.signature) == true {
                     kstatement.modifiers.isOverride = true
                 }
                 kstatement.isOpen = !kstatement.modifiers.isOverride && !statement.modifiers.isFinal && statement.modifiers.visibility != .private && owningDeclarationType == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal

@@ -111,6 +111,26 @@ extension TypeSignature {
         }
     }
 
+    var isCustomStringConvertible: Bool {
+        return self == .named("CustomStringConvertible", [])
+    }
+
+    var isEquatable: Bool {
+        return self == .named("Equatable", [])
+    }
+
+    var isHashable: Bool {
+        return self == .named("Hashable", [])
+    }
+
+    var isComparable: Bool {
+        return self == .named("Comparable", [])
+    }
+
+    static func kotlinComparable(for type: TypeSignature) -> TypeSignature {
+        return .named("Comparable", [type])
+    }
+
     /// Add appropriate messages if this type is not supported.
     func appendKotlinMessages(to node: KotlinSyntaxNode, source: Source) {
         var messages: [Message] = []
