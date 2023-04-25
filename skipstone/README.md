@@ -1,9 +1,8 @@
-# SkipSource
+# skiptool
 
-Swift Kotlin Interop
-
-
-
+This repository hosts the Swift to Kotlin command-line tool,
+which is distributed as a binary plug-in through the public repo at
+https://github.com/skiptools/skip/releases
 
 SkipBuild
 ========

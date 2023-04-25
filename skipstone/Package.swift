@@ -2,7 +2,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "SkipSource",
+    name: "skiptool",
     defaultLocalization: "en",
     platforms: [
         .iOS(.v15),

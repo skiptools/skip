@@ -1,7 +1,7 @@
 #!/bin/bash -e
 #
 # This script will coorinate releasing a binary artifact of:
-# https://github.com/skiptools/SkipSource.git
+# https://github.com/skiptools/skiptool.git
 # which will be published to the plug-in repository's releases:
 # https://github.com/skiptools/skip/releases
 #
@@ -155,7 +155,7 @@ git commit -m "Release ${SEMVER_NEXT}" "${VERSION_PATH}"
 git tag --sign "${SEMVER_NEXT}" -m "Release ${SEMVER_NEXT}"
 git push --follow-tags
 
-# get the new ref after we have pushed to SkipSource
+# get the new ref after we have pushed to skiptool
 GITREF="$(git rev-parse HEAD)"
 
 
