@@ -626,7 +626,7 @@ final class EnumTests: XCTestCase {
         }
         """, kotlin: """
         internal fun f() {
-            for (e in E.allCases.sref().asiterable()) {
+            for (e in E.allCases.sref()) {
                 if (e == E.two) {
                     print("TWO")
                 }

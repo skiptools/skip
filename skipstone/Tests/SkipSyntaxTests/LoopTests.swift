@@ -106,7 +106,7 @@ final class LoopTests: XCTestCase {
             print(i)
         }
         """, kotlin: """
-        for (i in arrayOf(1, 2, 3).asiterable()) {
+        for (i in arrayOf(1, 2, 3)) {
             print(i)
         }
         """)
@@ -121,7 +121,7 @@ final class LoopTests: XCTestCase {
         """, kotlin: """
         {
             val a = arrayOf(1, 2, 3)
-            for (i in a.sref().asiterable()) {
+            for (i in a.sref()) {
                 print(i)
             }
         }
@@ -138,7 +138,7 @@ final class LoopTests: XCTestCase {
         """, kotlin: """
         {
             val d = dictionaryOf(Tuple2(1, "a"), Tuple2(2, "b"), Tuple2(3, "c"))
-            for ((key, value) in d.sref().asiterable()) {
+            for ((key, value) in d.sref()) {
                 print(key)
                 print(value)
             }
@@ -153,7 +153,7 @@ final class LoopTests: XCTestCase {
         }
         """, kotlin: """
         {
-            for (i in arrayOf(a, b, c).asiterable()) {
+            for (i in arrayOf(a, b, c)) {
                 print(i.sref())
             }
         }
@@ -165,7 +165,7 @@ final class LoopTests: XCTestCase {
             print(s)
         }
         """, kotlin: """
-        for ((i, s) in arrayOf(Tuple2(1, "a"), Tuple2(2, "b"), Tuple2(3, "c")).asiterable()) {
+        for ((i, s) in arrayOf(Tuple2(1, "a"), Tuple2(2, "b"), Tuple2(3, "c"))) {
             print(i)
             print(s)
         }
@@ -191,7 +191,7 @@ final class LoopTests: XCTestCase {
             print(i)
         }
         """, kotlin: """
-        for (i_0 in arrayOf(1, 2, 3).asiterable()) {
+        for (i_0 in arrayOf(1, 2, 3)) {
             var i = i_0
             i += 1
             print(i)
@@ -205,7 +205,7 @@ final class LoopTests: XCTestCase {
             print(i)
         }
         """, kotlin: """
-        for (i in arrayOf(1, 2, 3).asiterable()) {
+        for (i in arrayOf(1, 2, 3)) {
             if (i % 2 != 0) {
                 continue
             }
@@ -226,7 +226,7 @@ final class LoopTests: XCTestCase {
         """, kotlin: """
         {
             val a: Array<Int?> = arrayOf(1, null, 3)
-            for (i_0 in a.sref().asiterable()) {
+            for (i_0 in a.sref()) {
                 var i = i_0
                 if (i == null) {
                     continue
@@ -247,7 +247,7 @@ final class LoopTests: XCTestCase {
             print(i)
         }
         """, kotlin: """
-        for (i in arrayOf(1, 2, 3).asiterable()) {
+        for (i in arrayOf(1, 2, 3)) {
             if (i % 2 == 0) {
                 break
             }
@@ -264,7 +264,7 @@ final class LoopTests: XCTestCase {
         }
         """, kotlin: """
         loop@
-        for (i in arrayOf(1, 2, 3).asiterable()) {
+        for (i in arrayOf(1, 2, 3)) {
             if (i % 2 == 0) {
                 break@loop
             }
@@ -282,7 +282,7 @@ final class LoopTests: XCTestCase {
             print(i)
         }
         """, kotlin: """
-        for (i in arrayOf(1, 2, 3).asiterable()) {
+        for (i in arrayOf(1, 2, 3)) {
             if (i % 2 == 0) {
                 continue
             }
@@ -299,7 +299,7 @@ final class LoopTests: XCTestCase {
         }
         """, kotlin: """
         loop@
-        for (i in arrayOf(1, 2, 3).asiterable()) {
+        for (i in arrayOf(1, 2, 3)) {
             if (i % 2 == 0) {
                 continue@loop
             }

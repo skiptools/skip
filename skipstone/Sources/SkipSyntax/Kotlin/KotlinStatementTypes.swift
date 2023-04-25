@@ -437,20 +437,7 @@ class KotlinForLoop: KotlinStatement {
             }
         }
         output.append(" in ")
-        if (sequence as? KotlinBinaryOperator)?.op.precedence == .range {
-            output.append(sequence, indentation: indentation)
-        } else {
-            let srefSequence = sequence.sref()
-            if srefSequence.isCompoundExpression {
-                output.append("(")
-            }
-            output.append(srefSequence, indentation: indentation)
-            if srefSequence.isCompoundExpression {
-                output.append(")")
-            }
-            // Convert to Kotlin Iterable<T>
-            output.append(".asiterable()")
-        }
+        output.append(sequence.sref(), indentation: indentation)
         output.append(") {\n")
 
         // Re-declare vars
