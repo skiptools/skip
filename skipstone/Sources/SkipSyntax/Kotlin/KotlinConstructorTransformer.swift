@@ -84,10 +84,13 @@ class KotlinConstructorTransformer: KotlinTransformer {
     }
 
     private func fixupClassConstructor(_ constructor: KotlinFunctionDeclaration, isSubclass: Bool, translator: KotlinTranslator) {
-        if constructor.isOptionalInit {
-            constructor.messages.append(.kotlinConstructorNullReturn(constructor, source: translator.syntaxTree.source))
+        guard let body = constructor.body else {
+            return
         }
-        guard constructor.delegatingConstructorCall == nil, let body = constructor.body else {
+        if constructor.isOptionalInit {
+            constructor.body?.updateWithExpectedReturn(.throwIfNull)
+        }
+        guard constructor.delegatingConstructorCall == nil else {
             return
         }
 

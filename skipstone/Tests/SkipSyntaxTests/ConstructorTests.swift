@@ -391,6 +391,37 @@ final class ConstructorTests: XCTestCase {
         }
         """)
     }
+
+    func testOptionalConstructor() async throws {
+        try await check(swift: """
+        class C {
+            let i: Int
+
+            init?(param: Int) {
+                if param == 0 {
+                    return nil
+                } else {
+                    i = param
+                }
+            }
+        }
+        func f() -> Int {
+            return C()?.i ?? -1
+        }
+        """, kotlin: """
+        internal open class C {
+            internal val i: Int
+
+            internal constructor(param: Int) {
+                if (param == 0) {
+                    throw NullReturnException()
+                } else {
+                    i = param
+                }
+            }
+        }
+        """)
+    }
 }
 
 private class ConstructorTestsSideEffectBase {

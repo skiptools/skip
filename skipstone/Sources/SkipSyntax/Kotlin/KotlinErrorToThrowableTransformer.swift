@@ -1,5 +1,5 @@
-/// Update types that conform to the `Error` protocol to extend from `Throwable`.
-class KotlinErrorToThrowableTransformer: KotlinTransformer {
+/// Update types that conform to the `Error` protocol to extend from `Exception`.
+class KotlinErrorToExceptionTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
         guard let codebaseInfo = translator.codebaseInfo else {
             return
@@ -39,17 +39,17 @@ class KotlinErrorToThrowableTransformer: KotlinTransformer {
             }
         }
 
-        var throwableInheritsIndex = 0
+        var exceptionInheritsIndex = 0
         if classDeclaration.declarationType == .enumDeclaration {
-            // To extend throwable, an enum must be modeled as a sealed class, and we cannot create singleton case instances
+            // To extend Exception, an enum must be modeled as a sealed class, and we cannot create singleton case instances
             classDeclaration.isSealedClassesEnum = true
             classDeclaration.alwaysCreateNewSealedClassInstances = true
             // Leave the enum raw type extension first
-            throwableInheritsIndex = classDeclaration.enumInheritedRawValueType != nil ? 1 : 0
+            exceptionInheritsIndex = classDeclaration.enumInheritedRawValueType != nil ? 1 : 0
         }
-        classDeclaration.inherits.insert(.named("Throwable", []), at: throwableInheritsIndex)
+        classDeclaration.inherits.insert(.named("Exception", []), at: exceptionInheritsIndex)
         if !hasConstructors {
-            classDeclaration.superclassCall = "Throwable()"
+            classDeclaration.superclassCall = "Exception()"
         }
     }
 }

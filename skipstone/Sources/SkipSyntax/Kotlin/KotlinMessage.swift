@@ -35,19 +35,13 @@ extension Message {
         return Message(kind: .error, message: "A Kotlin constructor can only include a single call to another 'this' or 'super' constructor", sourceDerived: sourceDerived, source: source)
     }
 
-    // Idea: factory callable on companion object? Factory function with class name?
-    // Or constructor that throws exception and we catch at call site
-    static func kotlinConstructorNullReturn(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "Kotlin does not support constructors that return nil. Consider creating a factory function", sourceDerived: sourceDerived, source: source)
-    }
-
     // Idea: generate an internal ordinal member var and synthesize code to use it and associated values to conform
     static func kotlinEnumSealedClassComparableConformance(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Skip does not support automatic Comparable conformance for enums that translate into Kotlin sealed classes. Consider writing your own < operator function", sourceDerived: sourceDerived, source: source)
     }
 
     static func kotlinErrorCannotExtendClass(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "An Error type cannot extend another class because it will be translated to extend Throwable in Kotlin", sourceDerived: sourceDerived, source: source)
+        return Message(kind: .error, message: "An Error type cannot extend another class because it will be translated to extend Exception in Kotlin", sourceDerived: sourceDerived, source: source)
     }
 
     // Idea: factory function with class name?

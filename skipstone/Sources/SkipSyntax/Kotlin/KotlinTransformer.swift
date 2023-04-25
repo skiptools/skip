@@ -30,7 +30,7 @@ public func builtinKotlinTransformers() -> [KotlinTransformer] {
         // May add members, so place it before transformers that could manipulate those members
         KotlinStructTransformer(),
         // May alter superclasses and change enums to use sealed classes
-        KotlinErrorToThrowableTransformer(),
+        KotlinErrorToExceptionTransformer(),
         // May *remove* information about protocol conformances. May change enums to use sealed classes. Requires knowledge of
         // sealed vs. unsealed enums. Take care with placement in transformers list
         KotlinCommonProtocolsTransformer(),

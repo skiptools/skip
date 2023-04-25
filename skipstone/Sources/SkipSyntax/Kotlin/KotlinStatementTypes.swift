@@ -110,10 +110,11 @@ class KotlinCodeBlock: KotlinStatement {
     @discardableResult func updateWithExpectedReturn(_ expectedReturn: KotlinExpectedReturn) -> Bool {
         var label: String?
         var assignToSelf = false
+        var convertBreak = false
         var sref = false
+        var throwIfNull = false
         var returnRequired = false
         var onUpdate: String? = nil
-        var convertBreak = false
         switch expectedReturn {
         case .no:
             // Don't shortcut and return here because we need to return whether any return statements were found
@@ -131,6 +132,8 @@ class KotlinCodeBlock: KotlinStatement {
             onUpdate = update
             sref = true
             returnRequired = true
+        case .throwIfNull:
+            throwIfNull = true
         }
 
         var didFindReturn = false
@@ -158,7 +161,15 @@ class KotlinCodeBlock: KotlinStatement {
                         if let label {
                             returnStatement.label = label
                         }
-                        if sref {
+                        if throwIfNull, let returnExpression = returnStatement.expression, returnExpression is KotlinNullLiteral {
+                            let throwStatement = KotlinRawStatement(sourceCode: "throw NullReturnException()", sourceFile: statement.sourceFile, sourceRange: statement.sourceRange)
+                            if let parent = statement.parent as? KotlinStatement {
+                                parent.insert(statements: [throwStatement], after: statement)
+                                parent.remove(statement: statement)
+                            } else {
+                                statement.messages.append(.internalError(statement))
+                            }
+                        } else if sref {
                             returnStatement.expression = returnStatement.expression?.sref(onUpdate: onUpdate)
                         }
                         return .skip
@@ -1262,6 +1273,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         }
         if let body = statement.body {
             kstatement.body = KotlinCodeBlock.translate(statement: body, translator: translator)
+            // Note: we leave optional init handling to our transformers because we handle them differently for different types
             kstatement.body?.updateWithExpectedReturn(statement.returnType == .void || statement.type == .initDeclaration ? .no : .sref(nil))
             for parameter in kstatement.parameters where parameter.isInOut {
                 kstatement.body?.updateWithInOutParameter(name: parameter.internalLabel, source: translator.syntaxTree.source)

@@ -565,7 +565,7 @@ final class EnumTests: XCTestCase {
             case two
         }
         """, kotlin: """
-        internal sealed class E: Throwable(), CaseIterable, Error {
+        internal sealed class E: Exception(), CaseIterable, Error {
             class One: E() {
 
                 override fun equals(other: Any?): Boolean {

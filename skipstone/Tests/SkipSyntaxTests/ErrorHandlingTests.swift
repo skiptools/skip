@@ -338,7 +338,7 @@ final class ErrorHandlingTests: XCTestCase {
         class C: Error {
         }
         """, kotlin: """
-        internal open class C: Throwable(), Error {
+        internal open class C: Exception(), Error {
         }
         """)
 
@@ -347,7 +347,7 @@ final class ErrorHandlingTests: XCTestCase {
             var message = ""
         }
         """, kotlin: """
-        internal open class C: Throwable(), Error {
+        internal open class C: Exception(), Error {
             override var message = ""
         }
         """)
@@ -361,7 +361,7 @@ final class ErrorHandlingTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal open class C: Throwable, Error {
+        internal open class C: Exception, Error {
             internal val i: Int
 
             internal constructor(param: Int): super() {
@@ -375,7 +375,7 @@ final class ErrorHandlingTests: XCTestCase {
             var message = ""
         }
         """, kotlin: """
-        internal open class C: Throwable(), Error {
+        internal open class C: Exception(), Error {
             override var message = ""
         }
         """)
@@ -388,7 +388,7 @@ final class ErrorHandlingTests: XCTestCase {
             case error2
         }
         """, kotlin: """
-        internal sealed class E: Throwable(), Error {
+        internal sealed class E: Exception(), Error {
             class Error1: E() {
 
                 override fun equals(other: Any?): Boolean {
@@ -427,7 +427,7 @@ final class ErrorHandlingTests: XCTestCase {
             case error2
         }
         """, kotlin: """
-        internal sealed class E(override val rawValue: Int, unusedp: Nothing? = null): Throwable(), Error, RawRepresentable<Int> {
+        internal sealed class E(override val rawValue: Int, unusedp: Nothing? = null): Exception(), Error, RawRepresentable<Int> {
             class Error1: E(2) {
 
                 override fun equals(other: Any?): Boolean {
@@ -482,7 +482,7 @@ final class ErrorHandlingTests: XCTestCase {
             case error2
         }
         """, kotlin: """
-        internal sealed class E: Throwable(), Error {
+        internal sealed class E: Exception(), Error {
             class Error1: E() {
 
                 override fun equals(other: Any?): Boolean {
@@ -521,7 +521,7 @@ final class ErrorHandlingTests: XCTestCase {
             case error2
         }
         """, kotlin: """
-        internal sealed class E(override val rawValue: Int, unusedp: Nothing? = null): Throwable(), Error, RawRepresentable<Int> {
+        internal sealed class E(override val rawValue: Int, unusedp: Nothing? = null): Exception(), Error, RawRepresentable<Int> {
             class Error1: E(2) {
 
                 override fun equals(other: Any?): Boolean {

@@ -595,6 +595,7 @@ class DictionaryLiteral: Expression {
 class FunctionCall: Expression {
     let function: Expression
     let arguments: [LabeledValue<Expression>]
+    private(set) var isInit = false
 
     init(function: Expression, arguments: [LabeledValue<Expression>], syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.function = function
@@ -638,6 +639,7 @@ class FunctionCall: Expression {
             } else {
                 returnType = function.inferredType.or(expecting)
             }
+            isInit = true
             return context
         case .dictionaryLiteral:
             // Must be a constructor call, e.g. [String: Int]()
@@ -647,6 +649,7 @@ class FunctionCall: Expression {
             } else {
                 returnType = function.inferredType.or(expecting)
             }
+            isInit = true
             return context
         case .identifier:
             let identifier = function as! Identifier
@@ -660,6 +663,7 @@ class FunctionCall: Expression {
             } else if let generics = identifier.generics, !generics.isEmpty {
                 // If generics are specified, assume the identifier is a type name and this call is a constructor
                 returnType = TypeSignature.for(name: identifier.name, genericTypes: generics)
+                isInit = true
                 return context
             } else {
                 baseType = nil
@@ -692,7 +696,8 @@ class FunctionCall: Expression {
         // First we infer argument types without knowing the function, so we expect .none
         arguments.forEach { $0.value.inferTypes(context: context, expecting: .none) }
         let argumentTypes = arguments.map { $0.value.inferredType }
-        if var function = candidateFunction(name: name, arguments: arguments, in: baseType, context: context, expecting: expecting, message: true) {
+        var isInit = false
+        if var function = candidateFunction(name: name, arguments: arguments, in: baseType, context: context, expecting: expecting, isInit: &isInit, message: true) {
             // Re-infer arguments now that we know the parameter types
             for (index, argument) in arguments.enumerated() {
                 argument.value.inferTypes(context: context, expecting: function.parameters[index].type)
@@ -700,7 +705,7 @@ class FunctionCall: Expression {
             // If any argument types changed, it could affect the return type of a generic function
             let refinedArgumentTypes = arguments.map({ $0.value.inferredType })
             if argumentTypes != refinedArgumentTypes {
-                if let refinedFunction = candidateFunction(name: name, arguments: arguments, in: baseType, context: context, expecting: expecting, message: false) {
+                if let refinedFunction = candidateFunction(name: name, arguments: arguments, in: baseType, context: context, expecting: expecting, isInit: &isInit, message: false) {
                     function = refinedFunction
                 }
             }

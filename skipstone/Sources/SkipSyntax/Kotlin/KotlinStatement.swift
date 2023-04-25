@@ -110,9 +110,9 @@ class KotlinMessageStatement: KotlinStatement {
 class KotlinRawStatement: KotlinStatement {
     let sourceCode: String
 
-    init(sourceCode: String) {
+    init(sourceCode: String, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.sourceCode = sourceCode
-        super.init(type: .raw)
+        super.init(type: .raw, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
     init(statement: RawStatement) {

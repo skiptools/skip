@@ -12,6 +12,8 @@ enum KotlinExpectedReturn {
     case labelIfBreak(String)
     /// Call `sref` on returned values with the given `onUpdate` code.
     case sref(String?)
+    /// Convert any null return to our Kotlin `NullReturnException`.
+    case throwIfNull
 }
 
 /// A variable we declare to mirror a Swift binding pattern.
