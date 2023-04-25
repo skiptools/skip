@@ -932,6 +932,61 @@ final class MemberDeclarationTests: XCTestCase {
         """)
     }
 
+    func testCustomDescription() async throws {
+        try await check(swift: """
+        class C {
+            let description = "foo"
+        }
+        """, kotlin: """
+        internal open class C {
+            internal val description = "foo"
+        }
+        """)
+
+        try await check(swift: """
+        class C: CustomStringConvertible {
+            let description = "foo"
+        }
+        """, kotlin: """
+        internal open class C {
+            internal val description = "foo"
+
+            override fun toString(): String {
+                return description
+            }
+        }
+        """)
+
+        try await check(swift: """
+        class C {
+            let i: Int
+            init(param: Int) {
+                self.i = param
+            }
+        }
+        extension C: CustomStringConvertible {
+            var description: String {
+                return "foo"
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal val i: Int
+            internal constructor(param: Int) {
+                this.i = param
+            }
+            internal open val description: String
+                get() {
+                    return "foo"
+                }
+
+            override fun toString(): String {
+                return description
+            }
+        }
+        """)
+    }
+
     func testLocalFunction() async throws {
         try await check(supportingSwift: """
         extension Int {

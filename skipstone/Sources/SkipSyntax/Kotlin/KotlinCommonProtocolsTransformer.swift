@@ -1,9 +1,9 @@
-/// Perform synthesis and fixups related to `Equatable`, `Hashable`, and `Comparable` implementations.
+/// Perform synthesis and fixups related to `Equatable`, `Hashable`, `Comparable`, etc implementations.
 ///
 ///   1. Synthesize `equals` and `hashCode` members in cases where the Swift compiler synthesizes `Equatable` and `Hashable`.
-///   2. Remove references to `Equatable` and `Hashable` in inherits lists and generic constraints, because they are just aliases for `Any` in Kotlin.
+///   2. Remove references to `CustomStringConvertible`, `Equatable`, `Hashable` in inherits lists and generic constraints, because they are just aliases for `Any` in Kotlin.
 ///   3. Change references to `Comparable` in inherits lists and generic constraints to Kotlin's `Comparable<T>`.
-class KotlinEquatableHashableComparableTransformer: KotlinTransformer {
+class KotlinCommonProtocolsTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
         guard let codebaseInfo = translator.codebaseInfo else {
             return
@@ -13,6 +13,7 @@ class KotlinEquatableHashableComparableTransformer: KotlinTransformer {
 
     private func visit(_ node: KotlinSyntaxNode, codebaseInfo: CodebaseInfo.Context) -> VisitResult<KotlinSyntaxNode> {
         if let classDeclaration = node as? KotlinClassDeclaration {
+            synthesizeToString(for: classDeclaration, codebaseInfo: codebaseInfo)
             synthesizeConformances(for: classDeclaration, codebaseInfo: codebaseInfo)
             classDeclaration.inherits = fixupInherits(classDeclaration.inherits, for: classDeclaration.signature)
             classDeclaration.generics = fixupGenerics(classDeclaration.generics)
@@ -37,7 +38,7 @@ class KotlinEquatableHashableComparableTransformer: KotlinTransformer {
     private func fixupInherits(_ inherits: [TypeSignature], for type: TypeSignature) -> [TypeSignature] {
         return inherits.compactMap {
             // Filter types that are aliased to Kotlin Any
-            guard !$0.isEquatable && !$0.isHashable else {
+            guard !$0.isCustomStringConvertible && !$0.isEquatable && !$0.isHashable else {
                 return nil
             }
             // Map Comparable to Kotlin's Comparable<T>
@@ -62,6 +63,25 @@ class KotlinEquatableHashableComparableTransformer: KotlinTransformer {
             return generic
         }
         return Generics(entries: entries)
+    }
+
+    private func synthesizeToString(for classDeclaration: KotlinClassDeclaration, codebaseInfo: CodebaseInfo.Context) {
+        guard classDeclaration.members.contains(where: { member in
+            guard let variableDeclaration = member as? KotlinVariableDeclaration else {
+                return false
+            }
+            return !variableDeclaration.isStatic && variableDeclaration.names == ["description"] && variableDeclaration.variableTypes == [.string]
+        }) else {
+            return
+        }
+        guard codebaseInfo.global.protocolSignatures(forNamed: classDeclaration.signature).contains(where: { $0.isCustomStringConvertible }) else {
+            return
+        }
+
+        let toStringFunction = toStringFunction()
+        classDeclaration.members.append(toStringFunction)
+        toStringFunction.parent = classDeclaration
+        toStringFunction.assignParentReferences()
     }
 
     private func synthesizeConformances(for classDeclaration: KotlinClassDeclaration, codebaseInfo: CodebaseInfo.Context) {
@@ -139,6 +159,19 @@ class KotlinEquatableHashableComparableTransformer: KotlinTransformer {
         }
     }
 
+    private func toStringFunction() -> KotlinFunctionDeclaration {
+        let toStringFunction = KotlinFunctionDeclaration(name: "toString")
+        toStringFunction.returnType = .string
+        toStringFunction.modifiers.visibility = .public
+        toStringFunction.modifiers.isOverride = true
+        toStringFunction.extras = .singleNewline
+        toStringFunction.isGenerated = true
+
+        let statements: [KotlinStatement] = [KotlinRawStatement(sourceCode: "return description")]
+        toStringFunction.body = KotlinCodeBlock(statements: statements)
+        return toStringFunction
+    }
+
     private func hashCodeFunction(for className: String, properties: [String]) -> KotlinFunctionDeclaration {
         let hashCodeFunction = KotlinFunctionDeclaration(name: "hashCode")
         hashCodeFunction.returnType = .int
@@ -213,6 +246,10 @@ private extension CodebaseInfoItem {
 }
 
 private extension TypeSignature {
+    var isCustomStringConvertible: Bool {
+        return self == .named("CustomStringConvertible", [])
+    }
+
     var isEquatable: Bool {
         return self == .named("Equatable", [])
     }

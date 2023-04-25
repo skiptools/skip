@@ -33,7 +33,7 @@ public func builtinKotlinTransformers() -> [KotlinTransformer] {
         KotlinErrorToThrowableTransformer(),
         // May *remove* information about protocol conformances. May change enums to use sealed classes. Requires knowledge of
         // sealed vs. unsealed enums. Take care with placement in transformers list
-        KotlinEquatableHashableComparableTransformer(),
+        KotlinCommonProtocolsTransformer(),
         // May add constructors
         KotlinConstructorTransformer(),
         // May add rawValue constructor and static allCases function

@@ -1758,6 +1758,9 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var isConstructingPropertyName: String?
     var mutationFunctionNames: (willMutate: String, didMutate: String)?
     var isGenerated = false
+    var isDescriptionImplementation: Bool {
+        return isProperty && names == ["description"] && variableTypes == [.string]
+    }
 
     // KotlinMemberDeclaration
     var extends: (TypeSignature, Generics)? {
