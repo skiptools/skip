@@ -16,6 +16,7 @@ class KotlinImportMapTransformer: KotlinTransformer {
                 //importDeclaration.modulePath[0...0] = ["skip", "unit"]
             }
             if importDeclaration.modulePath.first == "OSLog"
+                || importDeclaration.modulePath.first == "Dispatch"
                 || importDeclaration.modulePath.first == "JavaScriptCore"
                 || importDeclaration.modulePath.first == "CoreFoundation"
                 || importDeclaration.modulePath.first == "CryptoKit" {
