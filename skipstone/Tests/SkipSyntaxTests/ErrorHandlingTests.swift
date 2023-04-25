@@ -351,6 +351,34 @@ final class ErrorHandlingTests: XCTestCase {
             override var message = ""
         }
         """)
+
+        try await check(swift: """
+        class C: Error {
+            let i: Int
+
+            init(param: Int) {
+                self.i = param
+            }
+        }
+        """, kotlin: """
+        internal open class C: Throwable, Error {
+            internal val i: Int
+
+            internal constructor(param: Int): super() {
+                this.i = param
+            }
+        }
+        """)
+
+        try await check(swift: """
+        class C: Error {
+            var message = ""
+        }
+        """, kotlin: """
+        internal open class C: Throwable(), Error {
+            override var message = ""
+        }
+        """)
     }
 
     func testErrorEnum() async throws {

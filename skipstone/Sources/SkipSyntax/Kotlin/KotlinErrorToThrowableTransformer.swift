@@ -23,7 +23,12 @@ class KotlinErrorToThrowableTransformer: KotlinTransformer {
             return
         }
 
+        var hasConstructors = false
         for member in classDeclaration.members {
+            if member.type == .constructorDeclaration, let constructorDeclaration = member as? KotlinFunctionDeclaration {
+                hasConstructors = true
+                constructorDeclaration.delegatingConstructorCall = KotlinRawExpression(sourceCode: "super()")
+            }
             guard let variableDeclaration = member as? KotlinVariableDeclaration else {
                 continue
             }
@@ -43,6 +48,8 @@ class KotlinErrorToThrowableTransformer: KotlinTransformer {
             throwableInheritsIndex = classDeclaration.enumInheritedRawValueType != nil ? 1 : 0
         }
         classDeclaration.inherits.insert(.named("Throwable", []), at: throwableInheritsIndex)
-        classDeclaration.superclassCall = "Throwable()"
+        if !hasConstructors {
+            classDeclaration.superclassCall = "Throwable()"
+        }
     }
 }
