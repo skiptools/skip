@@ -17,6 +17,19 @@ final class FeatureSupportTests: XCTestCase {
             """)
     }
 
+    func testArrayOfDoubles() async throws {
+        // error: type mismatch: inferred type is IntegerLiteralType[Int,Long,Byte,Short] but Double was expected
+        try await check(compiler: nil, swiftCode: {
+            let doubles: Array<Double> = [1,2,3,4]
+            return "\(doubles)"
+        }, kotlin: """
+            val doubles: Array<Double> = arrayOf(1, 2, 3, 4)
+                get() {
+                    return field
+                }
+            return "${doubles}"
+            """)
+    }
 
     func testUnsignedEnumConstants() async throws {
         // compile error: conversion of signed constants to unsigned ones is prohibited ten(10), twenty(20)
@@ -328,5 +341,7 @@ final class FeatureSupportTests: XCTestCase {
         """)
     }
 }
+
+
 
 
