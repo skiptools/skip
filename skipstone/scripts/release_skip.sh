@@ -97,7 +97,7 @@ find ${ARTIFACTBUNDLE} -exec touch -d "${GITDATE:0:19}" {} \;
 zip -9 -q --symlinks -r ${ARTIFACTBUNDLE}.zip ${ARTIFACTBUNDLE}
 
 CHECKSUM=$(shasum -a 256 ${ARTIFACTBUNDLE}.zip | cut -f 1 -d ' ')
-ls -lah ${ARTIFACTBUNDLE}.zip
+du -skh "${ARTIFACTBUNDLE}.zip"
 
 # the location of the download once we have uploaded it
 ARTIFACT_URL="https://github.com/skiptools/skip/releases/download/${SEMVER_NEXT}/${ARTIFACTBUNDLE}.zip"
