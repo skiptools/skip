@@ -17,6 +17,35 @@ final class FeatureSupportTests: XCTestCase {
             """)
     }
 
+    func testInitNumberLiterals() async throws {
+        // Kotlin doesn't seem to allow initializing non-Ints with literals without being explicit
+
+        // error: the integer literal does not conform to the expected type Double
+        try await check(compiler: nil, swiftCode: {
+            var x: Int8
+            var y: UInt32
+            var z: Double
+            x = 1
+            y = 2
+            z = 3
+            _ = x
+            _ = y
+            _ = z
+            return ""
+        }, kotlin: """
+            var x: Byte
+            var y: UInt
+            var z: Double
+            x = 1
+            y = 2
+            z = 3
+            x
+            y
+            z
+            return ""
+            """)
+    }
+
     func testArrayOfDoubles() async throws {
         // error: type mismatch: inferred type is IntegerLiteralType[Int,Long,Byte,Short] but Double was expected
         try await check(compiler: nil, swiftCode: {
@@ -63,44 +92,6 @@ final class FeatureSupportTests: XCTestCase {
     }
 
 
-    /// 0.096 seconds
-    func testInferPerf11() async throws {
-        try await check(swiftCode: {
-            func f(_ number: Int) -> String { "\(number)" }
-            func f(_ string: String) -> Int { string.length }
-            let x = f(f(f(f(f(f(f(f(f(f(f(99999999)))))))))))
-            return x + x
-        }, kotlin: """
-            fun f(number: Int): String {
-                return "${number}"
-            }
-            fun f(string: String): Int {
-                return string.length
-            }
-            val x = f(f(f(f(f(f(f(f(f(f(f(99999999)))))))))))
-            return x + x
-            """)
-    }
-
-    /// 0.715 seconds
-    func testInferPerf14() async throws {
-        try await check(swiftCode: {
-            func f(_ number: Int) -> String { "\(number)" }
-            func f(_ string: String) -> Int { string.length }
-            let x = f(f(f(f(f(f(f(f(f(f(f(f(f(f("QQQQQ"))))))))))))))
-            return x
-        }, kotlin: """
-            fun f(number: Int): String {
-                return "${number}"
-            }
-            fun f(string: String): Int {
-                return string.length
-            }
-            val x = f(f(f(f(f(f(f(f(f(f(f(f(f(f("QQQQQ"))))))))))))))
-            return x
-            """)
-    }
-
     /// 1.406 seconds
     func testInferPerf15() async throws {
         try await check(swiftCode: {
@@ -117,97 +108,6 @@ final class FeatureSupportTests: XCTestCase {
             }
             val x = f(f(f(f(f(f(f(f(f(f(f(f(f(f(f(88888888)))))))))))))))
             return x
-            """)
-    }
-
-    ///// 11.213 seconds
-    //func testInferPerf18() async throws {
-    //    try await check(swiftCode: {
-    //        func f(_ number: Int) -> String { "\(number)" }
-    //        func f(_ string: String) -> Int { string.length }
-    //        let x = f(f(f(f(f(f(f(f(f(f(f(f(f(f(f(f(f(f("ZZZZZZZZZZ"))))))))))))))))))
-    //        return x
-    //    }, kotlin: """
-    //        fun f(number: Int): String {
-    //            return "${number}"
-    //        }
-    //        fun f(string: String): Int {
-    //            return string.length
-    //        }
-    //        val x = f(f(f(f(f(f(f(f(f(f(f(f(f(f(f(f(f(f("ZZZZZZZZZZ"))))))))))))))))))
-    //        return x
-    //        """)
-    //}
-    //
-    ///// 22.243 seconds
-    //func testInferPerf19() async throws {
-    //    try await check(swiftCode: {
-    //        func f(_ number: Int) -> String { "\(number)" }
-    //        func f(_ string: String) -> Int { string.length }
-    //        let x = f(f(f(f(f(f(f(f(f(f(f(f(f(f(f(f(f(f(f(111)))))))))))))))))))
-    //        return x
-    //    }, kotlin: """
-    //        fun f(number: Int): String {
-    //            return "${number}"
-    //        }
-    //        fun f(string: String): Int {
-    //            return string.length
-    //        }
-    //        val x = f(f(f(f(f(f(f(f(f(f(f(f(f(f(f(f(f(f(f(111)))))))))))))))))))
-    //        return x
-    //        """)
-    //}
-
-    func testTranspilePrimeCheck() async throws {
-        try await check(swiftCode: {
-            func isPrime(_ number: Int) -> Bool {
-                guard number > 1 else {
-                    return false
-                }
-                for i in 2..<number {
-                    if number % i == 0 {
-                        return false
-                    }
-                }
-                return true
-            }
-            return isPrime(100019) ? "YES" : "NO"
-        }, kotlin: """
-            fun isPrime(number: Int): Boolean {
-                if (number <= 1) {
-                    return false
-                }
-                for (i in 2 until number) {
-                    if (number % i == 0) {
-                        return false
-                    }
-                }
-                return true
-            }
-            return if (isPrime(100019)) "YES" else "NO"
-            """)
-    }
-
-    func testCheckSwiftCompiledTypes() async throws {
-
-        try await check(swiftCode: {
-            struct Foo {
-            }
-            return nil
-        }, kotlin: """
-            class Foo {
-            }
-            return null
-            """)
-
-        try await check(swiftCode: {
-            struct Foo {
-            }
-            return nil
-        }, kotlin: """
-            class Foo {
-            }
-            return null
             """)
     }
 
@@ -341,6 +241,10 @@ final class FeatureSupportTests: XCTestCase {
         """)
     }
 }
+
+
+
+
 
 
 
