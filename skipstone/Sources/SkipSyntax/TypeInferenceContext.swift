@@ -234,32 +234,32 @@ struct TypeInferenceContext {
         return member
     }
 
-    /// Return the signatures of the functions matching the given parameters.
+    /// Return the signatures of the functions matching the given parameters, and whether each is an init call.
     ///
     /// The match on the parameter types will attempt to allow for unknown types.
     ///
     /// - Parameters:
     ///   - type: The function's owning type if this is a member function, or nil if not.
-    func function(_ name: String, in type: TypeSignature?, parameters: [LabeledValue<TypeSignature>], messagesNode: SyntaxNode?) -> [TypeSignature] {
+    func function(_ name: String, in type: TypeSignature?, parameters: [LabeledValue<TypeSignature>], messagesNode: SyntaxNode?) -> [(TypeSignature, Bool)] {
         if let type, type.isOptional {
             return function(name, inNonOptional: type.asOptional(false), parameters: parameters, messagesNode: messagesNode).map {
-                .function($0.parameters, $0.returnType.asOptional(true))
+                (.function($0.0.parameters, $0.0.returnType.asOptional(true)), $0.1)
             }
         } else {
             return function(name, inNonOptional: type, parameters: parameters, messagesNode: messagesNode)
         }
     }
 
-    private func function(_ name: String, inNonOptional type: TypeSignature?, parameters: [LabeledValue<TypeSignature>], messagesNode: SyntaxNode?) -> [TypeSignature] {
+    private func function(_ name: String, inNonOptional type: TypeSignature?, parameters: [LabeledValue<TypeSignature>], messagesNode: SyntaxNode?) -> [(TypeSignature, Bool)] {
         let constrainedArguments = parameters.map { LabeledValue(label: $0.label, value: $0.value.constrainedTypeWithGenerics(generics)) }
         if let type {
             if let codebaseInfo {
                 let candidates = codebaseInfo.functionSignature(of: name, inConstrained: type.constrainedTypeWithGenerics(generics), arguments: constrainedArguments)
-                addMessages(to: messagesNode, for: candidates.map(\.1))
-                return candidates.map(\.0)
-            } else if let (function, message) = unavailableAPI?.knownUnavailableFunction(name, in: type, parameters: parameters) {
+                addMessages(to: messagesNode, for: candidates.map(\.2))
+                return candidates.map { ($0.0, $0.1) }
+            } else if let (function, isInit, message) = unavailableAPI?.knownUnavailableFunction(name, in: type, parameters: parameters) {
                 addMessages(to: messagesNode, for: [.unavailable(message)])
-                return [function]
+                return [(function, isInit)]
             } else {
                 return []
             }
@@ -269,7 +269,7 @@ struct TypeInferenceContext {
         if let localFunction = localIdentifierTypes[name], case .function = localFunction {
             if let codebaseInfo {
                 if let callSignature = codebaseInfo.callableSignature(of: localFunction, generics: generics, arguments: constrainedArguments) {
-                    return [callSignature]
+                    return [(callSignature, false)]
                 }
             } else {
                 return []
@@ -283,21 +283,21 @@ struct TypeInferenceContext {
             if let codebaseInfo {
                 let candidates = codebaseInfo.functionSignature(of: name, inConstrained: signature.constrainedTypeWithGenerics(generics), arguments: constrainedArguments)
                 if !candidates.isEmpty {
-                    addMessages(to: messagesNode, for: candidates.map(\.1))
-                    return candidates.map(\.0)
+                    addMessages(to: messagesNode, for: candidates.map(\.2))
+                    return candidates.map { ($0.0, $0.1) }
                 }
-            } else if let (function, message) = unavailableAPI?.knownUnavailableFunction(name, in: signature, parameters: parameters) {
+            } else if let (function, isInit, message) = unavailableAPI?.knownUnavailableFunction(name, in: signature, parameters: parameters) {
                 addMessages(to: messagesNode, for: [.unavailable(message)])
-                return [function]
+                return [(function, isInit)]
             }
         }
         if let codebaseInfo {
             let candidates = codebaseInfo.functionSignature(of: name, arguments: constrainedArguments)
-            addMessages(to: messagesNode, for: candidates.map(\.1))
-            return candidates.map(\.0)
-        } else if let (function, message) = unavailableAPI?.knownUnavailableFunction(name, in: nil, parameters: parameters) {
+            addMessages(to: messagesNode, for: candidates.map(\.2))
+            return candidates.map { ($0.0, $0.1) }
+        } else if let (function, isInit, message) = unavailableAPI?.knownUnavailableFunction(name, in: nil, parameters: parameters) {
             addMessages(to: messagesNode, for: [.unavailable(message)])
-            return [function]
+            return [(function, isInit)]
         } else {
             return []
         }
@@ -325,7 +325,7 @@ struct TypeInferenceContext {
             let candidates = codebaseInfo.subscriptSignature(inConstrained: type.constrainedTypeWithGenerics(generics), arguments: constrainedArguments)
             addMessages(to: messagesNode, for: candidates.map(\.1))
             return candidates.map(\.0)
-        } else if let (function, message) = unavailableAPI?.knownUnavailableFunction("subscript", in: type, parameters: parameters) {
+        } else if let (function, _, message) = unavailableAPI?.knownUnavailableFunction("subscript", in: type, parameters: parameters) {
             addMessages(to: messagesNode, for: [.unavailable(message)])
             return [function]
         } else {

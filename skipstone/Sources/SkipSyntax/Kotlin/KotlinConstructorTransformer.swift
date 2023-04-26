@@ -5,13 +5,20 @@ class KotlinConstructorTransformer: KotlinTransformer {
     }
 
     private func visit(_ node: KotlinSyntaxNode, translator: KotlinTranslator) -> VisitResult<KotlinSyntaxNode> {
-        guard let classDeclaration = node as? KotlinClassDeclaration else {
-            // Recurse to find nested declarations
-            return .recurse(nil)
-        }
-        // Enums are handled in the EnumTransformer
-        if classDeclaration.declarationType != .enumDeclaration {
-            fixupConstructors(for: classDeclaration, translator: translator)
+        if let classDeclaration = node as? KotlinClassDeclaration {
+            // Enums are handled in the EnumTransformer
+            if classDeclaration.declarationType != .enumDeclaration {
+                fixupConstructors(for: classDeclaration, translator: translator)
+            }
+        } else if let functionCall = node as? KotlinFunctionCall, functionCall.isOptionalInit {
+            // Rather than catching the NullReturnException from our Kotlin optional init function and then force unwrapping,
+            // just let the exception propagate
+            if let postfixOperator = functionCall.parent as? KotlinPostfixOperator, postfixOperator.operatorSymbol == "!" {
+                if translator.codebaseInfo?.declarationType(forNamed: functionCall.inferredType) != .enumDeclaration {
+                    functionCall.isOptionalInit = false
+                    postfixOperator.operatorSymbol = ""
+                }
+            }
         }
         return .recurse(nil)
     }

@@ -709,6 +709,7 @@ class FunctionCall: Expression {
                     function = refinedFunction
                 }
             }
+            self.isInit = isInit
             returnType = function.returnType.or(expecting)
         } else {
             returnType = expecting
@@ -716,13 +717,16 @@ class FunctionCall: Expression {
         return context
     }
 
-    private func candidateFunction(name: String, arguments: [LabeledValue<Expression>], in baseType: TypeSignature?, context: TypeInferenceContext, expecting: TypeSignature, message: Bool) -> TypeSignature? {
+    private func candidateFunction(name: String, arguments: [LabeledValue<Expression>], in baseType: TypeSignature?, context: TypeInferenceContext, expecting: TypeSignature, isInit: inout Bool, message: Bool) -> TypeSignature? {
         let parameters = arguments.map { LabeledValue<TypeSignature>(label: $0.label, value: $0.value.inferredType) }
         let candidateFunctions = context.function(name, in: baseType, parameters: parameters, messagesNode: message ? self : nil)
         guard !candidateFunctions.isEmpty else {
+            isInit = false
             return nil
         }
-        return candidateFunctions.first { $0.returnType == expecting } ?? candidateFunctions[0]
+        let (signature, signatureIsInit) = candidateFunctions.first { $0.0.returnType == expecting } ?? candidateFunctions[0]
+        isInit = signatureIsInit
+        return signature
     }
 
     private var returnType: TypeSignature = .none

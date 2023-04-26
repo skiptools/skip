@@ -11,6 +11,11 @@ class KotlinEnumTransformer: KotlinTransformer {
         if let classDeclaration = node as? KotlinClassDeclaration {
             handleConstructors(for: classDeclaration, codebaseInfo: codebaseInfo)
             synthesizeCaseIterable(for: classDeclaration, codebaseInfo: codebaseInfo)
+        } else if let functionCall = node as? KotlinFunctionCall, functionCall.isOptionalInit {
+            // We change enum constructors to factory functions
+            if codebaseInfo.declarationType(forNamed: functionCall.inferredType) == .enumDeclaration {
+                functionCall.isOptionalInit = false
+            }
         }
         return .recurse(nil)
     }

@@ -406,7 +406,10 @@ final class ConstructorTests: XCTestCase {
             }
         }
         func f() -> Int {
-            return C()?.i ?? -1
+            return C(param: 0)?.i ?? -1
+        }
+        func g() -> C {
+            return C(param: 0)!
         }
         """, kotlin: """
         internal open class C {
@@ -419,6 +422,12 @@ final class ConstructorTests: XCTestCase {
                     i = param
                 }
             }
+        }
+        internal fun f(): Int {
+            return (try { C(param = 0) } catch (_: NullReturnException) { null })?.i ?: -1
+        }
+        internal fun g(): C {
+            return C(param = 0)
         }
         """)
     }

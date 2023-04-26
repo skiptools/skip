@@ -17,8 +17,8 @@ public class UnavailableAPI {
         return nil
     }
 
-    /// If this is a function that is known to be unavailable, return its type and an optional customized unavailability messge.
-    func knownUnavailableFunction(_ name: String, in type: TypeSignature?, parameters: [LabeledValue<TypeSignature>]) -> (TypeSignature, String?)? {
+    /// If this is a function that is known to be unavailable, return its type, whether it is a constructor, and an optional customized unavailability messge.
+    func knownUnavailableFunction(_ name: String, in type: TypeSignature?, parameters: [LabeledValue<TypeSignature>]) -> (TypeSignature, Bool, String?)? {
         return nil
     }
 }

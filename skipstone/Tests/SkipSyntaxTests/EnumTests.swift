@@ -457,6 +457,13 @@ final class EnumTests: XCTestCase {
                 }
             }
         }
+
+        func f(param: Int) -> E {
+            return E(rawValue: param) ?? .one
+        }
+        func g(param: Int) -> E {
+            return E(rawValue: param)!
+        }
         """, kotlin: """
         internal enum class E: RawRepresentable<Int> {
             one,
@@ -475,6 +482,13 @@ final class EnumTests: XCTestCase {
                     return null
                 }
             }
+        }
+
+        internal fun f(param: Int): E {
+            return E(rawValue = param) ?: E.one
+        }
+        internal fun g(param: Int): E {
+            return E(rawValue = param)!!
         }
         """)
 

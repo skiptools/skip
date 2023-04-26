@@ -580,6 +580,8 @@ class KotlinDictionaryLiteral: KotlinExpression {
 class KotlinFunctionCall: KotlinExpression {
     var function: KotlinExpression
     var arguments: [LabeledValue<KotlinExpression>] = []
+    var isOptionalInit = false
+    var inferredType: TypeSignature = .none
     var mayBeSharedMutableStructType = false
     var useTrailingClosureFormatting = true
 
@@ -590,6 +592,8 @@ class KotlinFunctionCall: KotlinExpression {
             let kargumentExpression = translator.translateExpression($0.value)
             return LabeledValue(label: $0.label, value: kargumentExpression)
         }
+        kexpression.isOptionalInit = expression.isInit && expression.inferredType.isOptional
+        kexpression.inferredType = expression.inferredType
         kexpression.mayBeSharedMutableStructType = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
         return kexpression
     }
@@ -625,6 +629,9 @@ class KotlinFunctionCall: KotlinExpression {
         var trailingClosure: KotlinExpression? = nil
         var forceParentheses = false
         var isReduceFunction = false
+        if isOptionalInit {
+            output.append("(try { ")
+        }
         if let closure = function as? KotlinClosure, closure.hasReturnLabel {
             // Kotlin does not allow return labels in immediately-executed lambdas. Convert to a call to our special closure-running functions
             output.append("linvoke")
@@ -685,6 +692,9 @@ class KotlinFunctionCall: KotlinExpression {
         }
         if let trailingClosure {
             output.append(" ").append(trailingClosure, indentation: indentation)
+        }
+        if isOptionalInit {
+            output.append(" } catch (_: NullReturnException) { null })")
         }
     }
 }
@@ -1382,7 +1392,7 @@ class KotlinParenthesized: KotlinExpression {
 }
 
 class KotlinPostfixOperator: KotlinExpression {
-    var operatorSymbol: String
+    var operatorSymbol: String // May be set to empty by transformers
     var target: KotlinExpression
     var targetType: TypeSignature = .none
 
