@@ -20,6 +20,8 @@ final class FeatureSupportTests: XCTestCase {
     func testInitNumberLiterals() async throws {
         // Kotlin doesn't seem to allow initializing non-Ints with literals without being explicit
 
+        // see the very end of SkipFoundation/…/TestNSNumberBridging.swift for examples of number literals initializers we might want to support
+
         // error: the integer literal does not conform to the expected type Double
         try await check(compiler: nil, swiftCode: {
             var x: Int8
