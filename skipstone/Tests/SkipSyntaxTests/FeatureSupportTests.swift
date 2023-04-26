@@ -17,6 +17,25 @@ final class FeatureSupportTests: XCTestCase {
             """)
     }
 
+    func testCatchErrorLet() async throws {
+        // error: unresolved reference: someError
+        try await check(compiler: nil, swiftCode: {
+            do {
+            }
+            catch let someError {
+                let x = someError
+            }
+            return ""
+        }, kotlin: """
+            try {
+            } catch (error: Throwable) {
+                val error = error.aserror()
+                val x = someError
+            }
+            return ""
+            """)
+
+    }
     func testCheckUnicodeString() async throws {
         // interestingly, the special case check fails on Linux
         #if !os(Linux)
@@ -257,6 +276,7 @@ final class FeatureSupportTests: XCTestCase {
         """)
     }
 }
+
 
 
 
