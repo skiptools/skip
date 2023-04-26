@@ -1112,7 +1112,7 @@ struct KotlinExtensionDeclaration {
     static func translate(statement: ExtensionDeclaration, translator: KotlinTranslator) -> [KotlinStatement] {
         // If the extension can't move into its extended type or is on a type outside this module, use Kotlin extension
         // functions. Otherwise do not translate the extension - instead we'll move its members into the extended type
-        guard !statement.canMoveIntoExtendedType || translator.codebaseInfo?.declarationType(forNamed: statement.extends, mustBeInModule: true) == nil else {
+        guard !statement.canMoveIntoExtendedType || (translator.codebaseInfo != nil && translator.codebaseInfo?.declarationType(forNamed: statement.extends, mustBeInModule: true) == nil) else {
             return []
         }
 
