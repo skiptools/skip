@@ -803,12 +803,14 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             trace(transpilation.output.content)
 
             let sourcePath = try AbsolutePath(validating: transpilation.sourceFile.path)
-            let sourceSize = try fs.getFileInfo(sourcePath).size
+            let sourceSize = transpilation.isSourceFileSynthetic ? 0 : try fs.getFileInfo(sourcePath).size
 
             let (outputFile, changed, overridden) = try saveTranspilation()
 
             // 2 separate log messages, one linking to the source swift and the second linking to the kotlin
-            info("\(sourcePath.basename) (\(Self.byteCount(for: .init(sourceSize)))) transpiling to \(outputFile.basename)", sourceFile: transpilation.sourceFile)
+            if !transpilation.isSourceFileSynthetic {
+                info("\(sourcePath.basename) (\(Self.byteCount(for: .init(sourceSize)))) transpiling to \(outputFile.basename)", sourceFile: transpilation.sourceFile)
+            }
 
             info("\(outputFile.basename) (\(Self.byteCount(for: transpilation.output.content.lengthOfBytes(using: .utf8)))) transpilation \(overridden ? "overridden" : !changed ? "unchanged" : "saved") from \(sourcePath.basename) (\(Self.byteCount(for: .init(sourceSize)))) in \(Int64(transpilation.duration * 1000)) ms", sourceFile: overridden ? transpilation.sourceFile : outputFile.sourceFile)
 

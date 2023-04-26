@@ -77,7 +77,7 @@ class KotlinTupleLabelTransformer: KotlinTransformer {
 
     private func addLabel(_ label: String, forElement element: Int, ofArity arity: Int, in syntaxTree: KotlinSyntaxTree) {
         let generics = (0..<arity).map { "E\($0)" }.joined(separator: ", ")
-        let declaration = "internal val <\(generics)> Tuple\(arity).\(label): E\(element)"
+        let declaration = "internal val <\(generics)> Tuple\(arity)<\(generics)>.\(label): E\(element)"
         let get = "    get() = element\(element)"
         let statements = [declaration, get].map { KotlinRawStatement(sourceCode: $0) }
         statements[0].extras = .singleNewline

@@ -71,7 +71,9 @@ public class KotlinTranslator {
         guard results.contains(true) else {
             return nil
         }
-        return translator.transpilation(for: kotlinSyntaxTree, codebaseInfo: codebaseInfo, transformers: transformers, startTime: startTime)
+        var transpilation = translator.transpilation(for: kotlinSyntaxTree, codebaseInfo: codebaseInfo, transformers: transformers, startTime: startTime)
+        transpilation.isSourceFileSynthetic = true
+        return transpilation
     }
 
     /// Translate syntax trees only.

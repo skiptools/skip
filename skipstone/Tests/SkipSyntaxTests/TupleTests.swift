@@ -38,10 +38,10 @@ final class TupleTests: XCTestCase {
         """, kotlin: """
         internal val pair = Tuple2(1, "a")
         """, packageSupportKotlin: """
-        internal val <E0, E1> Tuple2.i: E0
+        internal val <E0, E1> Tuple2<E0, E1>.i: E0
             get() = element0
 
-        internal val <E0, E1> Tuple2.s: E1
+        internal val <E0, E1> Tuple2<E0, E1>.s: E1
             get() = element1
         """)
 
@@ -54,13 +54,13 @@ final class TupleTests: XCTestCase {
             return arrayOf(Tuple3(1, 2, 3.0))
         }
         """, packageSupportKotlin: """
-        internal val <E0, E1, E2> Tuple3.x: E0
+        internal val <E0, E1, E2> Tuple3<E0, E1, E2>.x: E0
             get() = element0
 
-        internal val <E0, E1, E2> Tuple3.y: E1
+        internal val <E0, E1, E2> Tuple3<E0, E1, E2>.y: E1
             get() = element1
 
-        internal val <E0, E1, E2> Tuple3.z: E2
+        internal val <E0, E1, E2> Tuple3<E0, E1, E2>.z: E2
             get() = element2
         """)
 
