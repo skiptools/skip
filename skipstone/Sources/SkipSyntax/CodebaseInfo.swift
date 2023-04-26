@@ -22,6 +22,12 @@ public class CodebaseInfo: Codable {
         }
     }
 
+    /// Map between Swift modules and the equivalent Skip modules.
+    static let moduleNameMap: [String: String] = [
+        "Foundation": "SkipFoundation",
+        "XCTest": "SkipUnit"
+    ]
+
     /// Messages for the user created during information gathering.
     func messages(for sourceFile: Source.FilePath) -> [Message] {
         return (messages[sourceFile] ?? []) + (languageAdditions?.messages(for: sourceFile) ?? [])
@@ -73,7 +79,8 @@ public class CodebaseInfo: Codable {
     
     /// Create a context that can access the given imported modules.
     func context(importedModuleNames: [String] = [], source: Source) -> Context {
-        return Context(global: self, importedModuleNames: Set(importedModuleNames), source: source)
+        let mappedModuleNames = importedModuleNames.map { Self.moduleNameMap[$0] ?? $0 }
+        return Context(global: self, importedModuleNames: Set(mappedModuleNames), source: source)
     }
 
     /// The items for the given name.
@@ -291,13 +298,12 @@ public class CodebaseInfo: Codable {
             }
             return (.none, .available)
         }
-        
+
         /// Return the signatures of the possible functions being called with the given arguments.
-        func functionSignature(of name: String, arguments: [LabeledValue<TypeSignature>]) -> [(TypeSignature, Bool, Availability)] {
+        func functionSignature(of name: String, arguments: [LabeledValue<TypeSignature>]) -> [(TypeSignature, StatementType, Availability)] {
             let items = ranked(global.lookup(name: name, qualifiedMatch: true))
             let funcs = items.filter { $0.declarationType == .functionDeclaration }
             let funcsCandidates = funcs.compactMap { matchFunction($0, arguments: arguments) }
-            
             let typeInfos = items.flatMap { (item) -> [TypeInfo] in
                 if let typeInfo = item as? TypeInfo {
                     return [typeInfo]
@@ -312,19 +318,19 @@ public class CodebaseInfo: Codable {
             guard let topCandidate = sortedCandidates.first else {
                 return []
             }
-            return sortedCandidates.filter { $0.score >= topCandidate.score }.map { ($0.signature, $0.isInit, $0.availability) }
+            return sortedCandidates.filter { $0.score >= topCandidate.score }.map { ($0.signature, $0.declarationType, $0.availability) }
         }
         
         /// Return the signatures of the possible member functions being called with the given arguments.
         ///
         /// This function also works for the creation of an enum case with associated values.
-        func functionSignature(of name: String, inConstrained type: TypeSignature, arguments: [LabeledValue<TypeSignature>], excludeConstrainedExtensions: Bool = false) -> [(TypeSignature, Bool, Availability)] {
+        func functionSignature(of name: String, inConstrained type: TypeSignature, arguments: [LabeledValue<TypeSignature>], excludeConstrainedExtensions: Bool = false) -> [(TypeSignature, StatementType, Availability)] {
             var type = type.asOptional(false)
             if case .tuple(let labels, let types) = type {
                 for (index, label) in labels.enumerated() {
                     if name == label || name == "\(index)" {
                         let function = matchTuple(types[index], arguments: arguments)
-                        return [(function, false, .available)]
+                        return [(function, .functionDeclaration, .available)]
                     }
                 }
                 return []
@@ -349,12 +355,12 @@ public class CodebaseInfo: Codable {
             guard let topCandidate = sortedCandidates.first else {
                 return []
             }
-            return sortedCandidates.filter { $0.score >= topCandidate.score }.map { ($0.signature.mappingSelf(to: type), $0.isInit, $0.availability) }
+            return sortedCandidates.filter { $0.score >= topCandidate.score }.map { ($0.signature.mappingSelf(to: type), $0.declarationType, $0.availability) }
         }
 
         /// If the given function signature can be called with the given arguments, return the call signature.
         func callableSignature(of functionSignature: TypeSignature, generics: Generics? = nil, arguments: [LabeledValue<TypeSignature>]) -> TypeSignature? {
-            return matchFunction(signature: functionSignature, generics: generics, isInit: false, availability: .available, arguments: arguments)?.signature
+            return matchFunction(signature: functionSignature, generics: generics, declarationType: .functionDeclaration, availability: .available, arguments: arguments)?.signature
         }
         
         /// Return the signatures of the possible subscripts being called with the given arguments.
@@ -480,7 +486,7 @@ public class CodebaseInfo: Codable {
             // while inferring the types of variable values in prepareForUse(), before we've called generateConstructors()
             if initSignatures.isEmpty {
                 let initParameters = arguments.map { TypeSignature.Parameter(label: $0.label, type: $0.value) }
-                initSignatures.append(FunctionCandidate(signature: .function(initParameters, primaryTypeInfo.signature), isInit: true, availability: primaryTypeInfo.availability, score: 0.0))
+                initSignatures.append(FunctionCandidate(signature: .function(initParameters, primaryTypeInfo.signature), declarationType: .initDeclaration, availability: primaryTypeInfo.availability, score: 0.0))
             }
             return initSignatures
         }
@@ -507,10 +513,10 @@ public class CodebaseInfo: Codable {
         
         private func matchFunction(_ item: CodebaseInfoItem, in typeInfo: TypeInfo? = nil, constrainedGenerics: [TypeSignature] = [], arguments: [LabeledValue<TypeSignature>]) -> FunctionCandidate? {
             let generics = (item as? FunctionInfo)?.generics
-            return matchFunction(signature: item.signature, generics: generics, isInit: item.declarationType == .initDeclaration, availability: item.availability, in: typeInfo, constrainedGenerics: constrainedGenerics, arguments: arguments)
+            return matchFunction(signature: item.signature, generics: generics, declarationType: item.declarationType, availability: item.availability, in: typeInfo, constrainedGenerics: constrainedGenerics, arguments: arguments)
         }
 
-        private func matchFunction(signature: TypeSignature, generics: Generics? = nil, isInit: Bool, availability: Availability, in typeInfo: TypeInfo? = nil, constrainedGenerics: [TypeSignature] = [], arguments: [LabeledValue<TypeSignature>]) -> FunctionCandidate? {
+        private func matchFunction(signature: TypeSignature, generics: Generics? = nil, declarationType: StatementType, availability: Availability, in typeInfo: TypeInfo? = nil, constrainedGenerics: [TypeSignature] = [], arguments: [LabeledValue<TypeSignature>]) -> FunctionCandidate? {
             guard case .function(let parameters, let returnType) = signature else {
                 return nil
             }
@@ -531,7 +537,7 @@ public class CodebaseInfo: Codable {
 
             // Match each argument to a parameter
             var matchingParameters: [TypeSignature.Parameter] = []
-            var matchingParameterIndexes: [Int] = []
+            var matchingOriginalParameters: [TypeSignature.Parameter] = []
             var parameterIndex = 0
             var totalScore = 0.0
             for argument in arguments {
@@ -546,9 +552,9 @@ public class CodebaseInfo: Codable {
                     parameterType = constrainedParameters[matchingIndex].type.or(argument.value)
                 }
                 var matchingParameter = parameters[matchingIndex]
+                matchingOriginalParameters.append(matchingParameter)
                 matchingParameter.type = parameterType
                 matchingParameters.append(matchingParameter)
-                matchingParameterIndexes.append(matchingIndex)
                 parameterIndex = matchingIndex + 1
                 totalScore += score
             }
@@ -559,10 +565,17 @@ public class CodebaseInfo: Codable {
                 }
             }
 
-            // Apply the generic types we determined from parameter matching and the given constraint information to the return type
-            let matchingGenerics = signature.mergeGenericMappings(in: .function(matchingParameters, returnType), with: generics)
-            let constrainedReturnType = returnType.constrainedTypeWithGenerics(matchingGenerics)
-            return FunctionCandidate(signature: .function(matchingParameters, constrainedReturnType), isInit: isInit, availability: availability, score: totalScore)
+            // Apply the generic types we determined from parameter matching and the given constraint information to the original function,
+            // using the result to fill in generic types in the return type and matching parameters
+            let matchingOriginalSignature: TypeSignature = .function(matchingOriginalParameters, signature.returnType)
+            let matchingParameterSignature: TypeSignature = .function(matchingParameters, returnType)
+            let matchingGenerics = matchingOriginalSignature.mergeGenericMappings(in: matchingParameterSignature, with: generics)
+            let mappedSignature = matchingOriginalSignature.constrainedTypeWithGenerics(matchingGenerics)
+            let mappedParameters = mappedSignature.parameters
+            for i in 0..<matchingParameters.count {
+                matchingParameters[i] = matchingParameters[i].or(mappedParameters[i], replaceAny: true)
+            }
+            return FunctionCandidate(signature: .function(matchingParameters, mappedSignature.returnType), declarationType: declarationType, availability: availability, score: totalScore)
         }
 
         private func matchArgument(_ argument: LabeledValue<TypeSignature>, to parameters: [TypeSignature.Parameter], startIndex: Int) -> (index: Int, score: Double)? {
@@ -626,7 +639,7 @@ public class CodebaseInfo: Codable {
 
     private struct FunctionCandidate: Hashable {
         let signature: TypeSignature
-        let isInit: Bool
+        let declarationType: StatementType
         let availability: Availability
         let score: Double
 

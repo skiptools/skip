@@ -724,8 +724,8 @@ class FunctionCall: Expression {
             isInit = false
             return nil
         }
-        let (signature, signatureIsInit) = candidateFunctions.first { $0.0.returnType == expecting } ?? candidateFunctions[0]
-        isInit = signatureIsInit
+        let (signature, declarationType) = candidateFunctions.first { $0.0.returnType == expecting } ?? candidateFunctions[0]
+        isInit = declarationType == .initDeclaration
         return signature
     }
 

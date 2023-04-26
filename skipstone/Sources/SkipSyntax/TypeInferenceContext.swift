@@ -240,7 +240,7 @@ struct TypeInferenceContext {
     ///
     /// - Parameters:
     ///   - type: The function's owning type if this is a member function, or nil if not.
-    func function(_ name: String, in type: TypeSignature?, parameters: [LabeledValue<TypeSignature>], messagesNode: SyntaxNode?) -> [(TypeSignature, Bool)] {
+    func function(_ name: String, in type: TypeSignature?, parameters: [LabeledValue<TypeSignature>], messagesNode: SyntaxNode?) -> [(TypeSignature, StatementType)] {
         if let type, type.isOptional {
             return function(name, inNonOptional: type.asOptional(false), parameters: parameters, messagesNode: messagesNode).map {
                 (.function($0.0.parameters, $0.0.returnType.asOptional(true)), $0.1)
@@ -250,16 +250,16 @@ struct TypeInferenceContext {
         }
     }
 
-    private func function(_ name: String, inNonOptional type: TypeSignature?, parameters: [LabeledValue<TypeSignature>], messagesNode: SyntaxNode?) -> [(TypeSignature, Bool)] {
+    private func function(_ name: String, inNonOptional type: TypeSignature?, parameters: [LabeledValue<TypeSignature>], messagesNode: SyntaxNode?) -> [(TypeSignature, StatementType)] {
         let constrainedArguments = parameters.map { LabeledValue(label: $0.label, value: $0.value.constrainedTypeWithGenerics(generics)) }
         if let type {
             if let codebaseInfo {
                 let candidates = codebaseInfo.functionSignature(of: name, inConstrained: type.constrainedTypeWithGenerics(generics), arguments: constrainedArguments)
                 addMessages(to: messagesNode, for: candidates.map(\.2))
                 return candidates.map { ($0.0, $0.1) }
-            } else if let (function, isInit, message) = unavailableAPI?.knownUnavailableFunction(name, in: type, parameters: parameters) {
+            } else if let (function, declarationType, message) = unavailableAPI?.knownUnavailableFunction(name, in: type, parameters: parameters) {
                 addMessages(to: messagesNode, for: [.unavailable(message)])
-                return [(function, isInit)]
+                return [(function, declarationType)]
             } else {
                 return []
             }
@@ -269,7 +269,7 @@ struct TypeInferenceContext {
         if let localFunction = localIdentifierTypes[name], case .function = localFunction {
             if let codebaseInfo {
                 if let callSignature = codebaseInfo.callableSignature(of: localFunction, generics: generics, arguments: constrainedArguments) {
-                    return [(callSignature, false)]
+                    return [(callSignature, .functionDeclaration)]
                 }
             } else {
                 return []
@@ -286,18 +286,18 @@ struct TypeInferenceContext {
                     addMessages(to: messagesNode, for: candidates.map(\.2))
                     return candidates.map { ($0.0, $0.1) }
                 }
-            } else if let (function, isInit, message) = unavailableAPI?.knownUnavailableFunction(name, in: signature, parameters: parameters) {
+            } else if let (function, declarationType, message) = unavailableAPI?.knownUnavailableFunction(name, in: signature, parameters: parameters) {
                 addMessages(to: messagesNode, for: [.unavailable(message)])
-                return [(function, isInit)]
+                return [(function, declarationType)]
             }
         }
         if let codebaseInfo {
             let candidates = codebaseInfo.functionSignature(of: name, arguments: constrainedArguments)
             addMessages(to: messagesNode, for: candidates.map(\.2))
             return candidates.map { ($0.0, $0.1) }
-        } else if let (function, isInit, message) = unavailableAPI?.knownUnavailableFunction(name, in: nil, parameters: parameters) {
+        } else if let (function, declarationType, message) = unavailableAPI?.knownUnavailableFunction(name, in: nil, parameters: parameters) {
             addMessages(to: messagesNode, for: [.unavailable(message)])
-            return [(function, isInit)]
+            return [(function, declarationType)]
         } else {
             return []
         }

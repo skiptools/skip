@@ -61,12 +61,16 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return elementType
         case .dictionary(let keyType, let valueType):
             return .tuple(["key", "value"], [keyType, valueType])
+        case .optional(let type):
+            return type.elementType
         case .range(let elementType):
             return elementType
         case .set(let elementType):
             return elementType
         case .string:
             return .character
+        case .unwrappedOptional(let type):
+            return type.elementType
         default:
             return .none
         }
@@ -79,6 +83,10 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return parameters
         case .member(_, let type):
             return type.parameters
+        case .optional(let type):
+            return type.parameters
+        case .unwrappedOptional(let type):
+            return type.parameters
         default:
             return []
         }
@@ -90,6 +98,10 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .function(_, let returnType):
             return returnType
         case .member(_, let type):
+            return type.returnType
+        case .optional(let type):
+            return type.returnType
+        case .unwrappedOptional(let type):
             return type.returnType
         default:
             return .none
@@ -104,8 +116,17 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         guard count > 1 else {
             return [self]
         }
-        if case .tuple(_, let types) = self, types.count == count {
-            return types
+        switch self {
+        case .optional(let type):
+            return type.tupleTypes(count: count).map { $0.asOptional(true) }
+        case .tuple(_, let types):
+            if types.count == count {
+                return types
+            }
+        case .unwrappedOptional(let type):
+            return type.tupleTypes(count: count)
+        default:
+            break
         }
         return Array(repeating: self, count: count)
     }

@@ -416,7 +416,7 @@ final class TypeInferenceTests: XCTestCase {
         """)
     }
 
-    func testGenericFunction() async throws {
+    func testGenericFunctionReturnType() async throws {
         try await check(supportingSwift: """
         func max<T>(_ a: T, _ b: T) -> T {
         }
@@ -436,6 +436,44 @@ final class TypeInferenceTests: XCTestCase {
             val b1 = max(1, 2) == Int.myValue
             val b2 = max("a", "b") == String.myValue
         }
+        """)
+    }
+
+    func testGenericFunctionParameters() async throws {
+//        try await check(supportingSwift: """
+//        enum E {
+//            case one, two
+//        }
+//        func f() -> E {
+//            return .one
+//        }
+//        func g<T>(_ a: T?, _ b: T?, c: Int = 0) -> Bool {
+//            return true
+//        }
+//        """, swift: """
+//        g(f(), .one)
+//        g(.one, f())
+//        """, kotlin: """
+//        g(f(), E.one)
+//        g(E.one, f())
+//        """)
+
+        try await check(supportingSwift: """
+        enum E {
+            case one, two
+        }
+        func f() -> [E] {
+            return []
+        }
+        func g<T>(_ a: T?, _ b: T?, c: Int = 0) -> Bool {
+            return true
+        }
+        """, swift: """
+        g(f(), [.one])
+        g([.one], f())
+        """, kotlin: """
+        g(f(), arrayOf(E.one))
+        g(arrayOf(E.one), f())
         """)
     }
 
