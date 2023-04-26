@@ -30,6 +30,9 @@ class KotlinTestAnnotationTransformer: KotlinTransformer {
         guard functionDeclaration.name.hasPrefix("test") && !functionDeclaration.isStatic && !functionDeclaration.isGlobal else {
             return false
         }
+        if !functionDeclaration.parameters.isEmpty {
+            return false
+        }
         let signatures = codebaseInfo.global.inheritanceChainSignatures(forNamed: owningClass.signature)
         guard let owningType = signatures.last else {
             return false
