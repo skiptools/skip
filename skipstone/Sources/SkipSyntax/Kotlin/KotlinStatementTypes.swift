@@ -17,6 +17,7 @@ enum KotlinStatementType {
     case constructorDeclaration
     case enumCaseDeclaration
     case extensionDeclaration
+    case finalizerDeclaration
     case functionDeclaration
     case importDeclaration
     case interfaceDeclaration
@@ -1238,6 +1239,14 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             if statement.type == .initDeclaration {
                 kstatement.isOpen = false
                 kstatement.modifiers.isOverride = false // Kotlin does not override constructors
+            } else if statement.type == .deinitDeclaration {
+                kstatement.isOpen = owningTypeDeclaration.type == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
+                kstatement.modifiers.visibility = .public
+                // Swift deinit is called automatically for all types in hierarchy, but Kotlin finalizers must explicitly override
+                if let codebaseInfo = translator.codebaseInfo {
+                    let inheritedTypeInfos = codebaseInfo.global.inheritanceChainSignatures(forNamed: owningSignature).dropFirst().flatMap { codebaseInfo.typeInfos(forNamed: $0) }
+                    kstatement.modifiers.isOverride = inheritedTypeInfos.contains { $0.members.contains { $0.declarationType == .deinitDeclaration } }
+                }
             } else {
                 if owningDeclarationType == .protocolDeclaration {
                     // Kotlin uses default public visibility on all interface members
@@ -1298,12 +1307,20 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
 
     init(name: String, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.name = name
-        super.init(type: name == "constructor" ? .constructorDeclaration : .functionDeclaration, sourceFile: sourceFile, sourceRange: sourceRange)
+        super.init(type: name == "constructor" ? .constructorDeclaration : name == "finalize" ? .finalizerDeclaration : .functionDeclaration, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
     private init(statement: FunctionDeclaration) {
-        self.name = statement.type == .initDeclaration ? "constructor" : statement.name
-        super.init(type: statement.type == .initDeclaration ? .constructorDeclaration : .functionDeclaration, statement: statement)
+        if statement.type == .initDeclaration {
+            self.name = "constructor"
+            super.init(type: .constructorDeclaration, statement: statement)
+        } else if statement.type == .deinitDeclaration {
+            self.name = "finalize"
+            super.init(type: .finalizerDeclaration, statement: statement)
+        } else {
+            self.name = statement.name
+            super.init(type: .functionDeclaration, statement: statement)
+        }
     }
 
     override func insertDependencies(into dependencies: inout KotlinDependencies) {
@@ -1345,14 +1362,18 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         }
         if let body {
             output.append(" {\n")
+            let bodyIndentation = indentation.inc()
             if !body.statements.isEmpty {
                 if isEqualImplementation {
-                    appendEqualsBody(body, to: output, indentation: indentation.inc())
+                    appendEqualsBody(body, to: output, indentation: bodyIndentation)
                 } else if isLessThanImplementation {
-                    appendLessThanBody(body, to: output, indentation: indentation.inc())
+                    appendLessThanBody(body, to: output, indentation: bodyIndentation)
                 } else {
-                    appendFunctionBody(body, to: output, indentation: indentation.inc())
+                    appendFunctionBody(body, to: output, indentation: bodyIndentation)
                 }
+            }
+            if type == .finalizerDeclaration && modifiers.isOverride {
+                output.append(bodyIndentation).append("super.finalize()\n")
             }
             output.append(indentation).append("}\n")
         } else {

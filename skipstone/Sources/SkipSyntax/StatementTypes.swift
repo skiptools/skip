@@ -18,6 +18,7 @@ enum StatementType: CaseIterable, Codable {
     case whileLoop
 
     case classDeclaration
+    case deinitDeclaration
     case enumCaseDeclaration
     case enumDeclaration
     case extensionDeclaration
@@ -67,6 +68,8 @@ enum StatementType: CaseIterable, Codable {
 
         case .classDeclaration:
             return TypeDeclaration.self
+        case .deinitDeclaration:
+            return FunctionDeclaration.self
         case .enumCaseDeclaration:
             return EnumCaseDeclaration.self
         case .enumDeclaration:
@@ -739,7 +742,7 @@ class FunctionDeclaration: Statement {
         return .function(parameters.map(\.signature), returnType)
     }
 
-    init(type: StatementType, name: String, isOptionalInit: Bool = false, returnType: TypeSignature = .void, parameters: [Parameter<Expression>], isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), body: CodeBlock? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(type: StatementType, name: String, isOptionalInit: Bool = false, returnType: TypeSignature = .void, parameters: [Parameter<Expression>] = [], isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), body: CodeBlock? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.name = name
         self.isOptionalInit = isOptionalInit
         self.returnType = returnType.or(.void)
@@ -758,6 +761,8 @@ class FunctionDeclaration: Statement {
             return [decodeFunctionDeclaration(functionDecl, extras: extras, in: syntaxTree)]
         } else if syntax.kind == .initializerDecl, let initializerDecl = syntax.as(InitializerDeclSyntax.self) {
             return [decodeInitializerDeclaration(initializerDecl, extras: extras, in: syntaxTree)]
+        } else if syntax.kind == .deinitializerDecl, let deinitializerDecl = syntax.as(DeinitializerDeclSyntax.self) {
+            return [decodeDeinitializerDeclaration(deinitializerDecl, extras: extras, in: syntaxTree)]
         } else {
             return nil
         }
@@ -794,6 +799,17 @@ class FunctionDeclaration: Statement {
         }
         let statement = FunctionDeclaration(type: .initDeclaration, name: "init", isOptionalInit: isOptionalInit, returnType: .void, parameters: parameters, isAsync: isAsync, isThrows: isThrows, attributes: attributes, modifiers: modifiers, generics: generics, body: body, syntax: initializerDecl, sourceFile: syntaxTree.source.file, sourceRange: initializerDecl.range(in: syntaxTree.source), extras: extras)
         statement.messages = signatureMessages + genericsMessages
+        return statement
+    }
+
+    private static func decodeDeinitializerDeclaration(_ deinitializerDecl: DeinitializerDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> FunctionDeclaration {
+        let attributes = Attributes.for(syntax: deinitializerDecl.attributes, in: syntaxTree)
+        let modifiers = Modifiers.for(syntax: deinitializerDecl.modifiers)
+        var body: CodeBlock? = nil
+        if let bodySyntax = deinitializerDecl.body {
+            body = CodeBlock(statements: StatementDecoder.decode(syntaxListContainer: bodySyntax, in: syntaxTree))
+        }
+        let statement = FunctionDeclaration(type: .deinitDeclaration, name: "deinit", returnType: .void, attributes: attributes, modifiers: modifiers, body: body, syntax: deinitializerDecl, sourceFile: syntaxTree.source.file, sourceRange: deinitializerDecl.range(in: syntaxTree.source), extras: extras)
         return statement
     }
 

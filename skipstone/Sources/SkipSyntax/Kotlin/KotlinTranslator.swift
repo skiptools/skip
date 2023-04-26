@@ -119,6 +119,8 @@ public class KotlinTranslator {
                 return [KotlinWhileLoop.translate(statement: statement as! WhileLoop, translator: self)]
             case .classDeclaration:
                 return [KotlinClassDeclaration.translate(statement: statement as! TypeDeclaration, translator: self)]
+            case .deinitDeclaration:
+                return [KotlinFunctionDeclaration.translate(statement: statement as! FunctionDeclaration, translator: self)]
             case .enumCaseDeclaration:
                 return [KotlinEnumCaseDeclaration.translate(statement: statement as! EnumCaseDeclaration, translator: self)]
             case .enumDeclaration:

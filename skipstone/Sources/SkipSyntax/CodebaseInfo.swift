@@ -45,7 +45,7 @@ public class CodebaseInfo: Codable {
                 needsVariableTypeInference = needsVariableTypeInference || typeInfo.needsVariableTypeInference
             case .extensionDeclaration:
                 rootExtensions.append(TypeInfo(statement: statement as! ExtensionDeclaration, codebaseInfo: self))
-            case .functionDeclaration, .initDeclaration:
+            case .functionDeclaration, .initDeclaration, .deinitDeclaration:
                 rootFunctions.append(FunctionInfo(statement: statement as! FunctionDeclaration, codebaseInfo: self))
             case .typealiasDeclaration:
                 rootTypealiases.append(TypealiasInfo(statement: statement as! TypealiasDeclaration, codebaseInfo: self))
@@ -1055,7 +1055,7 @@ public class CodebaseInfo: Codable {
                     types.append(TypeInfo(statement: statement as! TypeDeclaration, in: signature, codebaseInfo: codebaseInfo))
                 case .enumCaseDeclaration:
                     cases.append(EnumCaseInfo(statement: statement as! EnumCaseDeclaration, in: signature, codebaseInfo: codebaseInfo))
-                case .functionDeclaration, .initDeclaration:
+                case .functionDeclaration, .initDeclaration, .deinitDeclaration:
                     functions.append(FunctionInfo(statement: statement as! FunctionDeclaration, in: signature, codebaseInfo: codebaseInfo))
                 case .typealiasDeclaration:
                     typealiases.append(TypealiasInfo(statement: statement as! TypealiasDeclaration, in: signature, codebaseInfo: codebaseInfo))

@@ -109,8 +109,7 @@ extension Modifiers {
         }
         if isOverride {
             string = string.isEmpty ? "override" : "\(string) override"
-        }
-        if isOpen && !isStatic {
+        } else if isOpen && !isStatic {
             string = string.isEmpty ? "open" : "\(string) open"
         }
         return string.isEmpty || suffix.isEmpty ? string : "\(string)\(suffix)"

@@ -1,7 +1,7 @@
 @testable import SkipSyntax
 import XCTest
 
-final class ConstructorTests: XCTestCase {
+final class ConstructorDestructorTests: XCTestCase {
     func testBaseClassNoConstructor() async throws {
         try await check(swift: """
         class A {
@@ -428,6 +428,51 @@ final class ConstructorTests: XCTestCase {
         }
         internal fun g(): C {
             return C(param = 0)
+        }
+        """)
+    }
+
+    func testDeinit() async throws {
+//        try await check(swift: """
+//        class A {
+//        }
+//        class C: A {
+//            deinit {
+//                doStuff()
+//            }
+//        }
+//        """, kotlin: """
+//        internal open class A {
+//        }
+//        internal open class C: A() {
+//            open fun finalize() {
+//                doStuff()
+//            }
+//        }
+//        """)
+
+        try await check(swift: """
+        class A {
+            deinit {
+                doThings()
+            }
+        }
+        class C: A {
+            deinit {
+                doStuff()
+            }
+        }
+        """, kotlin: """
+        internal open class A {
+            open fun finalize() {
+                doThings()
+            }
+        }
+        internal open class C: A() {
+            override fun finalize() {
+                doStuff()
+                super.finalize()
+            }
         }
         """)
     }

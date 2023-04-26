@@ -440,23 +440,23 @@ final class TypeInferenceTests: XCTestCase {
     }
 
     func testGenericFunctionParameters() async throws {
-//        try await check(supportingSwift: """
-//        enum E {
-//            case one, two
-//        }
-//        func f() -> E {
-//            return .one
-//        }
-//        func g<T>(_ a: T?, _ b: T?, c: Int = 0) -> Bool {
-//            return true
-//        }
-//        """, swift: """
-//        g(f(), .one)
-//        g(.one, f())
-//        """, kotlin: """
-//        g(f(), E.one)
-//        g(E.one, f())
-//        """)
+        try await check(supportingSwift: """
+        enum E {
+            case one, two
+        }
+        func f() -> E {
+            return .one
+        }
+        func g<T>(_ a: T?, _ b: T?, c: Int = 0) -> Bool {
+            return true
+        }
+        """, swift: """
+        g(f(), .one)
+        g(.one, f())
+        """, kotlin: """
+        g(f(), E.one)
+        g(E.one, f())
+        """)
 
         try await check(supportingSwift: """
         enum E {
