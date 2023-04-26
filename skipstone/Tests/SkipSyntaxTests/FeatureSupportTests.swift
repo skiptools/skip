@@ -17,6 +17,17 @@ final class FeatureSupportTests: XCTestCase {
             """)
     }
 
+    func testCheckUnicodeString() async throws {
+        try await check(expectFailure: true, swiftCode: {
+            let currencySpacing = "\u{00A0}"
+            return "\(currencySpacing)"
+        }, kotlin: """
+            val currencySpacing = " "
+            return "${currencySpacing}"
+            """)
+    }
+
+
     func testInitNumberLiterals() async throws {
         // Kotlin doesn't seem to allow initializing non-Ints with literals without being explicit
 
@@ -243,6 +254,7 @@ final class FeatureSupportTests: XCTestCase {
         """)
     }
 }
+
 
 
 
