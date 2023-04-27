@@ -85,6 +85,39 @@ final class ErrorHandlingTests: XCTestCase {
         """)
     }
 
+    func testCatchLet() async throws {
+        try await check(swift: """
+        do {
+            action1()
+        } catch let e {
+            print("Caught error: \\(e)")
+        }
+        """, kotlin: """
+        try {
+            action1()
+        } catch (error: Throwable) {
+            val error = error.aserror()
+            val e = error
+            print("Caught error: ${e}")
+        }
+        """)
+
+        try await check(swift: """
+        do {
+            action1()
+        } catch var error {
+            print("Caught error: \\(error)")
+        }
+        """, kotlin: """
+        try {
+            action1()
+        } catch (error: Throwable) {
+            var error = error.aserror()
+            print("Caught error: ${error}")
+        }
+        """)
+    }
+
     func testCatchLetAs() async throws {
         try await check(supportingSwift: """
         struct S: Error {

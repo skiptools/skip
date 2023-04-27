@@ -324,8 +324,7 @@ class KotlinCodeBlock: KotlinStatement {
         let bodyIndentation = indentation.inc()
         if kcatch.patterns.isEmpty {
             output.append(indentation).append("} catch (error: Throwable) {\n")
-            output.append(bodyIndentation).append("val error = error.aserror()\n")
-            appendCatchBody(kcatch, to: output, indentation: bodyIndentation)
+            appendCatchBody(kcatch, addingError: "error", to: output, indentation: bodyIndentation)
         } else {
             for pattern in kcatch.patterns {
                 output.append(indentation).append("} catch (")
@@ -341,8 +340,18 @@ class KotlinCodeBlock: KotlinStatement {
         }
     }
 
-    private func appendCatchBody(_ kcatch: KotlinCase, to output: OutputGenerator, indentation: Indentation) {
-        for bindingVariable in kcatch.caseBindingVariables {
+    private func appendCatchBody(_ kcatch: KotlinCase, addingError: String? = nil, to output: OutputGenerator, indentation: Indentation) {
+        // Handle 'catch var error'-type catches where there are no patterns; our default 'error' identifier may be used by the developer
+        var errorBindingIndex: Int? = nil
+        if let addingError {
+            errorBindingIndex = kcatch.caseBindingVariables.firstIndex(where: { $0.names == [addingError] })
+            let isLet = errorBindingIndex == nil || kcatch.caseBindingVariables[errorBindingIndex!].isLet
+            output.append(indentation).append("\(isLet ? "val" : "var") error = error.aserror()\n")
+        }
+        for (index, bindingVariable) in kcatch.caseBindingVariables.enumerated() {
+            guard index != errorBindingIndex else {
+                continue
+            }
             output.append(indentation)
             bindingVariable.append(to: output, indentation: indentation)
             output.append("\n")
@@ -617,6 +626,9 @@ class KotlinTryCatch: KotlinStatement {
     }
 
     private static func promotedBindingIdentifier(from kcatch: inout KotlinCase) -> String? {
+        guard !kcatch.patterns.isEmpty else {
+            return nil
+        }
         // 'catch let e as Type' will generate a pattern of the form 'error is Type' and a binding 'e = error'. We can simplify
         // to just 'e is Type', which will translate to 'catch (e: Type)'
         guard let caseBindingVariable = kcatch.caseBindingVariables.first, caseBindingVariable.isLet, caseBindingVariable.names.count == 1 else {
