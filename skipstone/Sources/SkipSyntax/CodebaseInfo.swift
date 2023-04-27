@@ -39,7 +39,7 @@ public class CodebaseInfo: Codable {
         var needsVariableTypeInference = false
         for statement in syntaxTree.root.statements {
             switch statement.type {
-            case .classDeclaration, .enumDeclaration, .protocolDeclaration, .structDeclaration:
+            case .actorDeclaration, .classDeclaration, .enumDeclaration, .protocolDeclaration, .structDeclaration:
                 let typeInfo = TypeInfo(statement: statement as! TypeDeclaration, codebaseInfo: self)
                 rootTypes.append(typeInfo)
                 needsVariableTypeInference = needsVariableTypeInference || typeInfo.needsVariableTypeInference
@@ -253,7 +253,7 @@ public class CodebaseInfo: Codable {
         func identifierSignature(of identifier: String) -> (TypeSignature, Availability) {
             let topRanked = ranked(global.lookup(name: identifier, qualifiedMatch: true)).first { candidate in
                 switch candidate.declarationType {
-                case .classDeclaration, .enumDeclaration, .protocolDeclaration, .structDeclaration, .typealiasDeclaration, .enumCaseDeclaration, .variableDeclaration:
+                case .actorDeclaration, .classDeclaration, .enumDeclaration, .protocolDeclaration, .structDeclaration, .typealiasDeclaration, .enumCaseDeclaration, .variableDeclaration:
                     return true
                 default:
                     return false
@@ -438,7 +438,7 @@ public class CodebaseInfo: Codable {
                     return []
                 }
                 switch member.declarationType {
-                case .classDeclaration, .enumDeclaration, .extensionDeclaration, .structDeclaration, .typealiasDeclaration:
+                case .actorDeclaration, .classDeclaration, .enumDeclaration, .extensionDeclaration, .structDeclaration, .typealiasDeclaration:
                     return initCandidates(for: typeInfos(forNamed: member.signature), in: typeInfo, constrainedGenerics: constrainedGenerics, arguments: arguments)
                 case .functionDeclaration, .initDeclaration, .enumCaseDeclaration:
                     if let candidate = matchFunction(member, in: typeInfo, constrainedGenerics: constrainedGenerics, arguments: arguments) {
@@ -871,7 +871,7 @@ public class CodebaseInfo: Codable {
     private func addGeneratedConstructors(to typeInfo: TypeInfo) {
         // Handle nested types
         typeInfo.types.forEach { addGeneratedConstructors(to: $0) }
-        guard typeInfo.declarationType == .classDeclaration || typeInfo.declarationType == .structDeclaration else {
+        guard typeInfo.declarationType == .actorDeclaration || typeInfo.declarationType == .classDeclaration || typeInfo.declarationType == .structDeclaration else {
             return
         }
 
@@ -1051,7 +1051,7 @@ public class CodebaseInfo: Codable {
         private func addMembers(_ statements: [Statement], codebaseInfo: CodebaseInfo) {
             for statement in statements {
                 switch statement.type {
-                case .classDeclaration, .enumDeclaration, .structDeclaration:
+                case .actorDeclaration, .classDeclaration, .enumDeclaration, .structDeclaration:
                     types.append(TypeInfo(statement: statement as! TypeDeclaration, in: signature, codebaseInfo: codebaseInfo))
                 case .enumCaseDeclaration:
                     cases.append(EnumCaseInfo(statement: statement as! EnumCaseDeclaration, in: signature, codebaseInfo: codebaseInfo))

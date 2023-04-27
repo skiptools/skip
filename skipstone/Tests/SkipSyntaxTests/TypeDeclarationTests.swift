@@ -887,4 +887,11 @@ final class TypeDeclarationTests: XCTestCase {
         internal val strindex: StringIndex = 0
         """)
     }
+
+    func testActor() async throws {
+        try await checkProducesMessage(swift: """
+        actor A {
+        }
+        """)
+    }
 }

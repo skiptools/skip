@@ -17,6 +17,7 @@ enum StatementType: CaseIterable, Codable {
     case `throw`
     case whileLoop
 
+    case actorDeclaration
     case classDeclaration
     case deinitDeclaration
     case enumCaseDeclaration
@@ -66,6 +67,8 @@ enum StatementType: CaseIterable, Codable {
         case .whileLoop:
             return WhileLoop.self
 
+        case .actorDeclaration:
+            return TypeDeclaration.self
         case .classDeclaration:
             return TypeDeclaration.self
         case .deinitDeclaration:
@@ -1055,6 +1058,8 @@ class TypeDeclaration: Statement {
             return [decodeProtocolDeclaration(protocolDecl, extras: extras, in: syntaxTree)]
         } else if syntax.kind == .enumDecl, let enumDecl = syntax.as(EnumDeclSyntax.self) {
             return [decodeEnumDeclaration(enumDecl, extras: extras, in: syntaxTree)]
+        } else if syntax.kind == .actorDecl, let actorDecl = syntax.as(ActorDeclSyntax.self) {
+            return [decodeActorDeclaration(actorDecl, extras: extras, in: syntaxTree)]
         }
         return nil
     }
@@ -1105,6 +1110,18 @@ class TypeDeclaration: Statement {
         let (generics, genericsMessages) = Generics.for(syntax: enumDecl.genericParameters, where: enumDecl.genericWhereClause, in: syntaxTree)
         let members = StatementDecoder.decode(syntaxListContainer: enumDecl.memberBlock, in: syntaxTree)
         let statement = TypeDeclaration(type: .enumDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: enumDecl, sourceFile: syntaxTree.source.file, sourceRange: enumDecl.range(in: syntaxTree.source), extras: extras)
+        statement.messages = inheritsMessages + genericsMessages
+        return statement
+    }
+
+    private static func decodeActorDeclaration(_ actorDecl: ActorDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration {
+        let name = actorDecl.identifier.text
+        let (inherits, inheritsMessages) = actorDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], [])
+        let attributes = Attributes.for(syntax: actorDecl.attributes, in: syntaxTree)
+        let modifiers = Modifiers.for(syntax: actorDecl.modifiers)
+        let (generics, genericsMessages) = Generics.for(syntax: actorDecl.genericParameterClause, where: actorDecl.genericWhereClause, in: syntaxTree)
+        let members = StatementDecoder.decode(syntaxListContainer: actorDecl.memberBlock, in: syntaxTree)
+        let statement = TypeDeclaration(type: .actorDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: actorDecl, sourceFile: syntaxTree.source.file, sourceRange: actorDecl.range(in: syntaxTree.source), extras: extras)
         statement.messages = inheritsMessages + genericsMessages
         return statement
     }

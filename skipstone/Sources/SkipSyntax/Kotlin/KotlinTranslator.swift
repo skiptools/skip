@@ -121,6 +121,8 @@ public class KotlinTranslator {
                 return [KotlinThrow.translate(statement: statement as! Throw, translator: self)]
             case .whileLoop:
                 return [KotlinWhileLoop.translate(statement: statement as! WhileLoop, translator: self)]
+            case .actorDeclaration:
+                return [KotlinMessageStatement(message: .kotlinActors(statement, source: syntaxTree.source), statement: statement)]
             case .classDeclaration:
                 return [KotlinClassDeclaration.translate(statement: statement as! TypeDeclaration, translator: self)]
             case .deinitDeclaration:

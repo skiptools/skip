@@ -9,6 +9,11 @@ extension Message {
     // Idea: convert string mutation to re-assigning the string value
     static let kotlinStringMutation = "Detected possible string mutation. This may cause errors when converting to Kotlin, which does not have mutable strings"
 
+    // Idea: create our own actors for Kotlin
+    static func kotlinActors(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Kotlin supports async functions, but it does not have actors", sourceDerived: sourceDerived, source: source)
+    }
+
     // Idea: auto-translate to function?
     static func kotlinAsyncProperties(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Kotlin does not support async properties. Consider using a function", sourceDerived: sourceDerived, source: source)
