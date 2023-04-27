@@ -118,6 +118,11 @@ extension Message {
         return Message(kind: .error, message: "Skip does not support the referenced type as a generic constraint", source: source, sourceRange: range)
     }
 
+    static func keyPathUnsupported(_ syntax: SyntaxProtocol, source: Source) -> Message {
+        let range = syntax.range(in: source)
+        return Message(kind: .error, message: "Skip does not yet support key path expressions", source: source, sourceRange: range)
+    }
+
     static func localFunctionsUniqueIdentifiers(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .warning, message: "Skip requires that nested functions have names which do not conflict with other identifiers within the local scope. Consider giving this function a unique name", sourceDerived: sourceDerived, source: source)
     }

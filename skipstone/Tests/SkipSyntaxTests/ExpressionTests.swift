@@ -235,4 +235,22 @@ final class ExpressionTests: XCTestCase {
         }
         """)
     }
+
+    func testKeyPaths() async throws {
+        try await checkProducesMessage(swift: """
+        struct S {
+            let i = 0
+        }
+        func get(keyPath: KeyPath<S, Int>, from: S) -> Int {
+            return from[keyPath: keyPath]
+        }
+        func f() {
+            let s = S()
+            let i = s[keyPath: \\.i]
+            let j = get(keyPath: \\.i, from: s)
+        }
+        """)
+    }
 }
+
+
