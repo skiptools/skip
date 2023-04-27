@@ -125,7 +125,7 @@ class Break: Statement {
 
 /// A synthetic statement type used to represent a code block of statements.
 class CodeBlock: Statement {
-    let statements: [Statement]
+    var statements: [Statement]
 
     init(statements: [Statement]) {
         self.statements = statements
@@ -413,14 +413,70 @@ class IfDefined: Statement {
         // Look for a clause that matches a defined symbol, or an 'else'
         var clause: IfConfigClauseSyntax? = nil
         for ifConfigClause in ifConfigDecl.clauses {
-            let clauseSymbol = ifConfigClause.condition?.description ?? ""
-            guard clauseSymbol == "SKIP" || syntaxTree.preprocessorSymbols.contains(clauseSymbol) || ifConfigClause.poundKeyword.text == "#else" else {
-                continue
+            if ifConfigClause.poundKeyword.text == "#else" {
+                // If we reach an else, all previous clauses must have been false
+                clause = ifConfigClause
+                break
             }
-            clause = ifConfigClause
-            break
+
+            let clauseSymbol = ifConfigClause.condition?.description ?? ""
+            let (isSupported, isTrue) = processConditions(symbol: clauseSymbol, preprocessorSymbols: syntaxTree.preprocessorSymbols)
+            if !isSupported {
+                syntaxTree.root.messages.append(.preprocessorTooComplex(ifConfigClause, source: syntaxTree.source))
+                break
+            }
+            if isTrue {
+                clause = ifConfigClause
+                break
+            }
         }
         return try extractStatements(from: clause, in: syntaxTree)
+    }
+
+    private static func processConditions(symbol: String, preprocessorSymbols: Set<String>) -> (isSupported: Bool, isTrue: Bool) {
+        let symbols = symbol.split(separator: " ", omittingEmptySubsequences: true)
+        var hasTrue: Bool? = nil
+        var hasFalse: Bool? = nil
+        var hasSymbol = false
+        var hasAnd = false
+        var hasOr = false
+        var hasParens = false
+        for var symbol in symbols {
+            if symbol == "&&" {
+                hasAnd = true
+            } else if symbol == "||" {
+                hasOr = true
+            } else {
+                let isNot = symbol.hasPrefix("!")
+                if isNot {
+                    symbol = symbol.dropFirst()
+                } else if symbol.hasPrefix("(") {
+                    hasParens = true
+                    symbol = symbol.dropFirst()
+                } else if symbol.hasSuffix(")") && !symbol.contains("(") {
+                    hasParens = true
+                    symbol = symbol.dropLast()
+                }
+                let isSymbol = symbol == "SKIP" || symbol == "os(Android)" || preprocessorSymbols.contains(String(symbol))
+                let isTrue = (isSymbol && !isNot) || (!isSymbol && isNot)
+                hasSymbol = hasSymbol || isSymbol
+                hasTrue = hasTrue == true || isTrue
+                hasFalse = hasFalse == true || !isTrue
+            }
+        }
+        if !hasSymbol {
+            // Don't process Skip-less preprocessor directives at all
+            return (true, false)
+        } else if hasParens || (hasAnd && hasOr) {
+            // Unsupported
+            return (false, false)
+        } else if hasAnd {
+            return (true, hasFalse != true)
+        } else if hasOr {
+            return (true, hasTrue == true)
+        } else {
+            return (true, hasTrue == true)
+        }
     }
 
     private static func extractStatements(from clause: IfConfigClauseSyntax?, in syntaxTree: SyntaxTree) throws -> [Statement] {

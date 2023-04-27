@@ -6,14 +6,14 @@ public class SyntaxTree: PrettyPrintable {
     let source: Source
     let syntax: SourceFileSyntax
     let preprocessorSymbols: Set<String>
-    private(set) var root: CodeBlock = CodeBlock(statements: [])
+    let root: CodeBlock = CodeBlock(statements: [])
 
     /// - Note: `unavailableAPI` is not used when `codebaseInfo` is available
     public init(source: Source, preprocessorSymbols: Set<String> = [], codebaseInfo: CodebaseInfo? = nil, unavailableAPI: UnavailableAPI? = nil) {
         self.source = source
         self.preprocessorSymbols = preprocessorSymbols
         self.syntax = Parser.parse(source: source.content)
-        self.root = CodeBlock(statements: StatementDecoder.decode(syntaxListContainer: syntax, in: self))
+        self.root.statements = StatementDecoder.decode(syntaxListContainer: syntax, in: self)
 
         // Resolve nodes breadth first so that a child can use information from its parent's siblings
         var resolveQueue: [SyntaxNode] = [root]

@@ -948,4 +948,106 @@ final class ConditionalTests: XCTestCase {
         print(s_0)
         """)
     }
+
+    func testIfPreprocessor() async throws {
+        try await check(swift: """
+        #if SKIP
+        doSomething()
+        #endif
+        """, kotlin: """
+        doSomething()
+        """)
+
+        try await check(swift: """
+        #if !SKIP
+        doSomething()
+        #endif
+        """, kotlin: """
+        """)
+
+        try await check(swift: """
+        #if !SKIP
+        doSomething()
+        #else
+        doSomethingElse()
+        #endif
+        """, kotlin: """
+        doSomethingElse()
+        """)
+
+        try await check(swift: """
+        #if os(iOS)
+        doSomething()
+        #endif
+        #if os(Android)
+        doSomethingElse()
+        #endif
+        """, kotlin: """
+        doSomethingElse()
+        """)
+
+        try await check(swift: """
+        #if DEBUG || SKIP
+        doSomething()
+        #else
+        doSomethingElse()
+        #endif
+        """, kotlin: """
+        doSomething()
+        """)
+
+        try await check(swift: """
+        #if DEBUG && SKIP
+        doSomething()
+        #endif
+        """, kotlin: """
+        """)
+
+        try await check(swift: """
+        #if !DEBUG && SKIP
+        doSomething()
+        #endif
+        """, kotlin: """
+        doSomething()
+        """)
+
+        try await check(swift: """
+        #if !SKIP
+        doSomething()
+        #endif
+        """, kotlin: """
+        """)
+
+        try await check(swift: """
+        #if !SKIP || os(Android)
+        doSomething()
+        #endif
+        """, kotlin: """
+        doSomething()
+        """)
+
+        try await check(swift: """
+        #if !SKIP
+        doSomething()
+        #elif DEBUB
+        doSomething2()
+        #else
+        doSomethingElse()
+        #endif
+        """, kotlin: """
+        doSomethingElse()
+        """)
+
+        try await checkProducesMessage(swift: """
+        #if SKIP || DEBUG && FOO
+        doSomething()
+        #endif
+        """)
+
+        try await checkProducesMessage(swift: """
+        #if (os(Android) || DEBUG) && SKIP
+        doSomething()
+        #endif
+        """)
+    }
 }
