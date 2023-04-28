@@ -994,4 +994,61 @@ final class TypeDeclarationTests: XCTestCase {
         }
         """)
     }
+
+    func testNestedClassOptionSet() async throws {
+        try await check(supportingSwift: """
+        protocol RawRepresentable {
+            associatedtype T
+            var rawValue: T { get }
+        }
+        protocol OptionSet: RawRepresentable {
+        }
+        extension OptionSet {
+            func contains(_ member: Self) -> Bool {
+                return false
+            }
+        }
+        """, swift: """
+        struct Outer {
+            struct S: OptionSet {
+                let rawValue: Int
+
+                static let s1: S = S(rawValue: 1 << 0)
+                static let s2: S = S(rawValue: 1 << 1)
+                static let all: S = [.s1, .s2]
+            }
+        }
+        """, kotlin: """
+        internal class Outer {
+            internal class S: OptionSet<Outer.S, Int> {
+                override val rawValue: Int
+
+                constructor(rawValue: Int) {
+                    this.rawValue = rawValue
+                }
+
+                override val rawvaluelong: Long
+                    get() {
+                        return Long(rawValue)
+                    }
+
+                override fun optionset(rawvaluelong: Long): Outer.S {
+                    return S(rawValue = Int(rawvaluelong))
+                }
+
+                companion object {
+
+                    internal val s1: Outer.S = S(rawValue = 1 shl 0)
+                    internal val s2: Outer.S = S(rawValue = 1 shl 1)
+                    internal val all: Outer.S = Outer.S.of(Outer.S.s1, Outer.S.s2)
+
+                    fun of(vararg options: Outer.S): Outer.S {
+                        val value = options.fold(Int(0)) { result, option -> result or option.rawValue }
+                        return S(rawValue = value)
+                    }
+                }
+            }
+        }
+        """)
+    }
 }
