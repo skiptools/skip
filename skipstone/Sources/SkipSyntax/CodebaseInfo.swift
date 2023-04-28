@@ -296,6 +296,11 @@ public class CodebaseInfo: Codable {
                     return (signature.mappingSelf(to: type), availability)
                 }
             }
+            // Is this a nested type name?
+            let nested: TypeSignature = .member(type, .named(member, []))
+            if let nestedTypeInfo = global.primaryTypeInfo(forNamed: nested) {
+                return (nestedTypeInfo.signature.asMetaType(true), nestedTypeInfo.availability)
+            }
             return (.none, .available)
         }
 

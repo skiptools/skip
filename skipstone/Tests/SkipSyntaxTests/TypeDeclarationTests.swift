@@ -1013,8 +1013,8 @@ final class TypeDeclarationTests: XCTestCase {
             struct S: OptionSet {
                 let rawValue: Int
 
-                static let s1: S = S(rawValue: 1 << 0)
-                static let s2: S = S(rawValue: 1 << 1)
+                static let s1 = S(rawValue: 1 << 0)
+                static let s2 = S(rawValue: 1 << 1)
                 static let all: S = [.s1, .s2]
             }
         }
@@ -1038,8 +1038,8 @@ final class TypeDeclarationTests: XCTestCase {
 
                 companion object {
 
-                    internal val s1: Outer.S = S(rawValue = 1 shl 0)
-                    internal val s2: Outer.S = S(rawValue = 1 shl 1)
+                    internal val s1 = S(rawValue = 1 shl 0)
+                    internal val s2 = S(rawValue = 1 shl 1)
                     internal val all: Outer.S = Outer.S.of(Outer.S.s1, Outer.S.s2)
 
                     fun of(vararg options: Outer.S): Outer.S {
