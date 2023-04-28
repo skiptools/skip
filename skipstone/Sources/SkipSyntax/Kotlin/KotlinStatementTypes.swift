@@ -1413,7 +1413,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         output.append(name).append("(")
         for (index, parameter) in parameters.enumerated() {
             if parameter.isVariadic {
-                output.append("varargs ")
+                output.append("vararg ")
             }
             let label = parameter.externalLabel ?? parameter.internalLabel
             output.append(label)

@@ -84,6 +84,14 @@ extension Operator {
             return "until"
         case "...":
             return ".."
+        case "|":
+            return "or"
+        case "&":
+            return "and"
+        case "<<":
+            return "shl"
+        case ">>":
+            return "shr"
         default:
             // Note that we construct operators with non-Swift symbols like 'in'
             return symbol

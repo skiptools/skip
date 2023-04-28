@@ -1248,3 +1248,27 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         }
     }
 }
+
+extension TypeSignature {
+    static let caseIterable: TypeSignature = .named("CaseIterable", [])
+    static let comparable: TypeSignature = .named("Comparable", [])
+    static let customStringConvertible: TypeSignature = .named("CustomStringConvertible", [])
+    static let equatable: TypeSignature = .named("Equatable", [])
+    static let hashable: TypeSignature = .named("Hashable", [])
+
+    var isRawRepresentable: Bool {
+        // May have generics
+        if case .named("RawRepresentable", _) = self {
+            return true
+        }
+        return false
+    }
+
+    var isOptionSet: Bool {
+        // May have generics
+        if case .named("OptionSet", _) = self {
+            return true
+        }
+        return false
+    }
+}

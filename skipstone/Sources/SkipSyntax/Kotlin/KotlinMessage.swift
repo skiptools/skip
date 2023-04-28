@@ -119,6 +119,10 @@ extension Message {
         return Message(kind: .error, message: "Kotlin optionals are not enums. Use nil or a value rather than .none or .some. In switch statements, use the moden 'case nil', 'case <value>?', and 'case let <binding>?'", sourceDerived: sourceDerived, source: source)
     }
 
+    static func kotlinOptionSetRawValue(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Skip is unable to determine the rawValue type of this OptionSet. Make sure it is an enum that extends a numeric type or contains an init(rawValue: <numeric type>) constructor", sourceDerived: sourceDerived, source: source)
+    }
+
     static func kotlinProtocolConstructor(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Kotlin does not support constructors in protocols", sourceDerived: sourceDerived, source: source)
     }

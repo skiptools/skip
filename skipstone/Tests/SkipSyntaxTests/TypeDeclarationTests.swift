@@ -894,4 +894,91 @@ final class TypeDeclarationTests: XCTestCase {
         }
         """)
     }
+
+    func testOptionSet() async throws {
+        try await check(supportingSwift: """
+        protocol RawRepresentable {
+            associatedtype T
+            var rawValue: T { get }
+        }
+        protocol OptionSet: RawRepresentable {
+        }
+        """, swift: """
+        struct S: OptionSet {
+            let rawValue: Int
+
+            static let s1 = S(rawValue: 1 << 0)
+            static let s2 = S(rawValue: 1 << 1)
+            static let all: S = [.s1, .s2]
+        }
+        """, kotlin: """
+        internal class S: OptionSet<S, Int> {
+            override val rawValue: Int
+
+            constructor(rawValue: Int) {
+                this.rawValue = rawValue
+            }
+
+            override val rawvaluelong: Long
+                get() {
+                    return Long(rawValue)
+                }
+
+            override fun optionset(rawvaluelong: Long): S {
+                return S(rawValue = Int(rawvaluelong))
+            }
+
+            companion object {
+
+                internal val s1 = S(rawValue = 1 shl 0)
+                internal val s2 = S(rawValue = 1 shl 1)
+                internal val all: S = S.of(S.s1, S.s2)
+
+                fun of(vararg options: S): S {
+                    val value = options.fold(Int(0)) { result, option -> result or option.rawValue }
+                    return S(rawValue = value)
+                }
+            }
+        }
+        """)
+
+        try await check(swift: """
+        struct S: OptionSet {
+            let rawValue: Int64
+
+            static let s1 = S(rawValue: 1 << 0)
+            static let s2 = S(rawValue: 1 << 1)
+            static let all: S = [.s1, .s2]
+        }
+        """, kotlin: """
+        internal class S: OptionSet<S, Long> {
+            internal val rawValue: Long
+
+            constructor(rawValue: Long) {
+                this.rawValue = rawValue
+            }
+
+            override val rawvaluelong: Long
+                get() {
+                    return rawValue
+                }
+
+            override fun optionset(rawvaluelong: Long): S {
+                return S(rawValue = rawvaluelong)
+            }
+
+            companion object {
+
+                internal val s1 = S(rawValue = 1 shl 0)
+                internal val s2 = S(rawValue = 1 shl 1)
+                internal val all: S = S.of(S.s1, S.s2)
+
+                fun of(vararg options: S): S {
+                    val value = options.fold(Long(0)) { result, option -> result or option.rawValue }
+                    return S(rawValue = value)
+                }
+            }
+        }
+        """)
+    }
 }

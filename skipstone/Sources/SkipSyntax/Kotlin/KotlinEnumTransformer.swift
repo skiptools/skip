@@ -38,7 +38,7 @@ class KotlinEnumTransformer: KotlinTransformer {
         }
         if let rawValueType {
             let inherit: TypeSignature = .named("RawRepresentable", [rawValueType])
-            if let rawRepresentableIndex = classDeclaration.inherits.firstIndex(of: .named("RawRepresentable", [])) {
+            if let rawRepresentableIndex = classDeclaration.inherits.firstIndex(where: { $0.isRawRepresentable }) {
                 classDeclaration.inherits[rawRepresentableIndex] = inherit
             } else if classDeclaration.enumInheritedRawValueType != nil {
                 classDeclaration.inherits.append(inherit)
@@ -96,7 +96,7 @@ class KotlinEnumTransformer: KotlinTransformer {
     }
 
     private func synthesizeCaseIterable(for classDeclaration: KotlinClassDeclaration, codebaseInfo: CodebaseInfo.Context) {
-        guard classDeclaration.declarationType == .enumDeclaration, codebaseInfo.global.protocolSignatures(forNamed: classDeclaration.signature).contains(.named("CaseIterable", [])) else {
+        guard classDeclaration.declarationType == .enumDeclaration, codebaseInfo.global.protocolSignatures(forNamed: classDeclaration.signature).contains(.caseIterable) else {
             return
         }
         let typeInfos = codebaseInfo.typeInfos(forNamed: classDeclaration.signature)

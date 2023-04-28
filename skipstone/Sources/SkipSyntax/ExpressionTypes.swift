@@ -127,6 +127,10 @@ class ArrayLiteral: Expression {
         if expecting.elementType != .none {
             elementType = expecting.elementType
             elements.forEach { $0.inferTypes(context: context, expecting: elementType) }
+        } else if case .named = expecting {
+            // An array literal that maps to a named type is likely an option set
+            elementType = expecting
+            elements.forEach { $0.inferTypes(context: context, expecting: expecting) }
         } else {
             for element in elements {
                 element.inferTypes(context: context, expecting: elementType)

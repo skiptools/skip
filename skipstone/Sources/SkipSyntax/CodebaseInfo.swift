@@ -150,7 +150,7 @@ public class CodebaseInfo: Codable {
 
     // We need these in testing because SkipLib isn't available
     private static let builtinProtocols: Set<TypeSignature> = [
-        .named("CustomStringConvertible", []), .named("Equatable", []), .named("Error", [])
+        .named("CustomStringConvertible", []), .named("Equatable", []), .named("Error", []), .named("OptionSet", [])
     ]
     private static let builtinEquatableSubprotocols: Set<TypeSignature> = [
         .named("Comparable", []), .named("Hashable", [])

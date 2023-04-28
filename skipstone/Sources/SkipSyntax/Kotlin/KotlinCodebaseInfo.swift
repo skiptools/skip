@@ -95,7 +95,7 @@ extension CodebaseInfo.Context {
         let protocolSignatures = global.protocolSignatures(forNamed: owningType)
         for protocolSignature in protocolSignatures {
             // Exclude protocols that do not translate into Kotlin interfaces
-            guard !protocolSignature.isCustomStringConvertible && !protocolSignature.isEquatable && !protocolSignature.isHashable else {
+            guard protocolSignature != .customStringConvertible && protocolSignature != .equatable && protocolSignature != .hashable else {
                 continue
             }
             for protocolInfo in typeInfos(forNamed: protocolSignature) {

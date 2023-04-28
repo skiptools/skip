@@ -34,12 +34,16 @@ enum KotlinExpressionType {
 class KotlinArrayLiteral: KotlinExpression {
     var elements: [KotlinExpression] = []
     var inferredType: TypeSignature = .none
+    var isOptionSet = false
     var useMultilineFormatting = false
 
     static func translate(expression: ArrayLiteral, translator: KotlinTranslator) -> KotlinArrayLiteral {
         let kexpression = KotlinArrayLiteral(expression: expression)
         kexpression.elements = expression.elements.map { translator.translateExpression($0) }
         kexpression.inferredType = expression.inferredType
+        if case .array(let element) = expression.inferredType {
+            kexpression.isOptionSet = translator.codebaseInfo?.global.protocolSignatures(forNamed: element).contains(where: { $0.isOptionSet }) == true
+        }
         return kexpression
     }
 
@@ -61,7 +65,9 @@ class KotlinArrayLiteral: KotlinExpression {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
-        if case .set = inferredType {
+        if isOptionSet {
+            output.append("\(inferredType.elementType.kotlin).of(")
+        } else if case .set = inferredType {
             output.append("setOf(")
         } else {
             output.append("arrayOf(")

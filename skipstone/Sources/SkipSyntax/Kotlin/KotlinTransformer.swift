@@ -38,6 +38,8 @@ public func builtinKotlinTransformers() -> [KotlinTransformer] {
         KotlinConstructorTransformer(),
         // May add rawValue constructor and static allCases function
         KotlinEnumTransformer(),
+        // May add static function
+        KotlinOptionSetTransformer(),
         KotlinIfWhenTransformer(),
         KotlinDeferTransformer(),
         KotlinDisambiguateFunctionsTransformer(),

@@ -38,11 +38,11 @@ class KotlinCommonProtocolsTransformer: KotlinTransformer {
     private func fixupInherits(_ inherits: [TypeSignature], for type: TypeSignature) -> [TypeSignature] {
         return inherits.compactMap {
             // Filter types that are aliased to Kotlin Any
-            guard !$0.isCustomStringConvertible && !$0.isEquatable && !$0.isHashable else {
+            guard $0 != .customStringConvertible && $0 != .equatable && $0 != .hashable else {
                 return nil
             }
             // Map Comparable to Kotlin's Comparable<T>
-            if $0.isComparable {
+            if $0 == .comparable {
                 return .kotlinComparable(for: type)
             } else {
                 return $0
@@ -74,7 +74,7 @@ class KotlinCommonProtocolsTransformer: KotlinTransformer {
         }) else {
             return
         }
-        guard codebaseInfo.global.protocolSignatures(forNamed: classDeclaration.signature).contains(where: { $0.isCustomStringConvertible }) else {
+        guard codebaseInfo.global.protocolSignatures(forNamed: classDeclaration.signature).contains(.customStringConvertible) else {
             return
         }
 
@@ -101,14 +101,14 @@ class KotlinCommonProtocolsTransformer: KotlinTransformer {
 
         let protocols = codebaseInfo.global.protocolSignatures(forNamed: classDeclaration.signature)
         let isEnumWithoutAssociatedValues = isEnum && !classDeclaration.members.contains { ($0 as? KotlinEnumCaseDeclaration)?.associatedValues.isEmpty == false }
-        if isEnumWithoutAssociatedValues || protocols.contains(where: { $0.isHashable }) {
+        if isEnumWithoutAssociatedValues || protocols.contains(.hashable) {
             ensureHasEquals(for: classDeclaration, codebaseInfo: codebaseInfo)
             ensureHasHash(for: classDeclaration, codebaseInfo: codebaseInfo)
-        } else if isEnumWithoutAssociatedValues || protocols.contains(where: { $0.isEquatable }) {
+        } else if isEnumWithoutAssociatedValues || protocols.contains(.equatable) {
             ensureHasEquals(for: classDeclaration, codebaseInfo: codebaseInfo)
         }
 
-        if isEnum && !isEnumWithLessThan && protocols.contains(where: { $0.isComparable }) {
+        if isEnum && !isEnumWithLessThan && protocols.contains(.comparable) {
             classDeclaration.messages.append(.kotlinEnumSealedClassComparableConformance(classDeclaration, source: codebaseInfo.source))
         }
     }
