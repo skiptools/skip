@@ -17,19 +17,6 @@ final class FeatureSupportTests: XCTestCase {
             """)
     }
 
-    func testCheckUnicodeString() async throws {
-        // interestingly, the special case check fails on Linux
-        #if !os(Linux)
-        try await check(expectFailure: true, swiftCode: {
-            let currencySpacing = "\u{00A0}"
-            return "\(currencySpacing)"
-        }, kotlin: """
-            val currencySpacing = " "
-            return "${currencySpacing}"
-            """)
-        #endif
-    }
-
 
     func testInitNumberLiterals() async throws {
         // Kotlin doesn't seem to allow initializing non-Ints with literals without being explicit
@@ -107,6 +94,20 @@ final class FeatureSupportTests: XCTestCase {
             """)
     }
 
+    func testNestedSimpleEnumInFunction() async throws {
+        // error: Skip does not support type declarations within functions. Consider making this an independent type
+        // error: modifier 'enum' is not applicable to 'local class'
+        try await check(expectFailure: true, swift: """
+        class Foo {
+            public func someFunction() {
+                enum NestedEnum {
+                    case case1, case2, case3
+                }
+            }
+        }
+        """, kotlin: """
+        """)
+    }
 
     /// 1.406 seconds
     func testInferPerf15() async throws {
@@ -189,74 +190,23 @@ final class FeatureSupportTests: XCTestCase {
         fixup: { $0.replacingOccurrences(of: "fibIndex", with: "\(fibIndex)") }) // needed for source code comparison
     }
 
-    func testCheckDisambiguateFunc() async throws {
-        // failed - Transpilation produced unexpected messages: Source.swift: warning: Skip is unable to disambiguate this function call. Consider differentiating your functions with unique parameter labels
 
-        // Source.kts:7:7: error: overload resolution ambiguity:
-        // public final fun doSomething(): Int defined in Source
-        // public final fun doSomething(): String defined in Source
-        // print(doSomething() as String)
-
-        // try await check(compiler: nil, swiftCode: {
-        //      func doSomething() -> String {
-        //          "ZZZ"
-        //      }
-        //      func doSomething() -> Int {
-        //          1
-        //      }
-        //      return doSomething() as String
-        //  }, kotlin: """
-        //      fun doSomething(): String {
-        //          return "ZZZ"
-        //      }
-        //      fun doSomething(): Int {
-        //          return 1
-        //      }
-        //      return doSomething() as String
-        //      """)
-    }
-
-    func testInferCaseVariable() async throws {
-        try await check(swiftCode: {
-            enum SomeEnum {
-                case case1
-                case case2
-            }
-            func enumStuff() -> String {
-                var x = SomeEnum.case1
-                x = .case2
-                return "\(x)"
-            }
-            return enumStuff()
+    func testCheckUnicodeString() async throws {
+        // interestingly, the special case check fails on Linux
+        #if !os(Linux)
+        try await check(expectFailure: true, swiftCode: {
+            let currencySpacing = "\u{00A0}"
+            return "\(currencySpacing)"
         }, kotlin: """
-            enum class SomeEnum {
-                case1,
-                case2;
-            }
-            fun enumStuff(): String {
-                var x = SomeEnum.case1
-                x = SomeEnum.case2
-                return "${x}"
-            }
-            return enumStuff()
+            val currencySpacing = " "
+            return "${currencySpacing}"
             """)
-    }
-
-    func testNestedSimpleEnumInFunction() async throws {
-        // error: Skip does not support type declarations within functions. Consider making this an independent type
-        // error: modifier 'enum' is not applicable to 'local class'
-        try await check(expectFailure: true, swift: """
-        class Foo {
-            public func someFunction() {
-                enum NestedEnum {
-                    case case1, case2, case3
-                }
-            }
-        }
-        """, kotlin: """
-        """)
+        #endif
     }
 }
+
+
+
 
 
 

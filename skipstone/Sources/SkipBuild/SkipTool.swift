@@ -619,7 +619,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
                     let codebaseLoadEnd = Date().timeIntervalSinceReferenceDate
                     info("\(dependencyCodebaseInfo.basename) codebase (\(Self.byteCount(for: .init(cbdata.count)))) loaded (\(Int64((codebaseLoadEnd - codebaseLoadStart) * 1000)) ms) for \(linkModuleName)", sourceFile: dependencyCodebaseInfo.sourceFile)
                 } catch let e {
-                    warn("error loading codebase for linkModuleName: \(linkModuleName) from: \(dependencyCodebaseInfo.pathString) error: \(e.localizedDescription)", sourceFile: dependencyCodebaseInfo.sourceFile)
+                    error("error loading codebase for linkModuleName: \(linkModuleName) from: \(dependencyCodebaseInfo.pathString) error: \(e.localizedDescription)", sourceFile: dependencyCodebaseInfo.sourceFile)
                 }
             }
 
