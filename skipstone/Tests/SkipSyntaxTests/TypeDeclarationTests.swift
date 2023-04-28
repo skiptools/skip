@@ -903,6 +903,11 @@ final class TypeDeclarationTests: XCTestCase {
         }
         protocol OptionSet: RawRepresentable {
         }
+        extension OptionSet {
+            func contains(_ member: Self) -> Bool {
+                return false
+            }
+        }
         """, swift: """
         struct S: OptionSet {
             let rawValue: Int
@@ -910,6 +915,10 @@ final class TypeDeclarationTests: XCTestCase {
             static let s1 = S(rawValue: 1 << 0)
             static let s2 = S(rawValue: 1 << 1)
             static let all: S = [.s1, .s2]
+        }
+
+        func has1(s: S) -> Bool {
+            return s.contains(.s1)
         }
         """, kotlin: """
         internal class S: OptionSet<S, Int> {
@@ -939,6 +948,10 @@ final class TypeDeclarationTests: XCTestCase {
                     return S(rawValue = value)
                 }
             }
+        }
+
+        internal fun has1(s: S): Boolean {
+            return s.contains(S.s1)
         }
         """)
 
