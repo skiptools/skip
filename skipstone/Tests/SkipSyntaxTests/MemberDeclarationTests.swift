@@ -287,7 +287,7 @@ final class MemberDeclarationTests: XCTestCase {
                 set(newValue) {
                     willmutate()
                     try {
-                        if (!isconstructing) {
+                        if (!suppresssideeffects) {
                             print(newValue)
                         }
                         field = newValue
@@ -301,7 +301,7 @@ final class MemberDeclarationTests: XCTestCase {
                     try {
                         val oldValue = field
                         field = newValue
-                        if (!isconstructing) {
+                        if (!suppresssideeffects) {
                             print(j == 2)
                         }
                     } finally {
@@ -310,12 +310,12 @@ final class MemberDeclarationTests: XCTestCase {
                 }
 
             constructor(i: Int = 1, j: Int = 2) {
-                isconstructing = true
+                suppresssideeffects = true
                 try {
                     this.i = i
                     this.j = j
                 } finally {
-                    isconstructing = false
+                    suppresssideeffects = false
                 }
             }
 
@@ -325,7 +325,7 @@ final class MemberDeclarationTests: XCTestCase {
                 return A(i, j)
             }
 
-            private var isconstructing = false
+            private var suppresssideeffects = false
         }
         """)
     }

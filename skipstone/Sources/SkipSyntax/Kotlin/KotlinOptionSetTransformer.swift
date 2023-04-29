@@ -23,6 +23,10 @@ class KotlinOptionSetTransformer: KotlinTransformer {
         }) else {
             return
         }
+        guard classDeclaration.declarationType == .structDeclaration else {
+            classDeclaration.messages.append(.kotlinOptionSetStruct(classDeclaration, source: source))
+            return
+        }
         if valueType == nil {
             valueType = rawValueType(for: classDeclaration)
         }
@@ -46,6 +50,17 @@ class KotlinOptionSetTransformer: KotlinTransformer {
         if let rawValueConstructor = constructors.first(where: { $0.parameters.count == 1 && $0.parameters[0].externalLabel == "rawValue" }) {
             return rawValueConstructor.parameters[0].declaredType
         }
+        let variables = classDeclaration.members.compactMap { (member: KotlinStatement) -> KotlinVariableDeclaration? in
+            guard member.type == .variableDeclaration else {
+                return nil
+            }
+            return member as? KotlinVariableDeclaration
+        }
+        if let rawValueVariable = variables.first(where: { $0.names == ["rawValue"] }) {
+            if let type = rawValueVariable.variableTypes.first, type != .none {
+                return type
+            }
+        }
         return nil
     }
 
@@ -67,21 +82,39 @@ class KotlinOptionSetTransformer: KotlinTransformer {
         rawValueVar.parent = classDeclaration
         rawValueVar.assignParentReferences()
 
-        let factory = KotlinFunctionDeclaration(name: "optionset")
-        factory.extras = .singleNewline
-        factory.modifiers.visibility = .public
-        factory.modifiers.isOverride = true
-        factory.isGenerated = true
-        factory.returnType = classDeclaration.signature
-        factory.parameters = [Parameter<KotlinExpression>(externalLabel: "rawvaluelong", declaredType: .int64)]
+        let make = KotlinFunctionDeclaration(name: "makeoptionset")
+        make.extras = .singleNewline
+        make.modifiers.visibility = .public
+        make.modifiers.isOverride = true
+        make.isGenerated = true
+        make.returnType = classDeclaration.signature
+        make.parameters = [Parameter<KotlinExpression>(externalLabel: "rawvaluelong", declaredType: .int64)]
 
-        let factoryCode = rawValueType == .int64 ? "return \(classDeclaration.name)(rawValue = rawvaluelong)" : "return \(classDeclaration.name)(rawValue = \(rawValueType.kotlin)(rawvaluelong))"
-        let factoryStatement = KotlinRawStatement(sourceCode: factoryCode)
-        factory.body = KotlinCodeBlock(statements: [factoryStatement])
+        let makeCode = rawValueType == .int64 ? "return \(classDeclaration.name)(rawValue = rawvaluelong)" : "return \(classDeclaration.name)(rawValue = \(rawValueType.kotlin)(rawvaluelong))"
+        let makeStatement = KotlinRawStatement(sourceCode: makeCode)
+        make.body = KotlinCodeBlock(statements: [makeStatement])
 
-        classDeclaration.members.append(factory)
-        factory.parent = classDeclaration
-        factory.assignParentReferences()
+        classDeclaration.members.append(make)
+        make.parent = classDeclaration
+        make.assignParentReferences()
+
+        let assign = KotlinFunctionDeclaration(name: "assignoptionset")
+        assign.extras = .singleNewline
+        assign.modifiers.visibility = .public
+        assign.modifiers.isOverride = true
+        assign.modifiers.isMutating = true
+        assign.isGenerated = true
+        assign.parameters = [Parameter<KotlinExpression>(externalLabel: "target", declaredType: classDeclaration.signature)]
+
+        // Use structured statements so that subsequent transformers can detect and translate the self assignment
+        let selfAssignment = KotlinBinaryOperator(op: .with(symbol: "="), lhs: KotlinIdentifier(name: "self"), rhs: KotlinIdentifier(name: "target"))
+        let assignStatement = KotlinExpressionStatement(type: .expression)
+        assignStatement.expression = selfAssignment
+        assign.body = KotlinCodeBlock(statements: [assignStatement])
+
+        classDeclaration.members.append(assign)
+        assign.parent = classDeclaration
+        assign.assignParentReferences()
     }
 
     private func addVarargsFactory(to classDeclaration: KotlinClassDeclaration, rawValueType: TypeSignature) {

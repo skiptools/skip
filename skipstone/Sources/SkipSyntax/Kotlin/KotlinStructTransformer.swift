@@ -20,12 +20,12 @@ class KotlinStructTransformer: KotlinTransformer {
             return .skip
         } else if let functionDeclaration = node as? KotlinFunctionDeclaration {
             if functionDeclaration.modifiers.isMutating {
-                functionDeclaration.body?.addSelfAssignmentMessages(source: translator.syntaxTree.source)
+                handleSelfAssignments(in: functionDeclaration, translator: translator)
                 if let extends = functionDeclaration.extends, translator.codebaseInfo?.declarationType(forNamed: extends.0) == .structDeclaration {
                     functionDeclaration.mutationFunctionNames = mutationFunctionNames
                 }
-            } else if functionDeclaration.type == .constructorDeclaration {
-                functionDeclaration.body?.addSelfAssignmentMessages(source: translator.syntaxTree.source)
+            } else if functionDeclaration.type == .constructorDeclaration, (functionDeclaration.parent as? KotlinClassDeclaration)?.declarationType == .structDeclaration {
+                handleSelfAssignments(in: functionDeclaration, translator: translator)
             }
         }
         // Recurse to find nested declarations
@@ -38,14 +38,14 @@ class KotlinStructTransformer: KotlinTransformer {
         var initializableVariableDeclarations: [KotlinVariableDeclaration] = []
         for member in classDeclaration.members {
             if let variableDeclaration = member as? KotlinVariableDeclaration {
-                if !variableDeclaration.isStatic && !variableDeclaration.isReadOnly {
+                if !variableDeclaration.isStatic && !variableDeclaration.isReadOnly && !variableDeclaration.isGenerated {
                     variableDeclaration.mutationFunctionNames = mutationFunctionNames
                     isMutable = true
                 }
-                if !variableDeclaration.modifiers.isStatic, variableDeclaration.getter == nil, (!variableDeclaration.isLet || variableDeclaration.value == nil) {
+                if !variableDeclaration.modifiers.isStatic && variableDeclaration.getter == nil && (!variableDeclaration.isLet || variableDeclaration.value == nil) && !variableDeclaration.isGenerated {
                     initializableVariableDeclarations.append(variableDeclaration)
                 }
-            } else if let functionDeclaration = member as? KotlinFunctionDeclaration {
+            } else if let functionDeclaration = member as? KotlinFunctionDeclaration, !functionDeclaration.isGenerated {
                 if functionDeclaration.type == .constructorDeclaration {
                     hasConstructors = true
                 } else if functionDeclaration.modifiers.isMutating {
@@ -161,5 +161,72 @@ class KotlinStructTransformer: KotlinTransformer {
         constructor.parent = classDeclaration
         constructor.assignParentReferences()
         classDeclaration.members.append(constructor)
+    }
+
+    private func addAssignFrom(to classDeclaration: KotlinClassDeclaration) {
+        // Already added?
+        guard !classDeclaration.members.contains(where: { ($0 as? KotlinFunctionDeclaration)?.name == "assignfrom" }) else {
+            return
+        }
+
+        // Assign all stored variables
+        var storedVariableDeclarations: [KotlinVariableDeclaration] = []
+        for member in classDeclaration.members {
+            guard let variableDeclaration = member as? KotlinVariableDeclaration, !variableDeclaration.isStatic && !variableDeclaration.isGenerated else {
+                continue
+            }
+            guard variableDeclaration.getter == nil else {
+                continue
+            }
+
+            // Make let vars writeable, in case they can have different initial values
+            variableDeclaration.isAssignFromWriteable = true
+            storedVariableDeclarations.append(variableDeclaration)
+        }
+
+        let assignfrom = KotlinFunctionDeclaration(name: "assignfrom")
+        assignfrom.parameters = [Parameter(externalLabel: "target", declaredType: classDeclaration.signature)]
+        assignfrom.modifiers = Modifiers(visibility: .private)
+        assignfrom.extras = .singleNewline
+        assignfrom.isGenerated = true
+        assignfrom.suppressSideEffects = true
+
+        let bodyStatements: [KotlinStatement] = storedVariableDeclarations.map { variableDeclaration in
+            return KotlinRawStatement(sourceCode: "this.\(variableDeclaration.names[0] ?? "") = target.\(variableDeclaration.names[0] ?? "")")
+        }
+        assignfrom.body = KotlinCodeBlock(statements: bodyStatements)
+        assignfrom.parent = classDeclaration
+        assignfrom.assignParentReferences()
+        classDeclaration.members.append(assignfrom)
+    }
+
+    private func handleSelfAssignments(in functionDeclaration: KotlinFunctionDeclaration, translator: KotlinTranslator) {
+        guard let body = functionDeclaration.body, let classDeclaration = functionDeclaration.parent as? KotlinClassDeclaration else {
+            return
+        }
+        var hasSelfAssignments = false
+        body.visit { node in
+            guard let binaryOperator = node as? KotlinBinaryOperator, binaryOperator.op.symbol == "=", let lhs = binaryOperator.lhs as? KotlinIdentifier, lhs.name == "self", let statement = binaryOperator.parent as? KotlinExpressionStatement else {
+                return .recurse(nil)
+            }
+            if functionDeclaration.extends != nil {
+                binaryOperator.messages.append(.kotlinExtensionSelfAssignment(binaryOperator, source: translator.syntaxTree.source))
+            } else {
+                hasSelfAssignments = true
+                let assignCall = KotlinFunctionCall(function: KotlinIdentifier(name: "assignfrom"), arguments: [LabeledValue(value: binaryOperator.rhs)])
+                let assignStatement = KotlinExpressionStatement(type: .expression, sourceFile: statement.sourceFile, sourceRange: statement.sourceRange)
+                assignStatement.expression = assignCall
+                if let parent = statement.parent as? KotlinStatement {
+                    parent.insert(statements: [assignStatement], after: statement)
+                    parent.remove(statement: statement)
+                } else {
+                    binaryOperator.messages.append(.internalError(binaryOperator, source: translator.syntaxTree.source))
+                }
+            }
+            return .skip
+        }
+        if hasSelfAssignments {
+            addAssignFrom(to: classDeclaration)
+        }
     }
 }

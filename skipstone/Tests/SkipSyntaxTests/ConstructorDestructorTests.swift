@@ -309,11 +309,19 @@ final class ConstructorDestructorTests: XCTestCase {
                 self.j = j
             }
         }
+
+        struct S {
+            var i = 100 {
+                didSet {
+                    print(newValue)
+                }
+            }
+        }
         """, kotlin: """
         internal open class A {
             internal var i = 1
                 set(newValue) {
-                    if (!isconstructing) {
+                    if (!suppresssideeffects) {
                         print(newValue)
                     }
                     field = newValue
@@ -322,22 +330,55 @@ final class ConstructorDestructorTests: XCTestCase {
                 set(newValue) {
                     val oldValue = field
                     field = newValue
-                    if (!isconstructing) {
+                    if (!suppresssideeffects) {
                         print(j == 2)
                     }
                 }
 
             internal constructor(i: Int, j: Int) {
-                isconstructing = true
+                suppresssideeffects = true
                 try {
                     this.i = i
                     this.j = j
                 } finally {
-                    isconstructing = false
+                    suppresssideeffects = false
                 }
             }
 
-            private var isconstructing = false
+            private var suppresssideeffects = false
+        }
+
+        internal class S: MutableStruct {
+            internal var i = 100
+                set(newValue) {
+                    willmutate()
+                    try {
+                        val oldValue = field
+                        field = newValue
+                        if (!suppresssideeffects) {
+                            print(newValue)
+                        }
+                    } finally {
+                        didmutate()
+                    }
+                }
+
+            constructor(i: Int = 100) {
+                suppresssideeffects = true
+                try {
+                    this.i = i
+                } finally {
+                    suppresssideeffects = false
+                }
+            }
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct {
+                return S(i)
+            }
+
+            private var suppresssideeffects = false
         }
         """)
     }
@@ -432,24 +473,149 @@ final class ConstructorDestructorTests: XCTestCase {
         """)
     }
 
+    func testSelfAssignConstructor() async throws {
+        try await check(swift: """
+        struct S {
+            let a: [Int]
+
+            init(a: [Int]) {
+                self.a = a
+            }
+
+            init(copy: S) {
+                self = copy
+            }
+        }
+        """, kotlin: """
+        internal class S {
+            internal var a: Array<Int>
+                get() {
+                    return field.sref()
+                }
+                set(newValue) {
+                    field = newValue.sref()
+                }
+
+            internal constructor(a: Array<Int>) {
+                this.a = a
+            }
+
+            internal constructor(copy: S) {
+                assignfrom(copy)
+            }
+
+            private fun assignfrom(target: S) {
+                this.a = target.a
+            }
+        }
+        """)
+
+        try await check(swift: """
+        struct S {
+            let i: Int
+            var a: [String] = [] {
+                didSet {
+                    print("didset")
+                }
+            }
+
+            init(i: Int) {
+                self.i = i
+            }
+
+            init(copy: S) {
+                self = copy
+            }
+        }
+        """, kotlin: """
+        internal class S: MutableStruct {
+            internal var i: Int
+            internal var a: Array<String> = arrayOf()
+                get() {
+                    return field.sref({ this.a = it })
+                }
+                set(newValue) {
+                    val newValue = newValue.sref()
+                    willmutate()
+                    try {
+                        val oldValue = field
+                        field = newValue
+                        if (!suppresssideeffects) {
+                            print("didset")
+                        }
+                    } finally {
+                        didmutate()
+                    }
+                }
+
+            internal constructor(i: Int) {
+                suppresssideeffects = true
+                try {
+                    this.i = i
+                } finally {
+                    suppresssideeffects = false
+                }
+            }
+
+            internal constructor(copy: S) {
+                suppresssideeffects = true
+                try {
+                    assignfrom(copy)
+                } finally {
+                    suppresssideeffects = false
+                }
+            }
+
+            private constructor(copy: MutableStruct) {
+                suppresssideeffects = true
+                try {
+                    val copy = copy as S
+                    this.i = copy.i
+                    this.a = copy.a
+                } finally {
+                    suppresssideeffects = false
+                }
+            }
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct {
+                return S(this as MutableStruct)
+            }
+
+            private fun assignfrom(target: S) {
+                suppresssideeffects = true
+                try {
+                    this.i = target.i
+                    this.a = target.a
+                } finally {
+                    suppresssideeffects = false
+                }
+            }
+
+            private var suppresssideeffects = false
+        }
+        """)
+    }
+
     func testDeinit() async throws {
-//        try await check(swift: """
-//        class A {
-//        }
-//        class C: A {
-//            deinit {
-//                doStuff()
-//            }
-//        }
-//        """, kotlin: """
-//        internal open class A {
-//        }
-//        internal open class C: A() {
-//            open fun finalize() {
-//                doStuff()
-//            }
-//        }
-//        """)
+        try await check(swift: """
+        class A {
+        }
+        class C: A {
+            deinit {
+                doStuff()
+            }
+        }
+        """, kotlin: """
+        internal open class A {
+        }
+        internal open class C: A() {
+            open fun finalize() {
+                doStuff()
+            }
+        }
+        """)
 
         try await check(swift: """
         class A {

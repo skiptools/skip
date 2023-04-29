@@ -1,52 +1,49 @@
-/// Migrate Swift constructors to Kotlin constructors.
-class KotlinConstructorTransformer: KotlinTransformer {
+/// Migrate Swift constructors to Kotlin constructors, include suppressing property side effects.
+class KotlinConstructorAndSideEffectSupressionTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
         syntaxTree.root.visit { visit($0, translator: translator) }
     }
 
     private func visit(_ node: KotlinSyntaxNode, translator: KotlinTranslator) -> VisitResult<KotlinSyntaxNode> {
         if let classDeclaration = node as? KotlinClassDeclaration {
-            // Enums are handled in the EnumTransformer
-            if classDeclaration.declarationType != .enumDeclaration {
-                fixupConstructors(for: classDeclaration, translator: translator)
+            let hasNonEmptyConstructors = fixupConstructors(for: classDeclaration, translator: translator)
+            if hasNonEmptyConstructors || classDeclaration.members.contains(where: { ($0 as? KotlinFunctionDeclaration)?.suppressSideEffects == true }) {
+                addSuppressSideEffectsProperty(to: classDeclaration)
             }
         } else if let functionCall = node as? KotlinFunctionCall, functionCall.isOptionalInit {
             // Rather than catching the NullReturnException from our Kotlin optional init function and then force unwrapping,
             // just let the exception propagate
             if let postfixOperator = functionCall.parent as? KotlinPostfixOperator, postfixOperator.operatorSymbol == "!" {
-                if translator.codebaseInfo?.declarationType(forNamed: functionCall.inferredType) != .enumDeclaration {
-                    functionCall.isOptionalInit = false
-                    postfixOperator.operatorSymbol = ""
-                }
+                functionCall.isOptionalInit = false
+                postfixOperator.operatorSymbol = ""
             }
         }
         return .recurse(nil)
     }
 
-    private func fixupConstructors(for classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) {
+    private func fixupConstructors(for classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) -> Bool {
         let constructors = classDeclaration.members.compactMap { (member: KotlinStatement) -> KotlinFunctionDeclaration? in
             guard member.type == .constructorDeclaration else {
                 return nil
             }
             return member as? KotlinFunctionDeclaration
         }
+
         let superclass = superclass(of: classDeclaration, translator: translator)
+        var hasNonEmptyConstructor = false
         if constructors.isEmpty {
             if classDeclaration.declarationType != .structDeclaration, let superclass, !addInheritedConstructors(to: classDeclaration, translator: translator) {
                 classDeclaration.superclassCall = "\(superclass.kotlin)()"
             }
         } else {
-            var hasNonEmptyConstructor = false
             for constructor in constructors {
                 fixupClassConstructor(constructor, isSubclass: superclass != nil, translator: translator)
                 if constructor.body?.statements.isEmpty == false {
                     hasNonEmptyConstructor = true
                 }
             }
-            if hasNonEmptyConstructor {
-                addIsConstructingProperty(to: classDeclaration)
-            }
         }
+        return hasNonEmptyConstructor
     }
 
     private func addInheritedConstructors(to classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) -> Bool {
@@ -148,15 +145,15 @@ class KotlinConstructorTransformer: KotlinTransformer {
         return inherits
     }
 
-    private func addIsConstructingProperty(to classDeclaration: KotlinClassDeclaration) {
+    private func addSuppressSideEffectsProperty(to classDeclaration: KotlinClassDeclaration) {
         for member in classDeclaration.members {
             guard let variableDeclaration = member as? KotlinVariableDeclaration else {
                 continue
             }
             // We only need to add the check if there are any member vars with willSet, didSet
             if !variableDeclaration.modifiers.isStatic, variableDeclaration.willSet != nil || variableDeclaration.didSet != nil {
-                classDeclaration.isConstructingPropertyName = "isconstructing"
-                variableDeclaration.isConstructingPropertyName = "isconstructing"
+                classDeclaration.suppressSideEffectsPropertyName = "suppresssideeffects"
+                variableDeclaration.suppressSideEffectsPropertyName = "suppresssideeffects"
             }
         }
     }

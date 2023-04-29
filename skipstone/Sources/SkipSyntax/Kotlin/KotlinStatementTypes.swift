@@ -235,18 +235,6 @@ class KotlinCodeBlock: KotlinStatement {
         }
     }
 
-    /// Add warning messages for attempts to assign to self.
-    func addSelfAssignmentMessages(source: Source) {
-        visit { node in
-            if let binaryOperator = node as? KotlinBinaryOperator, binaryOperator.op.symbol == "=", let lhs = binaryOperator.lhs as? KotlinIdentifier, lhs.name == "self" {
-                binaryOperator.messages.append(.kotlinSelfAssignment(binaryOperator, source: source))
-                return .skip
-            } else {
-                return .recurse(nil)
-            }
-        }
-    }
-
     override var children: [KotlinSyntaxNode] {
         return statements + catches.flatMap { $0.children }
     }
@@ -749,7 +737,7 @@ class KotlinClassDeclaration: KotlinStatement {
     var generics = Generics()
     var declarationType: StatementType
     var members: [KotlinStatement] = []
-    var isConstructingPropertyName: String?
+    var suppressSideEffectsPropertyName: String?
     var enumInheritedRawValueType: TypeSignature? {
         guard let inherits = inherits.first else {
             return nil
@@ -913,9 +901,9 @@ class KotlinClassDeclaration: KotlinStatement {
         enumCases.forEach { output.append($0, indentation: memberIndentation) }
         nonstaticMembers.forEach { output.append($0, indentation: memberIndentation) }
 
-        if let isConstructingPropertyName {
+        if let suppressSideEffectsPropertyName {
             output.append("\n")
-            output.append(memberIndentation).append("private var \(isConstructingPropertyName) = false\n")
+            output.append(memberIndentation).append("private var \(suppressSideEffectsPropertyName) = false\n")
         }
 
         // Always add a companion object to public types in case another module extends it with static members
@@ -1191,6 +1179,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var delegatingConstructorCall: KotlinExpression?
     var mutationFunctionNames: (willMutate: String, didMutate: String)?
     var disambiguatingParameterCount = 0
+    var suppressSideEffects = false
     var isGenerated = false
     var functionType: TypeSignature {
         return .function(parameters.map(\.signature), returnType)
@@ -1459,9 +1448,9 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 output.append(indentation).append("val \(parameter.internalLabel) = \(externalLabel)\n")
             }
         }
-        if type == .constructorDeclaration, let isConstructingPropertyName = (parent as? KotlinClassDeclaration)?.isConstructingPropertyName {
-            output.append(indentation).append("\(isConstructingPropertyName) = true\n")
-            body.syntheticFinally = "\(isConstructingPropertyName) = false"
+        if type == .constructorDeclaration || suppressSideEffects, let suppressSideEffectsPropertyName = (parent as? KotlinClassDeclaration)?.suppressSideEffectsPropertyName {
+            output.append(indentation).append("\(suppressSideEffectsPropertyName) = true\n")
+            body.syntheticFinally = "\(suppressSideEffectsPropertyName) = false"
         } else if let mutationFunctionNames {
             output.append(indentation).append("\(mutationFunctionNames.willMutate)()\n")
             body.syntheticFinally = "\(mutationFunctionNames.didMutate)()"
@@ -1799,8 +1788,9 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var variableTypes: [TypeSignature]
     var mayBeSharedMutableStruct = false
     var isReadOnly = false
+    var isAssignFromWriteable = false
     var onUpdate: String?
-    var isConstructingPropertyName: String?
+    var suppressSideEffectsPropertyName: String?
     var mutationFunctionNames: (willMutate: String, didMutate: String)?
     var isGenerated = false
     var isDescriptionImplementation: Bool {
@@ -1952,7 +1942,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                     output.append("lateinit ")
                 }
             }
-            if isReadOnly {
+            if isReadOnly && !isAssignFromWriteable {
                 output.append("val ")
             } else {
                 output.append("var ")
@@ -2016,15 +2006,15 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
 
             if let willSetBody = willSet?.body {
                 var willSetIndentation = setIndentation
-                if let isConstructingPropertyName {
-                    output.append(setIndentation).append("if (!\(isConstructingPropertyName)) {\n")
+                if let suppressSideEffectsPropertyName {
+                    output.append(setIndentation).append("if (!\(suppressSideEffectsPropertyName)) {\n")
                     willSetIndentation = willSetIndentation.inc()
                 }
                 if let parameterName = willSet?.parameterName, parameterName != "newValue" {
                     output.append(willSetIndentation).append("val \(parameterName) = newValue\n")
                 }
                 output.append(willSetBody, indentation: willSetIndentation)
-                if isConstructingPropertyName != nil {
+                if suppressSideEffectsPropertyName != nil {
                     output.append(setIndentation).append("}\n")
                 }
             }
@@ -2043,12 +2033,12 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
 
             if let didSetBody = didSet?.body {
                 var didSetIndentation = setIndentation
-                if let isConstructingPropertyName {
-                    output.append(setIndentation).append("if (!\(isConstructingPropertyName)) {\n")
+                if let suppressSideEffectsPropertyName {
+                    output.append(setIndentation).append("if (!\(suppressSideEffectsPropertyName)) {\n")
                     didSetIndentation = didSetIndentation.inc()
                 }
                 output.append(didSetBody, indentation: didSetIndentation)
-                if isConstructingPropertyName != nil {
+                if suppressSideEffectsPropertyName != nil {
                     output.append(setIndentation).append("}\n")
                 }
             }
@@ -2062,7 +2052,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 }
             }
             output.append(setterIndentation).append("}\n")
-        } else if !isReadOnly && mayBeSharedMutableStruct && (isProperty || isGlobal) && !isProtocolProperty {
+        } else if (!isReadOnly || isAssignFromWriteable) && mayBeSharedMutableStruct && (isProperty || isGlobal) && !isProtocolProperty {
             let setterIndentation = indentation.inc()
             output.append(setterIndentation).append("set(newValue) {\n")
             output.append(setterIndentation.inc()).append("field = newValue.sref()\n")

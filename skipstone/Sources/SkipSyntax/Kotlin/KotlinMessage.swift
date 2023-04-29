@@ -66,6 +66,10 @@ extension Message {
         return Message(kind: .error, message: "This extension cannot be merged into its extended Kotlin type definition. Therefore it can add new properties and functions, but it cannot be used to override members or implement protocol requirements", sourceDerived: sourceDerived, source: source)
     }
 
+    static func kotlinExtensionSelfAssignment(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "This extension cannot be merged into its extended Kotlin type definition. Therefore you cannot assign a new value to self", sourceDerived: sourceDerived, source: source)
+    }
+
     static func kotlinExtensionUnsupportedMember(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "The declaring extension cannot be merged into its extended Kotlin type definition. Therefore the extension can only include properties and functions", sourceDerived: sourceDerived, source: source)
     }
@@ -120,7 +124,11 @@ extension Message {
     }
 
     static func kotlinOptionSetRawValue(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "Skip is unable to determine the rawValue type of this OptionSet. Make sure it is an enum that extends a numeric type or contains an init(rawValue: <numeric type>) constructor", sourceDerived: sourceDerived, source: source)
+        return Message(kind: .error, message: "Skip is unable to determine the rawValue type of this OptionSet. Make sure it contains a rawValue variable with a numeric type or an init(rawValue: <numeric type>) constructor", sourceDerived: sourceDerived, source: source)
+    }
+
+    static func kotlinOptionSetStruct(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Skip only supports OptionSets that are structs. Change this type to a struct", sourceDerived: sourceDerived, source: source)
     }
 
     static func kotlinProtocolConstructor(_ sourceDerived: SourceDerived, source: Source) -> Message {
@@ -129,11 +137,6 @@ extension Message {
 
     static func kotlinProtocolStaticMember(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Kotlin does not support static members in protocols", sourceDerived: sourceDerived, source: source)
-    }
-
-    // Idea: expand self assignment to merging all state from the given instance
-    static func kotlinSelfAssignment(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "Kotlin does not support assigning a new value to self", sourceDerived: sourceDerived, source: source)
     }
 
     // Idea: duplicate body that we're falling through to (and the following if that too does a fallthrough, etc)

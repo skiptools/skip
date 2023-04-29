@@ -922,19 +922,27 @@ final class TypeDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal class S: OptionSet<S, Int> {
-            override val rawValue: Int
-
-            constructor(rawValue: Int) {
-                this.rawValue = rawValue
-            }
+            override var rawValue: Int
 
             override val rawvaluelong: Long
                 get() {
                     return Long(rawValue)
                 }
 
-            override fun optionset(rawvaluelong: Long): S {
+            override fun makeoptionset(rawvaluelong: Long): S {
                 return S(rawValue = Int(rawvaluelong))
+            }
+
+            override fun assignoptionset(target: S) {
+                assignfrom(target)
+            }
+
+            constructor(rawValue: Int) {
+                this.rawValue = rawValue
+            }
+
+            private fun assignfrom(target: S) {
+                this.rawValue = target.rawValue
             }
 
             companion object {
@@ -965,19 +973,27 @@ final class TypeDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal class S: OptionSet<S, Long> {
-            internal val rawValue: Long
-
-            constructor(rawValue: Long) {
-                this.rawValue = rawValue
-            }
+            internal var rawValue: Long
 
             override val rawvaluelong: Long
                 get() {
                     return rawValue
                 }
 
-            override fun optionset(rawvaluelong: Long): S {
+            override fun makeoptionset(rawvaluelong: Long): S {
                 return S(rawValue = rawvaluelong)
+            }
+
+            override fun assignoptionset(target: S) {
+                assignfrom(target)
+            }
+
+            constructor(rawValue: Long) {
+                this.rawValue = rawValue
+            }
+
+            private fun assignfrom(target: S) {
+                this.rawValue = target.rawValue
             }
 
             companion object {
@@ -991,6 +1007,19 @@ final class TypeDeclarationTests: XCTestCase {
                     return S(rawValue = value)
                 }
             }
+        }
+        """)
+
+        try await checkProducesMessage(swift: """
+        class C: OptionSet {
+            let rawValue: Int
+
+            init(rawValue: Int) {
+                self.rawValue = rawValue
+            }
+
+            static let c1 = C(rawValue: 1 << 0)
+            static let c2 = C(rawValue: 1 << 1)
         }
         """)
     }
@@ -1021,19 +1050,27 @@ final class TypeDeclarationTests: XCTestCase {
         """, kotlin: """
         internal class Outer {
             internal class S: OptionSet<Outer.S, Int> {
-                override val rawValue: Int
-
-                constructor(rawValue: Int) {
-                    this.rawValue = rawValue
-                }
+                override var rawValue: Int
 
                 override val rawvaluelong: Long
                     get() {
                         return Long(rawValue)
                     }
 
-                override fun optionset(rawvaluelong: Long): Outer.S {
+                override fun makeoptionset(rawvaluelong: Long): Outer.S {
                     return S(rawValue = Int(rawvaluelong))
+                }
+
+                override fun assignoptionset(target: Outer.S) {
+                    assignfrom(target)
+                }
+
+                constructor(rawValue: Int) {
+                    this.rawValue = rawValue
+                }
+
+                private fun assignfrom(target: Outer.S) {
+                    this.rawValue = target.rawValue
                 }
 
                 companion object {

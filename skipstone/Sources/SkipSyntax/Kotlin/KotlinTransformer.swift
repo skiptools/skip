@@ -27,19 +27,22 @@ public func builtinKotlinTransformers() -> [KotlinTransformer] {
     return [
         // May change the names of members, so place it before transformers that could use those names in generated code
         KotlinEscapeKeywordsTransformer(),
+        // May add members to implement our internal OptionSet contract, including using self assignment that must be
+        // detected and further translated by the KotlinStructTransformer
+        KotlinOptionSetTransformer(),
         // May add members, so place it before transformers that could manipulate those members
         KotlinStructTransformer(),
         // May alter superclasses and change enums to use sealed classes
         KotlinErrorToExceptionTransformer(),
         // May *remove* information about protocol conformances. May change enums to use sealed classes. Requires knowledge of
-        // sealed vs. unsealed enums. Take care with placement in transformers list
+        // sealed vs. unsealed enums.
         KotlinCommonProtocolsTransformer(),
-        // May add constructors
-        KotlinConstructorTransformer(),
-        // May add rawValue constructor and static allCases function
-        KotlinEnumTransformer(),
-        // May add static function
-        KotlinOptionSetTransformer(),
+        // May *replace* constructors with factory functions. May add rawValue factory method and static allCases function.
+        // May change optional init call sites to factory calls. Requires knowledge of sealed vs. unsealed enums
+        KotlinEnumAndRawValueTransformer(),
+        // May add constructors and modify existing constructors. May suppress side property setting side effects in functions.
+        // May change optional init call sites
+        KotlinConstructorAndSideEffectSupressionTransformer(),
         KotlinIfWhenTransformer(),
         KotlinDeferTransformer(),
         KotlinDisambiguateFunctionsTransformer(),

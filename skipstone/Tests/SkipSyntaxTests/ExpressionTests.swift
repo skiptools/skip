@@ -151,13 +151,91 @@ final class ExpressionTests: XCTestCase {
         """)
     }
 
-    func testSelfAssignment() async throws {
-        try await checkProducesMessage(swift: """
+    func testSelfAssignMutatingFunction() async throws {
+        try await check(swift: """
         struct S {
-            var i = 1
-            init(copy: S) {
+            let i: Int
+            var a: [String] = [] {
+                didSet {
+                    print("didset")
+                }
+            }
+
+            init(i: Int) {
+                self.i = i
+            }
+
+            mutating func copy(_ copy: S) {
                 self = copy
             }
+        }
+        """, kotlin: """
+        internal class S: MutableStruct {
+            internal var i: Int
+            internal var a: Array<String> = arrayOf()
+                get() {
+                    return field.sref({ this.a = it })
+                }
+                set(newValue) {
+                    val newValue = newValue.sref()
+                    willmutate()
+                    try {
+                        val oldValue = field
+                        field = newValue
+                        if (!suppresssideeffects) {
+                            print("didset")
+                        }
+                    } finally {
+                        didmutate()
+                    }
+                }
+
+            internal constructor(i: Int) {
+                suppresssideeffects = true
+                try {
+                    this.i = i
+                } finally {
+                    suppresssideeffects = false
+                }
+            }
+
+            internal fun copy(copy: S) {
+                willmutate()
+                try {
+                    assignfrom(copy)
+                } finally {
+                    didmutate()
+                }
+            }
+
+            private constructor(copy: MutableStruct) {
+                suppresssideeffects = true
+                try {
+                    val copy = copy as S
+                    this.i = copy.i
+                    this.a = copy.a
+                } finally {
+                    suppresssideeffects = false
+                }
+            }
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct {
+                return S(this as MutableStruct)
+            }
+
+            private fun assignfrom(target: S) {
+                suppresssideeffects = true
+                try {
+                    this.i = target.i
+                    this.a = target.a
+                } finally {
+                    suppresssideeffects = false
+                }
+            }
+
+            private var suppresssideeffects = false
         }
         """)
     }

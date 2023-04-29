@@ -1,5 +1,5 @@
 /// Handle `RawRepresentable` and `CaseIterable` synthesis.
-class KotlinEnumTransformer: KotlinTransformer {
+class KotlinEnumAndRawValueTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
         guard let codebaseInfo = translator.codebaseInfo else {
             return
@@ -34,7 +34,7 @@ class KotlinEnumTransformer: KotlinTransformer {
         if let rawValueConstructor = constructors.first(where: { $0.parameters.count == 1 && $0.parameters[0].externalLabel == "rawValue" }) {
             rawValueType = rawValueConstructor.parameters[0].declaredType
         } else if let rawValueType {
-            addRawValueConstructor(to: classDeclaration, rawValueType: rawValueType)
+            addEnumRawValueFactory(to: classDeclaration, rawValueType: rawValueType)
         }
         if let rawValueType {
             let inherit: TypeSignature = .named("RawRepresentable", [rawValueType])
@@ -50,7 +50,7 @@ class KotlinEnumTransformer: KotlinTransformer {
         }
     }
 
-    private func addRawValueConstructor(to classDeclaration: KotlinClassDeclaration, rawValueType: TypeSignature) {
+    private func addEnumRawValueFactory(to classDeclaration: KotlinClassDeclaration, rawValueType: TypeSignature) {
         let factory = KotlinFunctionDeclaration(name: classDeclaration.name)
         factory.modifiers = classDeclaration.modifiers
         factory.generics = classDeclaration.generics
