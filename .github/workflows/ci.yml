@@ -25,7 +25,8 @@ jobs:
 
           swift package plugin --allow-writing-to-package-directory skip-init
           cat Package.swift Package.resolved
-          swift test --configuration debug
+          swift build --jobs 1 --configuration debug
+          swift test --jobs 1 --configuration debug
           brew install tree || true
           tree -l -I build
           cd -
@@ -41,8 +42,8 @@ jobs:
 
           swift package plugin --allow-writing-to-package-directory skip-init
           cat Package.swift Package.resolved
-          swift build --jobs 1
-          swift test --jobs 1
+          swift build --jobs 1 --configuration release
+          swift test --jobs 1 --configuration release
           brew install tree || true
           tree -l -I build
           cd -
