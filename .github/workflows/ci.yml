@@ -14,6 +14,12 @@ jobs:
   skip-init:
     runs-on: macos-13
     steps:
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
       - name: Create New Skip Package (Debug)
         run: |
           mkdir SomeLibraryDebug
