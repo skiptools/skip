@@ -8,18 +8,32 @@ on:
   workflow_dispatch:
 
 env:
-  DEVELOPER_DIR: /Applications/Xcode_14.2.app/Contents/Developer
+  DEVELOPER_DIR: /Applications/Xcode_14.3.app/Contents/Developer
 
 jobs:
   skip-init:
-    # needs: https://github.com/actions/runner-images/issues/6426
-    #runs-on: macos-13
-    runs-on: macos-12
+    runs-on: macos-13
     steps:
+      - name: Create New Skip Package (Debug)
+        run: |
+          mkdir SomeLibraryDebug
+          cd SomeLibraryDebug
+          swift package init
+
+          echo 'package.dependencies += [.package(url: "https://github.com/skiptools/skip", branch: "main")]' >> Package.swift
+          echo 'package.dependencies += [.package(url: "https://github.com/skiptools/skiphub", branch: "main")]' >> Package.swift
+
+          swift package plugin --allow-writing-to-package-directory skip-init
+          cat Package.swift Package.resolved
+          swift test --configuration debug
+          brew install tree || true
+          tree -l -I build
+          cd -
+
       - name: Create New Skip Package (Release)
         run: |
-          mkdir SomeLibrary
-          cd SomeLibrary
+          mkdir SomeLibraryRelease
+          cd SomeLibraryRelease
           swift package init
 
           echo 'package.dependencies += [.package(url: "https://github.com/skiptools/skip", from: "0.0.0")]' >> Package.swift
@@ -31,19 +45,5 @@ jobs:
           swift test --jobs 1
           brew install tree || true
           tree -l -I build
-
-      - name: Create New Skip Package (Debug)
-        run: |
-          mkdir SomeOtherLibrary
-          cd SomeOtherLibrary
-          swift package init
-
-          echo 'package.dependencies += [.package(url: "https://github.com/skiptools/skip", branch: "main")]' >> Package.swift
-          echo 'package.dependencies += [.package(url: "https://github.com/skiptools/skiphub", branch: "main")]' >> Package.swift
-
-          swift package plugin --allow-writing-to-package-directory skip-init
-          cat Package.swift Package.resolved
-          swift test --configuration debug
-          brew install tree || true
-          tree -l -I build
+          cd -
 
