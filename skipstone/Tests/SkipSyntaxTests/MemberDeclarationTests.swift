@@ -342,6 +342,43 @@ final class MemberDeclarationTests: XCTestCase {
         XCTAssertEqual(["willSetJ", "willSetI", "didSetI", "willSetI", "didSetI", "didSetJ", "willSetOwner", "didSetOwner"], sideEffectOrdering)
     }
 
+    func testAsyncProperty() async throws {
+        try await checkProducesMessage(swift: """
+        class C {
+            var v: Int {
+                get async {
+                    return await f()
+                }
+            }
+            func f() async -> Int {
+                return 0
+            }
+        }
+        """)
+    }
+
+    func testThrowingProperty() async throws {
+        try await check(supportingSwift: """
+        struct E: Error {
+        }
+        """, swift: """
+        class C {
+            var v: Int {
+                get throws {
+                    throw E()
+                }
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal open val v: Int
+                get() {
+                    throw E()
+                }
+        }
+        """)
+    }
+
     func testDiscardableResult() async throws {
         try await check(swift: """
         @discardableResult func f() -> Int {
