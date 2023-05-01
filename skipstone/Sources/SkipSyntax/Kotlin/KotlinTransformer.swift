@@ -27,6 +27,8 @@ public func builtinKotlinTransformers() -> [KotlinTransformer] {
     return [
         // May change the names of members, so place it before transformers that could use those names in generated code
         KotlinEscapeKeywordsTransformer(),
+        // May add enums and constructors that must be enhanced by subsequent transformers
+        KotlinCodableTransformer(),
         // May add members to implement our internal OptionSet contract, including using self assignment that must be
         // detected and further translated by the KotlinStructTransformer
         KotlinOptionSetTransformer(),

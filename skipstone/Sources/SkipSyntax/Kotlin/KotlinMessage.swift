@@ -27,6 +27,14 @@ extension Message {
         return Message(kind: .error, message: "Kotlin only supports catch clauses that use enum cases, 'is <type>', or 'let <e> as <type>' conditions", sourceDerived: sourceDerived, source: source)
     }
 
+    static func kotlinCodablePropertyForKey(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Unable to locate the property for this coding key", sourceDerived: sourceDerived, source: source)
+    }
+
+    static func kotlinCodablePropertyType(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Skip is unable to determine the type of this property for use in decoding. Add an explicit type to the declaration", sourceDerived: sourceDerived, source: source)
+    }
+
     // Idea: auto-create combined interface for composed protocols
     static func kotlinComposedTypes(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Kotlin does not support composed types. Consider creating a single type that conforms to these types", sourceDerived: sourceDerived, source: source)

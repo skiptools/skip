@@ -754,6 +754,7 @@ class KotlinClassDeclaration: KotlinStatement {
     }
     private var forceSealedClassesEnum = false
     var alwaysCreateNewSealedClassInstances = false
+    var isGenerated = false
 
     static func translate(statement: TypeDeclaration, translator: KotlinTranslator) -> KotlinClassDeclaration {
         let kstatement = KotlinClassDeclaration(statement: statement)
@@ -790,11 +791,46 @@ class KotlinClassDeclaration: KotlinStatement {
         return kstatement
     }
 
+    init(name: String, signature: TypeSignature, declarationType: StatementType, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
+        self.name = name
+        self.signature = signature
+        self.declarationType = declarationType
+        super.init(type: .classDeclaration, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
     private init(statement: TypeDeclaration) {
         self.name = statement.name
         self.signature = statement.signature
         self.declarationType = statement.type
         super.init(type: .classDeclaration, statement: statement)
+    }
+
+    /// Assign raw values and other attributes to enum case members.
+    func processEnumCaseDeclarations() {
+        guard declarationType == .enumDeclaration else {
+            return
+        }
+
+        let caseDeclarations = members.compactMap { $0 as? KotlinEnumCaseDeclaration }
+        let rawValueType = enumInheritedRawValueType
+        var lastRawValueInt = -1
+        for (index, caseDeclaration) in caseDeclarations.enumerated() {
+            if let rawValueType {
+                if rawValueType.isNumeric {
+                    if let rawValue = caseDeclaration.rawValue {
+                        if let literal = rawValue as? KotlinNumericLiteral, let literalInt = Double(literal.literal).map({ Int($0) }) {
+                            lastRawValueInt = literalInt
+                        }
+                    } else {
+                        lastRawValueInt += 1
+                        caseDeclaration.rawValue = KotlinNumericLiteral(literal: String(lastRawValueInt))
+                    }
+                } else if caseDeclaration.rawValue == nil {
+                    caseDeclaration.rawValue = KotlinStringLiteral(literal: caseDeclaration.name)
+                }
+            }
+            caseDeclaration.isLastDeclaration = index == caseDeclarations.count - 1
+        }
     }
 
     override var children: [KotlinSyntaxNode] {
@@ -922,33 +958,6 @@ class KotlinClassDeclaration: KotlinStatement {
         }
         output.append(indentation).append("}\n")
     }
-
-    private func processEnumCaseDeclarations() {
-        guard declarationType == .enumDeclaration else {
-            return
-        }
-
-        let caseDeclarations = members.compactMap { $0 as? KotlinEnumCaseDeclaration }
-        let rawValueType = enumInheritedRawValueType
-        var lastRawValueInt = -1
-        for (index, caseDeclaration) in caseDeclarations.enumerated() {
-            if let rawValueType {
-                if rawValueType.isNumeric {
-                    if let rawValue = caseDeclaration.rawValue {
-                        if let literal = rawValue as? KotlinNumericLiteral, let literalInt = Double(literal.literal).map({ Int($0) }) {
-                            lastRawValueInt = literalInt
-                        }
-                    } else {
-                        lastRawValueInt += 1
-                        caseDeclaration.rawValue = KotlinNumericLiteral(literal: String(lastRawValueInt))
-                    }
-                } else if caseDeclaration.rawValue == nil {
-                    caseDeclaration.rawValue = KotlinStringLiteral(literal: caseDeclaration.name)
-                }
-            }
-            caseDeclaration.isLastDeclaration = index == caseDeclarations.count - 1
-        }
-    }
 }
 
 class KotlinEnumCaseDeclaration: KotlinStatement {
@@ -986,6 +995,11 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
         }
         let _ = kstatement.processAttributes(statement.attributes, translator: translator)
         return kstatement
+    }
+
+    init(name: String, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
+        self.name = name
+        super.init(type: .enumCaseDeclaration, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
     private init(statement: EnumCaseDeclaration) {

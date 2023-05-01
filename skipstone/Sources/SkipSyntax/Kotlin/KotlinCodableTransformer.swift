@@ -1,0 +1,168 @@
+/// Synthesize `Encodable` and `Decodable` conformance.
+class KotlinCodableTransformer: KotlinTransformer {
+    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
+        syntaxTree.root.visit {
+            if let classDeclaration = $0 as? KotlinClassDeclaration {
+                if classDeclaration.declarationType == .enumDeclaration, classDeclaration.inherits.contains(.codingKey) {
+                    fixupCodingKey(enumDeclaration: classDeclaration)
+                } else {
+                    synthesizeCodable(for: classDeclaration, source: translator.syntaxTree.source)
+                }
+            }
+            return .recurse(nil)
+        }
+    }
+
+    private func synthesizeCodable(for classDeclaration: KotlinClassDeclaration, source: Source) {
+        // We don't need to worry about extensions because they will have already been merged into the class
+        let isEncodable = classDeclaration.inherits.contains(.codable) || classDeclaration.inherits.contains(.encodable)
+        let isDecodable = classDeclaration.inherits.contains(.codable) || classDeclaration.inherits.contains(.decodable)
+        guard isEncodable || isDecodable else {
+            return
+        }
+
+        var encodeDeclaration: KotlinFunctionDeclaration? = nil
+        if isEncodable {
+            encodeDeclaration = classDeclaration.members.first {
+                guard let functionDeclaration = $0 as? KotlinFunctionDeclaration else {
+                    return false
+                }
+                return functionDeclaration.name == "encode" && functionDeclaration.parameters.count == 1 && functionDeclaration.parameters[0].externalLabel == "to" && functionDeclaration.parameters[0].declaredType == .named("Encoder", [])
+            } as? KotlinFunctionDeclaration
+            encodeDeclaration?.modifiers.visibility = .public
+            encodeDeclaration?.modifiers.isOverride = true
+        }
+        var decodeDeclaration: KotlinFunctionDeclaration? = nil
+        if isDecodable {
+            decodeDeclaration = classDeclaration.members.first {
+                guard let functionDeclaration = $0 as? KotlinFunctionDeclaration else {
+                    return false
+                }
+                return functionDeclaration.type == .constructorDeclaration && functionDeclaration.parameters.count == 1 && functionDeclaration.parameters[0].externalLabel == "from" && functionDeclaration.parameters[0].declaredType == .named("Decoder", [])
+            } as? KotlinFunctionDeclaration
+            decodeDeclaration?.modifiers.visibility = .public
+        }
+        guard (isEncodable && encodeDeclaration == nil) || (isDecodable && decodeDeclaration == nil) else {
+            return
+        }
+
+        // The developer may use a bespoke name for their coding keys enum if they implement their own encode/decode,
+        // so we only synthesize or look for coding keys after knowing we need to generate a coding function
+        let codingKeys = synthesizeCodingKeys(for: classDeclaration, isDecodable: isDecodable)
+        let typedCodingKeys = codingKeys.map { ($0, propertyType(for: $0, in: classDeclaration, source: source)) }
+        if isEncodable && encodeDeclaration == nil {
+            synthesizeEncode(for: classDeclaration, codingKeys: typedCodingKeys)
+        }
+        if isDecodable && decodeDeclaration == nil {
+            synthesizeDecode(for: classDeclaration, codingKeys: typedCodingKeys)
+        }
+    }
+
+    private func synthesizeCodingKeys(for classDeclaration: KotlinClassDeclaration, isDecodable: Bool) -> [KotlinEnumCaseDeclaration] {
+        // Does the user have a custom enum?
+        if let existingKeys = classDeclaration.members.first(where: {
+            guard let memberClassDeclaration = $0 as? KotlinClassDeclaration else {
+                return false
+            }
+            return memberClassDeclaration.declarationType == .enumDeclaration && memberClassDeclaration.name == "CodingKeys"
+        }) as? KotlinClassDeclaration {
+            return existingKeys.members.compactMap { $0 as? KotlinEnumCaseDeclaration }
+        }
+
+        // Create cases for all stored variables
+        var storedVariableDeclarations: [KotlinVariableDeclaration] = []
+        for member in classDeclaration.members {
+            guard let variableDeclaration = member as? KotlinVariableDeclaration, !variableDeclaration.isStatic && !variableDeclaration.isGenerated else {
+                continue
+            }
+            guard variableDeclaration.getter == nil else {
+                continue
+            }
+            if isDecodable && variableDeclaration.value != nil {
+                // Make let vars writeable so that we can decode them. We decode in a constructor, so this is only needed
+                // if the vars have initial values that would otherwise not be re-assignable
+                variableDeclaration.isAssignFromWriteable = true
+            }
+            storedVariableDeclarations.append(variableDeclaration)
+        }
+
+        let enumDeclaration = KotlinClassDeclaration(name: "CodingKeys", signature: .named("CodingKeys", []), declarationType: .enumDeclaration)
+        enumDeclaration.inherits = [.string, .codingKey]
+        enumDeclaration.modifiers.visibility = .private
+        enumDeclaration.extras = .singleNewline
+        enumDeclaration.isGenerated = true
+        let caseDeclarations = storedVariableDeclarations.map {
+            KotlinEnumCaseDeclaration(name: ($0.names.first ?? "") ?? "")
+        }
+        enumDeclaration.members = caseDeclarations
+        enumDeclaration.processEnumCaseDeclarations()
+
+        classDeclaration.members.append(enumDeclaration)
+        enumDeclaration.parent = classDeclaration
+        enumDeclaration.assignParentReferences()
+        return caseDeclarations
+    }
+
+    private func fixupCodingKey(enumDeclaration: KotlinClassDeclaration) {
+        // Coding keys are strings by default
+        if enumDeclaration.enumInheritedRawValueType == nil {
+            enumDeclaration.inherits.insert(.string, at: 0)
+            enumDeclaration.processEnumCaseDeclarations()
+        }
+    }
+
+    private func synthesizeEncode(for classDeclaration: KotlinClassDeclaration, codingKeys: [(KotlinEnumCaseDeclaration, TypeSignature)]) {
+        let encode = KotlinFunctionDeclaration(name: "encode")
+        encode.extras = .singleNewline
+        encode.modifiers.visibility = .public
+        encode.modifiers.isOverride = true
+        encode.isGenerated = true
+        encode.parameters = [Parameter<KotlinExpression>(externalLabel: "to", declaredType: .named("Encoder", []))]
+
+        var statements: [KotlinStatement] = []
+        statements.append(KotlinRawStatement(sourceCode: "val container = to.container(keyedBy = CodingKeys::class)"))
+        statements += codingKeys.map {
+            let encodeFunction = $0.1.isOptional ? "encodeIfPresent" : "encode"
+            return KotlinRawStatement(sourceCode: "container.\(encodeFunction)(\($0.0.name), forKey = CodingKeys.\($0.0.name))")
+        }
+        encode.body = KotlinCodeBlock(statements: statements)
+
+        classDeclaration.members.append(encode)
+        encode.parent = classDeclaration
+        encode.assignParentReferences()
+    }
+
+    private func synthesizeDecode(for classDeclaration: KotlinClassDeclaration, codingKeys: [(KotlinEnumCaseDeclaration, TypeSignature)]) {
+        let decode = KotlinFunctionDeclaration(name: "constructor")
+        decode.extras = .singleNewline
+        decode.modifiers.visibility = .public
+        decode.isGenerated = true
+        decode.parameters = [Parameter<KotlinExpression>(externalLabel: "from", declaredType: .named("Decoder", []))]
+
+        var statements: [KotlinStatement] = []
+        statements.append(KotlinRawStatement(sourceCode: "val container = from.container(keyedBy = CodingKeys::class)"))
+        statements += codingKeys.map {
+            let type = $0.1
+            let decodeFunction = type.isOptional ? "decodeIfPresent" : "decode"
+            let decodeType = type.asOptional(false).withGenerics([])
+            return KotlinRawStatement(sourceCode: "this.\($0.0.name) = container.\(decodeFunction)(\(decodeType.kotlin)::class, forKey = CodingKeys.\($0.0.name))")
+        }
+        decode.body = KotlinCodeBlock(statements: statements)
+
+        classDeclaration.members.append(decode)
+        decode.parent = classDeclaration
+        decode.assignParentReferences()
+    }
+
+    private func propertyType(for codingKey: KotlinEnumCaseDeclaration, in classDeclaration: KotlinClassDeclaration, source: Source) -> TypeSignature {
+        guard let variableDeclaration = classDeclaration.members.first(where: { ($0 as? KotlinVariableDeclaration)?.names == [codingKey.name] }) as? KotlinVariableDeclaration else {
+            codingKey.messages.append(.kotlinCodablePropertyForKey(codingKey, source: source))
+            return .any
+        }
+        guard let type = variableDeclaration.variableTypes.first, type != .none else {
+            variableDeclaration.messages.append(.kotlinCodablePropertyType(variableDeclaration, source: source))
+            return .any
+        }
+        return type
+    }
+}

@@ -1251,8 +1251,12 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
 
 extension TypeSignature {
     static let caseIterable: TypeSignature = .named("CaseIterable", [])
+    static let codable: TypeSignature = .named("Codable", [])
+    static let codingKey: TypeSignature = .named("CodingKey", [])
     static let comparable: TypeSignature = .named("Comparable", [])
     static let customStringConvertible: TypeSignature = .named("CustomStringConvertible", [])
+    static let decodable: TypeSignature = .named("Decodable", [])
+    static let encodable: TypeSignature = .named("Encodable", [])
     static let equatable: TypeSignature = .named("Equatable", [])
     static let hashable: TypeSignature = .named("Hashable", [])
 
