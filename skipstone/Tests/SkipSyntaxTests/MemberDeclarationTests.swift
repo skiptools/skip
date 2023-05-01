@@ -379,6 +379,42 @@ final class MemberDeclarationTests: XCTestCase {
         """)
     }
 
+    //~~~
+//    func testLazyProperty() async throws {
+//        try await check(swift: """
+//        class C {
+//            lazy var v = C()
+//        }
+//        """, kotlin: """
+//        internal open class C {
+//            var v: C
+//                get() = lazyv
+//        }
+//        """)
+//    }
+
+    func testExplicitlyUnwrappedOptionalProperty() async throws {
+        try await check(swift: """
+        class V {
+        }
+        class C {
+            var v: V!
+            setUp() {
+                v = V()
+            }
+        }
+        """, kotlin: """
+        internal open class V {
+        }
+        internal open class C {
+            internal lateinit var v: V
+            internal open fun setUp() {
+                v = V()
+            }
+        }
+        """)
+    }
+
     func testDiscardableResult() async throws {
         try await check(swift: """
         @discardableResult func f() -> Int {

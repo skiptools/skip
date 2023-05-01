@@ -149,6 +149,34 @@ final class ExpressionTests: XCTestCase {
         }
         return Foo.Bar.Baz.prop
         """)
+
+        // Test nested type that is not fully qualified
+        try await check(swift: """
+        class A {
+            class B {
+                class C {
+                    static var a = 100
+                }
+            }
+            func f() {
+                let x = B.C.a
+            }
+        }
+        """, kotlin: """
+        internal open class A {
+            internal open class B {
+                internal open class C {
+
+                    companion object {
+                        internal var a = 100
+                    }
+                }
+            }
+            internal open fun f() {
+                val x = B.C.a
+            }
+        }
+        """)
     }
 
     func testSelfAssignMutatingFunction() async throws {

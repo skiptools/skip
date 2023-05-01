@@ -6,9 +6,6 @@ extension Message {
 
     // List of specific untranslatable errors. This will be helpful in maintaining documentation
 
-    // Idea: convert string mutation to re-assigning the string value
-    static let kotlinStringMutation = "Detected possible string mutation. This may cause errors when converting to Kotlin, which does not have mutable strings"
-
     // Idea: create our own actors for Kotlin
     static func kotlinActors(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Kotlin supports async functions, but it does not have actors", sourceDerived: sourceDerived, source: source)
@@ -146,6 +143,9 @@ extension Message {
     static func kotlinProtocolStaticMember(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Kotlin does not support static members in protocols", sourceDerived: sourceDerived, source: source)
     }
+
+    // Idea: convert string mutation to re-assigning the string value
+    static let kotlinStringMutation = "Detected possible string mutation. This may cause errors when converting to Kotlin, which does not have mutable strings"
 
     // Idea: duplicate body that we're falling through to (and the following if that too does a fallthrough, etc)
     static func kotlinSwitchFallthrough(_ sourceDerived: SourceDerived, source: Source) -> Message {

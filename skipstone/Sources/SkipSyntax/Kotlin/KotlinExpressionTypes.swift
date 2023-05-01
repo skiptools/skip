@@ -1159,6 +1159,11 @@ class KotlinMemberAccess: KotlinExpression {
         guard identifier.generics?.isEmpty != false else {
             return nil
         }
+        // Nested type that is not fully qualified?
+        if case .member(_, let nestedType) = type, nestedType.name == identifier.name {
+            return nil
+        }
+        // Builtin type?
         guard TypeSignature.for(name: identifier.name, genericTypes: [], allowNamed: false) == .none else {
             return nil
         }
