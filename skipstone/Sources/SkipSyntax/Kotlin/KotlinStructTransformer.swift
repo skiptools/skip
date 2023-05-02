@@ -96,18 +96,9 @@ class KotlinStructTransformer: KotlinTransformer {
         scopy.isGenerated = true
         scopy.returnType = .named("MutableStruct", [])
 
-        var className = classDeclaration.name
-        if !classDeclaration.generics.isEmpty {
-            // manually create the generics list
-            className += "<"
-            className += classDeclaration.generics
-                .entries.map(\.name).joined(separator: ", ")
-            className += ">"
-        }
-
         let constructorCall: KotlinExpression
         if useMemberwiseConstructor {
-            let initFunction = KotlinMemberAccess(base: KotlinIdentifier(name: className), member: "init")
+            let initFunction = KotlinMemberAccess(base: KotlinIdentifier(name: classDeclaration.signature.kotlin), member: "init")
             let arguments = variableDeclarations.map {
                 let argumentValue = KotlinIdentifier(name: $0.names[0] ?? "")
                 argumentValue.mayBeSharedMutableStruct = $0.mayBeSharedMutableStruct
@@ -115,7 +106,7 @@ class KotlinStructTransformer: KotlinTransformer {
             }
             constructorCall = KotlinFunctionCall(function: initFunction, arguments: arguments)
         } else {
-            constructorCall = KotlinRawExpression(sourceCode: "\(className)(this as MutableStruct)")
+            constructorCall = KotlinRawExpression(sourceCode: "\(classDeclaration.signature.kotlin)(this as MutableStruct)")
         }
         let returnStatement = KotlinReturn(expression: constructorCall)
         scopy.body = KotlinCodeBlock(statements: [returnStatement])
