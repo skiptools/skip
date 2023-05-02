@@ -1,16 +1,16 @@
-/// Handle adding factory function to `OptionSet` implementations.
+/// Handle `OptionSet` implementation.
 class KotlinOptionSetTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
         syntaxTree.root.visit {
+            // We don't need to worry about extensions because they will have already been merged into the class
             if let classDeclaration = $0 as? KotlinClassDeclaration {
-                transformOptionSet(for: classDeclaration, source: translator.syntaxTree.source)
+                handleOptionSet(for: classDeclaration, source: translator.syntaxTree.source)
             }
             return .recurse(nil)
         }
     }
 
-    private func transformOptionSet(for classDeclaration: KotlinClassDeclaration, source: Source) {
-        // We don't need to worry about extensions because they will have already been merged into the class.
+    private func handleOptionSet(for classDeclaration: KotlinClassDeclaration, source: Source) {
         // See if this is an OptionSet. We may already have resolved the inherited RawRepresentable generic type
         var valueType: TypeSignature? = nil
         guard let inheritsIndex = classDeclaration.inherits.firstIndex(where: {
@@ -28,7 +28,7 @@ class KotlinOptionSetTransformer: KotlinTransformer {
             return
         }
         if valueType == nil {
-            valueType = rawValueType(for: classDeclaration)
+            valueType = classDeclaration.rawValueType
         }
         guard let valueType, valueType.isNumeric else {
             classDeclaration.messages.append(.kotlinOptionSetRawValue(classDeclaration, source: source))
@@ -36,35 +36,11 @@ class KotlinOptionSetTransformer: KotlinTransformer {
         }
 
         classDeclaration.inherits[inheritsIndex] = .named("OptionSet", [classDeclaration.signature, valueType])
-        addInterfaceMembers(to: classDeclaration, rawValueType: valueType)
-        addVarargsFactory(to: classDeclaration, rawValueType: valueType)
+        addOptionSetInterfaceMembers(to: classDeclaration, rawValueType: valueType)
+        addOptionSetVarargsFactory(to: classDeclaration, rawValueType: valueType)
     }
 
-    private func rawValueType(for classDeclaration: KotlinClassDeclaration) -> TypeSignature? {
-        let constructors = classDeclaration.members.compactMap { (member: KotlinStatement) -> KotlinFunctionDeclaration? in
-            guard member.type == .constructorDeclaration else {
-                return nil
-            }
-            return member as? KotlinFunctionDeclaration
-        }
-        if let rawValueConstructor = constructors.first(where: { $0.parameters.count == 1 && $0.parameters[0].externalLabel == "rawValue" }) {
-            return rawValueConstructor.parameters[0].declaredType
-        }
-        let variables = classDeclaration.members.compactMap { (member: KotlinStatement) -> KotlinVariableDeclaration? in
-            guard member.type == .variableDeclaration else {
-                return nil
-            }
-            return member as? KotlinVariableDeclaration
-        }
-        if let rawValueVariable = variables.first(where: { $0.propertyName == "rawValue" }) {
-            if rawValueVariable.propertyType != .none {
-                return rawValueVariable.propertyType
-            }
-        }
-        return nil
-    }
-
-    private func addInterfaceMembers(to classDeclaration: KotlinClassDeclaration, rawValueType: TypeSignature) {
+    private func addOptionSetInterfaceMembers(to classDeclaration: KotlinClassDeclaration, rawValueType: TypeSignature) {
         let rawValueVar = KotlinVariableDeclaration(names: ["rawvaluelong"], variableTypes: [.int64])
         rawValueVar.extras = .singleNewline
         rawValueVar.isProperty = true
@@ -117,7 +93,7 @@ class KotlinOptionSetTransformer: KotlinTransformer {
         assign.assignParentReferences()
     }
 
-    private func addVarargsFactory(to classDeclaration: KotlinClassDeclaration, rawValueType: TypeSignature) {
+    private func addOptionSetVarargsFactory(to classDeclaration: KotlinClassDeclaration, rawValueType: TypeSignature) {
         let factory = KotlinFunctionDeclaration(name: "of")
         factory.extras = .singleNewline
         factory.modifiers.isStatic = true

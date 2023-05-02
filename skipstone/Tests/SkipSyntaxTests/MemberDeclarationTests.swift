@@ -1377,8 +1377,3 @@ private class MemberDeclarationTestsSideEffectsClass {
         }
     }
 }
-
-//~~~
-class C {
-
-}

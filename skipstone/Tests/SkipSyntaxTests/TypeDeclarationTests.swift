@@ -895,6 +895,27 @@ final class TypeDeclarationTests: XCTestCase {
         """)
     }
 
+    func testRawRepresentableStruct() async throws {
+        try await check(supportingSwift: """
+        protocol RawRepresentable {
+            associatedtype T
+            var rawValue: T { get }
+        }
+        """, swift: """
+        struct S: RawRepresentable {
+            let rawValue: Int
+        }
+        """, kotlin: """
+        internal class S: RawRepresentable<Int> {
+            override val rawValue: Int
+
+            constructor(rawValue: Int) {
+                this.rawValue = rawValue
+            }
+        }
+        """)
+    }
+
     func testOptionSet() async throws {
         try await check(supportingSwift: """
         protocol RawRepresentable {

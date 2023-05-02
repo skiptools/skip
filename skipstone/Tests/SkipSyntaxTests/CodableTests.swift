@@ -678,7 +678,41 @@ final class CodableTests: XCTestCase {
         """)
     }
 
-    func testEnum() async throws {
-        // TODO: Enum codable synthesis
+    func testRawValueEnum() async throws {
+        try await check(swift: """
+        enum E: Int, Codable {
+            case a, b
+        }
+        """, kotlin: """
+        internal enum class E(override val rawValue: Int, unusedp: Nothing? = null): Codable, RawRepresentable<Int> {
+            a(0),
+            b(1);
+
+            override fun encode(to: Encoder) {
+                val container = to.singleValueContainer()
+                container.encode(rawValue)
+            }
+        }
+
+        internal fun E(rawValue: Int): E? {
+            return when (rawValue) {
+                0 -> {
+                    E.a
+                }
+                1 -> {
+                    E.b
+                }
+                else -> {
+                    null
+                }
+            }
+        }
+
+        internal fun E(from: Decoder): E {
+            val container = from.singleValueContainer()
+            val rawValue = container.decode(Int::class)
+            return E(rawValue = rawValue) ?: throw ErrorException(cause = NullPointerException())
+        }
+        """)
     }
 }

@@ -738,11 +738,11 @@ class KotlinClassDeclaration: KotlinStatement {
     var declarationType: StatementType
     var members: [KotlinStatement] = []
     var suppressSideEffectsPropertyName: String?
-    var enumInheritedRawValueType: TypeSignature? {
+    var enumInheritedRawValueType: TypeSignature {
         guard let inherits = inherits.first else {
-            return nil
+            return .none
         }
-        return inherits.isNumeric || inherits == .string ? inherits : nil
+        return inherits.isNumeric || inherits == .string ? inherits : .none
     }
     var isSealedClassesEnum: Bool {
         get {
@@ -815,7 +815,7 @@ class KotlinClassDeclaration: KotlinStatement {
         let rawValueType = enumInheritedRawValueType
         var lastRawValueInt = -1
         for (index, caseDeclaration) in caseDeclarations.enumerated() {
-            if let rawValueType {
+            if rawValueType != .none {
                 if rawValueType.isNumeric {
                     if let rawValue = caseDeclaration.rawValue {
                         if let literal = rawValue as? KotlinNumericLiteral, let literalInt = Double(literal.literal).map({ Int($0) }) {
@@ -900,10 +900,10 @@ class KotlinClassDeclaration: KotlinStatement {
             generics.append(to: output, indentation: indentation, outParameters: isSealedClassesEnum)
 
             var inherits = inherits
-            if let inheritedRawValueType = enumInheritedRawValueType {
+            if enumInheritedRawValueType != .none {
                 inherits = Array(inherits.dropFirst())
                 // Add an unused parameter to disambiguate from the RawRepresentable constructor
-                output.append("(override val rawValue: \(inheritedRawValueType.kotlin), unusedp: Nothing? = null)")
+                output.append("(override val rawValue: \(enumInheritedRawValueType.kotlin), unusedp: Nothing? = null)")
             }
             if !inherits.isEmpty {
                 output.append(": ")

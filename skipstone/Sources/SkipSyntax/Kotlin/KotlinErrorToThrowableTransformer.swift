@@ -45,7 +45,7 @@ class KotlinErrorToExceptionTransformer: KotlinTransformer {
             classDeclaration.isSealedClassesEnum = true
             classDeclaration.alwaysCreateNewSealedClassInstances = true
             // Leave the enum raw type extension first
-            exceptionInheritsIndex = classDeclaration.enumInheritedRawValueType != nil ? 1 : 0
+            exceptionInheritsIndex = classDeclaration.enumInheritedRawValueType != .none ? 1 : 0
         }
         classDeclaration.inherits.insert(.named("Exception", []), at: exceptionInheritsIndex)
         if !hasConstructors {
