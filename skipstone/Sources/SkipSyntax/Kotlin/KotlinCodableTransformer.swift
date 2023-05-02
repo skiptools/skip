@@ -68,7 +68,7 @@ class KotlinCodableTransformer: KotlinTransformer {
         }) as? KotlinClassDeclaration {
             return existingKeys.members.compactMap { $0 as? KotlinEnumCaseDeclaration }
         }
-        guard classDeclaration.declarationType != .enumDeclaration || classDeclaration.rawValueType == .none else {
+        guard classDeclaration.rawValueType == .none else {
             return nil
         }
 

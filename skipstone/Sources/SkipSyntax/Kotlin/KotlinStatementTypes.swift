@@ -971,8 +971,9 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
 
     /// Return the name of the sealed class we create for the given enum case name in an enum with associated values.
     static func sealedClassName(for caseName: String) -> String {
+        // Always append "Case" to avoid conflicts with reserved names, e.g. case boolean -> Boolean
         if let first = caseName.first, first.isLowercase {
-            return first.uppercased() + caseName.dropFirst()
+            return first.uppercased() + caseName.dropFirst() + "Case"
         }
         return caseName + "Case"
     }

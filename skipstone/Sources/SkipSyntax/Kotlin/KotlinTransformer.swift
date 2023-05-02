@@ -39,7 +39,7 @@ public func builtinKotlinTransformers() -> [KotlinTransformer] {
         // May *remove* information about protocol conformances. May change enums to use sealed classes. Requires knowledge of
         // sealed vs. unsealed enums.
         KotlinCommonProtocolsTransformer(),
-        // May add RawRepresentable enum factory function. Requires knowledge of sealed vs. unsealed enums.Requires knowledge of
+        // May add RawRepresentable enum factory function. Requires knowledge of sealed vs. unsealed enums. Requires knowledge of
         // constructors, so place before KotlinEnumTransformer
         KotlinRawRepresentableTransformer(),
         // May *replace* constructors with factory functions. May add static allCases function. May change optional init call

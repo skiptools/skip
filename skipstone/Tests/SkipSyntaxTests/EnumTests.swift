@@ -165,15 +165,15 @@ final class EnumTests: XCTestCase {
         }
         """, kotlin: """
         internal sealed class E {
-            class A: E() {
+            class ACase: E() {
             }
-            class B(val associated0: Int, val associated1: String): E() {
+            class BCase(val associated0: Int, val associated1: String): E() {
             }
 
             companion object {
-                val a: E = A()
+                val a: E = ACase()
                 fun b(associated0: Int = 1, associated1: String): E {
-                    return B(associated0, associated1)
+                    return BCase(associated0, associated1)
                 }
             }
         }
@@ -188,16 +188,16 @@ final class EnumTests: XCTestCase {
         }
         """, kotlin: """
         internal sealed class E {
-            class A: E() {
+            class ACase: E() {
             }
-            class B(val associated0: Int, val associated1: String): E() {
+            class BCase(val associated0: Int, val associated1: String): E() {
                 val i = associated0
             }
 
             companion object {
-                val a: E = A()
+                val a: E = ACase()
                 fun b(i: Int = 1, associated1: String): E {
-                    return B(i, associated1)
+                    return BCase(i, associated1)
                 }
             }
         }
@@ -212,15 +212,15 @@ final class EnumTests: XCTestCase {
         }
         """, kotlin: """
         internal sealed class E<out T> {
-            class A: E<Nothing>() {
+            class ACase: E<Nothing>() {
             }
-            class B<T>(val associated0: Int, val associated1: T): E<T>() {
+            class BCase<T>(val associated0: Int, val associated1: T): E<T>() {
             }
 
             companion object {
-                val a: E<Nothing> = A()
+                val a: E<Nothing> = ACase()
                 fun <T> b(associated0: Int = 1, associated1: T): E<T> {
-                    return B(associated0, associated1)
+                    return BCase(associated0, associated1)
                 }
             }
         }
@@ -233,17 +233,17 @@ final class EnumTests: XCTestCase {
         }
         """, kotlin: """
         internal sealed class E<out T, out U> {
-            class A<T>(val associated0: T): E<T, Nothing>() {
+            class ACase<T>(val associated0: T): E<T, Nothing>() {
             }
-            class B<U>(val associated0: U): E<Nothing, U>() {
+            class BCase<U>(val associated0: U): E<Nothing, U>() {
             }
 
             companion object {
                 fun <T> a(associated0: T): E<T, Nothing> {
-                    return A(associated0)
+                    return ACase(associated0)
                 }
                 fun <U> b(associated0: U): E<Nothing, U> {
-                    return B(associated0)
+                    return BCase(associated0)
                 }
             }
         }
@@ -259,10 +259,10 @@ final class EnumTests: XCTestCase {
         }
         """, kotlin: """
         internal sealed class E<out T, out U> {
-            class A<T, U>(val associated0: T, val associated1: U): E<T, U>() {
+            class ACase<T, U>(val associated0: T, val associated1: U): E<T, U>() {
 
                 override fun equals(other: Any?): Boolean {
-                    if (other !is A<*, *>) return false
+                    if (other !is ACase<*, *>) return false
                     return associated0 == other.associated0 && associated1 == other.associated1
                 }
                 override fun hashCode(): Int {
@@ -272,10 +272,10 @@ final class EnumTests: XCTestCase {
                     return result
                 }
             }
-            class B<U>(val associated0: U, val associated1: String): E<Nothing, U>() {
+            class BCase<U>(val associated0: U, val associated1: String): E<Nothing, U>() {
 
                 override fun equals(other: Any?): Boolean {
-                    if (other !is B<*>) return false
+                    if (other !is BCase<*>) return false
                     return associated0 == other.associated0 && associated1 == other.associated1
                 }
                 override fun hashCode(): Int {
@@ -285,17 +285,17 @@ final class EnumTests: XCTestCase {
                     return result
                 }
             }
-            class C: E<Nothing, Nothing>() {
+            class CCase: E<Nothing, Nothing>() {
             }
 
             companion object {
                 fun <T, U> a(associated0: T, associated1: U): E<T, U> {
-                    return A(associated0, associated1)
+                    return ACase(associated0, associated1)
                 }
                 fun <U> b(associated0: U, associated1: String): E<Nothing, U> {
-                    return B(associated0, associated1)
+                    return BCase(associated0, associated1)
                 }
-                val c: E<Nothing, Nothing> = C()
+                val c: E<Nothing, Nothing> = CCase()
             }
         }
         """)
@@ -325,9 +325,9 @@ final class EnumTests: XCTestCase {
         }
         """, kotlin: """
         internal sealed class E: Comparable<E> {
-            class One: E() {
+            class OneCase: E() {
             }
-            class Two: E() {
+            class TwoCase: E() {
             }
 
             override fun compareTo(other: E): Int {
@@ -339,8 +339,8 @@ final class EnumTests: XCTestCase {
             }
 
             companion object {
-                val one: E = One()
-                val two: E = Two()
+                val one: E = OneCase()
+                val two: E = TwoCase()
             }
         }
         """)
@@ -364,12 +364,12 @@ final class EnumTests: XCTestCase {
         }
         """, kotlin: """
         internal sealed class E: Comparable<E> {
-            class One: E() {
+            class OneCase: E() {
             }
-            class Two(val associated0: String): E() {
+            class TwoCase(val associated0: String): E() {
 
                 override fun equals(other: Any?): Boolean {
-                    if (other !is Two) return false
+                    if (other !is TwoCase) return false
                     return associated0 == other.associated0
                 }
             }
@@ -379,9 +379,9 @@ final class EnumTests: XCTestCase {
                     if (lhs == E.one && rhs != E.one) {
                         return true
                     }
-                    if (lhs is E.Two) {
+                    if (lhs is E.TwoCase) {
                         val ls = lhs.associated0
-                        if (rhs is E.Two) {
+                        if (rhs is E.TwoCase) {
                             val rs = rhs.associated0
                             return ls < rs
                         }
@@ -392,9 +392,9 @@ final class EnumTests: XCTestCase {
             }
 
             companion object {
-                val one: E = One()
+                val one: E = OneCase()
                 fun two(associated0: String): E {
-                    return Two(associated0)
+                    return TwoCase(associated0)
                 }
             }
         }
@@ -503,15 +503,15 @@ final class EnumTests: XCTestCase {
         }
         """, kotlin: """
         internal sealed class E {
-            class One: E() {
+            class OneCase: E() {
             }
-            class Other(val associated0: Int): E() {
+            class OtherCase(val associated0: Int): E() {
             }
 
             companion object {
-                val one: E = One()
+                val one: E = OneCase()
                 fun other(associated0: Int): E {
-                    return Other(associated0)
+                    return OtherCase(associated0)
                 }
             }
         }
@@ -580,33 +580,33 @@ final class EnumTests: XCTestCase {
         }
         """, kotlin: """
         internal sealed class E: Exception(), CaseIterable, Error {
-            class One: E() {
+            class OneCase: E() {
 
                 override fun equals(other: Any?): Boolean {
-                    if (other !is One) return false
+                    if (other !is OneCase) return false
                     return true
                 }
                 override fun hashCode(): Int {
-                    return "One".hashCode()
+                    return "OneCase".hashCode()
                 }
             }
-            class Two: E() {
+            class TwoCase: E() {
 
                 override fun equals(other: Any?): Boolean {
-                    if (other !is Two) return false
+                    if (other !is TwoCase) return false
                     return true
                 }
                 override fun hashCode(): Int {
-                    return "Two".hashCode()
+                    return "TwoCase".hashCode()
                 }
             }
 
             companion object {
                 fun one(): E {
-                    return One()
+                    return OneCase()
                 }
                 fun two(): E {
-                    return Two()
+                    return TwoCase()
                 }
 
                 val allCases: Array<E>

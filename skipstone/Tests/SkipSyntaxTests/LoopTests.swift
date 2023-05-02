@@ -93,7 +93,7 @@ final class LoopTests: XCTestCase {
         }
         """, kotlin: """
         internal val e: E
-        while (e is E.Case2) {
+        while (e is E.Case2Case) {
             val i = e.associated0
             print(i)
         }

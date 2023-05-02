@@ -203,9 +203,9 @@ final class ErrorHandlingTests: XCTestCase {
         try {
             action1()
             action2()
-        } catch (error: E.Case1) {
+        } catch (error: E.Case1Case) {
             print("case1")
-        } catch (error: E.Case2) {
+        } catch (error: E.Case2Case) {
             print("case2")
         }
         """)
@@ -230,10 +230,10 @@ final class ErrorHandlingTests: XCTestCase {
         try {
             action1()
             action2()
-        } catch (error: E.Case1) {
+        } catch (error: E.Case1Case) {
             val code = error.associated0
             print("Caught error: ${code}")
-        } catch (error: E.Case2) {
+        } catch (error: E.Case2Case) {
             var message = error.associated1
             print("Caught error: ${message}")
         }
@@ -263,9 +263,9 @@ final class ErrorHandlingTests: XCTestCase {
             action2()
         } catch (error: S) {
             print("Caught error")
-        } catch (error: E.Case1) {
+        } catch (error: E.Case1Case) {
             print("Caught error")
-        } catch (error: E.Case2) {
+        } catch (error: E.Case2Case) {
             val code = error.associated0
             val message = error.associated1
             print("Caught error: ${code}: ${message}")
@@ -422,33 +422,33 @@ final class ErrorHandlingTests: XCTestCase {
         }
         """, kotlin: """
         internal sealed class E: Exception(), Error {
-            class Error1: E() {
+            class Error1Case: E() {
 
                 override fun equals(other: Any?): Boolean {
-                    if (other !is Error1) return false
+                    if (other !is Error1Case) return false
                     return true
                 }
                 override fun hashCode(): Int {
-                    return "Error1".hashCode()
+                    return "Error1Case".hashCode()
                 }
             }
-            class Error2: E() {
+            class Error2Case: E() {
 
                 override fun equals(other: Any?): Boolean {
-                    if (other !is Error2) return false
+                    if (other !is Error2Case) return false
                     return true
                 }
                 override fun hashCode(): Int {
-                    return "Error2".hashCode()
+                    return "Error2Case".hashCode()
                 }
             }
 
             companion object {
                 fun error1(): E {
-                    return Error1()
+                    return Error1Case()
                 }
                 fun error2(): E {
-                    return Error2()
+                    return Error2Case()
                 }
             }
         }
@@ -461,33 +461,33 @@ final class ErrorHandlingTests: XCTestCase {
         }
         """, kotlin: """
         internal sealed class E(override val rawValue: Int, unusedp: Nothing? = null): Exception(), Error, RawRepresentable<Int> {
-            class Error1: E(2) {
+            class Error1Case: E(2) {
 
                 override fun equals(other: Any?): Boolean {
-                    if (other !is Error1) return false
+                    if (other !is Error1Case) return false
                     return true
                 }
                 override fun hashCode(): Int {
-                    return "Error1".hashCode()
+                    return "Error1Case".hashCode()
                 }
             }
-            class Error2: E(3) {
+            class Error2Case: E(3) {
 
                 override fun equals(other: Any?): Boolean {
-                    if (other !is Error2) return false
+                    if (other !is Error2Case) return false
                     return true
                 }
                 override fun hashCode(): Int {
-                    return "Error2".hashCode()
+                    return "Error2Case".hashCode()
                 }
             }
 
             companion object {
                 fun error1(): E {
-                    return Error1()
+                    return Error1Case()
                 }
                 fun error2(): E {
-                    return Error2()
+                    return Error2Case()
                 }
             }
         }
@@ -516,33 +516,33 @@ final class ErrorHandlingTests: XCTestCase {
         }
         """, kotlin: """
         internal sealed class E: Exception(), Error {
-            class Error1: E() {
+            class Error1Case: E() {
 
                 override fun equals(other: Any?): Boolean {
-                    if (other !is Error1) return false
+                    if (other !is Error1Case) return false
                     return true
                 }
                 override fun hashCode(): Int {
-                    return "Error1".hashCode()
+                    return "Error1Case".hashCode()
                 }
             }
-            class Error2: E() {
+            class Error2Case: E() {
 
                 override fun equals(other: Any?): Boolean {
-                    if (other !is Error2) return false
+                    if (other !is Error2Case) return false
                     return true
                 }
                 override fun hashCode(): Int {
-                    return "Error2".hashCode()
+                    return "Error2Case".hashCode()
                 }
             }
 
             companion object {
                 fun error1(): E {
-                    return Error1()
+                    return Error1Case()
                 }
                 fun error2(): E {
-                    return Error2()
+                    return Error2Case()
                 }
             }
         }
@@ -555,33 +555,33 @@ final class ErrorHandlingTests: XCTestCase {
         }
         """, kotlin: """
         internal sealed class E(override val rawValue: Int, unusedp: Nothing? = null): Exception(), Error, RawRepresentable<Int> {
-            class Error1: E(2) {
+            class Error1Case: E(2) {
 
                 override fun equals(other: Any?): Boolean {
-                    if (other !is Error1) return false
+                    if (other !is Error1Case) return false
                     return true
                 }
                 override fun hashCode(): Int {
-                    return "Error1".hashCode()
+                    return "Error1Case".hashCode()
                 }
             }
-            class Error2: E(3) {
+            class Error2Case: E(3) {
 
                 override fun equals(other: Any?): Boolean {
-                    if (other !is Error2) return false
+                    if (other !is Error2Case) return false
                     return true
                 }
                 override fun hashCode(): Int {
-                    return "Error2".hashCode()
+                    return "Error2Case".hashCode()
                 }
             }
 
             companion object {
                 fun error1(): E {
-                    return Error1()
+                    return Error1Case()
                 }
                 fun error2(): E {
-                    return Error2()
+                    return Error2Case()
                 }
             }
         }
