@@ -27,8 +27,6 @@ public func builtinKotlinTransformers() -> [KotlinTransformer] {
     return [
         // May change the names of members, so place it before transformers that could use those names in generated code
         KotlinEscapeKeywordsTransformer(),
-        // May add enums and constructors that must be enhanced by subsequent transformers
-        KotlinCodableTransformer(),
         // May add members to implement our internal OptionSet contract, including using self assignment that must be
         // detected and further translated by the KotlinStructTransformer
         KotlinOptionSetTransformer(),
@@ -37,8 +35,11 @@ public func builtinKotlinTransformers() -> [KotlinTransformer] {
         // May alter superclasses and change enums to use sealed classes
         KotlinErrorToExceptionTransformer(),
         // May *remove* information about protocol conformances. May change enums to use sealed classes. Requires knowledge of
-        // sealed vs. unsealed enums.
+        // sealed vs. unsealed enums
         KotlinCommonProtocolsTransformer(),
+        // May add enums and constructors that must be enhanced by subsequent transformers. Requires knowledge of sealed vs.
+        // unsealed enums
+        KotlinCodableTransformer(),
         // May add RawRepresentable enum factory function. Requires knowledge of sealed vs. unsealed enums. Requires knowledge of
         // constructors, so place before KotlinEnumTransformer
         KotlinRawRepresentableTransformer(),

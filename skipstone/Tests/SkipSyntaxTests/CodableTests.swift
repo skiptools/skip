@@ -12,6 +12,11 @@ final class CodableTests: XCTestCase {
             internal val i: Int
             internal val s: String
 
+            constructor(i: Int, s: String) {
+                this.i = i
+                this.s = s
+            }
+
             private enum class CodingKeys(override val rawValue: String, unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 i("i"),
                 s("s");
@@ -41,11 +46,6 @@ final class CodableTests: XCTestCase {
                 val container = from.container(keyedBy = CodingKeys::class)
                 this.i = container.decode(Int::class, forKey = CodingKeys.i)
                 this.s = container.decode(String::class, forKey = CodingKeys.s)
-            }
-
-            constructor(i: Int, s: String) {
-                this.i = i
-                this.s = s
             }
         }
         """)
@@ -72,6 +72,17 @@ final class CodableTests: XCTestCase {
                     didmutate()
                 }
 
+            constructor(i: Int = 0, s: String = "") {
+                this.i = i
+                this.s = s
+            }
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct {
+                return S(i, s)
+            }
+
             private enum class CodingKeys(override val rawValue: String, unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 i("i"),
                 s("s");
@@ -101,17 +112,6 @@ final class CodableTests: XCTestCase {
                 val container = from.container(keyedBy = CodingKeys::class)
                 this.i = container.decode(Int::class, forKey = CodingKeys.i)
                 this.s = container.decode(String::class, forKey = CodingKeys.s)
-            }
-
-            constructor(i: Int = 0, s: String = "") {
-                this.i = i
-                this.s = s
-            }
-
-            override var supdate: ((Any) -> Unit)? = null
-            override var smutatingcount = 0
-            override fun scopy(): MutableStruct {
-                return S(i, s)
             }
         }
         """)
@@ -154,6 +154,11 @@ final class CodableTests: XCTestCase {
                 }
             }
 
+            constructor(i: Int, d: Double) {
+                this.i = i
+                this.d = d
+            }
+
             override fun encode(to: Encoder) {
                 val container = to.container(keyedBy = CodingKeys::class)
                 container.encode(i, forKey = CodingKeys.i)
@@ -164,11 +169,6 @@ final class CodableTests: XCTestCase {
                 val container = from.container(keyedBy = CodingKeys::class)
                 this.i = container.decode(Int::class, forKey = CodingKeys.i)
                 this.d = container.decode(Double::class, forKey = CodingKeys.d)
-            }
-
-            constructor(i: Int, d: Double) {
-                this.i = i
-                this.d = d
             }
         }
         """)
@@ -209,6 +209,11 @@ final class CodableTests: XCTestCase {
                 }
             }
 
+            constructor(i: Int, d: Double) {
+                this.i = i
+                this.d = d
+            }
+
             override fun encode(to: Encoder) {
                 val container = to.container(keyedBy = CodingKeys::class)
                 container.encode(i, forKey = CodingKeys.i)
@@ -219,11 +224,6 @@ final class CodableTests: XCTestCase {
                 val container = from.container(keyedBy = CodingKeys::class)
                 this.i = container.decode(Int::class, forKey = CodingKeys.i)
                 this.d = container.decode(Double::class, forKey = CodingKeys.d)
-            }
-
-            constructor(i: Int, d: Double) {
-                this.i = i
-                this.d = d
             }
         }
         """)
@@ -290,6 +290,10 @@ final class CodableTests: XCTestCase {
                     return field.sref()
                 }
 
+            constructor(a: Array<Int>) {
+                this.a = a
+            }
+
             private enum class CodingKeys(override val rawValue: String, unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 a("a");
             }
@@ -314,10 +318,6 @@ final class CodableTests: XCTestCase {
                 val container = from.container(keyedBy = CodingKeys::class)
                 this.a = container.decode(Array::class, forKey = CodingKeys.a)
             }
-
-            constructor(a: Array<Int>) {
-                this.a = a
-            }
         }
         """)
     }
@@ -332,6 +332,11 @@ final class CodableTests: XCTestCase {
         internal class S: Encodable {
             internal val i: Int
             internal val s: String
+
+            constructor(i: Int, s: String) {
+                this.i = i
+                this.s = s
+            }
 
             private enum class CodingKeys(override val rawValue: String, unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 i("i"),
@@ -356,11 +361,6 @@ final class CodableTests: XCTestCase {
                 val container = to.container(keyedBy = CodingKeys::class)
                 container.encode(i, forKey = CodingKeys.i)
                 container.encode(s, forKey = CodingKeys.s)
-            }
-
-            constructor(i: Int, s: String) {
-                this.i = i
-                this.s = s
             }
         }
         """)
@@ -406,6 +406,11 @@ final class CodableTests: XCTestCase {
             override fun encode(to: Encoder) {
             }
 
+            constructor(i: Int, s: String) {
+                this.i = i
+                this.s = s
+            }
+
             private enum class CodingKeys(override val rawValue: String, unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 i("i"),
                 s("s");
@@ -429,11 +434,6 @@ final class CodableTests: XCTestCase {
                 val container = from.container(keyedBy = CodingKeys::class)
                 this.i = container.decode(Int::class, forKey = CodingKeys.i)
                 this.s = container.decode(String::class, forKey = CodingKeys.s)
-            }
-
-            constructor(i: Int, s: String) {
-                this.i = i
-                this.s = s
             }
         }
         """)
@@ -450,6 +450,11 @@ final class CodableTests: XCTestCase {
             internal val i: Int
             internal val s: String
 
+            constructor(i: Int, s: String) {
+                this.i = i
+                this.s = s
+            }
+
             private enum class CodingKeys(override val rawValue: String, unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 i("i"),
                 s("s");
@@ -473,11 +478,6 @@ final class CodableTests: XCTestCase {
                 val container = from.container(keyedBy = CodingKeys::class)
                 this.i = container.decode(Int::class, forKey = CodingKeys.i)
                 this.s = container.decode(String::class, forKey = CodingKeys.s)
-            }
-
-            constructor(i: Int, s: String) {
-                this.i = i
-                this.s = s
             }
         }
         """)
@@ -543,6 +543,11 @@ final class CodableTests: XCTestCase {
             internal val i: Int?
             internal val s: String?
 
+            constructor(i: Int? = null, s: String? = null) {
+                this.i = i
+                this.s = s
+            }
+
             private enum class CodingKeys(override val rawValue: String, unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 i("i"),
                 s("s");
@@ -573,11 +578,6 @@ final class CodableTests: XCTestCase {
                 this.i = container.decodeIfPresent(Int::class, forKey = CodingKeys.i)
                 this.s = container.decodeIfPresent(String::class, forKey = CodingKeys.s)
             }
-
-            constructor(i: Int? = null, s: String? = null) {
-                this.i = i
-                this.s = s
-            }
         }
         """)
     }
@@ -598,6 +598,10 @@ final class CodableTests: XCTestCase {
                 set(newValue) {
                     field = newValue.sref()
                 }
+
+            constructor(i: Int) {
+                this.i = i
+            }
 
             private enum class CodingKeys(override val rawValue: String, unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 i("i"),
@@ -628,10 +632,6 @@ final class CodableTests: XCTestCase {
                 val container = from.container(keyedBy = CodingKeys::class)
                 this.i = container.decode(Int::class, forKey = CodingKeys.i)
                 this.a = container.decode(Array::class, forKey = CodingKeys.a)
-            }
-
-            constructor(i: Int) {
-                this.i = i
             }
         }
         """)
@@ -712,6 +712,122 @@ final class CodableTests: XCTestCase {
             val container = from.singleValueContainer()
             val rawValue = container.decode(Int::class)
             return E(rawValue = rawValue) ?: throw ErrorException(cause = NullPointerException())
+        }
+        """)
+
+        try await check(swift: """
+        enum E: Int, Codable {
+            case a, b
+
+            func encode(to: Encoder) {
+            }
+
+            init(from: Decoder) {
+                self = .a
+            }
+        }
+        """, kotlin: """
+        internal enum class E(override val rawValue: Int, unusedp: Nothing? = null): Codable, RawRepresentable<Int> {
+            a(0),
+            b(1);
+
+            override fun encode(to: Encoder) {
+            }
+        }
+
+        internal fun E(from: Decoder): E {
+            return E.a
+        }
+
+        internal fun E(rawValue: Int): E? {
+            return when (rawValue) {
+                0 -> {
+                    E.a
+                }
+                1 -> {
+                    E.b
+                }
+                else -> {
+                    null
+                }
+            }
+        }
+        """)
+    }
+
+    func testNonRawValueEnum() async throws {
+        try await checkProducesMessage(swift: """
+        enum E: Codable {
+            case a, b
+        }
+        """)
+
+        try await check(swift: """
+        enum E: Codable {
+            case a, b
+
+            func encode(to: Encoder) {
+            }
+
+            init(from: Decoder) {
+                self = .a
+            }
+        }
+        """, kotlin: """
+        internal enum class E: Codable {
+            a,
+            b;
+
+            override fun encode(to: Encoder) {
+            }
+        }
+
+        internal fun E(from: Decoder): E {
+            return E.a
+        }
+        """)
+    }
+
+    func testAssociatedValueEnum() async throws {
+        try await checkProducesMessage(swift: """
+        enum E: Codable {
+            case a(Int)
+            case b
+        }
+        """)
+
+        try await check(swift: """
+        enum E: Codable {
+            case a(Int)
+            case b
+
+            func encode(to: Encoder) {
+            }
+
+            init(from: Decoder) {
+                self = .a(100)
+            }
+        }
+        """, kotlin: """
+        internal sealed class E: Codable {
+            class ACase(val associated0: Int): E() {
+            }
+            class BCase: E() {
+            }
+
+            override fun encode(to: Encoder) {
+            }
+
+            companion object {
+                fun a(associated0: Int): E {
+                    return ACase(associated0)
+                }
+                val b: E = BCase()
+            }
+        }
+
+        internal fun E(from: Decoder): E {
+            return E.a(100)
         }
         """)
     }

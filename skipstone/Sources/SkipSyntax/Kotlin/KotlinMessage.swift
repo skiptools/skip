@@ -32,6 +32,14 @@ extension Message {
         return Message(kind: .error, message: "Skip is unable to determine the type of this property for use in decoding. Add an explicit type to the declaration", sourceDerived: sourceDerived, source: source)
     }
 
+    static func kotlinCodableDecodeRawValueEnumsOnly(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Skip is only able to synthesize Decodable conformance for enums with raw values. Implement the init(from: Decoder) constructor yourself to decode this enum", sourceDerived: sourceDerived, source: source)
+    }
+
+    static func kotlinCodableEncodeRawValueEnumsOnly(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Skip is only able to synthesize Encodable for enums with raw values. Implement the encode(to: Encoder) function yourself to encode this enum", sourceDerived: sourceDerived, source: source)
+    }
+
     // Idea: auto-create combined interface for composed protocols
     static func kotlinComposedTypes(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Kotlin does not support composed types. Consider creating a single type that conforms to these types", sourceDerived: sourceDerived, source: source)
