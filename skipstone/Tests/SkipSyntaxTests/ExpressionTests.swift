@@ -208,7 +208,6 @@ final class ExpressionTests: XCTestCase {
                     val newValue = newValue.sref()
                     willmutate()
                     try {
-                        val oldValue = field
                         field = newValue
                         if (!suppresssideeffects) {
                             print("didset")

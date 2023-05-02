@@ -116,13 +116,14 @@ final class BuiltinTypeTests: XCTestCase {
             set(newValue) {
                 field = newValue.sref()
             }
-        internal lateinit var u: CustomType
+        internal var u: CustomType
             get() {
-                return field.sref({ u = it })
+                return ustorage.sref({ u = it })
             }
             set(newValue) {
-                field = newValue.sref()
+                ustorage = newValue.sref()
             }
+        private lateinit var ustorage: CustomType
         """)
     }
 

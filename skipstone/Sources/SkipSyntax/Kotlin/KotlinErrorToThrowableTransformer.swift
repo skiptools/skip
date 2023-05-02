@@ -32,7 +32,7 @@ class KotlinErrorToExceptionTransformer: KotlinTransformer {
             guard let variableDeclaration = member as? KotlinVariableDeclaration else {
                 continue
             }
-            if variableDeclaration.names.first == "message" {
+            if variableDeclaration.propertyName == "message" {
                 variableDeclaration.modifiers.isOverride = true
                 variableDeclaration.modifiers.visibility = .public
                 break

@@ -56,9 +56,9 @@ class KotlinOptionSetTransformer: KotlinTransformer {
             }
             return member as? KotlinVariableDeclaration
         }
-        if let rawValueVariable = variables.first(where: { $0.names == ["rawValue"] }) {
-            if let type = rawValueVariable.variableTypes.first, type != .none {
-                return type
+        if let rawValueVariable = variables.first(where: { $0.propertyName == "rawValue" }) {
+            if rawValueVariable.propertyType != .none {
+                return rawValueVariable.propertyType
             }
         }
         return nil

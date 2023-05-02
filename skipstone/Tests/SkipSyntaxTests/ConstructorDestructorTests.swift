@@ -328,7 +328,6 @@ final class ConstructorDestructorTests: XCTestCase {
                 }
             internal var j = 2
                 set(newValue) {
-                    val oldValue = field
                     field = newValue
                     if (!suppresssideeffects) {
                         print(j == 2)
@@ -353,7 +352,6 @@ final class ConstructorDestructorTests: XCTestCase {
                 set(newValue) {
                     willmutate()
                     try {
-                        val oldValue = field
                         field = newValue
                         if (!suppresssideeffects) {
                             print(newValue)
@@ -538,7 +536,6 @@ final class ConstructorDestructorTests: XCTestCase {
                     val newValue = newValue.sref()
                     willmutate()
                     try {
-                        val oldValue = field
                         field = newValue
                         if (!suppresssideeffects) {
                             print("didset")

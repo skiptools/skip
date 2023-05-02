@@ -1171,6 +1171,12 @@ class TypeDeclaration: Statement {
 /// `let/var v ...`
 class VariableDeclaration: Statement {
     let names: [String?]
+    var propertyName: String {
+        return (names.first ?? "") ?? ""
+    }
+    var propertyType: TypeSignature {
+        return variableTypes.first ?? .none
+    }
     private(set) var declaredType: TypeSignature
     private(set) var constrainedDeclaredType: TypeSignature
     let isLet: Bool

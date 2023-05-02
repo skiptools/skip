@@ -1785,6 +1785,21 @@ class KotlinTypealiasDeclaration: KotlinStatement, KotlinMemberDeclaration {
 
 class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var names: [String?]
+    var propertyName: String {
+        get {
+            return (names.first ?? "") ?? ""
+        } set {
+            names = [newValue]
+        }
+    }
+    var propertyType: TypeSignature {
+        get {
+            return variableTypes.first ?? .none
+        }
+        set {
+            variableTypes = [newValue]
+        }
+    }
     var declaredType: TypeSignature = .none
     var isLet = false
     var isAsync = false
@@ -1808,7 +1823,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var mutationFunctionNames: (willMutate: String, didMutate: String)?
     var isGenerated = false
     var isDescriptionImplementation: Bool {
-        return isProperty && names == ["description"] && variableTypes == [.string]
+        return isProperty && propertyName == "description" && propertyType == .string
     }
 
     // KotlinMemberDeclaration
@@ -1939,6 +1954,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
+        let usesStorageProperty = self.usesStorageProperty
         if let declaration = extras?.declaration {
             output.append(indentation).append(declaration)
         } else if names.count == 1 && names[0] == nil {
@@ -1952,7 +1968,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             if isProperty || isGlobal {
                 // We can't override stored properties in Swift, so only need to mark open if computed
                 output.append(modifiers.kotlinMemberString(isOpen: isOpen && getter != nil, suffix: " "))
-                if case .unwrappedOptional = declaredType {
+                if !usesStorageProperty, case .unwrappedOptional = declaredType {
                     output.append("lateinit ")
                 }
             }
@@ -1976,14 +1992,11 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
 
             if declaredType != .none {
                 output.append(": ").append(declaredType.kotlin)
+            } else if usesStorageProperty {
+                output.append(": ").append(propertyType.kotlin)
             }
-            if let value {
-                output.append(" = ").append(value, indentation: indentation)
-            } else {
-                // In Swift an optional var defaults to nil, but not so in Kotlin
-                if (isProperty || isGlobal), !isProtocolProperty, declaredType.isOptional, !isLet, getter == nil {
-                    output.append(" = null")
-                }
+            if !usesStorageProperty {
+                appendInitialValue(to: output, indentation: indentation)
             }
             extends?.1.appendWhere(to: output, indentation: indentation)
         }
@@ -1994,11 +2007,28 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             output.append(getterIndentation).append("get() {\n")
             output.append(getterBody, indentation: getterIndentation.inc())
             output.append(getterIndentation).append("}\n")
-        } else if mayBeSharedMutableStruct && (isProperty || isGlobal) && !isProtocolProperty {
-            let getterIndentation = indentation.inc()
-            output.append(getterIndentation).append("get() {\n")
-            output.append(getterIndentation.inc()).append("return field.sref(\(onUpdate ?? ""))\n")
-            output.append(getterIndentation).append("}\n")
+        } else if (isProperty || isGlobal) && !isProtocolProperty {
+            if usesStorageProperty || mayBeSharedMutableStruct {
+                let getterIndentation = indentation.inc()
+                let getterBodyIndentation = getterIndentation.inc()
+                output.append(getterIndentation).append("get() {\n")
+
+                var getIndentation = getterBodyIndentation
+                if let mutationFunctionNames, modifiers.isLazy {
+                    // Lazy getters are considered mutable
+                    output.append(getterBodyIndentation).append("val isinitialized = \(lazyInitInitializedName)\n")
+                    output.append(getterBodyIndentation).append("if (!isinitialized) \(mutationFunctionNames.willMutate)()\n")
+                    output.append(getterBodyIndentation).append("try {\n")
+                    getIndentation = getterBodyIndentation.inc()
+                }
+                appendGetField(to: output, indentation: getIndentation, usesStorageProperty: usesStorageProperty)
+                if let mutationFunctionNames, modifiers.isLazy {
+                    output.append(getterBodyIndentation).append("} finally {\n")
+                    output.append(getIndentation).append("if (!isinitialized) \(mutationFunctionNames.didMutate)()\n")
+                    output.append(getterBodyIndentation).append("}\n")
+                }
+                output.append(getterIndentation).append("}\n")
+            }
         }
 
         let hasCustomSet = setter?.body != nil || willSet?.body != nil || didSet?.body != nil
@@ -2039,10 +2069,14 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 }
                 output.append(setterBody, indentation: setIndentation)
             } else {
-                if didSet?.body != nil {
-                    output.append(setIndentation).append("val oldValue = field\n")
+                if didSetUsesOldValue {
+                    if usesStorageProperty {
+                        output.append(setIndentation).append("val oldValue = this.\(propertyName)\n")
+                    } else {
+                        output.append(setIndentation).append("val oldValue = field\n")
+                    }
                 }
-                output.append(setIndentation).append("field = newValue\n")
+                appendSetField(to: output, indentation: setIndentation, usesStorageProperty: usesStorageProperty, isCopy: true)
             }
 
             if let didSetBody = didSet?.body {
@@ -2066,11 +2100,95 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 }
             }
             output.append(setterIndentation).append("}\n")
-        } else if (!isReadOnly || isAssignFromWriteable) && mayBeSharedMutableStruct && (isProperty || isGlobal) && !isProtocolProperty {
-            let setterIndentation = indentation.inc()
-            output.append(setterIndentation).append("set(newValue) {\n")
-            output.append(setterIndentation.inc()).append("field = newValue.sref()\n")
-            output.append(setterIndentation).append("}\n")
+        } else if (!isReadOnly || isAssignFromWriteable) && (isProperty || isGlobal) && !isProtocolProperty {
+            if usesStorageProperty || mayBeSharedMutableStruct {
+                let setterIndentation = indentation.inc()
+                output.append(setterIndentation).append("set(newValue) {\n")
+                appendSetField(to: output, indentation: setterIndentation.inc(), usesStorageProperty: usesStorageProperty, isCopy: false)
+                output.append(setterIndentation).append("}\n")
+            }
         }
+        if usesStorageProperty {
+            output.append(indentation).append("private lateinit var \(storagePropertyName): \(propertyType.kotlin)\n")
+            if modifiers.isLazy {
+                output.append(indentation).append("private var \(lazyInitInitializedName) = false\n")
+            }
+        }
+    }
+
+    private func appendInitialValue(to output: OutputGenerator, indentation: Indentation) {
+        if let value {
+            output.append(" = ").append(value, indentation: indentation)
+        } else {
+            // In Swift an optional var defaults to nil, but not so in Kotlin
+            if (isProperty || isGlobal), !isProtocolProperty, declaredType.isOptional, !isLet, getter == nil {
+                output.append(" = null")
+            }
+        }
+    }
+
+    private func appendGetField(to output: OutputGenerator, indentation: Indentation, usesStorageProperty: Bool) {
+        let fieldName = usesStorageProperty ? storagePropertyName : "field"
+        let storageValue = mayBeSharedMutableStruct ? "\(fieldName).sref(\(onUpdate ?? ""))" : fieldName
+        if modifiers.isLazy {
+            if value != nil {
+                output.append(indentation).append("if (!\(lazyInitInitializedName)) {\n")
+                let initializeIndentation = indentation.inc()
+                output.append(initializeIndentation).append(storagePropertyName)
+                appendInitialValue(to: output, indentation: initializeIndentation)
+                output.append("\n")
+                output.append(initializeIndentation).append("\(lazyInitInitializedName) = true\n")
+                output.append(indentation).append("}\n")
+            }
+        }
+        output.append(indentation).append("return \(storageValue)\n")
+    }
+
+    private func appendSetField(to output: OutputGenerator, indentation: Indentation, usesStorageProperty: Bool, isCopy: Bool) {
+        let fieldName = usesStorageProperty ? storagePropertyName : "field"
+        if !isCopy && mayBeSharedMutableStruct {
+            output.append(indentation).append("\(fieldName) = newValue.sref()\n")
+        } else {
+            output.append(indentation).append("\(fieldName) = newValue\n")
+        }
+        if modifiers.isLazy {
+            output.append(indentation).append("\(lazyInitInitializedName) = true\n")
+        }
+    }
+
+    private var usesStorageProperty: Bool {
+        guard !isProtocolProperty, isProperty || isGlobal else {
+            return false
+        }
+        if modifiers.isLazy {
+            return true
+        }
+        if case .unwrappedOptional = declaredType {
+            // We only need a separate storage var if we need custom get or set logic
+            return mayBeSharedMutableStruct || mutationFunctionNames != nil || setter?.body != nil || willSet?.body != nil || didSet?.body != nil
+        }
+        return false
+    }
+
+    private var storagePropertyName: String {
+        return "\(propertyName)storage"
+    }
+
+    private var lazyInitInitializedName: String {
+        return "\(propertyName)initialized"
+    }
+
+    private var didSetUsesOldValue: Bool {
+        guard let didSet = self.didSet?.body else {
+            return false
+        }
+        var usesOldValue = false
+        didSet.visit {
+            if !usesOldValue, ($0 as? KotlinIdentifier)?.name == "oldValue" {
+                usesOldValue = true
+            }
+            return usesOldValue ? .skip : .recurse(nil)
+        }
+        return usesOldValue
     }
 }

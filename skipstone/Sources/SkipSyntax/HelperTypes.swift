@@ -214,13 +214,15 @@ struct Modifiers: PrettyPrintable, Codable {
     var isMutating: Bool
     var isFinal: Bool
     var isOverride: Bool
+    var isLazy: Bool
 
-    init(visibility: Visibility = .default, isStatic: Bool = false, isMutating: Bool = false, isFinal: Bool = false, isOverride: Bool = false) {
+    init(visibility: Visibility = .default, isStatic: Bool = false, isMutating: Bool = false, isFinal: Bool = false, isOverride: Bool = false, isLazy: Bool = false) {
         self.visibility = visibility
         self.isStatic = isStatic
         self.isMutating = isMutating
         self.isFinal = isFinal
         self.isOverride = isOverride
+        self.isLazy = isLazy
     }
 
     /// Decode the modifier information in the given syntax.
@@ -233,6 +235,7 @@ struct Modifiers: PrettyPrintable, Codable {
         var isMutating = false
         var isFinal = false
         var isOverride = false
+        var isLazy = false
         for modifier in syntax {
             guard modifier.detail == nil else {
                 // Ignore e.g. 'private(set)' for now
@@ -257,15 +260,17 @@ struct Modifiers: PrettyPrintable, Codable {
                 isFinal = true
             case "override":
                 isOverride = true
+            case "lazy":
+                isLazy = true
             default:
                 break
             }
         }
-        return Modifiers(visibility: visibility, isStatic: isStatic, isMutating: isMutating, isFinal: isFinal, isOverride: isOverride)
+        return Modifiers(visibility: visibility, isStatic: isStatic, isMutating: isMutating, isFinal: isFinal, isOverride: isOverride, isLazy: isLazy)
     }
 
     var isEmpty: Bool {
-        return visibility == .default && !isStatic && !isFinal && !isOverride
+        return visibility == .default && !isStatic && !isFinal && !isOverride && !isLazy
     }
 
     var prettyPrintTree: PrettyPrintTree {
@@ -284,6 +289,9 @@ struct Modifiers: PrettyPrintable, Codable {
         }
         if isOverride {
             children.append(PrettyPrintTree(root: "override"))
+        }
+        if isLazy {
+            children.append(PrettyPrintTree(root: "lazy"))
         }
         return PrettyPrintTree(root: "modifiers", children: children)
     }

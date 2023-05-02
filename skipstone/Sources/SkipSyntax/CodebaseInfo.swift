@@ -1101,8 +1101,8 @@ public class CodebaseInfo: Codable {
         }
 
         fileprivate init(statement: VariableDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo) {
-            self.name = (statement.names.first ?? "") ?? ""
-            self.signature = statement.variableTypes.first ?? .none
+            self.name = statement.propertyName
+            self.signature = statement.propertyType
             self.moduleName = codebaseInfo.moduleName
             self.sourceFile = statement.sourceFile
             self.declaringType = declaringType

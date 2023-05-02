@@ -38,11 +38,13 @@ class KotlinStructTransformer: KotlinTransformer {
         var initializableVariableDeclarations: [KotlinVariableDeclaration] = []
         for member in classDeclaration.members {
             if let variableDeclaration = member as? KotlinVariableDeclaration {
-                if !variableDeclaration.isStatic && !variableDeclaration.isReadOnly && !variableDeclaration.isGenerated {
+                if !variableDeclaration.isStatic && (!variableDeclaration.isReadOnly || variableDeclaration.modifiers.isLazy) && !variableDeclaration.isGenerated {
                     variableDeclaration.mutationFunctionNames = mutationFunctionNames
                     isMutable = true
                 }
-                if !variableDeclaration.modifiers.isStatic && variableDeclaration.getter == nil && (!variableDeclaration.isLet || variableDeclaration.value == nil) && !variableDeclaration.isGenerated {
+                if case .unwrappedOptional = variableDeclaration.declaredType {
+                    // Not initialized
+                } else if !variableDeclaration.modifiers.isStatic && variableDeclaration.getter == nil && (!variableDeclaration.isLet || variableDeclaration.value == nil) && !variableDeclaration.modifiers.isLazy && !variableDeclaration.isGenerated {
                     initializableVariableDeclarations.append(variableDeclaration)
                 }
             } else if let functionDeclaration = member as? KotlinFunctionDeclaration, !functionDeclaration.isGenerated {
@@ -120,8 +122,8 @@ class KotlinStructTransformer: KotlinTransformer {
         constructor.isGenerated = true
 
         constructor.parameters = variableDeclarations.map { variableDeclaration in
-            let label = variableDeclaration.names[0]
-            let type = variableDeclaration.variableTypes[0]
+            let label = variableDeclaration.propertyName
+            let type = variableDeclaration.propertyType
             if type == .none && translator.codebaseInfo != nil {
                 variableDeclaration.messages.append(.kotlinConstructorCannotInferPropertyType(variableDeclaration, source: translator.syntaxTree.source))
             }

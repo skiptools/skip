@@ -92,7 +92,7 @@ class KotlinCodableTransformer: KotlinTransformer {
         enumDeclaration.extras = .singleNewline
         enumDeclaration.isGenerated = true
         let caseDeclarations = storedVariableDeclarations.map {
-            KotlinEnumCaseDeclaration(name: ($0.names.first ?? "") ?? "")
+            KotlinEnumCaseDeclaration(name: $0.propertyName)
         }
         enumDeclaration.members = caseDeclarations
         enumDeclaration.processEnumCaseDeclarations()
@@ -155,14 +155,14 @@ class KotlinCodableTransformer: KotlinTransformer {
     }
 
     private func propertyType(for codingKey: KotlinEnumCaseDeclaration, in classDeclaration: KotlinClassDeclaration, source: Source) -> TypeSignature {
-        guard let variableDeclaration = classDeclaration.members.first(where: { ($0 as? KotlinVariableDeclaration)?.names == [codingKey.name] }) as? KotlinVariableDeclaration else {
+        guard let variableDeclaration = classDeclaration.members.first(where: { ($0 as? KotlinVariableDeclaration)?.propertyName == codingKey.name }) as? KotlinVariableDeclaration else {
             codingKey.messages.append(.kotlinCodablePropertyForKey(codingKey, source: source))
             return .any
         }
-        guard let type = variableDeclaration.variableTypes.first, type != .none else {
+        guard variableDeclaration.propertyType != .none else {
             variableDeclaration.messages.append(.kotlinCodablePropertyType(variableDeclaration, source: source))
             return .any
         }
-        return type
+        return variableDeclaration.propertyType
     }
 }

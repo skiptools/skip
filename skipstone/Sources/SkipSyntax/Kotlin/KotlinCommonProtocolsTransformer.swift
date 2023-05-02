@@ -70,7 +70,7 @@ class KotlinCommonProtocolsTransformer: KotlinTransformer {
             guard let variableDeclaration = member as? KotlinVariableDeclaration else {
                 return false
             }
-            return !variableDeclaration.isStatic && variableDeclaration.names == ["description"] && variableDeclaration.variableTypes == [.string]
+            return !variableDeclaration.isStatic && variableDeclaration.propertyName == "description" && variableDeclaration.propertyType == .string
         }) else {
             return
         }

@@ -239,7 +239,6 @@ final class MemberDeclarationTests: XCTestCase {
                 }
             internal var j = 2
                 set(newValue) {
-                    val oldValue = field
                     field = newValue
                     print(j == 2)
                 }
@@ -262,6 +261,29 @@ final class MemberDeclarationTests: XCTestCase {
                     val value = newValue
                     print(value)
                     field = newValue
+                }
+        }
+        """)
+
+        try await check(swift: """
+        class A {
+            var i = 1 {
+                didSet {
+                    if newValue != oldValue {
+                        print(newValue)
+                    }
+                }
+            }
+        }
+        """, kotlin: """
+        internal open class A {
+            internal var i = 1
+                set(newValue) {
+                    val oldValue = field
+                    field = newValue
+                    if (newValue != oldValue) {
+                        print(newValue)
+                    }
                 }
         }
         """)
@@ -299,7 +321,6 @@ final class MemberDeclarationTests: XCTestCase {
                 set(newValue) {
                     willmutate()
                     try {
-                        val oldValue = field
                         field = newValue
                         if (!suppresssideeffects) {
                             print(j == 2)
@@ -379,24 +400,142 @@ final class MemberDeclarationTests: XCTestCase {
         """)
     }
 
-    //~~~
-//    func testLazyProperty() async throws {
-//        try await check(swift: """
-//        class C {
-//            lazy var v = C()
-//        }
-//        """, kotlin: """
-//        internal open class C {
-//            var v: C
-//                get() = lazyv
-//        }
-//        """)
-//    }
-
-    func testExplicitlyUnwrappedOptionalProperty() async throws {
-        try await check(swift: """
+    func testLazyProperty() async throws {
+        try await check(supportingSwift: """
         class V {
         }
+        """, swift: """
+        class C {
+            lazy var v = V()
+        }
+        """, kotlin: """
+        internal open class C {
+            internal var v: V
+                get() {
+                    if (!vinitialized) {
+                        vstorage = V()
+                        vinitialized = true
+                    }
+                    return vstorage
+                }
+                set(newValue) {
+                    vstorage = newValue
+                    vinitialized = true
+                }
+            private lateinit var vstorage: V
+            private var vinitialized = false
+        }
+        """)
+
+        try await check(supportingSwift: """
+        struct S {
+            var i = 0
+        }
+        """, swift: """
+        class C {
+            lazy var s = S()
+        }
+        """, kotlin: """
+        internal open class C {
+            internal var s: S
+                get() {
+                    if (!sinitialized) {
+                        sstorage = S()
+                        sinitialized = true
+                    }
+                    return sstorage.sref({ this.s = it })
+                }
+                set(newValue) {
+                    sstorage = newValue.sref()
+                    sinitialized = true
+                }
+            private lateinit var sstorage: S
+            private var sinitialized = false
+        }
+        """)
+
+        try await check(supportingSwift: """
+        class V {
+        }
+        """, swift: """
+        class C {
+            lazy var v = V() {
+                didSet {
+                    if v != oldValue {
+                        print("did set")
+                    }
+                }
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal var v: V
+                get() {
+                    if (!vinitialized) {
+                        vstorage = V()
+                        vinitialized = true
+                    }
+                    return vstorage
+                }
+                set(newValue) {
+                    val oldValue = this.v
+                    vstorage = newValue
+                    vinitialized = true
+                    if (v != oldValue) {
+                        print("did set")
+                    }
+                }
+            private lateinit var vstorage: V
+            private var vinitialized = false
+        }
+        """)
+
+        try await check(supportingSwift: """
+        class V {
+        }
+        """, swift: """
+        struct S {
+            lazy var v = V()
+        }
+        """, kotlin: """
+        internal class S: MutableStruct {
+            internal var v: V
+                get() {
+                    val isinitialized = vinitialized
+                    if (!isinitialized) willmutate()
+                    try {
+                        if (!vinitialized) {
+                            vstorage = V()
+                            vinitialized = true
+                        }
+                        return vstorage
+                    } finally {
+                        if (!isinitialized) didmutate()
+                    }
+                }
+                set(newValue) {
+                    willmutate()
+                    vstorage = newValue
+                    vinitialized = true
+                    didmutate()
+                }
+            private lateinit var vstorage: V
+            private var vinitialized = false
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct {
+                return S()
+            }
+        }
+        """)
+    }
+
+    func testExplicitlyUnwrappedOptionalProperty() async throws {
+        try await check(supportingSwift: """
+        class V {
+        }
+        """, swift: """
         class C {
             var v: V!
             setUp() {
@@ -404,12 +543,102 @@ final class MemberDeclarationTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal open class V {
-        }
         internal open class C {
             internal lateinit var v: V
             internal open fun setUp() {
                 v = V()
+            }
+        }
+        """)
+
+        try await check(supportingSwift: """
+        struct S {
+            var i = 0
+        }
+        """, swift: """
+        class C {
+            var s: S!
+            setUp() {
+                s = S()
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal var s: S
+                get() {
+                    return sstorage.sref({ this.s = it })
+                }
+                set(newValue) {
+                    sstorage = newValue.sref()
+                }
+            private lateinit var sstorage: S
+            internal open fun setUp() {
+                s = S()
+            }
+        }
+        """)
+
+        try await check(supportingSwift: """
+        class V {
+        }
+        """, swift: """
+        class C {
+            var v: V! {
+                didSet {
+                    print("did set")
+                }
+            }
+            setUp() {
+                v = V()
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal var v: V
+                get() {
+                    return vstorage
+                }
+                set(newValue) {
+                    vstorage = newValue
+                    print("did set")
+                }
+            private lateinit var vstorage: V
+            internal open fun setUp() {
+                v = V()
+            }
+        }
+        """)
+
+        try await check(supportingSwift: """
+        class V {
+        }
+        """, swift: """
+        struct S {
+            var v: V!
+            setUp() {
+                v = V()
+            }
+        }
+        """, kotlin: """
+        internal class S: MutableStruct {
+            internal var v: V
+                get() {
+                    return vstorage
+                }
+                set(newValue) {
+                    willmutate()
+                    vstorage = newValue
+                    didmutate()
+                }
+            private lateinit var vstorage: V
+            internal fun setUp() {
+                v = V()
+            }
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct {
+                return S()
             }
         }
         """)
@@ -1147,4 +1376,9 @@ private class MemberDeclarationTestsSideEffectsClass {
             sideEffectOrdering.append("didSetOwner")
         }
     }
+}
+
+//~~~
+class C {
+
 }
