@@ -1135,7 +1135,7 @@ final class TypeDeclarationTests: XCTestCase {
             }
         
             private constructor(copy: MutableStruct) {
-                val copy = copy as Gen
+                val copy = copy as Gen<T>
                 this.name = copy.name
             }
         

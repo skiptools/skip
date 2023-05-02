@@ -155,7 +155,7 @@ class KotlinStructTransformer: KotlinTransformer {
         constructor.isGenerated = true
 
         var bodyStatements: [KotlinStatement] = []
-        bodyStatements.append(KotlinRawStatement(sourceCode: "val copy = copy as \(classDeclaration.name)"))
+        bodyStatements.append(KotlinRawStatement(sourceCode: "val copy = copy as \(classDeclaration.signature.kotlin)"))
         bodyStatements += variableDeclarations.map { variableDeclaration in
             return KotlinRawStatement(sourceCode: "this.\(variableDeclaration.names[0] ?? "") = copy.\(variableDeclaration.names[0] ?? "")")
         }
