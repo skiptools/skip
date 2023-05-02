@@ -1904,6 +1904,9 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
 
         // Warnings and fixups
         kstatement.declaredType.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source)
+        if (kstatement.isProperty || kstatement.isGlobal), case .unwrappedOptional(let type) = kstatement.propertyType, type.kotlinIsPrimitive {
+            kstatement.messages.append(.kotlinLateinitPrimitive(kstatement, source: translator.syntaxTree.source))
+        }
         if statement.isAsync {
             kstatement.messages.append(.kotlinAsyncProperties(kstatement, source: translator.syntaxTree.source))
         }
@@ -2109,7 +2112,19 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             }
         }
         if usesStorageProperty {
-            output.append(indentation).append("private lateinit var \(storagePropertyName): \(propertyType.kotlin)\n")
+            if modifiers.isLazy && propertyType.kotlinIsPrimitive {
+                let defaultValue: String
+                if propertyType == .bool {
+                    defaultValue = "false"
+                } else if propertyType == .character {
+                    defaultValue = "' '"
+                } else {
+                    defaultValue = "\(propertyType.kotlin)(0)"
+                }
+                output.append(indentation).append("private var \(storagePropertyName) = \(defaultValue)\n")
+            } else {
+                output.append(indentation).append("private lateinit var \(storagePropertyName): \(propertyType.kotlin)\n")
+            }
             if modifiers.isLazy {
                 output.append(indentation).append("private var \(lazyInitInitializedName) = false\n")
             }

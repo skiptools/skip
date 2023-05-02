@@ -531,6 +531,38 @@ final class MemberDeclarationTests: XCTestCase {
         """)
     }
 
+    func testLazyPrimitivePropertyInitialization() async throws {
+        // Kotlin doesn't support lateinit on primitives
+        try await check(swift: """
+        class C {
+            lazy var f = factorial(100)
+            private func factorial(_ i: Int) -> Int {
+                return 0
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal var f: Int
+                get() {
+                    if (!finitialized) {
+                        fstorage = factorial(100)
+                        finitialized = true
+                    }
+                    return fstorage
+                }
+                set(newValue) {
+                    fstorage = newValue
+                    finitialized = true
+                }
+            private var fstorage = Int(0)
+            private var finitialized = false
+            private fun factorial(i: Int): Int {
+                return 0
+            }
+        }
+        """)
+    }
+
     func testExplicitlyUnwrappedOptionalProperty() async throws {
         try await check(supportingSwift: """
         class V {
@@ -639,6 +671,15 @@ final class MemberDeclarationTests: XCTestCase {
             override var smutatingcount = 0
             override fun scopy(): MutableStruct {
                 return S()
+            }
+        }
+        """)
+
+        try await checkProducesMessage(swift: """
+        struct S {
+            var i: Int!
+            setUp() {
+                i = 100
             }
         }
         """)

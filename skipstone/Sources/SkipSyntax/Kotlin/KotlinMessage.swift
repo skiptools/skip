@@ -107,6 +107,10 @@ extension Message {
         return Message(kind: .warning, message: "Shadowing an inout parameter with a variable of the same name may produce incorrect Kotlin. Consider using a different variable name", sourceDerived: sourceDerived, source: source)
     }
 
+    static func kotlinLateinitPrimitive(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Kotlin does not support late initialization of properties with primitive types", sourceDerived: sourceDerived, source: source)
+    }
+
     static func kotlinLoopCaseValue(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Kotlin does not support case bindings to complex expressions in loop conditions. Consider assigning the expression to a local variable before the loop - e.g. let x = ...; while case let .a(...) = x", sourceDerived: sourceDerived, source: source)
     }

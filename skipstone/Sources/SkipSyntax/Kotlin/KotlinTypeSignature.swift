@@ -210,6 +210,74 @@ extension TypeSignature {
         }
     }
 
+    /// Whether this type is a Kotlin primitive.
+    var kotlinIsPrimitive: Bool {
+        switch self {
+        case .any:
+            return false
+        case .anyObject:
+            return false
+        case .array:
+            return false
+        case .bool:
+            return true
+        case .character:
+            return true
+        case .composition:
+            return false
+        case .dictionary:
+            return false
+        case .double:
+            return true
+        case .float:
+            return true
+        case .function:
+            return false
+        case .int:
+            return true
+        case .int8:
+            return true
+        case .int16:
+            return true
+        case .int32:
+            return true
+        case .int64:
+            return true
+        case .named:
+            return false
+        case .none:
+            return false
+        case .optional(let type):
+            return type.kotlinIsPrimitive
+        case .member:
+            return false
+        case .metaType:
+            return false
+        case .range:
+            return false
+        case .set:
+            return false
+        case .string:
+            return false
+        case .tuple:
+            return false
+        case .uint:
+            return true
+        case .uint8:
+            return true
+        case .uint16:
+            return true
+        case .uint32:
+            return true
+        case .uint64:
+            return true
+        case .unwrappedOptional(let type):
+            return type.kotlinIsPrimitive
+        case .void:
+            return false
+        }
+    }
+
     /// Whether this type represents an enum modeled with sealed classes.
     func kotlinIsSealedClassesEnum(codebaseInfo: CodebaseInfo.Context?) -> Bool {
         guard case .named = asOptional(false) else {
