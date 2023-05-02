@@ -1088,4 +1088,67 @@ final class TypeDeclarationTests: XCTestCase {
         }
         """)
     }
+
+    func testMutableGenericStructNoConstructor() async throws {
+        try await check(swift: """
+        struct Gen<T, U, V> {
+            var name: String
+        }
+        """, kotlin: """
+        internal class Gen<T, U, V>: MutableStruct {
+            internal var name: String
+                set(newValue) {
+                    willmutate()
+                    field = newValue
+                    didmutate()
+                }
+
+            constructor(name: String) {
+                this.name = name
+            }
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct {
+                return Gen<T, U, V>(name)
+            }
+        }
+        """)
+    }
+
+    func testMutableGenericStructWithConstructor() async throws {
+        try await check(swift: """
+        struct Gen<T> {
+            var name: String? = nil
+            init() {
+            }
+        }
+        """, kotlin: """
+        internal class Gen<T>: MutableStruct {
+            internal var name: String? = null
+                set(newValue) {
+                    willmutate()
+                    field = newValue
+                    didmutate()
+                }
+            internal constructor() {
+            }
+        
+            private constructor(copy: MutableStruct) {
+                val copy = copy as Gen
+                this.name = copy.name
+            }
+        
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct {
+                return Gen<T>(this as MutableStruct)
+            }
+        }
+        """)
+    }
+
 }
+
+
+
