@@ -261,7 +261,7 @@ class KotlinCodeBlock: KotlinStatement {
     }
 
     /// Whether this code block can be appended safely as a single Kotlin statement.
-    var isSingleStatementAppendable: Bool {
+    func isSingleStatementAppendable(isFunctionBody: Bool) -> Bool {
         guard !isTryCatch && !disallowSingleStatementAppend && statements.count <= 1 else {
             return false
         }
@@ -277,13 +277,16 @@ class KotlinCodeBlock: KotlinStatement {
                     if statement.extras != nil {
                         hasDisallowed = true
                     }
+                    if !(statement is KotlinExpressionStatement) && !(statement is KotlinRawStatement) {
+                        hasDisallowed = true
+                    }
                 }
-                if ($0 as? KotlinBinaryOperator)?.op.precedence == .assignment {
-                    hasDisallowed = true
-                } else if $0 is KotlinVariableDeclaration || $0 is KotlinFunctionDeclaration {
-                    hasDisallowed = true
-                } else if $0 is KotlinThrow {
-                    hasDisallowed = true
+                if isFunctionBody {
+                    if ($0 as? KotlinBinaryOperator)?.op.precedence == .assignment {
+                        hasDisallowed = true
+                    } else if $0 is KotlinThrow {
+                        hasDisallowed = true // A function that just throws has to explicitly declare a Nothing return type
+                    }
                 }
             }
             return statementCount <= 1 && !hasDisallowed ? .recurse(nil) : .skip
@@ -292,26 +295,37 @@ class KotlinCodeBlock: KotlinStatement {
     }
     var disallowSingleStatementAppend = false
 
-    /// Append this code block as a single statement, stripping 'return'.
-    func appendAsSingleStatement(to output: OutputGenerator, indentation: Indentation) {
+    /// Append this code block formatted as a single statement.
+    func appendAsSingleStatement(to output: OutputGenerator, indentation: Indentation, isFunctionBody: Bool) {
         if statements.isEmpty {
-            output.append("Unit")
-        } else if let expressionStatement = statements[0] as? KotlinExpressionStatement {
-            if let expression = expressionStatement.expression {
+            if isFunctionBody {
+                output.append("Unit")
+            }
+        } else if let returnStatement = statements[0] as? KotlinReturn {
+            if !isFunctionBody {
+                returnStatement.appendAsSingleStatement(to: output, indentation: indentation)
+            } else if let expression = returnStatement.expression {
                 output.append(expression, indentation: indentation)
             } else {
                 output.append("Unit")
             }
+        } else if let expressionStatement = statements[0] as? KotlinExpressionStatement {
+            if let expression = expressionStatement.expression {
+                output.append(expression, indentation: indentation)
+            } else if isFunctionBody {
+                output.append("Unit")
+            }
         } else if let rawStatement = statements[0] as? KotlinRawStatement {
             let sourceCode = rawStatement.sourceCode
-            if sourceCode == "return" {
+            if isFunctionBody && sourceCode == "return" {
                 output.append("Unit")
-            } else if sourceCode.hasPrefix("return ") {
+            } else if isFunctionBody && sourceCode.hasPrefix("return ") {
                 output.append(String(sourceCode.dropFirst("return ".count)))
             } else {
-                output.append(rawStatement, indentation: 0)
+                output.append(sourceCode)
             }
         } else {
+            assert(false)
             output.append(statements[0], indentation: 0)
         }
     }
@@ -580,20 +594,21 @@ class KotlinReturn: KotlinExpressionStatement {
         super.init(type: .return, statement: statement)
     }
 
-    override func append(to output: OutputGenerator, indentation: Indentation) {
-        if let expression {
-            output.append(indentation).append("return")
-            if let label {
-                output.append("@\(label)")
-            }
-            output.append(" ").append(expression, indentation: indentation).append("\n")
-        } else {
-            output.append(indentation).append("return")
-            if let label {
-                output.append("@\(label)")
-            }
-            output.append("\n")
+    /// For use when appending a single-statement code block.
+    func appendAsSingleStatement(to output: OutputGenerator, indentation: Indentation) {
+        output.append("return")
+        if let label {
+            output.append("@\(label)")
         }
+        if let expression {
+            output.append(" ").append(expression, indentation: indentation)
+        }
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        output.append(indentation)
+        appendAsSingleStatement(to: output, indentation: indentation)
+        output.append("\n")
     }
 }
 
@@ -1536,9 +1551,9 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         }
 
         // Append Kotlin single statement format if possible
-        guard isConstructor || callSuperFinalize || !parameterVals.isEmpty || suppressSideEffects || mutationFunctionNames != nil || !body.isSingleStatementAppendable else {
+        guard isConstructor || callSuperFinalize || !parameterVals.isEmpty || suppressSideEffects || mutationFunctionNames != nil || !body.isSingleStatementAppendable(isFunctionBody: true) else {
             output.append(" = ")
-            body.appendAsSingleStatement(to: output, indentation: indentation)
+            body.appendAsSingleStatement(to: output, indentation: indentation, isFunctionBody: true)
             output.append("\n")
             return
         }
@@ -2102,9 +2117,9 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if let getterBody = getter?.body {
             let getterIndentation = indentation.inc()
             output.append(getterIndentation).append("get()")
-            if getterBody.isSingleStatementAppendable {
+            if getterBody.isSingleStatementAppendable(isFunctionBody: true) {
                 output.append(" = ")
-                getterBody.appendAsSingleStatement(to: output, indentation: getterIndentation)
+                getterBody.appendAsSingleStatement(to: output, indentation: getterIndentation, isFunctionBody: true)
                 output.append("\n")
             } else {
                 output.append(" {\n")

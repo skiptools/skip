@@ -501,43 +501,66 @@ class KotlinClosure: KotlinExpression {
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
         if isAnonymousFunction {
-            output.append("fun(")
+            appendAnonymousFunction(to: output, indentation: indentation)
+        } else {
+            appendClosure(to: output, indentation: indentation)
+        }
+    }
+
+    private func appendAnonymousFunction(to output: OutputGenerator, indentation: Indentation) {
+        output.append("fun(")
+        for (index, parameter) in parameters.enumerated() {
+            output.append(parameter.internalLabel).append(": ").append(parameter.declaredType)
+            if index < parameters.count - 1 {
+                output.append(", ")
+            }
+        }
+        output.append("): ").append(returnType)
+        if body.isSingleStatementAppendable(isFunctionBody: true) {
+            output.append(" = ")
+            body.appendAsSingleStatement(to: output, indentation: indentation, isFunctionBody: true)
+        } else {
+            output.append(" {\n")
+            output.append(body, indentation: indentation.inc())
+            output.append(indentation).append("}")
+        }
+    }
+
+    private func appendClosure(to output: OutputGenerator, indentation: Indentation) {
+        if hasReturnLabel {
+            output.append(Self.returnLabel).append("@")
+        }
+        output.append("{")
+        let isSingleStatement = body.isSingleStatementAppendable(isFunctionBody: false)
+        if parameters.isEmpty && implicitParameterLabels.isEmpty {
+            output.append(isSingleStatement ? " " : "\n")
+        } else {
+            // We never have both explicit and implicit parameters
             for (index, parameter) in parameters.enumerated() {
-                output.append(parameter.internalLabel).append(": ").append(parameter.declaredType)
+                if index == 0 {
+                    output.append(" ")
+                }
+                output.append(parameter.internalLabel)
+                if parameter.declaredType != .none {
+                    output.append(": ").append(parameter.declaredType)
+                }
                 if index < parameters.count - 1 {
                     output.append(", ")
                 }
             }
-            output.append("): ").append(returnType).append(" {\n")
-        } else {
-            if hasReturnLabel {
-                output.append(Self.returnLabel).append("@")
+            if !implicitParameterLabels.isEmpty {
+                output.append(" ").append(implicitParameterLabels.joined(separator: ", "))
             }
-            output.append("{")
-            if parameters.isEmpty && implicitParameterLabels.isEmpty {
-                output.append("\n")
-            } else {
-                // We never have both explicit and implicit parameters
-                for (index, parameter) in parameters.enumerated() {
-                    if index == 0 {
-                        output.append(" ")
-                    }
-                    output.append(parameter.internalLabel)
-                    if parameter.declaredType != .none {
-                        output.append(": ").append(parameter.declaredType)
-                    }
-                    if index < parameters.count - 1 {
-                        output.append(", ")
-                    }
-                }
-                if !implicitParameterLabels.isEmpty {
-                    output.append(" ").append(implicitParameterLabels.joined(separator: ", "))
-                }
-                output.append(" ->\n")
-            }
+            output.append(" ->")
+            output.append(isSingleStatement ? " " : "\n")
         }
-        output.append(body, indentation: indentation.inc())
-        output.append(indentation).append("}")
+        if isSingleStatement {
+            body.appendAsSingleStatement(to: output, indentation: indentation, isFunctionBody: false)
+            output.append(" }")
+        } else {
+            output.append(body, indentation: indentation.inc())
+            output.append(indentation).append("}")
+        }
     }
 }
 

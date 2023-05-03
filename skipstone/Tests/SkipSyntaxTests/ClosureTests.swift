@@ -8,9 +8,7 @@ final class ClosureTests: XCTestCase {
             print("f")
         }
         """, kotlin: """
-        call {
-            print("f")
-        }
+        call { print("f") }
         """)
 
         try await check(swift: """
@@ -18,17 +16,13 @@ final class ClosureTests: XCTestCase {
             print("f")
         }
         """, kotlin: """
-        call(100) {
-            print("f")
-        }
+        call(100) { print("f") }
         """)
 
         try await check(swift: """
         call(100, { print("f") })
         """, kotlin: """
-        call(100) {
-            print("f")
-        }
+        call(100) { print("f") }
         """)
     }
 
@@ -38,9 +32,7 @@ final class ClosureTests: XCTestCase {
             print(x)
         }
         """, kotlin: """
-        call { x ->
-            print(x)
-        }
+        call { x -> print(x) }
         """)
 
         try await check(swift: """
@@ -48,9 +40,7 @@ final class ClosureTests: XCTestCase {
             print(x)
         }
         """, kotlin: """
-        call { x: Int ->
-            print(x)
-        }
+        call { x: Int -> print(x) }
         """)
     }
 
@@ -60,9 +50,7 @@ final class ClosureTests: XCTestCase {
             print(x)
         }
         """, kotlin: """
-        call { x, y ->
-            print(x)
-        }
+        call { x, y -> print(x) }
         """)
 
         try await check(swift: """
@@ -70,9 +58,7 @@ final class ClosureTests: XCTestCase {
             print(x)
         }
         """, kotlin: """
-        call { x: Int, y: String ->
-            print(x)
-        }
+        call { x: Int, y: String -> print(x) }
         """)
     }
 
@@ -83,9 +69,7 @@ final class ClosureTests: XCTestCase {
             1
         }
         """, kotlin: """
-        call(fun(x: Int, y: String): Int {
-            return 1
-        })
+        call(fun(x: Int, y: String): Int = 1)
         """)
 
         // With explicit return
@@ -94,9 +78,7 @@ final class ClosureTests: XCTestCase {
             return 1
         }
         """, kotlin: """
-        call(fun(x: Int, y: String): Int {
-            return 1
-        })
+        call(fun(x: Int, y: String): Int = 1)
         """)
     }
 
@@ -106,9 +88,7 @@ final class ClosureTests: XCTestCase {
             return 1
         }
         """, kotlin: """
-        call llabel@{ _ ->
-            return@llabel 1
-        }
+        call llabel@{ _ -> return@llabel 1 }
         """)
     }
 
@@ -119,9 +99,7 @@ final class ClosureTests: XCTestCase {
         }
         """, kotlin: """
         {
-            val x = {
-                1
-            }()
+            val x = { 1 }()
         }
         """)
 
@@ -131,9 +109,7 @@ final class ClosureTests: XCTestCase {
         }
         """, kotlin: """
         {
-            val x = { i: Int ->
-                i
-            }(1)
+            val x = { i: Int -> i }(1)
         }
         """)
 
@@ -164,9 +140,7 @@ final class ClosureTests: XCTestCase {
         try await check(swift: """
         call { $0 + 1 }
         """, kotlin: """
-        call {
-            it + 1
-        }
+        call { it + 1 }
         """)
     }
 
@@ -174,9 +148,7 @@ final class ClosureTests: XCTestCase {
         try await check(swift: """
         call { $0 + $1 + $2 }
         """, kotlin: """
-        call { it, it_1, it_2 ->
-            it + it_1 + it_2
-        }
+        call { it, it_1, it_2 -> it + it_1 + it_2 }
         """)
     }
 

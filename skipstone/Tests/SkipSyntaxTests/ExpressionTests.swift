@@ -259,13 +259,9 @@ final class ExpressionTests: XCTestCase {
             return operation(on, on)
         }
         """, swift: """
-        {
-            perform(on: 10, +)
-        }
+        perform(on: 10, +)
         """, kotlin: """
-        {
-            perform(on = 10, { it, it_1 -> it + it_1 })
-        }
+        perform(on = 10, { it, it_1 -> it + it_1 })
         """)
     }
 
