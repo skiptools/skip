@@ -86,7 +86,7 @@ final class TypeDeclarationTests: XCTestCase {
             }
 
             private constructor(copy: MutableStruct) {
-                val copy = copy as A
+                @Suppress("NAME_SHADOWING") val copy = copy as A
                 this.i = copy.i
             }
 
@@ -1103,7 +1103,7 @@ final class TypeDeclarationTests: XCTestCase {
             }
         
             private constructor(copy: MutableStruct) {
-                val copy = copy as Gen<T>
+                @Suppress("NAME_SHADOWING") val copy = copy as Gen<T>
                 this.name = copy.name
             }
         

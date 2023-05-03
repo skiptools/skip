@@ -789,9 +789,9 @@ final class MemberDeclarationTests: XCTestCase {
         func g(a: Int) {
         }
         """, kotlin: """
-        internal fun f(a: Int, unusedp_0: Nothing? = null) = Unit
+        internal fun f(a: Int, @Suppress("UNUSED_PARAMETER") unusedp_0: Nothing? = null) = Unit
         internal fun f(c: Int) = Unit
-        internal fun f(b: Int, unusedp_0: Nothing? = null, unusedp_1: Nothing? = null) = Unit
+        internal fun f(b: Int, @Suppress("UNUSED_PARAMETER") unusedp_0: Nothing? = null, @Suppress("UNUSED_PARAMETER") unusedp_1: Nothing? = null) = Unit
         internal fun f(a: Double) = Unit
         internal fun g(a: Int) = Unit
         """)
@@ -807,7 +807,7 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal open class A {
-            internal open fun f(a: Int, unusedp_0: Nothing? = null) = Unit
+            internal open fun f(a: Int, @Suppress("UNUSED_PARAMETER") unusedp_0: Nothing? = null) = Unit
             internal open fun f(b: Int) = Unit
         }
         """)
@@ -822,7 +822,7 @@ final class MemberDeclarationTests: XCTestCase {
         """, kotlin: """
         open class A {
             open fun f(a: Int) = Unit
-            internal open fun f(b: Int, unusedp_0: Nothing? = null) = Unit
+            internal open fun f(b: Int, @Suppress("UNUSED_PARAMETER") unusedp_0: Nothing? = null) = Unit
 
             companion object {
             }
@@ -847,7 +847,7 @@ final class MemberDeclarationTests: XCTestCase {
             internal open fun f(a: Int) = Unit
         }
         internal open class B: A() {
-            internal open fun f(b: Int, unusedp_0: Nothing? = null) = Unit
+            internal open fun f(b: Int, @Suppress("UNUSED_PARAMETER") unusedp_0: Nothing? = null) = Unit
         }
         internal open class C {
             internal open fun f(c: Int) = Unit
@@ -891,7 +891,7 @@ final class MemberDeclarationTests: XCTestCase {
             internal open fun f(c: Int) = Unit
         }
         internal open class B: A() {
-            internal open fun f(b: Int, unusedp_0: Nothing? = null) = Unit
+            internal open fun f(b: Int, @Suppress("UNUSED_PARAMETER") unusedp_0: Nothing? = null) = Unit
         }
         internal open class C {
             internal open fun f(a: Int) = Unit
@@ -921,11 +921,11 @@ final class MemberDeclarationTests: XCTestCase {
             internal open fun g(z: Int) = Unit
         }
         internal open class B: A() {
-            internal open fun f(b: Int, unusedp_0: Nothing? = null) = Unit
+            internal open fun f(b: Int, @Suppress("UNUSED_PARAMETER") unusedp_0: Nothing? = null) = Unit
         }
         internal open class C: B() {
-            internal open fun f(c: Int, unusedp_0: Nothing? = null, unusedp_1: Nothing? = null) = Unit
-            internal open fun g(a: Int, unusedp_0: Nothing? = null) = Unit
+            internal open fun f(c: Int, @Suppress("UNUSED_PARAMETER") unusedp_0: Nothing? = null, @Suppress("UNUSED_PARAMETER") unusedp_1: Nothing? = null) = Unit
+            internal open fun g(a: Int, @Suppress("UNUSED_PARAMETER") unusedp_0: Nothing? = null) = Unit
         }
         """)
 
@@ -953,7 +953,7 @@ final class MemberDeclarationTests: XCTestCase {
         """, kotlin: """
         internal open class A: P {
             override fun f(a: Int) = Unit
-            internal open fun f(b: Int, unusedp_0: Nothing? = null) = Unit
+            internal open fun f(b: Int, @Suppress("UNUSED_PARAMETER") unusedp_0: Nothing? = null) = Unit
         }
         internal interface P {
             fun f(a: Int)
@@ -990,7 +990,7 @@ final class MemberDeclarationTests: XCTestCase {
             fun f(a: Double)
         }
         internal interface P3: P1, P2 {
-            fun f(b: Int, unusedp_0: Nothing? = null)
+            fun f(b: Int, @Suppress("UNUSED_PARAMETER") unusedp_0: Nothing? = null)
         }
         internal open class A: P1 {
             override fun f(a: Int) = Unit
@@ -998,7 +998,7 @@ final class MemberDeclarationTests: XCTestCase {
         internal open class B: P2, P3 {
             override fun f(a: Int) = Unit
             override fun f(a: Double) = Unit
-            override fun f(b: Int, unusedp_0: Nothing?) = Unit
+            override fun f(b: Int, @Suppress("UNUSED_PARAMETER") unusedp_0: Nothing?) = Unit
         }
         """)
 
@@ -1038,13 +1038,13 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal open class A {
-            internal constructor(a: Int, unusedp_0: Nothing? = null) {
+            internal constructor(a: Int, @Suppress("UNUSED_PARAMETER") unusedp_0: Nothing? = null) {
             }
             internal constructor(b: Int) {
             }
         }
         internal open class B: A {
-            internal constructor(a: Int, unusedp_0: Nothing? = null): super() {
+            internal constructor(a: Int, @Suppress("UNUSED_PARAMETER") unusedp_0: Nothing? = null): super() {
             }
             internal constructor(c: Int): super() {
             }

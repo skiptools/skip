@@ -228,7 +228,7 @@ final class ExpressionTests: XCTestCase {
             private constructor(copy: MutableStruct) {
                 suppresssideeffects = true
                 try {
-                    val copy = copy as S
+                    @Suppress("NAME_SHADOWING") val copy = copy as S
                     this.i = copy.i
                     this.a = copy.a
                 } finally {

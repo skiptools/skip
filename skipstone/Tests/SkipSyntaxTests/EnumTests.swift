@@ -25,7 +25,7 @@ final class EnumTests: XCTestCase {
             case d
         }
         """, kotlin: """
-        internal enum class E(override val rawValue: Int, unusedp: Nothing? = null): RawRepresentable<Int> {
+        internal enum class E(override val rawValue: Int, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): RawRepresentable<Int> {
             a(0),
             b(1),
             c(100),
@@ -60,7 +60,7 @@ final class EnumTests: XCTestCase {
             case c
         }
         """, kotlin: """
-        internal enum class E(override val rawValue: String, unusedp: Nothing? = null): RawRepresentable<String> {
+        internal enum class E(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): RawRepresentable<String> {
             a("a"),
             b("B"),
             c("c");
@@ -96,7 +96,7 @@ final class EnumTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal enum class E(override val rawValue: Int, unusedp: Nothing? = null): RawRepresentable<Int> {
+        internal enum class E(override val rawValue: Int, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): RawRepresentable<Int> {
             a(0),
             b(1);
 
@@ -129,7 +129,7 @@ final class EnumTests: XCTestCase {
             case b
         }
         """, kotlin: """
-        internal enum class E(override val rawValue: Int, unusedp: Nothing? = null): RawRepresentable<Int> {
+        internal enum class E(override val rawValue: Int, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): RawRepresentable<Int> {
             a(0),
 
             b(1);

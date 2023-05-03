@@ -54,7 +54,7 @@ final class ErrorHandlingTests: XCTestCase {
             action2()
             throw S()
         } catch (error: Throwable) {
-            val error = error.aserror()
+            @Suppress("NAME_SHADOWING") val error = error.aserror()
             print("Caught error: ${error}")
         }
         """)
@@ -80,7 +80,7 @@ final class ErrorHandlingTests: XCTestCase {
         } catch (error: S) {
             print("Caught error: ${error}")
         } catch (error: Throwable) {
-            val error = error.aserror()
+            @Suppress("NAME_SHADOWING") val error = error.aserror()
         }
         """)
     }
@@ -96,7 +96,7 @@ final class ErrorHandlingTests: XCTestCase {
         try {
             action1()
         } catch (error: Throwable) {
-            val error = error.aserror()
+            @Suppress("NAME_SHADOWING") val error = error.aserror()
             val e = error
             print("Caught error: ${e}")
         }
@@ -112,7 +112,7 @@ final class ErrorHandlingTests: XCTestCase {
         try {
             action1()
         } catch (error: Throwable) {
-            var error = error.aserror()
+            @Suppress("NAME_SHADOWING") var error = error.aserror()
             print("Caught error: ${error}")
         }
         """)
@@ -138,7 +138,7 @@ final class ErrorHandlingTests: XCTestCase {
         } catch (e: S) {
             print("Caught error: ${e}")
         } catch (error: Throwable) {
-            val error = error.aserror()
+            @Suppress("NAME_SHADOWING") val error = error.aserror()
         }
         """)
 
@@ -291,7 +291,7 @@ final class ErrorHandlingTests: XCTestCase {
             }
             action2()
         } catch (error: Throwable) {
-            val error = error.aserror()
+            @Suppress("NAME_SHADOWING") val error = error.aserror()
             print("Caught error: ${error}")
         } finally {
             deferaction_0?.invoke()
@@ -332,7 +332,7 @@ final class ErrorHandlingTests: XCTestCase {
                 try {
                     i += 1
                 } catch (error: Throwable) {
-                    val error = error.aserror()
+                    @Suppress("NAME_SHADOWING") val error = error.aserror()
                     print("Caught error ${error}")
                 } finally {
                     didmutate()
@@ -345,7 +345,7 @@ final class ErrorHandlingTests: XCTestCase {
                     try {
                         i += 1
                     } catch (error: Throwable) {
-                        val error = error.aserror()
+                        @Suppress("NAME_SHADOWING") val error = error.aserror()
                         print("Caught error ${error}")
                     }
                 } finally {
@@ -444,7 +444,7 @@ final class ErrorHandlingTests: XCTestCase {
             case error2
         }
         """, kotlin: """
-        internal sealed class E(override val rawValue: Int, unusedp: Nothing? = null): Exception(), Error, RawRepresentable<Int> {
+        internal sealed class E(override val rawValue: Int, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): Exception(), Error, RawRepresentable<Int> {
             class Error1Case: E(2) {
 
                 override fun equals(other: Any?): Boolean = other is Error1Case
@@ -510,7 +510,7 @@ final class ErrorHandlingTests: XCTestCase {
             case error2
         }
         """, kotlin: """
-        internal sealed class E(override val rawValue: Int, unusedp: Nothing? = null): Exception(), Error, RawRepresentable<Int> {
+        internal sealed class E(override val rawValue: Int, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): Exception(), Error, RawRepresentable<Int> {
             class Error1Case: E(2) {
 
                 override fun equals(other: Any?): Boolean = other is Error1Case

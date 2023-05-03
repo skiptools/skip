@@ -1030,12 +1030,10 @@ class KotlinIf: KotlinExpression {
 
     private func appendGuardConditionSet(_ conditionSet: ConditionSet, to output: OutputGenerator, indentation: Indentation) {
         if let optionalBindingVariable = conditionSet.optionalBindingVariable {
-            output.append(indentation)
             optionalBindingVariable.append(to: output, indentation: indentation)
             output.append("\n").append(indentation)
         }
         if let caseTargetVariable = conditionSet.caseTargetVariable {
-            output.append(indentation)
             caseTargetVariable.append(to: output, indentation: indentation)
             output.append("\n").append(indentation)
         }

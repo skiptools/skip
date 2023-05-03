@@ -390,7 +390,7 @@ class KotlinCodeBlock: KotlinStatement {
         if let addingError {
             errorBindingIndex = kcatch.caseBindingVariables.firstIndex(where: { $0.names == [addingError] })
             let isLet = errorBindingIndex == nil || kcatch.caseBindingVariables[errorBindingIndex!].isLet
-            output.append(indentation).append("\(isLet ? "val" : "var") error = error.aserror()\n")
+            output.append(indentation).append("@Suppress(\"NAME_SHADOWING\") \(isLet ? "val" : "var") error = error.aserror()\n")
         }
         for (index, bindingVariable) in kcatch.caseBindingVariables.enumerated() {
             guard index != errorBindingIndex else {
@@ -960,7 +960,7 @@ class KotlinClassDeclaration: KotlinStatement {
             if enumInheritedRawValueType != .none {
                 inherits = Array(inherits.dropFirst())
                 // Add an unused parameter to disambiguate from the RawRepresentable constructor
-                output.append("(override val rawValue: \(enumInheritedRawValueType.kotlin), unusedp: Nothing? = null)")
+                output.append("(override val rawValue: \(enumInheritedRawValueType.kotlin), @Suppress(\"UNUSED_PARAMETER\") unusedp: Nothing? = null)")
             }
             if !inherits.isEmpty {
                 output.append(": ")
@@ -1490,7 +1490,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             }
         }
         for i in 0..<disambiguatingParameterCount {
-            output.append("unusedp_\(i): Nothing?")
+            output.append("@Suppress(\"UNUSED_PARAMETER\") unusedp_\(i): Nothing?")
             if !modifiers.isOverride {
                 output.append(" = null")
             }

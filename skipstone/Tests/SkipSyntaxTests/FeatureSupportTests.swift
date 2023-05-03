@@ -180,7 +180,7 @@ final class FeatureSupportTests: XCTestCase {
             }
             return ""
         }, kotlin: """
-            enum class UnsignedEnum(override val rawValue: UInt, unusedp: Nothing? = null): RawRepresentable<UInt> {
+            enum class UnsignedEnum(override val rawValue: UInt, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): RawRepresentable<UInt> {
                 ten(10),
                 twenty(20);
             }

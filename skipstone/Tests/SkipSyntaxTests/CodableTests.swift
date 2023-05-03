@@ -17,7 +17,7 @@ final class CodableTests: XCTestCase {
                 this.s = s
             }
 
-            private enum class CodingKeys(override val rawValue: String, unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
+            private enum class CodingKeys(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 i("i"),
                 s("s");
             }
@@ -86,7 +86,7 @@ final class CodableTests: XCTestCase {
             override var smutatingcount = 0
             override fun scopy(): MutableStruct = S(i, s)
 
-            private enum class CodingKeys(override val rawValue: String, unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
+            private enum class CodingKeys(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 i("i"),
                 s("s");
             }
@@ -143,7 +143,7 @@ final class CodableTests: XCTestCase {
             internal val d: Double
             internal val s = "foo"
 
-            private enum class CodingKeys(override val rawValue: String, unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
+            private enum class CodingKeys(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 i("i"),
                 d("dbl");
             }
@@ -203,7 +203,7 @@ final class CodableTests: XCTestCase {
             internal val d: Double
             internal val s = "foo"
 
-            private enum class CodingKeys(override val rawValue: Int, unusedp: Nothing? = null): CodingKey, RawRepresentable<Int> {
+            private enum class CodingKeys(override val rawValue: Int, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<Int> {
                 i(100),
                 d(101);
             }
@@ -268,7 +268,7 @@ final class CodableTests: XCTestCase {
             internal val i: Int
             internal val s: String
 
-            private enum class CK(override val rawValue: String, unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
+            private enum class CK(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 i("i"),
                 s("s");
             }
@@ -316,7 +316,7 @@ final class CodableTests: XCTestCase {
                 this.a = a
             }
 
-            private enum class CodingKeys(override val rawValue: String, unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
+            private enum class CodingKeys(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 a("a");
             }
 
@@ -365,7 +365,7 @@ final class CodableTests: XCTestCase {
                 this.s = s
             }
 
-            private enum class CodingKeys(override val rawValue: String, unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
+            private enum class CodingKeys(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 i("i"),
                 s("s");
             }
@@ -411,7 +411,7 @@ final class CodableTests: XCTestCase {
             internal val i: Int
             internal val s: String
 
-            private enum class CK(override val rawValue: String, unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
+            private enum class CK(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 i("i"),
                 s("s");
             }
@@ -437,7 +437,7 @@ final class CodableTests: XCTestCase {
                 this.s = s
             }
 
-            private enum class CodingKeys(override val rawValue: String, unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
+            private enum class CodingKeys(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 i("i"),
                 s("s");
             }
@@ -486,7 +486,7 @@ final class CodableTests: XCTestCase {
                 this.s = s
             }
 
-            private enum class CodingKeys(override val rawValue: String, unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
+            private enum class CodingKeys(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 i("i"),
                 s("s");
             }
@@ -537,7 +537,7 @@ final class CodableTests: XCTestCase {
             internal val i: Int
             internal val s: String
 
-            private enum class CodingKeys(override val rawValue: String, unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
+            private enum class CodingKeys(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 i("i"),
                 s("s");
             }
@@ -589,7 +589,7 @@ final class CodableTests: XCTestCase {
                 this.s = s
             }
 
-            private enum class CodingKeys(override val rawValue: String, unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
+            private enum class CodingKeys(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 i("i"),
                 s("s");
             }
@@ -649,7 +649,7 @@ final class CodableTests: XCTestCase {
                 this.i = i
             }
 
-            private enum class CodingKeys(override val rawValue: String, unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
+            private enum class CodingKeys(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 i("i"),
                 a("a");
             }
@@ -701,7 +701,7 @@ final class CodableTests: XCTestCase {
         internal open class Sub: Base, Codable {
             internal var s = "string"
 
-            private enum class CodingKeys(override val rawValue: String, unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
+            private enum class CodingKeys(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 s("s");
             }
 
@@ -740,7 +740,7 @@ final class CodableTests: XCTestCase {
             case a, b
         }
         """, kotlin: """
-        internal enum class E(override val rawValue: Int, unusedp: Nothing? = null): Codable, RawRepresentable<Int> {
+        internal enum class E(override val rawValue: Int, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): Codable, RawRepresentable<Int> {
             a(0),
             b(1);
 
@@ -788,7 +788,7 @@ final class CodableTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal enum class E(override val rawValue: Int, unusedp: Nothing? = null): Codable, RawRepresentable<Int> {
+        internal enum class E(override val rawValue: Int, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): Codable, RawRepresentable<Int> {
             a(0),
             b(1);
 
