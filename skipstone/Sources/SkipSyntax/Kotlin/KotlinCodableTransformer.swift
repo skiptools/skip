@@ -200,9 +200,11 @@ class KotlinCodableTransformer: KotlinTransformer {
         classDeclaration.companionInherits.append(.named("DecodableCompanion", []))
 
         let factory = KotlinFunctionDeclaration(name: "init")
-        factory.extras = .singleNewline
-        factory.modifiers.visibility = .public
         factory.modifiers.isStatic = true
+        if classDeclaration.members.contains(where: { ($0 as? KotlinMemberDeclaration)?.isStatic == true }) {
+            factory.extras = .singleNewline
+        }
+        factory.modifiers.visibility = .public
         factory.modifiers.isOverride = true
         factory.isGenerated = true
         factory.parameters = [Parameter<KotlinExpression>(externalLabel: "from", declaredType: .named("Decoder", []))]

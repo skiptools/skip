@@ -54,6 +54,9 @@ class KotlinEnumTransformer: KotlinTransformer {
 
         let allCasesVar = KotlinVariableDeclaration(names: ["allCases"], variableTypes: [.array(classDeclaration.signature)])
         allCasesVar.modifiers.isStatic = true
+        if classDeclaration.members.contains(where: { ($0 as? KotlinMemberDeclaration)?.isStatic == true }) {
+            allCasesVar.extras = .singleNewline
+        }
         allCasesVar.declaredType = .array(classDeclaration.signature)
         allCasesVar.isReadOnly = true
         allCasesVar.isGenerated = true
