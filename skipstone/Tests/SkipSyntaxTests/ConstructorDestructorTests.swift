@@ -212,17 +212,13 @@ final class ConstructorDestructorTests: XCTestCase {
         internal class C {
             internal val i = 100
             internal val s: String
-                get() {
-                    return "100"
-                }
+                get() = "100"
         }
         
         internal class D: MutableStruct {
             internal val letVar = 100
             internal val computedVar: Int
-                get() {
-                    return 100
-                }
+                get() = 100
             internal var i = 100
                 set(newValue) {
                     willmutate()
@@ -382,9 +378,7 @@ final class ConstructorDestructorTests: XCTestCase {
         """, kotlin: """
         internal class S<T, U> where U: Any {
             internal val t: T
-                get() {
-                    return field.sref()
-                }
+                get() = field.sref()
             internal val u: U
 
             constructor(t: T, u: U) {
@@ -475,9 +469,7 @@ final class ConstructorDestructorTests: XCTestCase {
         """, kotlin: """
         internal class S {
             internal var a: Array<Int>
-                get() {
-                    return field.sref()
-                }
+                get() = field.sref()
                 set(newValue) {
                     field = newValue.sref()
                 }
@@ -517,9 +509,7 @@ final class ConstructorDestructorTests: XCTestCase {
         internal class S: MutableStruct {
             internal var i: Int
             internal var a: Array<String> = arrayOf()
-                get() {
-                    return field.sref({ this.a = it })
-                }
+                get() = field.sref({ this.a = it })
                 set(newValue) {
                     val newValue = newValue.sref()
                     willmutate()

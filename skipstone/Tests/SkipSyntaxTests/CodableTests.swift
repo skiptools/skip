@@ -303,9 +303,7 @@ final class CodableTests: XCTestCase {
         """, kotlin: """
         internal class S: Codable {
             internal val a: Array<Int>
-                get() {
-                    return field.sref()
-                }
+                get() = field.sref()
 
             constructor(a: Array<Int>) {
                 this.a = a
@@ -628,9 +626,7 @@ final class CodableTests: XCTestCase {
         internal class S: Codable {
             internal val i: Int
             internal var a = arrayOf("foo")
-                get() {
-                    return field.sref()
-                }
+                get() = field.sref()
                 set(newValue) {
                     field = newValue.sref()
                 }

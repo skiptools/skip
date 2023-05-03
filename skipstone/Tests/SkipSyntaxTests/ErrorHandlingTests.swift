@@ -421,12 +421,10 @@ final class ErrorHandlingTests: XCTestCase {
         """, kotlin: """
         internal sealed class E: Exception(), Error {
             class Error1Case: E() {
-
                 override fun equals(other: Any?): Boolean = other is Error1Case
                 override fun hashCode(): Int = "Error1Case".hashCode()
             }
             class Error2Case: E() {
-
                 override fun equals(other: Any?): Boolean = other is Error2Case
                 override fun hashCode(): Int = "Error2Case".hashCode()
             }
@@ -446,12 +444,10 @@ final class ErrorHandlingTests: XCTestCase {
         """, kotlin: """
         internal sealed class E(override val rawValue: Int, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): Exception(), Error, RawRepresentable<Int> {
             class Error1Case: E(2) {
-
                 override fun equals(other: Any?): Boolean = other is Error1Case
                 override fun hashCode(): Int = "Error1Case".hashCode()
             }
             class Error2Case: E(3) {
-
                 override fun equals(other: Any?): Boolean = other is Error2Case
                 override fun hashCode(): Int = "Error2Case".hashCode()
             }
@@ -487,12 +483,10 @@ final class ErrorHandlingTests: XCTestCase {
         """, kotlin: """
         internal sealed class E: Exception(), Error {
             class Error1Case: E() {
-
                 override fun equals(other: Any?): Boolean = other is Error1Case
                 override fun hashCode(): Int = "Error1Case".hashCode()
             }
             class Error2Case: E() {
-
                 override fun equals(other: Any?): Boolean = other is Error2Case
                 override fun hashCode(): Int = "Error2Case".hashCode()
             }
@@ -512,12 +506,10 @@ final class ErrorHandlingTests: XCTestCase {
         """, kotlin: """
         internal sealed class E(override val rawValue: Int, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): Exception(), Error, RawRepresentable<Int> {
             class Error1Case: E(2) {
-
                 override fun equals(other: Any?): Boolean = other is Error1Case
                 override fun hashCode(): Int = "Error1Case".hashCode()
             }
             class Error2Case: E(3) {
-
                 override fun equals(other: Any?): Boolean = other is Error2Case
                 override fun hashCode(): Int = "Error2Case".hashCode()
             }

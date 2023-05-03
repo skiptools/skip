@@ -183,9 +183,7 @@ final class FeatureSupportTests: XCTestCase {
             return "\(doubles)"
         }, kotlin: """
             val doubles: Array<Double> = arrayOf(1, 2, 3, 4)
-                get() {
-                    return field
-                }
+                get() = field
             return "${doubles}"
             """)
     }

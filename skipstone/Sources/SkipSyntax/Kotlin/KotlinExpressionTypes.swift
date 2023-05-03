@@ -966,14 +966,14 @@ class KotlinIf: KotlinExpression {
 
         if let ifCheckVariable {
             output.append("\n").append(indentation).append("if (!\(ifCheckVariable)) {\n")
-            elseBody.append(to: output, indentation: indentation.inc())
+            output.append(elseBody, indentation: indentation.inc())
             output.append(indentation).append("}")
         } else if let elseif {
             output.append(" else ")
-            elseif.append(to: output, indentation: indentation)
+            output.append(elseif, indentation: indentation)
         } else {
             output.append(" else {\n")
-            elseBody.append(to: output, indentation: indentation.inc())
+            output.append(elseBody, indentation: indentation.inc())
             output.append(indentation).append("}")
         }
     }

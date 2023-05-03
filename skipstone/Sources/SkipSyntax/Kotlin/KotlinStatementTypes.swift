@@ -1102,14 +1102,18 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
             }
             generics.appendWhere(to: output, indentation: indentation)
             output.append(" {\n")
+            var hasLabeledVals = false
             for (index, value) in associatedValues.enumerated() {
                 if let label = value.externalLabel {
+                    hasLabeledVals = true
                     output.append(indentation.inc()).append("val \(label) = associated\(index)\n")
                 }
             }
             if !members.isEmpty {
-                output.append("\n")
-                members.forEach { $0.append(to: output, indentation: indentation.inc()) }
+                if hasLabeledVals {
+                    output.append("\n")
+                }
+                members.forEach { output.append($0, indentation: indentation.inc()) }
             }
             output.append(indentation).append("}\n")
         } else {
@@ -2097,30 +2101,43 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
 
         if let getterBody = getter?.body {
             let getterIndentation = indentation.inc()
-            output.append(getterIndentation).append("get() {\n")
-            output.append(getterBody, indentation: getterIndentation.inc())
-            output.append(getterIndentation).append("}\n")
+            output.append(getterIndentation).append("get()")
+            if getterBody.isSingleStatementAppendable {
+                output.append(" = ")
+                getterBody.appendAsSingleStatement(to: output, indentation: getterIndentation)
+                output.append("\n")
+            } else {
+                output.append(" {\n")
+                output.append(getterBody, indentation: getterIndentation.inc())
+                output.append(getterIndentation).append("}\n")
+            }
         } else if (isProperty || isGlobal) && !isProtocolProperty {
             if usesStorageProperty || mayBeSharedMutableStruct {
                 let getterIndentation = indentation.inc()
-                let getterBodyIndentation = getterIndentation.inc()
-                output.append(getterIndentation).append("get() {\n")
-
-                var getIndentation = getterBodyIndentation
-                if let mutationFunctionNames, modifiers.isLazy {
-                    // Lazy getters are considered mutable
-                    output.append(getterBodyIndentation).append("val isinitialized = \(lazyInitInitializedName)\n")
-                    output.append(getterBodyIndentation).append("if (!isinitialized) \(mutationFunctionNames.willMutate)()\n")
-                    output.append(getterBodyIndentation).append("try {\n")
-                    getIndentation = getterBodyIndentation.inc()
+                let isSingleStatement = (!modifiers.isLazy || mutationFunctionNames == nil) && getFieldIsSingleStatementAppendable
+                output.append(getterIndentation).append("get()")
+                if isSingleStatement {
+                    output.append(" = ")
+                    appendGetField(to: output, indentation: getterIndentation, usesStorageProperty: usesStorageProperty, isSingleStatement: isSingleStatement)
+                } else {
+                    let getterBodyIndentation = getterIndentation.inc()
+                    var getIndentation = getterBodyIndentation
+                    output.append(" {\n")
+                    if let mutationFunctionNames, modifiers.isLazy {
+                        // Lazy getters are considered mutable
+                        output.append(getterBodyIndentation).append("val isinitialized = \(lazyInitInitializedName)\n")
+                        output.append(getterBodyIndentation).append("if (!isinitialized) \(mutationFunctionNames.willMutate)()\n")
+                        output.append(getterBodyIndentation).append("try {\n")
+                        getIndentation = getterBodyIndentation.inc()
+                    }
+                    appendGetField(to: output, indentation: getIndentation, usesStorageProperty: usesStorageProperty)
+                    if let mutationFunctionNames, modifiers.isLazy {
+                        output.append(getterBodyIndentation).append("} finally {\n")
+                        output.append(getIndentation).append("if (!isinitialized) \(mutationFunctionNames.didMutate)()\n")
+                        output.append(getterBodyIndentation).append("}\n")
+                    }
+                    output.append(getterIndentation).append("}\n")
                 }
-                appendGetField(to: output, indentation: getIndentation, usesStorageProperty: usesStorageProperty)
-                if let mutationFunctionNames, modifiers.isLazy {
-                    output.append(getterBodyIndentation).append("} finally {\n")
-                    output.append(getIndentation).append("if (!isinitialized) \(mutationFunctionNames.didMutate)()\n")
-                    output.append(getterBodyIndentation).append("}\n")
-                }
-                output.append(getterIndentation).append("}\n")
             }
         }
 
@@ -2232,21 +2249,27 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         }
     }
 
-    private func appendGetField(to output: OutputGenerator, indentation: Indentation, usesStorageProperty: Bool) {
+    private var getFieldIsSingleStatementAppendable: Bool {
+        return !modifiers.isLazy || value == nil
+    }
+
+    private func appendGetField(to output: OutputGenerator, indentation: Indentation, usesStorageProperty: Bool, isSingleStatement: Bool = false) {
         let fieldName = usesStorageProperty ? storagePropertyName : "field"
         let storageValue = mayBeSharedMutableStruct ? "\(fieldName).sref(\(onUpdate ?? ""))" : fieldName
-        if modifiers.isLazy {
-            if value != nil {
-                output.append(indentation).append("if (!\(lazyInitInitializedName)) {\n")
-                let initializeIndentation = indentation.inc()
-                output.append(initializeIndentation).append(storagePropertyName)
-                appendInitialValue(to: output, indentation: initializeIndentation)
-                output.append("\n")
-                output.append(initializeIndentation).append("\(lazyInitInitializedName) = true\n")
-                output.append(indentation).append("}\n")
-            }
+        if modifiers.isLazy && value != nil {
+            output.append(indentation).append("if (!\(lazyInitInitializedName)) {\n")
+            let initializeIndentation = indentation.inc()
+            output.append(initializeIndentation).append(storagePropertyName)
+            appendInitialValue(to: output, indentation: initializeIndentation)
+            output.append("\n")
+            output.append(initializeIndentation).append("\(lazyInitInitializedName) = true\n")
+            output.append(indentation).append("}\n")
         }
-        output.append(indentation).append("return \(storageValue)\n")
+        if isSingleStatement {
+            output.append(storageValue).append("\n")
+        } else {
+            output.append(indentation).append("return \(storageValue)\n")
+        }
     }
 
     private func appendSetField(to output: OutputGenerator, indentation: Indentation, usesStorageProperty: Bool, isCopy: Bool) {

@@ -191,9 +191,7 @@ final class ExpressionTests: XCTestCase {
         internal class S: MutableStruct {
             internal var i: Int
             internal var a: Array<String> = arrayOf()
-                get() {
-                    return field.sref({ this.a = it })
-                }
+                get() = field.sref({ this.a = it })
                 set(newValue) {
                     val newValue = newValue.sref()
                     willmutate()

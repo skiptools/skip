@@ -79,6 +79,7 @@ class KotlinCommonProtocolsTransformer: KotlinTransformer {
         }
 
         let toStringFunction = toStringFunction()
+        toStringFunction.extras = .singleNewline
         classDeclaration.members.append(toStringFunction)
         toStringFunction.parent = classDeclaration
         toStringFunction.assignParentReferences()
@@ -120,6 +121,9 @@ class KotlinCommonProtocolsTransformer: KotlinTransformer {
         }
         if classDeclaration.declarationType == .structDeclaration {
             let equalsFunction = equalsFunction(for: classDeclaration.signature.name, generics: classDeclaration.generics, properties: storedPropertyNames(of: classDeclaration))
+            if !classDeclaration.members.isEmpty {
+                equalsFunction.extras = .singleNewline
+            }
             classDeclaration.members.append(equalsFunction)
             equalsFunction.parent = classDeclaration
             equalsFunction.assignParentReferences()
@@ -143,6 +147,9 @@ class KotlinCommonProtocolsTransformer: KotlinTransformer {
         }
         if classDeclaration.declarationType == .structDeclaration {
             let hashCodeFunction = hashCodeFunction(for: classDeclaration.signature.name, properties: storedPropertyNames(of: classDeclaration))
+            if !classDeclaration.members.isEmpty {
+                hashCodeFunction.extras = .singleNewline
+            }
             classDeclaration.members.append(hashCodeFunction)
             hashCodeFunction.parent = classDeclaration
             hashCodeFunction.assignParentReferences()
@@ -164,7 +171,6 @@ class KotlinCommonProtocolsTransformer: KotlinTransformer {
         toStringFunction.returnType = .string
         toStringFunction.modifiers.visibility = .public
         toStringFunction.modifiers.isOverride = true
-        toStringFunction.extras = .singleNewline
         toStringFunction.isGenerated = true
 
         let statements: [KotlinStatement] = [KotlinRawStatement(sourceCode: "return description")]
@@ -177,7 +183,6 @@ class KotlinCommonProtocolsTransformer: KotlinTransformer {
         hashCodeFunction.returnType = .int
         hashCodeFunction.modifiers.visibility = .public
         hashCodeFunction.modifiers.isOverride = true
-        hashCodeFunction.extras = .singleNewline
         hashCodeFunction.isGenerated = true
 
         var statements: [KotlinStatement] = []
@@ -198,7 +203,6 @@ class KotlinCommonProtocolsTransformer: KotlinTransformer {
         equalsFunction.returnType = .bool
         equalsFunction.modifiers.visibility = .public
         equalsFunction.modifiers.isOverride = true
-        equalsFunction.extras = .singleNewline
         equalsFunction.isGenerated = true
 
         var typeName = className

@@ -246,7 +246,6 @@ final class EnumTests: XCTestCase {
         """, kotlin: """
         internal sealed class E<out T, out U> {
             class ACase<T, U>(val associated0: T, val associated1: U): E<T, U>() {
-
                 override fun equals(other: Any?): Boolean {
                     if (other !is ACase<*, *>) return false
                     return associated0 == other.associated0 && associated1 == other.associated1
@@ -259,7 +258,6 @@ final class EnumTests: XCTestCase {
                 }
             }
             class BCase<U>(val associated0: U, val associated1: String): E<Nothing, U>() {
-
                 override fun equals(other: Any?): Boolean {
                     if (other !is BCase<*>) return false
                     return associated0 == other.associated0 && associated1 == other.associated1
@@ -349,7 +347,6 @@ final class EnumTests: XCTestCase {
             class OneCase: E() {
             }
             class TwoCase(val associated0: String): E() {
-
                 override fun equals(other: Any?): Boolean {
                     if (other !is TwoCase) return false
                     return associated0 == other.associated0
@@ -512,9 +509,7 @@ final class EnumTests: XCTestCase {
 
             companion object {
                 val allCases: Array<E>
-                    get() {
-                        return arrayOf(one, two, three)
-                    }
+                    get() = arrayOf(one, two, three)
             }
         }
         """)
@@ -538,9 +533,7 @@ final class EnumTests: XCTestCase {
 
             companion object {
                 internal val allCases: Array<E>
-                    get() {
-                        return arrayOf(E.one, E.two, E.three)
-                    }
+                    get() = arrayOf(E.one, E.two, E.three)
             }
         }
         """)
@@ -553,12 +546,10 @@ final class EnumTests: XCTestCase {
         """, kotlin: """
         internal sealed class E: Exception(), CaseIterable, Error {
             class OneCase: E() {
-
                 override fun equals(other: Any?): Boolean = other is OneCase
                 override fun hashCode(): Int = "OneCase".hashCode()
             }
             class TwoCase: E() {
-
                 override fun equals(other: Any?): Boolean = other is TwoCase
                 override fun hashCode(): Int = "TwoCase".hashCode()
             }
@@ -568,9 +559,7 @@ final class EnumTests: XCTestCase {
                 fun two(): E = TwoCase()
 
                 val allCases: Array<E>
-                    get() {
-                        return arrayOf(one(), two())
-                    }
+                    get() = arrayOf(one(), two())
             }
         }
         """)

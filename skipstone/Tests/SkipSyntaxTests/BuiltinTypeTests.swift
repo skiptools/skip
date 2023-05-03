@@ -93,9 +93,7 @@ final class BuiltinTypeTests: XCTestCase {
         var c: CustomType
         """, kotlin: """
         internal var c: CustomType
-            get() {
-                return field.sref({ c = it })
-            }
+            get() = field.sref({ c = it })
             set(newValue) {
                 field = newValue.sref()
             }
@@ -110,16 +108,12 @@ final class BuiltinTypeTests: XCTestCase {
         """, kotlin: """
         internal var i: Int? = null
         internal var c: CustomType? = null
-            get() {
-                return field.sref({ c = it })
-            }
+            get() = field.sref({ c = it })
             set(newValue) {
                 field = newValue.sref()
             }
         internal var u: CustomType
-            get() {
-                return ustorage.sref({ u = it })
-            }
+            get() = ustorage.sref({ u = it })
             set(newValue) {
                 ustorage = newValue.sref()
             }

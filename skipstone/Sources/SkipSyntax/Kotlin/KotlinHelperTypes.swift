@@ -211,7 +211,7 @@ extension Array where Element == KotlinExpression {
     func appendAsLogicalConditions(to output: OutputGenerator, op: Operator = .with(symbol: "&&"), indentation: Indentation) {
         guard count > 1 else {
             if let condition = first {
-                condition.append(to: output, indentation: indentation)
+                output.append(condition, indentation: indentation)
             }
             return
         }

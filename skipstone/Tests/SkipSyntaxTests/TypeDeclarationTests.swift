@@ -212,16 +212,12 @@ final class TypeDeclarationTests: XCTestCase {
         """, kotlin: """
         internal interface P: I {
             val i: Int
-                get() {
-                    return 1
-                }
+                get() = 1
             val j: Int
             fun f(i: Int = 1): String = "f"
             fun g()
             val k: Int
-                get() {
-                    return 2
-                }
+                get() = 2
             fun h() = print("h")
         }
         """)
@@ -468,9 +464,7 @@ final class TypeDeclarationTests: XCTestCase {
         }
         internal open class C: U<Int, String, Double> {
             override var map = Dictionary<String, Double>()
-                get() {
-                    return field.sref({ this.map = it })
-                }
+                get() = field.sref({ this.map = it })
                 set(newValue) {
                     field = newValue.sref()
                 }
@@ -536,9 +530,7 @@ final class TypeDeclarationTests: XCTestCase {
             internal open fun f(): T? = null
         }
         internal val C<Int>.v: Int
-            get() {
-                return 1
-            }
+            get() = 1
         internal fun C<Int>.plusOne(): Int = (f() ?: 0) + 1
         """)
 
@@ -561,9 +553,7 @@ final class TypeDeclarationTests: XCTestCase {
             internal open fun f(): T? = null
         }
         internal val C<Int>.v: Int
-            get() {
-                return 1
-            }
+            get() = 1
         internal fun C<Int>.plusOne(): Int = (f() ?: 0) + 1
         """)
 
@@ -601,9 +591,7 @@ final class TypeDeclarationTests: XCTestCase {
         internal open class C<T, U> {
         }
         internal val <U> C<Int, U>.v: U? where U: P
-            get() {
-                return null
-            }
+            get() = null
         internal fun <U, V> C<Int, U>.f(p1: U, p2: V): Int where U: P, V: P = 1
         """)
 
@@ -670,9 +658,7 @@ final class TypeDeclarationTests: XCTestCase {
                     didmutate()
                 }
             internal val j: String
-                get() {
-                    return 1
-                }
+                get() = 1
 
             constructor(i: Int) {
                 this.i = i
@@ -915,9 +901,7 @@ final class TypeDeclarationTests: XCTestCase {
             override var rawValue: Int
 
             override val rawvaluelong: Long
-                get() {
-                    return Long(rawValue)
-                }
+                get() = Long(rawValue)
             override fun makeoptionset(rawvaluelong: Long): S = S(rawValue = Int(rawvaluelong))
             override fun assignoptionset(target: S) = assignfrom(target)
 
@@ -958,9 +942,7 @@ final class TypeDeclarationTests: XCTestCase {
             internal var rawValue: Long
 
             override val rawvaluelong: Long
-                get() {
-                    return rawValue
-                }
+                get() = rawValue
             override fun makeoptionset(rawvaluelong: Long): S = S(rawValue = rawvaluelong)
             override fun assignoptionset(target: S) = assignfrom(target)
 
@@ -1029,9 +1011,7 @@ final class TypeDeclarationTests: XCTestCase {
                 override var rawValue: Int
 
                 override val rawvaluelong: Long
-                    get() {
-                        return Long(rawValue)
-                    }
+                    get() = Long(rawValue)
                 override fun makeoptionset(rawvaluelong: Long): Outer.S = S(rawValue = Int(rawvaluelong))
                 override fun assignoptionset(target: Outer.S) = assignfrom(target)
 

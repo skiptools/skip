@@ -111,9 +111,7 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal val C.Companion.staticVar: Int
-            get() {
-                return 10
-            }
+            get() = 10
         internal fun C.Companion.staticFunc(): Int = 20
         """)
 
@@ -167,13 +165,9 @@ final class MemberDeclarationTests: XCTestCase {
         """, kotlin: """
         internal open class A {
             internal open val i: Int
-                get() {
-                    return 10
-                }
+                get() = 10
             internal open var j: Int
-                get() {
-                    return 10
-                }
+                get() = 10
                 set(newValue) {
                     print(newValue)
                 }
@@ -185,7 +179,7 @@ final class MemberDeclarationTests: XCTestCase {
         class A {
             var i: Int {
                 get {
-                    return 10
+                    10
                 }
                 set(value) {
                     print(value)
@@ -195,9 +189,7 @@ final class MemberDeclarationTests: XCTestCase {
         """, kotlin: """
         internal open class A {
             internal open var i: Int
-                get() {
-                    return 10
-                }
+                get() = 10
                 set(newValue) {
                     val value = newValue
                     print(value)
@@ -581,9 +573,7 @@ final class MemberDeclarationTests: XCTestCase {
         """, kotlin: """
         internal open class C {
             internal var s: S
-                get() {
-                    return sstorage.sref({ this.s = it })
-                }
+                get() = sstorage.sref({ this.s = it })
                 set(newValue) {
                     sstorage = newValue.sref()
                 }
@@ -611,9 +601,7 @@ final class MemberDeclarationTests: XCTestCase {
         """, kotlin: """
         internal open class C {
             internal var v: V
-                get() {
-                    return vstorage
-                }
+                get() = vstorage
                 set(newValue) {
                     vstorage = newValue
                     print("did set")
@@ -638,9 +626,7 @@ final class MemberDeclarationTests: XCTestCase {
         """, kotlin: """
         internal class S: MutableStruct {
             internal var v: V
-                get() {
-                    return vstorage
-                }
+                get() = vstorage
                 set(newValue) {
                     willmutate()
                     vstorage = newValue
@@ -1260,9 +1246,7 @@ final class MemberDeclarationTests: XCTestCase {
                 this.i = param
             }
             internal open val description: String
-                get() {
-                    return "foo"
-                }
+                get() = "foo"
 
             override fun toString(): String = description
         }
