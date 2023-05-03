@@ -110,15 +110,9 @@ final class FeatureSupportTests: XCTestCase {
             
                 companion object {
                     val null_: KeywordsEnum = Null_Case()
-                    fun string(associated0: String): KeywordsEnum {
-                        return StringCase(associated0)
-                    }
-                    fun boolean(associated0: Boolean): KeywordsEnum {
-                        return BooleanCase(associated0)
-                    }
-                    fun object_(associated0: Any): KeywordsEnum {
-                        return Object_Case(associated0)
-                    }
+                    fun string(associated0: String): KeywordsEnum = StringCase(associated0)
+                    fun boolean(associated0: Boolean): KeywordsEnum = BooleanCase(associated0)
+                    fun object_(associated0: Any): KeywordsEnum = Object_Case(associated0)
                     val case: KeywordsEnum = CaseCase()
                 }
             }
