@@ -42,20 +42,22 @@ class KotlinCodableTransformer: KotlinTransformer {
             } as? KotlinFunctionDeclaration
             decodeDeclaration?.modifiers.visibility = .public
         }
-        guard (isEncodable && encodeDeclaration == nil) || (isDecodable && decodeDeclaration == nil) else {
-            return
-        }
 
-        // The developer may use a bespoke name for their coding keys enum if they implement their own encode/decode,
-        // so we only synthesize or look for coding keys after knowing we need to generate a coding function
-        let rawValueType = classDeclaration.rawValueType
-        let codingKeys = synthesizeCodingKeys(for: classDeclaration, rawValueType: rawValueType, isDecodable: isDecodable)
-        let typedCodingKeys = codingKeys.map { $0.map { ($0, propertyType(for: $0, in: classDeclaration, source: source)) } }
-        if isEncodable && encodeDeclaration == nil {
-            synthesizeEncode(for: classDeclaration, codingKeys: typedCodingKeys, rawValueType: rawValueType, source: source)
+        if (isEncodable && encodeDeclaration == nil) || (isDecodable && decodeDeclaration == nil) {
+            // The developer may use a bespoke name for their coding keys enum if they implement their own encode/decode,
+            // so we only synthesize or look for coding keys after knowing we need to generate a coding function
+            let rawValueType = classDeclaration.rawValueType
+            let codingKeys = synthesizeCodingKeys(for: classDeclaration, rawValueType: rawValueType, isDecodable: isDecodable)
+            let typedCodingKeys = codingKeys.map { $0.map { ($0, propertyType(for: $0, in: classDeclaration, source: source)) } }
+            if isEncodable && encodeDeclaration == nil {
+                synthesizeEncode(for: classDeclaration, codingKeys: typedCodingKeys, rawValueType: rawValueType, source: source)
+            }
+            if isDecodable && decodeDeclaration == nil {
+                synthesizeDecode(for: classDeclaration, codingKeys: typedCodingKeys, rawValueType: rawValueType, source: source)
+            }
         }
-        if isDecodable && decodeDeclaration == nil {
-            synthesizeDecode(for: classDeclaration, codingKeys: typedCodingKeys, rawValueType: rawValueType, source: source)
+        if isDecodable {
+            synthesizeDecodableCompanion(for: classDeclaration)
         }
     }
 
@@ -190,6 +192,26 @@ class KotlinCodableTransformer: KotlinTransformer {
             return
         }
         decode.assignParentReferences()
+    }
+
+    private func synthesizeDecodableCompanion(for classDeclaration: KotlinClassDeclaration) {
+        classDeclaration.companionInherits.append(.named("DecodableCompanion", []))
+
+        let factory = KotlinFunctionDeclaration(name: "init")
+        factory.extras = .singleNewline
+        factory.modifiers.visibility = .public
+        factory.modifiers.isStatic = true
+        factory.modifiers.isOverride = true
+        factory.isGenerated = true
+        factory.parameters = [Parameter<KotlinExpression>(externalLabel: "from", declaredType: .named("Decoder", []))]
+        factory.returnType = .any
+
+        let statement = KotlinRawStatement(sourceCode: "return \(classDeclaration.signature.kotlin)(from = from)")
+        factory.body = KotlinCodeBlock(statements: [statement])
+
+        classDeclaration.members.append(factory)
+        factory.parent = classDeclaration
+        factory.assignParentReferences()
     }
 
     private func propertyType(for codingKey: KotlinEnumCaseDeclaration, in classDeclaration: KotlinClassDeclaration, source: Source) -> TypeSignature {

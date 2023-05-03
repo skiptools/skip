@@ -731,6 +731,7 @@ class KotlinClassDeclaration: KotlinStatement {
     var name: String
     var signature: TypeSignature
     var inherits: [TypeSignature] = []
+    var companionInherits: [TypeSignature] = []
     var superclassCall: String?
     var attributes = Attributes()
     var modifiers = Modifiers()
@@ -943,9 +944,13 @@ class KotlinClassDeclaration: KotlinStatement {
         }
 
         // Always add a companion object to public types in case another module extends it with static members
-        if !staticMembers.isEmpty || modifiers.visibility == .public || modifiers.visibility == .open || isSealedClassesEnum {
+        if !staticMembers.isEmpty || modifiers.visibility == .public || modifiers.visibility == .open || isSealedClassesEnum || !companionInherits.isEmpty {
             output.append("\n")
-            output.append(memberIndentation).append("companion object {\n")
+            output.append(memberIndentation).append("companion object")
+            if !companionInherits.isEmpty {
+                output.append(": \(companionInherits.map(\.kotlin).joined(separator: ", "))")
+            }
+            output.append(" {\n")
             let companionMemberIndentation = memberIndentation.inc()
             if isSealedClassesEnum {
                 enumCases.forEach { $0.appendSealedClassFactory(to: output, forEnum: name, alwaysCreateNewInstances: alwaysCreateNewSealedClassInstances, indentation: companionMemberIndentation) }
