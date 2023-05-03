@@ -45,9 +45,7 @@ final class TypeInferenceTests: XCTestCase {
             return .case1
         }
         """, kotlin: """
-        internal fun enumReturn(): E {
-            return E.case1
-        }
+        internal fun enumReturn(): E = E.case1
         """)
     }
 
@@ -87,9 +85,7 @@ final class TypeInferenceTests: XCTestCase {
             return .instance
         }
         """, kotlin: """
-        internal fun classReturn(): C {
-            return C.instance
-        }
+        internal fun classReturn(): C = C.instance
         """)
 
         try await check(supportingSwift: supportingSwift, swift: """
@@ -103,12 +99,8 @@ final class TypeInferenceTests: XCTestCase {
         }
         """, kotlin: """
         internal open class C2 {
-            internal open fun classReturnMemberFunc(): C {
-                return C.instance
-            }
-            internal open fun f(): Boolean {
-                return classReturnMemberFunc() == C.instance
-            }
+            internal open fun classReturnMemberFunc(): C = C.instance
+            internal open fun f(): Boolean = classReturnMemberFunc() == C.instance
         }
         """)
     }
@@ -202,21 +194,13 @@ final class TypeInferenceTests: XCTestCase {
         }
         """, kotlin: """
         internal open class C {
-            internal open fun returnEnum(): DuplicateE {
-                return DuplicateE.case1
-            }
-            internal open fun instanceContext(): Boolean {
-                return returnEnum() == DuplicateE.case1
-            }
+            internal open fun returnEnum(): DuplicateE = DuplicateE.case1
+            internal open fun instanceContext(): Boolean = returnEnum() == DuplicateE.case1
 
             companion object {
-                internal fun returnEnum(): E {
-                    return E.case1
-                }
+                internal fun returnEnum(): E = E.case1
 
-                internal fun staticContext(): Boolean {
-                    return returnEnum() == E.case1
-                }
+                internal fun staticContext(): Boolean = returnEnum() == E.case1
             }
         }
         """)
@@ -264,9 +248,7 @@ final class TypeInferenceTests: XCTestCase {
             return c.v == .myZero
         }
         """, kotlin: """
-        internal fun f(c: C<Int>): Boolean {
-            return c.v == Int.myZero
-        }
+        internal fun f(c: C<Int>): Boolean = c.v == Int.myZero
         """)
 
         try await check(supportingSwift: """
@@ -286,9 +268,7 @@ final class TypeInferenceTests: XCTestCase {
         """, kotlin: """
         internal open class C<T> where T: P {
             internal var v: T
-            internal open fun f(): Boolean {
-                return v.pfunc() == Int.myZero
-            }
+            internal open fun f(): Boolean = v.pfunc() == Int.myZero
         }
         """)
 
@@ -304,9 +284,7 @@ final class TypeInferenceTests: XCTestCase {
             return c.v[1] == .myZero
         }
         """, kotlin: """
-        internal fun f(c: C<Array<Int>>): Boolean {
-            return c.v[1] == Int.myZero
-        }
+        internal fun f(c: C<Array<Int>>): Boolean = c.v[1] == Int.myZero
         """)
     }
 
@@ -329,9 +307,7 @@ final class TypeInferenceTests: XCTestCase {
             return c.v == .myZero && c.u == .myEmpty
         }
         """, kotlin: """
-        internal fun f(c: C<String>): Boolean {
-            return c.v == Int.myZero && c.u == String.myEmpty
-        }
+        internal fun f(c: C<String>): Boolean = c.v == Int.myZero && c.u == String.myEmpty
         """)
     }
 

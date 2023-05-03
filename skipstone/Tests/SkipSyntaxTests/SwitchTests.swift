@@ -228,14 +228,10 @@ final class SwitchTests: XCTestCase {
 
             companion object {
                 val case1: E<Nothing> = Case1Case()
-                fun <T> case2(associated0: T, associated1: String): E<T> {
-                    return Case2Case(associated0, associated1)
-                }
+                fun <T> case2(associated0: T, associated1: String): E<T> = Case2Case(associated0, associated1)
             }
         }
-        internal fun enumFactory(): E<Double> {
-            return E.case2(100.0, "abc")
-        }
+        internal fun enumFactory(): E<Double> = E.case2(100.0, "abc")
         internal fun g() {
             val e = enumFactory()
             when (e) {

@@ -42,7 +42,22 @@ final class TriviaTests: XCTestCase {
             }
 
             // Func comment
-            internal open fun f2() {
+            internal open fun f2() = Unit
+        }
+        """)
+
+        try await check(swift: """
+        class S {
+            func f() {
+                // Comment on single-statement function
+                print("foo")
+            }
+        }
+        """, kotlin: """
+        internal open class S {
+            internal open fun f() {
+                // Comment on single-statement function
+                print("foo")
             }
         }
         """)
@@ -80,16 +95,13 @@ final class TriviaTests: XCTestCase {
             print("original")
         }
         """, kotlin: """
-        internal fun f() {
-        }
+        internal fun f() = Unit
 
         fun insert() {
             print("inserted")
         }
 
-        internal fun g() {
-            print("original")
-        }
+        internal fun g() = print("original")
         """)
     }
 
@@ -101,9 +113,7 @@ final class TriviaTests: XCTestCase {
             print("body")
         }
         """, kotlin: """
-        open fun myf() {
-            print("body")
-        }
+        open fun myf() = print("body")
         """)
 
         try await check(swift: """

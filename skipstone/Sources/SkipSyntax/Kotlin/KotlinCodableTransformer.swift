@@ -162,7 +162,9 @@ class KotlinCodableTransformer: KotlinTransformer {
 
         var statements: [KotlinStatement] = []
         if let codingKeys {
-            statements.append(KotlinRawStatement(sourceCode: "val container = from.container(keyedBy = CodingKeys::class)"))
+            if !codingKeys.isEmpty {
+                statements.append(KotlinRawStatement(sourceCode: "val container = from.container(keyedBy = CodingKeys::class)"))
+            }
             statements += codingKeys.map {
                 let type = $0.1
                 let decodeFunction = type.isOptional ? "decodeIfPresent" : "decode"

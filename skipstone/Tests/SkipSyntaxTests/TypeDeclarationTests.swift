@@ -92,9 +92,7 @@ final class TypeDeclarationTests: XCTestCase {
 
             override var supdate: ((Any) -> Unit)? = null
             override var smutatingcount = 0
-            override fun scopy(): MutableStruct {
-                return A(this as MutableStruct)
-            }
+            override fun scopy(): MutableStruct = A(this as MutableStruct)
         }
         """)
     }
@@ -117,10 +115,8 @@ final class TypeDeclarationTests: XCTestCase {
         """, kotlin: """
         internal open class TypeDeclarationTestsClass: TypeDeclarationTestsProtocol {
             internal var i = 0
-            override fun f() {
-            }
-            internal open fun g() {
-            }
+            override fun f() = Unit
+            internal open fun g() = Unit
         }
         """)
 
@@ -131,8 +127,7 @@ final class TypeDeclarationTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal fun C.f() {
-        }
+        internal fun C.f() = Unit
         """)
         try await checkProducesMessage(swift: """
         extension C: I {
@@ -221,17 +216,13 @@ final class TypeDeclarationTests: XCTestCase {
                     return 1
                 }
             val j: Int
-            fun f(i: Int = 1): String {
-                return "f"
-            }
+            fun f(i: Int = 1): String = "f"
             fun g()
             val k: Int
                 get() {
                     return 2
                 }
-            fun h() {
-                print("h")
-            }
+            fun h() = print("h")
         }
         """)
     }
@@ -446,11 +437,8 @@ final class TypeDeclarationTests: XCTestCase {
             fun get(): T
         }
         internal open class C: P<Int> {
-            override fun add(t: Int) {
-            }
-            override fun get(): Int {
-                return 0
-            }
+            override fun add(t: Int) = Unit
+            override fun get(): Int = 0
         }
         """)
 
@@ -486,10 +474,8 @@ final class TypeDeclarationTests: XCTestCase {
                 set(newValue) {
                     field = newValue.sref()
                 }
-            override fun add(t: Array<Int>) {
-            }
-            internal open fun add(x: Double) {
-            }
+            override fun add(t: Array<Int>) = Unit
+            internal open fun add(x: Double) = Unit
         }
         """)
 
@@ -521,9 +507,7 @@ final class TypeDeclarationTests: XCTestCase {
         internal open class Base<T> {
         }
         internal open class C<U>: Base<U>() {
-            internal open fun f(): U? {
-                return null
-            }
+            internal open fun f(): U? = null
         }
         internal open class D: Base<Boolean>() {
         }
@@ -549,17 +533,13 @@ final class TypeDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal open class C<T> {
-            internal open fun f(): T? {
-                return null
-            }
+            internal open fun f(): T? = null
         }
         internal val C<Int>.v: Int
             get() {
                 return 1
             }
-        internal fun C<Int>.plusOne(): Int {
-            return (f() ?: 0) + 1
-        }
+        internal fun C<Int>.plusOne(): Int = (f() ?: 0) + 1
         """)
 
         try await check(swift: """
@@ -578,17 +558,13 @@ final class TypeDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal open class C<T> {
-            internal open fun f(): T? {
-                return null
-            }
+            internal open fun f(): T? = null
         }
         internal val C<Int>.v: Int
             get() {
                 return 1
             }
-        internal fun C<Int>.plusOne(): Int {
-            return (f() ?: 0) + 1
-        }
+        internal fun C<Int>.plusOne(): Int = (f() ?: 0) + 1
         """)
 
         try await check(supportingSwift: """
@@ -604,8 +580,7 @@ final class TypeDeclarationTests: XCTestCase {
         """, kotlin: """
         internal open class C<T, U> {
         }
-        internal fun <T, U> C<T, U>.f(p: T) where T: P {
-        }
+        internal fun <T, U> C<T, U>.f(p: T) where T: P = Unit
         """)
 
         try await check(supportingSwift: """
@@ -629,9 +604,7 @@ final class TypeDeclarationTests: XCTestCase {
             get() {
                 return null
             }
-        internal fun <U, V> C<Int, U>.f(p1: U, p2: V): Int where U: P, V: P {
-            return 1
-        }
+        internal fun <U, V> C<Int, U>.f(p1: U, p2: V): Int where U: P, V: P = 1
         """)
 
         try await checkProducesMessage(swift: """
@@ -707,9 +680,7 @@ final class TypeDeclarationTests: XCTestCase {
 
             override var supdate: ((Any) -> Unit)? = null
             override var smutatingcount = 0
-            override fun scopy(): MutableStruct {
-                return S(i)
-            }
+            override fun scopy(): MutableStruct = S(i)
 
             override fun equals(other: Any?): Boolean {
                 if (other !is S) return false
@@ -799,9 +770,7 @@ final class TypeDeclarationTests: XCTestCase {
 
             override var supdate: ((Any) -> Unit)? = null
             override var smutatingcount = 0
-            override fun scopy(): MutableStruct {
-                return S(i)
-            }
+            override fun scopy(): MutableStruct = S(i)
 
             override fun equals(other: Any?): Boolean {
                 if (other !is S) return false
@@ -949,14 +918,8 @@ final class TypeDeclarationTests: XCTestCase {
                 get() {
                     return Long(rawValue)
                 }
-
-            override fun makeoptionset(rawvaluelong: Long): S {
-                return S(rawValue = Int(rawvaluelong))
-            }
-
-            override fun assignoptionset(target: S) {
-                assignfrom(target)
-            }
+            override fun makeoptionset(rawvaluelong: Long): S = S(rawValue = Int(rawvaluelong))
+            override fun assignoptionset(target: S) = assignfrom(target)
 
             constructor(rawValue: Int) {
                 this.rawValue = rawValue
@@ -979,9 +942,7 @@ final class TypeDeclarationTests: XCTestCase {
             }
         }
 
-        internal fun has1(s: S): Boolean {
-            return s.contains(S.s1)
-        }
+        internal fun has1(s: S): Boolean = s.contains(S.s1)
         """)
 
         try await check(swift: """
@@ -1000,14 +961,8 @@ final class TypeDeclarationTests: XCTestCase {
                 get() {
                     return rawValue
                 }
-
-            override fun makeoptionset(rawvaluelong: Long): S {
-                return S(rawValue = rawvaluelong)
-            }
-
-            override fun assignoptionset(target: S) {
-                assignfrom(target)
-            }
+            override fun makeoptionset(rawvaluelong: Long): S = S(rawValue = rawvaluelong)
+            override fun assignoptionset(target: S) = assignfrom(target)
 
             constructor(rawValue: Long) {
                 this.rawValue = rawValue
@@ -1077,14 +1032,8 @@ final class TypeDeclarationTests: XCTestCase {
                     get() {
                         return Long(rawValue)
                     }
-
-                override fun makeoptionset(rawvaluelong: Long): Outer.S {
-                    return S(rawValue = Int(rawvaluelong))
-                }
-
-                override fun assignoptionset(target: Outer.S) {
-                    assignfrom(target)
-                }
+                override fun makeoptionset(rawvaluelong: Long): Outer.S = S(rawValue = Int(rawvaluelong))
+                override fun assignoptionset(target: Outer.S) = assignfrom(target)
 
                 constructor(rawValue: Int) {
                     this.rawValue = rawValue
@@ -1130,9 +1079,7 @@ final class TypeDeclarationTests: XCTestCase {
 
             override var supdate: ((Any) -> Unit)? = null
             override var smutatingcount = 0
-            override fun scopy(): MutableStruct {
-                return Gen<T, U, V>(name)
-            }
+            override fun scopy(): MutableStruct = Gen<T, U, V>(name)
         }
         """)
     }
@@ -1162,14 +1109,9 @@ final class TypeDeclarationTests: XCTestCase {
         
             override var supdate: ((Any) -> Unit)? = null
             override var smutatingcount = 0
-            override fun scopy(): MutableStruct {
-                return Gen<T>(this as MutableStruct)
-            }
+            override fun scopy(): MutableStruct = Gen<T>(this as MutableStruct)
         }
         """)
     }
 
 }
-
-
-

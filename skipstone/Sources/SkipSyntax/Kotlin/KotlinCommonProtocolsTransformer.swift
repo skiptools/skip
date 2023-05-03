@@ -205,16 +205,16 @@ class KotlinCommonProtocolsTransformer: KotlinTransformer {
         if !generics.entries.isEmpty {
             typeName += "<\((0..<generics.entries.count).map { _ in "*" }.joined(separator: ", "))>"
         }
-        let conditions: String
+        let statements: [KotlinStatement]
         if properties.isEmpty {
-            conditions = "true"
+            statements = [KotlinRawStatement(sourceCode: "return other is \(typeName)")]
         } else {
-            conditions = properties.map { "\($0) == other.\($0)" }.joined(separator: " && ")
+            let conditions = properties.map { "\($0) == other.\($0)" }.joined(separator: " && ")
+            statements = [
+                KotlinRawStatement(sourceCode: "if (other !is \(typeName)) return false"),
+                KotlinRawStatement(sourceCode: "return \(conditions)")
+            ]
         }
-        let statements: [KotlinStatement] = [
-            KotlinRawStatement(sourceCode: "if (other !is \(typeName)) return false"),
-            KotlinRawStatement(sourceCode: "return \(conditions)")
-        ]
         equalsFunction.body = KotlinCodeBlock(statements: statements)
         return equalsFunction
     }

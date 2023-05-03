@@ -11,8 +11,7 @@ final class AttributeTests: XCTestCase {
         }
         """, kotlin: """
         internal open class C {
-            internal open fun f() {
-            }
+            internal open fun f() = Unit
         }
         """)
     }
@@ -26,9 +25,7 @@ final class AttributeTests: XCTestCase {
             return ""
         }, kotlin: """
             @Deprecated("this function is unimplemented", level = DeprecationLevel.ERROR)
-            fun someOldFunction(): String {
-                return ""
-            }
+            fun someOldFunction(): String = ""
             return ""
             """)
 
@@ -40,9 +37,7 @@ final class AttributeTests: XCTestCase {
             return ""
         }, kotlin: """
             @Deprecated("\(Message.unavailableLabel)", level = DeprecationLevel.ERROR)
-            fun someOldFunction(): String {
-                return ""
-            }
+            fun someOldFunction(): String = ""
             return ""
             """)
 
@@ -90,9 +85,7 @@ final class AttributeTests: XCTestCase {
             return ""
         }, kotlin: """
             @Deprecated("this function is deprecated")
-            fun someDepFunction(): String {
-                return ""
-            }
+            fun someDepFunction(): String = ""
             return ""
             """)
 
@@ -104,9 +97,7 @@ final class AttributeTests: XCTestCase {
             return ""
         }, kotlin: """
             @Deprecated("\(Message.deprecatedLabel)")
-            fun someDepFunction(): String {
-                return ""
-            }
+            fun someDepFunction(): String = ""
             return ""
             """)
 

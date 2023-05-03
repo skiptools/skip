@@ -21,9 +21,7 @@ final class OperatorTests: XCTestCase {
             return a + b * 2 == .myZero
         }
         """, kotlin: """
-        internal fun op(a: Int, b: Int): Boolean {
-            return a + b * 2 == Int.myZero
-        }
+        internal fun op(a: Int, b: Int): Boolean = a + b * 2 == Int.myZero
         """)
 
         try await check(supportingSwift: supportingSwift, swift: """
@@ -31,9 +29,7 @@ final class OperatorTests: XCTestCase {
             return a * b + 2 == .myZero
         }
         """, kotlin: """
-        internal fun op(a: Double, b: Double): Boolean {
-            return a * b + 2 == Double.myZero
-        }
+        internal fun op(a: Double, b: Double): Boolean = a * b + 2 == Double.myZero
         """)
     }
 
@@ -278,9 +274,7 @@ final class OperatorTests: XCTestCase {
             return i % 2 == 0 ? true : false
         }
         """, kotlin: """
-        internal fun isEven(i: Int): Boolean {
-            return if (i % 2 == 0) true else false
-        }
+        internal fun isEven(i: Int): Boolean = if (i % 2 == 0) true else false
         """)
     }
 }

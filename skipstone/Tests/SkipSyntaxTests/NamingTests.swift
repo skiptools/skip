@@ -45,10 +45,8 @@ final class NamingTests: XCTestCase {
                 var interface_: Int = 2
                 var this_ = 1.234
                 var enum: EnumType = EnumType.null_
-                fun packageFunction(package_: String) {
-                }
-                fun objectArgFunction(object_: EnumType) {
-                }
+                fun packageFunction(package_: String) = Unit
+                fun objectArgFunction(object_: EnumType) = Unit
             }
             enum class EnumType {
                 null_,

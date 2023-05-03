@@ -225,12 +225,8 @@ final class FeatureSupportTests: XCTestCase {
             let x = f(f(f(f(f(f(f(f(f(f(f(f(f(f(f(88888888)))))))))))))))
             return x
         }, kotlin: """
-            fun f(number: Int): String {
-                return "${number}"
-            }
-            fun f(string: String): Int {
-                return string.length
-            }
+            fun f(number: Int): String = "${number}"
+            fun f(string: String): Int = string.length
             val x = f(f(f(f(f(f(f(f(f(f(f(f(f(f(f(88888888)))))))))))))))
             return x
             """)

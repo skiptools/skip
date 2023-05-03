@@ -39,9 +39,7 @@ final class MemberDeclarationTests: XCTestCase {
                 internal val staticLet = 1
                 internal var staticVar = 10
 
-                internal fun staticFunc(): Int {
-                    return 20
-                }
+                internal fun staticFunc(): Int = 20
             }
         }
         """)
@@ -66,21 +64,16 @@ final class MemberDeclarationTests: XCTestCase {
         """, kotlin: """
         internal open class A<T> {
 
-            internal open fun f(): T {
-            }
+            internal open fun f(): T = Unit
 
             companion object {
                 internal val staticLet = 1
 
-                internal fun staticFunc(): Int {
-                    return 20
-                }
+                internal fun staticFunc(): Int = 20
 
-                internal fun <T> staticFunc2(p: T): T {
-                }
+                internal fun <T> staticFunc2(p: T): T = Unit
 
-                internal fun <T, U> staticFunc3(p1: T, p2: U): T {
-                }
+                internal fun <T, U> staticFunc3(p1: T, p2: U): T = Unit
             }
         }
         """)
@@ -96,7 +89,7 @@ final class MemberDeclarationTests: XCTestCase {
 
         try await checkProducesMessage(swift: """
         class A<T> {
-            static func staticFunc() -> T {
+            static func staticFunc() -> T
             }
 
             func f() -> T {
@@ -121,9 +114,7 @@ final class MemberDeclarationTests: XCTestCase {
             get() {
                 return 10
             }
-        internal fun C.Companion.staticFunc(): Int {
-            return 20
-        }
+        internal fun C.Companion.staticFunc(): Int = 20
         """)
 
         try await checkProducesMessage(swift: """
@@ -154,8 +145,7 @@ final class MemberDeclarationTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal fun <T> C.Companion.staticFunc(p: T): T {
-        }
+        internal fun <T> C.Companion.staticFunc(p: T): T = Unit
         """)
     }
 
@@ -342,9 +332,7 @@ final class MemberDeclarationTests: XCTestCase {
 
             override var supdate: ((Any) -> Unit)? = null
             override var smutatingcount = 0
-            override fun scopy(): MutableStruct {
-                return A(i, j)
-            }
+            override fun scopy(): MutableStruct = A(i, j)
 
             private var suppresssideeffects = false
         }
@@ -524,9 +512,7 @@ final class MemberDeclarationTests: XCTestCase {
 
             override var supdate: ((Any) -> Unit)? = null
             override var smutatingcount = 0
-            override fun scopy(): MutableStruct {
-                return S()
-            }
+            override fun scopy(): MutableStruct = S()
         }
         """)
     }
@@ -556,9 +542,7 @@ final class MemberDeclarationTests: XCTestCase {
                 }
             private var fstorage = Int(0)
             private var finitialized = false
-            private fun factorial(i: Int): Int {
-                return 0
-            }
+            private fun factorial(i: Int): Int = 0
         }
         """)
     }
@@ -669,9 +653,7 @@ final class MemberDeclarationTests: XCTestCase {
 
             override var supdate: ((Any) -> Unit)? = null
             override var smutatingcount = 0
-            override fun scopy(): MutableStruct {
-                return S()
-            }
+            override fun scopy(): MutableStruct = S()
         }
         """)
 
@@ -691,9 +673,7 @@ final class MemberDeclarationTests: XCTestCase {
             return 1
         }
         """, kotlin: """
-        internal fun f(): Int {
-            return 1
-        }
+        internal fun f(): Int = 1
         """)
     }
 
@@ -774,8 +754,7 @@ final class MemberDeclarationTests: XCTestCase {
         """, kotlin: """
         internal open class PImpl: P {
             override var i = 0
-            override fun f() {
-            }
+            override fun f() = Unit
         }
         """)
     }
@@ -810,16 +789,11 @@ final class MemberDeclarationTests: XCTestCase {
         func g(a: Int) {
         }
         """, kotlin: """
-        internal fun f(a: Int, unusedp_0: Nothing? = null) {
-        }
-        internal fun f(c: Int) {
-        }
-        internal fun f(b: Int, unusedp_0: Nothing? = null, unusedp_1: Nothing? = null) {
-        }
-        internal fun f(a: Double) {
-        }
-        internal fun g(a: Int) {
-        }
+        internal fun f(a: Int, unusedp_0: Nothing? = null) = Unit
+        internal fun f(c: Int) = Unit
+        internal fun f(b: Int, unusedp_0: Nothing? = null, unusedp_1: Nothing? = null) = Unit
+        internal fun f(a: Double) = Unit
+        internal fun g(a: Int) = Unit
         """)
     }
 
@@ -833,10 +807,8 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal open class A {
-            internal open fun f(a: Int, unusedp_0: Nothing? = null) {
-            }
-            internal open fun f(b: Int) {
-            }
+            internal open fun f(a: Int, unusedp_0: Nothing? = null) = Unit
+            internal open fun f(b: Int) = Unit
         }
         """)
 
@@ -849,10 +821,8 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         open class A {
-            open fun f(a: Int) {
-            }
-            internal open fun f(b: Int, unusedp_0: Nothing? = null) {
-            }
+            open fun f(a: Int) = Unit
+            internal open fun f(b: Int, unusedp_0: Nothing? = null) = Unit
 
             companion object {
             }
@@ -874,16 +844,13 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal open class A {
-            internal open fun f(a: Int) {
-            }
+            internal open fun f(a: Int) = Unit
         }
         internal open class B: A() {
-            internal open fun f(b: Int, unusedp_0: Nothing? = null) {
-            }
+            internal open fun f(b: Int, unusedp_0: Nothing? = null) = Unit
         }
         internal open class C {
-            internal open fun f(c: Int) {
-            }
+            internal open fun f(c: Int) = Unit
         }
         """)
 
@@ -898,12 +865,10 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal open class A {
-            internal open fun f(a: Int) {
-            }
+            internal open fun f(a: Int) = Unit
         }
         internal open class B: A() {
-            override fun f(a: Int) {
-            }
+            override fun f(a: Int) = Unit
         }
         """)
 
@@ -923,16 +888,13 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal open class A {
-            internal open fun f(c: Int) {
-            }
+            internal open fun f(c: Int) = Unit
         }
         internal open class B: A() {
-            internal open fun f(b: Int, unusedp_0: Nothing? = null) {
-            }
+            internal open fun f(b: Int, unusedp_0: Nothing? = null) = Unit
         }
         internal open class C {
-            internal open fun f(a: Int) {
-            }
+            internal open fun f(a: Int) = Unit
         }
         """)
 
@@ -955,20 +917,15 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal open class A {
-            internal open fun f(a: Int) {
-            }
-            internal open fun g(z: Int) {
-            }
+            internal open fun f(a: Int) = Unit
+            internal open fun g(z: Int) = Unit
         }
         internal open class B: A() {
-            internal open fun f(b: Int, unusedp_0: Nothing? = null) {
-            }
+            internal open fun f(b: Int, unusedp_0: Nothing? = null) = Unit
         }
         internal open class C: B() {
-            internal open fun f(c: Int, unusedp_0: Nothing? = null, unusedp_1: Nothing? = null) {
-            }
-            internal open fun g(a: Int, unusedp_0: Nothing? = null) {
-            }
+            internal open fun f(c: Int, unusedp_0: Nothing? = null, unusedp_1: Nothing? = null) = Unit
+            internal open fun g(a: Int, unusedp_0: Nothing? = null) = Unit
         }
         """)
 
@@ -995,10 +952,8 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal open class A: P {
-            override fun f(a: Int) {
-            }
-            internal open fun f(b: Int, unusedp_0: Nothing? = null) {
-            }
+            override fun f(a: Int) = Unit
+            internal open fun f(b: Int, unusedp_0: Nothing? = null) = Unit
         }
         internal interface P {
             fun f(a: Int)
@@ -1038,16 +993,12 @@ final class MemberDeclarationTests: XCTestCase {
             fun f(b: Int, unusedp_0: Nothing? = null)
         }
         internal open class A: P1 {
-            override fun f(a: Int) {
-            }
+            override fun f(a: Int) = Unit
         }
         internal open class B: P2, P3 {
-            override fun f(a: Int) {
-            }
-            override fun f(a: Double) {
-            }
-            override fun f(b: Int, unusedp_0: Nothing?) {
-            }
+            override fun f(a: Int) = Unit
+            override fun f(a: Double) = Unit
+            override fun f(b: Int, unusedp_0: Nothing?) = Unit
         }
         """)
 
@@ -1110,16 +1061,14 @@ final class MemberDeclarationTests: XCTestCase {
         func f<T, U>(a: T, b: U) -> T? {
         }
         """, kotlin: """
-        internal fun <T, U> f(a: T, b: U): T? {
-        }
+        internal fun <T, U> f(a: T, b: U): T? = Unit
         """)
 
         try await check(swift: """
         func f<T: I, U>(a: T, b: U) -> Int where U: J {
         }
         """, kotlin: """
-        internal fun <T, U> f(a: T, b: U): Int where T: I, U: J {
-        }
+        internal fun <T, U> f(a: T, b: U): Int where T: I, U: J = Unit
         """)
     }
 
@@ -1134,9 +1083,7 @@ final class MemberDeclarationTests: XCTestCase {
         """, kotlin: """
         internal open class C<T> {
             internal var v: C<T>
-            internal open fun f(p: Array<C<T>>): C<T>? {
-                return null
-            }
+            internal open fun f(p: Array<C<T>>): C<T>? = null
         }
         """)
     }
@@ -1183,9 +1130,7 @@ final class MemberDeclarationTests: XCTestCase {
             internal constructor(t: T) {
                 this.t = t
             }
-            internal open fun f(): Int {
-                return 1
-            }
+            internal open fun f(): Int = 1
             override fun equals(other: Any?): Boolean {
                 if (other !is C<*>) {
                     return false
@@ -1219,9 +1164,7 @@ final class MemberDeclarationTests: XCTestCase {
             internal constructor(t: T) {
                 this.t = t
             }
-            internal open fun f(): Int {
-                return 1
-            }
+            internal open fun f(): Int = 1
             override fun hashCode(): Int {
                 var hasher = Hasher()
                 hash(into = InOut<Hasher>({ hasher }, { hasher = it }))
@@ -1294,9 +1237,7 @@ final class MemberDeclarationTests: XCTestCase {
         internal open class C {
             internal val description = "foo"
 
-            override fun toString(): String {
-                return description
-            }
+            override fun toString(): String = description
         }
         """)
 
@@ -1323,9 +1264,7 @@ final class MemberDeclarationTests: XCTestCase {
                     return "foo"
                 }
 
-            override fun toString(): String {
-                return description
-            }
+            override fun toString(): String = description
         }
         """)
     }
@@ -1359,16 +1298,12 @@ final class MemberDeclarationTests: XCTestCase {
             internal var i: Int
 
             internal open fun f(s: String) {
-                fun doSomething(with: String): String {
-                    return String.myValue
-                }
+                fun doSomething(with: String): String = String.myValue
                 print(doSomething(with = i) == Int.myValue)
                 print(doSomething(with = s) == String.myValue)
             }
 
-            internal open fun doSomething(with: Int): Int {
-                return Int.myValue
-            }
+            internal open fun doSomething(with: Int): Int = Int.myValue
         }
         """)
 

@@ -260,6 +260,62 @@ class KotlinCodeBlock: KotlinStatement {
         statements = statements.filter { $0 !== statement }
     }
 
+    /// Whether this code block can be appended safely as a single Kotlin statement.
+    var isSingleStatementAppendable: Bool {
+        guard !isTryCatch && !disallowSingleStatementAppend && statements.count <= 1 else {
+            return false
+        }
+        // Make sure there is truly only one statement. We don't support any complex control structures with nested statements
+        // because of the possibility of 'return' or other statements not allowed in Kotlin's single-statement block format hiding within
+        var statementCount = 0
+        var hasDisallowed = false
+        visit {
+            if statementCount <= 1 && !hasDisallowed && $0 !== self {
+                if let statement = $0 as? KotlinStatement {
+                    statementCount += 1
+                    // Preserve comments
+                    if statement.extras != nil {
+                        hasDisallowed = true
+                    }
+                }
+                if ($0 as? KotlinBinaryOperator)?.op.precedence == .assignment {
+                    hasDisallowed = true
+                } else if $0 is KotlinVariableDeclaration || $0 is KotlinFunctionDeclaration {
+                    hasDisallowed = true
+                } else if $0 is KotlinThrow {
+                    hasDisallowed = true
+                }
+            }
+            return statementCount <= 1 && !hasDisallowed ? .recurse(nil) : .skip
+        }
+        return statementCount <= 1 && !hasDisallowed
+    }
+    var disallowSingleStatementAppend = false
+
+    /// Append this code block as a single statement, stripping 'return'.
+    func appendAsSingleStatement(to output: OutputGenerator, indentation: Indentation) {
+        if statements.isEmpty {
+            output.append("Unit")
+        } else if let expressionStatement = statements[0] as? KotlinExpressionStatement {
+            if let expression = expressionStatement.expression {
+                output.append(expression, indentation: indentation)
+            } else {
+                output.append("Unit")
+            }
+        } else if let rawStatement = statements[0] as? KotlinRawStatement {
+            let sourceCode = rawStatement.sourceCode
+            if sourceCode == "return" {
+                output.append("Unit")
+            } else if sourceCode.hasPrefix("return ") {
+                output.append(String(sourceCode.dropFirst("return ".count)))
+            } else {
+                output.append(rawStatement, indentation: 0)
+            }
+        } else {
+            output.append(statements[0], indentation: 0)
+        }
+    }
+
     override func append(to output: OutputGenerator, indentation: Indentation) {
         if deferCount == 1 {
             output.append(indentation).append("var deferaction_\(deferVariableSuffix): (() -> Unit)? = null\n")
@@ -1088,8 +1144,8 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
             output.append(": \(forEnum)")
             enumGenerics.append(to: output, indentation: indentation)
             generics.appendWhere(to: output, indentation: indentation)
-            output.append(" {\n")
-            output.append(indentation.inc()).append("return \(Self.sealedClassName(for: name))(")
+            output.append(" = ")
+            output.append("\(Self.sealedClassName(for: name))(")
             for (index, value) in associatedValues.enumerated() {
                 if let label = value.externalLabel {
                     output.append(label)
@@ -1101,7 +1157,6 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
                 }
             }
             output.append(")\n")
-            output.append(indentation).append("}\n")
         }
     }
 
@@ -1382,21 +1437,13 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             }
         }
         if let body {
-            output.append(" {\n")
-            let bodyIndentation = indentation.inc()
-            if !body.statements.isEmpty {
-                if isEqualImplementation {
-                    appendEqualsBody(body, to: output, indentation: bodyIndentation)
-                } else if isLessThanImplementation {
-                    appendLessThanBody(body, to: output, indentation: bodyIndentation)
-                } else {
-                    appendFunctionBody(body, to: output, indentation: bodyIndentation)
-                }
+            if isEqualImplementation {
+                appendEqualsBody(body, to: output, indentation: indentation)
+            } else if isLessThanImplementation {
+                appendLessThanBody(body, to: output, indentation: indentation)
+            } else {
+                appendFunctionBody(body, to: output, indentation: indentation)
             }
-            if type == .finalizerDeclaration && modifiers.isOverride {
-                output.append(bodyIndentation).append("super.finalize()\n")
-            }
-            output.append(indentation).append("}\n")
         } else {
             output.append("\n")
         }
@@ -1463,19 +1510,50 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
 
     private func appendFunctionBody(_ body: KotlinCodeBlock, to output: OutputGenerator, indentation: Indentation) {
+        let isConstructor = type == .constructorDeclaration
+        let callSuperFinalize = type == .finalizerDeclaration && modifiers.isOverride
+        guard isConstructor || callSuperFinalize || !body.statements.isEmpty else {
+            output.append(" = Unit\n")
+            return
+        }
+
+        var parameterVals: [String] = []
         for parameter in parameters {
-            if let externalLabel = parameter.externalLabel, parameter.internalLabel != parameter.externalLabel {
-                output.append(indentation).append("val \(parameter.internalLabel) = \(externalLabel)\n")
+            if let externalLabel = parameter.externalLabel, parameter.internalLabel != externalLabel {
+                parameterVals.append("val \(parameter.internalLabel) = \(externalLabel)\n")
             }
         }
-        if type == .constructorDeclaration || suppressSideEffects, let suppressSideEffectsPropertyName = (parent as? KotlinClassDeclaration)?.suppressSideEffectsPropertyName {
-            output.append(indentation).append("\(suppressSideEffectsPropertyName) = true\n")
-            body.syntheticFinally = "\(suppressSideEffectsPropertyName) = false"
+        var suppressSideEffectsPropertyName: String? = nil
+        if type == .constructorDeclaration || suppressSideEffects, let propertyName = (parent as? KotlinClassDeclaration)?.suppressSideEffectsPropertyName {
+            suppressSideEffectsPropertyName = propertyName
+            body.syntheticFinally = "\(propertyName) = false"
         } else if let mutationFunctionNames {
-            output.append(indentation).append("\(mutationFunctionNames.willMutate)()\n")
             body.syntheticFinally = "\(mutationFunctionNames.didMutate)()"
         }
-        output.append(body, indentation: indentation)
+
+        // Append Kotlin single statement format if possible
+        guard isConstructor || callSuperFinalize || !parameterVals.isEmpty || suppressSideEffects || mutationFunctionNames != nil || !body.isSingleStatementAppendable else {
+            output.append(" = ")
+            body.appendAsSingleStatement(to: output, indentation: indentation)
+            output.append("\n")
+            return
+        }
+
+        output.append(" {\n")
+        let bodyIndentation = indentation.inc()
+        if !body.statements.isEmpty {
+            parameterVals.forEach { output.append(bodyIndentation).append($0) }
+            if let suppressSideEffectsPropertyName {
+                output.append(bodyIndentation).append("\(suppressSideEffectsPropertyName) = true\n")
+            } else if let mutationFunctionNames {
+                output.append(bodyIndentation).append("\(mutationFunctionNames.willMutate)()\n")
+            }
+            output.append(body, indentation: bodyIndentation)
+        }
+        if callSuperFinalize {
+            output.append(bodyIndentation).append("super.finalize()\n")
+        }
+        output.append(indentation).append("}\n")
     }
 
     private func appendEqualsDeclaration(to output: OutputGenerator, indentation: Indentation) {
@@ -1483,13 +1561,16 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
 
     private func appendEqualsBody(_ body: KotlinCodeBlock, to output: OutputGenerator, indentation: Indentation) {
+        output.append(" {\n")
+        let bodyIndentation = indentation.inc()
         let anyGenerics = parameters[1].declaredType.generics.map { _ in TypeSignature.named("*", []) }
-        output.append(indentation).append("if (other !is \(parameters[1].declaredType.withGenerics(anyGenerics).kotlin)) {\n")
-        output.append(indentation.inc()).append("return false\n")
+        output.append(bodyIndentation).append("if (other !is \(parameters[1].declaredType.withGenerics(anyGenerics).kotlin)) {\n")
+        output.append(bodyIndentation.inc()).append("return false\n")
+        output.append(bodyIndentation).append("}\n")
+        output.append(bodyIndentation).append("val \(parameters[0].internalLabel) = this\n")
+        output.append(bodyIndentation).append("val \(parameters[1].internalLabel) = other\n")
+        output.append(body, indentation: bodyIndentation)
         output.append(indentation).append("}\n")
-        output.append(indentation).append("val \(parameters[0].internalLabel) = this\n")
-        output.append(indentation).append("val \(parameters[1].internalLabel) = other\n")
-        output.append(body, indentation: indentation)
     }
 
     private func appendLessThanDeclaration(to output: OutputGenerator, indentation: Indentation) {
@@ -1497,11 +1578,14 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
 
     private func appendLessThanBody(_ body: KotlinCodeBlock, to output: OutputGenerator, indentation: Indentation) {
-        output.append(indentation).append("if (this == other) return 0\n")
-        output.append(indentation).append("fun islessthan(\(parameters[0].internalLabel): \(parameters[0].declaredType.kotlin), \(parameters[1].internalLabel): \(parameters[1].declaredType.kotlin)): Boolean {\n")
-        output.append(body, indentation: indentation.inc())
+        output.append(" {\n")
+        let bodyIndentation = indentation.inc()
+        output.append(bodyIndentation).append("if (this == other) return 0\n")
+        output.append(bodyIndentation).append("fun islessthan(\(parameters[0].internalLabel): \(parameters[0].declaredType.kotlin), \(parameters[1].internalLabel): \(parameters[1].declaredType.kotlin)): Boolean {\n")
+        output.append(body, indentation: bodyIndentation.inc())
+        output.append(bodyIndentation).append("}\n")
+        output.append(bodyIndentation).append("return if (islessthan(this, other)) -1 else 1\n")
         output.append(indentation).append("}\n")
-        output.append(indentation).append("return if (islessthan(this, other)) -1 else 1\n")
     }
 
     private func appendHashCode(to output: OutputGenerator, indentation: Indentation) {

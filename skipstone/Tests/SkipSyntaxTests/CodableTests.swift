@@ -50,9 +50,7 @@ final class CodableTests: XCTestCase {
 
             companion object: DecodableCompanion {
 
-                override fun init(from: Decoder): Any {
-                    return S(from = from)
-                }
+                override fun init(from: Decoder): Any = S(from = from)
             }
         }
         """)
@@ -86,9 +84,7 @@ final class CodableTests: XCTestCase {
 
             override var supdate: ((Any) -> Unit)? = null
             override var smutatingcount = 0
-            override fun scopy(): MutableStruct {
-                return S(i, s)
-            }
+            override fun scopy(): MutableStruct = S(i, s)
 
             private enum class CodingKeys(override val rawValue: String, unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 i("i"),
@@ -123,9 +119,7 @@ final class CodableTests: XCTestCase {
 
             companion object: DecodableCompanion {
 
-                override fun init(from: Decoder): Any {
-                    return S(from = from)
-                }
+                override fun init(from: Decoder): Any = S(from = from)
             }
         }
         """)
@@ -187,9 +181,7 @@ final class CodableTests: XCTestCase {
 
             companion object: DecodableCompanion {
 
-                override fun init(from: Decoder): Any {
-                    return S(from = from)
-                }
+                override fun init(from: Decoder): Any = S(from = from)
             }
         }
         """)
@@ -249,9 +241,7 @@ final class CodableTests: XCTestCase {
 
             companion object: DecodableCompanion {
 
-                override fun init(from: Decoder): Any {
-                    return S(from = from)
-                }
+                override fun init(from: Decoder): Any = S(from = from)
             }
         }
         """)
@@ -297,17 +287,14 @@ final class CodableTests: XCTestCase {
                 }
             }
 
-            override fun encode(to: Encoder) {
-            }
+            override fun encode(to: Encoder) = Unit
 
             constructor(from: Decoder) {
             }
 
             companion object: DecodableCompanion {
 
-                override fun init(from: Decoder): Any {
-                    return S(from = from)
-                }
+                override fun init(from: Decoder): Any = S(from = from)
             }
         }
         """)
@@ -356,9 +343,7 @@ final class CodableTests: XCTestCase {
 
             companion object: DecodableCompanion {
 
-                override fun init(from: Decoder): Any {
-                    return S(from = from)
-                }
+                override fun init(from: Decoder): Any = S(from = from)
             }
         }
         """)
@@ -445,8 +430,7 @@ final class CodableTests: XCTestCase {
                 }
             }
 
-            override fun encode(to: Encoder) {
-            }
+            override fun encode(to: Encoder) = Unit
 
             constructor(i: Int, s: String) {
                 this.i = i
@@ -480,9 +464,7 @@ final class CodableTests: XCTestCase {
 
             companion object: DecodableCompanion {
 
-                override fun init(from: Decoder): Any {
-                    return S(from = from)
-                }
+                override fun init(from: Decoder): Any = S(from = from)
             }
         }
         """)
@@ -531,9 +513,7 @@ final class CodableTests: XCTestCase {
 
             companion object: DecodableCompanion {
 
-                override fun init(from: Decoder): Any {
-                    return S(from = from)
-                }
+                override fun init(from: Decoder): Any = S(from = from)
             }
         }
         """)
@@ -587,9 +567,7 @@ final class CodableTests: XCTestCase {
 
             companion object: DecodableCompanion {
 
-                override fun init(from: Decoder): Any {
-                    return S(from = from)
-                }
+                override fun init(from: Decoder): Any = S(from = from)
             }
         }
         """)
@@ -644,9 +622,7 @@ final class CodableTests: XCTestCase {
 
             companion object: DecodableCompanion {
 
-                override fun init(from: Decoder): Any {
-                    return S(from = from)
-                }
+                override fun init(from: Decoder): Any = S(from = from)
             }
         }
         """)
@@ -706,9 +682,7 @@ final class CodableTests: XCTestCase {
 
             companion object: DecodableCompanion {
 
-                override fun init(from: Decoder): Any {
-                    return S(from = from)
-                }
+                override fun init(from: Decoder): Any = S(from = from)
             }
         }
         """)
@@ -754,9 +728,7 @@ final class CodableTests: XCTestCase {
 
             companion object: DecodableCompanion {
 
-                override fun init(from: Decoder): Any {
-                    return Sub(from = from)
-                }
+                override fun init(from: Decoder): Any = Sub(from = from)
             }
         }
         """)
@@ -779,9 +751,7 @@ final class CodableTests: XCTestCase {
 
             companion object: DecodableCompanion {
 
-                override fun init(from: Decoder): Any {
-                    return E(from = from)
-                }
+                override fun init(from: Decoder): Any = E(from = from)
             }
         }
 
@@ -822,20 +792,15 @@ final class CodableTests: XCTestCase {
             a(0),
             b(1);
 
-            override fun encode(to: Encoder) {
-            }
+            override fun encode(to: Encoder) = Unit
 
             companion object: DecodableCompanion {
 
-                override fun init(from: Decoder): Any {
-                    return E(from = from)
-                }
+                override fun init(from: Decoder): Any = E(from = from)
             }
         }
 
-        internal fun E(from: Decoder): E {
-            return E.a
-        }
+        internal fun E(from: Decoder): E = E.a
 
         internal fun E(rawValue: Int): E? {
             return when (rawValue) {
@@ -876,20 +841,15 @@ final class CodableTests: XCTestCase {
             a,
             b;
 
-            override fun encode(to: Encoder) {
-            }
+            override fun encode(to: Encoder) = Unit
 
             companion object: DecodableCompanion {
 
-                override fun init(from: Decoder): Any {
-                    return E(from = from)
-                }
+                override fun init(from: Decoder): Any = E(from = from)
             }
         }
 
-        internal fun E(from: Decoder): E {
-            return E.a
-        }
+        internal fun E(from: Decoder): E = E.a
         """)
     }
 
@@ -920,25 +880,18 @@ final class CodableTests: XCTestCase {
             class BCase: E() {
             }
 
-            override fun encode(to: Encoder) {
-            }
+            override fun encode(to: Encoder) = Unit
 
             companion object: DecodableCompanion {
-                fun a(associated0: Int): E {
-                    return ACase(associated0)
-                }
+                fun a(associated0: Int): E = ACase(associated0)
                 val b: E = BCase()
 
 
-                override fun init(from: Decoder): Any {
-                    return E(from = from)
-                }
+                override fun init(from: Decoder): Any = E(from = from)
             }
         }
 
-        internal fun E(from: Decoder): E {
-            return E.a(100)
-        }
+        internal fun E(from: Decoder): E = E.a(100)
         """)
     }
 }

@@ -16,14 +16,10 @@ final class ExpressionTests: XCTestCase {
         """, kotlin: """
         internal open class C {
         
-            internal open fun f(): Int {
-                return Companion.staticf()
-            }
-        
+            internal open fun f(): Int = Companion.staticf()
+
             companion object {
-                internal fun staticf(): Int {
-                    return 10
-                }
+                internal fun staticf(): Int = 10
             }
         }
         """)
@@ -40,13 +36,9 @@ final class ExpressionTests: XCTestCase {
         }
         """, kotlin: """
         internal open class C {
-            internal open fun instancef(): Int {
-                return 10
-            }
+            internal open fun instancef(): Int = 10
 
-            internal open fun f(): Int {
-                return this.instancef()
-            }
+            internal open fun f(): Int = this.instancef()
         }
         """)
     }
@@ -109,8 +101,7 @@ final class ExpressionTests: XCTestCase {
             companion object {
                 internal val typeVar = C::class
 
-                internal fun staticFunc() {
-                }
+                internal fun staticFunc() = Unit
             }
         }
         internal typealias X = C
@@ -123,8 +114,7 @@ final class ExpressionTests: XCTestCase {
             (C.typeVar.companionObjectInstance as C.Companion).staticFunc()
         }
 
-        internal fun g(c: KClass<C>) {
-        }
+        internal fun g(c: KClass<C>) = Unit
         """)
 
         try await check(compiler: nil, swiftCode: {
@@ -248,9 +238,7 @@ final class ExpressionTests: XCTestCase {
 
             override var supdate: ((Any) -> Unit)? = null
             override var smutatingcount = 0
-            override fun scopy(): MutableStruct {
-                return S(this as MutableStruct)
-            }
+            override fun scopy(): MutableStruct = S(this as MutableStruct)
 
             private fun assignfrom(target: S) {
                 suppresssideeffects = true

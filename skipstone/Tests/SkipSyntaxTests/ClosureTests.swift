@@ -213,19 +213,13 @@ final class ClosureTests: XCTestCase {
         }
         """, kotlin: """
         internal open class C {
-            internal open fun visitor(i: Int) {
-            }
+            internal open fun visitor(i: Int) = Unit
 
-            internal open fun visit(with: (Int) -> Unit) {
-            }
-        
-            internal open fun f() {
-                visit(with = this::visitor)
-            }
+            internal open fun visit(with: (Int) -> Unit) = Unit
 
-            internal open fun g() {
-                visit(with = ::visitor)
-            }
+            internal open fun f() = visit(with = this::visitor)
+
+            internal open fun g() = visit(with = ::visitor)
         }
         """)
     }

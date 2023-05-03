@@ -206,9 +206,7 @@ final class ConstructorDestructorTests: XCTestCase {
         
             override var supdate: ((Any) -> Unit)? = null
             override var smutatingcount = 0
-            override fun scopy(): MutableStruct {
-                return B(this as MutableStruct)
-            }
+            override fun scopy(): MutableStruct = B(this as MutableStruct)
         }
         
         internal class C {
@@ -245,9 +243,7 @@ final class ConstructorDestructorTests: XCTestCase {
         
             override var supdate: ((Any) -> Unit)? = null
             override var smutatingcount = 0
-            override fun scopy(): MutableStruct {
-                return D(i, s)
-            }
+            override fun scopy(): MutableStruct = D(i, s)
         }
         
         internal class E: MutableStruct {
@@ -271,9 +267,7 @@ final class ConstructorDestructorTests: XCTestCase {
         
             override var supdate: ((Any) -> Unit)? = null
             override var smutatingcount = 0
-            override fun scopy(): MutableStruct {
-                return E(i, s)
-            }
+            override fun scopy(): MutableStruct = E(i, s)
         }
         """)
     }
@@ -372,9 +366,7 @@ final class ConstructorDestructorTests: XCTestCase {
 
             override var supdate: ((Any) -> Unit)? = null
             override var smutatingcount = 0
-            override fun scopy(): MutableStruct {
-                return S(i)
-            }
+            override fun scopy(): MutableStruct = S(i)
 
             private var suppresssideeffects = false
         }
@@ -462,12 +454,8 @@ final class ConstructorDestructorTests: XCTestCase {
                 }
             }
         }
-        internal fun f(): Int {
-            return (try { C(param = 0) } catch (_: NullReturnException) { null })?.i ?: -1
-        }
-        internal fun g(): C {
-            return C(param = 0)
-        }
+        internal fun f(): Int = (try { C(param = 0) } catch (_: NullReturnException) { null })?.i ?: -1
+        internal fun g(): C = C(param = 0)
         """)
     }
 
@@ -576,9 +564,7 @@ final class ConstructorDestructorTests: XCTestCase {
 
             override var supdate: ((Any) -> Unit)? = null
             override var smutatingcount = 0
-            override fun scopy(): MutableStruct {
-                return S(this as MutableStruct)
-            }
+            override fun scopy(): MutableStruct = S(this as MutableStruct)
 
             private fun assignfrom(target: S) {
                 suppresssideeffects = true
@@ -608,9 +594,7 @@ final class ConstructorDestructorTests: XCTestCase {
         internal open class A {
         }
         internal open class C: A() {
-            open fun finalize() {
-                doStuff()
-            }
+            open fun finalize() = doStuff()
         }
         """)
 
@@ -627,9 +611,7 @@ final class ConstructorDestructorTests: XCTestCase {
         }
         """, kotlin: """
         internal open class A {
-            open fun finalize() {
-                doThings()
-            }
+            open fun finalize() = doThings()
         }
         internal open class C: A() {
             override fun finalize() {

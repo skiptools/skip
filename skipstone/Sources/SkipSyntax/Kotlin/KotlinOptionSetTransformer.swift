@@ -59,7 +59,6 @@ class KotlinOptionSetTransformer: KotlinTransformer {
         rawValueVar.assignParentReferences()
 
         let make = KotlinFunctionDeclaration(name: "makeoptionset")
-        make.extras = .singleNewline
         make.modifiers.visibility = .public
         make.modifiers.isOverride = true
         make.isGenerated = true
@@ -75,7 +74,6 @@ class KotlinOptionSetTransformer: KotlinTransformer {
         make.assignParentReferences()
 
         let assign = KotlinFunctionDeclaration(name: "assignoptionset")
-        assign.extras = .singleNewline
         assign.modifiers.visibility = .public
         assign.modifiers.isOverride = true
         assign.modifiers.isMutating = true

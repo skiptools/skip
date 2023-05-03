@@ -26,9 +26,7 @@ final class TupleTests: XCTestCase {
             return (1, "s")
         }
         """, kotlin: """
-        internal fun f(): Tuple2<Int, String> {
-            return Tuple2(1, "s")
-        }
+        internal fun f(): Tuple2<Int, String> = Tuple2(1, "s")
         """)
     }
 
@@ -50,9 +48,7 @@ final class TupleTests: XCTestCase {
             return [(1, 2, 3.0)]
         }
         """, kotlin: """
-        internal fun f(p: Tuple2<String, Int>): Array<Tuple3<Int, Int, Double>> {
-            return arrayOf(Tuple3(1, 2, 3.0))
-        }
+        internal fun f(p: Tuple2<String, Int>): Array<Tuple3<Int, Int, Double>> = arrayOf(Tuple3(1, 2, 3.0))
         """, packageSupportKotlin: """
         internal val <E0, E1, E2> Tuple3<E0, E1, E2>.x: E0
             get() = element0
@@ -77,9 +73,7 @@ final class TupleTests: XCTestCase {
             return (A(), B())
         }
         """, kotlin: """
-        internal fun f(): Tuple2<A, B> {
-            return Tuple2(A(), B())
-        }
+        internal fun f(): Tuple2<A, B> = Tuple2(A(), B())
         """)
 
         try await check(swift: """
@@ -87,9 +81,7 @@ final class TupleTests: XCTestCase {
             return (a, b)
         }
         """, kotlin: """
-        internal fun f(a: A, b: B): Tuple2<A, B> {
-            return Tuple2(a.sref(), b.sref())
-        }
+        internal fun f(a: A, b: B): Tuple2<A, B> = Tuple2(a.sref(), b.sref())
         """)
     }
 

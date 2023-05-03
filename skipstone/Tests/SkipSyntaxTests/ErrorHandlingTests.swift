@@ -359,9 +359,7 @@ final class ErrorHandlingTests: XCTestCase {
 
             override var supdate: ((Any) -> Unit)? = null
             override var smutatingcount = 0
-            override fun scopy(): MutableStruct {
-                return S(i)
-            }
+            override fun scopy(): MutableStruct = S(i)
         }
         """)
     }
@@ -424,32 +422,18 @@ final class ErrorHandlingTests: XCTestCase {
         internal sealed class E: Exception(), Error {
             class Error1Case: E() {
 
-                override fun equals(other: Any?): Boolean {
-                    if (other !is Error1Case) return false
-                    return true
-                }
-                override fun hashCode(): Int {
-                    return "Error1Case".hashCode()
-                }
+                override fun equals(other: Any?): Boolean = other is Error1Case
+                override fun hashCode(): Int = "Error1Case".hashCode()
             }
             class Error2Case: E() {
 
-                override fun equals(other: Any?): Boolean {
-                    if (other !is Error2Case) return false
-                    return true
-                }
-                override fun hashCode(): Int {
-                    return "Error2Case".hashCode()
-                }
+                override fun equals(other: Any?): Boolean = other is Error2Case
+                override fun hashCode(): Int = "Error2Case".hashCode()
             }
 
             companion object {
-                fun error1(): E {
-                    return Error1Case()
-                }
-                fun error2(): E {
-                    return Error2Case()
-                }
+                fun error1(): E = Error1Case()
+                fun error2(): E = Error2Case()
             }
         }
         """)
@@ -463,32 +447,18 @@ final class ErrorHandlingTests: XCTestCase {
         internal sealed class E(override val rawValue: Int, unusedp: Nothing? = null): Exception(), Error, RawRepresentable<Int> {
             class Error1Case: E(2) {
 
-                override fun equals(other: Any?): Boolean {
-                    if (other !is Error1Case) return false
-                    return true
-                }
-                override fun hashCode(): Int {
-                    return "Error1Case".hashCode()
-                }
+                override fun equals(other: Any?): Boolean = other is Error1Case
+                override fun hashCode(): Int = "Error1Case".hashCode()
             }
             class Error2Case: E(3) {
 
-                override fun equals(other: Any?): Boolean {
-                    if (other !is Error2Case) return false
-                    return true
-                }
-                override fun hashCode(): Int {
-                    return "Error2Case".hashCode()
-                }
+                override fun equals(other: Any?): Boolean = other is Error2Case
+                override fun hashCode(): Int = "Error2Case".hashCode()
             }
 
             companion object {
-                fun error1(): E {
-                    return Error1Case()
-                }
-                fun error2(): E {
-                    return Error2Case()
-                }
+                fun error1(): E = Error1Case()
+                fun error2(): E = Error2Case()
             }
         }
 
@@ -518,32 +488,18 @@ final class ErrorHandlingTests: XCTestCase {
         internal sealed class E: Exception(), Error {
             class Error1Case: E() {
 
-                override fun equals(other: Any?): Boolean {
-                    if (other !is Error1Case) return false
-                    return true
-                }
-                override fun hashCode(): Int {
-                    return "Error1Case".hashCode()
-                }
+                override fun equals(other: Any?): Boolean = other is Error1Case
+                override fun hashCode(): Int = "Error1Case".hashCode()
             }
             class Error2Case: E() {
 
-                override fun equals(other: Any?): Boolean {
-                    if (other !is Error2Case) return false
-                    return true
-                }
-                override fun hashCode(): Int {
-                    return "Error2Case".hashCode()
-                }
+                override fun equals(other: Any?): Boolean = other is Error2Case
+                override fun hashCode(): Int = "Error2Case".hashCode()
             }
 
             companion object {
-                fun error1(): E {
-                    return Error1Case()
-                }
-                fun error2(): E {
-                    return Error2Case()
-                }
+                fun error1(): E = Error1Case()
+                fun error2(): E = Error2Case()
             }
         }
         """)
@@ -557,32 +513,18 @@ final class ErrorHandlingTests: XCTestCase {
         internal sealed class E(override val rawValue: Int, unusedp: Nothing? = null): Exception(), Error, RawRepresentable<Int> {
             class Error1Case: E(2) {
 
-                override fun equals(other: Any?): Boolean {
-                    if (other !is Error1Case) return false
-                    return true
-                }
-                override fun hashCode(): Int {
-                    return "Error1Case".hashCode()
-                }
+                override fun equals(other: Any?): Boolean = other is Error1Case
+                override fun hashCode(): Int = "Error1Case".hashCode()
             }
             class Error2Case: E(3) {
 
-                override fun equals(other: Any?): Boolean {
-                    if (other !is Error2Case) return false
-                    return true
-                }
-                override fun hashCode(): Int {
-                    return "Error2Case".hashCode()
-                }
+                override fun equals(other: Any?): Boolean = other is Error2Case
+                override fun hashCode(): Int = "Error2Case".hashCode()
             }
 
             companion object {
-                fun error1(): E {
-                    return Error1Case()
-                }
-                fun error2(): E {
-                    return Error2Case()
-                }
+                fun error1(): E = Error1Case()
+                fun error2(): E = Error2Case()
             }
         }
 

@@ -100,9 +100,7 @@ final class EnumTests: XCTestCase {
             a(0),
             b(1);
 
-            internal fun plusOne(): Int {
-                return rawValue + 1
-            }
+            internal fun plusOne(): Int = rawValue + 1
         }
 
         internal fun E(rawValue: Int): E? {
@@ -136,9 +134,7 @@ final class EnumTests: XCTestCase {
 
             b(1);
 
-            internal fun plusOne(): Int {
-                return rawValue + 1
-            }
+            internal fun plusOne(): Int = rawValue + 1
         }
 
         internal fun E(rawValue: Int): E? {
@@ -172,9 +168,7 @@ final class EnumTests: XCTestCase {
 
             companion object {
                 val a: E = ACase()
-                fun b(associated0: Int = 1, associated1: String): E {
-                    return BCase(associated0, associated1)
-                }
+                fun b(associated0: Int = 1, associated1: String): E = BCase(associated0, associated1)
             }
         }
         """)
@@ -196,9 +190,7 @@ final class EnumTests: XCTestCase {
 
             companion object {
                 val a: E = ACase()
-                fun b(i: Int = 1, associated1: String): E {
-                    return BCase(i, associated1)
-                }
+                fun b(i: Int = 1, associated1: String): E = BCase(i, associated1)
             }
         }
         """)
@@ -219,9 +211,7 @@ final class EnumTests: XCTestCase {
 
             companion object {
                 val a: E<Nothing> = ACase()
-                fun <T> b(associated0: Int = 1, associated1: T): E<T> {
-                    return BCase(associated0, associated1)
-                }
+                fun <T> b(associated0: Int = 1, associated1: T): E<T> = BCase(associated0, associated1)
             }
         }
         """)
@@ -239,12 +229,8 @@ final class EnumTests: XCTestCase {
             }
 
             companion object {
-                fun <T> a(associated0: T): E<T, Nothing> {
-                    return ACase(associated0)
-                }
-                fun <U> b(associated0: U): E<Nothing, U> {
-                    return BCase(associated0)
-                }
+                fun <T> a(associated0: T): E<T, Nothing> = ACase(associated0)
+                fun <U> b(associated0: U): E<Nothing, U> = BCase(associated0)
             }
         }
         """)
@@ -289,12 +275,8 @@ final class EnumTests: XCTestCase {
             }
 
             companion object {
-                fun <T, U> a(associated0: T, associated1: U): E<T, U> {
-                    return ACase(associated0, associated1)
-                }
-                fun <U> b(associated0: U, associated1: String): E<Nothing, U> {
-                    return BCase(associated0, associated1)
-                }
+                fun <T, U> a(associated0: T, associated1: U): E<T, U> = ACase(associated0, associated1)
+                fun <U> b(associated0: U, associated1: String): E<Nothing, U> = BCase(associated0, associated1)
                 val c: E<Nothing, Nothing> = CCase()
             }
         }
@@ -393,9 +375,7 @@ final class EnumTests: XCTestCase {
 
             companion object {
                 val one: E = OneCase()
-                fun two(associated0: String): E {
-                    return TwoCase(associated0)
-                }
+                fun two(associated0: String): E = TwoCase(associated0)
             }
         }
         """)
@@ -484,12 +464,8 @@ final class EnumTests: XCTestCase {
             }
         }
 
-        internal fun f(param: Int): E {
-            return E(rawValue = param) ?: E.one
-        }
-        internal fun g(param: Int): E {
-            return E(rawValue = param)!!
-        }
+        internal fun f(param: Int): E = E(rawValue = param) ?: E.one
+        internal fun g(param: Int): E = E(rawValue = param)!!
         """)
 
         try await check(swift: """
@@ -510,15 +486,11 @@ final class EnumTests: XCTestCase {
 
             companion object {
                 val one: E = OneCase()
-                fun other(associated0: Int): E {
-                    return OtherCase(associated0)
-                }
+                fun other(associated0: Int): E = OtherCase(associated0)
             }
         }
 
-        internal fun E(value: Int): E {
-            return if (value == 1) E.one else E.other(value)
-        }
+        internal fun E(value: Int): E = if (value == 1) E.one else E.other(value)
         """)
     }
 
@@ -582,32 +554,18 @@ final class EnumTests: XCTestCase {
         internal sealed class E: Exception(), CaseIterable, Error {
             class OneCase: E() {
 
-                override fun equals(other: Any?): Boolean {
-                    if (other !is OneCase) return false
-                    return true
-                }
-                override fun hashCode(): Int {
-                    return "OneCase".hashCode()
-                }
+                override fun equals(other: Any?): Boolean = other is OneCase
+                override fun hashCode(): Int = "OneCase".hashCode()
             }
             class TwoCase: E() {
 
-                override fun equals(other: Any?): Boolean {
-                    if (other !is TwoCase) return false
-                    return true
-                }
-                override fun hashCode(): Int {
-                    return "TwoCase".hashCode()
-                }
+                override fun equals(other: Any?): Boolean = other is TwoCase
+                override fun hashCode(): Int = "TwoCase".hashCode()
             }
 
             companion object {
-                fun one(): E {
-                    return OneCase()
-                }
-                fun two(): E {
-                    return TwoCase()
-                }
+                fun one(): E = OneCase()
+                fun two(): E = TwoCase()
 
                 val allCases: Array<E>
                     get() {

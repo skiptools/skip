@@ -197,6 +197,7 @@ class KotlinStructTransformer: KotlinTransformer {
             return KotlinRawStatement(sourceCode: "this.\(variableDeclaration.names[0] ?? "") = target.\(variableDeclaration.names[0] ?? "")")
         }
         assignfrom.body = KotlinCodeBlock(statements: bodyStatements)
+        assignfrom.body?.disallowSingleStatementAppend = true // Single statement assignment disallowed
         assignfrom.parent = classDeclaration
         assignfrom.assignParentReferences()
         classDeclaration.members.append(assignfrom)

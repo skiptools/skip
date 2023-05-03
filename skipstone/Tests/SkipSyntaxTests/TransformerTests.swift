@@ -20,16 +20,13 @@ final class TransformerTests: XCTestCase {
         import skip.unit.*
 
         internal open class TestCase: XCTestCase {
-            @Test internal open fun testSomeTest() {
-            }
+            @Test internal open fun testSomeTest() = Unit
 
-            @Test internal open fun testSomeOtherTest() {
-            }
+            @Test internal open fun testSomeOtherTest() = Unit
 
             companion object {
 
-                internal fun testDoNotTestStatic() {
-                }
+                internal fun testDoNotTestStatic() = Unit
             }
         }
         """)
