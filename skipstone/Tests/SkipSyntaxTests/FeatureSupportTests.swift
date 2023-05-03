@@ -17,6 +17,31 @@ final class FeatureSupportTests: XCTestCase {
             """)
     }
 
+    func testNoComments() async throws {
+        try await check(swiftCode: {
+            let x = "1" + "X"
+            return x
+        }, kotlin: """
+            val x = "1" + "X"
+            return x
+            """)
+    }
+
+    func testTrailingComments() async throws {
+        try await check(swift: """
+            // comment 1
+            let x = "1" + "X"
+            // comment 2
+            return x
+            // comment 3
+        """, kotlin: """
+            // comment 1
+            internal val x = "1" + "X"
+            // comment 2
+            return x
+            """)
+    }
+
     func testEnumKeyworkNames() async throws {
         // Postfix-underscored (e.g. "Object_") keyword name-derived case classes are do not use the escaped version when checking cases
 
@@ -302,6 +327,14 @@ final class FeatureSupportTests: XCTestCase {
         #endif
     }
 }
+
+
+
+
+
+
+
+
 
 
 
