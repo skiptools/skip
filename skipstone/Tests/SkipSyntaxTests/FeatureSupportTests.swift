@@ -17,6 +17,115 @@ final class FeatureSupportTests: XCTestCase {
             """)
     }
 
+    func testEnumKeyworkNames() async throws {
+        // Postfix-underscored (e.g. "Object_") keyword name-derived case classes are do not use the escaped version when checking cases
+
+        // compile error: unresolved reference: NullCase if (this is KeywordsEnum.NullCase)
+        // compile error: unresolved reference: ObjectCase if (this is KeywordsEnum.ObjectCase)
+        try await check(compiler: nil, swiftCode: {
+            enum KeywordsEnum {
+                case null
+                case string(String)
+                case boolean(Bool)
+                case object(Any)
+                case `case`
+
+                var isNull: Bool {
+                    if case .null = self {
+                        return true
+                    } else {
+                        return false
+                    }
+                }
+
+                func objectValue() -> Any? {
+                    if case .object(let any) = self {
+                        return any
+                    } else {
+                        return nil
+                    }
+                }
+
+                func stringValue() -> String? {
+                    if case .string(let str) = self {
+                        return str
+                    } else {
+                        return nil
+                    }
+                }
+
+                func booleanValue() -> Bool? {
+                    if case .boolean(let b) = self {
+                        return b
+                    } else {
+                        return nil
+                    }
+                }
+            }
+            return ""
+        }, kotlin: """
+            sealed class KeywordsEnum {
+                class Null_Case: KeywordsEnum() {
+                }
+                class StringCase(val associated0: String): KeywordsEnum() {
+                }
+                class BooleanCase(val associated0: Boolean): KeywordsEnum() {
+                }
+                class Object_Case(val associated0: Any): KeywordsEnum() {
+                }
+                class CaseCase: KeywordsEnum() {
+                }
+                val isNull: Boolean
+                    get() {
+                        if (this is KeywordsEnum.NullCase) {
+                            return true
+                        } else {
+                            return false
+                        }
+                    }
+                fun objectValue(): Any? {
+                    if (this is KeywordsEnum.ObjectCase) {
+                        val any = this.associated0
+                        return any
+                    } else {
+                        return null
+                    }
+                }
+                fun stringValue(): String? {
+                    if (this is KeywordsEnum.StringCase) {
+                        val str = this.associated0
+                        return str
+                    } else {
+                        return null
+                    }
+                }
+                fun booleanValue(): Boolean? {
+                    if (this is KeywordsEnum.BooleanCase) {
+                        val b = this.associated0
+                        return b
+                    } else {
+                        return null
+                    }
+                }
+            
+                companion object {
+                    val null_: KeywordsEnum = Null_Case()
+                    fun string(associated0: String): KeywordsEnum {
+                        return StringCase(associated0)
+                    }
+                    fun boolean(associated0: Boolean): KeywordsEnum {
+                        return BooleanCase(associated0)
+                    }
+                    fun object_(associated0: Any): KeywordsEnum {
+                        return Object_Case(associated0)
+                    }
+                    val case: KeywordsEnum = CaseCase()
+                }
+            }
+            return ""
+            """)
+    }
+
     func testInitNumberLiterals() async throws {
         // Kotlin doesn't seem to allow initializing non-Ints with literals without being explicit
 
@@ -203,6 +312,9 @@ final class FeatureSupportTests: XCTestCase {
         #endif
     }
 }
+
+
+
 
 
 
