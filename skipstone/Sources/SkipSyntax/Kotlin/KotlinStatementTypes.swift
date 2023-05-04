@@ -279,8 +279,8 @@ class KotlinCodeBlock: KotlinStatement {
             if statementCount <= 1 && !hasDisallowed && $0 !== self {
                 if let statement = $0 as? KotlinStatement {
                     statementCount += 1
-                    // Preserve comments
-                    if statement.extras != nil {
+                    // We can't support leading comments on e.g. `fun f() = <statement>`
+                    if statement.extras?.leadingTrivia.isEmpty == false {
                         hasDisallowed = true
                     }
                     if let appendable = statement as? KotlinSingleStatementAppendable {
@@ -308,7 +308,9 @@ class KotlinCodeBlock: KotlinStatement {
                 output.append("Unit")
             }
         } else if let appendable = statements[0] as? KotlinSingleStatementAppendable {
-            appendable.appendAsSingleStatement(to: output, indentation: indentation, isFunctionBody: isFunctionBody)
+            output.append(statements[0], indentation: indentation) {
+                appendable.appendAsSingleStatement(to: $0, indentation: indentation, isFunctionBody: isFunctionBody)
+            }
         } else {
             assert(false)
             output.append(statements[0], indentation: 0)

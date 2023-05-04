@@ -129,4 +129,26 @@ final class TriviaTests: XCTestCase {
         }
         """)
     }
+
+    func testSingleLineStatementTrivia() async throws {
+        try await check(swift: """
+        func f(): Int {
+            return 100
+        }
+        func g(): Int {
+            return 100 // Comment
+        }
+        func h(): Int {
+            // Comment
+            return 100
+        }
+        """, kotlin: """
+        internal fun f() = 100
+        internal fun g() = 100 // Comment
+        internal fun h() {
+            // Comment
+            return 100
+        }
+        """)
+    }
 }

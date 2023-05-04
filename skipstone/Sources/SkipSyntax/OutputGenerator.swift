@@ -20,9 +20,15 @@ class OutputGenerator {
     }
 
     @discardableResult func append(_ node: OutputNode, indentation: Indentation) -> OutputGenerator {
+        return append(node, indentation: indentation) {
+            node.append(to: $0, indentation: indentation)
+        }
+    }
+
+    @discardableResult func append(_ node: OutputNode, indentation: Indentation, appendContent: (OutputGenerator) -> Void) -> OutputGenerator {
         append(node.leadingTrivia(indentation: indentation))
         let startOffset = content.utf8.count
-        node.append(to: self, indentation: indentation)
+        appendContent(self)
         let trailingTrivia = node.trailingTrivia(indentation: indentation)
         var trailingNewline = false
         if !trailingTrivia.isEmpty && content.last == "\n" {
