@@ -66,7 +66,19 @@ extension KotlinMemberDeclaration {
     }
 }
 
-class KotlinExpressionStatement: KotlinStatement {
+/// A statement that can be appended in Kotlin single-statement format, e.g. `fun f() = <statement>`
+protocol KotlinSingleStatementAppendable {
+    func isSingleStatementAppendable(isFunctionBody: Bool) -> Bool
+    func appendAsSingleStatement(to output: OutputGenerator, indentation: Indentation, isFunctionBody: Bool)
+}
+
+extension KotlinSingleStatementAppendable {
+    func isSingleStatementAppendable(isFunctionBody: Bool) -> Bool {
+        return true
+    }
+}
+
+class KotlinExpressionStatement: KotlinStatement, KotlinSingleStatementAppendable {
     var expression: KotlinExpression?
 
     static func translate(statement: ExpressionStatement, translator: KotlinTranslator) -> KotlinExpressionStatement {
@@ -94,6 +106,14 @@ class KotlinExpressionStatement: KotlinStatement {
             output.append(indentation).append(expression, indentation: indentation).append("\n")
         }
     }
+
+    func appendAsSingleStatement(to output: OutputGenerator, indentation: Indentation, isFunctionBody: Bool) {
+        if let expression {
+            expression.append(to: output, indentation: indentation)
+        } else if isFunctionBody {
+            output.append("Unit")
+        }
+    }
 }
 
 class KotlinMessageStatement: KotlinStatement {
@@ -107,7 +127,7 @@ class KotlinMessageStatement: KotlinStatement {
     }
 }
 
-class KotlinRawStatement: KotlinStatement {
+class KotlinRawStatement: KotlinStatement, KotlinSingleStatementAppendable {
     let sourceCode: String
 
     init(sourceCode: String, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
@@ -122,5 +142,15 @@ class KotlinRawStatement: KotlinStatement {
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
         output.append(indentation).append(sourceCode).append("\n")
+    }
+
+    func appendAsSingleStatement(to output: OutputGenerator, indentation: Indentation, isFunctionBody: Bool) {
+        if isFunctionBody && sourceCode == "return" {
+            output.append("Unit")
+        } else if isFunctionBody && sourceCode.hasPrefix("return ") {
+            output.append(String(sourceCode.dropFirst("return ".count)))
+        } else {
+            output.append(sourceCode)
+        }
     }
 }

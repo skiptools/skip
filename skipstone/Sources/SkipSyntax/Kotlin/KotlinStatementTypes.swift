@@ -29,7 +29,7 @@ enum KotlinStatementType {
     case message
 }
 
-class KotlinBreak: KotlinStatement {
+class KotlinBreak: KotlinStatement, KotlinSingleStatementAppendable {
     var label: String?
     var asReturn = false
 
@@ -40,6 +40,15 @@ class KotlinBreak: KotlinStatement {
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
         output.append(indentation)
+        appendAsSingleStatement(to: output, indentation: indentation, isFunctionBody: false)
+        output.append("\n")
+    }
+
+    func isSingleStatementAppendable(isFunctionBody: Bool) -> Bool {
+        return !isFunctionBody
+    }
+
+    func appendAsSingleStatement(to output: OutputGenerator, indentation: Indentation, isFunctionBody: Bool) {
         if asReturn {
             output.append("return")
         } else {
@@ -48,7 +57,6 @@ class KotlinBreak: KotlinStatement {
         if let label {
             output.append("@\(label)")
         }
-        output.append("\n")
     }
 }
 
@@ -265,8 +273,6 @@ class KotlinCodeBlock: KotlinStatement {
         guard !isTryCatch && !disallowSingleStatementAppend && statements.count <= 1 else {
             return false
         }
-        // Make sure there is truly only one statement. We don't support any complex control structures with nested statements
-        // because of the possibility of 'return' or other statements not allowed in Kotlin's single-statement block format hiding within
         var statementCount = 0
         var hasDisallowed = false
         visit {
@@ -277,16 +283,16 @@ class KotlinCodeBlock: KotlinStatement {
                     if statement.extras != nil {
                         hasDisallowed = true
                     }
-                    if !(statement is KotlinExpressionStatement) && !(statement is KotlinRawStatement) {
+                    if let appendable = statement as? KotlinSingleStatementAppendable {
+                        if !appendable.isSingleStatementAppendable(isFunctionBody: isFunctionBody) {
+                            hasDisallowed = true
+                        }
+                    } else {
                         hasDisallowed = true
                     }
                 }
-                if isFunctionBody {
-                    if ($0 as? KotlinBinaryOperator)?.op.precedence == .assignment {
-                        hasDisallowed = true
-                    } else if $0 is KotlinThrow {
-                        hasDisallowed = true // A function that just throws has to explicitly declare a Nothing return type
-                    }
+                if isFunctionBody && ($0 as? KotlinBinaryOperator)?.op.precedence == .assignment {
+                    hasDisallowed = true
                 }
             }
             return statementCount <= 1 && !hasDisallowed ? .recurse(nil) : .skip
@@ -301,29 +307,8 @@ class KotlinCodeBlock: KotlinStatement {
             if isFunctionBody {
                 output.append("Unit")
             }
-        } else if let returnStatement = statements[0] as? KotlinReturn {
-            if !isFunctionBody {
-                returnStatement.appendAsSingleStatement(to: output, indentation: indentation)
-            } else if let expression = returnStatement.expression {
-                output.append(expression, indentation: indentation)
-            } else {
-                output.append("Unit")
-            }
-        } else if let expressionStatement = statements[0] as? KotlinExpressionStatement {
-            if let expression = expressionStatement.expression {
-                output.append(expression, indentation: indentation)
-            } else if isFunctionBody {
-                output.append("Unit")
-            }
-        } else if let rawStatement = statements[0] as? KotlinRawStatement {
-            let sourceCode = rawStatement.sourceCode
-            if isFunctionBody && sourceCode == "return" {
-                output.append("Unit")
-            } else if isFunctionBody && sourceCode.hasPrefix("return ") {
-                output.append(String(sourceCode.dropFirst("return ".count)))
-            } else {
-                output.append(sourceCode)
-            }
+        } else if let appendable = statements[0] as? KotlinSingleStatementAppendable {
+            appendable.appendAsSingleStatement(to: output, indentation: indentation, isFunctionBody: isFunctionBody)
         } else {
             assert(false)
             output.append(statements[0], indentation: 0)
@@ -594,21 +579,28 @@ class KotlinReturn: KotlinExpressionStatement {
         super.init(type: .return, statement: statement)
     }
 
-    /// For use when appending a single-statement code block.
-    func appendAsSingleStatement(to output: OutputGenerator, indentation: Indentation) {
-        output.append("return")
-        if let label {
-            output.append("@\(label)")
-        }
-        if let expression {
-            output.append(" ").append(expression, indentation: indentation)
-        }
-    }
-
     override func append(to output: OutputGenerator, indentation: Indentation) {
         output.append(indentation)
-        appendAsSingleStatement(to: output, indentation: indentation)
+        appendAsSingleStatement(to: output, indentation: indentation, isFunctionBody: false)
         output.append("\n")
+    }
+
+    override func appendAsSingleStatement(to output: OutputGenerator, indentation: Indentation, isFunctionBody: Bool) {
+        if isFunctionBody {
+            if let expression {
+                output.append(expression, indentation: indentation)
+            } else {
+                output.append("Unit")
+            }
+        } else {
+            output.append("return")
+            if let label {
+                output.append("@\(label)")
+            }
+            if let expression {
+                output.append(" ").append(expression, indentation: indentation)
+            }
+        }
     }
 }
 
@@ -2162,7 +2154,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             let setterBodyIndentation = setterIndentation.inc()
             output.append(setterIndentation).append("set(newValue) {\n")
             if mayBeSharedMutableStruct {
-                output.append(setterBodyIndentation).append("val newValue = newValue.sref()\n")
+                output.append(setterBodyIndentation).append("@Suppress(\"NAME_SHADOWING\") val newValue = newValue.sref()\n")
             }
             var setIndentation = setterBodyIndentation
             if let mutationFunctionNames {

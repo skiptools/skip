@@ -20,21 +20,11 @@ final class SwitchTests: XCTestCase {
         """, kotlin: """
         internal val i = 100
         when (i) {
-            0 -> {
-                print(0)
-            }
-            1 -> {
-                print(1)
-            }
-            1 + 1 -> {
-                print(2)
-            }
-            f(i) -> {
-                print("f")
-            }
-            else -> {
-                print("default")
-            }
+            0 -> print(0)
+            1 -> print(1)
+            1 + 1 -> print(2)
+            f(i) -> print("f")
+            else -> print("default")
         }
         """)
     }
@@ -53,15 +43,9 @@ final class SwitchTests: XCTestCase {
         """, kotlin: """
         internal val i = 100
         when (i) {
-            0, 1, 2 -> {
-                print("<2")
-            }
-            3 -> {
-                print(3)
-            }
-            else -> {
-                print("default")
-            }
+            0, 1, 2 -> print("<2")
+            3 -> print(3)
+            else -> print("default")
         }
         """)
     }
@@ -91,9 +75,7 @@ final class SwitchTests: XCTestCase {
                     }
                     print("0 is odd")
                 }
-                else -> {
-                    return@wlabel
-                }
+                else -> return@wlabel
             }
         }
         print("here")
@@ -118,12 +100,8 @@ final class SwitchTests: XCTestCase {
         }
         """, kotlin: """
         when (enumFactory()) {
-            E.case1 -> {
-                print("1")
-            }
-            E.case2 -> {
-                print("2")
-            }
+            E.case1 -> print("1")
+            E.case2 -> print("2")
         }
         """)
     }
@@ -235,9 +213,7 @@ final class SwitchTests: XCTestCase {
         internal fun g() {
             val e = enumFactory()
             when (e) {
-                is E.Case1Case -> {
-                    print("case1")
-                }
+                is E.Case1Case -> print("case1")
                 is E.Case2Case -> {
                     val d = e.associated0
                     var s = e.associated1
@@ -268,21 +244,11 @@ final class SwitchTests: XCTestCase {
         """, kotlin: """
         internal val i = 100
         when (i) {
-            in Int.min until 0 -> {
-                print(-1)
-            }
-            in 0 until 10 -> {
-                print(0)
-            }
-            in 10 .. 20 -> {
-                print(1)
-            }
-            in 21 .. Int.max -> {
-                print(21)
-            }
-            else -> {
-                print("default")
-            }
+            in Int.min until 0 -> print(-1)
+            in 0 until 10 -> print(0)
+            in 10 .. 20 -> print(1)
+            in 21 .. Int.max -> print(21)
+            else -> print("default")
         }
         """)
     }
@@ -304,15 +270,9 @@ final class SwitchTests: XCTestCase {
         {
             val a: Any
             when (a) {
-                is Int -> {
-                    print("Int")
-                }
-                is Double -> {
-                    print("Double")
-                }
-                else -> {
-                    print("default")
-                }
+                is Int -> print("Int")
+                is Double -> print("Double")
+                else -> print("default")
             }
         }
         """)
@@ -349,9 +309,7 @@ final class SwitchTests: XCTestCase {
                     val s = a.sref()
                     print(s)
                 }
-                else -> {
-                    print("default")
-                }
+                else -> print("default")
             }
         }
         """)
@@ -369,9 +327,7 @@ final class SwitchTests: XCTestCase {
         """, kotlin: """
         internal val i: Int
         when (i) {
-            0 -> {
-                print(0)
-            }
+            0 -> print(0)
             else -> {
                 val x = i
                 print(x)
@@ -390,12 +346,8 @@ final class SwitchTests: XCTestCase {
         """, kotlin: """
         internal val i: Int
         when (i) {
-            0 -> {
-                print(0)
-            }
-            else -> {
-                print("default")
-            }
+            0 -> print(0)
+            else -> print("default")
         }
         """)
 
@@ -411,9 +363,7 @@ final class SwitchTests: XCTestCase {
         """, kotlin: """
         internal val t = Tuple2(1, "s")
         when (t) {
-            Tuple2(0, "") -> {
-                print(0)
-            }
+            Tuple2(0, "") -> print(0)
             else -> {
                 val i = t.element0
                 val s = t.element1
@@ -436,9 +386,7 @@ final class SwitchTests: XCTestCase {
         """, kotlin: """
         internal val t = Tuple2(1, "s")
         when (t) {
-            Tuple2(0, "") -> {
-                print(0)
-            }
+            Tuple2(0, "") -> print(0)
             else -> {
                 var i = t.element0
                 val s = t.element1
@@ -461,9 +409,7 @@ final class SwitchTests: XCTestCase {
         """, kotlin: """
         internal val t = Tuple2(1, "s")
         when (t) {
-            Tuple2(0, "") -> {
-                print(0)
-            }
+            Tuple2(0, "") -> print(0)
             else -> {
                 var i = t.element0
                 i += 1
@@ -504,15 +450,9 @@ final class SwitchTests: XCTestCase {
         """, kotlin: """
         internal val i: Int? = null
         when (i) {
-            null -> {
-                print("nil")
-            }
-            1 -> {
-                print(1)
-            }
-            else -> {
-                print("default")
-            }
+            null -> print("nil")
+            1 -> print(1)
+            else -> print("default")
         }
         """)
     }
@@ -534,20 +474,14 @@ final class SwitchTests: XCTestCase {
         """, kotlin: """
         internal var i: Int? = null
         when {
-            i == null -> {
-                print("nil")
-            }
-            i == 1 -> {
-                print(1)
-            }
+            i == null -> print("nil")
+            i == 1 -> print(1)
             i != null -> {
                 var x = i
                 x += 1
                 print(x)
             }
-            else -> {
-                print("default")
-            }
+            else -> print("default")
         }
         """)
     }

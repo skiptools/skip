@@ -460,15 +460,9 @@ final class ErrorHandlingTests: XCTestCase {
 
         internal fun E(rawValue: Int): E? {
             return when (rawValue) {
-                2 -> {
-                    E.error1()
-                }
-                3 -> {
-                    E.error2()
-                }
-                else -> {
-                    null
-                }
+                2 -> E.error1()
+                3 -> E.error2()
+                else -> null
             }
         }
         """)
@@ -522,15 +516,9 @@ final class ErrorHandlingTests: XCTestCase {
 
         internal fun E(rawValue: Int): E? {
             return when (rawValue) {
-                2 -> {
-                    E.error1()
-                }
-                3 -> {
-                    E.error2()
-                }
-                else -> {
-                    null
-                }
+                2 -> E.error1()
+                3 -> E.error2()
+                else -> null
             }
         }
         """)

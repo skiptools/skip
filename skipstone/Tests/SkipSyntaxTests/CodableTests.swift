@@ -24,15 +24,9 @@ final class CodableTests: XCTestCase {
 
             private fun CodingKeys(rawValue: String): CodingKeys? {
                 return when (rawValue) {
-                    "i" -> {
-                        CodingKeys.i
-                    }
-                    "s" -> {
-                        CodingKeys.s
-                    }
-                    else -> {
-                        null
-                    }
+                    "i" -> CodingKeys.i
+                    "s" -> CodingKeys.s
+                    else -> null
                 }
             }
 
@@ -92,15 +86,9 @@ final class CodableTests: XCTestCase {
 
             private fun CodingKeys(rawValue: String): CodingKeys? {
                 return when (rawValue) {
-                    "i" -> {
-                        CodingKeys.i
-                    }
-                    "s" -> {
-                        CodingKeys.s
-                    }
-                    else -> {
-                        null
-                    }
+                    "i" -> CodingKeys.i
+                    "s" -> CodingKeys.s
+                    else -> null
                 }
             }
 
@@ -148,15 +136,9 @@ final class CodableTests: XCTestCase {
 
             private fun CodingKeys(rawValue: String): S.CodingKeys? {
                 return when (rawValue) {
-                    "i" -> {
-                        CodingKeys.i
-                    }
-                    "dbl" -> {
-                        CodingKeys.d
-                    }
-                    else -> {
-                        null
-                    }
+                    "i" -> CodingKeys.i
+                    "dbl" -> CodingKeys.d
+                    else -> null
                 }
             }
 
@@ -207,15 +189,9 @@ final class CodableTests: XCTestCase {
 
             private fun CodingKeys(rawValue: Int): S.CodingKeys? {
                 return when (rawValue) {
-                    100 -> {
-                        CodingKeys.i
-                    }
-                    101 -> {
-                        CodingKeys.d
-                    }
-                    else -> {
-                        null
-                    }
+                    100 -> CodingKeys.i
+                    101 -> CodingKeys.d
+                    else -> null
                 }
             }
 
@@ -271,15 +247,9 @@ final class CodableTests: XCTestCase {
 
             private fun CK(rawValue: String): S.CK? {
                 return when (rawValue) {
-                    "i" -> {
-                        CK.i
-                    }
-                    "s" -> {
-                        CK.s
-                    }
-                    else -> {
-                        null
-                    }
+                    "i" -> CK.i
+                    "s" -> CK.s
+                    else -> null
                 }
             }
 
@@ -315,12 +285,8 @@ final class CodableTests: XCTestCase {
 
             private fun CodingKeys(rawValue: String): CodingKeys? {
                 return when (rawValue) {
-                    "a" -> {
-                        CodingKeys.a
-                    }
-                    else -> {
-                        null
-                    }
+                    "a" -> CodingKeys.a
+                    else -> null
                 }
             }
 
@@ -364,15 +330,9 @@ final class CodableTests: XCTestCase {
 
             private fun CodingKeys(rawValue: String): CodingKeys? {
                 return when (rawValue) {
-                    "i" -> {
-                        CodingKeys.i
-                    }
-                    "s" -> {
-                        CodingKeys.s
-                    }
-                    else -> {
-                        null
-                    }
+                    "i" -> CodingKeys.i
+                    "s" -> CodingKeys.s
+                    else -> null
                 }
             }
 
@@ -410,15 +370,9 @@ final class CodableTests: XCTestCase {
 
             private fun CK(rawValue: String): S.CK? {
                 return when (rawValue) {
-                    "i" -> {
-                        CK.i
-                    }
-                    "s" -> {
-                        CK.s
-                    }
-                    else -> {
-                        null
-                    }
+                    "i" -> CK.i
+                    "s" -> CK.s
+                    else -> null
                 }
             }
 
@@ -436,15 +390,9 @@ final class CodableTests: XCTestCase {
 
             private fun CodingKeys(rawValue: String): CodingKeys? {
                 return when (rawValue) {
-                    "i" -> {
-                        CodingKeys.i
-                    }
-                    "s" -> {
-                        CodingKeys.s
-                    }
-                    else -> {
-                        null
-                    }
+                    "i" -> CodingKeys.i
+                    "s" -> CodingKeys.s
+                    else -> null
                 }
             }
 
@@ -484,15 +432,9 @@ final class CodableTests: XCTestCase {
 
             private fun CodingKeys(rawValue: String): CodingKeys? {
                 return when (rawValue) {
-                    "i" -> {
-                        CodingKeys.i
-                    }
-                    "s" -> {
-                        CodingKeys.s
-                    }
-                    else -> {
-                        null
-                    }
+                    "i" -> CodingKeys.i
+                    "s" -> CodingKeys.s
+                    else -> null
                 }
             }
 
@@ -534,15 +476,9 @@ final class CodableTests: XCTestCase {
 
             private fun CodingKeys(rawValue: String): S.CodingKeys? {
                 return when (rawValue) {
-                    "i" -> {
-                        CodingKeys.i
-                    }
-                    "s" -> {
-                        CodingKeys.s
-                    }
-                    else -> {
-                        null
-                    }
+                    "i" -> CodingKeys.i
+                    "s" -> CodingKeys.s
+                    else -> null
                 }
             }
 
@@ -585,15 +521,9 @@ final class CodableTests: XCTestCase {
 
             private fun CodingKeys(rawValue: String): CodingKeys? {
                 return when (rawValue) {
-                    "i" -> {
-                        CodingKeys.i
-                    }
-                    "s" -> {
-                        CodingKeys.s
-                    }
-                    else -> {
-                        null
-                    }
+                    "i" -> CodingKeys.i
+                    "s" -> CodingKeys.s
+                    else -> null
                 }
             }
 
@@ -642,15 +572,9 @@ final class CodableTests: XCTestCase {
 
             private fun CodingKeys(rawValue: String): CodingKeys? {
                 return when (rawValue) {
-                    "i" -> {
-                        CodingKeys.i
-                    }
-                    "a" -> {
-                        CodingKeys.a
-                    }
-                    else -> {
-                        null
-                    }
+                    "i" -> CodingKeys.i
+                    "a" -> CodingKeys.a
+                    else -> null
                 }
             }
 
@@ -692,12 +616,8 @@ final class CodableTests: XCTestCase {
 
             private fun CodingKeys(rawValue: String): CodingKeys? {
                 return when (rawValue) {
-                    "s" -> {
-                        CodingKeys.s
-                    }
-                    else -> {
-                        null
-                    }
+                    "s" -> CodingKeys.s
+                    else -> null
                 }
             }
 
@@ -740,15 +660,9 @@ final class CodableTests: XCTestCase {
 
         internal fun E(rawValue: Int): E? {
             return when (rawValue) {
-                0 -> {
-                    E.a
-                }
-                1 -> {
-                    E.b
-                }
-                else -> {
-                    null
-                }
+                0 -> E.a
+                1 -> E.b
+                else -> null
             }
         }
 
@@ -786,15 +700,9 @@ final class CodableTests: XCTestCase {
 
         internal fun E(rawValue: Int): E? {
             return when (rawValue) {
-                0 -> {
-                    E.a
-                }
-                1 -> {
-                    E.b
-                }
-                else -> {
-                    null
-                }
+                0 -> E.a
+                1 -> E.b
+                else -> null
             }
         }
         """)

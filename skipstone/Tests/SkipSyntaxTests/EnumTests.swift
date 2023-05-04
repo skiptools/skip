@@ -34,21 +34,11 @@ final class EnumTests: XCTestCase {
 
         internal fun E(rawValue: Int): E? {
             return when (rawValue) {
-                0 -> {
-                    E.a
-                }
-                1 -> {
-                    E.b
-                }
-                100 -> {
-                    E.c
-                }
-                101 -> {
-                    E.d
-                }
-                else -> {
-                    null
-                }
+                0 -> E.a
+                1 -> E.b
+                100 -> E.c
+                101 -> E.d
+                else -> null
             }
         }
         """)
@@ -68,18 +58,10 @@ final class EnumTests: XCTestCase {
 
         internal fun E(rawValue: String): E? {
             return when (rawValue) {
-                "a" -> {
-                    E.a
-                }
-                "B" -> {
-                    E.b
-                }
-                "c" -> {
-                    E.c
-                }
-                else -> {
-                    null
-                }
+                "a" -> E.a
+                "B" -> E.b
+                "c" -> E.c
+                else -> null
             }
         }
         """)
@@ -105,15 +87,9 @@ final class EnumTests: XCTestCase {
 
         internal fun E(rawValue: Int): E? {
             return when (rawValue) {
-                0 -> {
-                    E.a
-                }
-                1 -> {
-                    E.b
-                }
-                else -> {
-                    null
-                }
+                0 -> E.a
+                1 -> E.b
+                else -> null
             }
         }
         """)
@@ -139,15 +115,9 @@ final class EnumTests: XCTestCase {
 
         internal fun E(rawValue: Int): E? {
             return when (rawValue) {
-                0 -> {
-                    E.a
-                }
-                1 -> {
-                    E.b
-                }
-                else -> {
-                    null
-                }
+                0 -> E.a
+                1 -> E.b
+                else -> null
             }
         }
         """)
@@ -449,15 +419,9 @@ final class EnumTests: XCTestCase {
 
         internal fun E(rawValue: Int): E? {
             when (rawValue) {
-                1 -> {
-                    return E.one
-                }
-                2 -> {
-                    return E.two
-                }
-                else -> {
-                    return null
-                }
+                1 -> return E.one
+                2 -> return E.two
+                else -> return null
             }
         }
 

@@ -1938,14 +1938,21 @@ class KotlinWhen: KotlinExpression {
                 }
             }
         }
-        output.append(" -> {\n")
-        let bodyIndentation = indentation.inc()
-        for caseBindingVariable in whenCase.caseBindingVariables {
-            output.append(bodyIndentation)
-            caseBindingVariable.append(to: output, indentation: bodyIndentation)
+        output.append(" -> ")
+        let isSingleStatement = whenCase.caseBindingVariables.isEmpty && whenCase.body.isSingleStatementAppendable(isFunctionBody: false)
+        if isSingleStatement {
+            whenCase.body.appendAsSingleStatement(to: output, indentation: indentation, isFunctionBody: false)
             output.append("\n")
+        } else {
+            output.append("{\n")
+            let bodyIndentation = indentation.inc()
+            for caseBindingVariable in whenCase.caseBindingVariables {
+                output.append(bodyIndentation)
+                caseBindingVariable.append(to: output, indentation: bodyIndentation)
+                output.append("\n")
+            }
+            output.append(whenCase.body, indentation: bodyIndentation)
+            output.append(indentation).append("}\n")
         }
-        output.append(whenCase.body, indentation: bodyIndentation)
-        output.append(indentation).append("}\n")
     }
 }

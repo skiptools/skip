@@ -204,15 +204,9 @@ final class FeatureSupportTests: XCTestCase {
 
             fun UnsignedEnum(rawValue: UInt): UnsignedEnum? {
                 return when (rawValue) {
-                    10 -> {
-                        UnsignedEnum.ten
-                    }
-                    20 -> {
-                        UnsignedEnum.twenty
-                    }
-                    else -> {
-                        null
-                    }
+                    10 -> UnsignedEnum.ten
+                    20 -> UnsignedEnum.twenty
+                    else -> null
                 }
             }
             return ""
