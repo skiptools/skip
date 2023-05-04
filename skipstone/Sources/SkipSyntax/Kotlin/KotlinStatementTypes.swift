@@ -40,15 +40,15 @@ class KotlinBreak: KotlinStatement, KotlinSingleStatementAppendable {
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
         output.append(indentation)
-        appendAsSingleStatement(to: output, indentation: indentation, isFunctionBody: false)
+        appendAsSingleStatement(to: output, indentation: indentation, mode: .closure)
         output.append("\n")
     }
 
-    func isSingleStatementAppendable(isFunctionBody: Bool) -> Bool {
-        return !isFunctionBody
+    func isSingleStatementAppendable(mode: KotlinSingleStatementAppendMode) -> Bool {
+        return mode != .function
     }
 
-    func appendAsSingleStatement(to output: OutputGenerator, indentation: Indentation, isFunctionBody: Bool) {
+    func appendAsSingleStatement(to output: OutputGenerator, indentation: Indentation, mode: KotlinSingleStatementAppendMode) {
         if asReturn {
             output.append("return")
         } else {
@@ -60,7 +60,7 @@ class KotlinBreak: KotlinStatement, KotlinSingleStatementAppendable {
     }
 }
 
-class KotlinCodeBlock: KotlinStatement {
+class KotlinCodeBlock: KotlinStatement, KotlinSingleStatementAppendable {
     var statements: [KotlinStatement]
 
     /// The number of defer statements in this block.
@@ -268,8 +268,12 @@ class KotlinCodeBlock: KotlinStatement {
         statements = statements.filter { $0 !== statement }
     }
 
-    /// Whether this code block can be appended safely as a single Kotlin statement.
-    func isSingleStatementAppendable(isFunctionBody: Bool) -> Bool {
+    /// Prevent this code block from using Kotlin's single-statement syntax.
+    ///
+    /// Useful for formatting or when adding `KotlinRawStatements` with code you know is disallowed in single-statement functions.
+    var disallowSingleStatementAppend = false
+
+    func isSingleStatementAppendable(mode: KotlinSingleStatementAppendMode) -> Bool {
         guard !isTryCatch && !disallowSingleStatementAppend && statements.count <= 1 else {
             return false
         }
@@ -279,19 +283,23 @@ class KotlinCodeBlock: KotlinStatement {
             if statementCount <= 1 && !hasDisallowed && $0 !== self {
                 if let statement = $0 as? KotlinStatement {
                     statementCount += 1
-                    // We can't support leading comments on e.g. `fun f() = <statement>`
+                    // We can't support leading comments because we'll be on the same line as preceding code
                     if statement.extras?.leadingTrivia.isEmpty == false {
                         hasDisallowed = true
                     }
+                    // We can't suport trailing comments if there may be trailing code (e.g. closure closing brace)
+                    if mode == .closure && statement.extras?.trailingTrivia.isEmpty == false {
+                        hasDisallowed = true
+                    }
                     if let appendable = statement as? KotlinSingleStatementAppendable {
-                        if !appendable.isSingleStatementAppendable(isFunctionBody: isFunctionBody) {
+                        if !appendable.isSingleStatementAppendable(mode: mode) {
                             hasDisallowed = true
                         }
                     } else {
                         hasDisallowed = true
                     }
                 }
-                if isFunctionBody && ($0 as? KotlinBinaryOperator)?.op.precedence == .assignment {
+                if mode == .function && ($0 as? KotlinBinaryOperator)?.op.precedence == .assignment {
                     hasDisallowed = true
                 }
             }
@@ -299,17 +307,15 @@ class KotlinCodeBlock: KotlinStatement {
         }
         return statementCount <= 1 && !hasDisallowed
     }
-    var disallowSingleStatementAppend = false
 
-    /// Append this code block formatted as a single statement.
-    func appendAsSingleStatement(to output: OutputGenerator, indentation: Indentation, isFunctionBody: Bool) {
+    func appendAsSingleStatement(to output: OutputGenerator, indentation: Indentation, mode: KotlinSingleStatementAppendMode) {
         if statements.isEmpty {
-            if isFunctionBody {
+            if mode == .function || mode == .case {
                 output.append("Unit")
             }
         } else if let appendable = statements[0] as? KotlinSingleStatementAppendable {
             output.append(statements[0], indentation: indentation) {
-                appendable.appendAsSingleStatement(to: $0, indentation: indentation, isFunctionBody: isFunctionBody)
+                appendable.appendAsSingleStatement(to: $0, indentation: indentation, mode: mode)
             }
         } else {
             assert(false)
@@ -583,12 +589,12 @@ class KotlinReturn: KotlinExpressionStatement {
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
         output.append(indentation)
-        appendAsSingleStatement(to: output, indentation: indentation, isFunctionBody: false)
+        appendAsSingleStatement(to: output, indentation: indentation, mode: .closure)
         output.append("\n")
     }
 
-    override func appendAsSingleStatement(to output: OutputGenerator, indentation: Indentation, isFunctionBody: Bool) {
-        if isFunctionBody {
+    override func appendAsSingleStatement(to output: OutputGenerator, indentation: Indentation, mode: KotlinSingleStatementAppendMode) {
+        if mode == .function {
             if let expression {
                 output.append(expression, indentation: indentation)
             } else {
@@ -1545,9 +1551,9 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         }
 
         // Append Kotlin single statement format if possible
-        guard isConstructor || callSuperFinalize || !parameterVals.isEmpty || suppressSideEffects || mutationFunctionNames != nil || !body.isSingleStatementAppendable(isFunctionBody: true) else {
+        guard isConstructor || callSuperFinalize || !parameterVals.isEmpty || suppressSideEffects || mutationFunctionNames != nil || !body.isSingleStatementAppendable(mode: .function) else {
             output.append(" = ")
-            body.appendAsSingleStatement(to: output, indentation: indentation, isFunctionBody: true)
+            body.appendAsSingleStatement(to: output, indentation: indentation, mode: .function)
             output.append("\n")
             return
         }
@@ -2111,9 +2117,9 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if let getterBody = getter?.body {
             let getterIndentation = indentation.inc()
             output.append(getterIndentation).append("get()")
-            if getterBody.isSingleStatementAppendable(isFunctionBody: true) {
+            if getterBody.isSingleStatementAppendable(mode: .function) {
                 output.append(" = ")
-                getterBody.appendAsSingleStatement(to: output, indentation: getterIndentation, isFunctionBody: true)
+                getterBody.appendAsSingleStatement(to: output, indentation: getterIndentation, mode: .function)
                 output.append("\n")
             } else {
                 output.append(" {\n")

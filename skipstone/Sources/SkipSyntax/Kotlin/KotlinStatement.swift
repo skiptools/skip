@@ -66,14 +66,21 @@ extension KotlinMemberDeclaration {
     }
 }
 
+/// Use cases to generate single-statement append syntax.
+enum KotlinSingleStatementAppendMode {
+    case `case`
+    case closure
+    case function
+}
+
 /// A statement that can be appended in Kotlin single-statement format, e.g. `fun f() = <statement>`
 protocol KotlinSingleStatementAppendable {
-    func isSingleStatementAppendable(isFunctionBody: Bool) -> Bool
-    func appendAsSingleStatement(to output: OutputGenerator, indentation: Indentation, isFunctionBody: Bool)
+    func isSingleStatementAppendable(mode: KotlinSingleStatementAppendMode) -> Bool
+    func appendAsSingleStatement(to output: OutputGenerator, indentation: Indentation, mode: KotlinSingleStatementAppendMode)
 }
 
 extension KotlinSingleStatementAppendable {
-    func isSingleStatementAppendable(isFunctionBody: Bool) -> Bool {
+    func isSingleStatementAppendable(mode: KotlinSingleStatementAppendMode) -> Bool {
         return true
     }
 }
@@ -107,10 +114,10 @@ class KotlinExpressionStatement: KotlinStatement, KotlinSingleStatementAppendabl
         }
     }
 
-    func appendAsSingleStatement(to output: OutputGenerator, indentation: Indentation, isFunctionBody: Bool) {
+    func appendAsSingleStatement(to output: OutputGenerator, indentation: Indentation, mode: KotlinSingleStatementAppendMode) {
         if let expression {
             expression.append(to: output, indentation: indentation)
-        } else if isFunctionBody {
+        } else if mode == .function {
             output.append("Unit")
         }
     }
@@ -144,10 +151,10 @@ class KotlinRawStatement: KotlinStatement, KotlinSingleStatementAppendable {
         output.append(indentation).append(sourceCode).append("\n")
     }
 
-    func appendAsSingleStatement(to output: OutputGenerator, indentation: Indentation, isFunctionBody: Bool) {
-        if isFunctionBody && sourceCode == "return" {
+    func appendAsSingleStatement(to output: OutputGenerator, indentation: Indentation, mode: KotlinSingleStatementAppendMode) {
+        if mode == .function && sourceCode == "return" {
             output.append("Unit")
-        } else if isFunctionBody && sourceCode.hasPrefix("return ") {
+        } else if mode == .function && sourceCode.hasPrefix("return ") {
             output.append(String(sourceCode.dropFirst("return ".count)))
         } else {
             output.append(sourceCode)

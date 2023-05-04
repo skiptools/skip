@@ -142,12 +142,45 @@ final class TriviaTests: XCTestCase {
             // Comment
             return 100
         }
+
+        func closure(c: () -> Unit) {
+        }
+        func i() {
+            c({
+                // Comment
+                f()
+            })
+        }
+        func j() {
+            c({
+                f() // Comment
+            })
+        }
+        func k() {
+            c({ f() })
+        }
         """, kotlin: """
         internal fun f() = 100
         internal fun g() = 100 // Comment
         internal fun h() {
             // Comment
             return 100
+        }
+
+        internal fun closure(c: () -> Unit) = Unit
+        internal fun i() {
+            c {
+                // Comment
+                f()
+            }
+        }
+        internal fun j() {
+            c {
+                f() // Comment
+            }
+        }
+        internal fun k() {
+            c { f() }
         }
         """)
     }

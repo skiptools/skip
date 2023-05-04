@@ -516,9 +516,9 @@ class KotlinClosure: KotlinExpression {
             }
         }
         output.append("): ").append(returnType)
-        if body.isSingleStatementAppendable(isFunctionBody: true) {
+        if body.isSingleStatementAppendable(mode: .function) {
             output.append(" = ")
-            body.appendAsSingleStatement(to: output, indentation: indentation, isFunctionBody: true)
+            body.appendAsSingleStatement(to: output, indentation: indentation, mode: .function)
         } else {
             output.append(" {\n")
             output.append(body, indentation: indentation.inc())
@@ -531,7 +531,7 @@ class KotlinClosure: KotlinExpression {
             output.append(Self.returnLabel).append("@")
         }
         output.append("{")
-        let isSingleStatement = body.isSingleStatementAppendable(isFunctionBody: false)
+        let isSingleStatement = body.isSingleStatementAppendable(mode: .closure)
         if parameters.isEmpty && implicitParameterLabels.isEmpty {
             output.append(isSingleStatement ? " " : "\n")
         } else {
@@ -555,7 +555,7 @@ class KotlinClosure: KotlinExpression {
             output.append(isSingleStatement ? " " : "\n")
         }
         if isSingleStatement {
-            body.appendAsSingleStatement(to: output, indentation: indentation, isFunctionBody: false)
+            body.appendAsSingleStatement(to: output, indentation: indentation, mode: .closure)
             output.append(" }")
         } else {
             output.append(body, indentation: indentation.inc())
@@ -1939,9 +1939,9 @@ class KotlinWhen: KotlinExpression {
             }
         }
         output.append(" -> ")
-        let isSingleStatement = whenCase.caseBindingVariables.isEmpty && whenCase.body.isSingleStatementAppendable(isFunctionBody: false)
+        let isSingleStatement = whenCase.caseBindingVariables.isEmpty && whenCase.body.isSingleStatementAppendable(mode: .case)
         if isSingleStatement {
-            whenCase.body.appendAsSingleStatement(to: output, indentation: indentation, isFunctionBody: false)
+            whenCase.body.appendAsSingleStatement(to: output, indentation: indentation, mode: .case)
             output.append("\n")
         } else {
             output.append("{\n")
