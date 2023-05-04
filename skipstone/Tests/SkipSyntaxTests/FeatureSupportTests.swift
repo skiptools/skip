@@ -17,6 +17,26 @@ final class FeatureSupportTests: XCTestCase {
             """)
     }
 
+    func testNamedParameterOverridesOuterDefinition() async throws {
+        // the "a" part of the "a b: String" parameter is unused in Swift, but it acts as being locally declared in Kotlin and thus overrides the outer definition of "a".
+        // These two functions thus return different values: "xy" vs. "yy"
+        // There might not be an easy solution to this (and will cause confusing errors when the outer "a" and inner "a" are different types), so we may just need Skippy to disallow such name clashes.
+        try await check(compiler: nil, swiftCode: {
+            let a = "x"
+            func f(a b: String) -> String {
+                a + b
+            }
+            return f(a: "y")
+        }, kotlin: """
+            val a = "x"
+            fun f(a: String): String {
+                val b = a
+                return a + b
+            }
+            return f(a = "y")
+            """)
+    }
+
     func testNoComments() async throws {
         try await check(swiftCode: {
             let x = "1" + "X"
@@ -319,6 +339,9 @@ final class FeatureSupportTests: XCTestCase {
         #endif
     }
 }
+
+
+
 
 
 
