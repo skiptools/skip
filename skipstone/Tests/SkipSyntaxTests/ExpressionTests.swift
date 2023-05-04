@@ -193,7 +193,7 @@ final class ExpressionTests: XCTestCase {
             internal var a: Array<String> = arrayOf()
                 get() = field.sref({ this.a = it })
                 set(newValue) {
-                    val newValue = newValue.sref()
+                    @Suppress("NAME_SHADOWING") val newValue = newValue.sref()
                     willmutate()
                     try {
                         field = newValue
