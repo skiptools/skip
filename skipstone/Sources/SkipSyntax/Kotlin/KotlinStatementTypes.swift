@@ -1400,6 +1400,12 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         return kstatement
     }
 
+    static func translate(statement: SubscriptDeclaration, translator: KotlinTranslator) -> [KotlinStatement] {
+        // TODO: Translate to get/set functions
+        let kstatement = KotlinMessageStatement(message: .kotlinSubscriptFunction(statement, source: translator.syntaxTree.source), statement: statement)
+        return [kstatement]
+    }
+
     init(name: String, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.name = name
         super.init(type: name == "constructor" ? .constructorDeclaration : name == "finalize" ? .finalizerDeclaration : .functionDeclaration, sourceFile: sourceFile, sourceRange: sourceRange)

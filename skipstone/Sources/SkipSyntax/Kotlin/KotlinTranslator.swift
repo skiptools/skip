@@ -143,6 +143,8 @@ public class KotlinTranslator {
                 return [KotlinInterfaceDeclaration.translate(statement: statement as! TypeDeclaration, translator: self)]
             case .structDeclaration:
                 return [KotlinClassDeclaration.translate(statement: statement as! TypeDeclaration, translator: self)]
+            case .subscriptDeclaration:
+                return KotlinFunctionDeclaration.translate(statement: statement as! SubscriptDeclaration, translator: self)
             case .typealiasDeclaration:
                 if let typealiasDeclaration = KotlinTypealiasDeclaration.translate(statement: statement as! TypealiasDeclaration, translator: self) {
                     return [typealiasDeclaration]

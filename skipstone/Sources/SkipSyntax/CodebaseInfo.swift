@@ -372,7 +372,11 @@ public class CodebaseInfo: Codable {
         func subscriptSignature(inConstrained type: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> [(TypeSignature, Availability)] {
             var type = type.asOptional(false)
             if case .array(let elementType) = type, arguments.count == 1 {
-                return [(.function([TypeSignature.Parameter(type: .int)], elementType.mappingSelf(to: type)), .available)]
+                if case .range = arguments[0].value {
+                    // Slice - fall through to symbols
+                } else {
+                    return [(.function([TypeSignature.Parameter(type: .int)], elementType.mappingSelf(to: type)), .available)]
+                }
             } else if case .dictionary(let keyType, let valueType) = type, arguments.count == 1 {
                 return [(.function([TypeSignature.Parameter(type: keyType)], valueType.mappingSelf(to: type)), .available)]
             }
@@ -381,7 +385,7 @@ public class CodebaseInfo: Codable {
 
             var candidates: Set<FunctionCandidate> = []
             for typeInfo in typeInfos(forNamed: type) {
-                functionCandidates(for: "subscript", in: typeInfo, constrainedGenerics: type.generics, arguments: arguments, isStatic: isStatic).forEach { candidates.insert($0) }
+                subscriptCandidates(in: typeInfo, constrainedGenerics: type.generics, arguments: arguments, isStatic: isStatic).forEach { candidates.insert($0) }
             }
             let sortedCandidates = candidates.sorted { $0.score > $1.score }
             guard let topCandidate = sortedCandidates.first else {
@@ -459,6 +463,30 @@ public class CodebaseInfo: Codable {
                 for inheritsInfo in typeInfos(forNamed: inherits) {
                     let inheritsConstraints = inherits.mappingTypes(from: typeInfo.signature.generics, to: constrainedGenerics).generics
                     candidates += functionCandidates(for: name, in: inheritsInfo, constrainedGenerics: inheritsConstraints, arguments: arguments, isStatic: isStatic)
+                }
+            }
+            return candidates
+        }
+
+        /// - Note: Returns unsorted, un-deduped results.
+        private func subscriptCandidates(in typeInfo: TypeInfo, constrainedGenerics: [TypeSignature], arguments: [LabeledValue<TypeSignature>], isStatic: Bool) -> [FunctionCandidate] {
+            guard typeInfo.isApplicable(toConstrainedGenerics: constrainedGenerics, codebaseInfo: self) else {
+                return []
+            }
+            var candidates = typeInfo.visibleMembers(context: self).compactMap { (member) -> FunctionCandidate? in
+                guard member.declarationType == .subscriptDeclaration && member.isStatic == isStatic else {
+                    return nil
+                }
+                if let candidate = matchFunction(member, in: typeInfo, constrainedGenerics: constrainedGenerics, arguments: arguments) {
+                    return candidate
+                } else {
+                    return nil
+                }
+            }
+            for inherits in typeInfo.inherits {
+                for inheritsInfo in typeInfos(forNamed: inherits) {
+                    let inheritsConstraints = inherits.mappingTypes(from: typeInfo.signature.generics, to: constrainedGenerics).generics
+                    candidates += subscriptCandidates(in: inheritsInfo, constrainedGenerics: inheritsConstraints, arguments: arguments, isStatic: isStatic)
                 }
             }
             return candidates
@@ -546,7 +574,7 @@ public class CodebaseInfo: Codable {
             var parameterIndex = 0
             var totalScore = 0.0
             for argument in arguments {
-                guard let (matchingIndex, score) = matchArgument(argument, to: constrainedParameters, startIndex: parameterIndex) else {
+                guard let (matchingIndex, score) = matchArgument(argument, to: constrainedParameters, isSubscript: declarationType == .subscriptDeclaration, startIndex: parameterIndex) else {
                     return nil
                 }
                 // If the parameter type was constrained (i.e. is generic), the argument value will likely be more specific
@@ -583,7 +611,7 @@ public class CodebaseInfo: Codable {
             return FunctionCandidate(signature: .function(matchingParameters, mappedSignature.returnType), declarationType: declarationType, availability: availability, score: totalScore)
         }
 
-        private func matchArgument(_ argument: LabeledValue<TypeSignature>, to parameters: [TypeSignature.Parameter], startIndex: Int) -> (index: Int, score: Double)? {
+        private func matchArgument(_ argument: LabeledValue<TypeSignature>, to parameters: [TypeSignature.Parameter], isSubscript: Bool = false, startIndex: Int) -> (index: Int, score: Double)? {
             // Note: in the algorith below we give an extra point for matching a label (or absence of one), as opposed to
             // being a trailing closure that omits the label
             for (index, parameter) in parameters[startIndex...].enumerated() {
@@ -596,7 +624,7 @@ public class CodebaseInfo: Codable {
                     }
                 } else {
                     // If there is no label, then either this parameter has to have no label or it has to be a trailing closure
-                    if parameter.label == nil, let score = argument.value.compatibilityScore(target: parameter.type, codebaseInfo: self) {
+                    if (parameter.label == nil || isSubscript), let score = argument.value.compatibilityScore(target: parameter.type, codebaseInfo: self) {
                         return (startIndex + index, 1.0 + score)
                     } else if case .function = parameter.type, let score = argument.value.compatibilityScore(target: parameter.type, codebaseInfo: self) {
                         return (startIndex + index, score)
@@ -950,8 +978,17 @@ public class CodebaseInfo: Codable {
         var cases: [EnumCaseInfo] = []
         var variables: [VariableInfo] = []
         var functions: [FunctionInfo] = []
+        var subscripts: [SubscriptInfo] = []
         var members: [CodebaseInfoItem] {
-            return types + typealiases + cases + variables + functions
+            // Break up statement to satisfy compiler
+            var members: [CodebaseInfoItem] = []
+            members += types
+            members += typealiases
+            members += cases
+            members += variables
+            members += functions
+            members += subscripts
+            return members
         }
 
         func visibleMembers(context: CodebaseInfo.Context) -> [CodebaseInfoItem] {
@@ -984,7 +1021,7 @@ public class CodebaseInfo: Codable {
 
         private enum CodingKeys: String, CodingKey {
             // Exclude language additions
-            case name, declarationType, signature, moduleName, sourceFile, declaringType, modifiers, availability, generics, inherits, types, typealiases, cases, variables, functions
+            case name, declarationType, signature, moduleName, sourceFile, declaringType, modifiers, availability, generics, inherits, types, typealiases, cases, variables, functions, subscripts
         }
 
         fileprivate init(statement: TypeDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo) {
@@ -1062,6 +1099,8 @@ public class CodebaseInfo: Codable {
                     cases.append(EnumCaseInfo(statement: statement as! EnumCaseDeclaration, in: signature, codebaseInfo: codebaseInfo))
                 case .functionDeclaration, .initDeclaration, .deinitDeclaration:
                     functions.append(FunctionInfo(statement: statement as! FunctionDeclaration, in: signature, codebaseInfo: codebaseInfo))
+                case .subscriptDeclaration:
+                    subscripts.append(SubscriptInfo(statement: statement as! SubscriptDeclaration, in: signature, codebaseInfo: codebaseInfo))
                 case .typealiasDeclaration:
                     typealiases.append(TypealiasInfo(statement: statement as! TypealiasDeclaration, in: signature, codebaseInfo: codebaseInfo))
                 case .variableDeclaration:
@@ -1199,6 +1238,46 @@ public class CodebaseInfo: Codable {
             self.availability = availability
             self.generics = generics
             self.isMutating = isMutating
+        }
+    }
+
+    /// Information about a declared subscript function.
+    struct SubscriptInfo: CodebaseInfoItem, Codable {
+        var name: String {
+            return "subscript"
+        }
+        var declarationType: StatementType {
+            return .subscriptDeclaration
+        }
+        var signature: TypeSignature
+        var moduleName: String?
+        var sourceFile: Source.FilePath?
+        var declaringType: TypeSignature?
+        let modifiers: Modifiers
+        let availability: Availability
+        var isStatic: Bool {
+            return modifiers.isStatic
+        }
+        var languageAdditions: Any?
+
+        let generics: Generics
+        let isReadOnly: Bool
+
+        private enum CodingKeys: String, CodingKey {
+            // Exclude language additions
+            case signature, moduleName, sourceFile, declaringType, modifiers, availability, generics, isReadOnly
+        }
+
+        fileprivate init(statement: SubscriptDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo) {
+            self.signature = statement.getterType
+            self.moduleName = codebaseInfo.moduleName
+            self.sourceFile = statement.sourceFile
+            self.declaringType = declaringType
+            self.modifiers = statement.modifiers
+            self.availability = Availability(attributes: statement.attributes)
+            self.generics = statement.generics
+            self.isReadOnly = statement.setter == nil
+            (codebaseInfo.languageAdditions as? CodebaseInfoLanguageAdditionsGatherDelegate)?.codebaseInfo(codebaseInfo, didGather: &self, from: statement)
         }
     }
 
@@ -1341,6 +1420,7 @@ protocol CodebaseInfoLanguageAdditionsGatherDelegate {
     func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather typeInfo: CodebaseInfo.TypeInfo, from statement: ExtensionDeclaration)
     func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather variableInfo: inout CodebaseInfo.VariableInfo, from statement: VariableDeclaration)
     func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather functionInfo: inout CodebaseInfo.FunctionInfo, from statement: FunctionDeclaration)
+    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather subscriptInfo: inout CodebaseInfo.SubscriptInfo, from statement: SubscriptDeclaration)
     func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather typealiasInfo: inout CodebaseInfo.TypealiasInfo, from statement: TypealiasDeclaration)
     func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather enumCaseInfo: inout CodebaseInfo.EnumCaseInfo, from statement: EnumCaseDeclaration)
 }
@@ -1366,6 +1446,9 @@ extension CodebaseInfoLanguageAdditionsGatherDelegate {
     }
 
     func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather functionInfo: inout CodebaseInfo.FunctionInfo, from statement: FunctionDeclaration) {
+    }
+
+    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather subscriptInfo: inout CodebaseInfo.SubscriptInfo, from statement: SubscriptDeclaration) {
     }
 
     func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather typealiasInfo: inout CodebaseInfo.TypealiasInfo, from statement: TypealiasDeclaration) {

@@ -89,16 +89,21 @@ class SyntaxNode: SourceDerived, PrettyPrintable {
         return owningTypeDeclaration == nil && parent?.parent == nil
     }
 
-    /// Find the nearest function declaration by traversing up the syntax tree.
+    /// Find the nearest function, subscript, or variable getter/setter declaration by traversing up the syntax tree.
     ///
     /// Returns `nil` if we encounter a type before a function.
-    final var owningFunctionDeclaration: FunctionDeclaration? {
+    final var owningFunctionDeclaration: Statement? {
         var current: SyntaxNode? = self
         while current != nil {
-            if let owningFunctionDeclaration = current as? FunctionDeclaration {
-                return owningFunctionDeclaration
-            } else if current is TypeDeclaration {
-                return nil
+            if let statement = current as? Statement {
+                switch statement.type {
+                case .functionDeclaration, .subscriptDeclaration, .variableDeclaration:
+                    return statement
+                case .classDeclaration, .enumDeclaration, .extensionDeclaration, .protocolDeclaration, .structDeclaration:
+                    return nil
+                default:
+                    break
+                }
             }
             current = current?.parent
         }

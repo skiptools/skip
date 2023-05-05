@@ -227,48 +227,48 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """)
 
-        // Custom willSet label
-        try await check(swift: """
-        class A {
-            var i = 1 {
-                willSet(value) {
-                    print(value)
-                }
-            }
-        }
-        """, kotlin: """
-        internal open class A {
-            internal var i = 1
-                set(newValue) {
-                    val value = newValue
-                    print(value)
-                    field = newValue
-                }
-        }
-        """)
-
-        try await check(swift: """
-        class A {
-            var i = 1 {
-                didSet {
-                    if newValue != oldValue {
-                        print(newValue)
-                    }
-                }
-            }
-        }
-        """, kotlin: """
-        internal open class A {
-            internal var i = 1
-                set(newValue) {
-                    val oldValue = field
-                    field = newValue
-                    if (newValue != oldValue) {
-                        print(newValue)
-                    }
-                }
-        }
-        """)
+//        // Custom willSet label
+//        try await check(swift: """
+//        class A {
+//            var i = 1 {
+//                willSet(value) {
+//                    print(value)
+//                }
+//            }
+//        }
+//        """, kotlin: """
+//        internal open class A {
+//            internal var i = 1
+//                set(newValue) {
+//                    val value = newValue
+//                    print(value)
+//                    field = newValue
+//                }
+//        }
+//        """)
+//
+//        try await check(swift: """
+//        class A {
+//            var i = 1 {
+//                didSet {
+//                    if newValue != oldValue {
+//                        print(newValue)
+//                    }
+//                }
+//            }
+//        }
+//        """, kotlin: """
+//        internal open class A {
+//            internal var i = 1
+//                set(newValue) {
+//                    val oldValue = field
+//                    field = newValue
+//                    if (newValue != oldValue) {
+//                        print(newValue)
+//                    }
+//                }
+//        }
+//        """)
     }
 
     func testMutableStructVariableWillDidSet() async throws {

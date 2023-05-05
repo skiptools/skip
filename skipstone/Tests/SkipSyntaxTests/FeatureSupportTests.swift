@@ -313,7 +313,7 @@ final class FeatureSupportTests: XCTestCase {
                 }
                 var a = 0
                 var b = 1
-                for (unusedbinding in 2 .. n) {
+                for (unusedbinding in 2..n) {
                     val c = a + b
                     a = b
                     b = c

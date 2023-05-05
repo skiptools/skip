@@ -28,6 +28,7 @@ enum StatementType: CaseIterable, Codable {
     case initDeclaration
     case protocolDeclaration
     case structDeclaration
+    case subscriptDeclaration
     case typealiasDeclaration
     case variableDeclaration
 
@@ -89,6 +90,8 @@ enum StatementType: CaseIterable, Codable {
             return TypeDeclaration.self
         case .structDeclaration:
             return TypeDeclaration.self
+        case .subscriptDeclaration:
+            return SubscriptDeclaration.self
         case .typealiasDeclaration:
             return TypealiasDeclaration.self
         case .variableDeclaration:
@@ -961,6 +964,120 @@ class ImportDeclaration: Statement {
     }
 }
 
+/// `subscript() { ... }`
+class SubscriptDeclaration: Statement {
+    private(set) var elementType: TypeSignature
+    private(set) var parameters: [Parameter<Expression>]
+    let isAsync: Bool
+    let isThrows: Bool
+    let attributes: Attributes
+    private(set) var modifiers: Modifiers
+    private(set) var generics: Generics
+    let getter: Accessor<CodeBlock>?
+    let setter: Accessor<CodeBlock>?
+    var getterType: TypeSignature {
+        return .function(parameters.map(\.signature), elementType)
+    }
+    var setterType: TypeSignature {
+        return .function(parameters.map(\.signature), .void)
+    }
+
+    init(elementType: TypeSignature, parameters: [Parameter<Expression>], isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), getter: Accessor<CodeBlock>? = nil, setter: Accessor<CodeBlock>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.elementType = elementType
+        self.parameters = parameters
+        self.isAsync = isAsync
+        self.isThrows = isThrows
+        self.attributes = attributes
+        self.modifiers = modifiers
+        self.generics = generics
+        self.getter = getter
+        self.setter = setter
+        super.init(type: .subscriptDeclaration, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
+        guard syntax.kind == .subscriptDecl, let subscriptDecl = syntax.as(SubscriptDeclSyntax.self) else {
+            return nil
+        }
+        let elementType = TypeSignature.for(syntax: subscriptDecl.result.returnType)
+        let (parameters, parametersMessages) = subscriptDecl.indices.parameters(in: syntaxTree)
+        let attributes = Attributes.for(syntax: subscriptDecl.attributes, in: syntaxTree)
+        let modifiers = Modifiers.for(syntax: subscriptDecl.modifiers)
+        let (generics, genericsMessages) = Generics.for(syntax: subscriptDecl.genericParameterClause, where: subscriptDecl.genericWhereClause, in: syntaxTree)
+        var accessors = Accessors()
+        if let accessor = subscriptDecl.accessor {
+            switch accessor {
+            case .accessors(let syntax):
+                accessors = syntax.accessors(in: syntaxTree)
+            case .getter(let syntax):
+                let statements = StatementDecoder.decode(syntaxListContainer: syntax, in: syntaxTree)
+                accessors.getter = Accessor(body: CodeBlock(statements: statements))
+            }
+        }
+        let statement = SubscriptDeclaration(elementType: elementType, parameters: parameters, isAsync: accessors.isAsync, isThrows: accessors.isThrows, attributes: attributes, modifiers: modifiers, generics: generics, getter: accessors.getter, setter: accessors.setter, sourceFile: syntaxTree.source.file, sourceRange: subscriptDecl.range(in: syntaxTree.source), extras: extras)
+        statement.messages = accessors.messages + parametersMessages + genericsMessages
+        return [statement]
+    }
+
+    override func resolveAttributes(in syntaxTree: SyntaxTree) {
+        elementType = elementType.qualified(in: self)
+        parameters = parameters.map { $0.qualifiedType(in: self) }
+        // Functions in protocols or extensions inherit the visibility of the protocol or extension
+        if modifiers.visibility == .default {
+            if let owningTypeDeclaration = parent as? TypeDeclaration, (owningTypeDeclaration.type == .protocolDeclaration || owningTypeDeclaration.type == .extensionDeclaration) {
+                modifiers.visibility = owningTypeDeclaration.modifiers.visibility
+            } else {
+                modifiers.visibility = .internal
+            }
+        }
+        generics = generics.qualified(in: self)
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        parameters.forEach { $0.defaultValue?.inferTypes(context: context, expecting: $0.declaredType) }
+        if let body = getter?.body {
+            let bodyContext = context.expectingReturn(elementType)
+            let _ = body.inferTypes(context: bodyContext, expecting: .none)
+        }
+        if let body = setter?.body {
+            let bodyContext = context.addingIdentifier(setter?.parameterName ?? "newValue", type: elementType)
+            let _ = body.inferTypes(context: bodyContext, expecting: .none)
+        }
+        return context
+    }
+
+    override var children: [SyntaxNode] {
+        var children: [SyntaxNode] = []
+        if let body = getter?.body {
+            children.append(body)
+        }
+        if let body = setter?.body {
+            children.append(body)
+        }
+        return children
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        var attrs: [PrettyPrintTree] = []
+        if elementType != .none {
+            attrs.append(PrettyPrintTree(root: elementType.description))
+        }
+        if isAsync {
+            attrs.append("async")
+        }
+        if isThrows {
+            attrs.append("throws")
+        }
+        if !attributes.isEmpty {
+            attrs.append(attributes.prettyPrintTree)
+        }
+        if !modifiers.isEmpty {
+            attrs.append(modifiers.prettyPrintTree)
+        }
+        return attrs
+    }
+}
+
 /// `typealias ...`
 class TypealiasDeclaration: Statement {
     let name: String
@@ -1237,55 +1354,22 @@ class VariableDeclaration: Statement {
             value = ExpressionDecoder.decode(syntax: valueSyntax, in: syntaxTree)
         }
 
-        var getter: Accessor<CodeBlock>? = nil
-        var setter: Accessor<CodeBlock>? = nil
-        var willSet: Accessor<CodeBlock>? = nil
-        var didSet: Accessor<CodeBlock>? = nil
-        var isAsync = false
-        var isThrows = false
-        var messages: [Message] = []
+        var accessors: Accessors = Accessors()
         if let accessor = syntax.accessor {
             switch accessor {
-            case .accessors(let accessorListSyntax):
-                for accessorSyntax in accessorListSyntax.accessors {
-                    if accessorSyntax.effectSpecifiers?.asyncSpecifier != nil {
-                        isAsync = true
-                    }
-                    if accessorSyntax.effectSpecifiers?.throwsSpecifier != nil {
-                        isThrows = true
-                    }
-                    var body: CodeBlock? = nil
-                    if let bodySyntax = accessorSyntax.body {
-                        let statements = StatementDecoder.decode(syntaxListContainer: bodySyntax, in: syntaxTree)
-                        body = CodeBlock(statements: statements)
-                    }
-
-                    switch accessorSyntax.accessorKind.text {
-                    case "get":
-                        getter = Accessor(body: body)
-                    case "set":
-                        let parameterName = accessorSyntax.parameter?.name.text
-                        setter = Accessor(parameterName: parameterName, body: body)
-                    case "willSet":
-                        let parameterName = accessorSyntax.parameter?.name.text
-                        willSet = Accessor(parameterName: parameterName, body: body)
-                    case "didSet":
-                        didSet = Accessor(body: body)
-                    default:
-                        messages.append(.unsupportedSyntax(accessor, source: syntaxTree.source))
-                    }
-                }
+            case .accessors(let accessorBlockSyntax):
+                accessors = accessorBlockSyntax.accessors(in: syntaxTree)
             case .getter(let codeBlockSyntax):
                 let statements = StatementDecoder.decode(syntaxListContainer: codeBlockSyntax, in: syntaxTree)
-                getter = Accessor(body: CodeBlock(statements: statements))
+                accessors.getter = Accessor(body: CodeBlock(statements: statements))
             }
         }
 
         guard let names = syntax.pattern.identifierPatterns(in: syntaxTree)?.map(\.name) else {
             throw Message.unsupportedSyntax(syntax.pattern, source: syntaxTree.source)
         }
-        let declaration = VariableDeclaration(names: names, declaredType: declaredType, isLet: isLet, isAsync: isAsync, isThrows: isThrows, attributes: attributes, modifiers: modifiers, value: value, getter: getter, setter: setter, willSet: willSet, didSet: didSet, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
-        declaration.messages = messages
+        let declaration = VariableDeclaration(names: names, declaredType: declaredType, isLet: isLet, isAsync: accessors.isAsync, isThrows: accessors.isThrows, attributes: attributes, modifiers: modifiers, value: value, getter: accessors.getter, setter: accessors.setter, willSet: accessors.willSet, didSet: accessors.didSet, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
+        declaration.messages = accessors.messages
         return declaration
     }
 

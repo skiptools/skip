@@ -33,7 +33,7 @@ final class OperatorTests: XCTestCase {
         """)
     }
 
-    func testRange() async throws {
+    func testForLoopRange() async throws {
         let supportingSwift = """
         extension Int {
             static var myZero: Int {
@@ -48,7 +48,7 @@ final class OperatorTests: XCTestCase {
             print(b)
         }
         """, kotlin: """
-        for (i in 0 .. 10) {
+        for (i in 0..10) {
             val b = i == Int.myZero
             print(b)
         }
@@ -84,7 +84,7 @@ final class OperatorTests: XCTestCase {
             print(b)
         }
         """, kotlin: """
-        for (i in 10 .. Int.max) {
+        for (i in 10..Int.max) {
             val b = i == Int.myZero
             print(b)
         }
@@ -275,6 +275,29 @@ final class OperatorTests: XCTestCase {
         }
         """, kotlin: """
         internal fun isEven(i: Int): Boolean = if (i % 2 == 0) true else false
+        """)
+    }
+
+    func testSlice() async throws {
+        // Note that without symbols we don't understand slice types
+        try await check(swift: """
+        func slice() {
+            let a = [0, 1, 2, 3, 4]
+            let s1 = a[1...3]
+            let s2 = a[1..<3]
+            let s3 = a[1...]
+            let s4 = a[...3]
+            let s5 = a[..<3]
+        }
+        """, kotlin: """
+        internal fun slice() {
+            val a = arrayOf(0, 1, 2, 3, 4)
+            val s1 = a[1..3].sref()
+            val s2 = a[1 until 3].sref()
+            val s3 = a[1..Int.max].sref()
+            val s4 = a[Int.min..3].sref()
+            val s5 = a[Int.min until 3].sref()
+        }
         """)
     }
 }

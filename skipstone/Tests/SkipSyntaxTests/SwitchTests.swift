@@ -246,8 +246,8 @@ final class SwitchTests: XCTestCase {
         when (i) {
             in Int.min until 0 -> print(-1)
             in 0 until 10 -> print(0)
-            in 10 .. 20 -> print(1)
-            in 21 .. Int.max -> print(21)
+            in 10..20 -> print(1)
+            in 21..Int.max -> print(21)
             else -> print("default")
         }
         """)

@@ -204,7 +204,14 @@ class KotlinBinaryOperator: KotlinExpression {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
-        output.append(lhs, indentation: indentation).append(" \(op.kotlinSymbol) ").append(rhs, indentation: indentation)
+        let kotlinSymbol = op.kotlinSymbol
+        output.append(lhs, indentation: indentation)
+        if kotlinSymbol == ".." {
+            output.append(kotlinSymbol)
+        } else {
+            output.append(" \(kotlinSymbol) ")
+        }
+        output.append(rhs, indentation: indentation)
     }
 }
 
@@ -1460,7 +1467,7 @@ class KotlinPostfixOperator: KotlinExpression {
         case "!":
             output.append("!!")
         case "...":
-            output.append(" .. ").append(targetType.kotlin).append(".max")
+            output.append("..").append(targetType.kotlin).append(".max")
         default:
             output.append(operatorSymbol)
         }
@@ -1522,7 +1529,7 @@ class KotlinPrefixOperator: KotlinExpression {
         case "..<":
             output.append(targetType.kotlin).append(".min until ")
         case "...":
-            output.append(targetType.kotlin).append(".min .. ")
+            output.append(targetType.kotlin).append(".min..")
         default:
             output.append(operatorSymbol)
         }

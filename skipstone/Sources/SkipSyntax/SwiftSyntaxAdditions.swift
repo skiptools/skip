@@ -100,6 +100,51 @@ extension ParameterClauseSyntax {
     }
 }
 
+extension AccessorBlockSyntax {
+    func accessors(in syntaxTree: SyntaxTree) -> Accessors {
+        var accessors = Accessors()
+        for accessorSyntax in self.accessors {
+            if accessorSyntax.effectSpecifiers?.asyncSpecifier != nil {
+                accessors.isAsync = true
+            }
+            if accessorSyntax.effectSpecifiers?.throwsSpecifier != nil {
+                accessors.isThrows = true
+            }
+            var body: CodeBlock? = nil
+            if let bodySyntax = accessorSyntax.body {
+                let statements = StatementDecoder.decode(syntaxListContainer: bodySyntax, in: syntaxTree)
+                body = CodeBlock(statements: statements)
+            }
+
+            switch accessorSyntax.accessorKind.text {
+            case "get":
+                accessors.getter = Accessor(body: body)
+            case "set":
+                let parameterName = accessorSyntax.parameter?.name.text
+                accessors.setter = Accessor(parameterName: parameterName, body: body)
+            case "willSet":
+                let parameterName = accessorSyntax.parameter?.name.text
+                accessors.willSet = Accessor(parameterName: parameterName, body: body)
+            case "didSet":
+                accessors.didSet = Accessor(body: body)
+            default:
+                accessors.messages.append(.unsupportedSyntax(self, source: syntaxTree.source))
+            }
+        }
+        return accessors
+    }
+}
+
+struct Accessors {
+    var getter: Accessor<CodeBlock>?
+    var setter: Accessor<CodeBlock>?
+    var willSet: Accessor<CodeBlock>?
+    var didSet: Accessor<CodeBlock>?
+    var isAsync = false
+    var isThrows = false
+    var messages: [Message] = []
+}
+
 extension ClosureSignatureSyntax {
     /// The return type and parameters in this signature, and optional messages warning of any issues.
     func typeSignatures(in syntaxTree: SyntaxTree) -> (TypeSignature, [Parameter<Void>], [Message]) {

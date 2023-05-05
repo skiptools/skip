@@ -178,7 +178,7 @@ final class LoopTests: XCTestCase {
             doSomething()
         }
         """, kotlin: """
-        for (unusedbinding in 1 .. 100) {
+        for (unusedbinding in 1..100) {
             doSomething()
         }
         """)
