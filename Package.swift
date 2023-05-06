@@ -21,8 +21,7 @@ let package = Package(
                         .writeToPackageDirectory(reason: """
                         Skip: Swift Kotlin Interop (Technology Preview)”
 
-                        This operation will setup the necessary files and folders to transpile your Swift SPM package into a Kotlin Gradle project.
-                        This operation will setup the necessary files and folders to transpile your Swift SPM package into a Kotlin Gradle project.
+                        This operation will setup the necessary files and folders to transpile your Swift SPM package into a Kotlin Gradle project. It is meant to be run on individual library targets for which a Skip peer Kt module is desited. The command will do the following:
 
                         1. A “Skip” folder will be created at the root of your package with a skip.yml configuration file and links to the eventual build output of your project.
 
@@ -38,7 +37,24 @@ let package = Package(
                         """)
                     ]),
                 dependencies: ["skiptool"],
-                path: "Plugins/SkipInit"),
+                path: "Plugins/SkipInit",
+                sources: ["SkipInitPlugin.swift", "../SkipInit/SkipPluginSupport.swift"]),
+
+        .plugin(name: "Skip Sync Command",
+                capability: .command(
+                    intent: .custom(verb: "skip",  description: "Synchronize and link the local Skip build output folder(s)"),
+                    permissions: [
+                        .writeToPackageDirectory(reason: """
+                        This command synchronizes and links the build output of the transpiled Gradle project, facilitating the browsing and opening of project files in an external editor.
+
+                        The sync process will create local links under the Packages/Skip/ folder to the DerivedData output of the Skip transpilation process for any Kt library target that is selected.
+
+                        Skip Sync may need to be re-run if the build folder is cleaned or the Xcode DerivedData path changes. You should ensure your project folder is backed up before continuing. By proceeding you agree to abide by the terms and conditions of the Skip license.
+                        """)
+                    ]),
+                dependencies: ["skiptool"],
+                path: "Plugins/SkipSync",
+                sources: ["SkipSyncPlugin.swift", "../SkipInit/SkipPluginSupport.swift"]),
 
         .plugin(name: "Skip Custom Command",
                 capability: .command(
@@ -70,5 +86,5 @@ if let localPath = ProcessInfo.processInfo.environment["SKIPLOCAL"] {
     package.targets += [.executableTarget(name: "skiptool", dependencies: [.product(name: "SkipBuild", package: "skiptool")], path: "Sources/SkipTool", sources: ["skiptool.swift"])]
 } else {
     // default to using the latest binary skiptool release
-    package.targets += [.binaryTarget(name: "skiptool", url: "https://github.com/skiptools/skip/releases/download/0.4.16/skiptool.artifactbundle.zip", checksum: "babfbcf513dc43fc82447c053bc32c49a63ec33cdf19fb3f4768833947a2e945")]
+    package.targets += [.binaryTarget(name: "skiptool", url: "https://github.com/skiptools/skip/releases/download/0.4.17/skiptool.artifactbundle.zip", checksum: "cdd3327bb4d1197ef34f4d66b4b446784d20800ea5f13dccc0fa61584f3afc80")]
 }

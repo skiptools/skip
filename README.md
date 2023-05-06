@@ -13,7 +13,7 @@ creating dual-platform iOS+Android libraries and applications.
 
 1. Select the new `Package.swift` file in Xcode and add the following lines to activate the Skip transpiler plugin:
     ```swift
-    package.dependencies += [.package(url: "https://github.com/skiptools/skip", from: "0.4.16")]
+    package.dependencies += [.package(url: "https://github.com/skiptools/skip", from: "0.4.17")]
     package.dependencies += [.package(url: "https://github.com/skiptools/skiphub", from: "0.2.10")]
     ```
     <details><summary>Adding the Skip plugin to Xcode</summary><img src="https://user-images.githubusercontent.com/659086/230633291-e14e5687-a88d-4bc9-abbd-b78e9fa73c61.png"></details>
