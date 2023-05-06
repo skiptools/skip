@@ -8,7 +8,7 @@ import PackagePlugin
 
 @main struct SkipInitPlugin: CommandPlugin {
     func performCommand(context: PluginContext, arguments: [String]) async throws {
-        try performBuildCommand(.default, context: context, arguments: arguments)
+        try performBuildCommand(.`init`, context: context, arguments: arguments)
     }
 }
 

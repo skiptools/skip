@@ -8,6 +8,7 @@ import PackagePlugin
 
 @main struct SkipSyncPlugin: CommandPlugin {
     func performCommand(context: PluginContext, arguments: [String]) async throws {
+        try performBuildCommand(.sync, context: context, arguments: arguments)
     }
 }
 

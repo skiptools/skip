@@ -2,11 +2,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "skip",
+    name: "Skip Transpiler",
     defaultLocalization: "en",
     products: [
         .plugin(name: "skip-init", targets: ["Hello Skip"]),
-        .plugin(name: "skip", targets: ["Skip Custom Command"]),
+        .plugin(name: "skip-sync", targets: ["Synchronize Packages/Skip"]),
+        //.plugin(name: "skip", targets: ["Skip Custom Command"]),
 
         .plugin(name: "preflight", targets: ["skip-preflight"]),
         .plugin(name: "transpile", targets: ["skip-transpiler"]),
@@ -37,12 +38,11 @@ let package = Package(
                         """)
                     ]),
                 dependencies: ["skiptool"],
-                path: "Plugins/SkipInit",
-                sources: ["SkipInitPlugin.swift", "../SkipInit/SkipPluginSupport.swift"]),
+                path: "Plugins/SkipInit"),
 
-        .plugin(name: "Skip Sync Command",
+        .plugin(name: "Synchronize Packages/Skip",
                 capability: .command(
-                    intent: .custom(verb: "skip",  description: "Synchronize and link the local Skip build output folder(s)"),
+                    intent: .custom(verb: "skip-sync",  description: "Synchronize and link the local Skip build output folder(s)"),
                     permissions: [
                         .writeToPackageDirectory(reason: """
                         This command synchronizes and links the build output of the transpiled Gradle project, facilitating the browsing and opening of project files in an external editor.
@@ -53,8 +53,7 @@ let package = Package(
                         """)
                     ]),
                 dependencies: ["skiptool"],
-                path: "Plugins/SkipSync",
-                sources: ["SkipSyncPlugin.swift", "../SkipInit/SkipPluginSupport.swift"]),
+                path: "Plugins/SkipSync"),
 
         .plugin(name: "Skip Custom Command",
                 capability: .command(
