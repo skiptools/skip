@@ -16,6 +16,7 @@ struct GradleOutputContext {
 struct GradleBlock : Equatable, Codable {
     var block: String?
     var param: Either<String>.Or<[String]>?
+    var header: String?
     var contents: [BlockOrCommand]?
     /// Set to `false` to disable the block
     var enabled: Bool?
@@ -46,7 +47,7 @@ struct GradleBlock : Equatable, Codable {
         if enabled == false {
             return ""
         }
-        var content = ""
+        var content = header ?? ""
         content += Self.format(blocks: contents, context: context, indent: indent)
         return content
     }
