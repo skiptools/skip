@@ -15,10 +15,10 @@ import PackagePlugin
 //#if canImport(XcodeProjectPlugin)
 //import XcodeProjectPlugin
 //
-//extension SkipInitPlugin: XcodeCommandPlugin {
+//extension SkipSyncPlugin: XcodeCommandPlugin {
 //    /// 👇 This entry point is called when operating on an Xcode project.
 //    func performCommand(context: XcodePluginContext, arguments: [String]) throws {
-//        try performBuildCommand(.default, context: context, arguments: arguments)
+//        //try performBuildCommand(.sync, context: context, arguments: arguments)
 //    }
 //}
 //#endif

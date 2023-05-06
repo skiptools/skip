@@ -8,7 +8,7 @@ creating dual-platform iOS+Android libraries and applications.
 ## Quick Start
 
 1. Create a new Swift package from Xcode.app 14.3+ with `File` / `New` / `Package`.
-    <details><summary>Creating a new Multiplatform Swift Package</summary><img src="https://user-images.githubusercontent.com/659086/230632488-8bf87042-59ba-48aa-9108-71efdea5d9bb.png"></details>
+    <details><summary>Creating a new Dual-Platform Swift Package</summary><img src="https://user-images.githubusercontent.com/659086/230632488-8bf87042-59ba-48aa-9108-71efdea5d9bb.png"></details>
     This example names the package “MyLibrary” and saves it to the Desktop.
 
 1. Select the new `Package.swift` file in Xcode and add the following lines to activate the Skip transpiler plugin:

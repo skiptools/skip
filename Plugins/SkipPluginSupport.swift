@@ -56,6 +56,7 @@ extension CommandPlugin {
         var args = ArgumentExtractor(arguments)
         let targetArgs = args.extractOption(named: "target")
         var targets = try context.package.targets(named: targetArgs)
+
         // when no targets are specified (e.g., when running the CLI `swift package plugin skip-init`), enable all the targets
         if targets.isEmpty {
             targets = context.package.targets
@@ -292,7 +293,9 @@ extension CommandPlugin {
         }
 
         if options.contains(.link) {
-            let outputFolder = packageDir.appending(subpath: "Packages/Skip")
+            let packagesFolder = packageDir.appending(subpath: "Packages")
+            let outputFolder = packagesFolder.appending(subpath: "Skip")
+
             try FileManager.default.createDirectory(atPath: outputFolder.string, withIntermediateDirectories: true)
 
             func isDirectory(_ path: Path) -> Bool {
@@ -328,6 +331,16 @@ extension CommandPlugin {
                 .removingLastComponent()
                 .appending(subpath: context.package.id + "." + ext)
 
+            var readme = """
+            The Packages/Skip folder contains links to the transpilation
+            output for each of the following Skip packages:
+
+
+            """
+
+            let settingsPath = "settings.gradle.kts"
+            var packageCount = 0
+
             for target in allTargets {
                 var targetName = target.name
                 let isTestTarget = targetName.hasSuffix("Tests")
@@ -347,10 +360,15 @@ extension CommandPlugin {
                     continue
                 }
                 Diagnostics.remark("Creating link from \(linkBasePath) to \(destPath)")
+
+                readme += """
+                \(linkBasePath.stem): \((destPath.string as NSString).abbreviatingWithTildeInPath)
+                
+                """
+
                 try FileManager.default.createDirectory(atPath: linkBasePath.string, withIntermediateDirectories: true)
 
                 // we link to only two files in the destination: the folder for the project's source, and the settings.gradle.kts file for external editing
-                let settingsPath = "settings.gradle.kts"
 
                 try? FileManager.default.removeItem(atPath: linkBasePath.appending(subpath: settingsPath).string) // clear dest in case it exists
                 try FileManager.default.createSymbolicLink(atPath: linkBasePath.appending(subpath: settingsPath).string, withDestinationPath: destPath.appending(subpath: settingsPath).string)
@@ -358,6 +376,35 @@ extension CommandPlugin {
                 try? FileManager.default.removeItem(atPath: linkBasePath.appending(subpath: targetName).string) // clear dest in case it exists
                 try FileManager.default.createSymbolicLink(atPath: linkBasePath.appending(subpath: targetName).string, withDestinationPath: destPath.appending(subpath: targetName).string)
 
+                packageCount += 1
+
+                // raises: "internalError(\"unimplemented\")"
+                // let buildResult = try packageManager.build(.target(targetName), parameters: PackageManager.BuildParameters(configuration: PackageManager.BuildConfiguration.debug, logging: PackageManager.BuildLogVerbosity.verbose))
+
+            }
+
+            readme.append("""
+
+            
+            Each of these folders contains links to the transient build result,
+            as well as the \(settingsPath) file, for which the File command
+            Open in External Editor can be used to launch an IDE or supporting editor
+            to build, test, debug, and run the project.
+
+            Note that this Packages/Skip folder should be excluded from source control management.
+            It appears in the .gitignore file that is generated from swift package init,
+            and so it is likely to be excluded by default.
+
+            These links may need to be re-created using the
+            Synchronize Packages/Skip command when the Xcode DerivedData is
+            cleaned or the project name changes.
+            """)
+
+            try readme.write(toFile: packagesFolder.appending(subpath: "README").string, atomically: true, encoding: .utf8)
+
+            if packageCount == 0 {
+                // not an error, because this can happen as a side-effect of the Hello Skip command
+                Diagnostics.warning("No links were created. Ensure that the modules have each been alreaduy built.")
             }
         }
     }
