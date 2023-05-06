@@ -2,7 +2,7 @@
 struct KotlinDependencies {
     /// Package names to import, e.g. "kotlin.reflect.\*".
     var imports: Set<String> = []
-    /// Gradle libraries to add to dependencies, e.g. "org.jetbrains.kotlin:kotlin-reflect:1.8.10".
+    /// Gradle libraries to add to dependencies, e.g. "org.jetbrains.kotlin:kotlin-reflect:1.8.20".
     var gradle: Set<String> = []
 }
 
@@ -16,6 +16,6 @@ extension KotlinDependencies {
     /// Add a dependency on `kotlin.reflect.full`.
     mutating func insertReflectFull() {
         imports.insert("kotlin.reflect.full.*")
-        gradle.insert("org.jetbrains.kotlin:kotlin-reflect:1.8.10")
+        gradle.insert("org.jetbrains.kotlin:kotlin-reflect:1.8.20")
     }
 }
