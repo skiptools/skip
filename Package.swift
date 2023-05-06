@@ -7,7 +7,7 @@ let package = Package(
     products: [
         .plugin(name: "skip-init", targets: ["Hello Skip"]),
         .plugin(name: "skip-sync", targets: ["Synchronize Packages/Skip"]),
-        //.plugin(name: "skip", targets: ["Skip Custom Command"]),
+        .plugin(name: "skip", targets: ["Skip Custom Command"]),
 
         .plugin(name: "preflight", targets: ["skip-preflight"]),
         .plugin(name: "transpile", targets: ["skip-transpiler"]),
