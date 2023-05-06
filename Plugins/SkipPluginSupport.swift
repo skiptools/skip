@@ -273,8 +273,8 @@ extension CommandPlugin {
         }
 
         let packageDir = context.package.directory
+        let packageFile = packageDir.appending(subpath: "Package.swift")
         if options.contains(.inplace) && !packageAddition.isEmpty {
-            let packageFile = packageDir.appending(subpath: "Package.swift")
             var encoding: String.Encoding = .utf8
             var packageContents = try String(contentsOfFile: packageFile.string, usedEncoding: &encoding)
             // trim off anything after the skip marker
@@ -333,7 +333,8 @@ extension CommandPlugin {
 
             var readme = """
             The Packages/Skip folder contains links to the transpilation
-            output for each of the following Skip packages:
+            output for each of the following Skip packages defined in
+            \((packageFile.string as NSString).abbreviatingWithTildeInPath):
 
 
             """
@@ -397,7 +398,8 @@ extension CommandPlugin {
 
             These links may need to be re-created using the
             Synchronize Packages/Skip command when the Xcode DerivedData is
-            cleaned or the project name changes.
+            cleaned, the project name changes, or the project is relocated to another
+            source folder.
             """)
 
             try readme.write(toFile: packagesFolder.appending(subpath: "README").string, atomically: true, encoding: .utf8)
