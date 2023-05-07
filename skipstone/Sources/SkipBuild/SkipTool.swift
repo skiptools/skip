@@ -649,6 +649,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         func generateGradle(for sourceModules: [String], with skipConfig: SkipConfig) throws {
             try generateSettingsGradle()
             try generatePerModuleGradle()
+            try generateGradleProperties()
             if let gradleVersion = transpileOptions.gradleVersion as String? {
                 try generateGradleWrapperProperties(version: gradleVersion)
             }
@@ -702,7 +703,17 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
                 info("\(gradleWrapperPath.basename) (\(Self.byteCount(for: .init(gradeWrapperContents.count)))) \(!changed ? "unchanged" : "written")", sourceFile: gradleWrapperPath.sourceFile)
             }
 
+            func generateGradleProperties() throws {
+                let gradlePropertiesPath = moduleRootPath.parentDirectory.appending(component: "gradle.properties")
+                let gradePropertiesContents = """
+                org.gradle.jvmargs=-Xmx2048m
+                android.useAndroidX=true
+                kotlin.code.style=official
+                """
 
+                let changed = try fs.writeChanges(path: gradlePropertiesPath, makeReadOnly: true, bytes: ByteString(encodingAsUTF8: gradePropertiesContents))
+                info("\(gradlePropertiesPath.basename) (\(Self.byteCount(for: .init(gradePropertiesContents.count)))) \(!changed ? "unchanged" : "written")", sourceFile: gradlePropertiesPath.sourceFile)
+            }
         }
 
         func loadSkipConfig(path: AbsolutePath) throws -> SkipConfig {
