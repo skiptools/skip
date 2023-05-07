@@ -384,6 +384,9 @@ struct TranspilePhaseOptions: ParsableArguments {
 
     @Option(name: [.long], help: ArgumentHelp("Output directory", valueName: "dir"))
     var outputFolder: String? = nil
+
+    @Option(name: [.long], help: ArgumentHelp("The Gradle wrapper version to generate", valueName: "version"))
+    var gradleVersion: String = "8.1.1"
 }
 
 struct TranspileResult {
@@ -646,6 +649,9 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         func generateGradle(for sourceModules: [String], with skipConfig: SkipConfig) throws {
             try generateSettingsGradle()
             try generatePerModuleGradle()
+            if let gradleVersion = transpileOptions.gradleVersion as String? {
+                try generateGradleWrapperProperties(version: gradleVersion)
+            }
 
             func generatePerModuleGradle() throws {
                 let buildContents = (skipConfig.build ?? .init()).generate(context: .init(dsl: .kotlin))
@@ -682,6 +688,21 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
                 let changed = try fs.writeChanges(path: settingsPath, makeReadOnly: true, bytes: ByteString(encodingAsUTF8: settingsContents))
                 info("\(settingsPath.basename) (\(Self.byteCount(for: .init(settingsContents.count)))) \(!changed ? "unchanged" : "written")", sourceFile: settingsPath.sourceFile)
             }
+
+            /// Create the gradle-wrapper.properties file, which will dictate which version of Gradle that Android Studio should use to build the project.
+            func generateGradleWrapperProperties(version: String) throws {
+                let gradleWrapperFolder = moduleRootPath.parentDirectory.appending(components: "gradle", "wrapper")
+                try fs.createDirectory(gradleWrapperFolder, recursive: true)
+                let gradleWrapperPath = gradleWrapperFolder.appending(component: "gradle-wrapper.properties")
+                let gradeWrapperContents = """
+                distributionUrl=https\\://services.gradle.org/distributions/gradle-\(version)-all.zip
+                """
+
+                let changed = try fs.writeChanges(path: gradleWrapperPath, makeReadOnly: true, bytes: ByteString(encodingAsUTF8: gradeWrapperContents))
+                info("\(gradleWrapperPath.basename) (\(Self.byteCount(for: .init(gradeWrapperContents.count)))) \(!changed ? "unchanged" : "written")", sourceFile: gradleWrapperPath.sourceFile)
+            }
+
+
         }
 
         func loadSkipConfig(path: AbsolutePath) throws -> SkipConfig {
