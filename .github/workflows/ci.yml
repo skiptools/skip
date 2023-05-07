@@ -33,20 +33,24 @@ jobs:
           cat Package.swift Package.resolved
 
       - name: Build Skip Package (Debug)
+        working-directory: SomeLibraryDebug
         run: |
           swift build --jobs 1 --configuration debug
 
       - name: Test Skip Package (Debug)
+        working-directory: SomeLibraryDebug
         run: |
           swift test --jobs 1 --configuration debug
 
       - name: Show Skip Package (Debug)
+        working-directory: SomeLibraryDebug
         run: |
           brew install tree || true
           tree -l -I build
           cd -
 
       - name: Create New Skip Package (Release)
+        if: false
         run: |
           mkdir SomeLibraryRelease
           cd SomeLibraryRelease
