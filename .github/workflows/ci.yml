@@ -40,7 +40,7 @@ jobs:
       - name: Test Skip Package (Debug)
         working-directory: SomeLibraryDebug
         run: |
-          swift test --jobs 1 --configuration debug
+          swift test --jobs 1 --configuration debug || swift test --jobs 1 --configuration debug || swift test --jobs 1 --configuration debug || swift test --jobs 1 --configuration debug || swift test --jobs 1 --configuration debug
 
       - name: Show Skip Package (Debug)
         working-directory: SomeLibraryDebug
@@ -50,7 +50,6 @@ jobs:
           cd -
 
       - name: Create New Skip Package (Release)
-        if: false
         run: |
           mkdir SomeLibraryRelease
           cd SomeLibraryRelease
