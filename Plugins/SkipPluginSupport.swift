@@ -17,7 +17,7 @@ enum SkipBuildCommand : Equatable {
 struct SkipCommandOptions : OptionSet {
     let rawValue: Int
 
-    public static let `default`: Self = [project, scaffold, preflight, transpile, targets, inplace, link]
+    public static let `default`: Self = [project, scaffold, preflight, transpile, targets, inplace, link, skiplocal]
 
     /// Generate the project output structure
     public static let project = Self(rawValue: 1 << 0)
@@ -39,6 +39,9 @@ struct SkipCommandOptions : OptionSet {
 
     /// Link the Gradle outputs intpo the Packages/Skip folder
     public static let link = Self(rawValue: 1 << 6)
+
+    /// Add skiplocal directives to the Package.skip
+    public static let skiplocal = Self(rawValue: 1 << 7)
 }
 
 
@@ -73,8 +76,17 @@ extension CommandPlugin {
         let packageAdditionMarker = "// MARK: Skip Kotlin Peer Targets"
         var packageAddition = packageAdditionMarker + "\n\n"
 
+        packageAddition += """
+
+        // add the Skip transpiler preflight checks to each of the existing Swift targets
+        for target in package.targets {
+            target.plugins = (target.plugins ?? []) + [.plugin(name: "preflight", package: "skip")]
+        }
+
+        """
+
         if options.contains(.project) {
-            var contents = """
+            var skipREADME = """
             ███████╗██╗  ██╗██╗██████╗
             ██╔════╝██║ ██╔╝██║██╔══██╗
             ███████╗█████╔╝ ██║██████╔╝
@@ -193,13 +205,15 @@ extension CommandPlugin {
 
                         if !FileManager.default.fileExists(atPath: testSource.string) {
                             try """
+                            // This is free software: you can redistribute and/or modify it
+                            // under the terms of the GNU Lesser General Public License 3.0
+                            // as published by the Free Software Foundation https://fsf.org
                             import SkipUnit
 
-                            /// This test case will run the transpiled tests for the \(target.name) module using the `JUnitTestCase.testProjectGradle()` harness.
-                            /// New tests should be added to that module; this file does not need to be modified.
+                            /// Do not modify. This is a bridge to the Gradle test case runner.
+                            /// New tests should be added to the `\(target.name)` module.
                             class \(testClass): JUnitTestCase {
                             }
-
                             """.write(toFile: testSource.string, atomically: true, encoding: .utf8)
                         }
                     }
@@ -210,9 +224,12 @@ extension CommandPlugin {
 
                         if !FileManager.default.fileExists(atPath: testSource.string) {
                             try """
+                            // This is free software: you can redistribute and/or modify it
+                            // under the terms of the GNU Lesser General Public License 3.0
+                            // as published by the Free Software Foundation https://fsf.org
                             import Foundation
 
-                            /// A link to the \(moduleClass) module
+                            /// A link to the \(moduleClass) module, which can be used for loading resources.
                             public extension Bundle {
                                 static let \(moduleClass) = Bundle.module
                             }
@@ -223,14 +240,16 @@ extension CommandPlugin {
                     // include a sample Kotlin file as an extension point for the user
                     if target.kind != .test {
                         let kotlinSource = targetDirKtSkip.appending(subpath: target.name + "KtSupport.kt")
+                        let packageName = packageName(forModule: targetName)
                         if !FileManager.default.fileExists(atPath: kotlinSource.string) {
                             try """
                             // This is free software: you can redistribute and/or modify it
                             // under the terms of the GNU Lesser General Public License 3.0
                             // as published by the Free Software Foundation https://fsf.org
 
-                            // Kotlin included in this file will be included in the transpiled package for \(target.name)
-                            // This can be used to provide support functions for any Kotlin-specific Swift
+                            // Any Kotlin included in this file will be included in the transpiled package for \(targetName)
+                            // This can be used to provide support for Kotlin-specific functionality.
+                            package \(packageName)
 
                             """.write(toFile: kotlinSource.string, atomically: true, encoding: .utf8)
                         }
@@ -239,9 +258,24 @@ extension CommandPlugin {
 
             }
 
+            if options.contains(.skiplocal) {
+                packageAddition += """
+
+                // MARK: Internal Skip Development Support
+
+                import class Foundation.ProcessInfo
+                // For Skip library development in peer directories, run: SKIPLOCAL=.. xed Package.swift
+                if let localPath = ProcessInfo.processInfo.environment["SKIPLOCAL"] {
+                    package.platforms = package.platforms ?? [.iOS(.v15), .macOS(.v12), .tvOS(.v15), .watchOS(.v8), .macCatalyst(.v15)]
+                    package.dependencies[package.dependencies.count - 2] = .package(path: localPath + "/skip")
+                    package.dependencies[package.dependencies.count - 1] = .package(path: localPath + "/skiphub")
+                }
+                """
+            }
+
             // if we do not create the scaffold directly, insert advice on how to create it manually
             do { // if !options.contains(.scaffold) {
-                contents += """
+                skipREADME += """
 
                 The new targets can be added by appending the following block to
                 the bottom of the project's `Package.swift` file:
@@ -255,7 +289,7 @@ extension CommandPlugin {
                 """
 
 
-                contents += """
+                skipREADME += """
 
                 The files needed for these targets may need to be created by running
                 the following shell commands from the project root folder:
@@ -269,7 +303,7 @@ extension CommandPlugin {
 
             //let outputPath = outputFolder.appending(subpath: "README.md")
             //Diagnostics.remark("saving to \(outputPath.string)")
-            //try contents.write(toFile: outputPath.string, atomically: true, encoding: .utf8)
+            //try skipREADME.write(toFile: outputPath.string, atomically: true, encoding: .utf8)
         }
 
         let packageDir = context.package.directory
@@ -410,4 +444,30 @@ extension CommandPlugin {
             }
         }
     }
+}
+
+private func packageName(forModule moduleName: String, trimTests: Bool = true) -> String {
+    var lastLower = false
+    var packageName = ""
+    for c in moduleName {
+        let lower = c.lowercased()
+        if lower == String(c) {
+            lastLower = true
+        } else {
+            if lastLower == true {
+                packageName += "."
+            }
+            lastLower = false
+        }
+        packageName += lower
+    }
+
+    // the "Tests" module suffix is special: in Swift XXX and XXXTest are different modules (with a @testable import to allow the tests to access internal symbols), but in Kotlin, test cases need to be in the same package in order to be able to access the symbols
+    if trimTests && packageName.hasSuffix(".tests") {
+        packageName = String(packageName.dropLast(".tests".count))
+    }
+    if trimTests && packageName.hasSuffix("tests") {
+        packageName = String(packageName.dropLast("tests".count))
+    }
+    return packageName
 }
