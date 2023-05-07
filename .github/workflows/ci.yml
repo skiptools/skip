@@ -31,8 +31,17 @@ jobs:
 
           swift package plugin --allow-writing-to-package-directory skip-init
           cat Package.swift Package.resolved
+
+      - name: Build Skip Package (Debug)
+        run: |
           swift build --jobs 1 --configuration debug
+
+      - name: Test Skip Package (Debug)
+        run: |
           swift test --jobs 1 --configuration debug
+
+      - name: Show Skip Package (Debug)
+        run: |
           brew install tree || true
           tree -l -I build
           cd -
