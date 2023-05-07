@@ -708,6 +708,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
                 let gradePropertiesContents = """
                 org.gradle.jvmargs=-Xmx2048m
                 android.useAndroidX=true
+                android.enableJetifier=true
                 kotlin.code.style=official
                 """
 

@@ -48,6 +48,7 @@ final class FeatureSupportTests: XCTestCase {
     }
 
     func testTrailingComments() async throws {
+        // note also: the license headers are being removed from the transpiled Kotlin output; we'll want any file preamble comments to appear as preamble comments (before even the package and import declarations) in the output Kotlin file
         try await check(swift: """
             // comment 1
             let x = "1" + "X"
