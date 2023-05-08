@@ -356,4 +356,32 @@ final class ExpressionTests: XCTestCase {
         internal fun f(c: () -> Unit) = c()
         """)
     }
+
+    func testVariadicParameter() async throws {
+        try await check(swift: """
+        func f(v: Int...) -> [Int] {
+            let a = [0] + v
+            return a
+        }
+        """, kotlin: """
+        internal fun f(vararg v: Int): Array<Int> {
+            val v = Array(v.asIterable())
+            val a = (arrayOf(0) + v).sref()
+            return a.sref()
+        }
+        """)
+
+        try await check(swift: """
+        func f(_ v: Int...) -> [Int] {
+            let a = [0] + v
+            return a
+        }
+        """, kotlin: """
+        internal fun f(vararg v: Int): Array<Int> {
+            val v = Array(v.asIterable())
+            val a = (arrayOf(0) + v).sref()
+            return a.sref()
+        }
+        """)
+    }
 }

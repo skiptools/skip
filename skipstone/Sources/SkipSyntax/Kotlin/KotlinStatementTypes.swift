@@ -1544,7 +1544,9 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
 
         var parameterVals: [String] = []
         for parameter in parameters {
-            if let externalLabel = parameter.externalLabel, parameter.internalLabel != externalLabel {
+            if parameter.isVariadic {
+                parameterVals.append("val \(parameter.internalLabel) = Array(\(parameter.externalLabel ?? parameter.internalLabel).asIterable())\n")
+            } else if let externalLabel = parameter.externalLabel, parameter.internalLabel != externalLabel {
                 parameterVals.append("val \(parameter.internalLabel) = \(externalLabel)\n")
             }
         }
