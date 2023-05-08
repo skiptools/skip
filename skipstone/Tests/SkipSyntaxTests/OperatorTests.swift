@@ -292,11 +292,11 @@ final class OperatorTests: XCTestCase {
         """, kotlin: """
         internal fun slice() {
             val a = arrayOf(0, 1, 2, 3, 4)
-            val s1 = a[1..3].sref()
-            val s2 = a[1 until 3].sref()
-            val s3 = a[1..Int.max].sref()
-            val s4 = a[Int.min..3].sref()
-            val s5 = a[Int.min until 3].sref()
+            val s1 = a[1..3]
+            val s2 = a[1 until 3]
+            val s3 = a[1..Int.max]
+            val s4 = a[Int.min..3]
+            val s5 = a[Int.min until 3]
         }
         """)
     }

@@ -1579,6 +1579,7 @@ class KotlinSRef: KotlinExpression {
 class KotlinStringLiteral: KotlinExpression {
     var segments: [StringLiteralSegment<KotlinExpression>] = []
     var isMultiline = false
+    var isCharacter = false
 
     static func translate(expression: StringLiteral, translator: KotlinTranslator) -> KotlinStringLiteral {
         let kexpression = KotlinStringLiteral(expression: expression)
@@ -1594,6 +1595,7 @@ class KotlinStringLiteral: KotlinExpression {
         }
         kexpression.segments = segments
         kexpression.isMultiline = expression.isMultiline
+        kexpression.isCharacter = expression.inferredType == .character
         return kexpression
     }
 
@@ -1618,7 +1620,7 @@ class KotlinStringLiteral: KotlinExpression {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
-        let delimiter = isMultiline ? "\"\"\"" : "\""
+        let delimiter = isCharacter ? "'" : isMultiline ? "\"\"\"" : "\""
         output.append(delimiter)
         for segment in segments {
             switch segment {
