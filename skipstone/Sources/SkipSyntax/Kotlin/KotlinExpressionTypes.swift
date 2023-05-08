@@ -1636,7 +1636,7 @@ class KotlinStringLiteral: KotlinExpression {
 class KotlinSubscript: KotlinExpression {
     var base: KotlinExpression
     var arguments: [LabeledValue<KotlinExpression>] = []
-    var mayBeSharedMutableStruct = false
+    var mayBeSharedMutableStructType = false
 
     static func translate(expression: Subscript, translator: KotlinTranslator) -> KotlinSubscript {
         let kbase = translator.translateExpression(expression.base)
@@ -1645,7 +1645,7 @@ class KotlinSubscript: KotlinExpression {
             let kargumentExpression = translator.translateExpression($0.value)
             return LabeledValue(label: $0.label, value: kargumentExpression)
         }
-        kexpression.mayBeSharedMutableStruct = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
+        kexpression.mayBeSharedMutableStructType = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
         return kexpression
     }
 
@@ -1655,7 +1655,8 @@ class KotlinSubscript: KotlinExpression {
     }
 
     override func mayBeSharedMutableStructExpression(orType: Bool) -> Bool {
-        return mayBeSharedMutableStruct
+        // The result of a subscript is never a shared value because we always sref() on return
+        return orType && mayBeSharedMutableStructType
     }
 
     override var children: [KotlinSyntaxNode] {
