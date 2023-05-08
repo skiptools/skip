@@ -1074,6 +1074,52 @@ final class MemberDeclarationTests: XCTestCase {
         """)
     }
 
+    func testAutoclosureFunctionParameter() async throws {
+        try await checkProducesMessage(swift: """
+        func f(c: @autoclosure () -> Void) {
+            c()
+        }
+        """)
+    }
+
+    func testEscapingFunctionParameter() async throws {
+        try await check(swift: """
+        func f(c: @escaping () -> Void) {
+            c()
+        }
+        """, kotlin: """
+        internal fun f(c: () -> Unit) = c()
+        """)
+    }
+
+    func testVariadicFunctionParameter() async throws {
+        try await check(swift: """
+        func f(v: Int...) -> [Int] {
+            let a = [0] + v
+            return a
+        }
+        """, kotlin: """
+        internal fun f(vararg v: Int): Array<Int> {
+            val v = Array(v.asIterable())
+            val a = (arrayOf(0) + v).sref()
+            return a.sref()
+        }
+        """)
+
+        try await check(swift: """
+        func f(_ v: Int...) -> [Int] {
+            let a = [0] + v
+            return a
+        }
+        """, kotlin: """
+        internal fun f(vararg v: Int): Array<Int> {
+            val v = Array(v.asIterable())
+            val a = (arrayOf(0) + v).sref()
+            return a.sref()
+        }
+        """)
+    }
+
     func testCustomSubscript() async throws {
         try await checkProducesMessage(swift: """
         class C {
