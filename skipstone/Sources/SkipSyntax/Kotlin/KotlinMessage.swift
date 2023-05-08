@@ -20,6 +20,15 @@ extension Message {
         return Message(kind: .warning, message: "Kotlin does not support this Swift attribute or property wrapper", sourceDerived: sourceDerived, source: source)
     }
 
+    static func kotlinAttributeOnParameterUnsupported(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .warning, message: "Kotlin does not support this Swift function parameter attribute", sourceDerived: sourceDerived, source: source)
+    }
+
+    // Idea: modify call sites to wrap argument in a closure
+    static func kotlinAutoclosure(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Kotlin does not support @autoclosure parameters. Consider using a standard closure", sourceDerived: sourceDerived, source: source)
+    }
+
     static func kotlinCatchCaseCast(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Kotlin only supports catch clauses that use enum cases, 'is <type>', or 'let <e> as <type>' conditions", sourceDerived: sourceDerived, source: source)
     }

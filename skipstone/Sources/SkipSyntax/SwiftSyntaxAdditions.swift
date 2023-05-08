@@ -69,6 +69,7 @@ extension Parameter<Expression> {
     fileprivate init(firstName: String?, secondName: String?, typeSyntax: TypeSyntax?, ellipses: String? = nil, defaultArgument: InitializerClauseSyntax? = nil, in syntaxTree: SyntaxTree, messages: inout [Message]) {
         var type: TypeSignature = .none
         var isInOut = false
+        var attributes: Attributes? = nil
         if let typeSyntax {
             type = TypeSignature.for(syntax: typeSyntax)
             if type == .none {
@@ -76,13 +77,14 @@ extension Parameter<Expression> {
                 messages.append(.unsupportedTypeSignature(typeSyntax, source: syntaxTree.source))
             }
             isInOut = TypeSignature.isInOut(syntax: typeSyntax)
+            attributes = TypeSignature.attributes(syntax: typeSyntax, in: syntaxTree)
         }
         let isVariadic = ellipses == "..."
         var defaultValue: Expression? = nil
         if let defaultArgument {
             defaultValue = ExpressionDecoder.decode(syntax: defaultArgument.value, in: syntaxTree)
         }
-        self = Parameter<Expression>(externalLabel: firstName, internalLabel: secondName, declaredType: type, isInOut: isInOut, isVariadic: isVariadic, defaultValue: defaultValue)
+        self = Parameter<Expression>(externalLabel: firstName, internalLabel: secondName, declaredType: type, isInOut: isInOut, isVariadic: isVariadic, attributes: attributes ?? Attributes(), defaultValue: defaultValue)
     }
 }
 

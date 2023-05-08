@@ -857,6 +857,19 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         }
     }
 
+    /// Attributes on the given syntax.
+    static func attributes(syntax: TypeSyntax, in syntaxTree: SyntaxTree) -> Attributes? {
+        switch syntax.kind {
+        case .attributedType:
+            guard let attributedType = syntax.as(AttributedTypeSyntax.self), let attributes = attributedType.attributes else {
+                return nil
+            }
+            return Attributes.for(syntax: attributes, in: syntaxTree)
+        default:
+            return nil
+        }
+    }
+
     /// Create a type signature for the given syntax.
     static func `for`(syntax: TypeSyntax) -> TypeSignature {
         switch syntax.kind {

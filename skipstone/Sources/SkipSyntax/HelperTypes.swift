@@ -132,17 +132,19 @@ struct Parameter<V>: Hashable {
     var declaredType: TypeSignature
     var isInOut: Bool
     var isVariadic: Bool
+    var attributes: Attributes
     var defaultValue: V?
     var signature: TypeSignature.Parameter {
         return TypeSignature.Parameter(label: externalLabel, type: declaredType, isInOut: isInOut, isVariadic: isVariadic, hasDefaultValue: defaultValue != nil)
     }
 
-    init(externalLabel: String?, internalLabel: String? = nil, declaredType: TypeSignature = .none, isInOut: Bool = false, isVariadic: Bool = false, defaultValue: V? = nil) {
+    init(externalLabel: String?, internalLabel: String? = nil, declaredType: TypeSignature = .none, isInOut: Bool = false, isVariadic: Bool = false, attributes: Attributes = Attributes(), defaultValue: V? = nil) {
         self.externalLabel = externalLabel == "" || externalLabel == "_" ? nil : externalLabel
         _internalLabel = internalLabel
         self.declaredType = declaredType
         self.isInOut = isInOut
         self.isVariadic = isVariadic
+        self.attributes = attributes
         self.defaultValue = defaultValue
     }
 
@@ -171,7 +173,7 @@ struct Parameter<V>: Hashable {
     }
 
     static func ==(lhs: Parameter<V>, rhs: Parameter<V>) -> Bool {
-        return lhs.externalLabel == rhs.externalLabel && lhs.declaredType == rhs.declaredType && lhs.isInOut == rhs.isInOut && lhs.isVariadic == rhs.isVariadic
+        return lhs.externalLabel == rhs.externalLabel && lhs.declaredType == rhs.declaredType && lhs.isInOut == rhs.isInOut && lhs.isVariadic == rhs.isVariadic && lhs.attributes == rhs.attributes
     }
 
     func hash(into hasher: inout Hasher) {
@@ -298,7 +300,7 @@ struct Modifiers: PrettyPrintable, Codable {
 }
 
 /// @Attributes on a declaration.
-struct Attributes: PrettyPrintable {
+struct Attributes: Equatable, PrettyPrintable {
     let attributes: [Attribute]
 
     init(attributes: [Attribute] = []) {
@@ -334,7 +336,7 @@ struct Attributes: PrettyPrintable {
 }
 
 /// @Attribute on a declaration.
-struct Attribute {
+struct Attribute: Equatable {
     let signature: TypeSignature
     var tokens: [String] = []
 
@@ -361,10 +363,12 @@ struct Attribute {
     }
 
     /// The attribute kind, if it is recognized.
-    enum Kind {
+    enum Kind: Equatable {
+        case autoclosure
         case available
         case deprecated
         case discardableResult
+        case escaping
         case frozen
         case indirect
         case inlinable
@@ -378,6 +382,8 @@ struct Attribute {
             return .unknown
         }
         switch name {
+        case "autoclosure":
+            return .autoclosure
         case "available":
             if tokens.contains("unavailable") {
                 return .unavailable
@@ -388,6 +394,8 @@ struct Attribute {
             }
         case "discardableResult":
             return .discardableResult
+        case "escaping":
+            return .escaping
         case "frozen":
             return .frozen
         case "indirect":

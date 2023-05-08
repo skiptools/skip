@@ -131,7 +131,19 @@ extension Parameter where V: Expression {
         if let defaultValue {
             kdefaultValue = translator.translateExpression(defaultValue)
         }
-        return Parameter<KotlinExpression>(externalLabel: externalLabel, internalLabel: internalLabel, declaredType: declaredType, isInOut: isInOut, isVariadic: isVariadic, defaultValue: kdefaultValue)
+        return Parameter<KotlinExpression>(externalLabel: externalLabel, internalLabel: internalLabel, declaredType: declaredType, isInOut: isInOut, isVariadic: isVariadic, attributes: attributes, defaultValue: kdefaultValue)
+    }
+}
+
+extension Parameter {
+    /// Add messages about unsupported aspects of this parameter.
+    func appendKotlinMessages(to node: KotlinSyntaxNode, source: Source) {
+        declaredType.appendKotlinMessages(to: node, source: source)
+        if attributes.attributes.contains(where: { $0.kind == .autoclosure }) {
+            node.messages.append(.kotlinAutoclosure(node, source: source))
+        } else if attributes.attributes.contains(where: { $0.kind == .unknown }) {
+            node.messages.append(.kotlinAttributeOnParameterUnsupported(node, source: source))
+        }
     }
 }
 

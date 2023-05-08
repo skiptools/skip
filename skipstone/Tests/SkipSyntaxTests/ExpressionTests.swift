@@ -338,6 +338,22 @@ final class ExpressionTests: XCTestCase {
         }
         """)
     }
+
+    func testAutoclosure() async throws {
+        try await checkProducesMessage(swift: """
+        func f(c: @autoclosure () -> Void) {
+            c()
+        }
+        """)
+    }
+
+    func testEscaping() async throws {
+        try await check(swift: """
+        func f(c: @escaping () -> Void) {
+            c()
+        }
+        """, kotlin: """
+        internal fun f(c: () -> Unit) = c()
+        """)
+    }
 }
-
-

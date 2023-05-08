@@ -464,7 +464,9 @@ class KotlinClosure: KotlinExpression {
         }
         let kexpression = KotlinClosure(expression: expression, body: kbody)
         kexpression.returnType = expression.returnType
+        kexpression.returnType.appendKotlinMessages(to: kexpression, source: translator.syntaxTree.source)
         kexpression.parameters = expression.parameters
+        kexpression.parameters.forEach { $0.appendKotlinMessages(to: kexpression, source: translator.syntaxTree.source) }
         kexpression.isAnonymousFunction = isAnonymousFunction
         kexpression.implicitParameterLabels = implicitParameterLabels
         kexpression.hasReturnLabel = hasReturnLabel
