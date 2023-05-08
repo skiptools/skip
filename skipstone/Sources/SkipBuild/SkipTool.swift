@@ -708,7 +708,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
                 let gradePropertiesContents = """
                 org.gradle.jvmargs=-Xmx2048m
                 android.useAndroidX=true
-                android.enableJetifier=true
+                android.enableJetifier=false
                 kotlin.code.style=official
                 """
 
@@ -717,11 +717,37 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             }
         }
 
-        func loadSkipConfig(path: AbsolutePath) throws -> SkipConfig {
+        func loadSkipYAML(path: AbsolutePath, forExport: Bool) throws -> SkipConfig {
             do {
                 var yaml = try inputSource(path).withData(YAML.parse(_:))
                 if yaml.object == nil { // an empty file will appear as nil, so just convert to an empty dictionary
                     yaml = .object([:])
+                }
+
+                // go through all the top-level "export: false" blocks and remove them when the config is being imported elsewhere
+                if forExport {
+                    func filterExport(from yaml: YAML) -> YAML? {
+                        guard var obj = yaml.object else {
+                            if let array = yaml.array {
+                                return .array(array.compactMap(filterExport(from:)))
+                            } else {
+                                return yaml
+                            }
+                        }
+                        for (key, value) in obj {
+                            if key == "export" {
+                                if value.boolean == false {
+                                    // skip over the whole dict
+                                    return nil
+                                }
+                            } else {
+                                obj[key] = filterExport(from: value)
+                            }
+                        }
+                        return .object(obj)
+                    }
+
+                    yaml = filterExport(from: yaml) ?? yaml
                 }
                 return try yaml.json().decode()
             } catch let e {
@@ -733,7 +759,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         func loadSkipConfig(merge: Bool = true, configFileName: String = "skip.yml") throws -> (base: SkipConfig, merged: SkipConfig, configMap: [String: SkipConfig]) {
             let configStart = Date().timeIntervalSinceReferenceDate
             let skipConfigPath = skipFolderPath.appending(component: configFileName)
-            let currentModuleConfig = try loadSkipConfig(path: skipConfigPath)
+            let currentModuleConfig = try loadSkipYAML(path: skipConfigPath, forExport: false)
 
             var configMap: [String: SkipConfig] = [:]
             configMap[primaryModuleName] = currentModuleConfig
@@ -748,8 +774,12 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             // build up a merged YAML from the base dependenices to the current module
             var aggregateJSON: Universal.JSON = [:]
 
+            func isTestModule(_ moduleName: String) -> Bool {
+                primaryModuleName != moduleName && primaryModuleName != moduleName + "Tests"
+            }
+
             for (moduleName, modulePath) in moduleNamePaths {
-                trace("moduleName: \(moduleName) modulePath: \(modulePath)")
+                info("moduleName: \(moduleName) modulePath: \(modulePath)")
                 let moduleSkipBasePath = try AbsolutePath(validating: modulePath, relativeTo: moduleRootPath.parentDirectory)
                     .appending(components: ["Skip"])
 
@@ -757,7 +787,10 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
                 if fs.isFile(moduleSkipConfigPath) {
                     let skipConfigLoadStart = Date().timeIntervalSinceReferenceDate
-                    let moduleConfig = try loadSkipConfig(path: moduleSkipConfigPath)
+                    let isTestPeer = primaryModuleName == moduleName + "Tests" // test peers have the same module name
+                    trace("primaryModuleName: \(primaryModuleName) moduleName: \(moduleName) isTestPeer=\(isTestPeer)") // SkipLibTests moduleName: SkipLib
+                    let isForExport = !isTestPeer
+                    let moduleConfig = try loadSkipYAML(path: moduleSkipConfigPath, forExport: isForExport)
                     configMap[moduleName] = moduleConfig // remember the raw config for use in configuring transpiler plug-ins
                     let skipConfigLoadEnd = Date().timeIntervalSinceReferenceDate
                     info("\(moduleName) skip.yml config loaded (\(Int64((skipConfigLoadEnd - skipConfigLoadStart) * 1000)) ms)", sourceFile: moduleSkipConfigPath.sourceFile)
@@ -773,8 +806,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
                 for (moduleName, _) in moduleNamePaths {
                     // manually exclude our own module and tests names
-                    if primaryModuleName != moduleName
-                        && primaryModuleName != moduleName + "Tests" {
+                    if isTestModule(moduleName) {
                         if moduleName == "SkipUnit" {
                             contents += [.init("testImplementation(project(\":\(moduleName)\"))")]
                         } else {
