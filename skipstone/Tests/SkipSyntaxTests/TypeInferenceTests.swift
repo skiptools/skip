@@ -536,6 +536,32 @@ final class TypeInferenceTests: XCTestCase {
         """)
     }
 
+    func testTypealiasParameter() async throws {
+        try await check(supportingSwift: """
+        protocol Collection {
+            associatedtype Element
+            // SKIP NOWARN
+            subscript(i: Int) -> Element
+            func firstIndex(of: Element) -> Int?
+        }
+        struct S: Collection {
+            typealias Element = Character
+            // SKIP NOWARN
+            typealias Index = Int
+        }
+        """, swift: """
+        func f(s: S) {
+            let i: S.Index = s.firstIndex(of: "a")!
+            let b = s[i] == "a"
+        }
+        """, kotlin: """
+        internal fun f(s: S) {
+            val i: S.Index = s.firstIndex(of = 'a')!!
+            val b = s[i] == 'a'
+        }
+        """)
+    }
+
     func testMap() async throws {
         let supportingSwift = """
         extension Int {

@@ -562,7 +562,11 @@ public class CodebaseInfo: Codable {
             var generics = generics ?? Generics()
             var availability = availability
             if let typeInfo {
-                constrainedParameters = parameters.map { $0.mappingTypes(from: typeInfo.signature.generics, to: constrainedGenerics) }
+                constrainedParameters = parameters.map {
+                    var resolvedParameter = $0
+                    resolvedParameter.type = resolveTypealias(for: $0.type)
+                    return resolvedParameter.mappingTypes(from: typeInfo.signature.generics, to: constrainedGenerics)
+                }
                 generics = typeInfo.generics.merge(overrides: generics, addNew: true).merge(overrides: Generics(typeInfo.signature.generics, whereEqual: constrainedGenerics), addNew: true)
                 availability = availability.least(typeInfo.availability)
             }
@@ -574,15 +578,16 @@ public class CodebaseInfo: Codable {
             var parameterIndex = 0
             var totalScore = 0.0
             for argument in arguments {
-                guard let (matchingIndex, score) = matchArgument(argument, to: constrainedParameters, isSubscript: declarationType == .subscriptDeclaration, startIndex: parameterIndex) else {
+                let resolvedArgument = LabeledValue(label: argument.label, value: resolveTypealias(for: argument.value))
+                guard let (matchingIndex, score) = matchArgument(resolvedArgument, to: constrainedParameters, isSubscript: declarationType == .subscriptDeclaration, startIndex: parameterIndex) else {
                     return nil
                 }
                 // If the parameter type was constrained (i.e. is generic), the argument value will likely be more specific
                 let parameterType: TypeSignature
-                if parameters[matchingIndex].type != constrainedParameters[matchingIndex].type && argument.value != .any {
-                    parameterType = argument.value.or(constrainedParameters[matchingIndex].type)
+                if parameters[matchingIndex].type != constrainedParameters[matchingIndex].type && resolvedArgument.value != .any {
+                    parameterType = resolvedArgument.value.or(constrainedParameters[matchingIndex].type)
                 } else {
-                    parameterType = constrainedParameters[matchingIndex].type.or(argument.value)
+                    parameterType = constrainedParameters[matchingIndex].type.or(resolvedArgument.value)
                 }
                 var matchingParameter = parameters[matchingIndex]
                 matchingOriginalParameters.append(matchingParameter)
@@ -634,6 +639,20 @@ public class CodebaseInfo: Codable {
                 }
             }
             return nil
+        }
+
+        private func resolveTypealias(for type: TypeSignature) -> TypeSignature {
+            return type.mappingTypes {
+                switch $0 {
+                case .named, .member:
+                    if let alias = ranked(global.lookup(name: $0.name, qualifiedMatch: true).filter { $0.declarationType == .typealiasDeclaration }).first {
+                        return alias.signature.withGenerics($0.generics)
+                    }
+                default:
+                    break
+                }
+                return nil
+            }
         }
     }
 
