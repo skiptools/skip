@@ -210,10 +210,26 @@ extension CommandPlugin {
                             // as published by the Free Software Foundation https://fsf.org
                             import SkipUnit
 
+                            // This is the entry point for the Gradle test case runner,
+                            // which takes Skip's transpiled XCTest -> JUnit tests and
+                            // runs them by forking the `gradle` command.
+
+                            // Test results are parsed and mapped back to their equivalent
+                            // Swift source code locations and highlighted in the Xcode
+                            // Issue Navigator.
+
+                            #if os(macOS) // Skip transpiled tests can only be run against macOS
+
                             /// Do not modify. This is a bridge to the Gradle test case runner.
                             /// New tests should be added to the `\(target.name)` module.
-                            class \(testClass): JUnitTestCase {
+                            final class \(testClass): JUnitTestCase {
+                                /// This test case will run the transpiled tests defined in the Swift peer module.
+                                public func testSkipModule() async throws {
+                                    try await runTranspiledGradleTests()
+                                }
                             }
+
+                            #endif
                             """.write(toFile: testSource.string, atomically: true, encoding: .utf8)
                         }
                     }
