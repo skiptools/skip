@@ -923,7 +923,13 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
                 // also save the output line mapping file: SomeFile.kt -> .SomeFile.sourcemap
                 let sourceMappingPath = outputFilePath.parentDirectory.appending(component: "." + outputFilePath.basenameWithoutExt + ".sourcemap")
-                let sourceMapData = try JSONEncoder().encode(transpilation.outputMap)
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = [
+                    .sortedKeys, // needed for deterministic output
+                    .withoutEscapingSlashes,
+                    //.prettyPrinted,
+                ]
+                let sourceMapData = try encoder.encode(transpilation.outputMap)
                 try fs.writeChanges(path: sourceMappingPath, makeReadOnly: true, bytes: ByteString(sourceMapData))
 
                 return (output: outputFilePath, changed: fileWritten, overridden: false)
