@@ -386,7 +386,7 @@ struct TranspilePhaseOptions: ParsableArguments {
     var outputFolder: String? = nil
 
     @Option(name: [.long], help: ArgumentHelp("The Gradle wrapper version to generate", valueName: "version"))
-    var gradleVersion: String = "8.1.1"
+    var gradleVersion: String = "8.1.1" // note: this should not be higher than the pre-installed version on the active CI runner image: https://github.com/actions/runner-images/tree/main/images/macos
 }
 
 struct TranspileResult {
@@ -921,8 +921,8 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
                 trace("wrote to: \(outputFilePath)\(!fileWritten ? " (unchanged)" : "")", sourceFile: outputFilePath.sourceFile)
 
-                // also save the output line mapping file: SomeFile.kt -> SomeFile.sourcemap
-                let sourceMappingPath = outputFilePath.deletingPathExtension().appendingPathExtension("sourcemap")
+                // also save the output line mapping file: SomeFile.kt -> .SomeFile.sourcemap
+                let sourceMappingPath = outputFilePath.parentDirectory.appending(component: "." + outputFilePath.basenameWithoutExt + ".sourcemap")
                 let sourceMapData = try JSONEncoder().encode(transpilation.outputMap)
                 try fs.writeChanges(path: sourceMappingPath, makeReadOnly: true, bytes: ByteString(sourceMapData))
 
