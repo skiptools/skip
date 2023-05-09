@@ -510,6 +510,32 @@ final class TypeInferenceTests: XCTestCase {
         """)
     }
 
+    func testSelfGenericProtocol() async throws {
+        try await check(supportingSwift: """
+        public protocol SetAlgebra<Element> {
+            associatedtype Element
+        }
+        extension SetAlgebra {
+            public func contains(_ element: Element) -> Bool {
+                fatalError()
+            }
+        }
+        protocol P: SetAlgebra where Element == Self {
+        }
+        struct S: P {
+            static let s1 = S()
+        }
+        """, swift: """
+        func f(s: S) {
+            let b = s.contains(.s1)
+        }
+        """, kotlin: """
+        internal fun f(s: S) {
+            val b = s.contains(S.s1)
+        }
+        """)
+    }
+
     func testMap() async throws {
         let supportingSwift = """
         extension Int {
