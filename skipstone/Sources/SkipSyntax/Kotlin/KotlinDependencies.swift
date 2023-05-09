@@ -16,6 +16,5 @@ extension KotlinDependencies {
     /// Add a dependency on `kotlin.reflect.full`.
     mutating func insertReflectFull() {
         imports.insert("kotlin.reflect.full.*")
-        gradle.insert("org.jetbrains.kotlin:kotlin-reflect:1.8.20")
     }
 }

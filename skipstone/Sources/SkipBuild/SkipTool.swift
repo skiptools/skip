@@ -705,11 +705,12 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             }
 
             func generateGradleProperties() throws {
+                // TODO: assemble these from skip.yml settings
                 let gradlePropertiesPath = moduleRootPath.parentDirectory.appending(component: "gradle.properties")
                 let gradePropertiesContents = """
                 org.gradle.jvmargs=-Xmx2048m
                 android.useAndroidX=true
-                android.enableJetifier=false
+                android.enableJetifier=true
                 kotlin.code.style=official
                 """
 
