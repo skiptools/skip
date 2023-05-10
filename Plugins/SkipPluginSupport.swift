@@ -218,7 +218,7 @@ extension CommandPlugin {
                             // Swift source code locations and highlighted in the Xcode
                             // Issue Navigator.
 
-                            #if os(macOS) // Skip transpiled tests can only be run against macOS
+                            #if os(Android) || os(macOS) || os(Linux) || targetEnvironment(macCatalyst)
 
                             /// Do not modify. This is a bridge to the Gradle test case runner.
                             /// New tests should be added to the `\(target.name)` module.
