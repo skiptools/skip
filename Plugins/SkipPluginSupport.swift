@@ -222,7 +222,7 @@ extension CommandPlugin {
 
                             /// Do not modify. This is a bridge to the Gradle test case runner.
                             /// New tests should be added to the `\(target.name)` module.
-                            final class \(testClass): XCGradleHarness {
+                            final class \(testClass): XCTestCase, XCGradleHarness {
                                 /// This test case will run the transpiled tests defined in the Swift peer module.
                                 public func testSkipModule() async throws {
                                     try await gradle(actions: ["test"])
