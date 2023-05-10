@@ -830,7 +830,12 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             return (currentModuleConfig, aggregateSkipConfig, configMap)
         }
 
-        func kotlinOutputPath(for baseSourceFileName: String, in basePath: AbsolutePath? = nil) -> AbsolutePath {
+        func kotlinOutputPath(for baseSourceFileName: String, in basePath: AbsolutePath? = nil) -> AbsolutePath? {
+            if baseSourceFileName == "skip.yml" {
+                // skip metadata files are excluded from copy
+                return nil
+            }
+
             // the "AndroidManifest.xml" file is special: it needs to go in the root src/main/ folder
             let isManifest = baseSourceFileName == "AndroidManifest.xml"
             // if an empty basePath, treat as a source file and place in package-derived folders
@@ -855,20 +860,21 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
                     let subPaths = try linkSkipFolder(sourcePath, to: outputPath, topLevel: false, makeLinks: makeLinks)
                     copiedFiles.formUnion(subPaths)
                 } else {
-                    let outputFilePath = kotlinOutputPath(for: sourcePath.basename, in: topLevel ? nil : outputFilePath)
-                    if makeLinks {
-                        // we make links instead of copying so the file can be edited from the gradle project structure without needing to be manually synchronized
-                        try? fs.removeFileTree(outputFilePath)
-                        try fs.createDirectory(outputFilePath.parentDirectory, recursive: true) // ensure parent exists
-                        try fs.createSymbolicLink(outputFilePath, pointingAt: sourcePath, relative: false)
-                        trace("linked overridden source: \(sourcePath.pathString) to: \(outputFilePath.pathString)", sourceFile: sourcePath.sourceFile)
-                        info("\(outputFilePath.basename) override linked from project", sourceFile: sourcePath.sourceFile)
-                    } else {
-                        try fs.writeChanges(path: outputFilePath, checkSize: true, bytes: inputSource(sourcePath))
-                        trace("copied overridden source: \(sourcePath.pathString) to: \(outputFilePath.pathString)", sourceFile: sourcePath.sourceFile)
-                        info("\(outputFilePath.basename) copied from project", sourceFile: sourcePath.sourceFile)
+                    if let outputFilePath = kotlinOutputPath(for: sourcePath.basename, in: topLevel ? nil : outputFilePath) {
+                        copiedFiles.insert(outputFilePath)
+                        if makeLinks {
+                            // we make links instead of copying so the file can be edited from the gradle project structure without needing to be manually synchronized
+                            try? fs.removeFileTree(outputFilePath)
+                            try fs.createDirectory(outputFilePath.parentDirectory, recursive: true) // ensure parent exists
+                            try fs.createSymbolicLink(outputFilePath, pointingAt: sourcePath, relative: false)
+                            trace("linked overridden source: \(sourcePath.pathString) to: \(outputFilePath.pathString)", sourceFile: sourcePath.sourceFile)
+                            info("\(outputFilePath.basename) override linked from project", sourceFile: sourcePath.sourceFile)
+                        } else {
+                            try fs.writeChanges(path: outputFilePath, checkSize: true, bytes: inputSource(sourcePath))
+                            trace("copied overridden source: \(sourcePath.pathString) to: \(outputFilePath.pathString)", sourceFile: sourcePath.sourceFile)
+                            info("\(outputFilePath.basename) copied from project", sourceFile: sourcePath.sourceFile)
+                        }
                     }
-                    copiedFiles.insert(outputFilePath)
                 }
             }
             return copiedFiles
@@ -910,7 +916,9 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
                 trace("path: \(outputFolderPath)")
 
                 let kotlinName = transpilation.kotlinFileName
-                let outputFilePath = kotlinOutputPath(for: kotlinName)
+                guard let outputFilePath = kotlinOutputPath(for: kotlinName) else {
+                    throw error("No output path for \(kotlinName)")
+                }
 
                 if overriddenKotlinFiles.contains(kotlinName) {
                     return (output: outputFilePath, changed: false, overridden: true)
