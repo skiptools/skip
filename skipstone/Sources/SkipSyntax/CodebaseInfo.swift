@@ -25,7 +25,8 @@ public class CodebaseInfo: Codable {
     /// Map between Swift modules and the equivalent Skip modules.
     static let moduleNameMap: [String: String] = [
         "Foundation": "SkipFoundation",
-        "XCTest": "SkipUnit"
+        "Swift": "SkipLib",
+        "XCTest": "SkipUnit",
     ]
 
     /// Messages for the user created during information gathering.
@@ -94,14 +95,29 @@ public class CodebaseInfo: Codable {
         guard !path.isEmpty else {
             return []
         }
-        var candidates = itemsByName[path[path.count - 1], default: []]
-        if path.count > 1 {
-            let baseName = path.dropLast().joined(separator: ".")
-            candidates = candidates.filter { ($0 is TypeInfo || $0 is TypealiasInfo) && $0.declaringType?.name == baseName }
-        } else if qualifiedMatch {
-            candidates = candidates.filter { !($0 is TypeInfo || $0 is TypealiasInfo) || $0.declaringType == nil }
+        let candidates = itemsByName[path[path.count - 1], default: []]
+        guard !candidates.isEmpty else {
+            return []
         }
-        return candidates
+        return match(candidates: candidates, path: path.dropLast(), moduleName: nil, qualifiedMatch: qualifiedMatch)
+    }
+
+    private func match(candidates: [CodebaseInfoItem], path: [String], moduleName: String?, qualifiedMatch: Bool) -> [CodebaseInfoItem] {
+        var matches = candidates
+        if let moduleName {
+            matches = matches.filter { $0.moduleName == moduleName }
+        }
+        if !path.isEmpty {
+            let baseName = path.joined(separator: ".")
+            matches = matches.filter { ($0 is TypeInfo || $0 is TypealiasInfo) && $0.declaringType?.name == baseName }
+            // Only attempt to match as a module-qualified name if no unqualified matches
+            if matches.isEmpty && moduleName == nil {
+                matches += match(candidates: candidates, path: Array(path.dropFirst()), moduleName: path[0], qualifiedMatch: qualifiedMatch)
+            }
+        } else if qualifiedMatch {
+            matches = matches.filter { !($0 is TypeInfo || $0 is TypealiasInfo) || $0.declaringType == nil }
+        }
+        return matches
     }
 
     /// Return all type infos for the given type.
@@ -150,10 +166,14 @@ public class CodebaseInfo: Codable {
 
     // We need these in testing because SkipLib isn't available
     private static let builtinProtocols: Set<TypeSignature> = [
-        .named("CustomStringConvertible", []), .named("Equatable", []), .named("Error", []), .named("OptionSet", [])
+        .named("CustomStringConvertible", []), .member(.named("Swift", []), .named("CustomStringConvertible", [])),
+        .named("Equatable", []), .member(.named("Swift", []), .named("Equatable", [])),
+        .named("Error", []), .member(.named("Swift", []), .named("Error", [])),
+        .named("OptionSet", []), .member(.named("Swift", []), .named("OptionSet", [])),
     ]
     private static let builtinEquatableSubprotocols: Set<TypeSignature> = [
-        .named("Comparable", []), .named("Hashable", [])
+        .named("Comparable", []), .member(.named("Swift", []), .named("Comparable", [])),
+        .named("Hashable", []), .member(.named("Swift", []), .named("Hashable", [])),
     ]
 
     /// Return the protocols the given type conforms to, including inherited protocols.
@@ -250,8 +270,12 @@ public class CodebaseInfo: Codable {
         }
         
         /// Return the type of the given identifier.
-        func identifierSignature(of identifier: String) -> (TypeSignature, Availability) {
-            let topRanked = ranked(global.lookup(name: identifier, qualifiedMatch: true)).first { candidate in
+        func identifierSignature(of identifier: String, moduleName: String? = nil) -> (TypeSignature, Availability) {
+            var lookup = global.lookup(name: identifier, qualifiedMatch: true)
+            if let moduleName {
+                lookup = lookup.filter { $0.moduleName == moduleName }
+            }
+            let topRanked = ranked(lookup).first { candidate in
                 switch candidate.declarationType {
                 case .actorDeclaration, .classDeclaration, .enumDeclaration, .protocolDeclaration, .structDeclaration, .typealiasDeclaration, .enumCaseDeclaration, .variableDeclaration:
                     return true
@@ -260,7 +284,7 @@ public class CodebaseInfo: Codable {
                 }
             }
             guard let topRanked else {
-                let type = TypeSignature.for(name: identifier, genericTypes: [], allowNamed: false).asMetaType(true)
+                let type = moduleName == nil || moduleName == "Swift" ? TypeSignature.for(name: identifier, genericTypes: [], allowNamed: false).asMetaType(true) : .none
                 return (type, .available)
             }
             let type = topRanked.signature
@@ -301,12 +325,17 @@ public class CodebaseInfo: Codable {
             if let nestedTypeInfo = global.primaryTypeInfo(forNamed: nested) {
                 return (nestedTypeInfo.signature.asMetaType(true), nestedTypeInfo.availability)
             }
-            return (.none, .available)
+            // Is it a module name?
+            return identifierSignature(of: member, moduleName: type.name)
         }
 
         /// Return the signatures of the possible functions being called with the given arguments.
-        func functionSignature(of name: String, arguments: [LabeledValue<TypeSignature>]) -> [(TypeSignature, StatementType, Availability)] {
-            let items = ranked(global.lookup(name: name, qualifiedMatch: true))
+        func functionSignature(of name: String, arguments: [LabeledValue<TypeSignature>], moduleName: String? = nil) -> [(TypeSignature, StatementType, Availability)] {
+            var lookup = global.lookup(name: name, qualifiedMatch: true)
+            if let moduleName {
+                lookup = lookup.filter { $0.moduleName == moduleName }
+            }
+            let items = ranked(lookup)
             let funcs = items.filter { $0.declarationType == .functionDeclaration }
             let funcsCandidates = funcs.compactMap { matchFunction($0, arguments: arguments, level: 0) }
             let typeInfos = items.flatMap { (item) -> [TypeInfo] in
@@ -358,7 +387,8 @@ public class CodebaseInfo: Codable {
             }
             let sortedCandidates = candidates.sorted { $0.score > $1.score }
             guard let topCandidate = sortedCandidates.first else {
-                return []
+                // Is type a module name?
+                return functionSignature(of: name, arguments: arguments, moduleName: type.name)
             }
             return sortedCandidates.filter { $0.score >= topCandidate.score && $0.level <= topCandidate.level }.map { ($0.signature.mappingSelf(to: type), $0.declarationType, $0.availability) }
         }

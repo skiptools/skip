@@ -64,6 +64,49 @@ final class NamingTests: XCTestCase {
             return holder.null_
             """)
     }
+
+    func testModuleQualifiedNames() async throws {
+        try await check(supportingSwift: """
+        class A {
+        }
+        """, swift: """
+        class B: A {
+        }
+        class C: Swift.A {
+        }
+        """, kotlin: """
+        internal open class B: A() {
+        }
+        internal open class C: skip.lib.A() {
+        }
+        """)
+
+        try await check(supportingSwift: """
+        extension String {
+            static let myValue = ""
+        }
+        extension Int {
+            static let myValue = 0
+        }
+        class Array<Element> {
+            let count = "abc"
+        }
+        """, swift: """
+        func f(a: Swift.Array<Double>) {
+            let b = a.count == .myValue
+        }
+        func g(a: Array<Double>) {
+            let b = a.count == .myValue
+        }
+        """, kotlin: """
+        internal fun f(a: skip.lib.Array<Double>) {
+            val b = a.count == Int.myValue
+        }
+        internal fun g(a: Array<Double>) {
+            val b = a.count == String.myValue
+        }
+        """)
+    }
 }
 
 

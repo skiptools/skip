@@ -525,7 +525,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             let base = baseType.qualified(in: node)
             if case .named(let name, let generics) = type {
                 let generics = generics.map { $0.qualified(in: node) }
-                return .member(base, .named(name, generics))
+                return Self.memberOrSwiftType(baseType: base, name: name, genericTypes: generics)
             } else {
                 return .member(base, type)
             }
@@ -690,7 +690,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     /// 0 = Unknown match
     /// nil = Not compatible
     ///
-    /// Compound type with multiple elements return an average of their elements' scores.
+    /// Compound types with multiple elements return an average of their elements' scores.
     func compatibilityScore(target: TypeSignature, codebaseInfo: CodebaseInfo.Context) -> Double? {
         if self == target {
             return 2.0
@@ -751,24 +751,39 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             }
         case .member, .named:
             // TODO: Match on generics
-            let type = withGenerics([])
-            let target = target.withGenerics([])
+            let rawType: TypeSignature
+            if let typeInfo = codebaseInfo.primaryTypeInfo(forNamed: self) {
+                rawType = typeInfo.signature.withGenerics([])
+            } else {
+                rawType = withGenerics([])
+            }
+            let rawTarget: TypeSignature
+            if let typeInfo = codebaseInfo.primaryTypeInfo(forNamed: target) {
+                rawTarget = typeInfo.signature.withGenerics([])
+            } else {
+                rawTarget = target.withGenerics([])
+            }
             // Consider a match on all except generics a very close match
-            if type == target {
+            if rawType == rawTarget {
                 return 1.95
             }
+
+            // Note that below we use 'self' rather than rawType when querying CodebaseInfo in case 'self' has a module qualifier.
+            // We use rawTarget, however, because our algorithm ends up matching only on signatures without modules. This means we
+            // have the potential to get confused when dealing with candidats that have the same signature but different modules
+
             // Take away a tenth of a point for each level down the inheritance chain, so that less derived matches score lower.
             // This will allow another function with a more specific parameter type to score higher
-            let inherits = codebaseInfo.global.inheritanceChainSignatures(forNamed: type)
+            let inherits = codebaseInfo.global.inheritanceChainSignatures(forNamed: self)
             if inherits.count > 1 {
                 for i in 1..<inherits.count {
-                    if inherits[i].withGenerics([]) == target {
+                    if inherits[i].withGenerics([]) == rawTarget {
                         return 2.0 - (Double(i) * 0.1)
                     }
                 }
             }
-            let protocols = codebaseInfo.global.protocolSignatures(forNamed: type).map { $0.withGenerics([]) }
-            if protocols.contains(target) {
+            let protocols = codebaseInfo.global.protocolSignatures(forNamed: self).map { $0.withGenerics([]) }
+            if protocols.contains(rawTarget) {
                 return 1.5
             }
         case .none:
@@ -955,7 +970,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                     return .none
                 }
             }
-            return .member(baseType, .named(name, genericTypes))
+            return memberOrSwiftType(baseType: baseType, name: name, genericTypes: genericTypes)
         case .metatypeType:
             guard let metaType = syntax.as(MetatypeTypeSyntax.self) else {
                 return .none
@@ -1019,51 +1034,51 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
 
     static func `for`(name: String, genericTypes: [TypeSignature], allowNamed: Bool = true) -> TypeSignature {
         switch name {
-        case "Any":
+        case "Any", "Swift.Any":
             return genericTypes.isEmpty ? .any : allowNamed ? .named(name, genericTypes) : .none
-        case "AnyObject":
+        case "AnyObject", "Swift.AnyObject":
             return genericTypes.isEmpty ? .anyObject : allowNamed ? .named(name, genericTypes) : .none
-        case "Any.Type":
+        case "Any.Type", "Swift.Any.Type":
             return .metaType(.any)
-        case "Array":
+        case "Array", "Swift.Array":
             return genericTypes.isEmpty ? .array(.none) : allowNamed ? genericTypes.count == 1 ? .array(genericTypes[0]) : .named(name, genericTypes) : .none
-        case "Bool":
+        case "Bool", "Swift.Bool":
             return genericTypes.isEmpty ? .bool : allowNamed ? .named(name, genericTypes) : .none
-        case "Character":
+        case "Character", "Swift.Character":
             return genericTypes.isEmpty ? .character : allowNamed ? .named(name, genericTypes) : .none
-        case "Dictionary":
+        case "Dictionary", "Swift.Dictionary":
             return genericTypes.isEmpty ? .dictionary(.none, .none) : genericTypes.count == 2 ? .dictionary(genericTypes[0], genericTypes[1]) : allowNamed ? .named(name, genericTypes) : .none
-        case "Double":
+        case "Double", "Swift.Double":
             return genericTypes.isEmpty ? .double : allowNamed ? .named(name, genericTypes) : .none
-        case "Float":
+        case "Float", "Swift.Float":
             return genericTypes.isEmpty ? .float : allowNamed ? .named(name, genericTypes) : .none
-        case "Int":
+        case "Int", "Swift.Int":
             return genericTypes.isEmpty ? .int : allowNamed ? .named(name, genericTypes) : .none
-        case "Int8":
+        case "Int8", "Swift.Int8":
             return genericTypes.isEmpty ? .int8 : allowNamed ? .named(name, genericTypes) : .none
-        case "Int16":
+        case "Int16", "Swift.Int16":
             return genericTypes.isEmpty ? .int16 : allowNamed ? .named(name, genericTypes) : .none
-        case "Int32":
+        case "Int32", "Swift.Int32":
             return genericTypes.isEmpty ? .int32 : allowNamed ? .named(name, genericTypes) : .none
-        case "Int64":
+        case "Int64", "Swift.Int64":
             return genericTypes.isEmpty ? .int64 : allowNamed ? .named(name, genericTypes) : .none
-        case "Range":
+        case "Range", "Swift.Range":
             return genericTypes.isEmpty ? .range(.none) : genericTypes.count == 1 ? .range(genericTypes[0]) : allowNamed ? .named(name, genericTypes) : .none
-        case "Set":
+        case "Set", "Swift.Set":
             return genericTypes.isEmpty ? .set(.none) : genericTypes.count == 1 ? .set(genericTypes[0]) : allowNamed ? .named(name, genericTypes) : .none
-        case "String":
+        case "String", "Swift.String":
             return genericTypes.isEmpty ? .string : allowNamed ? .named(name, genericTypes) : .none
-        case "UInt":
+        case "UInt", "Swift.UInt":
             return genericTypes.isEmpty ? .uint : allowNamed ? .named(name, genericTypes) : .none
-        case "UInt8":
+        case "UInt8", "Swift.UInt8":
             return genericTypes.isEmpty ? .uint8 : allowNamed ? .named(name, genericTypes) : .none
-        case "UInt16":
+        case "UInt16", "Swift.UInt16":
             return genericTypes.isEmpty ? .uint16 : allowNamed ? .named(name, genericTypes) : .none
-        case "UInt32":
+        case "UInt32", "Swift.UInt32":
             return genericTypes.isEmpty ? .uint32 : allowNamed ? .named(name, genericTypes) : .none
-        case "UInt64":
+        case "UInt64", "Swift.UInt64":
             return genericTypes.isEmpty ? .uint64 : allowNamed ? .named(name, genericTypes) : .none
-        case "Void":
+        case "Void", "Swift.Void":
             return genericTypes.isEmpty ? .void : allowNamed ? .named(name, genericTypes) : .none
         default:
             if !allowNamed {
@@ -1093,6 +1108,17 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return types[0]
         }
         return .tuple(labels, types)
+    }
+
+    private static func memberOrSwiftType(baseType: TypeSignature, name: String, genericTypes: [TypeSignature]) -> TypeSignature {
+        // Swift.xxx builtin type?
+        if case .named("Swift", []) = baseType {
+            let builtinType = self.for(name: name, genericTypes: genericTypes, allowNamed: false)
+            if builtinType != .none {
+                return builtinType
+            }
+        }
+        return .member(baseType, .named(name, genericTypes))
     }
 
     var description: String {
@@ -1263,6 +1289,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
 }
 
 extension TypeSignature {
+    //~~~
     static let caseIterable: TypeSignature = .named("CaseIterable", [])
     static let codable: TypeSignature = .named("Codable", [])
     static let codingKey: TypeSignature = .named("CodingKey", [])
