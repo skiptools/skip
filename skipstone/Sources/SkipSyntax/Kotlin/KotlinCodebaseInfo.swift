@@ -95,7 +95,7 @@ extension CodebaseInfo.Context {
         let protocolSignatures = global.protocolSignatures(forNamed: owningType)
         for protocolSignature in protocolSignatures {
             // Exclude protocols that do not translate into Kotlin interfaces
-            guard protocolSignature != .customStringConvertible && protocolSignature != .equatable && protocolSignature != .hashable else {
+            guard !protocolSignature.isCustomStringConvertible && !protocolSignature.isEquatable && !protocolSignature.isHashable else {
                 continue
             }
             for protocolInfo in typeInfos(forNamed: protocolSignature) {
@@ -116,7 +116,7 @@ extension CodebaseInfo.Context {
         assert(global.kotlin != nil)
         let typeInfos = typeInfos(forNamed: type)
         if let structInfo = typeInfos.first(where: { $0.declarationType == .structDeclaration }) {
-            return structInfo.variables.contains(where: { !$0.isReadOnly }) || structInfo.functions.contains(where: { $0.isMutating })
+            return structInfo.variables.contains(where: { !$0.isReadOnly }) || structInfo.functions.contains(where: \.isMutating)
         } else if typeInfos.contains(where: { $0.declarationType == .protocolDeclaration }) {
             // If this is a protocol that is constrained to class impls, then it isn't a mutable struct. Otherwise it could be
             return !global.protocolSignatures(forNamed: type).contains(.anyObject)
@@ -140,7 +140,7 @@ extension CodebaseInfo.Context {
     /// Whether the given type conforms to `Error` through its protocols, **not** through inheritance.
     func conformsToError(type: TypeSignature) -> Bool {
         assert(global.kotlin != nil)
-        return global.protocolSignatures(forNamed: type).contains { $0.isError }
+        return global.protocolSignatures(forNamed: type).contains { $0.isNamed("Error", moduleName: "Swift", generics: []) }
     }
 
     /// Whether the given enum type has cases with associated values.

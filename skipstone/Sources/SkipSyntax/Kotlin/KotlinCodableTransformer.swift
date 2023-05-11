@@ -3,7 +3,7 @@ class KotlinCodableTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
         syntaxTree.root.visit {
             if let classDeclaration = $0 as? KotlinClassDeclaration {
-                if classDeclaration.declarationType == .enumDeclaration && classDeclaration.inherits.contains(.codingKey) {
+                if classDeclaration.declarationType == .enumDeclaration && classDeclaration.inherits.contains(where: \.isCodingKey) {
                     fixupCodingKey(enumDeclaration: classDeclaration)
                 } else {
                     synthesizeCodable(for: classDeclaration, source: translator.syntaxTree.source)
@@ -15,8 +15,8 @@ class KotlinCodableTransformer: KotlinTransformer {
 
     private func synthesizeCodable(for classDeclaration: KotlinClassDeclaration, source: Source) {
         // We don't need to worry about extensions because they will have already been merged into the class
-        let isEncodable = classDeclaration.inherits.contains(.codable) || classDeclaration.inherits.contains(.encodable)
-        let isDecodable = classDeclaration.inherits.contains(.codable) || classDeclaration.inherits.contains(.decodable)
+        let isEncodable = classDeclaration.inherits.contains(where: \.isCodable) || classDeclaration.inherits.contains(where: \.isEncodable)
+        let isDecodable = classDeclaration.inherits.contains(where: \.isCodable) || classDeclaration.inherits.contains(where: \.isDecodable)
         guard isEncodable || isDecodable else {
             return
         }
@@ -27,8 +27,7 @@ class KotlinCodableTransformer: KotlinTransformer {
                 guard let functionDeclaration = $0 as? KotlinFunctionDeclaration else {
                     return false
                 }
-                //~~~
-                return functionDeclaration.name == "encode" && functionDeclaration.parameters.count == 1 && functionDeclaration.parameters[0].externalLabel == "to" && functionDeclaration.parameters[0].declaredType == .named("Encoder", [])
+                return functionDeclaration.name == "encode" && functionDeclaration.parameters.count == 1 && functionDeclaration.parameters[0].externalLabel == "to" && functionDeclaration.parameters[0].declaredType.isNamed("Encoder", moduleName: "Swift", generics: [])
             } as? KotlinFunctionDeclaration
             encodeDeclaration?.modifiers.visibility = .public
             encodeDeclaration?.modifiers.isOverride = true
@@ -39,8 +38,7 @@ class KotlinCodableTransformer: KotlinTransformer {
                 guard let functionDeclaration = $0 as? KotlinFunctionDeclaration else {
                     return false
                 }
-                //~~~
-                return functionDeclaration.type == .constructorDeclaration && functionDeclaration.parameters.count == 1 && functionDeclaration.parameters[0].externalLabel == "from" && functionDeclaration.parameters[0].declaredType == .named("Decoder", [])
+                return functionDeclaration.type == .constructorDeclaration && functionDeclaration.parameters.count == 1 && functionDeclaration.parameters[0].externalLabel == "from" && functionDeclaration.parameters[0].declaredType.isNamed("Decoder", moduleName: "Swift", generics: [])
             } as? KotlinFunctionDeclaration
             decodeDeclaration?.modifiers.visibility = .public
         }
@@ -95,7 +93,7 @@ class KotlinCodableTransformer: KotlinTransformer {
         }
 
         let enumDeclaration = KotlinClassDeclaration(name: "CodingKeys", signature: .named("CodingKeys", []), declarationType: .enumDeclaration)
-        enumDeclaration.inherits = [.string, .codingKey]
+        enumDeclaration.inherits = [.string, .named("CodingKey", [])]
         enumDeclaration.modifiers.visibility = .private
         enumDeclaration.extras = .singleNewline
         enumDeclaration.isGenerated = true
@@ -230,5 +228,23 @@ class KotlinCodableTransformer: KotlinTransformer {
             return .any
         }
         return variableDeclaration.propertyType
+    }
+}
+
+extension TypeSignature {
+    fileprivate var isCodingKey: Bool {
+        return isNamed("CodingKey", moduleName: "Swift", generics: [])
+    }
+
+    fileprivate var isCodable: Bool {
+        return isNamed("Codable", moduleName: "Swift", generics: [])
+    }
+
+    fileprivate var isDecodable: Bool {
+        return isNamed("Decodable", moduleName: "Swift", generics: [])
+    }
+
+    fileprivate var isEncodable: Bool {
+        return isNamed("Encodable", moduleName: "Swift", generics: [])
     }
 }

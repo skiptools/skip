@@ -2021,7 +2021,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
 
         // Warnings and fixups
         kstatement.declaredType.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source)
-        if (kstatement.isProperty || kstatement.isGlobal), case .unwrappedOptional(let type) = kstatement.propertyType, type.kotlinIsPrimitive {
+        if (kstatement.isProperty || kstatement.isGlobal), case .unwrappedOptional(let type) = kstatement.propertyType, type.kotlinIsNative(primitive: true) {
             kstatement.messages.append(.kotlinLateinitPrimitive(kstatement, source: translator.syntaxTree.source))
         }
         if statement.isAsync {
@@ -2242,7 +2242,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             }
         }
         if usesStorageProperty {
-            if modifiers.isLazy && propertyType.kotlinIsPrimitive {
+            if modifiers.isLazy && propertyType.kotlinIsNative(primitive: true) {
                 let defaultValue: String
                 if propertyType == .bool {
                     defaultValue = "false"

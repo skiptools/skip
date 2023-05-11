@@ -42,7 +42,7 @@ class KotlinArrayLiteral: KotlinExpression {
         kexpression.elements = expression.elements.map { translator.translateExpression($0) }
         kexpression.inferredType = expression.inferredType
         if case .array(let element) = expression.inferredType {
-            kexpression.isOptionSet = translator.codebaseInfo?.global.protocolSignatures(forNamed: element).contains(where: { $0.isOptionSet }) == true
+            kexpression.isOptionSet = translator.codebaseInfo?.global.protocolSignatures(forNamed: element).contains(where: \.isOptionSet) == true
         }
         return kexpression
     }
@@ -746,6 +746,7 @@ class KotlinIdentifier: KotlinExpression {
     var isOperatorIdentifier = false
     var isInOut = false
     var isFunctionReference = false
+    var isModuleNameFor: TypeSignature = .none
 
     static func translate(expression: Identifier, translator: KotlinTranslator) -> KotlinIdentifier {
         let kexpression = KotlinIdentifier(expression: expression)
@@ -753,6 +754,7 @@ class KotlinIdentifier: KotlinExpression {
         kexpression.isOperatorIdentifier = !Operator.with(symbol: expression.name).isUnknown
         kexpression.mayBeSharedMutableStruct = !kexpression.isOperatorIdentifier && expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
         kexpression.isLocalOrSelfIdentifier = expression.isLocalOrSelfIdentifier
+        kexpression.isModuleNameFor = expression.isModuleNameFor
         if case .function = expression.inferredType {
             kexpression.isFunctionReference = !expression.isLocalOrSelfIdentifier && !expression.isCalledAsFunction && translator.codebaseInfo?.isFunctionName(expression.name, in: expression.owningTypeDeclaration?.signature) == true
         }
@@ -785,6 +787,12 @@ class KotlinIdentifier: KotlinExpression {
             output.append("this")
         } else if name == "Self" {
             output.append("Companion")
+        } else if isModuleNameFor != .none {
+            if isModuleNameFor.kotlinIsNative() {
+                output.append("kotlin") // Kotlin package
+            } else {
+                output.append(KotlinTranslator.packageName(forModule: name))
+            }
         } else {
             if isFunctionReference {
                 // To refer to a function rather than call it, Kotlin uses ::
@@ -1174,9 +1182,20 @@ class KotlinMemberAccess: KotlinExpression {
         if expression is TypeLiteral {
             return nil
         }
-        // Is this a nested class type name?
-        if let memberAccess = expression as? MemberAccess, case .member(_, let nestedType) = type, nestedType.name == memberAccess.member {
-            return nil
+        // Is this a nested or module-qualified class type name?
+        if let memberAccess = expression as? MemberAccess {
+            let typeName: String?
+            switch type {
+            case .member(_, let nestedType):
+                typeName = nestedType.name
+            case .module(_, let unqualifiedType):
+                typeName = unqualifiedType.name
+            default:
+                typeName = type.name
+            }
+            if memberAccess.member == typeName {
+                return nil
+            }
         }
         // Now that we've ruled out a type literal, any other non-Identifier must be represented by a KClass
         guard let identifier = expression as? Identifier else {

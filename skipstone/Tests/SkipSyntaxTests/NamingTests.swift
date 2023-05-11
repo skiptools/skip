@@ -65,47 +65,95 @@ final class NamingTests: XCTestCase {
             """)
     }
 
-    func testModuleQualifiedNames() async throws {
+    func testSwiftModuleQualifiedType() async throws {
         try await check(supportingSwift: """
-        class A {
-        }
-        """, swift: """
-        class B: A {
-        }
-        class C: Swift.A {
-        }
-        """, kotlin: """
-        internal open class B: A() {
-        }
-        internal open class C: skip.lib.A() {
-        }
-        """)
-
-        try await check(supportingSwift: """
-        extension String {
-            static let myValue = ""
-        }
-        extension Int {
+        extension Swift.Int {
             static let myValue = 0
         }
-        class Array<Element> {
-            let count = "abc"
-        }
         """, swift: """
-        func f(a: Swift.Array<Double>) {
-            let b = a.count == .myValue
-        }
-        func g(a: Array<Double>) {
-            let b = a.count == .myValue
+        func f(a: Int, b: Swift.Int) {
+            let b1 = a == .myValue
+            let b2 = b == .myValue
+            let b3 = a == Swift.Int.myValue
         }
         """, kotlin: """
-        internal fun f(a: skip.lib.Array<Double>) {
-            val b = a.count == Int.myValue
-        }
-        internal fun g(a: Array<Double>) {
-            val b = a.count == String.myValue
+        internal fun f(a: Int, b: Int) {
+            val b1 = a == Int.myValue
+            val b2 = b == Int.myValue
+            val b3 = a == kotlin.Int.myValue
         }
         """)
+    }
+
+    func testModuleQualifiedNames() async throws {
+        let moduleOne = try codebaseInfo(moduleName: "ModuleOne", swift: """
+        public class A {
+            public func f() -> Int {
+                return 0
+            }
+        }
+        public func g(i: Swift.Int) -> Int {
+            return 0
+        }
+        """)
+        let moduleTwo = try codebaseInfo(moduleName: "ModuleTwo", swift: """
+        public class A {
+            public func f() -> String {
+                return ""
+            }
+        }
+        public func g(i: Int) -> Swift.String {
+            return ""
+        }
+        """)
+        try await check(dependentModules: [moduleOne, moduleTwo], supportingSwift: """
+        extension Int {
+            var myValue: Int {
+                return 0
+            }
+        }
+        extension String {
+            var myValue: String {
+                return ""
+            }
+        }
+        """, swift: """
+        import ModuleOne
+        import ModuleTwo
+
+        class C: ModuleTwo.A {
+        }
+        /*
+        func f(a: ModuleOne.A) -> Int {
+            return 0
+        }
+        func f(a: ModuleTwo.A) -> String {
+            return ""
+        }
+        func g() {
+            let b1 = ModuleOne.g() == .myValue
+            let b2 = ModuleTwo.g() == .myValue
+
+            let b3 = a.f() == .myValue
+            let c = C()
+            let b4 = c.f() == .myValue
+
+            let b5 = f(ModuleOne.A()) == .myValue
+            let b6 = f(ModuleTwo.A()) == .myValue
+        }
+        */
+        """, kotlin: """
+        """)
+    }
+
+    private func codebaseInfo(moduleName: String, swift: String) throws -> CodebaseInfo {
+        let srcFile = try tmpFile(named: "Source_\(moduleName).swift", contents: swift)
+        let source = Source(file: Source.FilePath(path: srcFile.path), content: swift)
+        let syntaxTree = SyntaxTree(source: source)
+        let codebaseInfo = CodebaseInfo(moduleName: moduleName)
+        codebaseInfo.gather(from: syntaxTree)
+        codebaseInfo.prepareForUse()
+        return codebaseInfo
     }
 }
 

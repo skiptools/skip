@@ -754,6 +754,7 @@ class Identifier: Expression {
     /// Whether this appears to be a local variable or parameter.
     private(set) var isLocalOrSelfIdentifier: Bool
     var isCalledAsFunction = false
+    var isModuleNameFor: TypeSignature = .none
 
     init(name: String, generics: [TypeSignature]? = nil, isLocalOrSelfIdentifier: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.name = name
@@ -778,7 +779,7 @@ class Identifier: Expression {
         return Identifier(name: name, generics: generics, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
-    override func resolveAttributes(in syntaxTree: SyntaxTree, context: ModuleContext?) {
+    override func resolveAttributes(in syntaxTree: SyntaxTree, context: ModuleContext) {
         generics = generics?.map { $0.qualified(in: self, context: context) }
     }
 
@@ -938,7 +939,7 @@ class MatchingCase: Expression, BindingExpression {
         return MatchingCase(pattern: pattern, declaredType: declaredType, target: target, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
-    override func resolveAttributes(in syntaxTree: SyntaxTree, context: ModuleContext?) {
+    override func resolveAttributes(in syntaxTree: SyntaxTree, context: ModuleContext) {
         declaredType = declaredType.qualified(in: self, context: context)
     }
 
@@ -1004,7 +1005,7 @@ class MemberAccess: Expression {
         return MemberAccess(base: base, member: member, generics: generics, useMultlineFormatting: useMultlineFormatting, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
-    override func resolveAttributes(in syntaxTree: SyntaxTree, context: ModuleContext?) {
+    override func resolveAttributes(in syntaxTree: SyntaxTree, context: ModuleContext) {
         baseType = baseType.qualified(in: self, context: context)
         generics = generics?.map { $0.qualified(in: self, context: context) }
     }
@@ -1017,11 +1018,22 @@ class MemberAccess: Expression {
         } else {
             baseType = baseType.or(expecting.asMetaType(true).asOptional(false))
         }
+        // If we don't recognize the base type, perhaps it's a module name. Treat it as a type name and
+        // context.member(_:in:) will figure it out
+        let baseIdentifier = base as? Identifier
+        var baseType = self.baseType
+        if baseType == .none, let baseIdentifier {
+            baseType = .named(baseIdentifier.name, baseIdentifier.generics ?? []).asMetaType(true)
+        }
         // Don't output unavailable messages here if this is part of a function call. There could be other
         // member matches. The function call node will have more type information
         memberType = context.member(member, in: baseType, messagesNode: isCalledAsFunction ? nil : self)
         if let generics {
             memberType = memberType.withGenerics(generics)
+        }
+        // Were we able to resolve the member by treating our unknown base identifier as a module name?
+        if self.baseType == .none, memberType != .none, let baseIdentifier {
+            baseIdentifier.isModuleNameFor = memberType
         }
         memberType = memberType.or(expecting)
         return context
@@ -1148,7 +1160,7 @@ class OptionalBinding: Expression, BindingExpression {
         return OptionalBinding(names: names, declaredType: declaredType, isLet: isLet, value: value, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
-    override func resolveAttributes(in syntaxTree: SyntaxTree, context: ModuleContext?) {
+    override func resolveAttributes(in syntaxTree: SyntaxTree, context: ModuleContext) {
         declaredType = declaredType.qualified(in: self, context: context)
     }
 

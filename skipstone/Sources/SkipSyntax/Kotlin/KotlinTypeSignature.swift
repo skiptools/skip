@@ -51,15 +51,7 @@ extension TypeSignature {
         case .metaType(let baseType):
             return "KClass<\(baseType.kotlin)>"
         case .module(let module, let type):
-            //~~~ Do we need typealiases for e.g. skip.lib.Int = kotlin.Int?
-            var mappedModuleName = module
-            for (key, value) in CodebaseInfo.moduleNameMap {
-                if module == value {
-                    mappedModuleName = key
-                    break
-                }
-            }
-            return "\(KotlinTranslator.packageName(forModule: mappedModuleName)).\(type.kotlin)"
+            return "\(KotlinTranslator.packageName(forModule: module)).\(type.kotlin)"
         case .named(let name, let generics):
             guard !generics.isEmpty && generics.contains(where: { $0 != .none }) else {
                 if name == "Comparable" {
@@ -223,12 +215,12 @@ extension TypeSignature {
     }
 
     /// Whether this type is a Kotlin primitive.
-    var kotlinIsPrimitive: Bool {
+    func kotlinIsNative(primitive: Bool = false) -> Bool {
         switch self {
         case .any:
-            return false
+            return !primitive
         case .anyObject:
-            return false
+            return !primitive
         case .array:
             return false
         case .bool:
@@ -260,19 +252,19 @@ extension TypeSignature {
         case .none:
             return false
         case .optional(let type):
-            return type.kotlinIsPrimitive
+            return type.kotlinIsNative(primitive: primitive)
         case .member:
             return false
-        case .metaType:
-            return false
+        case .metaType(let type):
+            return !primitive && type.kotlinIsNative()
         case .module(_, let type):
-            return type.kotlinIsPrimitive
+            return type.kotlinIsNative(primitive: primitive)
         case .range:
-            return false
+            return !primitive
         case .set:
             return false
         case .string:
-            return false
+            return !primitive
         case .tuple:
             return false
         case .uint:
@@ -286,9 +278,9 @@ extension TypeSignature {
         case .uint64:
             return true
         case .unwrappedOptional(let type):
-            return type.kotlinIsPrimitive
+            return type.kotlinIsNative(primitive: primitive)
         case .void:
-            return false
+            return !primitive
         }
     }
 

@@ -15,16 +15,17 @@ extension XCTestCase {
     ///
     /// - Parameters:
     ///   - expectFailure: if `true`, expect that the match will fail
+    ///   - compiler: the compiler to fork to evaluate the transpiled Kotlin; configured with the `KOTLINC` environment variable as a default
+    ///   - replaceInlineSKIPME: when the kotlin source is set to `// SKIPME`, the generated Kotlin will be replaced in the project's source code file
+    ///   - dependentModules: Simulate additional modules
     ///   - supportingSwift: additional swift to add to the block
     ///   - swift: raw static swift code for verification
     ///   - swiftCode: a Swift block, whose string contents will be used as the source of transpilation and which can return a validation string
-    ///   - compiler: the compiler to fork to evaluate the transpiled Kotlin; configured with the `KOTLINC` environment variable as a default
-    ///   - replaceInlineSKIPME: when the kotlin source is set to `// SKIPME`, the generated Kotlin will be replaced in the project's source code file
     ///   - kotlin: the expected kotlin, or the literal `// SKIPME`
     ///   - packageSupportKotlin: the expected kotlin in the generated package support source file
     ///   - file: the file of the call site, expected to be `#file`
     ///   - line: the line of the call site, expected to be `#line`
-    public func check(expectFailure: Bool = false, compiler: String? = ProcessInfo.processInfo.environment["KOTLINC"], replaceInlineSKIPME: Int? = 1, supportingSwift: String? = nil, swift: StaticString? = nil, swiftCode: (() throws -> String?)? = nil, kotlin: String, fixup fixupKotlinBlock: ((String) -> (String)) = { $0 }, packageSupportKotlin: String? = nil, transformers: [KotlinTransformer] = builtinKotlinTransformers(), file: StaticString = #file, line: UInt = #line) async throws {
+    public func check(expectFailure: Bool = false, compiler: String? = ProcessInfo.processInfo.environment["KOTLINC"], replaceInlineSKIPME: Int? = 1, dependentModules: [CodebaseInfo] = [], supportingSwift: String? = nil, swift: StaticString? = nil, swiftCode: (() throws -> String?)? = nil, kotlin: String, fixup fixupKotlinBlock: ((String) -> (String)) = { $0 }, packageSupportKotlin: String? = nil, transformers: [KotlinTransformer] = builtinKotlinTransformers(), file: StaticString = #file, line: UInt = #line) async throws {
 
         func fixup(code: String) -> String {
             var code = fixupKotlinBlock(code)
@@ -87,6 +88,7 @@ extension XCTestCase {
             srcFiles.append(Source.FilePath(path: supportingFile.path))
         }
         let codebaseInfo = CodebaseInfo()
+        codebaseInfo.dependentModules = dependentModules
         let tp = Transpiler(sourceFiles: srcFiles, codebaseInfo: codebaseInfo, transformers: transformers)
         var transpilations: [Transpilation] = []
         try await tp.transpile { transpilations.append($0) }

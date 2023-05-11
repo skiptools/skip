@@ -537,7 +537,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     }
 
     /// Qualify local type names with any enclosing types.
-    func qualified(in node: SyntaxNode, context: ModuleContext?) -> TypeSignature {
+    func qualified(in node: SyntaxNode, context: ModuleContext) -> TypeSignature {
         switch self {
         case .array(let elementType):
             return .array(elementType.qualified(in: node, context: context))
@@ -552,7 +552,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             let base = baseType.qualified(in: node, context: context)
             if case .named(let name, let generics) = type {
                 let generics = generics.map { $0.qualified(in: node, context: context) }
-                return Self.memberOrModuleType(baseType: base, name: name, genericTypes: generics, context: context)
+                return context.resolve(.named(name, generics), in: base)
             } else {
                 return .member(base, type)
             }
@@ -1045,7 +1045,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                     return .none
                 }
             }
-            return memberOrModuleType(baseType: baseType, name: name, genericTypes: genericTypes, context: nil)
+            return ModuleContext().resolve(.named(name, genericTypes), in: baseType)
         case .metatypeType:
             guard let metaType = syntax.as(MetatypeTypeSyntax.self) else {
                 return .none
@@ -1190,20 +1190,6 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return types[0]
         }
         return .tuple(labels, types)
-    }
-
-    private static func memberOrModuleType(baseType: TypeSignature, name: String, genericTypes: [TypeSignature], context: ModuleContext?) -> TypeSignature {
-        // Swift.xxx builtin type?
-        if case .named("Swift", []) = baseType {
-            let builtinType = self.for(name: name, genericTypes: genericTypes, allowNamed: false)
-            if builtinType != .none {
-                return builtinType
-            }
-        }
-        if let moduleType = context?.moduleType(for: .named(name, genericTypes), in: baseType) {
-            return moduleType
-        }
-        return .member(baseType, .named(name, genericTypes))
     }
 
     var description: String {
@@ -1376,31 +1362,33 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
 }
 
 extension TypeSignature {
-    //~~~
-    static let caseIterable: TypeSignature = .named("CaseIterable", [])
-    static let codable: TypeSignature = .named("Codable", [])
-    static let codingKey: TypeSignature = .named("CodingKey", [])
-    static let comparable: TypeSignature = .named("Comparable", [])
-    static let customStringConvertible: TypeSignature = .named("CustomStringConvertible", [])
-    static let decodable: TypeSignature = .named("Decodable", [])
-    static let encodable: TypeSignature = .named("Encodable", [])
-    var isError: Bool {
-        return isNamed("Error", moduleName: "Swift", generics: [])
+    var isComparable: Bool {
+        return isNamed("Comparable", moduleName: "Swift", generics: [])
     }
-    static let equatable: TypeSignature = .named("Equatable", [])
-    static let hashable: TypeSignature = .named("Hashable", [])
 
-    var isRawRepresentable: Bool {
-        // May have generics
-        if case .named("RawRepresentable", _) = self {
-            return true
-        }
-        return false
+    var isCustomStringConvertible: Bool {
+        return isNamed("CustomStringConvertible", moduleName: "Swift", generics: [])
+    }
+
+    var isEquatable: Bool {
+        return isNamed("Equatable", moduleName: "Swift", generics: [])
+    }
+
+    var isHashable: Bool {
+        return isNamed("Hashable", moduleName: "Swift", generics: [])
     }
 
     var isOptionSet: Bool {
         // May have generics
         if case .named("OptionSet", _) = self {
+            return true
+        }
+        return false
+    }
+
+    var isRawRepresentable: Bool {
+        // May have generics
+        if case .named("RawRepresentable", _) = self {
             return true
         }
         return false

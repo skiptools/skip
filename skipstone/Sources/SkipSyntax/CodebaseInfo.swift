@@ -99,7 +99,7 @@ public class CodebaseInfo: Codable {
         guard !candidates.isEmpty else {
             return []
         }
-        return match(candidates: candidates, path: path.dropLast(), moduleName: nil, qualifiedMatch: qualifiedMatch)
+        return match(candidates: candidates, path: path.dropLast(), moduleName: moduleName, qualifiedMatch: qualifiedMatch)
     }
 
     private func match(candidates: [CodebaseInfoItem], path: [String], moduleName: String?, qualifiedMatch: Bool) -> [CodebaseInfoItem] {
@@ -113,7 +113,7 @@ public class CodebaseInfo: Codable {
             matches = matches.filter { ($0 is TypeInfo || $0 is TypealiasInfo) && $0.declaringType?.name == baseName }
             // Only attempt to match as a module-qualified name if no unqualified matches
             if matches.isEmpty && moduleName == nil {
-                matches += match(candidates: candidates, path: Array(path.dropFirst()), moduleName: path[0], qualifiedMatch: qualifiedMatch)
+                matches = match(candidates: candidates, path: Array(path.dropFirst()), moduleName: path[0], qualifiedMatch: qualifiedMatch)
             }
         } else if qualifiedMatch {
             matches = matches.filter { !($0 is TypeInfo || $0 is TypealiasInfo) || $0.declaringType == nil }

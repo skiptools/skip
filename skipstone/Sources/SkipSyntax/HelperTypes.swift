@@ -166,7 +166,7 @@ struct Parameter<V>: Hashable {
         return PrettyPrintTree(root: externalLabel ?? "_", children: children)
     }
 
-    func qualifiedType(in node: SyntaxNode, context: ModuleContext?) -> Parameter<V> {
+    func qualifiedType(in node: SyntaxNode, context: ModuleContext) -> Parameter<V> {
         var parameter = self
         parameter.declaredType = declaredType.qualified(in: node, context: context)
         return parameter
@@ -574,7 +574,7 @@ struct Generics: Equatable, Codable {
         return result
     }
 
-    func qualified(in node: SyntaxNode, context: ModuleContext?) -> Generics {
+    func qualified(in node: SyntaxNode, context: ModuleContext) -> Generics {
         var generics = self
         generics.entries = generics.entries.map { $0.qualified(in: node, context: context) }
         return generics
@@ -627,7 +627,7 @@ struct Generic: Equatable, Codable {
         }
     }
 
-    func qualified(in node: SyntaxNode, context: ModuleContext?) -> Generic {
+    func qualified(in node: SyntaxNode, context: ModuleContext) -> Generic {
         var generic = self
         generic.whereEqual = generic.whereEqual.map { $0.qualified(in: node, context: context) }
         generic.inherits = generic.inherits.map { $0.qualified(in: node, context: context) }

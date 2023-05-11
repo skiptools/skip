@@ -26,7 +26,7 @@ class KotlinRawRepresentableTransformer: KotlinTransformer {
 
         if rawValueType != .none {
             let inherit: TypeSignature = .named("RawRepresentable", [rawValueType])
-            if let rawRepresentableIndex = classDeclaration.inherits.firstIndex(where: { $0.isRawRepresentable }) {
+            if let rawRepresentableIndex = classDeclaration.inherits.firstIndex(where: \.isRawRepresentable) {
                 classDeclaration.inherits[rawRepresentableIndex] = inherit
             } else if classDeclaration.enumInheritedRawValueType != .none {
                 classDeclaration.inherits.append(inherit)

@@ -714,7 +714,7 @@ class EnumCaseDeclaration: Statement {
         }
     }
 
-    override func resolveAttributes(in syntaxTree: SyntaxTree, context: ModuleContext?) {
+    override func resolveAttributes(in syntaxTree: SyntaxTree, context: ModuleContext) {
         // Enum case declarations inherit the visibility of the enum
         if modifiers.visibility == .default {
             if let owningTypeDeclaration = parent as? TypeDeclaration {
@@ -875,7 +875,7 @@ class FunctionDeclaration: Statement {
         return statement
     }
 
-    override func resolveAttributes(in syntaxTree: SyntaxTree, context: ModuleContext?) {
+    override func resolveAttributes(in syntaxTree: SyntaxTree, context: ModuleContext) {
         if type == .initDeclaration, let owningTypeDeclaration {
             returnType = owningTypeDeclaration.signature.asOptional(isOptionalInit)
         } else {
@@ -1019,7 +1019,7 @@ class SubscriptDeclaration: Statement {
         return [statement]
     }
 
-    override func resolveAttributes(in syntaxTree: SyntaxTree, context: ModuleContext?) {
+    override func resolveAttributes(in syntaxTree: SyntaxTree, context: ModuleContext) {
         elementType = elementType.qualified(in: self, context: context)
         parameters = parameters.map { $0.qualifiedType(in: self, context: context) }
         // Functions in protocols or extensions inherit the visibility of the protocol or extension
@@ -1113,7 +1113,7 @@ class TypealiasDeclaration: Statement {
         return [statement]
     }
 
-    override func resolveAttributes(in syntaxTree: SyntaxTree, context: ModuleContext?) {
+    override func resolveAttributes(in syntaxTree: SyntaxTree, context: ModuleContext) {
         if _signature == nil {
             _signature = qualifyDeclaredType(signature)
         }
@@ -1243,7 +1243,7 @@ class TypeDeclaration: Statement {
         return statement
     }
 
-    override func resolveAttributes(in syntaxTree: SyntaxTree, context: ModuleContext?) {
+    override func resolveAttributes(in syntaxTree: SyntaxTree, context: ModuleContext) {
         if parent?.owningFunctionDeclaration != nil {
             messages.append(.localTypesNotSupported(self, source: syntaxTree.source))
         }
@@ -1373,7 +1373,7 @@ class VariableDeclaration: Statement {
         return declaration
     }
 
-    override func resolveAttributes(in syntaxTree: SyntaxTree, context: ModuleContext?) {
+    override func resolveAttributes(in syntaxTree: SyntaxTree, context: ModuleContext) {
         declaredType = declaredType.qualified(in: self, context: context)
         // Variables in protocols or extensions inherit the visibility of the protocol or extension
         if modifiers.visibility == .default {

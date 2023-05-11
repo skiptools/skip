@@ -44,11 +44,11 @@ class KotlinEnumTransformer: KotlinTransformer {
     }
 
     private func synthesizeCaseIterable(for classDeclaration: KotlinClassDeclaration, codebaseInfo: CodebaseInfo.Context) {
-        guard codebaseInfo.global.protocolSignatures(forNamed: classDeclaration.signature).contains(.caseIterable) else {
+        guard codebaseInfo.global.protocolSignatures(forNamed: classDeclaration.signature).contains(where: { $0.isNamed("CaseIterable", moduleName: "Swift", generics: []) }) else {
             return
         }
         let typeInfos = codebaseInfo.typeInfos(forNamed: classDeclaration.signature)
-        guard !typeInfos.contains(where: { $0.members.contains(where: { $0.isAllCasesVar }) }) else {
+        guard !typeInfos.contains(where: { $0.members.contains(where: \.isAllCasesVar) }) else {
             return
         }
 

@@ -38,11 +38,11 @@ class KotlinCommonProtocolsTransformer: KotlinTransformer {
     private func fixupInherits(_ inherits: [TypeSignature], for type: TypeSignature) -> [TypeSignature] {
         return inherits.compactMap {
             // Filter types that are aliased to Kotlin Any
-            guard $0 != .customStringConvertible && $0 != .equatable && $0 != .hashable else {
+            guard !$0.isCustomStringConvertible && !$0.isEquatable && !$0.isHashable else {
                 return nil
             }
             // Map Comparable to Kotlin's Comparable<T>
-            if $0 == .comparable {
+            if $0.isComparable {
                 return .kotlinComparable(for: type)
             } else {
                 return $0
@@ -74,7 +74,7 @@ class KotlinCommonProtocolsTransformer: KotlinTransformer {
         }) else {
             return
         }
-        guard codebaseInfo.global.protocolSignatures(forNamed: classDeclaration.signature).contains(.customStringConvertible) else {
+        guard codebaseInfo.global.protocolSignatures(forNamed: classDeclaration.signature).contains(where: { !$0.isCustomStringConvertible }) else {
             return
         }
 
@@ -102,21 +102,21 @@ class KotlinCommonProtocolsTransformer: KotlinTransformer {
 
         let protocols = codebaseInfo.global.protocolSignatures(forNamed: classDeclaration.signature)
         let isEnumWithoutAssociatedValues = isEnum && !classDeclaration.members.contains { ($0 as? KotlinEnumCaseDeclaration)?.associatedValues.isEmpty == false }
-        if isEnumWithoutAssociatedValues || protocols.contains(.hashable) {
+        if isEnumWithoutAssociatedValues || protocols.contains(where: \.isHashable) {
             ensureHasEquals(for: classDeclaration, codebaseInfo: codebaseInfo)
             ensureHasHash(for: classDeclaration, codebaseInfo: codebaseInfo)
-        } else if isEnumWithoutAssociatedValues || protocols.contains(.equatable) {
+        } else if isEnumWithoutAssociatedValues || protocols.contains(where: \.isEquatable) {
             ensureHasEquals(for: classDeclaration, codebaseInfo: codebaseInfo)
         }
 
-        if isEnum && !isEnumWithLessThan && protocols.contains(.comparable) {
+        if isEnum && !isEnumWithLessThan && protocols.contains(where: \.isComparable) {
             classDeclaration.messages.append(.kotlinEnumSealedClassComparableConformance(classDeclaration, source: codebaseInfo.source))
         }
     }
 
     private func ensureHasEquals(for classDeclaration: KotlinClassDeclaration, codebaseInfo: CodebaseInfo.Context) {
         let typeInfos = codebaseInfo.typeInfos(forNamed: classDeclaration.signature)
-        guard !typeInfos.contains(where: { $0.members.contains { $0.isEqualsFunction } }) else {
+        guard !typeInfos.contains(where: { $0.members.contains(where: \.isEqualsFunction) }) else {
             return
         }
         if classDeclaration.declarationType == .structDeclaration {
@@ -142,7 +142,7 @@ class KotlinCommonProtocolsTransformer: KotlinTransformer {
 
     private func ensureHasHash(for classDeclaration: KotlinClassDeclaration, codebaseInfo: CodebaseInfo.Context) {
         let typeInfos = codebaseInfo.typeInfos(forNamed: classDeclaration.signature)
-        guard !typeInfos.contains(where: { $0.members.contains { $0.isHashFunction } }) else {
+        guard !typeInfos.contains(where: { $0.members.contains(where: \.isHashFunction) }) else {
             return
         }
         if classDeclaration.declarationType == .structDeclaration {
