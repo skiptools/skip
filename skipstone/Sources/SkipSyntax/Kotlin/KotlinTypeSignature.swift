@@ -50,6 +50,16 @@ extension TypeSignature {
             return Self.innerExtensions[typeName] ?? typeName
         case .metaType(let baseType):
             return "KClass<\(baseType.kotlin)>"
+        case .module(let module, let type):
+            //~~~ Do we need typealiases for e.g. skip.lib.Int = kotlin.Int?
+            var mappedModuleName = module
+            for (key, value) in CodebaseInfo.moduleNameMap {
+                if module == value {
+                    mappedModuleName = key
+                    break
+                }
+            }
+            return "\(KotlinTranslator.packageName(forModule: mappedModuleName)).\(type.kotlin)"
         case .named(let name, let generics):
             guard !generics.isEmpty && generics.contains(where: { $0 != .none }) else {
                 if name == "Comparable" {
@@ -183,6 +193,8 @@ extension TypeSignature {
             return codebaseInfo.mayBeMutableStruct(type: self)
         case .metaType:
             return false
+        case .module(_, let type):
+            return type.kotlinMayBeSharedMutableStruct(codebaseInfo: codebaseInfo)
         case .range:
             return false
         case .set:
@@ -253,6 +265,8 @@ extension TypeSignature {
             return false
         case .metaType:
             return false
+        case .module(_, let type):
+            return type.kotlinIsPrimitive
         case .range:
             return false
         case .set:
@@ -280,10 +294,12 @@ extension TypeSignature {
 
     /// Whether this type represents an enum modeled with sealed classes.
     func kotlinIsSealedClassesEnum(codebaseInfo: CodebaseInfo.Context?) -> Bool {
-        guard case .named = asOptional(false) else {
+        switch asOptional(false) {
+        case .named, .member, .module:
+            return codebaseInfo?.isSealedClassesEnum(type: self) == true
+        default:
             return false
         }
-        return codebaseInfo?.isSealedClassesEnum(type: self) == true
     }
 
     /// Whether this type uses `KClass`, which requires additional imports.

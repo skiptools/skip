@@ -14,8 +14,8 @@ class KotlinOptionSetTransformer: KotlinTransformer {
         // See if this is an OptionSet. We may already have resolved the inherited RawRepresentable generic type
         var valueType: TypeSignature? = nil
         guard let inheritsIndex = classDeclaration.inherits.firstIndex(where: {
-            if case .named(let name, let generics) = $0, name == "OptionSet" {
-                valueType = generics.first
+            if $0.isOptionSet {
+                valueType = $0.generics.first
                 return true
             } else {
                 return false

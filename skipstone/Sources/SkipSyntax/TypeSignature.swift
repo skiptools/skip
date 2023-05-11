@@ -21,6 +21,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     case int64
     case member(TypeSignature, TypeSignature) // A.B
     case metaType(TypeSignature) // A.Type
+    case module(String, TypeSignature) // Module.Type
     case named(String, [TypeSignature]) // A<B, C>
     case none
     case optional(TypeSignature)
@@ -61,6 +62,10 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return elementType
         case .dictionary(let keyType, let valueType):
             return .tuple(["key", "value"], [keyType, valueType])
+        case .member(_, let type):
+            return type.elementType
+        case .module(_, let type):
+            return type.elementType
         case .optional(let type):
             return type.elementType
         case .range(let elementType):
@@ -83,6 +88,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return parameters
         case .member(_, let type):
             return type.parameters
+        case .module(_, let type):
+            return type.parameters
         case .optional(let type):
             return type.parameters
         case .unwrappedOptional(let type):
@@ -98,6 +105,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .function(_, let returnType):
             return returnType
         case .member(_, let type):
+            return type.returnType
+        case .module(_, let type):
             return type.returnType
         case .optional(let type):
             return type.returnType
@@ -142,6 +151,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return type.generics
         case .metaType(let type):
             return type.generics
+        case .module(_, let type):
+            return type.generics
         case .named(_, let generics):
             return generics
         case .optional(let type):
@@ -180,6 +191,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return .member(base, type.withGenerics(generics))
         case .metaType(let type):
             return .metaType(type.withGenerics(generics))
+        case .module(let module, let type):
+            return .module(module, type.withGenerics(generics))
         case .named(let name, _):
             return .named(name, generics)
         case .optional(let type):
@@ -223,6 +236,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return .member(base.constrainedTypeWithGenerics(generics), type.constrainedTypeWithGenerics(generics))
         case .metaType(let base):
             return .metaType(base.constrainedTypeWithGenerics(generics))
+        case .module(let module, let type):
+            return .module(module, type.constrainedTypeWithGenerics(generics))
         case .named(let name, let genericTypes):
             return .named(name, genericTypes.map { $0.constrainedTypeWithGenerics(generics) })
         case .optional(let type):
@@ -292,6 +307,14 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .metaType(let base):
             if case .metaType(let base2) = to {
                 base.addGenericMappings(to: base2, into: &generics)
+            }
+        case .module(let module, let type):
+            if case .module(let module2, let type2) = to {
+                if module == module2 {
+                    type.addGenericMappings(to: type2, into: &generics)
+                }
+            } else {
+                type.addGenericMappings(to: to, into: &generics)
             }
         case .named(let name, let genericTypes):
             if case .named(let name2, let genericTypes2) = to, name == name2, genericTypes.count == genericTypes2.count {
@@ -427,6 +450,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             type.visit(visitor)
         case .metaType(let type):
             type.visit(visitor)
+        case .module(_, let type):
+            type.visit(visitor)
         case .named(_, let generics):
             generics.forEach { $0.visit(visitor) }
         case .optional(let type):
@@ -492,6 +517,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return .member(base.mappingTypes(with: map), type.mappingTypes(with: map))
         case .metaType(let type):
             return .metaType(type.mappingTypes(with: map))
+        case .module(let module, let type):
+            return .module(module, type.mappingTypes(with: map))
         case .named(let name, let generics):
             return .named(name, generics.map { $0.mappingTypes(with: map) })
         case .optional(let type):
@@ -510,40 +537,43 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     }
 
     /// Qualify local type names with any enclosing types.
-    func qualified(in node: SyntaxNode) -> TypeSignature {
+    func qualified(in node: SyntaxNode, context: ModuleContext?) -> TypeSignature {
         switch self {
         case .array(let elementType):
-            return .array(elementType.qualified(in: node))
+            return .array(elementType.qualified(in: node, context: context))
         case .composition(let types):
-            return .composition(types.map { $0.qualified(in: node) })
+            return .composition(types.map { $0.qualified(in: node, context: context) })
         case .dictionary(let keyType, let valueType):
-            return .dictionary(keyType.qualified(in: node), valueType.qualified(in: node))
+            return .dictionary(keyType.qualified(in: node, context: context), valueType.qualified(in: node, context: context))
         case .function(let parameters, let returnType):
-            let qualifiedParameters = parameters.map { Parameter(label: $0.label, type: $0.type.qualified(in: node), isInOut: $0.isInOut, isVariadic: $0.isVariadic, hasDefaultValue: $0.hasDefaultValue) }
-            return .function(qualifiedParameters, returnType.qualified(in: node))
+            let qualifiedParameters = parameters.map { Parameter(label: $0.label, type: $0.type.qualified(in: node, context: context), isInOut: $0.isInOut, isVariadic: $0.isVariadic, hasDefaultValue: $0.hasDefaultValue) }
+            return .function(qualifiedParameters, returnType.qualified(in: node, context: context))
         case .member(let baseType, let type):
-            let base = baseType.qualified(in: node)
+            let base = baseType.qualified(in: node, context: context)
             if case .named(let name, let generics) = type {
-                let generics = generics.map { $0.qualified(in: node) }
-                return Self.memberOrSwiftType(baseType: base, name: name, genericTypes: generics)
+                let generics = generics.map { $0.qualified(in: node, context: context) }
+                return Self.memberOrModuleType(baseType: base, name: name, genericTypes: generics, context: context)
             } else {
                 return .member(base, type)
             }
         case .metaType(let type):
-            return .metaType(type.qualified(in: node))
+            return .metaType(type.qualified(in: node, context: context))
+        case .module:
+            // Already fully qualified
+            return self
         case .named(let name, let generics):
-            let generics = generics.map { $0.qualified(in: node) }
+            let generics = generics.map { $0.qualified(in: node, context: context) }
             return node.qualifyReferencedNamedType(name: name, generics: generics)
         case .optional(let type):
-            return .optional(type.qualified(in: node))
+            return .optional(type.qualified(in: node, context: context))
         case .range(let elementType):
-            return .range(elementType.qualified(in: node))
+            return .range(elementType.qualified(in: node, context: context))
         case .set(let elementType):
-            return .set(elementType.qualified(in: node))
+            return .set(elementType.qualified(in: node, context: context))
         case .tuple(let labels, let types):
-            return .tuple(labels, types.map { $0.qualified(in: node) })
+            return .tuple(labels, types.map { $0.qualified(in: node, context: context) })
         case .unwrappedOptional(let type):
-            return .unwrappedOptional(type.qualified(in: node))
+            return .unwrappedOptional(type.qualified(in: node, context: context))
         default:
             return self
         }
@@ -551,6 +581,13 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
 
     /// Attempt to replace `.none` cases in this type signature with information from the given signature.
     func or(_ typeSignature: TypeSignature, replaceAny: Bool = false) -> TypeSignature {
+        var typeSignature = typeSignature
+        var typeModule: String? = nil
+        if case .module(let module, let type) = typeSignature {
+            typeSignature = type
+            typeModule = module
+        }
+
         switch self {
         case .any:
             if replaceAny && typeSignature.isFullySpecified {
@@ -587,6 +624,10 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .metaType(let type):
             if case .metaType(let type2) = typeSignature {
                 return .metaType(type.or(type2, replaceAny: replaceAny))
+            }
+        case .module(let module, let type):
+            if module == typeModule || typeModule == nil {
+                return .module(module, type.or(typeSignature, replaceAny: replaceAny))
             }
         case .none:
             return typeSignature
@@ -632,6 +673,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return true
         case .float:
             return true
+        case .module(_, let type):
+            return type.isFloatingPoint
         default:
             return false
         }
@@ -664,6 +707,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return true
         case .uint64:
             return true
+        case .module(_, let type):
+            return type.isNumeric
         default:
             return false
         }
@@ -678,6 +723,26 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return true
         case .string:
             return true
+        case .module(_, let type):
+            return type.isStringy
+        default:
+            return false
+        }
+    }
+
+    /// Whether this is a named type with the given name, optionally matching a module and generics.
+    func isNamed(_ name: String, moduleName: String? = nil, generics: [TypeSignature]? = nil) -> Bool {
+        switch asOptional(false) {
+        case .module(let module2, let type):
+            guard type.isNamed(name, generics: generics) else {
+                return false
+            }
+            return moduleName == nil || moduleName == module2
+        case .named(let name2, let generics2):
+            guard name == name2 else {
+                return false
+            }
+            return generics == nil || generics == generics2
         default:
             return false
         }
@@ -697,9 +762,17 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         }
         var target = target
         var targetIsOptional = false
+        var targetModule: String? = nil
         if case .optional(let type) = target {
             target = type
             targetIsOptional = true
+            if self == target {
+                return 2.0
+            }
+        }
+        if case .module(let module, let type) = target {
+            target = type
+            targetModule = module
             if self == target {
                 return 2.0
             }
@@ -751,40 +824,22 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             }
         case .member, .named:
             // TODO: Match on generics
-            let rawType: TypeSignature
-            if let typeInfo = codebaseInfo.primaryTypeInfo(forNamed: self) {
-                rawType = typeInfo.signature.withGenerics([])
-            } else {
-                rawType = withGenerics([])
-            }
-            let rawTarget: TypeSignature
-            if let typeInfo = codebaseInfo.primaryTypeInfo(forNamed: target) {
-                rawTarget = typeInfo.signature.withGenerics([])
-            } else {
-                rawTarget = target.withGenerics([])
-            }
             // Consider a match on all except generics a very close match
-            if rawType == rawTarget {
+            if withGenerics([]) == target.withGenerics([]) {
                 return 1.95
             }
-
-            // Note that below we use 'self' rather than rawType when querying CodebaseInfo in case 'self' has a module qualifier.
-            // We use rawTarget, however, because our algorithm ends up matching only on signatures without modules. This means we
-            // have the potential to get confused when dealing with candidats that have the same signature but different modules
-
-            // Take away a tenth of a point for each level down the inheritance chain, so that less derived matches score lower.
-            // This will allow another function with a more specific parameter type to score higher
-            let inherits = codebaseInfo.global.inheritanceChainSignatures(forNamed: self)
-            if inherits.count > 1 {
-                for i in 1..<inherits.count {
-                    if inherits[i].withGenerics([]) == rawTarget {
-                        return 2.0 - (Double(i) * 0.1)
-                    }
-                }
+            if let score = inheritanceCompatibilityScore(target: target, codebaseInfo: codebaseInfo) {
+                return score
             }
-            let protocols = codebaseInfo.global.protocolSignatures(forNamed: self).map { $0.withGenerics([]) }
-            if protocols.contains(rawTarget) {
-                return 1.5
+        case .module(let module, let type):
+            if type == target && module == targetModule {
+                return 2.0
+            }
+            if targetModule == nil {
+                return type.compatibilityScore(target: target, codebaseInfo: codebaseInfo)
+            }
+            if let score = inheritanceCompatibilityScore(target: target, codebaseInfo: codebaseInfo) {
+                return score
             }
         case .none:
             return 0.0
@@ -844,6 +899,26 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         default:
             return nil
         }
+    }
+
+    private func inheritanceCompatibilityScore(target: TypeSignature, codebaseInfo: CodebaseInfo.Context) -> Double? {
+        // TODO: Match on generics
+        let target = target.withGenerics([])
+        // Take away a tenth of a point for each level down the inheritance chain, so that less derived matches score lower.
+        // This will allow another function with a more specific parameter type to score higher
+        let inherits = codebaseInfo.global.inheritanceChainSignatures(forNamed: self)
+        if inherits.count > 1 {
+            for i in 1..<inherits.count {
+                if inherits[i].withGenerics([]) == target {
+                    return 2.0 - (Double(i) * 0.1)
+                }
+            }
+        }
+        let protocols = codebaseInfo.global.protocolSignatures(forNamed: self).map { $0.withGenerics([]) }
+        if protocols.contains(target) {
+            return 1.5
+        }
+        return nil
     }
 
     /// Whether this type signature does not have any `.none` values.
@@ -970,7 +1045,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                     return .none
                 }
             }
-            return memberOrSwiftType(baseType: baseType, name: name, genericTypes: genericTypes)
+            return memberOrModuleType(baseType: baseType, name: name, genericTypes: genericTypes, context: nil)
         case .metatypeType:
             guard let metaType = syntax.as(MetatypeTypeSyntax.self) else {
                 return .none
@@ -1033,53 +1108,60 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     }
 
     static func `for`(name: String, genericTypes: [TypeSignature], allowNamed: Bool = true) -> TypeSignature {
+        func swiftNamed(_ name: String, _ genericTypes: [TypeSignature]) -> TypeSignature {
+            if name.hasPrefix("Swift.") {
+                return .module("Swift", .named(String(name.dropFirst("Swift.".count)), genericTypes))
+            } else {
+                return .named(name, genericTypes)
+            }
+        }
         switch name {
         case "Any", "Swift.Any":
-            return genericTypes.isEmpty ? .any : allowNamed ? .named(name, genericTypes) : .none
+            return genericTypes.isEmpty ? .any : allowNamed ? swiftNamed(name, genericTypes) : .none
         case "AnyObject", "Swift.AnyObject":
-            return genericTypes.isEmpty ? .anyObject : allowNamed ? .named(name, genericTypes) : .none
+            return genericTypes.isEmpty ? .anyObject : allowNamed ? swiftNamed(name, genericTypes) : .none
         case "Any.Type", "Swift.Any.Type":
             return .metaType(.any)
         case "Array", "Swift.Array":
-            return genericTypes.isEmpty ? .array(.none) : allowNamed ? genericTypes.count == 1 ? .array(genericTypes[0]) : .named(name, genericTypes) : .none
+            return genericTypes.isEmpty ? .array(.none) : genericTypes.count == 1 ? .array(genericTypes[0]) : allowNamed ? swiftNamed(name, genericTypes) : .none
         case "Bool", "Swift.Bool":
-            return genericTypes.isEmpty ? .bool : allowNamed ? .named(name, genericTypes) : .none
+            return genericTypes.isEmpty ? .bool : allowNamed ? swiftNamed(name, genericTypes) : .none
         case "Character", "Swift.Character":
-            return genericTypes.isEmpty ? .character : allowNamed ? .named(name, genericTypes) : .none
+            return genericTypes.isEmpty ? .character : allowNamed ? swiftNamed(name, genericTypes) : .none
         case "Dictionary", "Swift.Dictionary":
-            return genericTypes.isEmpty ? .dictionary(.none, .none) : genericTypes.count == 2 ? .dictionary(genericTypes[0], genericTypes[1]) : allowNamed ? .named(name, genericTypes) : .none
+            return genericTypes.isEmpty ? .dictionary(.none, .none) : genericTypes.count == 2 ? .dictionary(genericTypes[0], genericTypes[1]) : allowNamed ? swiftNamed(name, genericTypes) : .none
         case "Double", "Swift.Double":
-            return genericTypes.isEmpty ? .double : allowNamed ? .named(name, genericTypes) : .none
+            return genericTypes.isEmpty ? .double : allowNamed ? swiftNamed(name, genericTypes) : .none
         case "Float", "Swift.Float":
-            return genericTypes.isEmpty ? .float : allowNamed ? .named(name, genericTypes) : .none
+            return genericTypes.isEmpty ? .float : allowNamed ? swiftNamed(name, genericTypes) : .none
         case "Int", "Swift.Int":
-            return genericTypes.isEmpty ? .int : allowNamed ? .named(name, genericTypes) : .none
+            return genericTypes.isEmpty ? .int : allowNamed ? swiftNamed(name, genericTypes) : .none
         case "Int8", "Swift.Int8":
-            return genericTypes.isEmpty ? .int8 : allowNamed ? .named(name, genericTypes) : .none
+            return genericTypes.isEmpty ? .int8 : allowNamed ? swiftNamed(name, genericTypes) : .none
         case "Int16", "Swift.Int16":
-            return genericTypes.isEmpty ? .int16 : allowNamed ? .named(name, genericTypes) : .none
+            return genericTypes.isEmpty ? .int16 : allowNamed ? swiftNamed(name, genericTypes) : .none
         case "Int32", "Swift.Int32":
-            return genericTypes.isEmpty ? .int32 : allowNamed ? .named(name, genericTypes) : .none
+            return genericTypes.isEmpty ? .int32 : allowNamed ? swiftNamed(name, genericTypes) : .none
         case "Int64", "Swift.Int64":
-            return genericTypes.isEmpty ? .int64 : allowNamed ? .named(name, genericTypes) : .none
+            return genericTypes.isEmpty ? .int64 : allowNamed ? swiftNamed(name, genericTypes) : .none
         case "Range", "Swift.Range":
-            return genericTypes.isEmpty ? .range(.none) : genericTypes.count == 1 ? .range(genericTypes[0]) : allowNamed ? .named(name, genericTypes) : .none
+            return genericTypes.isEmpty ? .range(.none) : genericTypes.count == 1 ? .range(genericTypes[0]) : allowNamed ? swiftNamed(name, genericTypes) : .none
         case "Set", "Swift.Set":
-            return genericTypes.isEmpty ? .set(.none) : genericTypes.count == 1 ? .set(genericTypes[0]) : allowNamed ? .named(name, genericTypes) : .none
+            return genericTypes.isEmpty ? .set(.none) : genericTypes.count == 1 ? .set(genericTypes[0]) : allowNamed ? swiftNamed(name, genericTypes) : .none
         case "String", "Swift.String":
-            return genericTypes.isEmpty ? .string : allowNamed ? .named(name, genericTypes) : .none
+            return genericTypes.isEmpty ? .string : allowNamed ? swiftNamed(name, genericTypes) : .none
         case "UInt", "Swift.UInt":
-            return genericTypes.isEmpty ? .uint : allowNamed ? .named(name, genericTypes) : .none
+            return genericTypes.isEmpty ? .uint : allowNamed ? swiftNamed(name, genericTypes) : .none
         case "UInt8", "Swift.UInt8":
-            return genericTypes.isEmpty ? .uint8 : allowNamed ? .named(name, genericTypes) : .none
+            return genericTypes.isEmpty ? .uint8 : allowNamed ? swiftNamed(name, genericTypes) : .none
         case "UInt16", "Swift.UInt16":
-            return genericTypes.isEmpty ? .uint16 : allowNamed ? .named(name, genericTypes) : .none
+            return genericTypes.isEmpty ? .uint16 : allowNamed ? swiftNamed(name, genericTypes) : .none
         case "UInt32", "Swift.UInt32":
-            return genericTypes.isEmpty ? .uint32 : allowNamed ? .named(name, genericTypes) : .none
+            return genericTypes.isEmpty ? .uint32 : allowNamed ? swiftNamed(name, genericTypes) : .none
         case "UInt64", "Swift.UInt64":
-            return genericTypes.isEmpty ? .uint64 : allowNamed ? .named(name, genericTypes) : .none
+            return genericTypes.isEmpty ? .uint64 : allowNamed ? swiftNamed(name, genericTypes) : .none
         case "Void", "Swift.Void":
-            return genericTypes.isEmpty ? .void : allowNamed ? .named(name, genericTypes) : .none
+            return genericTypes.isEmpty ? .void : allowNamed ? swiftNamed(name, genericTypes) : .none
         default:
             if !allowNamed {
                 return .none
@@ -1110,13 +1192,16 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         return .tuple(labels, types)
     }
 
-    private static func memberOrSwiftType(baseType: TypeSignature, name: String, genericTypes: [TypeSignature]) -> TypeSignature {
+    private static func memberOrModuleType(baseType: TypeSignature, name: String, genericTypes: [TypeSignature], context: ModuleContext?) -> TypeSignature {
         // Swift.xxx builtin type?
         if case .named("Swift", []) = baseType {
             let builtinType = self.for(name: name, genericTypes: genericTypes, allowNamed: false)
             if builtinType != .none {
                 return builtinType
             }
+        }
+        if let moduleType = context?.moduleType(for: .named(name, genericTypes), in: baseType) {
+            return moduleType
         }
         return .member(baseType, .named(name, genericTypes))
     }
@@ -1168,6 +1253,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             default:
                 return "\(baseType[keyPath: keyPath]).Type"
             }
+        case .module(let module, let type):
+            return "\(module).\(type[keyPath: keyPath])"
         case .named(let name, let generics):
             guard !generics.isEmpty else {
                 return name
@@ -1297,6 +1384,9 @@ extension TypeSignature {
     static let customStringConvertible: TypeSignature = .named("CustomStringConvertible", [])
     static let decodable: TypeSignature = .named("Decodable", [])
     static let encodable: TypeSignature = .named("Encodable", [])
+    var isError: Bool {
+        return isNamed("Error", moduleName: "Swift", generics: [])
+    }
     static let equatable: TypeSignature = .named("Equatable", [])
     static let hashable: TypeSignature = .named("Hashable", [])
 

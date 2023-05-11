@@ -39,6 +39,6 @@ class KotlinTestAnnotationTransformer: KotlinTransformer {
         }
         let infos = codebaseInfo.typeInfos(forNamed: owningType)
         // check for whether the containing class inherits from `XCTestCase`
-        return infos.contains { $0.inherits.contains(.named("XCTestCase", [])) }
+        return infos.contains { $0.inherits.contains { $0.isNamed("XCTestCase", moduleName: "XCTest", generics: []) } }
     }
 }

@@ -90,7 +90,7 @@ public class CodebaseInfo: Codable {
     ///
     /// - Parameters:
     ///  - qualifiedMatch: If true, names without `.` separators will only match root types.
-    func lookup(name: String, qualifiedMatch: Bool = false) -> [CodebaseInfoItem] {
+    func lookup(name: String, moduleName: String? = nil, qualifiedMatch: Bool = false) -> [CodebaseInfoItem] {
         let path = name.split(separator: ".").map { String($0) }
         guard !path.isEmpty else {
             return []
@@ -105,7 +105,8 @@ public class CodebaseInfo: Codable {
     private func match(candidates: [CodebaseInfoItem], path: [String], moduleName: String?, qualifiedMatch: Bool) -> [CodebaseInfoItem] {
         var matches = candidates
         if let moduleName {
-            matches = matches.filter { $0.moduleName == moduleName }
+            let mappedModuleName = Self.moduleNameMap[moduleName] ?? moduleName
+            matches = matches.filter { $0.moduleName == mappedModuleName }
         }
         if !path.isEmpty {
             let baseName = path.joined(separator: ".")
@@ -135,8 +136,8 @@ public class CodebaseInfo: Codable {
         guard recursionDepth < 10 else {
             return []
         }
-        return candidateTypeNames(for: type.asOptional(false)).flatMap { name in
-            let candidates = candidateMap(lookup(name: name, qualifiedMatch: true))
+        return candidateTypeNames(for: type.asOptional(false)).flatMap { (name, moduleName) in
+            let candidates = candidateMap(lookup(name: name, moduleName: moduleName, qualifiedMatch: true))
             return candidates.flatMap { candidate in
                 if let typeInfo = candidate as? TypeInfo {
                     return [typeInfo]
@@ -166,14 +167,14 @@ public class CodebaseInfo: Codable {
 
     // We need these in testing because SkipLib isn't available
     private static let builtinProtocols: Set<TypeSignature> = [
-        .named("CustomStringConvertible", []), .member(.named("Swift", []), .named("CustomStringConvertible", [])),
-        .named("Equatable", []), .member(.named("Swift", []), .named("Equatable", [])),
-        .named("Error", []), .member(.named("Swift", []), .named("Error", [])),
-        .named("OptionSet", []), .member(.named("Swift", []), .named("OptionSet", [])),
+        .named("CustomStringConvertible", []), .module("Swift", .named("CustomStringConvertible", [])),
+        .named("Equatable", []), .module("Swift", .named("Equatable", [])),
+        .named("Error", []), .module("Swift", .named("Error", [])),
+        .named("OptionSet", []), .module("Swift", .named("OptionSet", [])),
     ]
     private static let builtinEquatableSubprotocols: Set<TypeSignature> = [
-        .named("Comparable", []), .member(.named("Swift", []), .named("Comparable", [])),
-        .named("Hashable", []), .member(.named("Swift", []), .named("Hashable", [])),
+        .named("Comparable", []), .module("Swift", .named("Comparable", [])),
+        .named("Hashable", []), .module("Swift", .named("Hashable", [])),
     ]
 
     /// Return the protocols the given type conforms to, including inherited protocols.
@@ -250,7 +251,6 @@ public class CodebaseInfo: Codable {
 
         /// Whether the given type is a class, struct, etc, optionally limiting results to this module.
         func declarationType(forNamed type: TypeSignature, unknownTypealiasFallback: StatementType = .classDeclaration, mustBeInModule: Bool = false) -> StatementType? {
-            assert(global.kotlin != nil)
             guard let typeInfo = primaryTypeInfo(forNamed: type) else {
                 guard let typealiasInfo = crossPlatformTypealias(forUnknownNamed: type) else {
                     return nil
@@ -271,10 +271,7 @@ public class CodebaseInfo: Codable {
         
         /// Return the type of the given identifier.
         func identifierSignature(of identifier: String, moduleName: String? = nil) -> (TypeSignature, Availability) {
-            var lookup = global.lookup(name: identifier, qualifiedMatch: true)
-            if let moduleName {
-                lookup = lookup.filter { $0.moduleName == moduleName }
-            }
+            let lookup = global.lookup(name: identifier, moduleName: moduleName, qualifiedMatch: true)
             let topRanked = ranked(lookup).first { candidate in
                 switch candidate.declarationType {
                 case .actorDeclaration, .classDeclaration, .enumDeclaration, .protocolDeclaration, .structDeclaration, .typealiasDeclaration, .enumCaseDeclaration, .variableDeclaration:
@@ -331,10 +328,7 @@ public class CodebaseInfo: Codable {
 
         /// Return the signatures of the possible functions being called with the given arguments.
         func functionSignature(of name: String, arguments: [LabeledValue<TypeSignature>], moduleName: String? = nil) -> [(TypeSignature, StatementType, Availability)] {
-            var lookup = global.lookup(name: name, qualifiedMatch: true)
-            if let moduleName {
-                lookup = lookup.filter { $0.moduleName == moduleName }
-            }
+            let lookup = global.lookup(name: name, moduleName: moduleName, qualifiedMatch: true)
             let items = ranked(lookup)
             let funcs = items.filter { $0.declarationType == .functionDeclaration }
             let funcsCandidates = funcs.compactMap { matchFunction($0, arguments: arguments, level: 0) }
@@ -686,36 +680,38 @@ public class CodebaseInfo: Codable {
         }
     }
 
-    private func candidateTypeNames(for type: TypeSignature) -> [String] {
+    private func candidateTypeNames(for type: TypeSignature) -> [(String, String?)] {
         switch type {
         case .array:
-            return ["Array"]
+            return [("Array", nil)]
         case .composition(let types):
             return types.flatMap { candidateTypeNames(for: $0) }
         case .dictionary:
-            return ["Dictionary"]
+            return [("Dictionary", nil)]
         case .function:
             return []
         case .member(let base, let type):
             let typeNames = candidateTypeNames(for: type)
             let baseName = base.name
-            return typeNames.map { "\(baseName).\($0)" }
+            return typeNames.map { ("\(baseName).\($0.0)", nil as String?) }
         case .metaType(let type):
             return candidateTypeNames(for: type)
+        case .module(let module, let type):
+            return candidateTypeNames(for: type).map { ($0.0, module) }
         case .named(let name, _):
-            return [name]
+            return [(name, nil)]
         case .none:
             return []
         case .optional(let type):
             return candidateTypeNames(for: type)
         case .set:
-            return ["Set"]
+            return [("Set", nil)]
         case .unwrappedOptional(let type):
             return candidateTypeNames(for: type)
         case .void:
             return []
         default:
-            return [type.name]
+            return [(type.name, nil)]
         }
     }
 

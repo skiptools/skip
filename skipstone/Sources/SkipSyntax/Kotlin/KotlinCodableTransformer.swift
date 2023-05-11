@@ -27,6 +27,7 @@ class KotlinCodableTransformer: KotlinTransformer {
                 guard let functionDeclaration = $0 as? KotlinFunctionDeclaration else {
                     return false
                 }
+                //~~~
                 return functionDeclaration.name == "encode" && functionDeclaration.parameters.count == 1 && functionDeclaration.parameters[0].externalLabel == "to" && functionDeclaration.parameters[0].declaredType == .named("Encoder", [])
             } as? KotlinFunctionDeclaration
             encodeDeclaration?.modifiers.visibility = .public
@@ -38,6 +39,7 @@ class KotlinCodableTransformer: KotlinTransformer {
                 guard let functionDeclaration = $0 as? KotlinFunctionDeclaration else {
                     return false
                 }
+                //~~~
                 return functionDeclaration.type == .constructorDeclaration && functionDeclaration.parameters.count == 1 && functionDeclaration.parameters[0].externalLabel == "from" && functionDeclaration.parameters[0].declaredType == .named("Decoder", [])
             } as? KotlinFunctionDeclaration
             decodeDeclaration?.modifiers.visibility = .public

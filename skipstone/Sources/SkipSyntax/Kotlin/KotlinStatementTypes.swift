@@ -1296,7 +1296,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         return name == "==" && modifiers.isStatic && parameters.count == 2
     }
     var isHashImplementation: Bool {
-        return name == "hash" && !modifiers.isStatic && parameters.count == 1 && parameters[0].isInOut && parameters[0].declaredType == .named("Hasher", [])
+        return name == "hash" && !modifiers.isStatic && parameters.count == 1 && parameters[0].isInOut && parameters[0].declaredType.isNamed("Hasher", moduleName: "Swift", generics: [])
     }
     var isLessThanImplementation: Bool {
         return name == "<" && modifiers.isStatic && parameters.count == 2

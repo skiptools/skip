@@ -241,7 +241,7 @@ private extension CodebaseInfoItem {
             return false
         }
         let parameters = signature.parameters
-        return parameters.count == 1 && parameters[0].label == "into" && parameters[0].type == .named("Hasher", [])
+        return parameters.count == 1 && parameters[0].label == "into" && parameters[0].type.isNamed("Hasher", moduleName: "Swift", generics: [])
     }
 
     var isLessThanFunction: Bool {

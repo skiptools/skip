@@ -714,7 +714,7 @@ class EnumCaseDeclaration: Statement {
         }
     }
 
-    override func resolveAttributes(in syntaxTree: SyntaxTree) {
+    override func resolveAttributes(in syntaxTree: SyntaxTree, context: ModuleContext?) {
         // Enum case declarations inherit the visibility of the enum
         if modifiers.visibility == .default {
             if let owningTypeDeclaration = parent as? TypeDeclaration {
@@ -723,7 +723,7 @@ class EnumCaseDeclaration: Statement {
                 modifiers.visibility = .internal
             }
         }
-        associatedValues = associatedValues.map { $0.qualifiedType(in: self) }
+        associatedValues = associatedValues.map { $0.qualifiedType(in: self, context: context) }
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
@@ -875,13 +875,13 @@ class FunctionDeclaration: Statement {
         return statement
     }
 
-    override func resolveAttributes(in syntaxTree: SyntaxTree) {
+    override func resolveAttributes(in syntaxTree: SyntaxTree, context: ModuleContext?) {
         if type == .initDeclaration, let owningTypeDeclaration {
             returnType = owningTypeDeclaration.signature.asOptional(isOptionalInit)
         } else {
-            returnType = returnType.qualified(in: self)
+            returnType = returnType.qualified(in: self, context: context)
         }
-        parameters = parameters.map { $0.qualifiedType(in: self) }
+        parameters = parameters.map { $0.qualifiedType(in: self, context: context) }
         // Functions in protocols or extensions inherit the visibility of the protocol or extension
         if modifiers.visibility == .default {
             if let owningTypeDeclaration = parent as? TypeDeclaration, (owningTypeDeclaration.type == .protocolDeclaration || owningTypeDeclaration.type == .extensionDeclaration) {
@@ -890,7 +890,7 @@ class FunctionDeclaration: Statement {
                 modifiers.visibility = .internal
             }
         }
-        generics = generics.qualified(in: self)
+        generics = generics.qualified(in: self, context: context)
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
@@ -1019,9 +1019,9 @@ class SubscriptDeclaration: Statement {
         return [statement]
     }
 
-    override func resolveAttributes(in syntaxTree: SyntaxTree) {
-        elementType = elementType.qualified(in: self)
-        parameters = parameters.map { $0.qualifiedType(in: self) }
+    override func resolveAttributes(in syntaxTree: SyntaxTree, context: ModuleContext?) {
+        elementType = elementType.qualified(in: self, context: context)
+        parameters = parameters.map { $0.qualifiedType(in: self, context: context) }
         // Functions in protocols or extensions inherit the visibility of the protocol or extension
         if modifiers.visibility == .default {
             if let owningTypeDeclaration = parent as? TypeDeclaration, (owningTypeDeclaration.type == .protocolDeclaration || owningTypeDeclaration.type == .extensionDeclaration) {
@@ -1030,7 +1030,7 @@ class SubscriptDeclaration: Statement {
                 modifiers.visibility = .internal
             }
         }
-        generics = generics.qualified(in: self)
+        generics = generics.qualified(in: self, context: context)
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
@@ -1113,12 +1113,12 @@ class TypealiasDeclaration: Statement {
         return [statement]
     }
 
-    override func resolveAttributes(in syntaxTree: SyntaxTree) {
+    override func resolveAttributes(in syntaxTree: SyntaxTree, context: ModuleContext?) {
         if _signature == nil {
             _signature = qualifyDeclaredType(signature)
         }
-        generics = generics.qualified(in: self)
-        aliasedType = aliasedType.qualified(in: self)
+        generics = generics.qualified(in: self, context: context)
+        aliasedType = aliasedType.qualified(in: self, context: context)
         // Aliases in protocols or extensions inherit the visibility of the protocol or extension
         if modifiers.visibility == .default {
             if let owningTypeDeclaration = parent as? TypeDeclaration, (owningTypeDeclaration.type == .protocolDeclaration || owningTypeDeclaration.type == .extensionDeclaration) {
@@ -1243,18 +1243,18 @@ class TypeDeclaration: Statement {
         return statement
     }
 
-    override func resolveAttributes(in syntaxTree: SyntaxTree) {
+    override func resolveAttributes(in syntaxTree: SyntaxTree, context: ModuleContext?) {
         if parent?.owningFunctionDeclaration != nil {
             messages.append(.localTypesNotSupported(self, source: syntaxTree.source))
         }
         if _signature == nil {
             _signature = qualifyDeclaredType(signature)
         }
-        inherits = inherits.map { $0.qualified(in: self) }
+        inherits = inherits.map { $0.qualified(in: self, context: context) }
         if modifiers.visibility == .default {
             modifiers.visibility = .internal
         }
-        generics = generics.qualified(in: self)
+        generics = generics.qualified(in: self, context: context)
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
@@ -1373,8 +1373,8 @@ class VariableDeclaration: Statement {
         return declaration
     }
 
-    override func resolveAttributes(in syntaxTree: SyntaxTree) {
-        declaredType = declaredType.qualified(in: self)
+    override func resolveAttributes(in syntaxTree: SyntaxTree, context: ModuleContext?) {
+        declaredType = declaredType.qualified(in: self, context: context)
         // Variables in protocols or extensions inherit the visibility of the protocol or extension
         if modifiers.visibility == .default {
             if let owningTypeDeclaration = parent as? TypeDeclaration, (owningTypeDeclaration.type == .protocolDeclaration || owningTypeDeclaration.type == .extensionDeclaration) {

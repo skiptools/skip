@@ -123,12 +123,13 @@ extension CodebaseInfo.Context {
         } else if typeInfos.isEmpty {
             // Assume an unknown type could be a mutable struct
             let type = type.asOptional(false)
-            if case .named = type {
+            switch type {
+            case .named, .member, .module:
                 // Cross platform typealiases should not be treated as mutable structs
                 return crossPlatformTypealias(forUnknownNamed: type) == nil
-            } else if type == .any {
+            case .any:
                 return true
-            } else {
+            default:
                 return false
             }
         } else {
@@ -139,7 +140,7 @@ extension CodebaseInfo.Context {
     /// Whether the given type conforms to `Error` through its protocols, **not** through inheritance.
     func conformsToError(type: TypeSignature) -> Bool {
         assert(global.kotlin != nil)
-        return global.protocolSignatures(forNamed: type).contains(.named("Error", []))
+        return global.protocolSignatures(forNamed: type).contains { $0.isError }
     }
 
     /// Whether the given enum type has cases with associated values.
