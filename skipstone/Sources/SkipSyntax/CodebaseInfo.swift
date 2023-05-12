@@ -37,21 +37,30 @@ public class CodebaseInfo: Codable {
     /// Gather codebase-level information from the given syntax tree.
     func gather(from syntaxTree: SyntaxTree) {
         assert(!isInUse)
+        let importedModuleNames = syntaxTree.root.statements.importedModuleNames
         var needsVariableTypeInference = false
         for statement in syntaxTree.root.statements {
             switch statement.type {
             case .actorDeclaration, .classDeclaration, .enumDeclaration, .protocolDeclaration, .structDeclaration:
                 let typeInfo = TypeInfo(statement: statement as! TypeDeclaration, codebaseInfo: self)
+                typeInfo.importedModuleNames = importedModuleNames
                 rootTypes.append(typeInfo)
                 needsVariableTypeInference = needsVariableTypeInference || typeInfo.needsVariableTypeInference
             case .extensionDeclaration:
-                rootExtensions.append(TypeInfo(statement: statement as! ExtensionDeclaration, codebaseInfo: self))
+                let typeInfo = TypeInfo(statement: statement as! ExtensionDeclaration, codebaseInfo: self)
+                typeInfo.importedModuleNames = importedModuleNames
+                rootExtensions.append(typeInfo)
             case .functionDeclaration, .initDeclaration, .deinitDeclaration:
-                rootFunctions.append(FunctionInfo(statement: statement as! FunctionDeclaration, codebaseInfo: self))
+                var functionInfo = FunctionInfo(statement: statement as! FunctionDeclaration, codebaseInfo: self)
+                functionInfo.importedModuleNames = importedModuleNames
+                rootFunctions.append(functionInfo)
             case .typealiasDeclaration:
-                rootTypealiases.append(TypealiasInfo(statement: statement as! TypealiasDeclaration, codebaseInfo: self))
+                var typealiasInfo = TypealiasInfo(statement: statement as! TypealiasDeclaration, codebaseInfo: self)
+                typealiasInfo.importedModuleNames = importedModuleNames
+                rootTypealiases.append(typealiasInfo)
             case .variableDeclaration:
-                let variableInfo = VariableInfo(statement: statement as! VariableDeclaration, codebaseInfo: self)
+                var variableInfo = VariableInfo(statement: statement as! VariableDeclaration, codebaseInfo: self)
+                variableInfo.importedModuleNames = importedModuleNames
                 rootVariables.append(variableInfo)
                 needsVariableTypeInference = needsVariableTypeInference || variableInfo.needsTypeInference
             default:
@@ -72,6 +81,7 @@ public class CodebaseInfo: Codable {
         isInUse = true
         buildItemsByName() // We use this for lookups in subsequent steps
         inferVariableTypes() // May need variable types to match signatures to protocol generics
+        resolveModuleTypeSignatures()
         fixupGenericsInfo()
         addGeneratedConstructors()
         buildItemsByName() // Final mappings after updates
@@ -205,8 +215,6 @@ public class CodebaseInfo: Codable {
         fileprivate init(global: CodebaseInfo, importedModuleNames: Set<String>, source: Source) {
             self.global = global
             self.source = source
-            var importedModuleNames = importedModuleNames
-            importedModuleNames.insert("SkipLib") // Contains our supported subset of the Swift builtin module
             self.importedModuleNames = importedModuleNames
         }
         
@@ -224,19 +232,7 @@ public class CodebaseInfo: Codable {
         ///
         /// A score of 0 indicates that the item is not visible.
         func rankScore(of item: CodebaseInfoItem) -> Int {
-            var score = 0
-            if item.moduleName == global.moduleName {
-                if let itemSourcePath = item.sourceFile?.path, itemSourcePath.hasSuffix(source.file.path) {
-                    // Favor a symbol in this file
-                    score += 3
-                } else if item.modifiers.visibility != .private {
-                    // Favor a symbol in this module
-                    score += 2
-                }
-            } else if let itemModuleName = item.moduleName, importedModuleNames.contains(itemModuleName) {
-                score += 1
-            }
-            return score
+            return item.rankScore(moduleName: global.moduleName, importedModuleNames: importedModuleNames, sourceFile: source.file)
         }
         
         /// Return all type infos visible for the given type.
@@ -905,7 +901,8 @@ public class CodebaseInfo: Codable {
                 if let existingContext = typeInferenceContexts[sourceFile] {
                     context = existingContext
                 } else {
-                    context = TypeInferenceContext(codebaseInfo: self, unavailableAPI: nil, source: syntaxTree.source, statements: syntaxTree.root.statements)
+                    let codebaseInfoContext = self.context(importedModuleNames: syntaxTree.root.statements.importedModuleNames, source: syntaxTree.source)
+                    context = TypeInferenceContext(codebaseInfo: codebaseInfoContext, unavailableAPI: nil, source: syntaxTree.source)
                     typeInferenceContexts[sourceFile] = context
                 }
                 for i in 0..<rootVariables.count {
@@ -941,6 +938,15 @@ public class CodebaseInfo: Codable {
                 needsInferenceCount = 0
             }
         }
+    }
+
+    private func resolveModuleTypeSignatures() {
+        // Now that we've gathered complete type information, we can differentiate between nested and module-qualified types
+        for i in 0..<rootTypes.count { rootTypes[i].resolveModuleTypeSignatures(codebaseInfo: self) }
+        for i in 0..<rootTypealiases.count { rootTypealiases[i].resolveModuleTypeSignatures(codebaseInfo: self) }
+        for i in 0..<rootVariables.count { rootVariables[i].resolveModuleTypeSignatures(codebaseInfo: self) }
+        for i in 0..<rootFunctions.count { rootFunctions[i].resolveModuleTypeSignatures(codebaseInfo: self) }
+        for i in 0..<rootExtensions.count { rootExtensions[i].resolveModuleTypeSignatures(codebaseInfo: self) }
     }
 
     private func addGeneratedConstructors() {
@@ -1015,6 +1021,16 @@ public class CodebaseInfo: Codable {
             return true
         }
         var languageAdditions: Any?
+        var importedModuleNames: [String]? {
+            didSet {
+                for i in 0..<types.count { types[i].importedModuleNames = importedModuleNames }
+                for i in 0..<typealiases.count { typealiases[i].importedModuleNames = importedModuleNames }
+                for i in 0..<cases.count { cases[i].importedModuleNames = importedModuleNames }
+                for i in 0..<variables.count { variables[i].importedModuleNames = importedModuleNames }
+                for i in 0..<functions.count { functions[i].importedModuleNames = importedModuleNames }
+                for i in 0..<subscripts.count { subscripts[i].importedModuleNames = importedModuleNames }
+            }
+        }
 
         var generics: Generics
         var inherits: [TypeSignature]
@@ -1066,7 +1082,7 @@ public class CodebaseInfo: Codable {
         }
 
         private enum CodingKeys: String, CodingKey {
-            // Exclude language additions
+            // Exclude language additions, importedModuleNames
             case name, declarationType, signature, moduleName, sourceFile, declaringType, modifiers, availability, generics, inherits, types, typealiases, cases, variables, functions, subscripts
         }
 
@@ -1136,6 +1152,18 @@ public class CodebaseInfo: Codable {
             types.forEach { $0.cleanupTypeInference(source: source, messages: &messages) }
         }
 
+        fileprivate func resolveModuleTypeSignatures(codebaseInfo: CodebaseInfo) {
+            let moduleContext = ModuleContext(codebaseInfo: codebaseInfo, importedModuleNames: importedModuleNames ?? [], sourceFile: sourceFile)
+            generics = generics.qualified(context: moduleContext)
+            inherits = inherits.map { $0.qualified(context: moduleContext) }
+            for i in 0..<types.count { types[i].resolveModuleTypeSignatures(codebaseInfo: codebaseInfo) }
+            for i in 0..<typealiases.count { typealiases[i].resolveModuleTypeSignatures(codebaseInfo: codebaseInfo) }
+            for i in 0..<cases.count { cases[i].resolveModuleTypeSignatures(codebaseInfo: codebaseInfo) }
+            for i in 0..<variables.count { variables[i].resolveModuleTypeSignatures(codebaseInfo: codebaseInfo) }
+            for i in 0..<functions.count { functions[i].resolveModuleTypeSignatures(codebaseInfo: codebaseInfo) }
+            for i in 0..<subscripts.count { subscripts[i].resolveModuleTypeSignatures(codebaseInfo: codebaseInfo) }
+        }
+
         private func addMembers(_ statements: [Statement], codebaseInfo: CodebaseInfo) {
             for statement in statements {
                 switch statement.type {
@@ -1174,6 +1202,7 @@ public class CodebaseInfo: Codable {
             return modifiers.isStatic
         }
         var languageAdditions: Any?
+        var importedModuleNames: [String]?
 
         let isReadOnly: Bool
         let isInitializable: Bool
@@ -1181,7 +1210,7 @@ public class CodebaseInfo: Codable {
         var value: Expression?
 
         private enum CodingKeys: String, CodingKey {
-            // Exclude value expression, language additions
+            // Exclude value expression, language additions, importedModuleNames
             case name, signature, moduleName, sourceFile, declaringType, modifiers, availability, isReadOnly, isInitializable, hasValue
         }
 
@@ -1233,6 +1262,11 @@ public class CodebaseInfo: Codable {
             v.value = nil
             return v
         }
+
+        fileprivate mutating func resolveModuleTypeSignatures(codebaseInfo: CodebaseInfo) {
+            let moduleContext = ModuleContext(codebaseInfo: codebaseInfo, importedModuleNames: importedModuleNames ?? [], sourceFile: sourceFile)
+            signature = signature.qualified(context: moduleContext)
+        }
     }
 
     /// Information about a declared function.
@@ -1249,13 +1283,14 @@ public class CodebaseInfo: Codable {
             return modifiers.isStatic
         }
         var languageAdditions: Any?
+        var importedModuleNames: [String]?
 
-        let generics: Generics
+        var generics: Generics
         let isMutating: Bool
         var isGenerated = false
 
         private enum CodingKeys: String, CodingKey {
-            // Exclude language additions
+            // Exclude language additions, importedModuleNames
             case name, declarationType, signature, moduleName, sourceFile, declaringType, modifiers, availability, generics, isMutating, isGenerated
         }
 
@@ -1285,6 +1320,12 @@ public class CodebaseInfo: Codable {
             self.generics = generics
             self.isMutating = isMutating
         }
+
+        fileprivate mutating func resolveModuleTypeSignatures(codebaseInfo: CodebaseInfo) {
+            let moduleContext = ModuleContext(codebaseInfo: codebaseInfo, importedModuleNames: importedModuleNames ?? [], sourceFile: sourceFile)
+            generics = generics.qualified(context: moduleContext)
+            signature = signature.qualified(context: moduleContext)
+        }
     }
 
     /// Information about a declared subscript function.
@@ -1305,12 +1346,13 @@ public class CodebaseInfo: Codable {
             return modifiers.isStatic
         }
         var languageAdditions: Any?
+        var importedModuleNames: [String]?
 
-        let generics: Generics
+        var generics: Generics
         let isReadOnly: Bool
 
         private enum CodingKeys: String, CodingKey {
-            // Exclude language additions
+            // Exclude language additions, importedModuleNames
             case signature, moduleName, sourceFile, declaringType, modifiers, availability, generics, isReadOnly
         }
 
@@ -1325,6 +1367,12 @@ public class CodebaseInfo: Codable {
             self.isReadOnly = statement.setter == nil
             (codebaseInfo.languageAdditions as? CodebaseInfoLanguageAdditionsGatherDelegate)?.codebaseInfo(codebaseInfo, didGather: &self, from: statement)
         }
+
+        fileprivate mutating func resolveModuleTypeSignatures(codebaseInfo: CodebaseInfo) {
+            let moduleContext = ModuleContext(codebaseInfo: codebaseInfo, importedModuleNames: importedModuleNames ?? [], sourceFile: sourceFile)
+            generics = generics.qualified(context: moduleContext)
+            signature = signature.qualified(context: moduleContext)
+        }
     }
 
     /// Information about a typealias.
@@ -1333,7 +1381,7 @@ public class CodebaseInfo: Codable {
         var declarationType: StatementType {
             return .typealiasDeclaration
         }
-        let signature: TypeSignature
+        var signature: TypeSignature
         let moduleName: String?
         let sourceFile: Source.FilePath?
         let declaringType: TypeSignature?
@@ -1343,11 +1391,12 @@ public class CodebaseInfo: Codable {
             return true
         }
         var languageAdditions: Any?
+        var importedModuleNames: [String]?
 
-        let generics: Generics
+        var generics: Generics
 
         private enum CodingKeys: String, CodingKey {
-            // Exclude language additions
+            // Exclude language additions, importedModuleNames
             case name, signature, moduleName, sourceFile, declaringType, modifiers, availability, generics
         }
 
@@ -1362,6 +1411,12 @@ public class CodebaseInfo: Codable {
             self.generics = statement.generics
             (codebaseInfo.languageAdditions as? CodebaseInfoLanguageAdditionsGatherDelegate)?.codebaseInfo(codebaseInfo, didGather: &self, from: statement)
         }
+
+        fileprivate mutating func resolveModuleTypeSignatures(codebaseInfo: CodebaseInfo) {
+            let moduleContext = ModuleContext(codebaseInfo: codebaseInfo, importedModuleNames: importedModuleNames ?? [], sourceFile: sourceFile)
+            generics = generics.qualified(context: moduleContext)
+            signature = signature.qualified(context: moduleContext)
+        }
     }
 
     /// Information about an enum case.
@@ -1370,7 +1425,7 @@ public class CodebaseInfo: Codable {
         var declarationType: StatementType {
             return .enumCaseDeclaration
         }
-        let signature: TypeSignature // Owning enum or a function returning the owning enum
+        var signature: TypeSignature // Owning enum or a function returning the owning enum
         let moduleName: String?
         let sourceFile: Source.FilePath?
         let declaringType: TypeSignature?
@@ -1380,9 +1435,10 @@ public class CodebaseInfo: Codable {
             return true
         }
         var languageAdditions: Any?
+        var importedModuleNames: [String]?
 
         private enum CodingKeys: String, CodingKey {
-            // Exclude language additions
+            // Exclude language additions, importedModuleNames
             case name, signature, moduleName, sourceFile, declaringType, modifiers, availability
         }
 
@@ -1395,6 +1451,11 @@ public class CodebaseInfo: Codable {
             self.modifiers = statement.modifiers
             self.availability = Availability(attributes: statement.attributes)
             (codebaseInfo.languageAdditions as? CodebaseInfoLanguageAdditionsGatherDelegate)?.codebaseInfo(codebaseInfo, didGather: &self, from: statement)
+        }
+
+        fileprivate mutating func resolveModuleTypeSignatures(codebaseInfo: CodebaseInfo) {
+            let moduleContext = ModuleContext(codebaseInfo: codebaseInfo, importedModuleNames: importedModuleNames ?? [], sourceFile: sourceFile)
+            signature = signature.qualified(context: moduleContext)
         }
     }
 
@@ -1447,7 +1508,28 @@ protocol CodebaseInfoItem {
     var modifiers: Modifiers { get }
     var availability: CodebaseInfo.Availability { get }
     var isStatic: Bool { get }
+    /// Not serialized.
     var languageAdditions: Any? { get set }
+    /// Not serialized.
+    var importedModuleNames: [String]? { get set }
+}
+
+extension CodebaseInfoItem {
+    func rankScore(moduleName: String?, importedModuleNames: Set<String>, sourceFile: Source.FilePath?) -> Int {
+        var score = 0
+        if self.moduleName == moduleName {
+            if let itemSourcePath = self.sourceFile?.path, let sourcePath = sourceFile?.path, itemSourcePath.hasSuffix(sourcePath) {
+                // Favor a symbol in this file
+                score += 3
+            } else if modifiers.visibility != .private {
+                // Favor a symbol in this module
+                score += 2
+            }
+        } else if let itemModuleName = self.moduleName, itemModuleName == "SkipLib" || importedModuleNames.contains(itemModuleName) {
+            score += 1
+        }
+        return score
+    }
 }
 
 /// Helper to track target language additions.

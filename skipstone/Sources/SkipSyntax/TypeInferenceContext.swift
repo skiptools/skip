@@ -19,21 +19,10 @@ struct TypeInferenceContext {
     ///   - codebaseInfo: Available codebase information.
     ///   - unavailableAPI: Known unavailable API to use when `codebaseInfo` is not available.
     ///   - source: Source for this context.
-    ///   - statements: Top-level statements from which to determine imports.
-    init(codebaseInfo: CodebaseInfo? = nil, unavailableAPI: UnavailableAPI?, source: Source, statements: [Statement]) {
-        self.source = source
-        if codebaseInfo != nil {
-            let importedModuleNames: [String] = statements.compactMap { statement in
-                guard statement.type == .importDeclaration, let importDeclaration = statement as? ImportDeclaration else {
-                    return nil
-                }
-                return importDeclaration.modulePath.first
-            }
-            self.codebaseInfo = codebaseInfo?.context(importedModuleNames: importedModuleNames, source: source)
-        } else {
-            self.codebaseInfo = nil
-        }
+    init(codebaseInfo: CodebaseInfo.Context? = nil, unavailableAPI: UnavailableAPI?, source: Source) {
+        self.codebaseInfo = codebaseInfo
         self.unavailableAPI = unavailableAPI
+        self.source = source
     }
 
     /// The type we're expecting to return from the current code block.

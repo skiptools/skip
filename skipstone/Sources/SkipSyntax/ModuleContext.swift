@@ -1,38 +1,20 @@
 /// Resolve module-qualified types.
 struct ModuleContext {
-    private let codebaseInfo: CodebaseInfo.Context?
-    private let source: Source?
+    private let codebaseInfo: CodebaseInfo?
+    private let importedModuleNames: Set<String>
+    private let sourceFile: Source.FilePath?
 
-    init() {
-        self.codebaseInfo = nil
-        self.source = nil
-    }
-
-    /// Create a context for using module information.
-    ///
-    /// - Parameters:
-    ///   - codebaseInfo: Available codebase information.
-    ///   - source: Source for this context.
-    ///   - statements: Top-level statements from which to determine imports.
-    init(codebaseInfo: CodebaseInfo? = nil, source: Source, statements: [Statement]) {
-        self.source = source
-        if let codebaseInfo {
-            let importedModuleNames: [String] = statements.compactMap { statement in
-                guard statement.type == .importDeclaration, let importDeclaration = statement as? ImportDeclaration else {
-                    return nil
-                }
-                return importDeclaration.modulePath.first
-            }
-            self.codebaseInfo = codebaseInfo.context(importedModuleNames: importedModuleNames, source: source)
-        } else {
-            self.codebaseInfo = nil
-        }
+    init(codebaseInfo: CodebaseInfo? = nil, importedModuleNames: [String] = [], sourceFile: Source.FilePath? = nil) {
+        self.codebaseInfo = codebaseInfo
+        self.importedModuleNames = Set(importedModuleNames)
+        self.sourceFile = sourceFile
     }
 
     /// If the given type represents a module-qualified type, return it as such.
     func resolve(_  type: TypeSignature, in baseOrModule: TypeSignature) -> TypeSignature {
+        let member: TypeSignature = .member(baseOrModule, type)
         guard case .named(let baseName, let baseGenerics) = baseOrModule, baseGenerics.isEmpty else {
-            return .member(baseOrModule, type)
+            return member
         }
         // Swift.xxx builtin type?
         if baseName == "Swift" {
@@ -42,15 +24,18 @@ struct ModuleContext {
             }
         }
         guard let codebaseInfo else {
-            return .member(baseOrModule, type)
+            return member
         }
         
         let qualifiedTypeName = "\(baseName).\(type.name)"
         guard let typeInfo = codebaseInfo.primaryTypeInfo(forNamed: .named(qualifiedTypeName, [])) else {
-            return .member(baseOrModule, type)
+            return member
+        }
+        guard typeInfo.rankScore(moduleName: codebaseInfo.moduleName, importedModuleNames: importedModuleNames, sourceFile: sourceFile) > 0 else {
+            return member
         }
         guard typeInfo.signature.name != qualifiedTypeName, typeInfo.moduleName == CodebaseInfo.moduleNameMap[baseName, default: baseName] else {
-            return .member(baseOrModule, type)
+            return member
         }
         return .module(baseName, type)
     }

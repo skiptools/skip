@@ -106,6 +106,65 @@ final class NamingTests: XCTestCase {
             return ""
         }
         """)
+//        try await check(dependentModules: [moduleOne, moduleTwo], supportingSwift: """
+//        extension Int {
+//            var myValue: Int {
+//                return 0
+//            }
+//        }
+//        extension String {
+//            var myValue: String {
+//                return ""
+//            }
+//        }
+//        """, swift: """
+//        import ModuleOne
+//        import ModuleTwo
+//
+//        class C: ModuleTwo.A {
+//        }
+//
+//        func f(a: ModuleOne.A) -> Int {
+//            return 0
+//        }
+//        func f(a: ModuleTwo.A) -> String {
+//            return ""
+//        }
+//        func g() {
+//            let b1 = ModuleOne.g(i: 0) == .myValue
+//            let b2 = ModuleTwo.g(i: 0) == .myValue
+//
+//            let a = ModuleOne.A()
+//            let b3 = a.f() == .myValue
+//            let c = C()
+//            let b4 = c.f() == .myValue
+//
+//            let b5 = f(a: ModuleOne.A()) == .myValue
+//            let b6 = f(a: ModuleTwo.A()) == .myValue
+//        }
+//        """, kotlin: """
+//        import module.one.*
+//        import module.two.*
+//
+//        internal open class C: module.two.A() {
+//        }
+//
+//        internal fun f(a: module.one.A): Int = 0
+//        internal fun f(a: module.two.A): String = ""
+//        internal fun g() {
+//            val b1 = module.one.g(i = 0) == Int.myValue
+//            val b2 = modle.two.g(i = 0) == String.myValue
+//
+//            val a = module.one.A()
+//            val b3 = a.f() == Int.myValue
+//            val c = C()
+//            val b4 = c.f() == String.myValue
+//
+//            val b5 = f(a = module.one.A()) == Int.myValue
+//            val b6 = f(a = module.two.A()) == String.myValue
+//        }
+//        """)
+
         try await check(dependentModules: [moduleOne, moduleTwo], supportingSwift: """
         extension Int {
             var myValue: Int {
@@ -121,28 +180,18 @@ final class NamingTests: XCTestCase {
         import ModuleOne
         import ModuleTwo
 
-        class C: ModuleTwo.A {
-        }
-        /*
-        func f(a: ModuleOne.A) -> Int {
-            return 0
-        }
-        func f(a: ModuleTwo.A) -> String {
-            return ""
-        }
         func g() {
-            let b1 = ModuleOne.g() == .myValue
-            let b2 = ModuleTwo.g() == .myValue
-
-            let b3 = a.f() == .myValue
-            let c = C()
-            let b4 = c.f() == .myValue
-
-            let b5 = f(ModuleOne.A()) == .myValue
-            let b6 = f(ModuleTwo.A()) == .myValue
+            let b1 = ModuleOne.g(i: 0) == .myValue
+            let b2 = ModuleTwo.g(i: 0) == .myValue
         }
-        */
         """, kotlin: """
+        import module.one.*
+        import module.two.*
+
+        internal fun g() {
+            val b1 = module.one.g(i = 0) == Int.myValue
+            val b2 = modle.two.g(i = 0) == String.myValue
+        }
         """)
     }
 

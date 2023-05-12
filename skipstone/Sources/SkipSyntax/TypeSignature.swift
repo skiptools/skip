@@ -537,7 +537,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     }
 
     /// Qualify local type names with any enclosing types.
-    func qualified(in node: SyntaxNode, context: ModuleContext) -> TypeSignature {
+    func qualified(in node: SyntaxNode? = nil, context: ModuleContext) -> TypeSignature {
         switch self {
         case .array(let elementType):
             return .array(elementType.qualified(in: node, context: context))
@@ -563,7 +563,11 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return self
         case .named(let name, let generics):
             let generics = generics.map { $0.qualified(in: node, context: context) }
-            return node.qualifyReferencedNamedType(name: name, generics: generics)
+            if let node {
+                return node.qualifyReferencedNamedType(name: name, generics: generics)
+            } else {
+                return .named(name, generics)
+            }
         case .optional(let type):
             return .optional(type.qualified(in: node, context: context))
         case .range(let elementType):

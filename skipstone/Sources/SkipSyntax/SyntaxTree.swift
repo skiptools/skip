@@ -16,7 +16,8 @@ public class SyntaxTree: PrettyPrintable {
         self.root.statements = StatementDecoder.decode(syntaxListContainer: syntax, in: self)
 
         // Resolve nodes breadth first so that a child can use information from its parent's siblings
-        let moduleContext = ModuleContext(codebaseInfo: codebaseInfo, source: source, statements: root.statements)
+        let importedModuleNames = root.statements.importedModuleNames
+        let moduleContext = ModuleContext(codebaseInfo: codebaseInfo, importedModuleNames: importedModuleNames, sourceFile: source.file)
         var resolveQueue: [SyntaxNode] = [root]
         while !resolveQueue.isEmpty {
             let node = resolveQueue.removeFirst()
@@ -25,7 +26,8 @@ public class SyntaxTree: PrettyPrintable {
             resolveQueue += node.children
         }
 
-        let typeContext = TypeInferenceContext(codebaseInfo: codebaseInfo, unavailableAPI: unavailableAPI, source: source, statements: root.statements)
+        let codebaseContext = codebaseInfo?.context(importedModuleNames: importedModuleNames, source: source)
+        let typeContext = TypeInferenceContext(codebaseInfo: codebaseContext, unavailableAPI: unavailableAPI, source: source)
         let _ = root.inferTypes(context: typeContext, expecting: .none)
     }
 
