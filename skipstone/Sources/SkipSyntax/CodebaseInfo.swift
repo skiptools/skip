@@ -345,7 +345,7 @@ public class CodebaseInfo: Codable {
                 }
             }
             let initsCandidates = initCandidates(for: typeInfos, arguments: arguments)
-            let sortedCandidates = Set(funcsCandidates + initsCandidates).sorted()
+            let sortedCandidates = Set(funcsCandidates + initsCandidates).sorted { $0.score > $1.score }
             guard let topCandidate = sortedCandidates.first else {
                 return []
             }
@@ -384,7 +384,7 @@ public class CodebaseInfo: Codable {
                     functionCandidates(for: name, in: typeInfo, constrainedGenerics: type.generics, arguments: arguments, isStatic: isStatic).forEach { candidates.insert($0) }
                 }
             }
-            let sortedCandidates = candidates.sorted()
+            let sortedCandidates = candidates.sorted { $0.score > $1.score || ($0.score == $1.score && $0.level < $1.level) }
             guard let topCandidate = sortedCandidates.first else {
                 if case .named(let moduleName, []) = type {
                     // Is type a module name?
@@ -420,7 +420,7 @@ public class CodebaseInfo: Codable {
             for typeInfo in typeInfos(forNamed: type) {
                 subscriptCandidates(in: typeInfo, constrainedGenerics: type.generics, arguments: arguments, isStatic: isStatic).forEach { candidates.insert($0) }
             }
-            let sortedCandidates = candidates.sorted()
+            let sortedCandidates = candidates.sorted { $0.score > $1.score || ($0.score == $1.score && $0.level < $1.level) }
             guard let topCandidate = sortedCandidates.first else {
                 return []
             }
@@ -724,7 +724,7 @@ public class CodebaseInfo: Codable {
         }
     }
 
-    private struct FunctionCandidate: Hashable, Comparable {
+    private struct FunctionCandidate: Hashable {
         let signature: TypeSignature
         let declarationType: StatementType
         let availability: Availability
@@ -733,10 +733,6 @@ public class CodebaseInfo: Codable {
 
         static func ==(lhs: FunctionCandidate, rhs: FunctionCandidate) -> Bool {
             return lhs.signature == rhs.signature
-        }
-
-        static func <(lhs: FunctionCandidate, rhs: FunctionCandidate) -> Bool {
-            return lhs.score > rhs.score || (lhs.score == rhs.score && lhs.level < rhs.level)
         }
 
         func hash(into hasher: inout Hasher) {
