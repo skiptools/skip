@@ -676,7 +676,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
                 settingsContents += """
 
-                rootProject.name = "\(primaryModuleName)"
+                rootProject.name = "\(packageName)"
 
                 """
 
