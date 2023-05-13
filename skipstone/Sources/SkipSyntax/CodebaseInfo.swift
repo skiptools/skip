@@ -126,7 +126,7 @@ public class CodebaseInfo: Codable {
                 matches = match(candidates: candidates, path: Array(path.dropFirst()), moduleName: path[0], qualifiedMatch: qualifiedMatch)
             }
         } else if qualifiedMatch {
-            matches = matches.filter { !($0 is TypeInfo || $0 is TypealiasInfo) || $0.declaringType == nil }
+            matches = matches.filter { $0.declaringType == nil }
         }
         return matches
     }
@@ -345,7 +345,7 @@ public class CodebaseInfo: Codable {
                 }
             }
             let initsCandidates = initCandidates(for: typeInfos, arguments: arguments)
-            let sortedCandidates = Set(funcsCandidates + initsCandidates).sorted { $0.score > $1.score }
+            let sortedCandidates = Set(funcsCandidates + initsCandidates).sorted()
             guard let topCandidate = sortedCandidates.first else {
                 return []
             }
@@ -384,7 +384,7 @@ public class CodebaseInfo: Codable {
                     functionCandidates(for: name, in: typeInfo, constrainedGenerics: type.generics, arguments: arguments, isStatic: isStatic).forEach { candidates.insert($0) }
                 }
             }
-            let sortedCandidates = candidates.sorted { $0.score > $1.score }
+            let sortedCandidates = candidates.sorted()
             guard let topCandidate = sortedCandidates.first else {
                 if case .named(let moduleName, []) = type {
                     // Is type a module name?
@@ -420,7 +420,7 @@ public class CodebaseInfo: Codable {
             for typeInfo in typeInfos(forNamed: type) {
                 subscriptCandidates(in: typeInfo, constrainedGenerics: type.generics, arguments: arguments, isStatic: isStatic).forEach { candidates.insert($0) }
             }
-            let sortedCandidates = candidates.sorted { $0.score > $1.score }
+            let sortedCandidates = candidates.sorted()
             guard let topCandidate = sortedCandidates.first else {
                 return []
             }
@@ -724,7 +724,7 @@ public class CodebaseInfo: Codable {
         }
     }
 
-    private struct FunctionCandidate: Hashable {
+    private struct FunctionCandidate: Hashable, Comparable {
         let signature: TypeSignature
         let declarationType: StatementType
         let availability: Availability
@@ -733,6 +733,10 @@ public class CodebaseInfo: Codable {
 
         static func ==(lhs: FunctionCandidate, rhs: FunctionCandidate) -> Bool {
             return lhs.signature == rhs.signature
+        }
+
+        static func <(lhs: FunctionCandidate, rhs: FunctionCandidate) -> Bool {
+            return lhs.score > rhs.score || (lhs.score == rhs.score && lhs.level < rhs.level)
         }
 
         func hash(into hasher: inout Hasher) {
@@ -1470,22 +1474,6 @@ public class CodebaseInfo: Codable {
             let moduleContext = ModuleContext(codebaseInfo: codebaseInfo, importedModuleNames: importedModuleNames ?? [], sourceFile: sourceFile)
             signature = signature.qualified(context: moduleContext)
         }
-    }
-
-    //~~~
-    /// Identifier match information.
-    struct IdentifierMatch {
-        let signature: TypeSignature
-        let declaringType: TypeSignature? // Uses .module(name, .none) for a free module-qualified function
-        let availability: Availability
-    }
-
-    /// Function match information.
-    struct FunctionMatch {
-        let signature: TypeSignature
-        let declaringType: TypeSignature? // Uses .module(name, .none) for a free module-qualified function
-        let declarationType: StatementType
-        let availability: Availability
     }
 
     /// Availability information.
