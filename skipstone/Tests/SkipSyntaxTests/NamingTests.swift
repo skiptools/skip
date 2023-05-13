@@ -88,91 +88,33 @@ final class NamingTests: XCTestCase {
     func testModuleQualifiedNames() async throws {
         let moduleOne = try codebaseInfo(moduleName: "ModuleOne", swift: """
         public class A {
-            public func f() -> Int {
+            public func f() -> Swift.Int {
                 return 0
             }
         }
-        public func g(i: Swift.Int) -> Int {
+        public func g(i: Swift.Int) -> Swift.Int {
             return 0
         }
         """)
         let moduleTwo = try codebaseInfo(moduleName: "ModuleTwo", swift: """
-        public class A {
-            public func f() -> String {
+        public class B {
+            public func f() -> Swift.String {
                 return ""
             }
         }
-        public func g(i: Int) -> Swift.String {
+        public func g(i: Swift.Int) -> Swift.String {
             return ""
         }
         """)
-//        try await check(dependentModules: [moduleOne, moduleTwo], supportingSwift: """
-//        extension Int {
-//            var myValue: Int {
-//                return 0
-//            }
-//        }
-//        extension String {
-//            var myValue: String {
-//                return ""
-//            }
-//        }
-//        """, swift: """
-//        import ModuleOne
-//        import ModuleTwo
-//
-//        class C: ModuleTwo.A {
-//        }
-//
-//        func f(a: ModuleOne.A) -> Int {
-//            return 0
-//        }
-//        func f(a: ModuleTwo.A) -> String {
-//            return ""
-//        }
-//        func g() {
-//            let b1 = ModuleOne.g(i: 0) == .myValue
-//            let b2 = ModuleTwo.g(i: 0) == .myValue
-//
-//            let a = ModuleOne.A()
-//            let b3 = a.f() == .myValue
-//            let c = C()
-//            let b4 = c.f() == .myValue
-//
-//            let b5 = f(a: ModuleOne.A()) == .myValue
-//            let b6 = f(a: ModuleTwo.A()) == .myValue
-//        }
-//        """, kotlin: """
-//        import module.one.*
-//        import module.two.*
-//
-//        internal open class C: module.two.A() {
-//        }
-//
-//        internal fun f(a: module.one.A): Int = 0
-//        internal fun f(a: module.two.A): String = ""
-//        internal fun g() {
-//            val b1 = module.one.g(i = 0) == Int.myValue
-//            val b2 = modle.two.g(i = 0) == String.myValue
-//
-//            val a = module.one.A()
-//            val b3 = a.f() == Int.myValue
-//            val c = C()
-//            val b4 = c.f() == String.myValue
-//
-//            val b5 = f(a = module.one.A()) == Int.myValue
-//            val b6 = f(a = module.two.A()) == String.myValue
-//        }
-//        """)
 
         try await check(dependentModules: [moduleOne, moduleTwo], supportingSwift: """
         extension Int {
-            var myValue: Int {
+            static var myValue: Int {
                 return 0
             }
         }
         extension String {
-            var myValue: String {
+            static var myValue: String {
                 return ""
             }
         }
@@ -180,17 +122,47 @@ final class NamingTests: XCTestCase {
         import ModuleOne
         import ModuleTwo
 
+        class C: ModuleTwo.B {
+        }
+
+        func f(obj: ModuleOne.A) -> Int {
+            return obj.f()
+        }
+        func f(obj: ModuleTwo.B) -> String {
+            return obj.f()
+        }
         func g() {
             let b1 = ModuleOne.g(i: 0) == .myValue
             let b2 = ModuleTwo.g(i: 0) == .myValue
+
+            let a = ModuleOne.A()
+            let b3 = a.f() == .myValue
+            let c = C()
+            let b4 = c.f() == .myValue
+
+            let b5 = f(obj: ModuleOne.A()) == .myValue
+            let b6 = f(obj: ModuleTwo.B()) == .myValue
         }
         """, kotlin: """
         import module.one.*
         import module.two.*
 
+        internal open class C: module.two.B() {
+        }
+
+        internal fun f(obj: module.one.A): Int = obj.f()
+        internal fun f(obj: module.two.B): String = obj.f()
         internal fun g() {
             val b1 = module.one.g(i = 0) == Int.myValue
-            val b2 = modle.two.g(i = 0) == String.myValue
+            val b2 = module.two.g(i = 0) == String.myValue
+
+            val a = module.one.A()
+            val b3 = a.f() == Int.myValue
+            val c = C()
+            val b4 = c.f() == String.myValue
+
+            val b5 = f(obj = module.one.A()) == Int.myValue
+            val b6 = f(obj = module.two.B()) == String.myValue
         }
         """)
     }

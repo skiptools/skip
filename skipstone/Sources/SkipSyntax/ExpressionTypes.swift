@@ -964,7 +964,7 @@ class MatchingCase: Expression, BindingExpression {
 /// `person.name`
 class MemberAccess: Expression {
     let base: Expression?
-    private(set) var baseType: TypeSignature
+    private(set) var baseType: TypeSignature // Will be .module(name, .none) for module qualifier
     let member: String
     private(set) var generics: [TypeSignature]?
     let useMultlineFormatting: Bool
@@ -1034,6 +1034,7 @@ class MemberAccess: Expression {
         // Were we able to resolve the member by treating our unknown base identifier as a module name?
         if self.baseType == .none, memberType != .none, let baseIdentifier {
             baseIdentifier.isModuleNameFor = memberType
+            self.baseType = .module(baseIdentifier.name, .none)
         }
         memberType = memberType.or(expecting)
         return context

@@ -74,7 +74,7 @@ class KotlinCommonProtocolsTransformer: KotlinTransformer {
         }) else {
             return
         }
-        guard codebaseInfo.global.protocolSignatures(forNamed: classDeclaration.signature).contains(where: { !$0.isCustomStringConvertible }) else {
+        guard codebaseInfo.global.protocolSignatures(forNamed: classDeclaration.signature).contains(where: { $0.isCustomStringConvertible }) else {
             return
         }
 

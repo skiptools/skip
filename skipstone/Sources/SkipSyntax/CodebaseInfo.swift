@@ -270,7 +270,7 @@ public class CodebaseInfo: Codable {
             let lookup = global.lookup(name: identifier, moduleName: moduleName, qualifiedMatch: true)
             let topRanked = ranked(lookup).first { candidate in
                 switch candidate.declarationType {
-                case .actorDeclaration, .classDeclaration, .enumDeclaration, .protocolDeclaration, .structDeclaration, .typealiasDeclaration, .enumCaseDeclaration, .variableDeclaration:
+                case .actorDeclaration, .classDeclaration, .enumDeclaration, .protocolDeclaration, .structDeclaration, .typealiasDeclaration, .enumCaseDeclaration, .variableDeclaration, .functionDeclaration:
                     return true
                 default:
                     return false
@@ -284,7 +284,7 @@ public class CodebaseInfo: Codable {
             if let typeInfo = topRanked as? TypeInfo {
                 return (type.constrainedTypeWithGenerics(typeInfo.generics).asMetaType(true), topRanked.availability)
             } else {
-                return (type.asMetaType(topRanked.declarationType != .variableDeclaration && topRanked.declarationType != .enumCaseDeclaration), topRanked.availability)
+                return (type.asMetaType(topRanked.declarationType != .variableDeclaration && topRanked.declarationType != .enumCaseDeclaration && topRanked.declarationType != .functionDeclaration), topRanked.availability)
             }
         }
         
@@ -298,6 +298,8 @@ public class CodebaseInfo: Codable {
                     }
                 }
                 return (.none, .available)
+            } else if case .module(let module, .none) = type {
+                return identifierSignature(of: member, moduleName: module)
             }
             let isStatic = type.isMetaType
             type = type.asMetaType(false)
@@ -319,7 +321,12 @@ public class CodebaseInfo: Codable {
                 return (nestedTypeInfo.signature.asMetaType(true), nestedTypeInfo.availability)
             }
             // Is it a module name?
-            return identifierSignature(of: member, moduleName: type.name)
+            if case .named(let moduleName, []) = type {
+                // Is type a module name?
+                return identifierSignature(of: member, moduleName: moduleName)
+            } else {
+                return (.none, .available)
+            }
         }
 
         /// Return the signatures of the possible functions being called with the given arguments.
@@ -358,6 +365,8 @@ public class CodebaseInfo: Codable {
                     }
                 }
                 return []
+            } else if case .module(let module, .none) = type {
+                return functionSignature(of: name, arguments: arguments, moduleName: module)
             }
             let isStatic = type.isMetaType
             type = type.asMetaType(false)
@@ -377,8 +386,12 @@ public class CodebaseInfo: Codable {
             }
             let sortedCandidates = candidates.sorted { $0.score > $1.score }
             guard let topCandidate = sortedCandidates.first else {
-                // Is type a module name?
-                return functionSignature(of: name, arguments: arguments, moduleName: type.name)
+                if case .named(let moduleName, []) = type {
+                    // Is type a module name?
+                    return functionSignature(of: name, arguments: arguments, moduleName: moduleName)
+                } else {
+                    return []
+                }
             }
             return sortedCandidates.filter { $0.score >= topCandidate.score && $0.level <= topCandidate.level }.map { ($0.signature.mappingSelf(to: type), $0.declarationType, $0.availability) }
         }
@@ -1457,6 +1470,22 @@ public class CodebaseInfo: Codable {
             let moduleContext = ModuleContext(codebaseInfo: codebaseInfo, importedModuleNames: importedModuleNames ?? [], sourceFile: sourceFile)
             signature = signature.qualified(context: moduleContext)
         }
+    }
+
+    //~~~
+    /// Identifier match information.
+    struct IdentifierMatch {
+        let signature: TypeSignature
+        let declaringType: TypeSignature? // Uses .module(name, .none) for a free module-qualified function
+        let availability: Availability
+    }
+
+    /// Function match information.
+    struct FunctionMatch {
+        let signature: TypeSignature
+        let declaringType: TypeSignature? // Uses .module(name, .none) for a free module-qualified function
+        let declarationType: StatementType
+        let availability: Availability
     }
 
     /// Availability information.
