@@ -680,6 +680,14 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
                 """
 
+                // always add the primary module include
+                if !sourceModules.contains(primaryModuleName) && !primaryModuleName.hasSuffix("Tests") {
+                    settingsContents += """
+                    include(":\(primaryModuleName)")
+
+                    """
+                }
+
                 for sourceModule in sourceModules {
                     settingsContents += """
                     include(":\(sourceModule)")
