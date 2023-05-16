@@ -1660,7 +1660,7 @@ class KotlinSubscript: KotlinExpression {
     var base: KotlinExpression
     var arguments: [LabeledValue<KotlinExpression>] = []
     var mayBeSharedMutableStructType = false
-    var isDictionarySubscriptWithDefault = false
+    var isDictionarySubscript = false // Special case support for dict[key, default: @autoclosure]
 
     static func translate(expression: Subscript, translator: KotlinTranslator) -> KotlinSubscript {
         let kbase = translator.translateExpression(expression.base)
@@ -1671,7 +1671,7 @@ class KotlinSubscript: KotlinExpression {
         }
         kexpression.mayBeSharedMutableStructType = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
         if case .dictionary = expression.base.inferredType {
-            kexpression.isDictionarySubscriptWithDefault = expression.arguments.count == 2 && expression.arguments[1].label == "default"
+            kexpression.isDictionarySubscript = true
         }
         return kexpression
     }
@@ -1700,14 +1700,8 @@ class KotlinSubscript: KotlinExpression {
             output.append("[")
         }
         for (index, argument) in arguments.enumerated() {
-            var isAutoclosure = false
-            if let label = argument.label {
-                if isDictionarySubscriptWithDefault && label == "default" {
-                    isAutoclosure = true
-                } else {
-                    output.append(label).append(" = ")
-                }
-            }
+            // Note: Kotlin does not support labels for subscript arguments
+            let isAutoclosure = isDictionarySubscript && index == 1 && argument.label == "default"
             if isAutoclosure {
                 output.append("{ ")
             }
