@@ -1660,6 +1660,7 @@ class KotlinSubscript: KotlinExpression {
     var base: KotlinExpression
     var arguments: [LabeledValue<KotlinExpression>] = []
     var mayBeSharedMutableStructType = false
+    var isDictionarySubscriptWithDefault = false
 
     static func translate(expression: Subscript, translator: KotlinTranslator) -> KotlinSubscript {
         let kbase = translator.translateExpression(expression.base)
@@ -1669,6 +1670,9 @@ class KotlinSubscript: KotlinExpression {
             return LabeledValue(label: $0.label, value: kargumentExpression)
         }
         kexpression.mayBeSharedMutableStructType = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
+        if case .dictionary = expression.base.inferredType {
+            kexpression.isDictionarySubscriptWithDefault = expression.arguments.count == 2 && expression.arguments[1].label == "default"
+        }
         return kexpression
     }
 
@@ -1696,10 +1700,21 @@ class KotlinSubscript: KotlinExpression {
             output.append("[")
         }
         for (index, argument) in arguments.enumerated() {
+            var isAutoclosure = false
             if let label = argument.label {
-                output.append(label).append(" = ")
+                if isDictionarySubscriptWithDefault && label == "default" {
+                    isAutoclosure = true
+                } else {
+                    output.append(label).append(" = ")
+                }
+            }
+            if isAutoclosure {
+                output.append("{ ")
             }
             output.append(argument.value, indentation: indentation)
+            if isAutoclosure {
+                output.append(" }")
+            }
             if index < arguments.count - 1 {
                 output.append(", ")
             }
