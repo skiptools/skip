@@ -55,7 +55,14 @@ struct  StatementDecoder {
     }
 
     static func decode<ListContainer: SyntaxListContainer>(syntaxListContainer: ListContainer, in syntaxTree: SyntaxTree) -> [Statement] {
-        return decode(syntaxList: syntaxListContainer.syntaxList, in: syntaxTree)
+        var statements = decode(syntaxList: syntaxListContainer.syntaxList, in: syntaxTree)
+        let endSyntax = syntaxListContainer.endOfListSyntax
+        if let extras = StatementExtras.decode(syntax: endSyntax) {
+            let (extraStatements, _) = extras.statements(syntax: endSyntax, in: syntaxTree)
+            statements += extraStatements
+            statements.append(EndOfBlock(syntax: endSyntax, extras: extras, in: syntaxTree))
+        }
+        return statements
     }
 
     static func decode<List: SyntaxList>(syntaxList: List, in syntaxTree: SyntaxTree) -> [Statement] {

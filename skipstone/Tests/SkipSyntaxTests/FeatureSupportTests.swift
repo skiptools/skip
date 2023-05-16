@@ -47,22 +47,6 @@ final class FeatureSupportTests: XCTestCase {
             """)
     }
 
-    func testTrailingComments() async throws {
-        // note also: the license headers are being removed from the transpiled Kotlin output; we'll want any file preamble comments to appear as preamble comments (before even the package and import declarations) in the output Kotlin file
-        try await check(swift: """
-            // comment 1
-            let x = "1" + "X"
-            // comment 2
-            return x
-            // comment 3
-        """, kotlin: """
-            // comment 1
-            internal val x = "1" + "X"
-            // comment 2
-            return x
-            """)
-    }
-
     func testEnumKeyworkNames() async throws {
         // Postfix-underscored (e.g. "Object_") keyword name-derived case classes are do not use the escaped version when checking cases
 
@@ -292,7 +276,6 @@ final class FeatureSupportTests: XCTestCase {
     }
 
     func fibCheck(n fibIndex: Int, expectFailure: Bool) async throws {
-
         try await check(expectFailure: expectFailure, swiftCode: {
             func fibonacci(_ n: Int) -> Int {
                 if n <= 1 {

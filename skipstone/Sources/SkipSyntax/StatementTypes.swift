@@ -8,6 +8,7 @@ enum StatementType: CaseIterable, Codable {
     case `continue`
     case `defer`
     case doCatch
+    case endOfBlock
     case `fallthrough`
     case forLoop
     case `guard`
@@ -51,6 +52,8 @@ enum StatementType: CaseIterable, Codable {
             return Defer.self
         case .doCatch:
             return DoCatch.self
+        case .endOfBlock:
+            return EndOfBlock.self
         case .fallthrough:
             return Fallthrough.self
         case .forLoop:
@@ -268,6 +271,13 @@ class DoCatch: Statement {
 
     override var children: [SyntaxNode] {
         return [body] + catches
+    }
+}
+
+/// Empty statement used to hold trivia that appears at the end of a block or file.
+class EndOfBlock: Statement {
+    init(syntax: SyntaxProtocol, extras: StatementExtras, in syntaxTree: SyntaxTree) {
+        super.init(type: .endOfBlock, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
     }
 }
 

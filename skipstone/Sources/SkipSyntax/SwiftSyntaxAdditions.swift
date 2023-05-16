@@ -334,6 +334,7 @@ protocol SyntaxList: Sequence where Element: SyntaxListElement {
 protocol SyntaxListContainer {
     associatedtype ElementList: SyntaxList
     var syntaxList: ElementList { get }
+    var endOfListSyntax: SyntaxProtocol { get }
 }
 
 // MARK: - Conformances
@@ -341,6 +342,10 @@ protocol SyntaxListContainer {
 extension SourceFileSyntax: SyntaxListContainer {
     var syntaxList: CodeBlockItemListSyntax {
         return self.statements
+    }
+
+    var endOfListSyntax: SyntaxProtocol {
+        return self.eofToken
     }
 }
 
@@ -357,6 +362,10 @@ extension CodeBlockSyntax: SyntaxListContainer {
     var syntaxList: CodeBlockItemListSyntax {
         return self.statements
     }
+
+    var endOfListSyntax: SyntaxProtocol {
+        return self.rightBrace
+    }
 }
 
 extension MemberDeclListItemSyntax: SyntaxListElement {
@@ -372,10 +381,18 @@ extension MemberDeclBlockSyntax: SyntaxListContainer {
     var syntaxList: MemberDeclListSyntax {
         return self.members
     }
+
+    var endOfListSyntax: SyntaxProtocol {
+        return self.rightBrace
+    }
 }
 
 extension ClosureExprSyntax: SyntaxListContainer {
     var syntaxList: CodeBlockItemListSyntax {
         return self.statements
+    }
+
+    var endOfListSyntax: SyntaxProtocol {
+        return self.rightBrace
     }
 }

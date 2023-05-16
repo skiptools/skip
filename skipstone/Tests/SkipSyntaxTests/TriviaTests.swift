@@ -63,6 +63,44 @@ final class TriviaTests: XCTestCase {
         """)
     }
 
+    func testTrailingTriviaPreservation() async throws {
+        try await check(swift: """
+        let x = "1" + "X" // comment 1
+        // comment 2
+        """, kotlin: """
+        internal val x = "1" + "X" // comment 1
+        // comment 2
+        """)
+
+        try await check(swift: """
+        class C {
+            func f() {
+                if x == 0 {
+                    return -1
+                    // comment 1
+                }
+                return x
+                // comment 2
+            }
+            // comment 3
+        }
+        // comment 4
+        """, kotlin: """
+        internal open class C {
+            internal open fun f() {
+                if (x == 0) {
+                    return -1
+                    // comment 1
+                }
+                return x
+                // comment 2
+            }
+            // comment 3
+        }
+        // comment 4
+        """)
+    }
+
     func testReplaceDirective() async throws {
         try await check(swift: """
         // SKIP REPLACE:
@@ -102,6 +140,20 @@ final class TriviaTests: XCTestCase {
         }
 
         internal fun g() = print("original")
+        """)
+    }
+
+    func testTrailingInsertDirective() async throws {
+        try await check(swift: """
+        func f() {
+            print("Here")
+            // SKIP INSERT: print("From Kotlin!")
+        }
+        """, kotlin: """
+        internal fun f() {
+            print("Here")
+            print("From Kotlin!")
+        }
         """)
     }
 

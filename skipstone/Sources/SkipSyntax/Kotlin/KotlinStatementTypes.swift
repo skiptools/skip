@@ -4,6 +4,7 @@ enum KotlinStatementType {
     case codeBlock
     case `continue`
     case `defer`
+    case endOfBlock
     case expression
     case forLoop
     case labeledStatement
@@ -448,6 +449,12 @@ class KotlinDefer: KotlinStatement {
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
         codeBlock?.appendDefer(body, to: output, indentation: indentation)
+    }
+}
+
+class KotlinEndOfBlock: KotlinStatement {
+    init(statement: EndOfBlock) {
+        super.init(type: .endOfBlock, statement: statement)
     }
 }
 
