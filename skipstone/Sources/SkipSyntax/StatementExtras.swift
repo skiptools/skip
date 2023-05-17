@@ -29,10 +29,12 @@ struct StatementExtras {
         var directive: Directive? = nil
         var directiveLines: [String] = []
         var triviaLines: [String] = []
-        let insertPrefix = "// SKIP INSERT:"
-        let replacePrefix = "// SKIP REPLACE:"
-        let declarationPrefix = "// SKIP DECLARE:"
-        let noWarnPrefix = "// SKIP NOWARN"
+        var isMultilineCommentDirective = false
+        var multilineCommentDirectiveIndentation = 0
+        let insertPrefix = "SKIP INSERT:"
+        let replacePrefix = "SKIP REPLACE:"
+        let declarationPrefix = "SKIP DECLARE:"
+        let noWarnPrefix = "SKIP NOWARN"
         func endDirective() {
             guard let currentDirective = directive else {
                 return
@@ -54,6 +56,7 @@ struct StatementExtras {
             }
             directive = nil
             directiveLines = []
+            isMultilineCommentDirective = false
         }
 
         var triviaString = syntax.leadingTrivia.description
@@ -75,16 +78,52 @@ struct StatementExtras {
                 hasNewline = false
                 triviaString = ""
             }
-            let trimmedLine = line.trimmingCharacters(in: .whitespaces)
-            guard !trimmedLine.isEmpty else {
+
+            var trimmedLine = line.trimmingCharacters(in: .whitespaces)
+            var isDirective = false
+            var isSingleLineDirective = false
+            if isMultilineCommentDirective {
+                if trimmedLine == "*/" {
+                    endDirective()
+                    if hasNewline {
+                        triviaLines.append("\n")
+                    }
+                    continue
+                } else if trimmedLine.isEmpty {
+                    if hasNewline {
+                        directiveLines.append("\n")
+                    }
+                    continue
+                } else {
+                    let firstNonWhitespaceIndex = line.firstIndex(where: { !$0.isWhitespace })!
+                    let leadingWhitespaceCount = line.distance(from: line.startIndex, to: firstNonWhitespaceIndex)
+                    let trailingWhitespaceCount = line.count - trimmedLine.count - leadingWhitespaceCount
+                    trimmedLine = String(line.dropFirst(min(multilineCommentDirectiveIndentation, leadingWhitespaceCount)).dropLast(trailingWhitespaceCount))
+                }
+            } else if trimmedLine.isEmpty {
                 endDirective()
                 if hasNewline {
                     triviaLines.append("\n")
                 }
                 continue
+            } else {
+                if trimmedLine.hasPrefix("/* SKIP") {
+                    isDirective = true
+                    trimmedLine.removeFirst(3)
+                    if trimmedLine.hasSuffix("*/") {
+                        isSingleLineDirective = true
+                        trimmedLine.removeLast(2)
+                    } else {
+                        isMultilineCommentDirective = true
+                        multilineCommentDirectiveIndentation = line.distance(from: line.startIndex, to: line.firstIndex(of: "/")!)
+                    }
+                } else if trimmedLine.hasPrefix("// SKIP") {
+                    isDirective = true
+                    trimmedLine.removeFirst(3)
+                }
             }
 
-            if trimmedLine.hasPrefix("// SKIP") {
+            if isDirective {
                 endDirective()
                 if trimmedLine.hasPrefix(insertPrefix) {
                     directive = .insert("", nil)
@@ -97,13 +136,20 @@ struct StatementExtras {
                     directiveLines.append(String(trimmedLine.dropFirst(declarationPrefix.count)).trimmingCharacters(in: .whitespaces) + "\n")
                 } else if trimmedLine.hasPrefix(noWarnPrefix) {
                     directives.append(.nowarn)
+                    isSingleLineDirective = isSingleLineDirective || !isMultilineCommentDirective
                 } else {
                     directives.append(.invalid(trimmedLine))
+                    isSingleLineDirective = isSingleLineDirective || !isMultilineCommentDirective
                 }
-                continue
-            }
-            if directive != nil && trimmedLine.hasPrefix("// ") {
-                directiveLines.append(trimmedLine.dropFirst(3) + "\n")
+                if isSingleLineDirective {
+                    endDirective()
+                }
+            } else if directive != nil && (isMultilineCommentDirective || trimmedLine.hasPrefix("// ")) {
+                if trimmedLine.hasPrefix("// ") {
+                    directiveLines.append(trimmedLine.dropFirst(3) + "\n")
+                } else {
+                    directiveLines.append(trimmedLine + "\n")
+                }
             } else {
                 endDirective()
                 triviaLines.append(trimmedLine + "\n")

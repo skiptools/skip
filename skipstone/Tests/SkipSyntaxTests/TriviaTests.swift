@@ -63,6 +63,63 @@ final class TriviaTests: XCTestCase {
         """)
     }
 
+    func testMultilineTriviaPreservation() async throws {
+        try await check(swift: """
+        /*
+         Header comment
+
+         Class comment
+         Spanning two lines
+         */
+        class S {
+            var s: String /* EOL comment */
+
+            var i: Int
+            func f() -> S {
+                /*
+                 Copy */
+                var copy = self
+                /* Double
+                 */
+                copy.s = s + s
+                return copy
+            }
+
+            /*
+             Func comment
+            */
+            func f2() {
+            }
+        }
+        """, kotlin: """
+        /*
+        Header comment
+
+        Class comment
+        Spanning two lines
+        */
+        internal open class S {
+            internal var s: String /* EOL comment */
+
+            internal var i: Int
+            internal open fun f(): S {
+                /*
+                Copy */
+                var copy = this
+                /* Double
+                */
+                copy.s = s + s
+                return copy
+            }
+
+            /*
+            Func comment
+            */
+            internal open fun f2() = Unit
+        }
+        """)
+    }
+
     func testTrailingTriviaPreservation() async throws {
         try await check(swift: """
         let x = "1" + "X" // comment 1
@@ -116,6 +173,26 @@ final class TriviaTests: XCTestCase {
             print("replaced")
         }
         print("here")
+        """)
+
+        try await check(swift: """
+        /* SKIP REPLACE:
+        fun f() {
+            print("replaced")
+        }
+        */
+        func f() {
+            print("original")
+        }
+        print("here")
+        /* SKIP REPLACE: print("kotlin") */
+        print("swift")
+        """, kotlin: """
+        fun f() {
+            print("replaced")
+        }
+        print("here")
+        print("kotlin")
         """)
     }
 
@@ -234,6 +311,31 @@ final class TriviaTests: XCTestCase {
         internal fun k() {
             c { f() }
         }
+        """)
+    }
+
+    func testMultlineCommentDepth() async throws {
+        try await check(swift: """
+        /**
+         Comment line
+            /*
+            Embedded comment
+            */
+         More comments /* Inline */
+         Last line
+        */
+        func f() {
+        }
+        """, kotlin: """
+        /**
+        Comment line
+        /*
+        Embedded comment
+        */
+        More comments /* Inline */
+        Last line
+        */
+        internal fun f() = Unit
         """)
     }
 }
