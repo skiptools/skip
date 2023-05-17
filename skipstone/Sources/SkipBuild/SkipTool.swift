@@ -817,9 +817,14 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
                     // manually exclude our own module and tests names
                     if isTestModule(moduleName) {
                         if moduleName == "SkipUnit" {
-                            contents += [.init("testImplementation(project(\":\(moduleName)\"))")]
+                            contents += [
+                                .init("testImplementation(project(\":\(moduleName)\"))"),
+                                .init("androidTestImplementation(project(\":\(moduleName)\"))")
+                            ]
                         } else {
-                            contents += [.init("implementation(project(\":\(moduleName)\"))")]
+                            contents += [
+                                .init("implementation(project(\":\(moduleName)\"))"),
+                            ]
                         }
                     }
                 }
