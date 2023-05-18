@@ -1296,7 +1296,7 @@ class KotlinMemberAccess: KotlinExpression {
                     }
                     if let id = base as? KotlinIdentifier,
                        TypeSignature.innerExtensions.keys.contains(id.name + "." + member) {
-                        output.append("") // String.Encoding to StringEncoding
+                        output.append("") // e.g. String.Encoding to StringEncoding
                     } else {
                         output.append(".")
                     }
@@ -1305,6 +1305,10 @@ class KotlinMemberAccess: KotlinExpression {
                     output.append(KotlinTupleLiteral.member(index: memberIndex))
                 } else {
                     output.append(member)
+                    // Special case for Task.value -> Task.value() //~~~
+                    if member == "value", case .named("Task", _) = baseType {
+                        output.append("()")
+                    }
                 }
             }
         } else if baseType != .none {
