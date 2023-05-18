@@ -1,7 +1,7 @@
 /// Update variables declared in `if`, `guard`, and `when` statements to prevent shadowing locals and each other.
 ///
 /// - Seealso: ``KotlinIf``, ``KotlinWhen``
-class KotlinIfWhenTransformer: KotlinTransformer {
+final class KotlinIfWhenTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
         let identifiersVisitor = IdentifiersVisitor()
         syntaxTree.root.visit(perform: identifiersVisitor.visit)

@@ -1,5 +1,5 @@
 /// Update types that conform to the `Error` protocol to extend from `Exception`.
-class KotlinErrorToExceptionTransformer: KotlinTransformer {
+final class KotlinErrorToExceptionTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
         guard let codebaseInfo = translator.codebaseInfo else {
             return

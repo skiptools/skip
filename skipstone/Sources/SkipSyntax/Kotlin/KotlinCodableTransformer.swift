@@ -1,5 +1,5 @@
 /// Synthesize `Encodable` and `Decodable` conformance.
-class KotlinCodableTransformer: KotlinTransformer {
+final class KotlinCodableTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
         syntaxTree.root.visit {
             if let classDeclaration = $0 as? KotlinClassDeclaration {

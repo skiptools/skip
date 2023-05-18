@@ -2,6 +2,8 @@
 ///
 /// The transformer lifetime is tied to that of the entire transpilation process. This means that a given transformer instance may be applied to multiple syntax trees.
 public protocol KotlinTransformer {
+    init()
+
     /// Gather any needed info from the given Swift syntax tree.
     ///
     /// - Note: This phase is run during pre-flight and can also be used to add messages to the syntax trees.
@@ -24,39 +26,51 @@ public protocol KotlinTransformer {
 
 /// The set of builtin transformers in the order in which they should run.
 public func builtinKotlinTransformers() -> [KotlinTransformer] {
-    return [
-        // May change the names of members, so place it before transformers that could use those names in generated code
-        KotlinEscapeKeywordsTransformer(),
-        // May add members to implement our internal OptionSet contract, including using self assignment that must be
-        // detected and further translated by the KotlinStructTransformer
-        KotlinOptionSetTransformer(),
-        // May add members, so place it before transformers that could manipulate those members
-        KotlinStructTransformer(),
-        // May alter superclasses and change enums to use sealed classes
-        KotlinErrorToExceptionTransformer(),
-        // May *remove* information about protocol conformances. May change enums to use sealed classes. Requires knowledge of
-        // sealed vs. unsealed enums
-        KotlinCommonProtocolsTransformer(),
-        // May add enums and constructors that must be enhanced by subsequent transformers. Requires knowledge of sealed vs.
-        // unsealed enums
-        KotlinCodableTransformer(),
-        // May add RawRepresentable enum factory function. Requires knowledge of sealed vs. unsealed enums. Requires knowledge of
-        // constructors, so place before KotlinEnumTransformer
-        KotlinRawRepresentableTransformer(),
-        // May *replace* constructors with factory functions. May add static allCases function. May change optional init call
-        // sites to factory calls. Requires knowledge of sealed vs. unsealed enums
-        KotlinEnumTransformer(),
-        // May add constructors and modify existing constructors. May suppress side property setting side effects in functions.
-        // May change optional init call sites
-        KotlinConstructorAndSideEffectSupressionTransformer(),
-        KotlinIfWhenTransformer(),
-        KotlinDeferTransformer(),
-        KotlinDisambiguateFunctionsTransformer(),
-        KotlinTupleLabelTransformer(),
-        KotlinSwiftUITransformer(),
-        KotlinImportMapTransformer(),
-        KotlinTestAnnotationTransformer(),
-    ]
+    return builtinKotlinTransformerTypes.map { $0.init() }
+}
+
+public let builtinKotlinTransformerTypes: [KotlinTransformer.Type] = [
+    // May change the names of members, so place it before transformers that could use those names in generated code
+    KotlinEscapeKeywordsTransformer.self,
+    // May add members to implement our internal OptionSet contract, including using self assignment that must be
+    // detected and further translated by the KotlinStructTransformer
+    KotlinOptionSetTransformer.self,
+    // May add members, so place it before transformers that could manipulate those members
+    KotlinStructTransformer.self,
+    // May alter superclasses and change enums to use sealed classes
+    KotlinErrorToExceptionTransformer.self,
+    // May *remove* information about protocol conformances. May change enums to use sealed classes. Requires knowledge of
+    // sealed vs. unsealed enums
+    KotlinCommonProtocolsTransformer.self,
+    // May add enums and constructors that must be enhanced by subsequent transformers. Requires knowledge of sealed vs.
+    // unsealed enums
+    KotlinCodableTransformer.self,
+    // May add RawRepresentable enum factory function. Requires knowledge of sealed vs. unsealed enums. Requires knowledge of
+    // constructors, so place before KotlinEnumTransformer
+    KotlinRawRepresentableTransformer.self,
+    // May *replace* constructors with factory functions. May add static allCases function. May change optional init call
+    // sites to factory calls. Requires knowledge of sealed vs. unsealed enums
+    KotlinEnumTransformer.self,
+    // May add constructors and modify existing constructors. May suppress side property setting side effects in functions.
+    // May change optional init call sites
+    KotlinConstructorAndSideEffectSupressionTransformer.self,
+    KotlinConcurrencyTransformer.self,
+    KotlinIfWhenTransformer.self,
+    KotlinDeferTransformer.self,
+    KotlinDisambiguateFunctionsTransformer.self,
+    KotlinTupleLabelTransformer.self,
+    KotlinSwiftUITransformer.self,
+    KotlinImportMapTransformer.self,
+    KotlinTestAnnotationTransformer.self,
+]
+
+/// The builtin transformers can implement this protocol to modify how type signatures are output.
+///
+/// The returned signature will be written to output instead of the input signature.
+///
+/// - Note: This is only called for `member`, `module`, and `named` types.
+protocol KotlinTypeSignatureOutputTransformer {
+    static func outputSignature(for: TypeSignature) -> TypeSignature
 }
 
 extension KotlinTransformer {

@@ -1,5 +1,5 @@
 /// Migrate Swift constructors to Kotlin constructors, include suppressing property side effects.
-class KotlinConstructorAndSideEffectSupressionTransformer: KotlinTransformer {
+final class KotlinConstructorAndSideEffectSupressionTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
         syntaxTree.root.visit { visit($0, translator: translator) }
     }

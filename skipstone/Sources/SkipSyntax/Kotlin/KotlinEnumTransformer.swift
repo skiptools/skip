@@ -1,5 +1,5 @@
 /// Handle enum constructors and `CaseIterable` synthesis.
-class KotlinEnumTransformer: KotlinTransformer {
+final class KotlinEnumTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
         guard let codebaseInfo = translator.codebaseInfo else {
             return

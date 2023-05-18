@@ -1,5 +1,5 @@
 /// Handle `OptionSet` implementation.
-class KotlinOptionSetTransformer: KotlinTransformer {
+final class KotlinOptionSetTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
         syntaxTree.root.visit {
             // We don't need to worry about extensions because they will have already been merged into the class

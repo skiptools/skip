@@ -1,5 +1,5 @@
 /// Disambiguate Kotlin functions translated from Swift functions that are only differentkated on their parameter labels.
-class KotlinDisambiguateFunctionsTransformer: KotlinTransformer {
+final class KotlinDisambiguateFunctionsTransformer: KotlinTransformer {
     func prepareForUse(codebaseInfo: CodebaseInfo?) {
         guard let codebaseInfo else {
             return

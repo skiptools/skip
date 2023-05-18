@@ -3,7 +3,7 @@
 ///   1. Synthesize `equals` and `hashCode` members in cases where the Swift compiler synthesizes `Equatable` and `Hashable`.
 ///   2. Remove references to `CustomStringConvertible`, `Equatable`, `Hashable` in inherits lists and generic constraints, because they are just aliases for `Any` in Kotlin.
 ///   3. Change references to `Comparable` in inherits lists and generic constraints to Kotlin's `Comparable<T>`.
-class KotlinCommonProtocolsTransformer: KotlinTransformer {
+final class KotlinCommonProtocolsTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
         guard let codebaseInfo = translator.codebaseInfo else {
             return
@@ -228,6 +228,16 @@ class KotlinCommonProtocolsTransformer: KotlinTransformer {
             .compactMap { $0 as? KotlinVariableDeclaration }
             .filter { !$0.isStatic && !$0.isGenerated && $0.getter == nil }
             .map { $0.names[0] ?? "" }
+    }
+}
+
+extension KotlinCommonProtocolsTransformer: KotlinTypeSignatureOutputTransformer {
+    static func outputSignature(for signature: TypeSignature) -> TypeSignature {
+        if case .named("Comparable", []) = signature {
+            return .named("Comparable", [.named("*", [])])
+        } else {
+            return signature
+        }
     }
 }
 

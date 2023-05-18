@@ -1,7 +1,7 @@
 /// Determine tuple labels used within the module and generate extension properites to support them.
 ///
 /// This transformer also generates errors for label conflicts, i.e. the same label being used to access different elements of the same N-tuple.
-class KotlinTupleLabelTransformer: KotlinTransformer {
+final class KotlinTupleLabelTransformer: KotlinTransformer {
     // Tuple arity -> Element -> Labels
     private var tupleLabels: [Int: [Int: Set<String>]] = [:]
     private var sourceFile: Source.FilePath? = nil

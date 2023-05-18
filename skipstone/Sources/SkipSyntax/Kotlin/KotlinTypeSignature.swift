@@ -12,7 +12,19 @@ extension TypeSignature {
 
     /// Kotlin description of this type.
     var kotlin: String {
+        var signature = self
         switch self {
+        case .member, .module, .named:
+            for transformerType in builtinKotlinTransformerTypes {
+                if let signatureTransformer = transformerType as? KotlinTypeSignatureOutputTransformer.Type {
+                    signature = signatureTransformer.outputSignature(for: signature)
+                }
+            }
+        default:
+            break
+        }
+
+        switch signature {
         case .any:
             return "Any"
         case .anyObject:
@@ -58,11 +70,7 @@ extension TypeSignature {
             return "\(KotlinTranslator.packageName(forModule: module)).\(type.kotlin)"
         case .named(let name, let generics):
             guard !generics.isEmpty && generics.contains(where: { $0 != .none }) else {
-                if name == "Comparable" {
-                    return "Comparable<*>"
-                } else {
-                    return name
-                }
+                return name
             }
             return "\(name)<\(generics.map { $0.kotlin }.joined(separator: ", "))>"
         case .none:
@@ -95,7 +103,7 @@ extension TypeSignature {
                 return "Unit"
             }
             let generics = types.map { $0.kotlin }.joined(separator: ", ")
-            if types.count < 6 {
+            if types.count <= KotlinTupleLiteral.maximumArity {
                 return "Tuple\(types.count)<\(generics)>"
             } else {
                 return "Any"

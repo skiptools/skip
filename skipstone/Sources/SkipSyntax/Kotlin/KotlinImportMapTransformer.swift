@@ -1,5 +1,5 @@
 /// Hande mapping from one import to another.
-class KotlinImportMapTransformer: KotlinTransformer {
+final class KotlinImportMapTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
         var importPaths: Set<[String]> = []
         for importDeclaration in syntaxTree.root.statements.compactMap({ $0 as? KotlinImportDeclaration }) {

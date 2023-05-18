@@ -1,5 +1,5 @@
 /// Append an underscore to the end of hard keywords in Kotlin, since they cannot be otherwise escaped.
-class KotlinEscapeKeywordsTransformer: KotlinTransformer {
+final class KotlinEscapeKeywordsTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
         let visitor = EscapeKeywordsVisitor()
         syntaxTree.root.visit(perform: visitor.visit)

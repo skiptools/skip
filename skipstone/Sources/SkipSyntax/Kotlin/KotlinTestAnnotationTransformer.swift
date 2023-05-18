@@ -1,7 +1,7 @@
 /// Add the necessary JUnit `@Test` annotation to any function named "test" in any class that extens "TestCase".
 ///
 /// - Seealso: `SkipUnit/XCTestCase.kt`
-class KotlinTestAnnotationTransformer: KotlinTransformer {
+final class KotlinTestAnnotationTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
         if let codebaseInfo = translator.codebaseInfo {
             syntaxTree.root.visit { visit($0, codebaseInfo: codebaseInfo) }

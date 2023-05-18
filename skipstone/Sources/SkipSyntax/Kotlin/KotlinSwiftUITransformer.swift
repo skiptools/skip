@@ -1,7 +1,7 @@
 /// Translate SwiftUI to syntactically correct Kotlin.
 ///
 /// We rely on our Kotlin UI libraries to provide the implementation of the SwiftUI-like API that this translation will result in.
-class KotlinSwiftUITransformer: KotlinTransformer {
+final class KotlinSwiftUITransformer: KotlinTransformer {
     private var sourceFile: Source.FilePath? = nil
     private var messages: [Message] = []
 
