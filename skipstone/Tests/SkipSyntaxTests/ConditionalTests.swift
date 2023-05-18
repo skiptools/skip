@@ -429,14 +429,14 @@ final class ConditionalTests: XCTestCase {
         }
         """, kotlin: """
         internal fun f(i: Int?): Int {
-            val r = linvoke llabel@{
+            val r = linvoke l@{
                 var letexec_0 = false
                 i?.let { x ->
                     letexec_0 = true
-                    return@llabel x
+                    return@l x
                 }
                 if (!letexec_0) {
-                    return@llabel 0
+                    return@l 0
                 }
                 error("Unreachable")
             }

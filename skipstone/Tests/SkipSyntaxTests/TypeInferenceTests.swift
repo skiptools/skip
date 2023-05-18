@@ -611,7 +611,7 @@ final class TypeInferenceTests: XCTestCase {
         """, kotlin: """
         {
             val c = Container<Int>()
-            val a = c.map llabel@{ i -> return@llabel Element(id = i) }
+            val a = c.map l@{ i -> return@l Element(id = i) }
             val b = a[0].id == Int.myValue
         }
         """)

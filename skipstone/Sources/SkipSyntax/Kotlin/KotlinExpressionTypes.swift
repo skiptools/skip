@@ -421,7 +421,7 @@ struct KotlinCasePattern {
 }
 
 class KotlinClosure: KotlinExpression {
-    static let returnLabel = "llabel"
+    static let returnLabel = "l"
 
     var returnType: TypeSignature = .none
     var parameters: [Parameter<Void>] = []
@@ -1871,7 +1871,7 @@ class KotlinTypeLiteral: KotlinExpression {
 }
 
 class KotlinWhen: KotlinExpression {
-    static let breakLabel = "wlabel"
+    static let breakLabel = "l"
 
     var on: KotlinExpression
     var cases: [KotlinCase]

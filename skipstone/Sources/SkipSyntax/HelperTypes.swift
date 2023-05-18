@@ -372,6 +372,7 @@ struct Attribute: Equatable {
         case frozen
         case indirect
         case inlinable
+        case mainActor
         case unavailable
         case unknown
     }
@@ -402,6 +403,8 @@ struct Attribute: Equatable {
             return .indirect
         case "inlinable":
             return .inlinable
+        case "MainActor":
+            return .mainActor
         default:
             return .unknown
         }

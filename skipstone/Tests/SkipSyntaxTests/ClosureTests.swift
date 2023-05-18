@@ -88,7 +88,7 @@ final class ClosureTests: XCTestCase {
             return 1
         }
         """, kotlin: """
-        call llabel@{ _ -> return@llabel 1 }
+        call l@{ _ -> return@l 1 }
         """)
     }
 
@@ -125,11 +125,11 @@ final class ClosureTests: XCTestCase {
         }
         """, kotlin: """
         {
-            val x = linvoke(1) llabel@{
+            val x = linvoke(1) l@{
                 if (it % 2 == 0) {
-                    return@llabel "YES"
+                    return@l "YES"
                 } else {
-                    return@llabel "NO"
+                    return@l "NO"
                 }
             }
         }
