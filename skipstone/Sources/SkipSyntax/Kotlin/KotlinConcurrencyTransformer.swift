@@ -2,6 +2,13 @@
 final class KotlinConcurrencyTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
         syntaxTree.root.visit { node in
+            if node is KotlinIdentifier {
+
+            } else if node is KotlinMemberAccess {
+
+            } else if node is KotlinAwait {
+                
+            }
             return .recurse(nil)
         }
     }
