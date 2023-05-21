@@ -108,6 +108,10 @@ class KotlinAwait: KotlinExpression {
         output.append(target, indentation: indentation)
     }
 
+    override var children: [KotlinSyntaxNode] {
+        return [target]
+    }
+
     /// Adjust the given Kotlin syntax for an asynchronous call.
     private func setIsAsynchronous(_ node: KotlinSyntaxNode) {
         node.visit { node in
@@ -1148,6 +1152,7 @@ class KotlinMemberAccess: KotlinExpression {
     var baseType: TypeSignature = .none
     var mayBeSharedMutableStruct = false
     var isFunctionReference = false
+    var isKotlinFunctionCall = false // Treat as a function call rather than member access in Kotlin
 
     static func translate(expression: MemberAccess, translator: KotlinTranslator) -> KotlinMemberAccess {
         let kexpression = KotlinMemberAccess(expression: expression)
@@ -1315,10 +1320,6 @@ class KotlinMemberAccess: KotlinExpression {
                     output.append(KotlinTupleLiteral.member(index: memberIndex))
                 } else {
                     output.append(member)
-                    // Special case for Task.value -> Task.value() //~~~
-                    if member == "value", case .named("Task", _) = baseType {
-                        output.append("()")
-                    }
                 }
             }
         } else if baseType != .none {
@@ -1334,6 +1335,9 @@ class KotlinMemberAccess: KotlinExpression {
         }
         if let generics, !generics.isEmpty {
             output.append("<\(generics.map(\.kotlin).joined(separator: ", "))>")
+        }
+        if isKotlinFunctionCall {
+            output.append("()")
         }
     }
 }

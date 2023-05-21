@@ -424,6 +424,56 @@ struct Attribute: Equatable {
     }
 }
 
+/// Availability information.
+///
+/// - Note: `Codable` for use in `CodebaseInfo`.
+enum Availability: Codable {
+    case available
+    case deprecated(String?)
+    case unavailable(String?)
+
+    init(attributes: Attributes) {
+        if let unavailable = attributes.attributes.first(where: { $0.kind == .unavailable }) {
+            self = .unavailable(unavailable.message)
+        } else if let deprecated = attributes.attributes.first(where: { $0.kind == .deprecated }) {
+            self = .deprecated(deprecated.message)
+        } else {
+            self = .available
+        }
+    }
+
+    /// Return the least available of this and the given availability.
+    func least(_ other: Availability) -> Availability {
+        switch self {
+        case .unavailable:
+            return self
+        case .deprecated:
+            if case .unavailable = other {
+                return other
+            } else {
+                return self
+            }
+        case .available:
+            if case .available = other {
+                return self
+            } else {
+                return other
+            }
+        }
+    }
+}
+
+/// Flags that affect API calls.
+///
+/// - Note: `Codable` for use in `CodebaseInfo`.
+struct CallFlags: OptionSet, Codable {
+    let rawValue: Int
+
+    static let async = CallFlags(rawValue: 1 << 0)
+    static let `throws` = CallFlags(rawValue: 1 << 1)
+    static let mainActor = CallFlags(rawValue: 1 << 2)
+}
+
 /// Generic information for a type or API.
 ///
 /// - Note: `Codable` for use in `CodebaseInfo`.
@@ -636,6 +686,23 @@ struct Generic: Equatable, Codable {
         generic.inherits = generic.inherits.map { $0.qualified(in: node, context: context) }
         return generic
     }
+}
+
+/// Match when querying identifiers, functions, and other API.
+struct APIMatch {
+    var signature: TypeSignature
+    var callFlags: CallFlags = []
+    /// May be `nil` for bultins like tuple members.
+    var declarationType: StatementType?
+    var availability: Availability = .available
+}
+
+/// The result of visiting a syntax node.
+enum VisitResult<N> {
+    /// Skip the content of this node.
+    case skip
+    /// Recurse into the content of this node, optionally invoking the given block when leaving this node's content.
+    case recurse(((N) -> Void)?)
 }
 
 extension Array where Element == Statement {

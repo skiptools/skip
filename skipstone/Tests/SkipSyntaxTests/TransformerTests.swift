@@ -31,4 +31,18 @@ final class TransformerTests: XCTestCase {
         }
         """)
     }
+
+    func testConcurrencyTransformerTaskValue() async throws {
+        try await check(swift: """
+        func f() async {
+            let task: Task = Task {}
+            let value = await task.value
+        }
+        """, kotlin: """
+        internal suspend fun f() {
+            val task: Task = Task {  }
+            val value = task.value()
+        }
+        """)
+    }
 }
