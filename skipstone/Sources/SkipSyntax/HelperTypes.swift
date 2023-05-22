@@ -463,17 +463,6 @@ enum Availability: Codable {
     }
 }
 
-/// Flags that affect API calls.
-///
-/// - Note: `Codable` for use in `CodebaseInfo`.
-struct CallFlags: OptionSet, Codable {
-    let rawValue: Int
-
-    static let async = CallFlags(rawValue: 1 << 0)
-    static let `throws` = CallFlags(rawValue: 1 << 1)
-    static let mainActor = CallFlags(rawValue: 1 << 2)
-}
-
 /// Generic information for a type or API.
 ///
 /// - Note: `Codable` for use in `CodebaseInfo`.
@@ -691,10 +680,21 @@ struct Generic: Equatable, Codable {
 /// Match when querying identifiers, functions, and other API.
 struct APIMatch {
     var signature: TypeSignature
-    var callFlags: CallFlags = []
+    var apiFlags: APIFlags = []
     /// May be `nil` for bultins like tuple members.
     var declarationType: StatementType?
     var availability: Availability = .available
+}
+
+/// Flags that affect API calls.
+///
+/// - Note: `Codable` for use in `CodebaseInfo`.
+struct APIFlags: OptionSet, Codable {
+    let rawValue: Int
+
+    static let async = APIFlags(rawValue: 1 << 0)
+    static let `throws` = APIFlags(rawValue: 1 << 1)
+    static let mainActor = APIFlags(rawValue: 1 << 2)
 }
 
 /// The result of visiting a syntax node.

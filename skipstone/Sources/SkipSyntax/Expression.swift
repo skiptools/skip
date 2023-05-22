@@ -125,6 +125,14 @@ struct ExpressionDecoder {
     }
 }
 
+/// An expression that represents a possible API call.
+protocol APICallExpression {
+    /// Additional information about the API call represented by this expression.
+    ///
+    /// Use `nil` the API call could not be determined. Use an empty `APIFlags` if this is not an API call.
+    var apiFlags: APIFlags? { get }
+}
+
 /// An expression that creates binding variables.
 protocol BindingExpression {
     var bindings: [String: TypeSignature] { get }

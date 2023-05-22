@@ -286,8 +286,8 @@ public class CodebaseInfo: Codable {
                 return APIMatch(signature: matchSignature, declarationType: topRanked.declarationType, availability: topRanked.availability)
             } else {
                 let matchSignature = type.asMetaType(topRanked.declarationType != .variableDeclaration && topRanked.declarationType != .enumCaseDeclaration && topRanked.declarationType != .functionDeclaration)
-                let callFlags: CallFlags = (topRanked as? FunctionInfo)?.callFlags ?? (topRanked as? VariableInfo)?.callFlags ?? []
-                return APIMatch(signature: matchSignature, callFlags: callFlags, declarationType: topRanked.declarationType, availability: topRanked.availability)
+                let apiFlags: APIFlags = (topRanked as? FunctionInfo)?.apiFlags ?? (topRanked as? VariableInfo)?.apiFlags ?? []
+                return APIMatch(signature: matchSignature, apiFlags: apiFlags, declarationType: topRanked.declarationType, availability: topRanked.availability)
             }
         }
         
@@ -463,8 +463,8 @@ public class CodebaseInfo: Codable {
                     return APIMatch(signature: signature, declarationType: memberInfo.declarationType, availability: availability)
                 } else {
                     let signature = memberInfo.signature.mappingTypes(from: typeInfo.signature.generics, to: constrainedGenerics)
-                    let callFlags: CallFlags = (memberInfo as? FunctionInfo)?.callFlags ?? (memberInfo as? VariableInfo)?.callFlags ?? []
-                    return APIMatch(signature: signature, callFlags: callFlags, declarationType: memberInfo.declarationType, availability: availability)
+                    let apiFlags: APIFlags = (memberInfo as? FunctionInfo)?.apiFlags ?? (memberInfo as? VariableInfo)?.apiFlags ?? []
+                    return APIMatch(signature: signature, apiFlags: apiFlags, declarationType: memberInfo.declarationType, availability: availability)
                 }
             }
             for inherits in typeInfo.inherits {
@@ -590,7 +590,7 @@ public class CodebaseInfo: Codable {
         private func matchFunction(_ item: CodebaseInfoItem, in typeInfo: TypeInfo? = nil, constrainedGenerics: [TypeSignature] = [], arguments: [LabeledValue<TypeSignature>], level: Int) -> FunctionCandidate? {
             let generics = (item as? FunctionInfo)?.generics
             if var candidate = matchFunction(signature: item.signature, generics: generics, declarationType: item.declarationType, availability: item.availability, in: typeInfo, constrainedGenerics: constrainedGenerics, arguments: arguments, level: level) {
-                candidate.match.callFlags = (item as? FunctionInfo)?.callFlags ?? (item as? VariableInfo)?.callFlags ?? []
+                candidate.match.apiFlags = (item as? FunctionInfo)?.apiFlags ?? (item as? VariableInfo)?.apiFlags ?? []
                 return candidate
             } else {
                 return nil
@@ -1231,7 +1231,7 @@ public class CodebaseInfo: Codable {
         var languageAdditions: Any?
         var importedModuleNames: [String]?
 
-        let callFlags: CallFlags
+        let apiFlags: APIFlags
         let isReadOnly: Bool
         let isInitializable: Bool
         let hasValue: Bool
@@ -1239,7 +1239,7 @@ public class CodebaseInfo: Codable {
 
         private enum CodingKeys: String, CodingKey {
             // Exclude value expression, language additions, importedModuleNames
-            case name, signature, moduleName, sourceFile, declaringType, modifiers, availability, callFlags, isReadOnly, isInitializable, hasValue
+            case name, signature, moduleName, sourceFile, declaringType, modifiers, availability, apiFlags, isReadOnly, isInitializable, hasValue
         }
 
         fileprivate init(statement: VariableDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo) {
@@ -1250,14 +1250,14 @@ public class CodebaseInfo: Codable {
             self.declaringType = declaringType
             self.modifiers = statement.modifiers
             self.availability = Availability(attributes: statement.attributes)
-            var callFlags: CallFlags = []
+            var apiFlags: APIFlags = []
             if statement.isAsync {
-                callFlags.insert(.async)
+                apiFlags.insert(.async)
             }
             if statement.isThrows {
-                callFlags.insert(.throws)
+                apiFlags.insert(.throws)
             }
-            self.callFlags = callFlags
+            self.apiFlags = apiFlags
             self.isReadOnly = statement.isLet || (statement.getter != nil && statement.setter == nil)
             self.isInitializable = !statement.modifiers.isStatic && statement.getter == nil && (!statement.isLet || statement.value == nil)
             self.hasValue = self.signature.isOptional || statement.value != nil
@@ -1322,13 +1322,13 @@ public class CodebaseInfo: Codable {
         var importedModuleNames: [String]?
 
         var generics: Generics
-        let callFlags: CallFlags
+        let apiFlags: APIFlags
         let isMutating: Bool
         var isGenerated = false
 
         private enum CodingKeys: String, CodingKey {
             // Exclude language additions, importedModuleNames
-            case name, declarationType, signature, moduleName, sourceFile, declaringType, modifiers, availability, generics, callFlags, isMutating, isGenerated
+            case name, declarationType, signature, moduleName, sourceFile, declaringType, modifiers, availability, generics, apiFlags, isMutating, isGenerated
         }
 
         fileprivate init(statement: FunctionDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo) {
@@ -1341,19 +1341,19 @@ public class CodebaseInfo: Codable {
             self.modifiers = statement.modifiers
             self.availability = Availability(attributes: statement.attributes)
             self.generics = statement.generics
-            var callFlags: CallFlags = []
+            var apiFlags: APIFlags = []
             if statement.isAsync {
-                callFlags.insert(.async)
+                apiFlags.insert(.async)
             }
             if statement.isThrows {
-                callFlags.insert(.throws)
+                apiFlags.insert(.throws)
             }
-            self.callFlags = callFlags
+            self.apiFlags = apiFlags
             self.isMutating = statement.modifiers.isMutating
             (codebaseInfo.languageAdditions as? CodebaseInfoLanguageAdditionsGatherDelegate)?.codebaseInfo(codebaseInfo, didGather: &self, from: statement)
         }
 
-        fileprivate init(name: String, declarationType: StatementType, signature: TypeSignature, moduleName: String?, sourceFile: Source.FilePath? = nil, declaringType: TypeSignature? = nil, modifiers: Modifiers, availability: Availability, generics: Generics = Generics(), callFlags: CallFlags = [], isMutating: Bool = false) {
+        fileprivate init(name: String, declarationType: StatementType, signature: TypeSignature, moduleName: String?, sourceFile: Source.FilePath? = nil, declaringType: TypeSignature? = nil, modifiers: Modifiers, availability: Availability, generics: Generics = Generics(), apiFlags: APIFlags = [], isMutating: Bool = false) {
             self.name = name
             self.declarationType = declarationType
             self.signature = signature
@@ -1363,7 +1363,7 @@ public class CodebaseInfo: Codable {
             self.modifiers = modifiers
             self.availability = availability
             self.generics = generics
-            self.callFlags = callFlags
+            self.apiFlags = apiFlags
             self.isMutating = isMutating
         }
 
@@ -1395,12 +1395,12 @@ public class CodebaseInfo: Codable {
         var importedModuleNames: [String]?
 
         var generics: Generics
-        let callFlags: CallFlags
+        let apiFlags: APIFlags
         let isReadOnly: Bool
 
         private enum CodingKeys: String, CodingKey {
             // Exclude language additions, importedModuleNames
-            case signature, moduleName, sourceFile, declaringType, modifiers, availability, generics, callFlags, isReadOnly
+            case signature, moduleName, sourceFile, declaringType, modifiers, availability, generics, apiFlags, isReadOnly
         }
 
         fileprivate init(statement: SubscriptDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo) {
@@ -1411,14 +1411,14 @@ public class CodebaseInfo: Codable {
             self.modifiers = statement.modifiers
             self.availability = Availability(attributes: statement.attributes)
             self.generics = statement.generics
-            var callFlags: CallFlags = []
+            var apiFlags: APIFlags = []
             if statement.isAsync {
-                callFlags.insert(.async)
+                apiFlags.insert(.async)
             }
             if statement.isThrows {
-                callFlags.insert(.throws)
+                apiFlags.insert(.throws)
             }
-            self.callFlags = callFlags
+            self.apiFlags = apiFlags
             self.isReadOnly = statement.setter == nil
             (codebaseInfo.languageAdditions as? CodebaseInfoLanguageAdditionsGatherDelegate)?.codebaseInfo(codebaseInfo, didGather: &self, from: statement)
         }

@@ -45,4 +45,15 @@ final class TransformerTests: XCTestCase {
         }
         """)
     }
+
+//    func testConcurrencyTransformerMainActorTask() async throws {
+//        try await check(swift: """
+//        func f() {
+//            Task { @MainActor in
+//                doSomething()
+//            }
+//        }
+//        """, kotlin: """
+//        """)
+//    }
 }

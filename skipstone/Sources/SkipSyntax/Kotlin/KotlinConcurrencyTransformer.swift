@@ -5,18 +5,26 @@ final class KotlinConcurrencyTransformer: KotlinTransformer {
             return
         }
         syntaxTree.root.visit { node in
-            if node is KotlinIdentifier {
-                // TODO
+            if let identifier = node as? KotlinIdentifier {
+                if identifier.name == "Task", let functionCall = identifier.parent as? KotlinFunctionCall, identifier === functionCall.function {
+                    updateTaskConstructor(functionCall)
+                }
             } else if let memberAccess = node as? KotlinMemberAccess {
-                // Special case for Task.value -> Task.value() in our Kotlin implementation
                 if memberAccess.member == "value", case .named("Task", _) = memberAccess.baseType {
-                    memberAccess.isKotlinFunctionCall = true
+                    // Special case for Task.value -> Task.value() in our Kotlin implementation
+                    memberAccess.member = "value()"
+                } else if memberAccess.member == "Task", case .module("Swift", _) = memberAccess.baseType, let functionCall = memberAccess.parent as? KotlinFunctionCall, memberAccess === functionCall.function {
+                    updateTaskConstructor(functionCall)
                 }
             } else if node is KotlinAwait {
                 // TODO
             }
             return .recurse(nil)
         }
+    }
+
+    private func updateTaskConstructor(_ functionCall: KotlinFunctionCall) {
+        
     }
 }
 

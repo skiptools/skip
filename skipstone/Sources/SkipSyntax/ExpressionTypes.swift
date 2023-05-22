@@ -475,13 +475,15 @@ class Closure: Expression {
     // TODO: Capture list
     private(set) var returnType: TypeSignature
     private(set) var parameters: [Parameter<Void>]
+    let attributes: Attributes
     let isAsync: Bool
     let isThrows: Bool
     let body: CodeBlock
 
-    init(returnType: TypeSignature = .none, parameters: [Parameter<Void>], isAsync: Bool = false, isThrows: Bool = false, body: CodeBlock, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
+    init(returnType: TypeSignature = .none, parameters: [Parameter<Void>], attributes: Attributes = Attributes(), isAsync: Bool = false, isThrows: Bool = false, body: CodeBlock, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.returnType = returnType
         self.parameters = parameters
+        self.attributes = attributes
         self.isAsync = isAsync
         self.isThrows = isThrows
         self.body = body
@@ -493,11 +495,12 @@ class Closure: Expression {
             return nil
         }
         let (returnType, parameters, messages) = closureExpr.signature?.typeSignatures(in: syntaxTree) ?? (.none, [], [])
+        let attributes = Attributes.for(syntax: closureExpr.signature?.attributes, in: syntaxTree)
         let isAsync = closureExpr.signature?.effectSpecifiers?.asyncSpecifier != nil
         let isThrows = closureExpr.signature?.effectSpecifiers?.throwsSpecifier != nil
         let statements = StatementDecoder.decode(syntaxList: closureExpr.statements, in: syntaxTree)
         let body = CodeBlock(statements: statements)
-        let expression = Closure(returnType: returnType, parameters: parameters, isAsync: isAsync, isThrows: isThrows, body: body, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+        let expression = Closure(returnType: returnType, parameters: parameters, attributes: attributes, isAsync: isAsync, isThrows: isThrows, body: body, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
         expression.messages = messages
         return expression
     }
@@ -669,6 +672,7 @@ class FunctionCall: Expression {
                 name = "init"
             } else if let generics = identifier.generics, !generics.isEmpty {
                 // If generics are specified, assume the identifier is a type name and this call is a constructor
+                //~~~ Need to switch this to constructor call to figure out APIFlags
                 returnType = TypeSignature.for(name: identifier.name, genericTypes: generics)
                 isInit = true
                 return context
@@ -688,6 +692,7 @@ class FunctionCall: Expression {
             baseType = memberAccess.baseType
             name = memberAccess.member
         default:
+            //~~~ Get APIFlags from function
             function.inferTypes(context: context, expecting: .none)
             if case .function(_, var returnType) = function.inferredType.asOptional(false) {
                 if function.inferredType.isOptional {
@@ -703,37 +708,34 @@ class FunctionCall: Expression {
         // First we infer argument types without knowing the function, so we expect .none
         arguments.forEach { $0.value.inferTypes(context: context, expecting: .none) }
         let argumentTypes = arguments.map { $0.value.inferredType }
-        var isInit = false
-        if var function = candidateFunction(name: name, arguments: arguments, in: baseType, context: context, expecting: expecting, isInit: &isInit, message: true) {
+        if var match = matchFunction(name: name, arguments: arguments, in: baseType, context: context, expecting: expecting, message: true) {
             // Re-infer arguments now that we know the parameter types
             for (index, argument) in arguments.enumerated() {
-                argument.value.inferTypes(context: context, expecting: function.parameters[index].type)
+                argument.value.inferTypes(context: context, expecting: match.signature.parameters[index].type)
             }
             // If any argument types changed, it could affect the return type of a generic function
             let refinedArgumentTypes = arguments.map({ $0.value.inferredType })
             if argumentTypes != refinedArgumentTypes {
-                if let refinedFunction = candidateFunction(name: name, arguments: arguments, in: baseType, context: context, expecting: expecting, isInit: &isInit, message: false) {
-                    function = refinedFunction
+                if let refinedMatch = matchFunction(name: name, arguments: arguments, in: baseType, context: context, expecting: expecting, message: false) {
+                    match = refinedMatch
                 }
             }
-            self.isInit = isInit
-            returnType = function.returnType.or(expecting)
+            self.isInit = match.declarationType == .initDeclaration
+            //~~~ APIFlags
+            returnType = match.signature.returnType.or(expecting)
         } else {
             returnType = expecting
         }
         return context
     }
 
-    private func candidateFunction(name: String, arguments: [LabeledValue<Expression>], in baseType: TypeSignature?, context: TypeInferenceContext, expecting: TypeSignature, isInit: inout Bool, message: Bool) -> TypeSignature? {
+    private func matchFunction(name: String, arguments: [LabeledValue<Expression>], in baseType: TypeSignature?, context: TypeInferenceContext, expecting: TypeSignature, message: Bool) -> APIMatch? {
         let parameters = arguments.map { LabeledValue<TypeSignature>(label: $0.label, value: $0.value.inferredType) }
-        let candidateFunctions = context.function(name, in: baseType, parameters: parameters, messagesNode: message ? self : nil)
-        guard !candidateFunctions.isEmpty else {
-            isInit = false
+        let matches = context.function(name, in: baseType, parameters: parameters, messagesNode: message ? self : nil)
+        guard !matches.isEmpty else {
             return nil
         }
-        let (signature, declarationType) = candidateFunctions.first { $0.0.returnType == expecting } ?? candidateFunctions[0]
-        isInit = declarationType == .initDeclaration
-        return signature
+        return matches.first { $0.signature.returnType == expecting } ?? matches[0]
     }
 
     private var returnType: TypeSignature = .none
@@ -784,7 +786,10 @@ class Identifier: Expression {
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
-        identifierType = context.identifier(name, messagesNode: self)
+        if let match = context.identifier(name, messagesNode: self) {
+            identifierType = match.signature
+            //~~~ APIFlags
+        }
         if let generics, !generics.isEmpty {
             identifierType = identifierType.withGenerics(generics.map { $0.constrainedTypeWithGenerics(context.generics) })
         }
@@ -1027,7 +1032,10 @@ class MemberAccess: Expression {
         }
         // Don't output unavailable messages here if this is part of a function call. There could be other
         // member matches. The function call node will have more type information
-        memberType = context.member(member, in: baseType, messagesNode: isCalledAsFunction ? nil : self)
+        if let match = context.member(member, in: baseType, messagesNode: isCalledAsFunction ? nil : self) {
+            //~~~ APIFlags. Note that if this is a function call, ultimate responsibility for having flags is with the FunctionCall expr
+            memberType = match.signature
+        }
         if let generics {
             memberType = memberType.withGenerics(generics)
         }
@@ -1035,6 +1043,7 @@ class MemberAccess: Expression {
         if self.baseType == .none, memberType != .none, let baseIdentifier {
             baseIdentifier.isModuleNameFor = memberType
             self.baseType = .module(baseIdentifier.name, .none)
+            //~~~ Empty APIFlags
         }
         memberType = memberType.or(expecting)
         return context
@@ -1172,7 +1181,7 @@ class OptionalBinding: Expression, BindingExpression {
             if let value {
                 variableType = value.inferredType
             } else {
-                variableType = TypeSignature.for(labels: names, types: names.map { $0.map { context.identifier($0, messagesNode: self) } ?? .none })
+                variableType = TypeSignature.for(labels: names, types: names.map { $0.map { context.identifier($0, messagesNode: self)?.signature ?? .none } ?? .none })
             }
         }
         // Flow will only continue when the value is non-optional
@@ -1448,14 +1457,15 @@ class Subscript: Expression {
         // First we infer argument types without knowing the function, so we expect .none
         arguments.forEach { $0.value.inferTypes(context: context, expecting: .none) }
         let parameters = arguments.map { LabeledValue<TypeSignature>(label: $0.label, value: $0.value.inferredType) }
-        let candidateFunctions = context.subscript(in: base.inferredType, parameters: parameters, messagesNode: self)
-        if !candidateFunctions.isEmpty {
-            let function = candidateFunctions.first { $0.returnType == expecting } ?? candidateFunctions[0]
+        let matches = context.subscript(in: base.inferredType, parameters: parameters, messagesNode: self)
+        if !matches.isEmpty {
+            let match = matches.first { $0.signature.returnType == expecting } ?? matches[0]
             // Re-infer arguments now that we know the parameter types
             for (index, argument) in arguments.enumerated() {
-                argument.value.inferTypes(context: context, expecting: function.parameters[index].type)
+                argument.value.inferTypes(context: context, expecting: match.signature.parameters[index].type)
             }
-            returnType = function.returnType.or(expecting)
+            returnType = match.signature.returnType.or(expecting)
+            //~~~ APICall
         } else {
             returnType = expecting
         }

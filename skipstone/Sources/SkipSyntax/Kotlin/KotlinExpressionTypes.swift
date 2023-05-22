@@ -439,6 +439,7 @@ class KotlinClosure: KotlinExpression {
 
     var returnType: TypeSignature = .none
     var parameters: [Parameter<Void>] = []
+    var attributes = Attributes()
     var implicitParameterLabels: [String] = []
     var isAnonymousFunction = false
     var body: KotlinCodeBlock
@@ -481,6 +482,7 @@ class KotlinClosure: KotlinExpression {
         kexpression.returnType.appendKotlinMessages(to: kexpression, source: translator.syntaxTree.source)
         kexpression.parameters = expression.parameters
         kexpression.parameters.forEach { $0.appendKotlinMessages(to: kexpression, source: translator.syntaxTree.source) }
+        kexpression.attributes = expression.attributes
         kexpression.isAnonymousFunction = isAnonymousFunction
         kexpression.implicitParameterLabels = implicitParameterLabels
         kexpression.hasReturnLabel = hasReturnLabel
@@ -1152,7 +1154,6 @@ class KotlinMemberAccess: KotlinExpression {
     var baseType: TypeSignature = .none
     var mayBeSharedMutableStruct = false
     var isFunctionReference = false
-    var isKotlinFunctionCall = false // Treat as a function call rather than member access in Kotlin
 
     static func translate(expression: MemberAccess, translator: KotlinTranslator) -> KotlinMemberAccess {
         let kexpression = KotlinMemberAccess(expression: expression)
@@ -1335,9 +1336,6 @@ class KotlinMemberAccess: KotlinExpression {
         }
         if let generics, !generics.isEmpty {
             output.append("<\(generics.map(\.kotlin).joined(separator: ", "))>")
-        }
-        if isKotlinFunctionCall {
-            output.append("()")
         }
     }
 }
