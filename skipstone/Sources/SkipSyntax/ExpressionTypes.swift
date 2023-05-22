@@ -602,7 +602,7 @@ class DictionaryLiteral: Expression {
 }
 
 /// `function(...)`
-class FunctionCall: Expression {
+class FunctionCall: Expression, APICallExpression {
     let function: Expression
     let arguments: [LabeledValue<Expression>]
     private(set) var isInit = false
@@ -650,6 +650,7 @@ class FunctionCall: Expression {
                 returnType = function.inferredType.or(expecting)
             }
             isInit = true
+            apiFlags = APIFlags()
             return context
         case .dictionaryLiteral:
             // Must be a constructor call, e.g. [String: Int]()
@@ -660,6 +661,7 @@ class FunctionCall: Expression {
                 returnType = function.inferredType.or(expecting)
             }
             isInit = true
+            apiFlags = APIFlags()
             return context
         case .identifier:
             let identifier = function as! Identifier
@@ -672,10 +674,8 @@ class FunctionCall: Expression {
                 name = "init"
             } else if let generics = identifier.generics, !generics.isEmpty {
                 // If generics are specified, assume the identifier is a type name and this call is a constructor
-                //~~~ Need to switch this to constructor call to figure out APIFlags
-                returnType = TypeSignature.for(name: identifier.name, genericTypes: generics)
-                isInit = true
-                return context
+                baseType = TypeSignature.for(name: identifier.name, genericTypes: generics)
+                name = "init"
             } else {
                 baseType = nil
                 name = identifier.name
@@ -692,13 +692,13 @@ class FunctionCall: Expression {
             baseType = memberAccess.baseType
             name = memberAccess.member
         default:
-            //~~~ Get APIFlags from function
             function.inferTypes(context: context, expecting: .none)
             if case .function(_, var returnType) = function.inferredType.asOptional(false) {
                 if function.inferredType.isOptional {
                     returnType = returnType.asOptional(true)
                 }
                 self.returnType = returnType.or(expecting)
+                apiFlags = (function as? APICallExpression)?.apiFlags
             } else {
                 returnType = expecting
             }
@@ -720,8 +720,8 @@ class FunctionCall: Expression {
                     match = refinedMatch
                 }
             }
-            self.isInit = match.declarationType == .initDeclaration
-            //~~~ APIFlags
+            isInit = match.declarationType == .initDeclaration
+            apiFlags = match.apiFlags
             returnType = match.signature.returnType.or(expecting)
         } else {
             returnType = expecting
@@ -743,6 +743,7 @@ class FunctionCall: Expression {
     override var inferredType: TypeSignature {
         return returnType
     }
+    var apiFlags: APIFlags?
 
     override var children: [SyntaxNode] {
         return [function] + arguments.map { $0.value }
@@ -750,13 +751,26 @@ class FunctionCall: Expression {
 }
 
 /// `x`, also `this` or `super`
-class Identifier: Expression {
+class Identifier: Expression, APICallExpression {
     let name: String
     private(set) var generics: [TypeSignature]?
     /// Whether this appears to be a local variable or parameter.
     private(set) var isLocalOrSelfIdentifier: Bool
-    var isCalledAsFunction = false
-    var isModuleNameFor: TypeSignature = .none
+    var isCalledAsFunction = false {
+        didSet {
+            // The function call may be able to figure out the API flags even if we can't
+            if isCalledAsFunction && apiFlags == nil {
+                apiFlags = APIFlags()
+            }
+        }
+    }
+    var isModuleNameFor: TypeSignature = .none {
+        didSet {
+            if isModuleNameFor != .none && apiFlags == nil {
+                apiFlags = APIFlags()
+            }
+        }
+    }
 
     init(name: String, generics: [TypeSignature]? = nil, isLocalOrSelfIdentifier: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.name = name
@@ -788,7 +802,7 @@ class Identifier: Expression {
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
         if let match = context.identifier(name, messagesNode: self) {
             identifierType = match.signature
-            //~~~ APIFlags
+            apiFlags = match.apiFlags
         }
         if let generics, !generics.isEmpty {
             identifierType = identifierType.withGenerics(generics.map { $0.constrainedTypeWithGenerics(context.generics) })
@@ -805,6 +819,7 @@ class Identifier: Expression {
     override var inferredType: TypeSignature {
         return identifierType
     }
+    var apiFlags: APIFlags? = nil
 
     override var prettyPrintAttributes: [PrettyPrintTree] {
         var children: [PrettyPrintTree] = []
@@ -967,13 +982,20 @@ class MatchingCase: Expression, BindingExpression {
 }
 
 /// `person.name`
-class MemberAccess: Expression {
+class MemberAccess: Expression, APICallExpression {
     let base: Expression?
     private(set) var baseType: TypeSignature // Will be .module(name, .none) for module qualifier
     let member: String
     private(set) var generics: [TypeSignature]?
     let useMultlineFormatting: Bool
-    var isCalledAsFunction = false
+    var isCalledAsFunction = false {
+        didSet {
+            // The function call may be able to figure out the API flags even if we can't
+            if isCalledAsFunction && apiFlags == nil {
+                apiFlags = APIFlags()
+            }
+        }
+    }
 
     init(base: Expression?, baseType: TypeSignature = .none, member: String, generics: [TypeSignature]? = nil, useMultlineFormatting: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.base = base
@@ -1033,8 +1055,8 @@ class MemberAccess: Expression {
         // Don't output unavailable messages here if this is part of a function call. There could be other
         // member matches. The function call node will have more type information
         if let match = context.member(member, in: baseType, messagesNode: isCalledAsFunction ? nil : self) {
-            //~~~ APIFlags. Note that if this is a function call, ultimate responsibility for having flags is with the FunctionCall expr
             memberType = match.signature
+            apiFlags = match.apiFlags
         }
         if let generics {
             memberType = memberType.withGenerics(generics)
@@ -1043,7 +1065,6 @@ class MemberAccess: Expression {
         if self.baseType == .none, memberType != .none, let baseIdentifier {
             baseIdentifier.isModuleNameFor = memberType
             self.baseType = .module(baseIdentifier.name, .none)
-            //~~~ Empty APIFlags
         }
         memberType = memberType.or(expecting)
         return context
@@ -1054,6 +1075,7 @@ class MemberAccess: Expression {
     override var inferredType: TypeSignature {
         return memberType
     }
+    var apiFlags: APIFlags?
 
     override var children: [SyntaxNode] {
         return base == nil ? [] : [base!]
@@ -1417,7 +1439,7 @@ class StringLiteral: Expression {
 }
 
 /// `array[0]`
-class Subscript: Expression {
+class Subscript: Expression, APICallExpression {
     let base: Expression
     let arguments: [LabeledValue<Expression>]
 
@@ -1465,7 +1487,7 @@ class Subscript: Expression {
                 argument.value.inferTypes(context: context, expecting: match.signature.parameters[index].type)
             }
             returnType = match.signature.returnType.or(expecting)
-            //~~~ APICall
+            apiFlags = match.apiFlags
         } else {
             returnType = expecting
         }
@@ -1477,6 +1499,7 @@ class Subscript: Expression {
     override var inferredType: TypeSignature {
         return returnType
     }
+    var apiFlags: APIFlags?
 
     override var children: [SyntaxNode] {
         return [base] + arguments.map { $0.value }

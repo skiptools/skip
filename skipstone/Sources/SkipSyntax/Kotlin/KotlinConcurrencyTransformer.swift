@@ -16,15 +16,19 @@ final class KotlinConcurrencyTransformer: KotlinTransformer {
                 } else if memberAccess.member == "Task", case .module("Swift", _) = memberAccess.baseType, let functionCall = memberAccess.parent as? KotlinFunctionCall, memberAccess === functionCall.function {
                     updateTaskConstructor(functionCall)
                 }
-            } else if node is KotlinAwait {
-                // TODO
+            } else if let awaitExpression = node as? KotlinAwait {
+                processAwaitExpression(awaitExpression)
             }
             return .recurse(nil)
         }
     }
 
     private func updateTaskConstructor(_ functionCall: KotlinFunctionCall) {
-        
+        //~~~
+    }
+
+    private func processAwaitExpression(_ expression: KotlinAwait) {
+        //~~~
     }
 }
 

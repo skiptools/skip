@@ -632,11 +632,12 @@ class KotlinDictionaryLiteral: KotlinExpression {
     }
 }
 
-class KotlinFunctionCall: KotlinExpression {
+class KotlinFunctionCall: KotlinExpression, APICallExpression {
     var function: KotlinExpression
     var arguments: [LabeledValue<KotlinExpression>] = []
     var isOptionalInit = false
     var inferredType: TypeSignature = .none
+    var apiFlags: APIFlags?
     var mayBeSharedMutableStructType = false
     var useTrailingClosureFormatting = true
 
@@ -649,6 +650,7 @@ class KotlinFunctionCall: KotlinExpression {
         }
         kexpression.isOptionalInit = expression.isInit && expression.inferredType.isOptional
         kexpression.inferredType = expression.inferredType
+        kexpression.apiFlags = expression.apiFlags
         kexpression.mayBeSharedMutableStructType = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
         return kexpression
     }
@@ -754,9 +756,10 @@ class KotlinFunctionCall: KotlinExpression {
     }
 }
 
-class KotlinIdentifier: KotlinExpression {
+class KotlinIdentifier: KotlinExpression, APICallExpression {
     var name: String
     var generics: [TypeSignature]?
+    var apiFlags: APIFlags?
     var mayBeSharedMutableStruct = false
     var isLocalOrSelfIdentifier = false
     var isOperatorIdentifier = false
@@ -767,6 +770,7 @@ class KotlinIdentifier: KotlinExpression {
     static func translate(expression: Identifier, translator: KotlinTranslator) -> KotlinIdentifier {
         let kexpression = KotlinIdentifier(expression: expression)
         kexpression.generics = expression.generics
+        kexpression.apiFlags = expression.apiFlags
         kexpression.isOperatorIdentifier = !Operator.with(symbol: expression.name).isUnknown
         kexpression.mayBeSharedMutableStruct = !kexpression.isOperatorIdentifier && expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
         kexpression.isLocalOrSelfIdentifier = expression.isLocalOrSelfIdentifier
@@ -1145,11 +1149,12 @@ struct KotlinMatchingCase {
     }
 }
 
-class KotlinMemberAccess: KotlinExpression {
+class KotlinMemberAccess: KotlinExpression, APICallExpression {
     var base: KotlinExpression?
     var baseKClass: TypeSignature?
     var member: String
     var generics: [TypeSignature]?
+    var apiFlags: APIFlags?
     var useMultlineFormatting = false
     var baseType: TypeSignature = .none
     var mayBeSharedMutableStruct = false
@@ -1170,6 +1175,7 @@ class KotlinMemberAccess: KotlinExpression {
             kexpression.messages.append(.kotlinOptionalNoneSome(expression, source: translator.syntaxTree.source))
         }
         kexpression.generics = expression.generics
+        kexpression.apiFlags = expression.apiFlags
         kexpression.baseType = expression.baseType.asMetaType(false)
         if case .tuple = expression.baseType {
             // Tuples sref() their members on the way out and do not set an onUpdate block, so no need to sref() again
@@ -1672,9 +1678,10 @@ class KotlinStringLiteral: KotlinExpression {
     }
 }
 
-class KotlinSubscript: KotlinExpression {
+class KotlinSubscript: KotlinExpression, APICallExpression {
     var base: KotlinExpression
     var arguments: [LabeledValue<KotlinExpression>] = []
+    var apiFlags: APIFlags?
     var mayBeSharedMutableStructType = false
     var isDictionarySubscript = false // Special case support for dict[key, default: @autoclosure]
 
@@ -1685,6 +1692,7 @@ class KotlinSubscript: KotlinExpression {
             let kargumentExpression = translator.translateExpression($0.value)
             return LabeledValue(label: $0.label, value: kargumentExpression)
         }
+        kexpression.apiFlags = expression.apiFlags
         kexpression.mayBeSharedMutableStructType = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
         if case .dictionary = expression.base.inferredType {
             kexpression.isDictionarySubscript = true
