@@ -31,8 +31,12 @@ class KotlinStatement: KotlinSyntaxNode {
     }
 
     final override var subtreeMessages: [Message] {
-        let messages: [Message] = extras?.suppressMessages == true ? [] : messages
-        return messages + children.flatMap { $0.subtreeMessages }
+        if extras?.suppressMessages == true {
+            // Filter out our own messages and any child Expression messages, but leave child statements
+            return children.filter { $0 is KotlinStatement }.flatMap { $0.subtreeMessages }
+        } else {
+            return messages + children.flatMap { $0.subtreeMessages }
+        }
     }
 
     final override func leadingTrivia(indentation: Indentation) -> String {

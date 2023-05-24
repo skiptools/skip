@@ -665,7 +665,6 @@ class FunctionCall: Expression, APICallExpression {
             return context
         case .identifier:
             let identifier = function as! Identifier
-            identifier.isCalledAsFunction = true
             let _ = identifier.inferTypes(context: context, expecting: .none)
             if identifier.inferredType.isMetaType {
                 // Assume the call is a constructor. Do not assume return type is the same, however, as we might use the
@@ -682,7 +681,6 @@ class FunctionCall: Expression, APICallExpression {
             }
         case .memberAccess:
             let memberAccess = function as! MemberAccess
-            memberAccess.isCalledAsFunction = true
             if memberAccess.base == nil {
                 // Supply expected result type as probable base type when base is missing
                 _ = memberAccess.inferTypes(context: context, expecting: expecting)
@@ -756,21 +754,7 @@ class Identifier: Expression, APICallExpression {
     private(set) var generics: [TypeSignature]?
     /// Whether this appears to be a local variable or parameter.
     private(set) var isLocalOrSelfIdentifier: Bool
-    var isCalledAsFunction = false {
-        didSet {
-            // The function call may be able to figure out the API flags even if we can't
-            if isCalledAsFunction && apiFlags == nil {
-                apiFlags = APIFlags()
-            }
-        }
-    }
-    var isModuleNameFor: TypeSignature = .none {
-        didSet {
-            if isModuleNameFor != .none && apiFlags == nil {
-                apiFlags = APIFlags()
-            }
-        }
-    }
+    var isModuleNameFor: TypeSignature = .none
 
     init(name: String, generics: [TypeSignature]? = nil, isLocalOrSelfIdentifier: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.name = name
@@ -988,14 +972,6 @@ class MemberAccess: Expression, APICallExpression {
     let member: String
     private(set) var generics: [TypeSignature]?
     let useMultlineFormatting: Bool
-    var isCalledAsFunction = false {
-        didSet {
-            // The function call may be able to figure out the API flags even if we can't
-            if isCalledAsFunction && apiFlags == nil {
-                apiFlags = APIFlags()
-            }
-        }
-    }
 
     init(base: Expression?, baseType: TypeSignature = .none, member: String, generics: [TypeSignature]? = nil, useMultlineFormatting: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.base = base

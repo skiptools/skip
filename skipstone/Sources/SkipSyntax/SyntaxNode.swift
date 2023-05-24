@@ -110,6 +110,11 @@ class SyntaxNode: SourceDerived, PrettyPrintable {
         return nil
     }
 
+    /// Whether this node is called as a function.
+    final var isCalledAsFunction: Bool {
+        return self === (parent as? FunctionCall)?.function
+    }
+
     /// Traverse up the syntax tree to fully qualify a type.
     final func qualifyReferencedNamedType(name: String, generics: [TypeSignature]) -> TypeSignature {
         // Look for a qualified name whose last token(s) are the given type name

@@ -12,8 +12,17 @@ extension Message {
     }
 
     // Idea: auto-translate to function?
+    static func kotlinAsyncConstructors(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Kotlin does not support async constructors. Consider using a factory function", sourceDerived: sourceDerived, source: source)
+    }
+
+    // Idea: auto-translate to function?
     static func kotlinAsyncProperties(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Kotlin does not support async properties. Consider using a function", sourceDerived: sourceDerived, source: source)
+    }
+
+    static func kotlinAsyncAwaitTypeInference(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Skip is unable to match this API call to determine the correct actor on which to run it. Consider adding additional type information", sourceDerived: sourceDerived, source: source)
     }
 
     static func kotlinAttributeUnsupported(_ sourceDerived: SourceDerived, source: Source) -> Message {

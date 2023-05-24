@@ -84,6 +84,7 @@ public class CodebaseInfo: Codable {
         resolveModuleTypeSignatures()
         fixupGenericsInfo()
         addGeneratedConstructors()
+        addMainActorFlags()
         buildItemsByName() // Final mappings after updates
         languageAdditions?.prepareForUse(codebaseInfo: self)
     }
@@ -1032,6 +1033,11 @@ public class CodebaseInfo: Codable {
         typeInfo.functions.append(initInfo)
     }
 
+    private func addMainActorFlags() {
+        for i in 0..<rootTypes.count { rootTypes[i].addMainActorFlags(codebaseInfo: self) }
+        for i in 0..<rootExtensions.count { rootExtensions[i].addMainActorFlags(codebaseInfo: self) }
+    }
+
     /// Information about a declared type.
     ///
     /// - Note: Unlike the other `CodebaseInfoItem` datastructures, types are modeled as `class` instances so that we can mutate them in place.
@@ -1191,6 +1197,10 @@ public class CodebaseInfo: Codable {
             for i in 0..<subscripts.count { subscripts[i].resolveModuleTypeSignatures(codebaseInfo: codebaseInfo) }
         }
 
+        fileprivate func addMainActorFlags(codebaseInfo: CodebaseInfo) {
+            //~~~
+        }
+
         private func addMembers(_ statements: [Statement], codebaseInfo: CodebaseInfo) {
             for statement in statements {
                 switch statement.type {
@@ -1256,6 +1266,9 @@ public class CodebaseInfo: Codable {
             }
             if statement.isThrows {
                 apiFlags.insert(.throws)
+            }
+            if statement.attributes.contains(.mainActor) {
+                apiFlags.insert(.mainActor)
             }
             self.apiFlags = apiFlags
             self.isReadOnly = statement.isLet || (statement.getter != nil && statement.setter == nil)
@@ -1348,6 +1361,9 @@ public class CodebaseInfo: Codable {
             if statement.isThrows {
                 apiFlags.insert(.throws)
             }
+            if statement.attributes.contains(.mainActor) {
+                apiFlags.insert(.mainActor)
+            }
             self.apiFlags = apiFlags
             self.isMutating = statement.modifiers.isMutating
             (codebaseInfo.languageAdditions as? CodebaseInfoLanguageAdditionsGatherDelegate)?.codebaseInfo(codebaseInfo, didGather: &self, from: statement)
@@ -1417,6 +1433,9 @@ public class CodebaseInfo: Codable {
             }
             if statement.isThrows {
                 apiFlags.insert(.throws)
+            }
+            if statement.attributes.contains(.mainActor) {
+                apiFlags.insert(.mainActor)
             }
             self.apiFlags = apiFlags
             self.isReadOnly = statement.setter == nil

@@ -323,6 +323,10 @@ struct Attributes: Equatable, PrettyPrintable {
         return Attributes(attributes: attributes)
     }
 
+    func contains(_ kind: Attribute.Kind) -> Bool {
+        return attributes.contains { $0.kind == kind }
+    }
+
     var isEmpty: Bool {
         return attributes.isEmpty
     }

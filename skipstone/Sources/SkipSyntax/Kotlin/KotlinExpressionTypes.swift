@@ -95,13 +95,13 @@ class KotlinAwait: KotlinExpression {
 
     static func translate(expression: Await, translator: KotlinTranslator) -> KotlinExpression {
         let ktarget = translator.translateExpression(expression.target)
-        return KotlinAwait(target: ktarget)
+        return KotlinAwait(target: ktarget, source: translator.syntaxTree.source)
     }
 
-    init(target: KotlinExpression) {
+    init(target: KotlinExpression, source: Source) {
         self.target = target
         super.init(type: .await, sourceFile: target.sourceFile, sourceRange: target.sourceRange)
-        setIsAsynchronous(target)
+        setIsAsynchronous(target, source: source)
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
@@ -113,10 +113,13 @@ class KotlinAwait: KotlinExpression {
     }
 
     /// Adjust the given Kotlin syntax for an asynchronous call.
-    private func setIsAsynchronous(_ node: KotlinSyntaxNode) {
+    private func setIsAsynchronous(_ node: KotlinSyntaxNode, source: Source) {
         node.visit { node in
-            if let functionCall = node as? KotlinFunctionCall {
-                functionCall.setIsAsynchronous()
+            if var awaitable = node as? (KotlinSyntaxNode & KotlinAwaitable) {
+                awaitable.isInAwait = true
+                if awaitable.awaitableMode == nil {
+                    awaitable.messages.append(.kotlinAsyncAwaitTypeInference(awaitable, source: source))
+                }
                 return .recurse(nil)
             } else if node is KotlinClosure {
                 // Async outer call doesn't affect code within a closure
@@ -632,7 +635,7 @@ class KotlinDictionaryLiteral: KotlinExpression {
     }
 }
 
-class KotlinFunctionCall: KotlinExpression, APICallExpression {
+class KotlinFunctionCall: KotlinExpression, KotlinAwaitable {
     var function: KotlinExpression
     var arguments: [LabeledValue<KotlinExpression>] = []
     var isOptionalInit = false
@@ -640,6 +643,7 @@ class KotlinFunctionCall: KotlinExpression, APICallExpression {
     var apiFlags: APIFlags?
     var mayBeSharedMutableStructType = false
     var useTrailingClosureFormatting = true
+    var isInAwait = false
 
     static func translate(expression: FunctionCall, translator: KotlinTranslator) -> KotlinFunctionCall {
         let kfunction = translator.translateExpression(expression.function)
@@ -664,12 +668,6 @@ class KotlinFunctionCall: KotlinExpression, APICallExpression {
     private init(expression: FunctionCall, function: KotlinExpression) {
         self.function = function
         super.init(type: .functionCall, expression: expression)
-    }
-
-    /// Adjust our behavior for an asynchronous call.
-    func setIsAsynchronous() {
-        // Copy all structs when passing to an async context
-        arguments = arguments.map { LabeledValue(label: $0.label, value: $0.value.sref()) }
     }
 
     override func mayBeSharedMutableStructExpression(orType: Bool) -> Bool {
@@ -750,13 +748,18 @@ class KotlinFunctionCall: KotlinExpression, APICallExpression {
         if let trailingClosure {
             output.append(" ").append(trailingClosure, indentation: indentation)
         }
+        if awaitableOutputMode != .none {
+            // Cooperate with our function child, which will output the beginning part of the closure to execute this
+            // on the main actor. We just output the closing brace
+            output.append(" }")
+        }
         if isOptionalInit {
             output.append(" } catch (_: NullReturnException) { null })")
         }
     }
 }
 
-class KotlinIdentifier: KotlinExpression, APICallExpression {
+class KotlinIdentifier: KotlinExpression, KotlinAwaitable {
     var name: String
     var generics: [TypeSignature]?
     var apiFlags: APIFlags?
@@ -766,6 +769,7 @@ class KotlinIdentifier: KotlinExpression, APICallExpression {
     var isInOut = false
     var isFunctionReference = false
     var isModuleNameFor: TypeSignature = .none
+    var isInAwait = false
 
     static func translate(expression: Identifier, translator: KotlinTranslator) -> KotlinIdentifier {
         let kexpression = KotlinIdentifier(expression: expression)
@@ -803,6 +807,10 @@ class KotlinIdentifier: KotlinExpression, APICallExpression {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
+        let awaitableOutputMode = self.awaitableOutputMode
+        if awaitableOutputMode != .none {
+            output.append("MainActor.run { ")
+        }
         if name == "self" {
             output.append("this")
         } else if name == "Self" {
@@ -830,6 +838,9 @@ class KotlinIdentifier: KotlinExpression, APICallExpression {
                     output.append(".value")
                 }
             }
+        }
+        if awaitableOutputMode == .mainActor {
+            output.append(" }")
         }
     }
 }
@@ -1149,7 +1160,7 @@ struct KotlinMatchingCase {
     }
 }
 
-class KotlinMemberAccess: KotlinExpression, APICallExpression {
+class KotlinMemberAccess: KotlinExpression, KotlinAwaitable {
     var base: KotlinExpression?
     var baseKClass: TypeSignature?
     var member: String
@@ -1159,6 +1170,7 @@ class KotlinMemberAccess: KotlinExpression, APICallExpression {
     var baseType: TypeSignature = .none
     var mayBeSharedMutableStruct = false
     var isFunctionReference = false
+    var isInAwait = false
 
     static func translate(expression: MemberAccess, translator: KotlinTranslator) -> KotlinMemberAccess {
         let kexpression = KotlinMemberAccess(expression: expression)
@@ -1297,7 +1309,20 @@ class KotlinMemberAccess: KotlinExpression, APICallExpression {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
+        let awaitableOutputMode = self.awaitableOutputMode
+        var hasAwaitableOutputStart = false
         if let base {
+            if awaitableOutputMode != .none {
+                if let baseIdentifier = base as? KotlinIdentifier, baseIdentifier.isModuleNameFor != .none {
+                    // MainActor.run { module.Type... }
+                    output.append("MainActor.run { ")
+                    hasAwaitableOutputStart = true
+                } else if member == "init" {
+                    // MainActor.run { Type(...) }
+                    output.append("MainActor.run { ")
+                    hasAwaitableOutputStart = true
+                }
+            }
             if baseKClass != nil {
                 output.append("(")
             }
@@ -1316,11 +1341,16 @@ class KotlinMemberAccess: KotlinExpression, APICallExpression {
                     if useMultlineFormatting {
                         output.append("\n").append(indentation.inc())
                     }
-                    if let id = base as? KotlinIdentifier,
-                       TypeSignature.innerExtensions.keys.contains(id.name + "." + member) {
+                    if let baseIdentifier = base as? KotlinIdentifier,
+                       TypeSignature.innerExtensions.keys.contains(baseIdentifier.name + "." + member) {
                         output.append("") // e.g. String.Encoding to StringEncoding
                     } else {
                         output.append(".")
+                        if !hasAwaitableOutputStart, awaitableOutputMode != .none {
+                            // base.runOnMainActor { it.member...
+                            output.append("runOnMainActor { it.")
+                            hasAwaitableOutputStart = true
+                        }
                     }
                 }
                 if let memberIndex = Int(member) {
@@ -1330,18 +1360,41 @@ class KotlinMemberAccess: KotlinExpression, APICallExpression {
                 }
             }
         } else if baseType != .none {
+            if awaitableOutputMode != .none && member == "init" {
+                // MainActor.run { Type(...) }
+                output.append("MainActor.run { ")
+                hasAwaitableOutputStart = true
+            }
             output.append(baseType.kotlin)
             if member != "init" {
                 if useMultlineFormatting {
                     output.append("\n").append(indentation.inc())
                 }
-                output.append(".").append(member)
+                output.append(".")
+                if awaitableOutputMode != .none {
+                    // base.runOnMainActor { it.member...
+                    output.append("runOnMainActor { it.")
+                    hasAwaitableOutputStart = true
+                }
+                output.append(member)
             }
         } else {
+            if awaitableOutputMode != .none {
+                output.append("MainActor.run { ")
+                hasAwaitableOutputStart = true
+            }
             output.append(member)
         }
         if let generics, !generics.isEmpty {
             output.append("<\(generics.map(\.kotlin).joined(separator: ", "))>")
+        }
+        if hasAwaitableOutputStart {
+            if awaitableOutputMode != .mainActorFunctionReference {
+                // If this isn't a function reference that will be invoked with () or [], end the main actor closure
+                output.append(" }")
+            }
+        } else if awaitableOutputMode != .none {
+            messages.append(.internalError(self))
         }
     }
 }
@@ -1678,12 +1731,13 @@ class KotlinStringLiteral: KotlinExpression {
     }
 }
 
-class KotlinSubscript: KotlinExpression, APICallExpression {
+class KotlinSubscript: KotlinExpression, KotlinAwaitable {
     var base: KotlinExpression
     var arguments: [LabeledValue<KotlinExpression>] = []
     var apiFlags: APIFlags?
     var mayBeSharedMutableStructType = false
     var isDictionarySubscript = false // Special case support for dict[key, default: @autoclosure]
+    var isInAwait = false
 
     static func translate(expression: Subscript, translator: KotlinTranslator) -> KotlinSubscript {
         let kbase = translator.translateExpression(expression.base)
@@ -1738,6 +1792,11 @@ class KotlinSubscript: KotlinExpression, APICallExpression {
             }
         }
         output.append(isOptionalChain ? ")" : "]")
+        if awaitableOutputMode != .none {
+            // Cooperate with our base child, which will output the beginning part of the closure to execute this
+            // on the main actor. We just output the closing brace
+            output.append(" }")
+        }
     }
 }
 

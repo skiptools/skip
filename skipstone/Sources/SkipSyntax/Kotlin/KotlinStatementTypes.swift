@@ -469,7 +469,7 @@ class KotlinForLoop: KotlinStatement {
     static func translate(statement: ForLoop, translator: KotlinTranslator) -> KotlinForLoop {
         var ksequence = translator.translateExpression(statement.sequence)
         if statement.isAwait {
-            ksequence = KotlinAwait(target: ksequence)
+            ksequence = KotlinAwait(target: ksequence, source: translator.syntaxTree.source)
         }
         let kbody = KotlinCodeBlock.translate(statement: statement.body, translator: translator)
         let kstatement = KotlinForLoop(statement: statement, sequence: ksequence, body: kbody)
@@ -1267,6 +1267,8 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var returnType: TypeSignature = .void
     var parameters: [Parameter<KotlinExpression>] = []
     var isAsync = false
+    var isAsyncMainActor = false
+    var isAsyncReturning = false
     var isOpen = false
     var isGlobal = false
     var isLocal = false
@@ -1341,6 +1343,9 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             if statement.type == .initDeclaration {
                 kstatement.isOpen = false
                 kstatement.modifiers.isOverride = false // Kotlin does not override constructors
+                if statement.isAsync {
+                    kstatement.messages.append(.kotlinAsyncConstructors(statement, source: translator.syntaxTree.source))
+                }
             } else if statement.type == .deinitDeclaration {
                 kstatement.isOpen = owningTypeDeclaration.type == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
                 kstatement.modifiers.visibility = .public
@@ -1364,6 +1369,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                     kstatement.modifiers.visibility = .public
                 }
             }
+            kstatement.isAsyncMainActor = statement.isAsync && translator.codebaseInfo?.isMainActor(declaration: statement, in: owningTypeDeclaration.signature) == true
             if !owningSignature.generics.isEmpty {
                 // Kotlin companion objects do not have access to their type's generics, but we can create a generic function so long as the generic
                 // is on a parameter rather than in the return type
@@ -1381,11 +1387,19 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             }
         } else if statement.isGlobal {
             kstatement.isGlobal = true
+            kstatement.isAsyncMainActor = statement.isAsync && translator.codebaseInfo?.isMainActor(declaration: statement) == true
         }
         if let body = statement.body {
             kstatement.body = KotlinCodeBlock.translate(statement: body, translator: translator)
             // Note: we leave optional init handling to our transformers because we handle them differently for different types
-            kstatement.body?.updateWithExpectedReturn(statement.returnType == .void || statement.type == .initDeclaration ? .no : .sref(nil))
+            if statement.type != .initDeclaration {
+                if statement.returnType != .void {
+                    kstatement.body?.updateWithExpectedReturn(.sref(nil))
+                }
+                if kstatement.isAsync {
+                    kstatement.isAsyncReturning = kstatement.body?.updateWithExpectedReturn(.labelIfPresent(KotlinClosure.returnLabel)) == true
+                }
+            }
             for parameter in kstatement.parameters where parameter.isInOut {
                 kstatement.body?.updateWithInOutParameter(name: parameter.internalLabel, source: translator.syntaxTree.source)
             }
@@ -1566,14 +1580,26 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         }
 
         // Append Kotlin single statement format if possible
-        guard isConstructor || callSuperFinalize || !parameterVals.isEmpty || suppressSideEffects || mutationFunctionNames != nil || !body.isSingleStatementAppendable(mode: .function) else {
+        guard isConstructor || isAsync || callSuperFinalize || !parameterVals.isEmpty || suppressSideEffects || mutationFunctionNames != nil || !body.isSingleStatementAppendable(mode: .function) else {
             output.append(" = ")
             body.appendAsSingleStatement(to: output, indentation: indentation, mode: .function)
             output.append("\n")
             return
         }
 
-        output.append(" {\n")
+        if isAsync {
+            if isAsyncMainActor {
+                output.append(" = MainActor.run ")
+            } else {
+                output.append(" = Task.run ")
+            }
+            if isAsyncReturning {
+                output.append("\(KotlinClosure.returnLabel)@")
+            }
+            output.append("{\n")
+        } else {
+            output.append(" {\n")
+        }
         let bodyIndentation = indentation.inc()
         if !body.statements.isEmpty {
             parameterVals.forEach { output.append(bodyIndentation).append($0) }
