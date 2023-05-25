@@ -98,10 +98,26 @@ class KotlinAwait: KotlinExpression {
         return KotlinAwait(target: ktarget, source: translator.syntaxTree.source)
     }
 
-    init(target: KotlinExpression, source: Source) {
+    convenience init(target: KotlinExpression, source: Source) {
+        self.init(target: target)
+        setIsAsynchronous(target, source: source)
+    }
+
+    private init(target: KotlinExpression) {
         self.target = target
         super.init(type: .await, sourceFile: target.sourceFile, sourceRange: target.sourceRange)
-        setIsAsynchronous(target, source: source)
+    }
+
+    override func mayBeSharedMutableStructExpression(orType: Bool) -> Bool {
+        return target.mayBeSharedMutableStructExpression(orType: orType)
+    }
+
+    override var isCompoundExpression: Bool {
+        return target.isCompoundExpression
+    }
+
+    override func logicalNegated() -> KotlinExpression {
+        return KotlinAwait(target: target.logicalNegated())
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
@@ -115,10 +131,10 @@ class KotlinAwait: KotlinExpression {
     /// Adjust the given Kotlin syntax for an asynchronous call.
     private func setIsAsynchronous(_ node: KotlinSyntaxNode, source: Source) {
         node.visit { node in
-            if var awaitable = node as? (KotlinSyntaxNode & KotlinAwaitable) {
-                awaitable.isInAwait = true
-                if awaitable.awaitableMode == nil {
-                    awaitable.messages.append(.kotlinAsyncAwaitTypeInference(awaitable, source: source))
+            if var mainActorTargeting = node as? (KotlinSyntaxNode & KotlinMainActorTargeting) {
+                mainActorTargeting.isInAwait = true
+                if mainActorTargeting.needsMainActorIsolation == nil {
+                    node.messages.append(.kotlinAsyncAwaitTypeInference(node, source: source))
                 }
                 return .recurse(nil)
             } else if node is KotlinClosure {
@@ -635,7 +651,7 @@ class KotlinDictionaryLiteral: KotlinExpression {
     }
 }
 
-class KotlinFunctionCall: KotlinExpression, KotlinAwaitable {
+class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting {
     var function: KotlinExpression
     var arguments: [LabeledValue<KotlinExpression>] = []
     var isOptionalInit = false
@@ -668,6 +684,10 @@ class KotlinFunctionCall: KotlinExpression, KotlinAwaitable {
     private init(expression: FunctionCall, function: KotlinExpression) {
         self.function = function
         super.init(type: .functionCall, expression: expression)
+    }
+
+    func mainActorMode(for child: KotlinSyntaxNode) -> KotlinMainActorMode {
+        return child === function ? .isolatedFunctionReference : .isolated
     }
 
     override func mayBeSharedMutableStructExpression(orType: Bool) -> Bool {
@@ -748,7 +768,7 @@ class KotlinFunctionCall: KotlinExpression, KotlinAwaitable {
         if let trailingClosure {
             output.append(" ").append(trailingClosure, indentation: indentation)
         }
-        if awaitableOutputMode != .none {
+        if mainActorMode.output != .none {
             // Cooperate with our function child, which will output the beginning part of the closure to execute this
             // on the main actor. We just output the closing brace
             output.append(" }")
@@ -759,7 +779,7 @@ class KotlinFunctionCall: KotlinExpression, KotlinAwaitable {
     }
 }
 
-class KotlinIdentifier: KotlinExpression, KotlinAwaitable {
+class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting {
     var name: String
     var generics: [TypeSignature]?
     var apiFlags: APIFlags?
@@ -802,13 +822,17 @@ class KotlinIdentifier: KotlinExpression, KotlinAwaitable {
         super.init(type: .identifier, expression: expression)
     }
 
+    func mainActorMode(for child: KotlinSyntaxNode) -> KotlinMainActorMode {
+        return .isolated
+    }
+
     override func mayBeSharedMutableStructExpression(orType: Bool) -> Bool {
         return mayBeSharedMutableStruct
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
-        let awaitableOutputMode = self.awaitableOutputMode
-        if awaitableOutputMode != .none {
+        let mainActorOutputMode = mainActorMode.output
+        if mainActorOutputMode != .none {
             output.append("MainActor.run { ")
         }
         if name == "self" {
@@ -839,7 +863,7 @@ class KotlinIdentifier: KotlinExpression, KotlinAwaitable {
                 }
             }
         }
-        if awaitableOutputMode == .mainActor {
+        if mainActorOutputMode == .isolated {
             output.append(" }")
         }
     }
@@ -1160,7 +1184,7 @@ struct KotlinMatchingCase {
     }
 }
 
-class KotlinMemberAccess: KotlinExpression, KotlinAwaitable {
+class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting {
     var base: KotlinExpression?
     var baseKClass: TypeSignature?
     var member: String
@@ -1170,6 +1194,7 @@ class KotlinMemberAccess: KotlinExpression, KotlinAwaitable {
     var baseType: TypeSignature = .none
     var mayBeSharedMutableStruct = false
     var isFunctionReference = false
+    var isStaticReferenceOrTypeName = false
     var isInAwait = false
 
     static func translate(expression: MemberAccess, translator: KotlinTranslator) -> KotlinMemberAccess {
@@ -1194,6 +1219,11 @@ class KotlinMemberAccess: KotlinExpression, KotlinAwaitable {
             kexpression.mayBeSharedMutableStruct = false
         } else {
             kexpression.mayBeSharedMutableStruct = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
+            if case .module(_, .none) = expression.baseType {
+                kexpression.isStaticReferenceOrTypeName = true
+            } else {
+                kexpression.isStaticReferenceOrTypeName = expression.baseType.isMetaType
+            }
         }
 
         // Kotlin member access never includes generics on the owning type unless we're referencing the class or a function
@@ -1268,28 +1298,19 @@ class KotlinMemberAccess: KotlinExpression, KotlinAwaitable {
         super.init(type: .memberAccess, expression: expression)
     }
 
-    enum BaseKind {
-        case unknown
-        case `this`
-        case `super`
-        case identifier(String)
-        case type(TypeSignature)
+    var isBaseSelfOrSuper: Bool {
+        guard let identifier = base as? KotlinIdentifier else {
+            return false
+        }
+        return identifier.name == "self" || identifier.name == "super"
     }
 
-    var baseKind: BaseKind {
-        if base == nil {
-            return baseType == .none ? .unknown : .type(baseType)
-        } else if let identifier = base as? KotlinIdentifier {
-            if identifier.name == "self" {
-                return .this
-            } else if identifier.name == "super" {
-                return .super
-            } else {
-                return .identifier(identifier.name)
-            }
-        } else {
-            return .unknown
-        }
+    var isBaseIncludedInMainActor: Bool {
+        return isStaticReferenceOrTypeName || isBaseSelfOrSuper || base == nil
+    }
+
+    func mainActorMode(for child: KotlinSyntaxNode) -> KotlinMainActorMode {
+        return isBaseIncludedInMainActor ? .isolated : .none
     }
 
     override func mayBeSharedMutableStructExpression(orType: Bool) -> Bool {
@@ -1309,20 +1330,12 @@ class KotlinMemberAccess: KotlinExpression, KotlinAwaitable {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
-        let awaitableOutputMode = self.awaitableOutputMode
-        var hasAwaitableOutputStart = false
+        let mainActorOutputMode = mainActorMode.output
+        if mainActorOutputMode != .none && isBaseIncludedInMainActor {
+            // MainActor.run { self... or Type.... }
+            output.append("MainActor.run { ")
+        }
         if let base {
-            if awaitableOutputMode != .none {
-                if let baseIdentifier = base as? KotlinIdentifier, baseIdentifier.isModuleNameFor != .none {
-                    // MainActor.run { module.Type... }
-                    output.append("MainActor.run { ")
-                    hasAwaitableOutputStart = true
-                } else if member == "init" {
-                    // MainActor.run { Type(...) }
-                    output.append("MainActor.run { ")
-                    hasAwaitableOutputStart = true
-                }
-            }
             if baseKClass != nil {
                 output.append("(")
             }
@@ -1346,10 +1359,9 @@ class KotlinMemberAccess: KotlinExpression, KotlinAwaitable {
                         output.append("") // e.g. String.Encoding to StringEncoding
                     } else {
                         output.append(".")
-                        if !hasAwaitableOutputStart, awaitableOutputMode != .none {
-                            // base.runOnMainActor { it.member...
-                            output.append("runOnMainActor { it.")
-                            hasAwaitableOutputStart = true
+                        if mainActorOutputMode != .none && !isBaseIncludedInMainActor {
+                            // base.mainactor { it.member...
+                            output.append("mainactor { it.")
                         }
                     }
                 }
@@ -1360,41 +1372,22 @@ class KotlinMemberAccess: KotlinExpression, KotlinAwaitable {
                 }
             }
         } else if baseType != .none {
-            if awaitableOutputMode != .none && member == "init" {
-                // MainActor.run { Type(...) }
-                output.append("MainActor.run { ")
-                hasAwaitableOutputStart = true
-            }
             output.append(baseType.kotlin)
             if member != "init" {
                 if useMultlineFormatting {
                     output.append("\n").append(indentation.inc())
                 }
-                output.append(".")
-                if awaitableOutputMode != .none {
-                    // base.runOnMainActor { it.member...
-                    output.append("runOnMainActor { it.")
-                    hasAwaitableOutputStart = true
-                }
-                output.append(member)
+                output.append(".").append(member)
             }
         } else {
-            if awaitableOutputMode != .none {
-                output.append("MainActor.run { ")
-                hasAwaitableOutputStart = true
-            }
             output.append(member)
         }
         if let generics, !generics.isEmpty {
             output.append("<\(generics.map(\.kotlin).joined(separator: ", "))>")
         }
-        if hasAwaitableOutputStart {
-            if awaitableOutputMode != .mainActorFunctionReference {
-                // If this isn't a function reference that will be invoked with () or [], end the main actor closure
-                output.append(" }")
-            }
-        } else if awaitableOutputMode != .none {
-            messages.append(.internalError(self))
+        if mainActorOutputMode == .isolated {
+            // If this isn't a function reference that will be invoked with () or [], end the main actor closure
+            output.append(" }")
         }
     }
 }
@@ -1731,7 +1724,7 @@ class KotlinStringLiteral: KotlinExpression {
     }
 }
 
-class KotlinSubscript: KotlinExpression, KotlinAwaitable {
+class KotlinSubscript: KotlinExpression, KotlinMainActorTargeting {
     var base: KotlinExpression
     var arguments: [LabeledValue<KotlinExpression>] = []
     var apiFlags: APIFlags?
@@ -1757,6 +1750,10 @@ class KotlinSubscript: KotlinExpression, KotlinAwaitable {
     private init(expression: Subscript, base: KotlinExpression) {
         self.base = base
         super.init(type: .subscript, expression: expression)
+    }
+
+    func mainActorMode(for child: KotlinSyntaxNode) -> KotlinMainActorMode {
+        return child === base ? .isolatedFunctionReference : .isolated
     }
 
     override func mayBeSharedMutableStructExpression(orType: Bool) -> Bool {
@@ -1792,7 +1789,7 @@ class KotlinSubscript: KotlinExpression, KotlinAwaitable {
             }
         }
         output.append(isOptionalChain ? ")" : "]")
-        if awaitableOutputMode != .none {
+        if mainActorMode.output != .none {
             // Cooperate with our base child, which will output the beginning part of the closure to execute this
             // on the main actor. We just output the closing brace
             output.append(" }")

@@ -128,14 +128,7 @@ final class KotlinConstructorAndSideEffectSupressionTransformer: KotlinTransform
         guard memberAccess.member == "init" else {
             return nil
         }
-        switch memberAccess.baseKind {
-        case .this:
-            return functionCall
-        case .super:
-            return functionCall
-        default:
-            return nil
-        }
+        return memberAccess.isBaseSelfOrSuper ? functionCall : nil
     }
 
     private func superclass(of classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) -> TypeSignature? {

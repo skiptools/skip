@@ -697,8 +697,8 @@ struct APIFlags: OptionSet, Codable {
     let rawValue: Int
 
     static let async = APIFlags(rawValue: 1 << 0)
-    static let `throws` = APIFlags(rawValue: 1 << 1)
-    static let mainActor = APIFlags(rawValue: 1 << 2)
+    static let mainActor = APIFlags(rawValue: 1 << 1)
+    static let `throws` = APIFlags(rawValue: 1 << 2)
 }
 
 /// The result of visiting a syntax node.

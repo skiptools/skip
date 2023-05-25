@@ -226,9 +226,22 @@ class BinaryOperator: Expression {
         guard let op = op(for: syntax) else {
             return nil
         }
-        let lhs = try ExpressionDecoder.decodeSequence(sequence, elements: Array(elements[..<index]), in: syntaxTree)
-        let rhs = try ExpressionDecoder.decodeSequence(sequence, elements: Array(elements[(index + 1)...]), in: syntaxTree)
-        return BinaryOperator(op: op, lhs: lhs, rhs: rhs, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+        var lhs = try ExpressionDecoder.decodeSequence(sequence, elements: Array(elements[..<index]), in: syntaxTree)
+        var rhs = try ExpressionDecoder.decodeSequence(sequence, elements: Array(elements[(index + 1)...]), in: syntaxTree)
+        // When 'await' appears on one side of a binary expression, it actually applies to both branches, e.g. 'let x = await a + b'
+        var isAwait = false
+        if op.precedence != .assignment {
+            if let lhsAwait = lhs as? Await {
+                lhs = lhsAwait.target
+                isAwait = true
+            }
+            if let rhsAwait = rhs as? Await {
+                rhs = rhsAwait.target
+                isAwait = true
+            }
+        }
+        let binaryOperator = BinaryOperator(op: op, lhs: lhs, rhs: rhs, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+        return isAwait ? Await(target: binaryOperator) : binaryOperator
     }
 
     private static func op(for syntax: SyntaxProtocol) -> Operator? {

@@ -43,7 +43,7 @@ final class ConcurrencyTests: XCTestCase {
     }
 
     func testAwaitMainActorConstructor() async throws {
-        try await check(supportingSwift: """
+        let supportingSwift = """
         class C {
             @MainActor
             init() {
@@ -55,7 +55,9 @@ final class ConcurrencyTests: XCTestCase {
                 }
             }
         }
-        """, swift: """
+        """
+
+        try await check(supportingSwift: supportingSwift, swift: """
         func f() {
             let c = C()
             let i = C.Inner()
@@ -72,6 +74,193 @@ final class ConcurrencyTests: XCTestCase {
         internal suspend fun g() = Task.run {
             val c = MainActor.run { C() }
             val i = MainActor.run { C.Inner() }
+        }
+        """)
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        func a(c: C, i: C.Inner) -> Int {
+            return 1
+        }
+        @MainActor func b(c: C, i: C.Inner) -> Int {
+            return 1
+        }
+        func f() async {
+            let sum = await a(c: C(), i: C.Inner()) + b(c: C(), i: C.Inner())
+        }
+        """, kotlin: """
+        internal fun a(c: C, i: C.Inner): Int = 1
+        internal fun b(c: C, i: C.Inner): Int = 1
+        internal suspend fun f() = Task.run {
+            val sum = a(c = MainActor.run { C() }, i = MainActor.run { C.Inner() }) + MainActor.run { b(c = C(), i = C.Inner()) }
+        }
+        """)
+    }
+
+    func testAwaitMainActorStatics() async throws {
+        let supportingSwift = """
+        class C {
+            static let x = 0
+            @MainActor
+            static let i = 1
+            @MainActor
+            static func f() -> Int {
+                return 1
+            }
+
+            class Inner {
+                @MainActor
+                static let j = 1
+            }
+        }
+        """
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        func f() {
+            let x = C.x
+            let i = C.i
+            let f = C.f()
+            let j = C.Inner.j
+        }
+        func g() async {
+            let x = C.x
+            let i = await C.i
+            let f = await C.f()
+            let j = await C.Inner.j
+        }
+        """, kotlin: """
+        internal fun f() {
+            val x = C.x
+            val i = C.i
+            val f = C.f()
+            val j = C.Inner.j
+        }
+        internal suspend fun g() = Task.run {
+            val x = C.x
+            val i = MainActor.run { C.i }
+            val f = MainActor.run { C.f() }
+            val j = MainActor.run { C.Inner.j }
+        }
+        """)
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        func f(i: Int) async {
+            await f(i: C.i)
+            await f(i: C.Inner.j + C.f() - C.i)
+        }
+        """, kotlin: """
+        internal suspend fun f(i: Int) = Task.run {
+            f(i = MainActor.run { C.i })
+            f(i = MainActor.run { C.Inner.j } + MainActor.run { C.f() } - MainActor.run { C.i })
+        }
+        """)
+    }
+
+    func testAwaitMainActorMemberVariable() async throws {
+        let supportingSwift = """
+        class C {
+            @MainActor
+            var i = 1
+            @MainActor
+            var mainC = C()
+            var c = C()
+        }
+        """
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        func f(c: C) async {
+            let i = await C().i
+            let mainCi = await c.mainC.i
+            let ci = await c.c.i
+            let mainCci = await c.mainC.c.i
+        }
+        """, kotlin: """
+        internal suspend fun f(c: C) = Task.run {
+            val i = C().mainactor { it.i }
+            val mainCi = c.mainactor { it.mainC }.mainactor { it.i }
+            val ci = c.c.mainactor { it.i }
+            val mainCci = c.mainactor { it.mainC }.c.mainactor { it.i }
+        }
+        """)
+    }
+
+    func testAwaitMainActorMemberFunction() async throws {
+        let supportingSwift = """
+        class C {
+            @MainActor
+            func i() -> Int {
+                return 1
+            }
+            @MainActor
+            func j(i: Int) -> Int {
+                return i
+            }
+            @MainActor
+            func mainC() -> C {
+                return C()
+            }
+            func c() -> C {
+                return C()
+            }
+        }
+        """
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        func f(c: C) async {
+            let i = await C().i()
+            let mainCi = await c.mainC().i()
+            let ci = await c.c().i()
+            let mainCci = await c.mainC().c().i()
+        }
+        """, kotlin: """
+        internal suspend fun f(c: C) = Task.run {
+            val i = C().mainactor { it.i() }
+            val mainCi = c.mainactor { it.mainC() }.mainactor { it.i() }
+            val ci = c.c().mainactor { it.i() }
+            val mainCci = c.mainactor { it.mainC() }.c().mainactor { it.i() }
+        }
+        """)
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        func f(c: C) async {
+            let i = await c.j(i: c.i())
+        }
+        """, kotlin: """
+        internal suspend fun f(c: C) = Task.run {
+            val i = c.mainactor { it.j(i = c.i()) }
+        }
+        """)
+    }
+
+    func testMainActorStruct() async throws {
+        let supportingSwift = """
+        struct S {
+            @MainActor
+            var r = R()
+        }
+        struct R {
+            @MainActor
+            var i = 1
+            var j = 1
+            @MainActor
+            func f() -> Int {
+                return 1
+            }
+        }
+        """
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        func f() -> Int async {
+            let r = await S().r
+            let i = await S().r.i
+            let j = await S().r.j
+            return await i + j + r.f()
+        }
+        """, kotlin: """
+        internal suspend fun f(): Int = Task.run l@{
+            val r = S().mainactor { it.r }.sref()
+            val i = S().mainactor { it.r }.mainactor { it.i }
+            val j = S().mainactor { it.r }.j
+            return@l i + j + r.mainactor { it.f() }
         }
         """)
     }
