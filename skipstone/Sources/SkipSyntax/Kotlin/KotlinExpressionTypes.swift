@@ -117,6 +117,7 @@ class KotlinAwait: KotlinExpression {
     }
 
     override func logicalNegated() -> KotlinExpression {
+        // Use private constructor that does not call setIsAsynchronous again on target
         return KotlinAwait(target: target.logicalNegated())
     }
 
@@ -1947,7 +1948,7 @@ class KotlinTypeLiteral: KotlinExpression {
 }
 
 class KotlinWhen: KotlinExpression {
-    static let breakLabel = "l"
+    static let breakLabel = "bl"
 
     var on: KotlinExpression
     var cases: [KotlinCase]

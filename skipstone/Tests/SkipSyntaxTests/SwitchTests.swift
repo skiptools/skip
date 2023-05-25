@@ -66,16 +66,16 @@ final class SwitchTests: XCTestCase {
         print("here")
         """, kotlin: """
         internal val i = 100
-        linvoke l@{
+        linvoke bl@{
             when (i) {
                 0 -> {
                     if (i % 2 == 0) {
                         print("0 is even")
-                        return@l
+                        return@bl
                     }
                     print("0 is odd")
                 }
-                else -> return@l
+                else -> return@bl
             }
         }
         print("here")
