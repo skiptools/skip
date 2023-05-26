@@ -17,24 +17,28 @@ final class FeatureSupportTests: XCTestCase {
             """)
     }
 
-    func testConstructorNamedArgs() async throws {
-        try await check(swiftCode: {
-            class X {
-                let name: String
-                init(named name: String) {
-                    self.name = name
-                }
+    func testOptionalDictionaryAccess() async throws {
+        // this creates the syntax error:
+        // error: expecting function type dict["A"] as? Int?.let { num
+        // a workaround is to wrap it in parens: if let num = (dict["A"] as? Int)
+        try await check(compiler: nil, swiftCode: {
+            let dict: [String: Any] = ["A": 1]
+            if let num = dict["A"] as? Int {
+                return "A"
+            } else {
+                return "B"
             }
-            return X(named: "Z").name
         }, kotlin: """
-            open class X {
-                val name: String
-                constructor(named: String) {
-                    val name = named
-                    this.name = name
-                }
+            val dict: Dictionary<String, Any> = dictionaryOf(Tuple2("A", 1))
+                get() = field
+            var letexec_0 = false
+            dict["A"] as? Int?.let { num ->
+                letexec_0 = true
+                return "A"
             }
-            return X(named = "Z").name
+            if (!letexec_0) {
+                return "B"
+            }
             """)
     }
 
@@ -344,6 +348,7 @@ final class FeatureSupportTests: XCTestCase {
         #endif
     }
 }
+
 
 
 
