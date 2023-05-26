@@ -77,7 +77,7 @@ import PackagePlugin
             throw TranspilePlugInError("Peer target «\(peerTarget.name)» was not a source module")
         }
 
-        let swiftSourceFiles = swiftSourceTarget.sourceFiles(withSuffix: ".swift").map({ $0 })
+        let swiftSourceFiles = swiftSourceTarget.sourceFiles.filter({ $0.type == .source })
 
         guard !swiftSourceFiles.isEmpty else {
             throw TranspilePlugInError("The target «\(peerTarget.name)» does not contain any .swift files for transpilation.")
@@ -155,10 +155,16 @@ import PackagePlugin
             }
         }
 
+        // collect the resources for linking
+        var resourceArgs: [String] = []
+        for resource in swiftSourceTarget.sourceFiles.filter({ $0.type == .resource }) {
+            resourceArgs += ["--resource", resource.path.string]
+        }
+
         let outputURL = URL(fileURLWithPath: outputFolder.string, isDirectory: true)
         let outputBase = URL(fileURLWithPath: kotlinModule, isDirectory: true, relativeTo: outputURL)
 
-        let sourceOutputPath = URL(fileURLWithPath: isTest ? "src/test/kotlin" : "src/main/kotlin", isDirectory: true, relativeTo: outputBase)
+        let sourceBase = URL(fileURLWithPath: isTest ? "src/test" : "src/main", isDirectory: true, relativeTo: outputBase)
 
         // the marker file with the most recent input source file, either explicitly as the transpilation args, or any configuration files that are loaded as a side-effect
         let markerFileName = ".skipbuild"
@@ -173,12 +179,13 @@ import PackagePlugin
             .buildCommand(displayName: "Skip Transpile \(target.name)", executable: skiptool.path, arguments: [
                 "transpile",
                 "--marker-file", markerFile.path,
-                "--output-folder", sourceOutputPath.path,
+                "--output-folder", sourceBase.path,
                 "--module-root", outputBase.path,
                 "--skip-folder", skipFolder.string,
                 "--output", outputFile.path,
                 //"-v",
                 ]
+                + resourceArgs
                 + buildModuleArgs
                 + sourceFilePaths, inputFiles: inputFiles, outputFiles: outputFiles)
 
