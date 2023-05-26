@@ -171,6 +171,24 @@ final class BuiltinTypeTests: XCTestCase {
         """)
     }
 
+    func testHexLiteral() async throws {
+        try await check(swift: """
+        0xABABAB
+        """, kotlin: """
+        0xABABAB
+        """)
+    }
+
+    func testOctalLiteral() async throws {
+        // Swift supports octal literals: https://docs.swift.org/swift-book/documentation/the-swift-programming-language/lexicalstructure/#Integer-Literals
+        // Octal literals are not supported in Kotlin: https://kotlinlang.org/docs/numbers.html#literal-constants-for-numbers
+        try await check(swift: """
+        0o400
+        """, kotlin: """
+        256
+        """)
+    }
+
     func testStringLiteral() async throws {
         try await check(swift: """
         "abc"

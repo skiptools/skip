@@ -17,6 +17,27 @@ final class FeatureSupportTests: XCTestCase {
             """)
     }
 
+    func testConstructorNamedArgs() async throws {
+        try await check(swiftCode: {
+            class X {
+                let name: String
+                init(named name: String) {
+                    self.name = name
+                }
+            }
+            return X(named: "Z").name
+        }, kotlin: """
+            open class X {
+                val name: String
+                constructor(named: String) {
+                    val name = named
+                    this.name = name
+                }
+            }
+            return X(named = "Z").name
+            """)
+    }
+
     func testNamedParameterOverridesOuterDefinition() async throws {
         // the "a" part of the "a b: String" parameter is unused in Swift, but it acts as being locally declared in Kotlin and thus overrides the outer definition of "a".
         // These two functions thus return different values: "xy" vs. "yy"
@@ -323,6 +344,7 @@ final class FeatureSupportTests: XCTestCase {
         #endif
     }
 }
+
 
 
 

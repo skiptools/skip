@@ -1431,7 +1431,16 @@ class KotlinNumericLiteral: KotlinExpression {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
-        output.append(literal)
+        if literal.hasPrefix("0o") {
+            // Swift supports octal literals but Kotlin doesn't; convert and output the decimal version
+            if let decimal = Int(literal.dropFirst(2), radix: 8) {
+                output.append(decimal)
+            } else {
+                output.append(literal) // bad octal? try to output the literal anyway and let Kotlin complain
+            }
+        } else {
+            output.append(literal)
+        }
     }
 }
 
