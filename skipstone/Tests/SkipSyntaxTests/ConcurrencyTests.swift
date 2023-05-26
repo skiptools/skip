@@ -264,4 +264,31 @@ final class ConcurrencyTests: XCTestCase {
         }
         """)
     }
+
+    func testMainActorAndAsync() async throws {
+        let supportingSwift = """
+        class C {
+            @MainActor
+            func f(i: Int) {
+            }
+        }
+        func i() async -> Int {
+            return 1
+        }
+        """
+
+        // Note that the call to i() within the mainactor block would require an await call in Swift.
+        // In Kotlin we don't need await calls, and the mainactor block is a suspending closure
+        try await check(supportingSwift: supportingSwift, swift: """
+        func f() async {
+            let c = C()
+            await c.f(i: i())
+        }
+        """, kotlin: """
+        internal suspend fun f() = Task.run {
+            val c = C()
+            c.mainactor { it.f(i = i()) }
+        }
+        """)
+    }
 }

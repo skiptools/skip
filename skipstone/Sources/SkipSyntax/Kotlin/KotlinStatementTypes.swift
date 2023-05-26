@@ -1267,11 +1267,11 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var returnType: TypeSignature = .void
     var parameters: [Parameter<KotlinExpression>] = []
     var isAsync = false
-    var isAsyncMainActor = false
     var isAsyncReturning = false
     var isOpen = false
     var isGlobal = false
     var isLocal = false
+    var isMainActor: Bool? // Populated if needed by transformer
     var isOptionalInit = false
     var annotations: [String] = []
     var attributes = Attributes()
@@ -1369,7 +1369,6 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                     kstatement.modifiers.visibility = .public
                 }
             }
-            kstatement.isAsyncMainActor = statement.isAsync && translator.codebaseInfo?.isMainActor(declaration: statement, in: owningTypeDeclaration.signature) == true
             if !owningSignature.generics.isEmpty {
                 // Kotlin companion objects do not have access to their type's generics, but we can create a generic function so long as the generic
                 // is on a parameter rather than in the return type
@@ -1387,7 +1386,6 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             }
         } else if statement.isGlobal {
             kstatement.isGlobal = true
-            kstatement.isAsyncMainActor = statement.isAsync && translator.codebaseInfo?.isMainActor(declaration: statement) == true
         }
         if let body = statement.body {
             kstatement.body = KotlinCodeBlock.translate(statement: body, translator: translator)
@@ -1588,7 +1586,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         }
 
         if isAsync {
-            if isAsyncMainActor {
+            if isMainActor == true {
                 output.append(" = MainActor.run ")
             } else {
                 output.append(" = Task.run ")
@@ -1956,6 +1954,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var isProperty = false
     var isProtocolProperty = false
     var isGlobal = false
+    var isMainActor: Bool? // Populated if needed by transformer
     var isOpen = false
     var modifiers = Modifiers()
     var attributes = Attributes()

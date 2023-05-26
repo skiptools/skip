@@ -52,6 +52,7 @@ class KotlinExpression: KotlinSyntaxNode {
 protocol KotlinMainActorTargeting {
     var apiFlags: APIFlags? { get }
     var isInAwait: Bool { get set }
+    var isInMainActorContext: Bool { get set }
     /// The main actor mode of the given child node.
     func mainActorMode(for child: KotlinSyntaxNode) -> KotlinMainActorMode
 }
@@ -70,7 +71,7 @@ extension KotlinMainActorTargeting where Self: KotlinSyntaxNode {
     /// - Returns: A tuple of (1) the effective isolation mode needed, and (2) the mode to encode into the output of this node.
     ///     These values may be different if a parent node's isolation will capture and isolate this node already.
     var mainActorMode: (effective: KotlinMainActorMode, output: KotlinMainActorMode) {
-        guard isInAwait else {
+        guard isInAwait && !isInMainActorContext else {
             return (.none, .none)
         }
         guard let needsMainActorIsolation = self.needsMainActorIsolation else {
@@ -78,7 +79,7 @@ extension KotlinMainActorTargeting where Self: KotlinSyntaxNode {
         }
         let mode: KotlinMainActorMode = needsMainActorIsolation ? .isolated : .none
 
-        // Are we already in an isolated mode? See if we have an isolated parent before we hit the await call
+        // Are we already captured in an isolated call? See if we have an isolated parent before we hit the await call
         var child: KotlinSyntaxNode = self
         while child.parent != nil && !(child.parent is KotlinAwait) {
             if let mainActorTargeting = child.parent as? (KotlinSyntaxNode & KotlinMainActorTargeting) {

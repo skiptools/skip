@@ -134,6 +134,7 @@ class KotlinAwait: KotlinExpression {
         node.visit { node in
             if var mainActorTargeting = node as? (KotlinSyntaxNode & KotlinMainActorTargeting) {
                 mainActorTargeting.isInAwait = true
+                //~~~ move to transformer
                 if mainActorTargeting.needsMainActorIsolation == nil {
                     node.messages.append(.kotlinAsyncAwaitTypeInference(node, source: source))
                 }
@@ -660,7 +661,6 @@ class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting {
     var apiFlags: APIFlags?
     var mayBeSharedMutableStructType = false
     var useTrailingClosureFormatting = true
-    var isInAwait = false
 
     static func translate(expression: FunctionCall, translator: KotlinTranslator) -> KotlinFunctionCall {
         let kfunction = translator.translateExpression(expression.function)
@@ -686,6 +686,9 @@ class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting {
         self.function = function
         super.init(type: .functionCall, expression: expression)
     }
+
+    var isInAwait = false
+    var isInMainActorContext = false
 
     func mainActorMode(for child: KotlinSyntaxNode) -> KotlinMainActorMode {
         return child === function ? .isolatedFunctionReference : .isolated
@@ -790,7 +793,6 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting {
     var isInOut = false
     var isFunctionReference = false
     var isModuleNameFor: TypeSignature = .none
-    var isInAwait = false
 
     static func translate(expression: Identifier, translator: KotlinTranslator) -> KotlinIdentifier {
         let kexpression = KotlinIdentifier(expression: expression)
@@ -822,6 +824,9 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting {
         self.name = expression.name
         super.init(type: .identifier, expression: expression)
     }
+
+    var isInAwait = false
+    var isInMainActorContext = false
 
     func mainActorMode(for child: KotlinSyntaxNode) -> KotlinMainActorMode {
         return .isolated
@@ -1196,7 +1201,6 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting {
     var mayBeSharedMutableStruct = false
     var isFunctionReference = false
     var isStaticReferenceOrTypeName = false
-    var isInAwait = false
 
     static func translate(expression: MemberAccess, translator: KotlinTranslator) -> KotlinMemberAccess {
         let kexpression = KotlinMemberAccess(expression: expression)
@@ -1309,6 +1313,9 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting {
     var isBaseIncludedInMainActor: Bool {
         return isStaticReferenceOrTypeName || isBaseSelfOrSuper || base == nil
     }
+
+    var isInAwait = false
+    var isInMainActorContext = false
 
     func mainActorMode(for child: KotlinSyntaxNode) -> KotlinMainActorMode {
         return isBaseIncludedInMainActor ? .isolated : .none
@@ -1731,7 +1738,6 @@ class KotlinSubscript: KotlinExpression, KotlinMainActorTargeting {
     var apiFlags: APIFlags?
     var mayBeSharedMutableStructType = false
     var isDictionarySubscript = false // Special case support for dict[key, default: @autoclosure]
-    var isInAwait = false
 
     static func translate(expression: Subscript, translator: KotlinTranslator) -> KotlinSubscript {
         let kbase = translator.translateExpression(expression.base)
@@ -1752,6 +1758,9 @@ class KotlinSubscript: KotlinExpression, KotlinMainActorTargeting {
         self.base = base
         super.init(type: .subscript, expression: expression)
     }
+
+    var isInAwait = false
+    var isInMainActorContext = false
 
     func mainActorMode(for child: KotlinSyntaxNode) -> KotlinMainActorMode {
         return child === base ? .isolatedFunctionReference : .isolated
