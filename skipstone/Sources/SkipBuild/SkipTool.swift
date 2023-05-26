@@ -367,6 +367,9 @@ struct TranspilePhaseOptions: ParsableArguments {
     @Option(name: [.customLong("module")], help: ArgumentHelp("ModuleName:SourcePath", valueName: "module"))
     var moduleNames: [String] = [] // --module name:path
 
+    @Option(name: [.customLong("resource")], help: ArgumentHelp("Resource path to link", valueName: "file"))
+    var resources: [String] = [] // --resource Source/App/Resources/fr.lproj/Localizable.strings
+
     @Option(name: [.customLong("link")], help: ArgumentHelp("ModuleName:LinkPath", valueName: "module"))
     var linkPaths: [String] = [] // --link name:path
 
@@ -473,11 +476,14 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             throw error("Must specify --output-folder")
         }
 
-        let outputFolderPath = try AbsolutePath(validating: outputFolder, relativeTo: baseOutputPath)
-        if !fs.isDirectory(outputFolderPath) {
+        let kotlinOutputFolder = try AbsolutePath(AbsolutePath(validating: outputFolder, relativeTo: baseOutputPath), "kotlin")
+        // the standard base name for resources, which will be linked from a path like: src/main/resources/package/name/resname.ext
+        let resourcesOutputFolder = try AbsolutePath(AbsolutePath(validating: outputFolder, relativeTo: baseOutputPath), "resources")
+
+        if !fs.isDirectory(kotlinOutputFolder) {
             // e.g.: ~Library/Developer/Xcode/DerivedData/PACKAGE-ID/SourcePackages/plugins/skiphub.output/SkipFoundationKotlinTests/skip-transpiler/SkipFoundation/src/test/kotlin
             //throw error("Folder specified by --output-folder did not exist: \(outputFolder)")
-            try fs.createDirectory(outputFolderPath, recursive: true)
+            try fs.createDirectory(kotlinOutputFolder, recursive: true)
         }
 
         guard let moduleRoot = transpileOptions.moduleRoot else {
@@ -533,7 +539,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
         var sourceURLs = sourceFiles.map(\.asURL)
 
-        let overridden = try linkSkipFolder(skipFolderPath, to: outputFolderPath, topLevel: true)
+        let overridden = try linkSkipFolder(skipFolderPath, to: kotlinOutputFolder, topLevel: true)
         let overriddenKotlinFiles = overridden.map({ $0.basename })
 
         // also check any Kotlin files in the skipFolderFile
@@ -553,6 +559,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         try saveCodebaseInfo() // save out the ModuleName.skipcode.json
 
         let sourceModules = try linkDependentModuleSources()
+        try linkResources()
         try generateGradle(for: sourceModules, with: mergedSkipConfig)
         try saveSkipBuildSourceTimeMarker()
 
@@ -852,7 +859,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             // the "AndroidManifest.xml" file is special: it needs to go in the root src/main/ folder
             let isManifest = baseSourceFileName == "AndroidManifest.xml"
             // if an empty basePath, treat as a source file and place in package-derived folders
-            return (basePath ?? outputFolderPath
+            return (basePath ?? kotlinOutputFolder
                 .appending(components: isManifest ? [".."] : packageName.split(separator: ".").map(\.description)))
                 .appending(RelativePath(baseSourceFileName))
         }
@@ -926,7 +933,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
             func saveTranspilation() throws -> (output: AbsolutePath, changed: Bool, overridden: Bool) {
                 // the build plug-in's output folder base will be something like ~/Library/Developer/Xcode/DerivedData/Mod-ID/SourcePackages/plugins/module-name.output/ModuleNameKotlin/skip-transpiler/ModuleName/src/test/kotlin
-                trace("path: \(outputFolderPath)")
+                trace("path: \(kotlinOutputFolder)")
 
                 let kotlinName = transpilation.kotlinFileName
                 guard let outputFilePath = kotlinOutputPath(for: kotlinName) else {
@@ -954,6 +961,55 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
                 try fs.writeChanges(path: sourceMappingPath, makeReadOnly: true, bytes: ByteString(sourceMapData))
 
                 return (output: outputFilePath, changed: fileWritten, overridden: false)
+            }
+        }
+
+        /// Links each of the resource files passed to the transpiler to the underlying source files.
+        /// - Returns: the list of root resource folder(s) that contain the link(s) for the resources
+        func linkResources() throws {
+            let destinationBasePath = resourcesOutputFolder
+                .appending(components: packageName.split(separator: ".").map(\.description))
+                .appending(component: "Resources")
+
+            var resourcesIndex: [String] = []
+
+            for resourceFile in self.transpileOptions.resources {
+                guard let resourceSourceURL = moduleNamePaths.compactMap({ (_, folder) in
+                    resourceFile.hasPrefix(folder) ? URL(fileURLWithPath: resourceFile.dropFirst(folder.count).trimmingCharacters(in: CharacterSet(charactersIn: "/")).description, relativeTo: URL(fileURLWithPath: folder, isDirectory: true)) : nil }).first else {
+                    msg(.warning, "no module root parent for \(resourceFile)")
+                    continue
+                }
+
+                let sourcePath = try AbsolutePath(validating: resourceSourceURL.path)
+
+                // all resources get put into a single "Resources/" folder in the jar, so drop the first item and replace it with "Resources/"
+                let components = RelativePath(resourceSourceURL.relativePath).components.dropFirst(1)
+                let resPath = components.joined(separator: "/")
+                let resourceSourcePath = RelativePath(resPath)
+                resourcesIndex.append(resPath)
+
+                let destinationPath = destinationBasePath.appending(resourceSourcePath)
+
+                // only create links for files that exist
+                if fs.isFile(sourcePath) {
+                    info("linking resource \(destinationPath.pathString) to \(sourcePath.sourceFile)", sourceFile: sourcePath.sourceFile)
+                    try fs.createDirectory(destinationPath.parentDirectory, recursive: true)
+                    if fs.isSymlink(destinationPath) {
+                        try fs.removeFileTree(destinationPath) // clear any pre-existing symlink
+                    }
+                    try fs.createSymbolicLink(destinationPath, pointingAt: sourcePath, relative: false)
+                }
+            }
+
+            let indexPath = destinationBasePath.appending(component: "resources.lst")
+
+            if !resourcesIndex.isEmpty {
+                // write out the resources index file that acts as the directory for Java/Android resources
+                try fs.writeChanges(path: indexPath, bytes: ByteString(encodingAsUTF8: resourcesIndex.sorted().joined(separator: "\n")))
+                info("indexed \(resourcesIndex.count) resources at \(indexPath.pathString)", sourceFile: indexPath.sourceFile)
+            } else {
+                // remove the resources file if it should be empty
+                try? fs.removeFileTree(indexPath)
             }
         }
 
