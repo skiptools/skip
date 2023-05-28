@@ -699,6 +699,7 @@ struct APIFlags: OptionSet, Codable {
     static let async = APIFlags(rawValue: 1 << 0)
     static let mainActor = APIFlags(rawValue: 1 << 1)
     static let `throws` = APIFlags(rawValue: 1 << 2)
+    static let writeable = APIFlags(rawValue: 1 << 3)
 }
 
 /// The result of visiting a syntax node.

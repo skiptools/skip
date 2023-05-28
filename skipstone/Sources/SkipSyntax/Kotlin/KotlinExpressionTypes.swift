@@ -1097,7 +1097,14 @@ class KotlinIf: KotlinExpression {
             output.append("\n").append(indentation)
         }
         if let optionalBindingVariable = conditionSet.optionalBindingVariable {
-            output.append(optionalBindingVariable.value, indentation: indentation).append("?.let { ")
+            if optionalBindingVariable.value.isCompoundExpression {
+                output.append("(")
+            }
+            output.append(optionalBindingVariable.value, indentation: indentation)
+            if optionalBindingVariable.value.isCompoundExpression {
+                output.append(")")
+            }
+            output.append("?.let { ")
             if optionalBindingVariable.names.count > 1 {
                 output.append("(")
             }
@@ -1486,15 +1493,16 @@ struct KotlinOptionalBinding {
         guard expression.isLet else {
             return true
         }
-        // 'let x' doesn't need a new var
+        // 'let x' doesn't need a new var unless 'x' is unstable
         guard let value = expression.value else {
-            return false
+            return expression.nameShadowsUnstableValue
         }
         // We need a new var if we're binding to anything other than 'let x = x'
         guard let identifier = value as? Identifier else {
             return true
         }
-        return expression.names.count != 1 || identifier.name != expression.names[0]
+        // 'let x = x' doesn't need a new var unless 'x' is unstable
+        return expression.names.count != 1 || identifier.name != expression.names[0] || expression.nameShadowsUnstableValue
     }
 }
 

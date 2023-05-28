@@ -1242,14 +1242,13 @@ public class CodebaseInfo: Codable {
         var importedModuleNames: [String]?
 
         let apiFlags: APIFlags
-        let isReadOnly: Bool
         let isInitializable: Bool
         let hasValue: Bool
         var value: Expression?
 
         private enum CodingKeys: String, CodingKey {
             // Exclude value expression, language additions, importedModuleNames
-            case name, signature, moduleName, sourceFile, declaringType, modifiers, availability, apiFlags, isReadOnly, isInitializable, hasValue
+            case name, signature, moduleName, sourceFile, declaringType, modifiers, availability, apiFlags, isInitializable, hasValue
         }
 
         fileprivate init(statement: VariableDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo) {
@@ -1270,8 +1269,10 @@ public class CodebaseInfo: Codable {
             if statement.attributes.contains(.mainActor) {
                 apiFlags.insert(.mainActor)
             }
+            if !statement.isLet && (statement.getter == nil || statement.setter != nil) {
+                apiFlags.insert(.writeable)
+            }
             self.apiFlags = apiFlags
-            self.isReadOnly = statement.isLet || (statement.getter != nil && statement.setter == nil)
             self.isInitializable = !statement.modifiers.isStatic && statement.getter == nil && (!statement.isLet || statement.value == nil)
             self.hasValue = self.signature.isOptional || statement.value != nil
             if !self.signature.isFullySpecified, self.sourceFile != nil {

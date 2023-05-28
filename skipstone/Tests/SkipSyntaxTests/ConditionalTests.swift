@@ -106,38 +106,136 @@ final class ConditionalTests: XCTestCase {
 
     func testOptionalBinding() async throws {
         try await check(swift: """
-        var i: Int?
-        if let i {
-            print(i)
+        {
+            var i: Int?
+            if let i {
+                print(i)
+            }
         }
         """, kotlin: """
-        internal var i: Int? = null
-        if (i != null) {
-            print(i)
+        {
+            var i: Int?
+            if (i != null) {
+                print(i)
+            }
         }
         """)
 
         try await check(swift: """
-        var i: Int?
-        if let i = i {
-            print(i)
+        {
+            var i: Int?
+            if let i = i {
+                print(i)
+            }
         }
         """, kotlin: """
-        internal var i: Int? = null
-        if (i != null) {
-            print(i)
+        {
+            var i: Int?
+            if (i != null) {
+                print(i)
+            }
         }
         """)
 
         try await check(swift: """
-        var i: Int?
-        if let x = i {
-            print(x)
+        {
+            var i: Int?
+            if let x = i {
+                print(x)
+            }
         }
         """, kotlin: """
-        internal var i: Int? = null
-        i?.let { x ->
-            print(x)
+        {
+            var i: Int?
+            i?.let { x ->
+                print(x)
+            }
+        }
+        """)
+    }
+
+    func testOptionalBindingToMember() async throws {
+        try await check(swift: """
+        class C {
+            var i: Int?
+            let j: Int?
+            func f() {
+                if let i {
+                    print(i)
+                }
+                if let j {
+                    print(j)
+                }
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal var i: Int? = null
+            internal val j: Int?
+            internal open fun f() {
+                i?.let { i ->
+                    print(i)
+                }
+                if (j != null) {
+                    print(j)
+                }
+            }
+        }
+        """)
+
+        try await check(swift: """
+        class C {
+            var i: Int?
+            let j: Int?
+            func f() {
+                if let i = i {
+                    print(i)
+                }
+                if let j = j {
+                    print(j)
+                }
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal var i: Int? = null
+            internal val j: Int?
+            internal open fun f() {
+                i?.let { i ->
+                    print(i)
+                }
+                if (j != null) {
+                    print(j)
+                }
+            }
+        }
+        """)
+
+        try await check(swift: """
+        class C {
+            var i: Int?
+            let j: Int?
+            func f() {
+                if let x = i {
+                    print(x)
+                }
+                if let y = j {
+                    print(y)
+                }
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal var i: Int? = null
+            internal val j: Int?
+            internal open fun f() {
+                i?.let { x ->
+                    print(x)
+                }
+                j?.let { y ->
+                    print(y)
+                }
+            }
         }
         """)
     }
@@ -145,84 +243,73 @@ final class ConditionalTests: XCTestCase {
     func testMutableStructOptionalBinding() async throws {
         // Translate let into a simple null check because the value can't change
         try await check(swift: """
-        if let i {
-            print(i)
+        {
+            let i: S?
+            if let i {
+                print(i)
+            }
         }
         """, kotlin: """
-        if (i != null) {
-            print(i)
+        {
+            val i: S?
+            if (i != null) {
+                print(i)
+            }
         }
         """)
 
         // Translate var into a new reference because we don't want to mutate the original value
         try await check(swift: """
-        if var i {
-            i.mutate()
+        {
+            let i: S?
+            if var i {
+                i.mutate()
+            }
         }
         """, kotlin: """
-        i.sref()?.let { i ->
-            var i = i
-            i.mutate()
+        {
+            val i: S?
+            i.sref()?.let { i ->
+                var i = i
+                i.mutate()
+            }
         }
         """)
     }
 
     func testOptionalBindingElse() async throws {
         try await check(swift: """
-        var i: Int?
-        if let i {
-            print(i)
-        } else {
-            print("nil")
+        {
+            var i: Int?
+            if let i {
+                print(i)
+            } else {
+                print("nil")
+            }
         }
         """, kotlin: """
-        internal var i: Int? = null
-        if (i != null) {
-            print(i)
-        } else {
-            print("nil")
+        {
+            var i: Int?
+            if (i != null) {
+                print(i)
+            } else {
+                print("nil")
+            }
         }
         """)
 
         try await check(swift: """
-        var i: Int?
-        if let x = i {
-            print(x)
-        } else {
-            print("nil")
+        {
+            var i: Int?
+            if let x = i {
+                print(x)
+            } else {
+                print("nil")
+            }
         }
         """, kotlin: """
-        internal var i: Int? = null
-        var letexec_0 = false
-        i?.let { x ->
-            letexec_0 = true
-            print(x)
-        }
-        if (!letexec_0) {
-            print("nil")
-        }
-        """)
-    }
-
-    func testOptionalBindingElseIf() async throws {
-        try await check(swift: """
-        var i: Int?
-        if x > 0 {
-            print("positive")
-        } else if let i {
-            print(i)
-        } else if let x = i {
-            print(x)
-        } else {
-            print("nil")
-        }
-        """, kotlin: """
-        internal var i: Int? = null
-        if (x > 0) {
-            print("positive")
-        } else if (i != null) {
-            print(i)
-        } else {
+        {
+            var i: Int?
             var letexec_0 = false
             i?.let { x ->
                 letexec_0 = true
@@ -233,60 +320,103 @@ final class ConditionalTests: XCTestCase {
             }
         }
         """)
+    }
 
+    func testOptionalBindingElseIf() async throws {
         try await check(swift: """
-        var i: Int?
-        if var i {
-            print(i)
-        } else if x > 0 {
-            print("positive")
-        } else if let y = i {
-            print(y)
+        {
+            var i: Int?
+            if x > 0 {
+                print("positive")
+            } else if let i {
+                print(i)
+            } else if let x = i {
+                print(x)
+            } else {
+                print("nil")
+            }
         }
         """, kotlin: """
-        internal var i: Int? = null
-        var letexec_0 = false
-        i?.let { i ->
-            var i = i
-            letexec_0 = true
-            print(i)
-        }
-        if (!letexec_0) {
+        {
+            var i: Int?
             if (x > 0) {
                 print("positive")
+            } else if (i != null) {
+                print(i)
             } else {
-                i?.let { y ->
-                    print(y)
+                var letexec_0 = false
+                i?.let { x ->
+                    letexec_0 = true
+                    print(x)
+                }
+                if (!letexec_0) {
+                    print("nil")
                 }
             }
         }
         """)
 
         try await check(swift: """
-        var i: Int?
-        if var i {
-            print(i)
-        } else if let x = i {
-            print(x)
-        } else {
-            print("nil")
+        {
+            var i: Int?
+            if var i {
+                print(i)
+            } else if x > 0 {
+                print("positive")
+            } else if let y = i {
+                print(y)
+            }
         }
         """, kotlin: """
-        internal var i: Int? = null
-        var letexec_0 = false
-        i?.let { i ->
-            var i = i
-            letexec_0 = true
-            print(i)
-        }
-        if (!letexec_0) {
-            var letexec_1 = false
-            i?.let { x ->
-                letexec_1 = true
-                print(x)
+        {
+            var i: Int?
+            var letexec_0 = false
+            i?.let { i ->
+                var i = i
+                letexec_0 = true
+                print(i)
             }
-            if (!letexec_1) {
+            if (!letexec_0) {
+                if (x > 0) {
+                    print("positive")
+                } else {
+                    i?.let { y ->
+                        print(y)
+                    }
+                }
+            }
+        }
+        """)
+
+        try await check(swift: """
+        {
+            var i: Int?
+            if var i {
+                print(i)
+            } else if let x = i {
+                print(x)
+            } else {
                 print("nil")
+            }
+        }
+        """, kotlin: """
+        {
+            var i: Int?
+            var letexec_0 = false
+            i?.let { i ->
+                var i = i
+                letexec_0 = true
+                print(i)
+            }
+            if (!letexec_0) {
+                var letexec_1 = false
+                i?.let { x ->
+                    letexec_1 = true
+                    print(x)
+                }
+                if (!letexec_1) {
+                    print("nil")
+                }
             }
         }
         """)
@@ -294,34 +424,38 @@ final class ConditionalTests: XCTestCase {
 
     func testMultipleOptionalBindings() async throws {
         try await check(swift: """
-        var i: Int?
-        var j: String?
-        var k: Int?
-        if var i, i > 5, let x = j, x == "x" || x == "y" {
-            print(i)
-        } else if boolValue, let x = k {
-            print(x)
+        {
+            var i: Int?
+            var j: String?
+            var k: Int?
+            if var i, i > 5, let x = j, x == "x" || x == "y" {
+                print(i)
+            } else if boolValue, let x = k {
+                print(x)
+            }
         }
         """, kotlin: """
-        internal var i: Int? = null
-        internal var j: String? = null
-        internal var k: Int? = null
-        var letexec_0 = false
-        i?.let { i ->
-            var i = i
-            if (i > 5) {
-                j?.let { x ->
-                    if (x == "x" || x == "y") {
-                        letexec_0 = true
-                        print(i)
+        {
+            var i: Int?
+            var j: String?
+            var k: Int?
+            var letexec_0 = false
+            i?.let { i ->
+                var i = i
+                if (i > 5) {
+                    j?.let { x ->
+                        if (x == "x" || x == "y") {
+                            letexec_0 = true
+                            print(i)
+                        }
                     }
                 }
             }
-        }
-        if (!letexec_0) {
-            if (boolValue) {
-                k?.let { x ->
-                    print(x)
+            if (!letexec_0) {
+                if (boolValue) {
+                    k?.let { x ->
+                        print(x)
+                    }
                 }
             }
         }
@@ -334,16 +468,20 @@ final class ConditionalTests: XCTestCase {
             var related: C?
         }
         """, swift: """
-        var c: C?
-        if let x = c, let related = x.related, let doublerelated = related.related {
-            print(doublerelated)
+        {
+            var c: C?
+            if let x = c, let related = x.related, let doublerelated = related.related {
+                print(doublerelated)
+            }
         }
         """, kotlin: """
-        internal var c: C? = null
-        c?.let { x ->
-            x.related?.let { related ->
-                related.related?.let { doublerelated ->
-                    print(doublerelated)
+        {
+            var c: C?
+            c?.let { x ->
+                x.related?.let { related ->
+                    related.related?.let { doublerelated ->
+                        print(doublerelated)
+                    }
                 }
             }
         }
@@ -473,6 +611,32 @@ final class ConditionalTests: XCTestCase {
         """)
     }
 
+    func testCompoundOptionalBinding() async throws {
+        try await check(swift: """
+        func f() -> String {
+            let dict: [String: Any] = ["A": 1]
+            if let num = dict["A"] as? Int {
+                return "A"
+            } else {
+                return "B"
+            }
+        }
+        """, kotlin: """
+        internal fun f(): String {
+            val dict: Dictionary<String, Any> = dictionaryOf(Tuple2("A", 1))
+            var letexec_0 = false
+            (dict["A"] as? Int)?.let { num ->
+                letexec_0 = true
+                return "A"
+            }
+            if (!letexec_0) {
+                return "B"
+            }
+            error("Unreachable")
+        }
+        """)
+    }
+
     func testIfCase() async throws {
         try await check(supportingSwift: """
         enum E {
@@ -566,61 +730,27 @@ final class ConditionalTests: XCTestCase {
             case case2(Int, String)
         }
         """, swift: """
-        var i: Int?
-        let e: E
-        if let i {
-            print(i)
-        } else if case .case2(_, let s) = e {
-            print(s)
-        } else {
-            print("else")
-        }
-        """, kotlin: """
-        internal var i: Int? = null
-        internal val e: E
-        if (i != null) {
-            print(i)
-        } else if (e is E.Case2Case) {
-            val s = e.associated1
-            print(s)
-        } else {
-            print("else")
-        }
-        """)
-
-        try await check(supportingSwift: """
-        func enumFactory() -> E {
-            return .case1
-        }
-        enum E {
-            case case1
-            case case2(Int, String)
-        }
-        """, swift: """
-        var i: Int?
-        if let i {
-            print(i)
-        } else if case .case2(let i, let s) = enumFactory(), i > 1 {
-            print(s)
-        } else {
-            print("else")
-        }
-        """, kotlin: """
-        internal var i: Int? = null
-        if (i != null) {
-            print(i)
-        } else {
-            var letexec_0 = false
-            val matchtarget_0 = enumFactory()
-            if (matchtarget_0 is E.Case2Case) {
-                val i = matchtarget_0.associated0
-                val s = matchtarget_0.associated1
-                if (i > 1) {
-                    letexec_0 = true
-                    print(s)
-                }
+        {
+            var i: Int?
+            let e: E
+            if let i {
+                print(i)
+            } else if case .case2(_, let s) = e {
+                print(s)
+            } else {
+                print("else")
             }
-            if (!letexec_0) {
+        }
+        """, kotlin: """
+        {
+            var i: Int?
+            val e: E
+            if (i != null) {
+                print(i)
+            } else if (e is E.Case2Case) {
+                val s = e.associated1
+                print(s)
+            } else {
                 print("else")
             }
         }
@@ -635,25 +765,71 @@ final class ConditionalTests: XCTestCase {
             case case2(Int, String)
         }
         """, swift: """
-        var i: Int?
-        if let x = i, case .case2(let i, _) = enumFactory() {
-            print(x + i)
-        } else {
-            print("else")
-        }
-        """, kotlin: """
-        internal var i: Int? = null
-        var letexec_0 = false
-        i?.let { x ->
-            val matchtarget_0 = enumFactory()
-            if (matchtarget_0 is E.Case2Case) {
-                val i = matchtarget_0.associated0
-                letexec_0 = true
-                print(x + i)
+        {
+            var i: Int?
+            if let i {
+                print(i)
+            } else if case .case2(let i, let s) = enumFactory(), i > 1 {
+                print(s)
+            } else {
+                print("else")
             }
         }
-        if (!letexec_0) {
-            print("else")
+        """, kotlin: """
+        {
+            var i: Int?
+            if (i != null) {
+                print(i)
+            } else {
+                var letexec_0 = false
+                val matchtarget_0 = enumFactory()
+                if (matchtarget_0 is E.Case2Case) {
+                    val i = matchtarget_0.associated0
+                    val s = matchtarget_0.associated1
+                    if (i > 1) {
+                        letexec_0 = true
+                        print(s)
+                    }
+                }
+                if (!letexec_0) {
+                    print("else")
+                }
+            }
+        }
+        """)
+
+        try await check(supportingSwift: """
+        func enumFactory() -> E {
+            return .case1
+        }
+        enum E {
+            case case1
+            case case2(Int, String)
+        }
+        """, swift: """
+        {
+            var i: Int?
+            if let x = i, case .case2(let i, _) = enumFactory() {
+                print(x + i)
+            } else {
+                print("else")
+            }
+        }
+        """, kotlin: """
+        {
+            var i: Int?
+            var letexec_0 = false
+            i?.let { x ->
+                val matchtarget_0 = enumFactory()
+                if (matchtarget_0 is E.Case2Case) {
+                    val i = matchtarget_0.associated0
+                    letexec_0 = true
+                    print(x + i)
+                }
+            }
+            if (!letexec_0) {
+                print("else")
+            }
         }
         """)
     }
@@ -726,83 +902,213 @@ final class ConditionalTests: XCTestCase {
 
     func testGuardOptionalBinding() async throws {
         try await check(swift: """
-        var i: Int?
-        guard let i else {
-            print(i)
-            return
+        {
+            var i: Int?
+            guard let i else {
+                print(i)
+                return
+            }
+            print(i + 1)
         }
-        print(i + 1)
         """, kotlin: """
-        internal var i: Int? = null
-        if (i == null) {
-            print(i)
-            return
+        l@{
+            var i: Int?
+            if (i == null) {
+                print(i)
+                return@l
+            }
+            print(i + 1)
         }
-        print(i + 1)
         """)
 
         try await check(swift: """
-        var i: Int?
-        guard let i = i else {
-            print(i)
-            return
+        {
+            var i: Int?
+            guard let i = i else {
+                print(i)
+                return
+            }
+            print(i + 1)
         }
-        print(i + 1)
         """, kotlin: """
-        internal var i: Int? = null
-        if (i == null) {
-            print(i)
-            return
+        l@{
+            var i: Int?
+            if (i == null) {
+                print(i)
+                return@l
+            }
+            print(i + 1)
         }
-        print(i + 1)
         """)
 
         try await check(swift: """
-        var i: Int?
-        guard var i = i else {
-            print(i)
-            return
+        {
+            var i: Int?
+            guard var i = i else {
+                print(i)
+                return
+            }
+            print(i + 1)
         }
-        print(i + 1)
         """, kotlin: """
-        internal var i: Int? = null
-        var i_0 = i
-        if (i_0 == null) {
-            print(i)
-            return
+        l@{
+            var i: Int?
+            var i_0 = i
+            if (i_0 == null) {
+                print(i)
+                return@l
+            }
+            print(i_0 + 1)
         }
-        print(i_0 + 1)
+        """)
+    }
+
+    func testGuardOptionalBindingToMember() async throws {
+        try await check(swift: """
+        class C {
+            var i: Int?
+            let j: Int?
+            func f() {
+                guard let i else {
+                    print(i)
+                    return
+                }
+                guard let j else {
+                    print(j)
+                    return
+                }
+                print(i + j)
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal var i: Int? = null
+            internal val j: Int?
+            internal open fun f() {
+                val i_0 = i
+                if (i_0 == null) {
+                    print(i)
+                    return
+                }
+                if (j == null) {
+                    print(j)
+                    return
+                }
+                print(i_0 + j)
+            }
+        }
+        """)
+
+        try await check(swift: """
+        class C {
+            var i: Int?
+            let j: Int?
+            func f() {
+                guard let i = i else {
+                    print(i)
+                    return
+                }
+                guard let j = j else {
+                    print(j)
+                    return
+                }
+                print(i + j)
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal var i: Int? = null
+            internal val j: Int?
+            internal open fun f() {
+                val i_0 = i
+                if (i_0 == null) {
+                    print(i)
+                    return
+                }
+                if (j == null) {
+                    print(j)
+                    return
+                }
+                print(i_0 + j)
+            }
+        }
+        """)
+
+        try await check(swift: """
+        class C {
+            var i: Int?
+            let j: Int?
+            func f() {
+                guard var i = i else {
+                    print(i)
+                    return
+                }
+                guard var j = j else {
+                    print(j)
+                    return
+                }
+                print(i + j)
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal var i: Int? = null
+            internal val j: Int?
+            internal open fun f() {
+                var i_0 = i
+                if (i_0 == null) {
+                    print(i)
+                    return
+                }
+                var j_0 = j
+                if (j_0 == null) {
+                    print(j)
+                    return
+                }
+                print(i_0 + j_0)
+            }
+        }
         """)
     }
 
     func testGuardMutableStructOptionalBinding() async throws {
         try await check(swift: """
-        guard let i else {
+        {
+            let i: S?
+            guard let i else {
+                print(i)
+                return
+            }
             print(i)
-            return
         }
-        print(i)
         """, kotlin: """
-        if (i == null) {
+        l@{
+            val i: S?
+            if (i == null) {
+                print(i)
+                return@l
+            }
             print(i)
-            return
         }
-        print(i)
         """)
 
         try await check(swift: """
-        guard let x = i else {
-            print(i)
-            return
+        {
+            guard let x = i else {
+                print(i)
+                return
+            }
+            print(x)
         }
-        print(x)
         """, kotlin: """
-        val x_0 = i.sref()
-        if (x_0 == null) {
-            print(i)
-            return
+        l@{
+            val x_0 = i.sref()
+            if (x_0 == null) {
+                print(i)
+                return@l
+            }
+            print(x_0)
         }
-        print(x_0)
         """)
     }
 
@@ -812,60 +1118,68 @@ final class ConditionalTests: XCTestCase {
             var related: C?
         }
         """, swift: """
-        var c: C?
-        guard var c, c > 5, let related = c.related, let doublerelated = related.related else {
-            doSomethingWith(c)
-            return
+        {
+            var c: C?
+            guard var c, c > 5, let related = c.related, let doublerelated = related.related else {
+                doSomethingWith(c)
+                return
+            }
+            print(doublerelated)
         }
-        print(doublerelated)
         """, kotlin: """
-        internal var c: C? = null
-        var c_0 = c
-        if ((c_0 == null) || (c_0 <= 5)) {
-            doSomethingWith(c)
-            return
+        l@{
+            var c: C?
+            var c_0 = c
+            if ((c_0 == null) || (c_0 <= 5)) {
+                doSomethingWith(c)
+                return@l
+            }
+            val related_0 = c_0.related
+            if (related_0 == null) {
+                doSomethingWith(c)
+                return@l
+            }
+            val doublerelated_0 = related_0.related
+            if (doublerelated_0 == null) {
+                doSomethingWith(c)
+                return@l
+            }
+            print(doublerelated_0)
         }
-        val related_0 = c_0.related
-        if (related_0 == null) {
-            doSomethingWith(c)
-            return
-        }
-        val doublerelated_0 = related_0.related
-        if (doublerelated_0 == null) {
-            doSomethingWith(c)
-            return
-        }
-        print(doublerelated_0)
         """)
     }
 
     func testGuardsWithSameNamedOptionalBindings() async throws {
         try await check(swift: """
-        var i: Int?
-        guard var i else {
+        {
+            var i: Int?
+            guard var i else {
+                print(i)
+                return
+            }
             print(i)
-            return
-        }
-        print(i)
-        guard var i = x else {
+            guard var i = x else {
+                print(i)
+                return
+            }
             print(i)
-            return
         }
-        print(i)
         """, kotlin: """
-        internal var i: Int? = null
-        var i_0 = i
-        if (i_0 == null) {
-            print(i)
-            return
-        }
-        print(i_0)
-        var i_1 = x.sref()
-        if (i_1 == null) {
+        l@{
+            var i: Int?
+            var i_0 = i
+            if (i_0 == null) {
+                print(i)
+                return@l
+            }
             print(i_0)
-            return
+            var i_1 = x.sref()
+            if (i_1 == null) {
+                print(i_0)
+                return@l
+            }
+            print(i_1)
         }
-        print(i_1)
         """)
     }
 
@@ -876,19 +1190,23 @@ final class ConditionalTests: XCTestCase {
             case case2
         }
         """, swift: """
-        let e: E
-        guard case .case1 = e else {
-            print("no")
-            return
+        {
+            let e: E
+            guard case .case1 = e else {
+                print("no")
+                return
+            }
+            print(e)
         }
-        print(e)
         """, kotlin: """
-        internal val e: E
-        if (e != E.case1) {
-            print("no")
-            return
+        l@{
+            val e: E
+            if (e != E.case1) {
+                print("no")
+                return@l
+            }
+            print(e)
         }
-        print(e)
         """)
     }
 

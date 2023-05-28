@@ -1141,6 +1141,8 @@ class OptionalBinding: Expression, BindingExpression {
     private(set) var declaredType: TypeSignature
     let isLet: Bool
     let value: Expression?
+    // Whether this is a 'let x' or 'let x = x' binding where 'x' may be concurrently mutated (i.e. is a writeable member/global)
+    private(set) var nameShadowsUnstableValue: Bool
     var variableTypes: [TypeSignature] {
         return variableType.tupleTypes(count: names.count)
     }
@@ -1153,11 +1155,12 @@ class OptionalBinding: Expression, BindingExpression {
     func bindAsVar() {
     }
 
-    init(names: [String?], declaredType: TypeSignature = .none, isLet: Bool = true, value: Expression? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
+    init(names: [String?], declaredType: TypeSignature = .none, isLet: Bool = true, value: Expression? = nil, nameShadowsUnstableValue: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.names = names
         self.declaredType = declaredType
         self.isLet = isLet
         self.value = value
+        self.nameShadowsUnstableValue = nameShadowsUnstableValue
         self.variableType = declaredType
         super.init(type: .optionalBinding, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
@@ -1197,6 +1200,15 @@ class OptionalBinding: Expression, BindingExpression {
         }
         // Flow will only continue when the value is non-optional
         variableType = variableType.asOptional(false)
+
+        if names.count == 1, let name = names[0], !context.isLocalOrSelfIdentifier(name), value == nil || (value as? Identifier)?.name == name {
+            if let match = context.identifier(name, messagesNode: nil) {
+                nameShadowsUnstableValue = match.apiFlags.contains(.writeable)
+            } else {
+                nameShadowsUnstableValue = true // Better safe than sorry
+            }
+        }
+
         return context.addingIdentifiers(bindings)
     }
 

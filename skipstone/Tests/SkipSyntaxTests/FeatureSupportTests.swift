@@ -17,31 +17,6 @@ final class FeatureSupportTests: XCTestCase {
             """)
     }
 
-    func testOptionalDictionaryAccess() async throws {
-        // this creates the syntax error:
-        // error: expecting function type dict["A"] as? Int?.let { num
-        // a workaround is to wrap it in parens: if let num = (dict["A"] as? Int)
-        try await check(compiler: nil, swiftCode: {
-            let dict: [String: Any] = ["A": 1]
-            if let num = dict["A"] as? Int {
-                return "A"
-            } else {
-                return "B"
-            }
-        }, kotlin: """
-            val dict: Dictionary<String, Any> = dictionaryOf(Tuple2("A", 1))
-                get() = field
-            var letexec_0 = false
-            dict["A"] as? Int?.let { num ->
-                letexec_0 = true
-                return "A"
-            }
-            if (!letexec_0) {
-                return "B"
-            }
-            """)
-    }
-
     func testNamedParameterOverridesOuterDefinition() async throws {
         // the "a" part of the "a b: String" parameter is unused in Swift, but it acts as being locally declared in Kotlin and thus overrides the outer definition of "a".
         // These two functions thus return different values: "xy" vs. "yy"

@@ -34,26 +34,34 @@ final class LoopTests: XCTestCase {
         """)
 
         try await check(swift: """
-        var i: Int?
-        while let i, i < 5 {
-            doSomething()
+        {
+            var i: Int?
+            while let i, i < 5 {
+                doSomething()
+            }
         }
         """, kotlin: """
-        internal var i: Int? = null
-        while ((i != null) && (i < 5)) {
-            doSomething()
+        {
+            var i: Int?
+            while ((i != null) && (i < 5)) {
+                doSomething()
+            }
         }
         """)
 
         try await check(swift: """
-        var i: Int?
-        while let i = i, i < 5 {
-            doSomething()
+        {
+            var i: Int?
+            while let i = i, i < 5 {
+                doSomething()
+            }
         }
         """, kotlin: """
-        internal var i: Int? = null
-        while ((i != null) && (i < 5)) {
-            doSomething()
+        {
+            var i: Int?
+            while ((i != null) && (i < 5)) {
+                doSomething()
+            }
         }
         """)
     }
