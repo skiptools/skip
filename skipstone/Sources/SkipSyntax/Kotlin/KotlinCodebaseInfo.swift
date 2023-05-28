@@ -110,19 +110,6 @@ extension CodebaseInfo.Context {
         return false
     }
 
-    /// Whether this declaration is implicitly or explicitly `@MainActor`.
-    func isMainActor(declaration: FunctionDeclaration, in type: TypeSignature = .none) -> Bool {
-        assert(global.kotlin != nil)
-        let arguments = declaration.parameters.map { LabeledValue(label: $0.externalLabel, value: $0.declaredType) }
-        let matches: [APIMatch]
-        if type == .none {
-            matches = matchFunction(name: declaration.name, arguments: arguments)
-        } else {
-            matches = matchFunction(name: declaration.name, inConstrained: type, arguments: arguments)
-        }
-        return matches.first?.apiFlags.contains(.mainActor) == true
-    }
-
     /// Whether the given type may be a mutable struct.
     func mayBeMutableStruct(type: TypeSignature) -> Bool {
         assert(global.kotlin != nil)

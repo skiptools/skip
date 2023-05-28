@@ -16,8 +16,8 @@ final class KotlinConcurrencyTransformer: KotlinTransformer {
                 } else if memberAccess.member == "Task", case .module("Swift", _) = memberAccess.baseType, let functionCall = memberAccess.parent as? KotlinFunctionCall, memberAccess === functionCall.function {
                     updateTaskConstructor(functionCall)
                 }
-            } else if let awaitExpression = node as? KotlinAwait {
-                processAwaitExpression(awaitExpression)
+            } else if let mainActorTargeting = node as? (KotlinSyntaxNode & KotlinMainActorTargeting) {
+                if mainActorTargeting.isInAwait && mainActorTargeting.needsMainActorIsolation
             }
             return .recurse(nil)
         }
@@ -28,7 +28,11 @@ final class KotlinConcurrencyTransformer: KotlinTransformer {
     }
 
     private func processAwaitExpression(_ expression: KotlinAwait) {
-        //~~~
+        var isInMainActorContext: Bool? = nil
+        expression.visit { node in
+
+        }
+
     }
 }
 
@@ -38,6 +42,49 @@ extension KotlinConcurrencyTransformer: KotlinTypeSignatureOutputTransformer {
             return .named("Task", [generics[0]])
         } else {
             return signature
+        }
+    }
+}
+
+fileprivate extension CodebaseInfo.Context {
+    func isMainActor(declaration: KotlinFunctionDeclaration) -> Bool {
+        if declaration.attributes.contains(.mainActor) {
+            return true
+        }
+        let arguments = declaration.parameters.map { LabeledValue(label: $0.externalLabel, value: $0.declaredType) }
+        let matches: [APIMatch]
+        if let owningType = owningType(of: declaration) {
+            matches = matchFunction(name: declaration.name, inConstrained: owningType, arguments: arguments)
+        } else {
+            matches = matchFunction(name: declaration.name, arguments: arguments)
+        }
+        return matches.first?.apiFlags.contains(.mainActor) == true
+    }
+
+    func isMainActor(declaration: KotlinVariableDeclaration) -> Bool {
+        if declaration.attributes.contains(.mainActor) {
+            return true
+        }
+        let match: APIMatch?
+        if declaration.isProperty, let owningType = owningType(of: declaration) {
+            match = matchIdentifier(name: declaration.propertyName, inConstrained: owningType)
+        } else if declaration.isGlobal {
+            match = matchIdentifier(name: declaration.propertyName)
+        } else {
+            match = nil
+        }
+        return match?.apiFlags.contains(.mainActor) == true
+    }
+
+    private func owningType(of declaration: KotlinStatement) -> TypeSignature? {
+        if let classDeclaration = declaration.parent as? KotlinClassDeclaration {
+            return primaryTypeInfo(forNamed: classDeclaration.signature)?.signature
+        } else if let interfaceDeclaration = declaration.parent as? KotlinInterfaceDeclaration {
+            return primaryTypeInfo(forNamed: interfaceDeclaration.signature)?.signature
+        } else if let memberDeclaration = declaration as? KotlinMemberDeclaration {
+            return memberDeclaration.extends?.0
+        } else {
+            return nil
         }
     }
 }
