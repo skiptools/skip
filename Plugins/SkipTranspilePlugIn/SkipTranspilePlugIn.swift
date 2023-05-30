@@ -17,6 +17,7 @@ import PackagePlugin
 
         // In SPM the per-module outputs has no suffix, but in Xcode it is "ModuleName.output" below DerivedData/
         // We determine we are in Xcode by checking for environment variables that should only be present for Xcode
+        // Note that xcodebuild some has different environment variables, so we need to also check for those.
         let env = ProcessInfo.processInfo.environment
         let xcodeBuildFolder = env["__XCODE_BUILT_PRODUCTS_DIR_PATHS"] ?? env["BUILT_PRODUCTS_DIR"]
         let isXcode = env["__CFBundleIdentifier"] == "com.apple.dt.Xcode" || xcodeBuildFolder != nil
