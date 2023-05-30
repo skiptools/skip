@@ -136,6 +136,7 @@ class KotlinAwait: KotlinExpression {
                 mainActorTargeting.isInAwait = true
                 //~~~ move to transformer
                 if mainActorTargeting.needsMainActorIsolation == nil {
+                    // FIXME: converted to a .warning for async testing
                     node.messages.append(.kotlinAsyncAwaitTypeInference(node, source: source))
                 }
                 return .recurse(nil)

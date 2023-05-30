@@ -9,21 +9,14 @@ final class KotlinTestAnnotationTransformer: KotlinTransformer {
     }
 
     private func visit(_ node: KotlinSyntaxNode, codebaseInfo: CodebaseInfo.Context) -> VisitResult<KotlinSyntaxNode> {
-        if let functionDeclaration = node as? KotlinFunctionDeclaration, isTestFunction(functionDeclaration, owningClass: functionDeclaration.parent as? KotlinClassDeclaration, codebaseInfo: codebaseInfo) {
+        if let functionDeclaration = node as? KotlinFunctionDeclaration, Self.isTestFunction(functionDeclaration, owningClass: functionDeclaration.parent as? KotlinClassDeclaration, codebaseInfo: codebaseInfo) {
             functionDeclaration.annotations += ["@Test"]
-            if functionDeclaration.isAsync {
-                // TODO: add in special support for testing coroutines: https://developer.android.com/kotlin/coroutines/test
-                // @Test fun testAsyncFunction() = runTest  {
-                //     val result = asyncFunction()
-                //     assertEquals(expectedResult, result)
-                // }
-            }
             return .skip
         }
         return .recurse(nil)
     }
 
-    private func isTestFunction(_ functionDeclaration: KotlinFunctionDeclaration, owningClass: KotlinClassDeclaration?, codebaseInfo: CodebaseInfo.Context) -> Bool {
+    static func isTestFunction(_ functionDeclaration: KotlinFunctionDeclaration, owningClass: KotlinClassDeclaration?, codebaseInfo: CodebaseInfo.Context) -> Bool {
         guard let owningClass else {
             return false
         }

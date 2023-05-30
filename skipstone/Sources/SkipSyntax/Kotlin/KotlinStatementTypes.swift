@@ -1497,7 +1497,9 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if !isLocal {
             output.append(modifiers.kotlinMemberString(isOpen: isOpen, suffix: " "))
         }
-        if isAsync {
+        let isTestFunction = annotations.contains("@Test")
+        if isAsync && !isTestFunction {
+            // JUnit test functions are not marked suspend
             output.append("suspend ")
         }
 
@@ -1586,7 +1588,11 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         }
 
         if isAsync {
-            if isMainActor == true {
+            let isTestFunction = annotations.contains("@Test")
+            if isTestFunction == true {
+                // JUnit coroutine test cases use `runTest`
+                output.append(" = kotlinx.coroutines.test.runTest ")
+            } else if isMainActor == true {
                 output.append(" = MainActor.run ")
             } else {
                 output.append(" = Task.run ")
