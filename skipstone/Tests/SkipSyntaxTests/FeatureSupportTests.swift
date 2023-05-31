@@ -8,6 +8,48 @@ fileprivate extension String {
 
 /// A test case that verifies that transpilation are *not* working as hoped.
 final class FeatureSupportTests: XCTestCase {
+    func testOptionalChaining() async throws {
+        // In Swift you can do: instance.optional?.actual.actual
+        // But Kotlin seems to need: instance.optional?.actual?.actual
+        // Source.kts:17:21: error: only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type Source.Baz?
+        try await check(compiler: nil, swiftCode: {
+            class Foo {
+                var bar: Bar? = nil
+                init() {
+                    self.bar = Bar()
+                }
+            }
+            class Bar {
+                var bar: Baz = Baz()
+                init() {
+                }
+            }
+            class Baz {
+                var str: String = "ABC"
+                init() {
+                }
+            }
+            return Foo().bar?.bar.str ?? ""
+        }, kotlin: """
+            open class Foo {
+                var bar: Bar? = null
+                constructor() {
+                    this.bar = Bar()
+                }
+            }
+            open class Bar {
+                var bar: Baz = Baz()
+                constructor() {
+                }
+            }
+            open class Baz {
+                var str: String = "ABC"
+                constructor() {
+                }
+            }
+            return Foo().bar?.bar.str ?: ""
+            """)
+    }
 
     func testCheckSwiftCompiledSource() async throws {
         try await check(swiftCode: {
@@ -41,6 +83,7 @@ final class FeatureSupportTests: XCTestCase {
         try await check(swiftCode: {
             let x = "1" + "X"
             return x
+            // trailing comment
         }, kotlin: """
             val x = "1" + "X"
             return x
@@ -323,6 +366,9 @@ final class FeatureSupportTests: XCTestCase {
         #endif
     }
 }
+
+
+
 
 
 
