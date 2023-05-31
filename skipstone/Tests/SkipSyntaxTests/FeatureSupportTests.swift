@@ -82,11 +82,10 @@ final class FeatureSupportTests: XCTestCase {
     func testNoComments() async throws {
         try await check(swiftCode: {
             let x = "1" + "X"
-            return x
-            // trailing comment
+            return x /* TRAILING */
         }, kotlin: """
             val x = "1" + "X"
-            return x
+            return x /* TRAILING */
             """)
     }
 
@@ -366,6 +365,7 @@ final class FeatureSupportTests: XCTestCase {
         #endif
     }
 }
+
 
 
 
