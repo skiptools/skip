@@ -51,6 +51,32 @@ final class FeatureSupportTests: XCTestCase {
             """)
     }
 
+    func testGuaranteedLetAssignmnet() async throws {
+        // Kotlin doesn't seem to be able to handle a guaranteed let assignment
+        // Source.kts:3:5: error: captured member values initialization is forbidden due to possible reassignment
+
+        // make we could transpile `let str: String` as `var str: String!` to work around this
+
+        try await check(compiler: nil, swiftCode: {
+            let str: String
+            if true {
+                str = "x"
+            } else {
+                str = "y"
+            }
+
+            return str
+        }, kotlin: """
+            val str: String
+            if (true) {
+                str = "x"
+            } else {
+                str = "y"
+            }
+            return str
+            """)
+    }
+
     func testCheckSwiftCompiledSource() async throws {
         try await check(swiftCode: {
             return "\(1 + 2)"
@@ -365,6 +391,7 @@ final class FeatureSupportTests: XCTestCase {
         #endif
     }
 }
+
 
 
 
