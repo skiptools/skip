@@ -8,7 +8,7 @@ enum StatementType: CaseIterable, Codable {
     case `continue`
     case `defer`
     case doCatch
-    case endOfBlock
+    case empty
     case `fallthrough`
     case forLoop
     case `guard`
@@ -52,8 +52,8 @@ enum StatementType: CaseIterable, Codable {
             return Defer.self
         case .doCatch:
             return DoCatch.self
-        case .endOfBlock:
-            return EndOfBlock.self
+        case .empty:
+            return Empty.self
         case .fallthrough:
             return Fallthrough.self
         case .forLoop:
@@ -274,10 +274,14 @@ class DoCatch: Statement {
     }
 }
 
-/// Empty statement used to hold trivia that appears at the end of a block or file.
-class EndOfBlock: Statement {
+/// Empty statement typically used to hold trivia.
+class Empty: Statement {
     init(syntax: SyntaxProtocol, extras: StatementExtras, in syntaxTree: SyntaxTree) {
-        super.init(type: .endOfBlock, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
+        super.init(type: .empty, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
+    }
+
+    init(extras: StatementExtras) {
+        super.init(type: .empty, extras: extras)
     }
 }
 
@@ -446,7 +450,21 @@ class IfDefined: Statement {
                 break
             }
         }
-        return try extractStatements(from: clause, in: syntaxTree)
+        var statements = try extractStatements(from: clause, in: syntaxTree)
+        guard let extras else {
+            return statements
+        }
+
+        // Preserve #if leading and trailng trivia
+        if !extras.leadingTrivia.isEmpty {
+            let leadingExtras = StatementExtras(directives: [], leadingTrivia: extras.leadingTrivia, trailingTrivia: [])
+            statements.insert(Empty(extras: leadingExtras), at: 0)
+        }
+        if !extras.trailingTrivia.isEmpty {
+            let trailingExtras = StatementExtras(directives: [], leadingTrivia: [], trailingTrivia: extras.trailingTrivia)
+            statements.append(Empty(extras: trailingExtras))
+        }
+        return statements
     }
 
     private static func processConditions(symbol: String, preprocessorSymbols: Set<String>) -> (isSupported: Bool, isTrue: Bool) {

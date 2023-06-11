@@ -4,7 +4,7 @@ enum KotlinStatementType {
     case codeBlock
     case `continue`
     case `defer`
-    case endOfBlock
+    case empty
     case expression
     case forLoop
     case labeledStatement
@@ -452,9 +452,9 @@ class KotlinDefer: KotlinStatement {
     }
 }
 
-class KotlinEndOfBlock: KotlinStatement {
-    init(statement: EndOfBlock) {
-        super.init(type: .endOfBlock, statement: statement)
+class KotlinEmpty: KotlinStatement {
+    init(statement: Empty) {
+        super.init(type: .empty, statement: statement)
     }
 }
 

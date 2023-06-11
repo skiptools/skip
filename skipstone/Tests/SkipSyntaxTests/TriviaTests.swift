@@ -338,4 +338,35 @@ final class TriviaTests: XCTestCase {
         internal fun f() = Unit
         """)
     }
+
+    func testIfDefinedComments() async throws {
+        try await check(swift: """
+        // Leading comment
+        #if SKIP
+        // Inner comment
+        doSomething()
+        #else
+        // Else comment
+        doSomethingElse()
+        #endif
+        // Trailing comment
+        """, kotlin: """
+        // Leading comment
+        // Inner comment
+        doSomething()
+        // Trailing comment
+        """)
+
+        try await check(swift: """
+        // Leading comment
+        #if !SKIP
+        // Inner comment
+        doSomething()
+        #endif
+        // Trailing comment
+        """, kotlin: """
+        // Leading comment
+        // Trailing comment
+        """)
+    }
 }
