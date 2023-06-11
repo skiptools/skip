@@ -466,6 +466,7 @@ class KotlinClosure: KotlinExpression {
     var isAnonymousFunction = false
     var body: KotlinCodeBlock
     var hasReturnLabel = false
+    var isMainActor: Bool? // Populated if needed by transformer
 
     static func translate(expression: Closure, translator: KotlinTranslator) -> KotlinClosure {
         // If there is an explicit return type we'll use an anonymous function rather than a closure,

@@ -1,6 +1,8 @@
 import XCTest
 
 final class ConcurrencyTests: XCTestCase {
+    //~~~ change 'let task: Task...' to supportingSwift: struct Task { }...
+    //~~~ test Swift.Task?
     func testTaskValueAsFunction() async throws {
         try await check(swift: """
         func f() -> Int async {

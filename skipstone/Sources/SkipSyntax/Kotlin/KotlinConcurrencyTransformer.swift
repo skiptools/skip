@@ -1,38 +1,49 @@
-/// Update uses of `Task` and `async` calls.
+/// Update uses of `Task` and main actor information used in `async` calls.
 final class KotlinConcurrencyTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
-        guard translator.codebaseInfo != nil else {
+        guard let codebaseInfo = translator.codebaseInfo else {
             return
         }
         syntaxTree.root.visit { node in
-            if let identifier = node as? KotlinIdentifier {
+            if let functionDeclaration = node as? KotlinFunctionDeclaration {
+                // Async implementations change for main actor
+                if functionDeclaration.isAsync {
+                    functionDeclaration.isMainActor = codebaseInfo.isMainActor(declaration: functionDeclaration)
+                }
+            } else if let variableDeclaration = node as? KotlinVariableDeclaration {
+                // Async implementations change for main actor
+                if variableDeclaration.isAsync {
+                    variableDeclaration.isMainActor = codebaseInfo.isMainActor(declaration: variableDeclaration)
+                }
+            } else if let identifier = node as? KotlinIdentifier {
                 if identifier.name == "Task", let functionCall = identifier.parent as? KotlinFunctionCall, identifier === functionCall.function {
-                    updateTaskConstructor(functionCall)
+                    updateTaskConstructor(functionCall, codebaseInfo: codebaseInfo)
                 }
             } else if let memberAccess = node as? KotlinMemberAccess {
-                if memberAccess.member == "value", case .named("Task", _) = memberAccess.baseType {
+                if memberAccess.member == "value" && memberAccess.baseType.isNamed("Task", moduleName: "Swift") {
                     // Special case for Task.value -> Task.value() in our Kotlin implementation
                     memberAccess.member = "value()"
                 } else if memberAccess.member == "Task", case .module("Swift", _) = memberAccess.baseType, let functionCall = memberAccess.parent as? KotlinFunctionCall, memberAccess === functionCall.function {
-                    updateTaskConstructor(functionCall)
+                    updateTaskConstructor(functionCall, codebaseInfo: codebaseInfo)
+                } else if memberAccess.member == "detached" && memberAccess.baseType.isNamed("Task", moduleName: "Swift"), let functionCall = memberAccess.parent as? KotlinFunctionCall, memberAccess === functionCall.function {
+                    updateTaskConstructor(functionCall, isDetached: true, codebaseInfo: codebaseInfo)
                 }
             } else if let mainActorTargeting = node as? (KotlinSyntaxNode & KotlinMainActorTargeting) {
-                if mainActorTargeting.isInAwait && mainActorTargeting.needsMainActorIsolation
+                // Update any main actor await call to see if it's in a main actor context
+                if mainActorTargeting.isInAwait && mainActorTargeting.needsMainActorIsolation == true {
+                    updateMainActorTargeting(mainActorTargeting, codebaseInfo: codebaseInfo)
+                }
             }
             return .recurse(nil)
         }
     }
 
-    private func updateTaskConstructor(_ functionCall: KotlinFunctionCall) {
-        //~~~
+    private func updateTaskConstructor(_ functionCall: KotlinFunctionCall, isDetached: Bool = false, codebaseInfo: CodebaseInfo.Context) {
+        //~~~ add an argument if task is main actor-bound
     }
 
-    private func processAwaitExpression(_ expression: KotlinAwait) {
-        var isInMainActorContext: Bool? = nil
-        expression.visit { node in
-
-        }
-
+    private func updateMainActorTargeting(_ mainActorTargeting: KotlinSyntaxNode & KotlinMainActorTargeting, codebaseInfo: CodebaseInfo.Context) {
+        //~~~ set whether in main actor context
     }
 }
 
