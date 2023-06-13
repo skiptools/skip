@@ -146,9 +146,11 @@ final class FeatureSupportTests: XCTestCase {
 
         // perhaps we could transpile `let str: String` as `var str: String!` to work around this, or else just end with a `fatalError("unreachable")`
 
+        // the `if ({ true }())` construct is merely to avoid Swift compiler warnings about the else statement never being excuted
+
         try await check(compiler: nil, swiftCode: {
             let str: String
-            if true {
+            if ({ true }()) {
                 str = "x"
             } else {
                 str = "y"
@@ -157,7 +159,7 @@ final class FeatureSupportTests: XCTestCase {
             return str
         }, kotlin: """
             val str: String
-            if (true) {
+            if (({ true }())) {
                 str = "x"
             } else {
                 str = "y"
