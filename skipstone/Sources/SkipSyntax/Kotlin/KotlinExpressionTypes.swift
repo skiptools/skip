@@ -701,6 +701,10 @@ class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting {
         return orType && mayBeSharedMutableStructType
     }
 
+    override var optionalChain: KotlinOptionalChain {
+        return function.optionalChain == .none ? .none : .implicit
+    }
+
     override var children: [KotlinSyntaxNode] {
         return [function] + arguments.map { $0.value }
     }
@@ -728,7 +732,7 @@ class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting {
             } else {
                 output.append(function, indentation: indentation)
                 // Kotlin does not support <closure>?(args); use <closure>?.invoke(args)
-                if (function as? KotlinPostfixOperator)?.operatorSymbol == "?" {
+                if function.optionalChain == .explicit {
                     output.append(".invoke")
                 }
                 if let identifier = function as? KotlinIdentifier {
@@ -1214,8 +1218,13 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting {
     static func translate(expression: MemberAccess, translator: KotlinTranslator) -> KotlinMemberAccess {
         let kexpression = KotlinMemberAccess(expression: expression)
         if let base = expression.base {
-            kexpression.base = translator.translateExpression(base)
+            let kbase = translator.translateExpression(base)
+            kexpression.base = kbase
             kexpression.useMultlineFormatting = expression.useMultlineFormatting
+            if let functionCall = kbase as? KotlinFunctionCall, functionCall.optionalChain == .implicit {
+                // f({ ... })?.member is cleaner and simpler for us than (f() { ... })?.member
+                functionCall.useTrailingClosureFormatting = false
+            }
             if case .function = expression.inferredType {
                 kexpression.isFunctionReference = !expression.isCalledAsFunction && translator.codebaseInfo?.isFunctionName(expression.member, in: base.inferredType) == true
             }
@@ -1336,6 +1345,13 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting {
         return mayBeSharedMutableStruct
     }
 
+    override var optionalChain: KotlinOptionalChain {
+        guard let base else {
+            return .none
+        }
+        return base.optionalChain == .none ? .none : .implicit
+    }
+
     override func insertDependencies(into dependencies: inout KotlinDependencies) {
         if baseKClass != nil {
             dependencies.insertReflectFull()
@@ -1357,8 +1373,14 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting {
                 output.append("(")
             }
             output.append(base, indentation: indentation)
+            if base.optionalChain == .implicit {
+                output.append("?")
+            }
             if let baseKClass {
                 output.append(".companionObjectInstance as \(baseKClass).Companion)")
+                if base.optionalChain == .implicit {
+                    output.append("?")
+                }
             }
             if member == "self" {
                 // Must be Type.self
@@ -1556,6 +1578,9 @@ class KotlinPostfixOperator: KotlinExpression {
         let ktarget = translator.translateExpression(expression.target)
         let kexpression = KotlinPostfixOperator(expression: expression, target: ktarget)
         kexpression.targetType = expression.target.inferredType
+        if expression.operatorSymbol == "!" && ktarget.optionalChain != .none {
+            kexpression.messages.append(.kotlinOptionalChainUnwrap(kexpression, source: translator.syntaxTree.source))
+        }
         return kexpression
     }
 
@@ -1571,6 +1596,17 @@ class KotlinPostfixOperator: KotlinExpression {
 
     override var isCompoundExpression: Bool {
         return operatorSymbol == "..."
+    }
+
+    override var optionalChain: KotlinOptionalChain {
+        switch operatorSymbol {
+        case "?":
+            return .explicit
+        case "!":
+            return .none
+        default:
+            return target.optionalChain
+        }
     }
 
     override var children: [KotlinSyntaxNode] {
@@ -1665,6 +1701,10 @@ class KotlinSRef: KotlinExpression {
 
     override func mayBeSharedMutableStructExpression(orType: Bool) -> Bool {
         return orType
+    }
+
+    override var optionalChain: KotlinOptionalChain {
+        return base.optionalChain == .none ? .none : .implicit
     }
 
     override func sref(onUpdate: String? = nil) -> KotlinExpression {
@@ -1790,6 +1830,10 @@ class KotlinSubscript: KotlinExpression, KotlinMainActorTargeting {
         return orType && mayBeSharedMutableStructType
     }
 
+    override var optionalChain: KotlinOptionalChain {
+        return base.optionalChain == .none ? .none : .implicit
+    }
+
     override var children: [KotlinSyntaxNode] {
         return [base] + arguments.map { $0.value }
     }
@@ -1797,11 +1841,13 @@ class KotlinSubscript: KotlinExpression, KotlinMainActorTargeting {
     override func append(to output: OutputGenerator, indentation: Indentation) {
         output.append(base, indentation: indentation)
         // Kotlin can't optional chain a subscript, i.e. a?[0]
-        let isOptionalChain = (base as? KotlinPostfixOperator)?.operatorSymbol == "?"
-        if isOptionalChain {
-            output.append(".get(")
-        } else {
+        switch base.optionalChain {
+        case .none:
             output.append("[")
+        case .explicit:
+            output.append(".get(")
+        case .implicit:
+            output.append("?.get(")
         }
         for (index, argument) in arguments.enumerated() {
             // Note: Kotlin does not support labels for subscript arguments
@@ -1817,7 +1863,7 @@ class KotlinSubscript: KotlinExpression, KotlinMainActorTargeting {
                 output.append(", ")
             }
         }
-        output.append(isOptionalChain ? ")" : "]")
+        output.append(base.optionalChain == .none ? "]" : ")")
         if mainActorMode.output != .none {
             // Cooperate with our base child, which will output the beginning part of the closure to execute this
             // on the main actor. We just output the closing brace

@@ -294,4 +294,71 @@ final class ExpressionTests: XCTestCase {
         }
         """)
     }
+
+    func testOptionalChaining() async throws {
+        // In Swift you can do: instance.optional?.actual.actual
+        // But Kotlin seems to need: instance.optional?.actual?.actual
+        let supportingSwift = """
+        class Foo {
+            var bar: Bar?
+            func barf() -> Bar? {
+                return bar
+            }
+        }
+        class Bar {
+            var baz: Baz = Baz()
+            var bazs: [Baz]?
+            func bazf() -> Baz {
+                return baz
+            }
+        }
+        class Baz {
+            var str: String = "ABC"
+            var strs: [String?] = []
+            func strf() -> String {
+                return str
+            }
+        }
+        """
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        func f() -> String? {
+            return Foo().bar?.baz.str
+        }
+        func g() -> String {
+            return Foo().bar!.baz.str
+        }
+        """, kotlin: """
+        internal fun f(): String? = Foo().bar?.baz?.str
+        internal fun g(): String = Foo().bar!!.baz.str
+        """)
+
+        try await check(expectMessages: true, supportingSwift: supportingSwift, swift: """
+        func f() -> String? {
+            return Foo().bar?.bazs?[0].str
+        }
+        func g() -> String? {
+            return Foo().bar?.baz.strs[0]
+        }
+        func h() -> String? {
+            return Foo().bar?.bazs![0].str
+        }
+        """, kotlin: """
+        internal fun f(): String? = Foo().bar?.bazs?.get(0)?.str
+        internal fun g(): String? = Foo().bar?.baz?.strs?.get(0)
+        internal fun h(): String? = Foo().bar?.bazs!![0].str
+        """)
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        func f() -> String? {
+            return Foo().barf()?.bazf().str
+        }
+        func g() -> String {
+            return Foo().barf()!.bazf().str
+        }
+        """, kotlin: """
+        internal fun f(): String? = Foo().barf()?.bazf()?.str
+        internal fun g(): String = Foo().barf()!!.bazf().str
+        """)
+    }
 }

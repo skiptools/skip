@@ -25,7 +25,7 @@ extension XCTestCase {
     ///   - packageSupportKotlin: the expected kotlin in the generated package support source file
     ///   - file: the file of the call site, expected to be `#file`
     ///   - line: the line of the call site, expected to be `#line`
-    public func check(expectFailure: Bool = false, compiler: String? = ProcessInfo.processInfo.environment["KOTLINC"], replaceInlineSKIPME: Int? = 1, dependentModules: [CodebaseInfo] = [], supportingSwift: String? = nil, swift: StaticString? = nil, swiftCode: (() throws -> String?)? = nil, kotlin: String, fixup fixupKotlinBlock: ((String) -> (String)) = { $0 }, packageSupportKotlin: String? = nil, transformers: [KotlinTransformer] = builtinKotlinTransformers(), file: StaticString = #file, line: UInt = #line) async throws {
+    public func check(expectFailure: Bool = false, expectMessages: Bool = false, compiler: String? = ProcessInfo.processInfo.environment["KOTLINC"], replaceInlineSKIPME: Int? = 1, dependentModules: [CodebaseInfo] = [], supportingSwift: String? = nil, swift: StaticString? = nil, swiftCode: (() throws -> String?)? = nil, kotlin: String, fixup fixupKotlinBlock: ((String) -> (String)) = { $0 }, packageSupportKotlin: String? = nil, transformers: [KotlinTransformer] = builtinKotlinTransformers(), file: StaticString = #file, line: UInt = #line) async throws {
 
         func fixup(code: String) -> String {
             var code = fixupKotlinBlock(code)
@@ -96,9 +96,11 @@ extension XCTestCase {
             return XCTFail("transpilation produced no result", file: file, line: line)
         }
 
+        var messages: [Message] = []
         for transpilation in transpilations {
             let messagesString = transpilation.messages.map(\.description).joined(separator: ",")
-            if !transpilation.messages.isEmpty && !expectFailure {
+            messages += transpilation.messages
+            if !transpilation.messages.isEmpty && !expectMessages && !expectFailure {
                 XCTFail("Transpilation produced unexpected messages: \(messagesString)", file: file, line: line)
             }
             if transpilation.sourceFile == srcFiles.first {
@@ -149,6 +151,14 @@ extension XCTestCase {
                     XCTFail("Transpilation produced unexpected package support content: \(transpilation.output.content)", file: file, line: line)
                 }
             }
+        }
+
+        if messages.isEmpty {
+            if expectMessages {
+                XCTFail("Did not receive expected messages", file: file, line: line)
+            }
+        } else {
+            messages.forEach { print("Received expected message: \($0)") }
         }
 
         // if we spcify to fork the kotlinc compiler, proceed with evaluating and comparing the results

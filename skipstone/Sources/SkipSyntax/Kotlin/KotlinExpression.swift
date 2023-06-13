@@ -38,6 +38,11 @@ class KotlinExpression: KotlinSyntaxNode {
         return false
     }
 
+    /// Return whether this expression is part of an optional chain.
+    var optionalChain: KotlinOptionalChain {
+        return .none
+    }
+
     /// Create a new expression that is the logical negation of this one.
     func logicalNegated() -> KotlinExpression {
         var target: KotlinExpression = self
@@ -46,6 +51,14 @@ class KotlinExpression: KotlinSyntaxNode {
         }
         return KotlinPrefixOperator(operatorSymbol: "!", target: target)
     }
+}
+
+enum KotlinOptionalChain {
+    case none
+    /// Chained call with ?.
+    case explicit
+    /// Part of a chain of calls that originates with ?.
+    case implicit
 }
 
 /// Expression that participates in main actor targeting.
@@ -151,6 +164,10 @@ class KotlinSharedExpressionPointer: KotlinExpression {
 
     override var isCompoundExpression: Bool {
         return shared.isCompoundExpression
+    }
+
+    override var optionalChain: KotlinOptionalChain {
+        return shared.optionalChain
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
