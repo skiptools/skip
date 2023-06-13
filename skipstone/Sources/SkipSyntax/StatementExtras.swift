@@ -13,6 +13,8 @@ struct StatementExtras {
         case nowarn
         /// Encountered an invalid directive.
         case invalid(String)
+        /// Marker for a file whose purpose is to provide Swift symbols for separate Kotlin code. Symbols files are not transpiled, and warnings are suppressed.
+        case symbolFile
     }
 
     let directives: [Directive]
@@ -35,6 +37,7 @@ struct StatementExtras {
         let replacePrefix = "SKIP REPLACE:"
         let declarationPrefix = "SKIP DECLARE:"
         let noWarnPrefix = "SKIP NOWARN"
+        let symbolFilePrefix = "SKIP SYMBOLFILE"
         func endDirective() {
             guard let currentDirective = directive else {
                 return
@@ -137,6 +140,9 @@ struct StatementExtras {
                 } else if trimmedLine.hasPrefix(noWarnPrefix) {
                     directives.append(.nowarn)
                     isSingleLineDirective = isSingleLineDirective || !isMultilineCommentDirective
+                } else if trimmedLine.hasPrefix(symbolFilePrefix) {
+                    directives.append(.symbolFile)
+                    isSingleLineDirective = isSingleLineDirective || !isMultilineCommentDirective
                 } else {
                     directives.append(.invalid(trimmedLine))
                     isSingleLineDirective = isSingleLineDirective || !isMultilineCommentDirective
@@ -196,6 +202,16 @@ struct StatementExtras {
             }
         }
         return nil
+    }
+
+    /// Whether the symbol file directive is present.
+    var isSymbolFile: Bool {
+        for directive in directives {
+            if case .symbolFile = directive {
+                return true
+            }
+        }
+        return false
     }
 
     /// Whether to suppress the statement's messages.

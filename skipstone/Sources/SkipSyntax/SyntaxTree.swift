@@ -31,11 +31,19 @@ public class SyntaxTree: PrettyPrintable {
         let _ = root.inferTypes(context: typeContext, expecting: .none)
     }
 
+    /// Whether this syntax tree content is used to provide the transpiler with Swift symbols and is not a transpilation target.
+    public var isSymbolFile: Bool {
+        return root.statements.contains(where: { $0.extras?.isSymbolFile == true })
+    }
+
     public var prettyPrintTree: PrettyPrintTree {
         return PrettyPrintTree(root: source.file.name, children: [root.prettyPrintTree])
     }
 
     public var messages: [Message] {
+        guard !isSymbolFile else {
+            return []
+        }
         return root.subtreeMessages
     }
 }

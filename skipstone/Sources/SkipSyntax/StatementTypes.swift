@@ -457,7 +457,7 @@ class IfDefined: Statement {
 
         // Preserve #if leading and trailng trivia
         if !extras.leadingTrivia.isEmpty {
-            let leadingExtras = StatementExtras(directives: [], leadingTrivia: extras.leadingTrivia, trailingTrivia: [])
+            let leadingExtras = StatementExtras(directives: extras.directives, leadingTrivia: extras.leadingTrivia, trailingTrivia: [])
             statements.insert(Empty(extras: leadingExtras), at: 0)
         }
         if !extras.trailingTrivia.isEmpty {

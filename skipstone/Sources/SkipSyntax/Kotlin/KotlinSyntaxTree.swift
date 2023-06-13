@@ -11,6 +11,9 @@ public class KotlinSyntaxTree {
     }
 
     public var messages: [Message] {
+        guard !root.statements.contains(where: { $0.extras?.isSymbolFile == true }) else {
+            return []
+        }
         return root.subtreeMessages
     }
 }

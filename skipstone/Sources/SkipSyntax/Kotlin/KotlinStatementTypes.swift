@@ -452,10 +452,13 @@ class KotlinDefer: KotlinStatement {
     }
 }
 
-class KotlinEmpty: KotlinStatement {
+class KotlinEmpty: KotlinStatement, KotlinMemberDeclaration {
     init(statement: Empty) {
         super.init(type: .empty, statement: statement)
     }
+
+    var extends: (TypeSignature, Generics)?
+    let isStatic = false
 }
 
 class KotlinForLoop: KotlinStatement {

@@ -1445,7 +1445,7 @@ class KotlinNumericLiteral: KotlinExpression {
             if let decimal = Int(literal.dropFirst(2), radix: 8) {
                 output.append(decimal)
             } else {
-                output.append(literal) // bad octal? try to output the literal anyway and let Kotlin complain
+                output.append(literal) // Bad octal? Try to output the literal anyway and let Kotlin complain
             }
         } else {
             output.append(literal)

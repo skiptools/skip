@@ -27,6 +27,7 @@ public struct Transpiler {
 
         // First create syntax trees used to populate codebase info
         codebaseInfo.kotlin = KotlinCodebaseInfo(packageName: packageName)
+        var symbolFiles: Set<Source.FilePath> = []
         try await withThrowingTaskGroup(of: SyntaxTree.self) { group in
             for sourceFile in sourceFiles {
                 group.addTask {
@@ -36,13 +37,16 @@ public struct Transpiler {
             for try await syntaxTree in group {
                 codebaseInfo.gather(from: syntaxTree)
                 transformers.forEach { $0.gather(from: syntaxTree) }
+                if syntaxTree.isSymbolFile {
+                    symbolFiles.insert(syntaxTree.source.file)
+                }
             }
             codebaseInfo.prepareForUse()
             transformers.forEach { $0.prepareForUse(codebaseInfo: codebaseInfo) }
         }
         // Next perform transpilation with populated info
         try await withThrowingTaskGroup(of: Transpilation.self) { group in
-            for sourceFile in sourceFiles {
+            for sourceFile in sourceFiles where !symbolFiles.contains(sourceFile) {
                 group.addTask {
                     let start = Date().timeIntervalSinceReferenceDate
                     let syntaxTree = try SyntaxTree(source: Source(file: sourceFile), preprocessorSymbols: preprocessorSymbols, codebaseInfo: codebaseInfo)
