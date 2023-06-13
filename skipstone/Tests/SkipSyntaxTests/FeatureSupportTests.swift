@@ -188,12 +188,69 @@ final class FeatureSupportTests: XCTestCase {
             """)
     }
 
-    func testEnumKeyworkNames() async throws {
-        // Postfix-underscored (e.g. "Object_") keyword name-derived case classes are do not use the escaped version when checking cases
-
-        // compile error: unresolved reference: NullCase if (this is KeywordsEnum.NullCase)
-        // compile error: unresolved reference: ObjectCase if (this is KeywordsEnum.ObjectCase)
+    func testEnumRawValueKeywords() async throws {
+        // The case match label is wrong for KeywordsEnum.null
         try await check(compiler: nil, swiftCode: {
+            enum KeywordsEnum : Int {
+                case null
+                case string
+                case boolean
+                case object
+                case `case`
+
+                var index: Int {
+                    switch self {
+                    case .null:
+                        return 0
+                    case .string:
+                        return 1
+                    case .boolean:
+                        return 2
+                    case .object:
+                        return 3
+                    case .case:
+                        return 4
+                    }
+                }
+            }
+            return ""
+        }, kotlin: """
+            enum class KeywordsEnum(override val rawValue: Int, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): RawRepresentable<Int> {
+                null_(0),
+                string(1),
+                boolean(2),
+                object_(3),
+                case(4);
+                val index: Int
+                    get() {
+                        when (this) {
+                            KeywordsEnum.null_ -> return 0
+                            KeywordsEnum.string -> return 1
+                            KeywordsEnum.boolean -> return 2
+                            KeywordsEnum.object_ -> return 3
+                            KeywordsEnum.case -> return 4
+                        }
+                    }
+            }
+            
+            fun KeywordsEnum(rawValue: Int): KeywordsEnum? {
+                return when (rawValue) {
+                    0 -> KeywordsEnum.null
+                    1 -> KeywordsEnum.string
+                    2 -> KeywordsEnum.boolean
+                    3 -> KeywordsEnum.object
+                    4 -> KeywordsEnum.`case`
+                    else -> null
+                }
+            }
+            return ""
+            """)
+    }
+
+
+    func testEnumKeywords() async throws {
+        // Postfix-underscored (e.g. "Object_") keyword name-derived case classes are do not use the escaped version when checking cases
+        try await check(swiftCode: {
             enum KeywordsEnum {
                 case null
                 case string(String)
@@ -201,89 +258,50 @@ final class FeatureSupportTests: XCTestCase {
                 case object(Any)
                 case `case`
 
-                var isNull: Bool {
-                    if case .null = self {
-                        return true
-                    } else {
-                        return false
-                    }
-                }
-
-                func objectValue() -> Any? {
-                    if case .object(let any) = self {
-                        return any
-                    } else {
-                        return nil
-                    }
-                }
-
-                func stringValue() -> String? {
-                    if case .string(let str) = self {
-                        return str
-                    } else {
-                        return nil
-                    }
-                }
-
-                func booleanValue() -> Bool? {
-                    if case .boolean(let b) = self {
-                        return b
-                    } else {
-                        return nil
+                var index: Int {
+                    switch self {
+                    case .null:
+                        return 0
+                    case .string(_):
+                        return 1
+                    case .boolean(_):
+                        return 2
+                    case .object(_):
+                        return 3
+                    case .case:
+                        return 4
                     }
                 }
             }
             return ""
         }, kotlin: """
             sealed class KeywordsEnum {
-                class Null_Case: KeywordsEnum() {
+                class NullCase: KeywordsEnum() {
                 }
                 class StringCase(val associated0: String): KeywordsEnum() {
                 }
                 class BooleanCase(val associated0: Boolean): KeywordsEnum() {
                 }
-                class Object_Case(val associated0: Any): KeywordsEnum() {
+                class ObjectCase(val associated0: Any): KeywordsEnum() {
                 }
                 class CaseCase: KeywordsEnum() {
                 }
-                val isNull: Boolean
+                val index: Int
                     get() {
-                        if (this is KeywordsEnum.NullCase) {
-                            return true
-                        } else {
-                            return false
+                        when (this) {
+                            is KeywordsEnum.NullCase -> return 0
+                            is KeywordsEnum.StringCase -> return 1
+                            is KeywordsEnum.BooleanCase -> return 2
+                            is KeywordsEnum.ObjectCase -> return 3
+                            is KeywordsEnum.CaseCase -> return 4
                         }
                     }
-                fun objectValue(): Any? {
-                    if (this is KeywordsEnum.ObjectCase) {
-                        val any = this.associated0
-                        return any
-                    } else {
-                        return null
-                    }
-                }
-                fun stringValue(): String? {
-                    if (this is KeywordsEnum.StringCase) {
-                        val str = this.associated0
-                        return str
-                    } else {
-                        return null
-                    }
-                }
-                fun booleanValue(): Boolean? {
-                    if (this is KeywordsEnum.BooleanCase) {
-                        val b = this.associated0
-                        return b
-                    } else {
-                        return null
-                    }
-                }
             
                 companion object {
-                    val null_: KeywordsEnum = Null_Case()
+                    val null_: KeywordsEnum = NullCase()
                     fun string(associated0: String): KeywordsEnum = StringCase(associated0)
                     fun boolean(associated0: Boolean): KeywordsEnum = BooleanCase(associated0)
-                    fun object_(associated0: Any): KeywordsEnum = Object_Case(associated0)
+                    fun object_(associated0: Any): KeywordsEnum = ObjectCase(associated0)
                     val case: KeywordsEnum = CaseCase()
                 }
             }
@@ -464,6 +482,11 @@ final class FeatureSupportTests: XCTestCase {
         #endif
     }
 }
+
+
+
+
+
 
 
 

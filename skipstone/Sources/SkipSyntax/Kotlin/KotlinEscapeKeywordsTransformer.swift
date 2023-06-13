@@ -41,7 +41,7 @@ private class EscapeKeywordsVisitor {
 
     func visit(_ node: KotlinSyntaxNode) -> VisitResult<KotlinSyntaxNode> {
         if let node = node as? KotlinEnumCaseDeclaration {
-            node.name = fixKeyword(name: node.name)
+            node.caseName = fixKeyword(name: node.name)
         } else if let node = node as? KotlinIdentifier {
             node.name = fixKeyword(name: node.name)
         } else if let node = node as? KotlinMemberAccess {

@@ -1048,6 +1048,8 @@ class KotlinClassDeclaration: KotlinStatement {
 
 class KotlinEnumCaseDeclaration: KotlinStatement {
     var name: String
+    /// The case name if different from `name`, such as when a keyword is escaped
+    var caseName: String?
     var generics: Generics = Generics()
     var enumGenerics: Generics = Generics()
     var associatedValues: [Parameter<KotlinExpression>] = []
@@ -1057,11 +1059,13 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
 
     /// Return the name of the sealed class we create for the given enum case name in an enum with associated values.
     static func sealedClassName(for caseName: String) -> String {
+        // de-quote the keyword if needed
+        let cname = caseName.hasPrefix("`") && caseName.hasSuffix("`") ? caseName.dropFirst().dropLast().description : caseName
         // Always append "Case" to avoid conflicts with reserved names, e.g. case boolean -> Boolean
-        if let first = caseName.first, first.isLowercase {
-            return first.uppercased() + caseName.dropFirst() + "Case"
+        if let first = cname.first, first.isLowercase {
+            return first.uppercased() + cname.dropFirst() + "Case"
         }
-        return caseName + "Case"
+        return cname + "Case"
     }
 
     static func translate(statement: EnumCaseDeclaration, translator: KotlinTranslator) -> KotlinEnumCaseDeclaration {
@@ -1142,7 +1146,7 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
             }
             output.append(indentation).append("}\n")
         } else {
-            output.append(name)
+            output.append(caseName ?? name)
             if let rawValue {
                 output.append("(").append(rawValue, indentation: indentation).append(")")
             }
@@ -1157,7 +1161,7 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
     func appendSealedClassFactory(to output: OutputGenerator, forEnum: String, alwaysCreateNewInstances: Bool, indentation: Indentation) {
         output.append(indentation)
         if associatedValues.isEmpty && !alwaysCreateNewInstances {
-            output.append("val \(name): \(forEnum)")
+            output.append("val \(caseName ?? name): \(forEnum)")
             enumGenerics.append(to: output, indentation: indentation)
             output.append(" = \(Self.sealedClassName(for: name))")
             generics.appendWhere(to: output, indentation: indentation)
@@ -1168,7 +1172,7 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
                 generics.append(to: output, indentation: indentation)
                 output.append(" ")
             }
-            output.append(name)
+            output.append(caseName ?? name)
             appendAssociatedValueArguments(to: output, asConstructor: false, indentation: indentation)
             output.append(": \(forEnum)")
             enumGenerics.append(to: output, indentation: indentation)
