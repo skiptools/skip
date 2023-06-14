@@ -888,6 +888,10 @@ class KotlinIf: KotlinExpression {
     var body: KotlinCodeBlock
     var elseBody: KotlinCodeBlock?
     var ifCheckVariable: String?
+    var isUsedAsExpression = false
+    var requiresNestingClosure: Bool {
+        return isUsedAsExpression && ifCheckVariable != nil
+    }
 
     struct ConditionSet {
         var optionalBindingVariable: KotlinBindingVariable?
@@ -905,8 +909,20 @@ class KotlinIf: KotlinExpression {
         let kbody = KotlinCodeBlock.translate(statement: expression.body, translator: translator)
         let kexpression = KotlinIf(expression: expression, conditionSets: kconditionSets, body: kbody)
         kexpression.ifCheckVariable = ifCheckVariable
+        kexpression.isUsedAsExpression = !(expression.parent is ExpressionStatement) || expression.parent is Return
+        // If we're going to nest this 'if' in its own closure, we have to return its value
+        if kexpression.requiresNestingClosure {
+            if kexpression.body.updateWithExpectedReturn(.yes) {
+                kexpression.body.updateWithExpectedReturn(.labelIfPresent(KotlinClosure.returnLabel))
+            }
+        }
         if let elseBody = expression.elseBody {
             kexpression.elseBody = KotlinCodeBlock.translate(statement: elseBody, translator: translator)
+            if kexpression.requiresNestingClosure {
+                if kexpression.elseBody?.updateWithExpectedReturn(.yes) == true {
+                    kexpression.elseBody?.updateWithExpectedReturn(.labelIfPresent(KotlinClosure.returnLabel))
+                }
+            }
         }
         return kexpression
     }
@@ -1039,6 +1055,12 @@ class KotlinIf: KotlinExpression {
     }
 
     private func appendIf(to output: OutputGenerator, indentation: Indentation) {
+        var indentation = indentation
+        if requiresNestingClosure {
+            indentation = indentation.inc()
+            output.append("linvoke \(KotlinClosure.returnLabel)@{\n").append(indentation)
+        }
+
         // If check
         var hasOutput = false
         if let ifCheckVariable {
@@ -1046,7 +1068,6 @@ class KotlinIf: KotlinExpression {
             hasOutput = true
         }
         // Nested conditions and their opening braces
-        var indentation = indentation
         for conditionSet in conditionSets {
             if (hasOutput) {
                 output.append(indentation)
@@ -1082,6 +1103,13 @@ class KotlinIf: KotlinExpression {
             output.append(" else {\n")
             output.append(elseBody, indentation: indentation.inc())
             output.append(indentation).append("}")
+        }
+
+        if (requiresNestingClosure) {
+            // requiresNestingClosure means we're returning a value and using an if check variable, so the compiler will need to know
+            // that all branches are covered
+            output.append("\n").append(indentation).append("error(\"Unreachable\")\n")
+            output.append(indentation.dec()).append("}")
         }
     }
 
@@ -1743,7 +1771,8 @@ class KotlinStringLiteral: KotlinExpression {
         for segment in expression.segments {
             switch segment {
             case .string(let string):
-                segments.append(.string(string))
+                let kstring = translateStringSegment(string)
+                segments.append(.string(kstring))
             case .expression(let expression):
                 let kexpression = translator.translateExpression(expression)
                 segments.append(.expression(kexpression))
@@ -1753,6 +1782,13 @@ class KotlinStringLiteral: KotlinExpression {
         kexpression.isMultiline = expression.isMultiline
         kexpression.isCharacter = expression.inferredType == .character
         return kexpression
+    }
+
+    private static func translateStringSegment(_ string: String) -> String {
+        var kstring = string
+        // Escape $ in Kotlin string
+        kstring = kstring.split(separator: "$").joined(separator: "\\$")
+        return kstring
     }
 
     init(literal: String, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
@@ -1781,8 +1817,7 @@ class KotlinStringLiteral: KotlinExpression {
         for segment in segments {
             switch segment {
             case .string(let string):
-                //output.append(string.replacing("$", with: "\\$")) // macOS 13+
-                output.append(string.split(separator: "$").joined(separator: "\\$"))
+                output.append(string)
             case .expression(let expression):
                 output.append("${").append(expression, indentation: indentation).append("}")
             }

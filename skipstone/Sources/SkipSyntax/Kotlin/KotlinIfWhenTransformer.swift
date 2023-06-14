@@ -161,7 +161,7 @@ private class UnreachableVisitor {
             } else if hasReturnValue == nil, let kret = node as? KotlinReturn {
                 hasReturnValue = kret.expression != nil
                 return .skip
-            } else if !hasIfCheckVariable, let kif = node as? KotlinIf {
+            } else if !hasIfCheckVariable, let kif = node as? KotlinIf, !kif.isUsedAsExpression {
                 hasIfCheckVariable = kif.ifCheckVariable != nil
                 return .recurse(nil)
             } else {

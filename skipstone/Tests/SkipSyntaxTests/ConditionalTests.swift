@@ -834,6 +834,210 @@ final class ConditionalTests: XCTestCase {
         """)
     }
 
+    func testIfAsAssignmentExpression() async throws {
+        try await check(swift: """
+        {
+            let i = 0
+            let j = if i < 0 {
+                "Negative"
+            } else {
+                "Positive"
+            }
+        }
+        """, kotlin: """
+        {
+            val i = 0
+            val j = if (i < 0) {
+                "Negative"
+            } else {
+                "Positive"
+            }
+        }
+        """)
+
+        try await check(swift: """
+        {
+            var i: Int? = nil
+            let j = if let i {
+                "Non-Nil"
+            } else {
+                "Nil"
+            }
+        }
+        """, kotlin: """
+        {
+            var i: Int? = null
+            val j = if (i != null) {
+                "Non-Nil"
+            } else {
+                "Nil"
+            }
+        }
+        """)
+
+        try await check(swift: """
+        func f() {
+            var i: Int? = nil
+            let j = if let x = i {
+                x + 1
+            } else {
+                0
+            }
+        }
+        """, kotlin: """
+        internal fun f() {
+            var i: Int? = null
+            val j = linvoke l@{
+                var letexec_0 = false
+                i?.let { x ->
+                    letexec_0 = true
+                    return@l x + 1
+                }
+                if (!letexec_0) {
+                    return@l 0
+                }
+                error("Unreachable")
+            }
+        }
+        """)
+    }
+
+    func testIfAsReturnExpression() async throws {
+        try await check(swift: """
+        func f(i: Int) -> Int {
+            if i < 0 {
+                -1
+            } else {
+                i
+            }
+        }
+        """, kotlin: """
+        internal fun f(i: Int): Int {
+            return if (i < 0) {
+                -1
+            } else {
+                i
+            }
+        }
+        """)
+
+        try await check(swift: """
+        func f(i: Int) throws -> Int {
+            if i < 0 { throw MyError() } else { i }
+        }
+        """, kotlin: """
+        internal fun f(i: Int): Int {
+            return if (i < 0) {
+                throw MyError() as Throwable
+            } else {
+                i
+            }
+        }
+        """)
+
+        //~~~
+//        try await check(swift: """
+//        func f(i: Int?) -> Int {
+//            if let x = i {
+//                x + 1
+//            } else {
+//                0
+//            }
+//        }
+//        """, kotlin: """
+//        internal fun f(i: Int?): Int {
+//            return linvoke l@{
+//                var letexec_0 = false
+//                i?.let { x ->
+//                    letexec_0 = true
+//                    return@l x + 1
+//                }
+//                if (!letexec_0) {
+//                    return@l 0
+//                }
+//                error("Unreachable")
+//            }
+//        }
+//        """)
+
+        try await check(swift: """
+        func f(i: Int?) -> Int {
+            return if let x = i {
+                x + 1
+            } else {
+                0
+            }
+        }
+        """, kotlin: """
+        internal fun f(i: Int?): Int {
+            return linvoke l@{
+                var letexec_0 = false
+                i?.let { x ->
+                    letexec_0 = true
+                    return@l x + 1
+                }
+                if (!letexec_0) {
+                    return@l 0
+                }
+                error("Unreachable")
+            }
+        }
+        """)
+
+        //~~~
+//        try await check(swift: """
+//        func f(i: Int) {
+//            let c: () -> Int = {
+//                if let x = i {
+//                    x + 1
+//                } else {
+//                    0
+//                }
+//            }
+//        }
+//        """, kotlin: """
+//        internal fun f(i: Int) {
+//            val c: () -> Int = l@{
+//                var letexec_0 = false
+//                i?.let { x ->
+//                    letexec_0 = true
+//                    return@l x + 1
+//                }
+//                if (!letexec_0) {
+//                    return@l 0
+//                }
+//                error("Unreachable")
+//            }
+//        }
+//        """)
+
+        try await check(swift: """
+        func f(i: Int) {
+            let c: () -> Int = {
+                if let x = i {
+                    return x + 1
+                } else {
+                    return 0
+                }
+            }
+        }
+        """, kotlin: """
+        internal fun f(i: Int) {
+            val c: () -> Int = l@{
+                var letexec_0 = false
+                i?.let { x ->
+                    letexec_0 = true
+                    return@l x + 1
+                }
+                if (!letexec_0) {
+                    return@l 0
+                }
+                error("Unreachable")
+            }
+        }
+        """)
+    }
+
     func testGuardCondition() async throws {
         try await check(swift: """
         guard i == 1 else {
