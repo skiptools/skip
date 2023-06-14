@@ -8,6 +8,132 @@ fileprivate extension String {
 
 /// A test case that verifies that transpilation are *not* working as hoped.
 final class FeatureSupportTests: XCTestCase {
+    func testUnicodeLiteralStrings() async throws {
+        try await check(expectFailure: true, swift: #""\\u{2665}""# , kotlin: #""\\u2665""#)
+
+        // Swit's form-feed '\f' does not exist in Kotlin
+        try await check(expectFailure: true, swift: #""\\f""# , kotlin: #""\\u000C""#)
+    }
+
+    func testOptionSetInitFromEmptyArrayLiteral() async throws {
+        // note the incorrect:
+        //   f(opts = arrayOf())
+        // should be:
+        //   f(opts = Opts.of())
+        try await check(compiler: nil, swiftCode: {
+            struct Opts : OptionSet {
+                let rawValue: Int
+                init(rawValue: Int) { self.rawValue = rawValue }
+
+                static let a = Opts(rawValue: 1 << 0)
+                static let b = Opts(rawValue: 1 << 1)
+            }
+
+            func f(opts: Opts = []) {
+            }
+
+            f(opts: [])
+            return ""
+        }, kotlin: """
+        class Opts: OptionSet<Opts, Int> {
+            var rawValue: Int
+            constructor(rawValue: Int) {
+                this.rawValue = rawValue
+            }
+        
+            override val rawvaluelong: Long
+                get() = Long(rawValue)
+            override fun makeoptionset(rawvaluelong: Long): Opts = Opts(rawValue = Int(rawvaluelong))
+            override fun assignoptionset(target: Opts) = assignfrom(target)
+        
+            private fun assignfrom(target: Opts) {
+                this.rawValue = target.rawValue
+            }
+        
+            companion object {
+                val a = Opts(rawValue = 1 shl 0)
+                val b = Opts(rawValue = 1 shl 1)
+        
+                fun of(vararg options: Opts): Opts {
+                    val value = options.fold(Int(0)) { result, option -> result or option.rawValue }
+                    return Opts(rawValue = value)
+                }
+            }
+        }
+        fun f(opts: Opts = Opts.of()) = Unit
+        f(opts = arrayOf())
+        return ""
+        """)
+    }
+
+    /// Attempting to reproduce an issue with JSONSerialization.serializeJSON where the "obj" variable name is referenced incorrectly
+    func testGuardLet() async throws {
+        try await check(compiler: nil, swiftCode: {
+            struct Thing {
+                init() { }
+
+                mutating func doSomething(object: Any?) -> String {
+                    var toSerialize = object
+
+                    guard let obj = toSerialize else {
+                        return ""
+                    }
+                    switch obj {
+                    case let str as String: return ""
+                    case let boolValue as Bool: return ""
+                    case let num as Int: return ""
+                    default: return ""
+                    }
+                }
+            }
+
+            var t = Thing()
+            return t.doSomething(object: nil)
+        }, kotlin: """
+        class Thing: MutableStruct {
+            constructor() {
+            }
+            fun doSomething(object_: Any?): String {
+                willmutate()
+                try {
+                    var toSerialize = object_
+                    val obj_0 = toSerialize
+                    if (obj_0 == null) {
+                        return ""
+                    }
+                    when (obj_0) {
+                        is String -> {
+                            val str = obj_0
+                            return ""
+                        }
+                        is Boolean -> {
+                            val boolValue = obj_0
+                            return ""
+                        }
+                        is Int -> {
+                            val num = obj_0
+                            return ""
+                        }
+                        else -> return ""
+                    }
+                } finally {
+                    didmutate()
+                }
+            }
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct = Thing(this as MutableStruct)
+        }
+        var t = Thing()
+            get() = field.sref({ t = it })
+            set(newValue) {
+                field = newValue
+            }
+        return t.doSomething(object_ = null)
+        """)
+    }
+
     func testWhileOptionalBinding() async throws {
         // currently bindings in if loops are disallowed:
         // error: Kotlin does not support optional bindings in loop conditions. Consider using an if statement before or within your loop
@@ -405,56 +531,4 @@ final class FeatureSupportTests: XCTestCase {
         #endif
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
