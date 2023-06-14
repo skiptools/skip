@@ -11,7 +11,7 @@ final class FeatureSupportTests: XCTestCase {
     func testUnicodeLiteralStrings() async throws {
         try await check(expectFailure: true, swift: #""\\u{2665}""# , kotlin: #""\\u2665""#)
 
-        // Swit's form-feed '\f' does not exist in Kotlin
+        // Swift's form-feed '\f' does not exist in Kotlin
         try await check(expectFailure: true, swift: #""\\f""# , kotlin: #""\\u000C""#)
     }
 
@@ -243,6 +243,24 @@ final class FeatureSupportTests: XCTestCase {
                 return a + b
             }
             return f(a = "y")
+            """)
+    }
+
+    func testUnicodeCombiningCharacters() async throws {
+        // "cafe" appending "COMBINING ACUTE ACCENT, U+0301" should still have `.count` of 4.
+        // This will be tricky to get right, since Swift's count is built-in, but to get equivalent
+        // behavior we'd need to use java.text.BreakIterator or com.ibm.icu.text.StringCharacterIterator
+        // to get the correct character count. We could, perhaps, have a `count`
+        // implementation that does an initial check for combining characters, and if any are
+        // detected, use the slow-track method for getting the count.
+        try await check(expectFailure: true, compiler: nil, swiftCode: {
+            var word = "cafe"
+            word += "\u{301}"
+            return "\(word.count)"
+        }, kotlin: """
+            var word = "cafe"
+            word += "\\u0301"
+            return "${word.count}"
             """)
     }
 
@@ -575,5 +593,7 @@ final class FeatureSupportTests: XCTestCase {
         #endif
     }
 }
+
+
 
 
