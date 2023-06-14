@@ -66,6 +66,50 @@ final class FeatureSupportTests: XCTestCase {
         """)
     }
 
+    func testOptionSetUInt() async throws {
+        // error: conversion of signed constants to unsigned ones is prohibited
+
+        // we may not be able to perform all implicit numeric literal conversions correctly, but using a UInt is a very common rawValue type for options, so it would be nice to be able to special-case it for OptionSet implementations
+
+        try await check(compiler: nil, swiftCode: {
+            struct Opts : OptionSet {
+                let rawValue: UInt
+                init(rawValue: UInt) { self.rawValue = rawValue }
+
+                static let a = Opts(rawValue: 1 << 0)
+                static let b = Opts(rawValue: 1 << 1)
+            }
+            return ""
+        }, kotlin: """
+        class Opts: OptionSet<Opts, UInt> {
+            var rawValue: UInt
+            constructor(rawValue: UInt) {
+                this.rawValue = rawValue
+            }
+        
+            override val rawvaluelong: Long
+                get() = Long(rawValue)
+            override fun makeoptionset(rawvaluelong: Long): Opts = Opts(rawValue = UInt(rawvaluelong))
+            override fun assignoptionset(target: Opts) = assignfrom(target)
+        
+            private fun assignfrom(target: Opts) {
+                this.rawValue = target.rawValue
+            }
+        
+            companion object {
+                val a = Opts(rawValue = 1 shl 0)
+                val b = Opts(rawValue = 1 shl 1)
+        
+                fun of(vararg options: Opts): Opts {
+                    val value = options.fold(UInt(0)) { result, option -> result or option.rawValue }
+                    return Opts(rawValue = value)
+                }
+            }
+        }
+        return ""
+        """)
+    }
+
     /// Attempting to reproduce an issue with JSONSerialization.serializeJSON where the "obj" variable name is referenced incorrectly
     func testGuardLet() async throws {
         try await check(compiler: nil, swiftCode: {
@@ -531,4 +575,5 @@ final class FeatureSupportTests: XCTestCase {
         #endif
     }
 }
+
 
