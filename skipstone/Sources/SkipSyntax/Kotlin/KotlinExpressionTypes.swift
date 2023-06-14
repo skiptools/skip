@@ -2094,7 +2094,12 @@ class KotlinWhen: KotlinExpression {
     }
 
     override var children: [KotlinSyntaxNode] {
-        return [on] + cases.flatMap { $0.children }
+        var children: [KotlinSyntaxNode] = [on]
+        if let caseTargetVariable {
+            children.append(caseTargetVariable.value)
+        }
+        children += cases.flatMap { $0.children }
+        return children
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {

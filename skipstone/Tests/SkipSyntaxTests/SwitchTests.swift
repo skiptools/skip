@@ -485,4 +485,38 @@ final class SwitchTests: XCTestCase {
         }
         """)
     }
+
+    func testGuardIntroducedMatchTarget() async throws {
+        try await check(swift: """
+        class C {
+            func f(_ object: Any?) {
+                guard let obj = object else {
+                    return
+                }
+                switch obj {
+                case let str as String:
+                    print(str)
+                default:
+                    print("?")
+                }
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal open fun f(object_: Any?) {
+                val obj_0 = object_.sref()
+                if (obj_0 == null) {
+                    return
+                }
+                when (obj_0) {
+                    is String -> {
+                        val str = obj_0
+                        print(str)
+                    }
+                    else -> print("?")
+                }
+            }
+        }
+        """)
+    }
 }
