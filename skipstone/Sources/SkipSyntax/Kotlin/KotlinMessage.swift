@@ -69,7 +69,11 @@ extension Message {
     }
 
     static func kotlinConstructorSingleDelegatingStatement(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "A Kotlin constructor can only include a single call to another 'this' or 'super' constructor", sourceDerived: sourceDerived, source: source)
+        return Message(kind: .error, message: "A Kotlin constructor can only include a single top-level call to another 'this' or 'super' constructor", sourceDerived: sourceDerived, source: source)
+    }
+
+    static func kotlinConstructorDelegatingStatementArguments(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "In Kotlin, delegating calls to 'self' or 'super' constructors can not use local variables other than the parameters passed to this constructor", sourceDerived: sourceDerived, source: source)
     }
 
     // Idea: generate an internal ordinal member var and synthesize code to use it and associated values to conform

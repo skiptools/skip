@@ -8,7 +8,6 @@ fileprivate extension String {
 
 /// A test case that verifies that transpilation are *not* working as hoped.
 final class FeatureSupportTests: XCTestCase {
-
     func testMultipleNamedEnumParameters() async throws {
         // error: expecting property name or receiver type
         // val in = associated1
@@ -76,55 +75,6 @@ final class FeatureSupportTests: XCTestCase {
         """)
     }
 
-    func testOptionalDelegatingInit() async throws {
-        // decimalWithoutDelegatingInit works, but
-        // decimalWithDelegatingInit is broken
-        try await check(compiler: nil, swiftCode: {
-            struct WholeNumber {
-                let number: Int
-                init(number: Int) {
-                    self.number = number
-                }
-
-                init?(decimalWithoutDelegatingInit decimal: Double) {
-                    guard decimal == Double(Int(decimal)) else {
-                        return nil
-                    }
-                    self.number = Int(decimal)
-                }
-
-                init?(decimalWithDelegatingInit decimal: Double) {
-                    guard decimal == Double(Int(decimal)) else {
-                        return nil
-                    }
-                    self.init(number: Int(decimal))
-                }
-            }
-            return ""
-        }, kotlin: """
-        class WholeNumber {
-            val number: Int
-            constructor(number: Int) {
-                this.number = number
-            }
-            constructor(decimalWithoutDelegatingInit: Double) {
-                val decimal = decimalWithoutDelegatingInit
-                if (decimal != Double(Int(decimal))) {
-                    throw NullReturnException()
-                }
-                this.number = Int(decimal)
-            }
-            constructor(decimalWithDelegatingInit: Double, @Suppress("UNUSED_PARAMETER") unusedp_0: Nothing? = null): this(number = Int(decimal)) {
-                val decimal = decimalWithDelegatingInit
-                if (decimal != Double(Int(decimal))) {
-                    throw NullReturnException()
-                }
-            }
-        }
-        return ""
-        """)
-    }
-
     func testWhileOptionalBinding() async throws {
         // currently bindings in if loops are disallowed:
         // error: Kotlin does not support optional bindings in loop conditions. Consider using an if statement before or within your loop
@@ -162,34 +112,6 @@ final class FeatureSupportTests: XCTestCase {
                 }
             }
             return "${sum}"
-            """)
-    }
-
-    func testGuaranteedLetAssignment() async throws {
-        // Kotlin doesn't seem to be able to handle a guaranteed let assignment
-        // Source.kts:3:5: error: captured member values initialization is forbidden due to possible reassignment
-
-        // perhaps we could transpile `let str: String` as `var str: String!` to work around this, or else just end with a `fatalError("unreachable")`
-
-        // the `if ({ true }())` construct is merely to avoid Swift compiler warnings about the else statement never being excuted
-
-        try await check(compiler: nil, swiftCode: {
-            let str: String
-            if ({ true }()) {
-                str = "x"
-            } else {
-                str = "y"
-            }
-
-            return str
-        }, kotlin: """
-            val str: String
-            if (({ true }())) {
-                str = "x"
-            } else {
-                str = "y"
-            }
-            return str
             """)
     }
 

@@ -103,19 +103,25 @@ final class KotlinConstructorAndSideEffectSupressionTransformer: KotlinTransform
             guard let delegatingCall = delegatingConstructorCall(for: statement) else {
                 continue
             }
-            if constructor.delegatingConstructorCall != nil {
-                statement.messages.append(.kotlinConstructorSingleDelegatingStatement(statement, source: translator.syntaxTree.source))
-                break
-            }
             body.statements.remove(at: index)
+            fixupDelegatingConstructorCall(delegatingCall, in: constructor, translator: translator)
             constructor.delegatingConstructorCall = delegatingCall
+            break
         }
+        // Validate that there aren't additional or conditional delegating calls
+        body.visit { syntaxNode in
+            if let statement = syntaxNode as? KotlinStatement, delegatingConstructorCall(for: statement) != nil {
+                statement.messages.append(.kotlinConstructorSingleDelegatingStatement(statement, source: translator.syntaxTree.source))
+            }
+            return .recurse(nil)
+        }
+        // Add super call if needed
         if isSubclass && constructor.delegatingConstructorCall == nil {
             constructor.delegatingConstructorCall = KotlinRawExpression(sourceCode: "super()")
         }
     }
 
-    private func delegatingConstructorCall(for statement: KotlinStatement) -> KotlinExpression? {
+    private func delegatingConstructorCall(for statement: KotlinStatement) -> KotlinFunctionCall? {
         guard statement.type == .expression, let expressionStatement = statement as? KotlinExpressionStatement else {
             return nil
         }
@@ -129,6 +135,29 @@ final class KotlinConstructorAndSideEffectSupressionTransformer: KotlinTransform
             return nil
         }
         return memberAccess.isBaseSelfOrSuper ? functionCall : nil
+    }
+
+    private func fixupDelegatingConstructorCall(_ functionCall: KotlinFunctionCall, in constructor: KotlinFunctionDeclaration, translator: KotlinTranslator) {
+        // Make sure that the delegating call doesn't use locals that won't be available when it is moved (e.g. any local other
+        // than the constructor parameters). This includes mapping internal parameter names to external ones
+        for argument in functionCall.arguments {
+            argument.value.visit { node in
+                // Closures might introduce their own identifiers, which should be fine
+                guard !(node is KotlinClosure) else {
+                    return .skip
+                }
+                if let identifier = node as? KotlinIdentifier, identifier.isLocalOrSelfIdentifier && identifier.name != "self" {
+                    if let parameter = constructor.parameters.first(where: { $0.internalLabel == identifier.name }) {
+                        if let externalLabel = parameter.externalLabel {
+                            identifier.name = externalLabel
+                        }
+                    } else {
+                        identifier.messages.append(.kotlinConstructorDelegatingStatementArguments(identifier, source: translator.syntaxTree.source))
+                    }
+                }
+                return .recurse(nil)
+            }
+        }
     }
 
     private func superclass(of classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) -> TypeSignature? {

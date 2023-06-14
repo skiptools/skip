@@ -268,6 +268,147 @@ final class ConstructorDestructorTests: XCTestCase {
         """)
     }
 
+    func testDelegatingConstructor() async throws {
+        try await check(swift: """
+        class C {
+            init(i: Int) {
+            }
+            convenience init(x: Double) {
+                self.init(i: Int(x))
+                print("double")
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal constructor(i: Int) {
+            }
+            internal constructor(x: Double): this(i = Int(x)) {
+                print("double")
+            }
+        }
+        """)
+
+        // External vs internal parameter
+        try await check(swift: """
+        class C {
+            init(i: Int) {
+            }
+            convenience init(convertingFromDouble d: Double) {
+                self.init(i: Int(d))
+                print("double")
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal constructor(i: Int) {
+            }
+            internal constructor(convertingFromDouble: Double): this(i = Int(convertingFromDouble)) {
+                val d = convertingFromDouble
+                print("double")
+            }
+        }
+        """)
+
+        try await check(swift: """
+        class C {
+            init(i: Int) {
+            }
+            convenience init(convertingFromDouble d: Double) {
+                self.init(i: Int(d) + Self.s)
+                print("double")
+            }
+            static let s = 100
+        }
+        """, kotlin: """
+        internal open class C {
+            internal constructor(i: Int) {
+            }
+            internal constructor(convertingFromDouble: Double): this(i = Int(convertingFromDouble) + Companion.s) {
+                val d = convertingFromDouble
+                print("double")
+            }
+
+            companion object {
+                internal val s = 100
+            }
+        }
+        """)
+
+        try await check(swift: """
+        class C {
+            init(i: Int) {
+            }
+            convenience init(x: Double) {
+                if x < 0.0 {
+                    print("Bad x")
+                }
+                self.init(i: Int(x))
+                print("double")
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal constructor(i: Int) {
+            }
+            internal constructor(x: Double): this(i = Int(x)) {
+                if (x < 0.0) {
+                    print("Bad x")
+                }
+                print("double")
+            }
+        }
+        """)
+
+        try await check(expectMessages: true, swift: """
+        class C {
+            init(i: Int) {
+            }
+            convenience init(x: Double) {
+                if x < 0.0 {
+                    self.init(i: -1)
+                } else {
+                    self.init(i: Int(x))
+                }
+                print("double")
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal constructor(i: Int) {
+            }
+            internal constructor(x: Double) {
+                if (x < 0.0) {
+                    this(i = -1)
+                } else {
+                    this(i = Int(x))
+                }
+                print("double")
+            }
+        }
+        """)
+
+        try await check(expectMessages: true, swift: """
+        class C {
+            init(i: Int) {
+            }
+            convenience init(x: Double) {
+                let i = Int(x)
+                self.init(i: i)
+                print("double")
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal constructor(i: Int) {
+            }
+            internal constructor(x: Double): this(i = i) {
+                val i = Int(x)
+                print("double")
+            }
+        }
+        """)
+    }
+
     func testSetterSideEffects() {
         let base = ConstructorTestsSideEffectBase()
         XCTAssertFalse(base.didSet1)
