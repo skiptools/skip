@@ -420,7 +420,7 @@ public class CodebaseInfo: Codable {
                     return [APIMatch(signature: signature)]
                 }
             } else if case .dictionary(let keyType, let valueType) = type, arguments.count == 1 {
-                let signature: TypeSignature = .function([TypeSignature.Parameter(type: keyType)], valueType.mappingSelf(to: type))
+                let signature: TypeSignature = .function([TypeSignature.Parameter(type: keyType)], valueType.mappingSelf(to: type).asOptional(true))
                 return [APIMatch(signature: signature)]
             }
             let isStatic = type.isMetaType

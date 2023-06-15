@@ -100,7 +100,7 @@ final class CodebaseInfoTests: XCTestCase {
     func testSubscript() async throws {
         let context = try await setUpContext(swift: "")
         XCTAssertEqual([.function([.init(type: .int)], .int)], context.matchSubscript(inConstrained: .array(.int), arguments: [LabeledValue<TypeSignature>(label: nil, value: .int)]).map(\.signature))
-        XCTAssertEqual([.function([.init(type: .string)], .int)], context.matchSubscript(inConstrained: .dictionary(.string, .int), arguments: [LabeledValue<TypeSignature>(label: nil, value: .int)]).map(\.signature))
+        XCTAssertEqual([.function([.init(type: .string)], .optional(.int))], context.matchSubscript(inConstrained: .dictionary(.string, .int), arguments: [LabeledValue<TypeSignature>(label: nil, value: .string)]).map(\.signature))
     }
 
     func testFunction() async throws {

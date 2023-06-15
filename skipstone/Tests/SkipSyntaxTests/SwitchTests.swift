@@ -809,4 +809,43 @@ final class SwitchTests: XCTestCase {
         }
         """)
     }
+
+    func testOptionalValue() async throws {
+        try await checkProducesMessage(swift: """
+        func f() {
+            let dict = ["a": 1, "b": 2]
+            switch dict["a"] {
+            case 1:
+                print(1)
+            case .none:
+                print("nil")
+            default:
+                print("other")
+            }
+        }
+        """)
+
+        try await check(swift: """
+        func f() {
+            let dict = ["a": 1, "b": 2]
+            switch dict["a"] {
+            case 1:
+                print(1)
+            case nil:
+                print("nil")
+            default:
+                print("other")
+            }
+        }
+        """, kotlin: """
+        internal fun f() {
+            val dict = dictionaryOf(Tuple2("a", 1), Tuple2("b", 2))
+            when (dict["a"]) {
+                1 -> print(1)
+                null -> print("nil")
+                else -> print("other")
+            }
+        }
+        """)
+    }
 }
