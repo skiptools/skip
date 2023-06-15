@@ -8,13 +8,6 @@ fileprivate extension String {
 
 /// A test case that verifies that transpilation are *not* working as hoped.
 final class FeatureSupportTests: XCTestCase {
-    func testUnicodeLiteralStrings() async throws {
-        try await check(expectFailure: true, swift: #""\\u{2665}""# , kotlin: #""\\u2665""#)
-
-        // Swift's form-feed '\f' does not exist in Kotlin
-        try await check(expectFailure: true, swift: #""\\f""# , kotlin: #""\\u000C""#)
-    }
-
     func testOptionSetInitFromEmptyArrayLiteral() async throws {
         // note the incorrect:
         //   f(opts = arrayOf())

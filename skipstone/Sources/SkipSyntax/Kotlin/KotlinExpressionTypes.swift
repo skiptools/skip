@@ -1772,9 +1772,49 @@ class KotlinStringLiteral: KotlinExpression {
     }
 
     private static func translateStringSegment(_ string: String) -> String {
-        var kstring = string
-        // Escape $ in Kotlin string
-        kstring = kstring.split(separator: "$").joined(separator: "\\$")
+        var kstring = ""
+        var backslashCount = 0
+        var skipNextClosingBraceCount = 0
+        var index = string.startIndex
+        while index != string.endIndex {
+            let c = string[index]
+            switch c {
+            case "f":
+                // Kotlin doesn't have \f
+                if backslashCount % 2 == 1 {
+                    kstring.append("u000C") // Leading backslash already appended
+                } else {
+                    kstring.append(c)
+                }
+            case "u":
+                // Swift uses \u{####} for Unicode while Kotlin uses \u####
+                if backslashCount % 2 == 1 {
+                    let nextIndex = string.index(after: index)
+                    if nextIndex != string.endIndex && string[nextIndex] == "{" {
+                        index = nextIndex // Will skip opening brace
+                        skipNextClosingBraceCount += 1
+                    }
+                }
+                kstring.append(c)
+            case "$":
+                kstring.append("\\")
+                kstring.append("$")
+            case "}":
+                if skipNextClosingBraceCount > 0 {
+                    skipNextClosingBraceCount -= 1
+                } else {
+                    kstring.append(c)
+                }
+            default:
+                kstring.append(c)
+            }
+            if c == "\\" {
+                backslashCount += 1
+            } else {
+                backslashCount = 0
+            }
+            index = string.index(after: index)
+        }
         return kstring
     }
 

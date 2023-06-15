@@ -213,6 +213,20 @@ final class BuiltinTypeTests: XCTestCase {
         """, kotlin: """
         "It costs \\${x}"
         """)
+
+        // Swift's form-feed '\f' does not exist in Kotlin
+        try await check(swift: #""\f""#, kotlin: #""\u000C""#)
+        try await check(swift: #""\\f""#, kotlin: #""\\f""#)
+    }
+
+    func testUnicodeLiteralStrings() async throws {
+        try await check(swift: #""\u{2665}""# , kotlin: #""\u2665""#)
+        try await check(swift: #""\\u{2665}""# , kotlin: #""\\u{2665}""#)
+        try await check(swift: #""\u2665""# , kotlin: #""\u2665""#)
+    }
+
+    func testFormFeedInStringLiteral() async throws {
+
     }
 
     func testRawStringLiteral() async throws {
