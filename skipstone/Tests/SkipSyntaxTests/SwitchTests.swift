@@ -488,32 +488,322 @@ final class SwitchTests: XCTestCase {
 
     func testGuardIntroducedMatchTarget() async throws {
         try await check(swift: """
-        class C {
-            func f(_ object: Any?) {
-                guard let obj = object else {
-                    return
-                }
-                switch obj {
-                case let str as String:
-                    print(str)
-                default:
-                    print("?")
-                }
+        func f(_ object: Any?) {
+            guard let obj = object else {
+                return
+            }
+            switch (obj) {
+            case let str as String:
+                print(str)
+            default:
+                print("?")
             }
         }
         """, kotlin: """
-        internal open class C {
-            internal open fun f(object_: Any?) {
-                val obj_0 = object_.sref()
-                if (obj_0 == null) {
-                    return
+        internal fun f(object_: Any?) {
+            val obj_0 = object_.sref()
+            if (obj_0 == null) {
+                return
+            }
+            val matchtarget_0 = (obj_0)
+            when (matchtarget_0) {
+                is String -> {
+                    val str = matchtarget_0
+                    print(str)
                 }
-                when (obj_0) {
-                    is String -> {
-                        val str = obj_0
-                        print(str)
+                else -> print("?")
+            }
+        }
+        """)
+    }
+
+    func testSwitchAsAssignmentExpression() async throws {
+        try await check(swift: """
+        func f(i: Int) {
+            let i = switch i {
+            case ...0: -1
+            default: 100
+            }
+        }
+        """, kotlin: """
+        internal fun f(i: Int) {
+            val i = when (i) {
+                in Int.min..0 -> -1
+                else -> 100
+            }
+        }
+        """)
+
+        try await check(swift: """
+        func f() {
+            let i = switch g() {
+            case let x as Int: x
+            default: 100
+            }
+        }
+        """, kotlin: """
+        internal fun f() {
+            val i = linvoke l@{
+                val matchtarget_0 = g()
+                when (matchtarget_0) {
+                    is Int -> {
+                        val x = matchtarget_0
+                        return@l x
                     }
-                    else -> print("?")
+                    else -> return@l 100
+                }
+            }
+        }
+        """)
+    }
+
+    func testSwitchAsReturnExpression() async throws {
+        try await check(swift: """
+        func f(i: Int) -> Int {
+            return switch i {
+            case ...0: -1
+            default: 100
+            }
+        }
+        func g(i: Int) -> Int {
+            switch i {
+            case ...0: -1
+            default: 100
+            }
+        }
+        """, kotlin: """
+        internal fun f(i: Int): Int {
+            return when (i) {
+                in Int.min..0 -> -1
+                else -> 100
+            }
+        }
+        internal fun g(i: Int): Int {
+            return when (i) {
+                in Int.min..0 -> -1
+                else -> 100
+            }
+        }
+        """)
+
+        try await check(swift: """
+        func f() -> Int {
+            return switch g() {
+            case let x as Int: x
+            default: 100
+            }
+        }
+        func g() -> Int {
+            return switch g() {
+            case let x as Int: x
+            default: 100
+            }
+        }
+        """, kotlin: """
+        internal fun f(): Int {
+            return linvoke l@{
+                val matchtarget_0 = g()
+                when (matchtarget_0) {
+                    is Int -> {
+                        val x = matchtarget_0
+                        return@l x
+                    }
+                    else -> return@l 100
+                }
+            }
+        }
+        internal fun g(): Int {
+            return linvoke l@{
+                val matchtarget_1 = g()
+                when (matchtarget_1) {
+                    is Int -> {
+                        val x = matchtarget_1
+                        return@l x
+                    }
+                    else -> return@l 100
+                }
+            }
+        }
+        """)
+    }
+
+    func testSwitchAsClosureReturnExpression() async throws {
+        // We have no reliable way to detect using 'switch' as an implicit return value vs. a statement in a closure
+        try await check(expectFailure: true, swift: """
+        func f(i: Int) {
+            let c = {
+                switch g() {
+                case let x as Int: print(x)
+                default: print(100)
+            }
+        }
+        """, kotlin: """
+        internal fun f(i: Int) {
+            val c = {
+                val matchtarget_1 = g()
+                when (matchtarget_1) {
+                    is Int -> {
+                        val x = matchtarget_1
+                        print(x)
+                    }
+                    else -> print(100)
+                }
+            }
+        }
+        """)
+
+        // We have no reliable way to detect using 'switch' as an implicit return value vs. a statement in a closure
+        try await check(expectFailure: true, swift: """
+        func f(i: Int) {
+            let c = {
+                switch g() {
+                case let x as Int: x
+                default: 100
+            }
+        }
+        """, kotlin: """
+        internal fun f(i: Int) {
+            val c = l@{
+                val matchtarget_0 = g()
+                when (matchtarget_0) {
+                    is Int -> {
+                        val x = matchtarget_0
+                        return@l x
+                    }
+                    else -> return@l 100
+                }
+            }
+        }
+        """)
+
+        try await check(expectFailure: true, swift: """
+        func f(i: Int) {
+            let c: () -> Int = {
+                switch g() {
+                case let x as Int: x
+                default: 100
+            }
+        }
+        """, kotlin: """
+        internal fun f(i: Int) {
+            val c: () -> Int = l@{
+                val matchtarget_0 = g()
+                when (matchtarget_0) {
+                    is Int -> {
+                        val x = matchtarget_0
+                        return@l x
+                    }
+                    else -> return@l 100
+                }
+            }
+        }
+        """)
+
+        try await check(swift: """
+        func f(i: Int) {
+            let c1 = {
+                switch g() {
+                case let x as Int: return x
+                default: return 100
+            }
+        }
+        """, kotlin: """
+        internal fun f(i: Int) {
+            val c1 = l@{
+                val matchtarget_0 = g()
+                when (matchtarget_0) {
+                    is Int -> {
+                        val x = matchtarget_0
+                        return@l x
+                    }
+                    else -> return@l 100
+                }
+            }
+        }
+        """)
+    }
+
+    func testNestedAsExpression() async throws {
+        try await check(swift: """
+        func f(i: Int) -> Int {
+            return switch i {
+            case ...0:
+            switch i {
+                case -1: 1
+                default: -1
+            }
+            default: 100
+            }
+        }
+        """, kotlin: """
+        internal fun f(i: Int): Int {
+            return when (i) {
+                in Int.min..0 -> {
+                    when (i) {
+                        -1 -> 1
+                        else -> -1
+                    }
+                }
+                else -> 100
+            }
+        }
+        """)
+
+        try await check(swift: """
+        func f(i: Int) -> Int {
+            switch g() {
+            case let x as Int: switch x {
+                case ...0: -1
+                default: x
+            }
+            default: 100
+            }
+        }
+        """, kotlin: """
+        internal fun f(i: Int): Int {
+            return linvoke l@{
+                val matchtarget_0 = g()
+                when (matchtarget_0) {
+                    is Int -> {
+                        val x = matchtarget_0
+                        when (x) {
+                            in Int.min..0 -> return@l -1
+                            else -> return@l x
+                        }
+                    }
+                    else -> return@l 100
+                }
+            }
+        }
+        """)
+
+        try await check(swift: """
+        func f(i: Int) -> Int {
+            switch g() {
+            case let x as Int: switch g(x) {
+                case let y as Double: 0.0
+                default: x
+            }
+            default: 100
+            }
+        }
+        """, kotlin: """
+        internal fun f(i: Int): Int {
+            return linvoke l@{
+                val matchtarget_0 = g()
+                when (matchtarget_0) {
+                    is Int -> {
+                        val x = matchtarget_0
+                        val matchtarget_1 = g(x)
+                        when (matchtarget_1) {
+                            is Double -> {
+                                val y = matchtarget_1
+                                return@l 0.0
+                            }
+                            else -> return@l x
+                        }
+                    }
+                    else -> return@l 100
                 }
             }
         }

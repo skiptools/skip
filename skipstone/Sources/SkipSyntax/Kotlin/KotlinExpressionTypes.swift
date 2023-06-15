@@ -462,6 +462,7 @@ class KotlinClosure: KotlinExpression {
     var returnType: TypeSignature = .none
     var parameters: [Parameter<Void>] = []
     var attributes = Attributes()
+    var inferredReturnType: TypeSignature = .none
     var implicitParameterLabels: [String] = []
     var isAnonymousFunction = false
     var body: KotlinCodeBlock
@@ -507,6 +508,7 @@ class KotlinClosure: KotlinExpression {
         kexpression.parameters.forEach { $0.appendKotlinMessages(to: kexpression, source: translator.syntaxTree.source) }
         kexpression.attributes = expression.attributes
         kexpression.isAnonymousFunction = isAnonymousFunction
+        kexpression.inferredReturnType = expression.returnType != .none ? expression.returnType : expression.inferredType.returnType
         kexpression.implicitParameterLabels = implicitParameterLabels
         kexpression.hasReturnLabel = hasReturnLabel
         return kexpression
@@ -888,10 +890,7 @@ class KotlinIf: KotlinExpression {
     var body: KotlinCodeBlock
     var elseBody: KotlinCodeBlock?
     var ifCheckVariable: String?
-    var isUsedAsExpression = false
-    var requiresNestingClosure: Bool {
-        return isUsedAsExpression && ifCheckVariable != nil
-    }
+    var requiresNestingClosure = false
 
     struct ConditionSet {
         var optionalBindingVariable: KotlinBindingVariable?
@@ -908,22 +907,10 @@ class KotlinIf: KotlinExpression {
         let ifCheckVariable = (kconditionSets.count > 1 || kconditionSets.contains(where: { $0.optionalBindingVariable != nil })) && expression.elseBody != nil ? "letexec" : nil
         let kbody = KotlinCodeBlock.translate(statement: expression.body, translator: translator)
         let kexpression = KotlinIf(expression: expression, conditionSets: kconditionSets, body: kbody)
-        kexpression.ifCheckVariable = ifCheckVariable
-        kexpression.isUsedAsExpression = !(expression.parent is ExpressionStatement) || expression.parent is Return
-        // If we're going to nest this 'if' in its own closure, we have to return its value
-        if kexpression.requiresNestingClosure {
-            if kexpression.body.updateWithExpectedReturn(.yes) {
-                kexpression.body.updateWithExpectedReturn(.labelIfPresent(KotlinClosure.returnLabel))
-            }
-        }
         if let elseBody = expression.elseBody {
             kexpression.elseBody = KotlinCodeBlock.translate(statement: elseBody, translator: translator)
-            if kexpression.requiresNestingClosure {
-                if kexpression.elseBody?.updateWithExpectedReturn(.yes) == true {
-                    kexpression.elseBody?.updateWithExpectedReturn(.labelIfPresent(KotlinClosure.returnLabel))
-                }
-            }
         }
+        kexpression.ifCheckVariable = ifCheckVariable
         return kexpression
     }
 
@@ -2064,6 +2051,7 @@ class KotlinWhen: KotlinExpression {
     var caseTargetVariable: KotlinCaseTargetVariable?
     var hasNonNilMatches = false
     var hasBreakLabel = false
+    var requiresNestingClosure = false
 
     static func translate(expression: Switch, translator: KotlinTranslator) -> KotlinWhen {
         var kon = translator.translateExpression(expression.on)
@@ -2138,6 +2126,12 @@ class KotlinWhen: KotlinExpression {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
+        var indentation = indentation
+        if requiresNestingClosure {
+            indentation = indentation.inc()
+            output.append("linvoke \(KotlinClosure.returnLabel)@{\n").append(indentation)
+        }
+
         if let caseTargetVariable {
             caseTargetVariable.append(to: output, indentation: indentation)
             output.append("\n").append(indentation)
@@ -2158,6 +2152,10 @@ class KotlinWhen: KotlinExpression {
         output.append(whenIndentation).append("}")
         if hasBreakLabel {
             output.append("\n").append(indentation).append("}")
+        }
+
+        if (requiresNestingClosure) {
+            output.append("\n").append(indentation.dec()).append("}")
         }
     }
 

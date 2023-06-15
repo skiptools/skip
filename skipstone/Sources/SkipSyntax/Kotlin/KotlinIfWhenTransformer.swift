@@ -3,11 +3,98 @@
 /// - Seealso: ``KotlinIf``, ``KotlinWhen``
 final class KotlinIfWhenTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
+        let expressionVisitor = ValueExpressionVisitor()
+        syntaxTree.root.visit(perform: expressionVisitor.visit)
         let identifiersVisitor = IdentifiersVisitor()
         syntaxTree.root.visit(perform: identifiersVisitor.visit)
         let unreachableVisitor = UnreachableVisitor()
         syntaxTree.root.visit(perform: unreachableVisitor.visit)
     }
+}
+
+/// Detect usages as value expressions rather than as statements.
+private class ValueExpressionVisitor {
+    func visit(_ node: KotlinSyntaxNode) -> VisitResult<KotlinSyntaxNode> {
+        // When used as value expressions, any 'if' or 'when' that we've turned into multiple statements because it requires an if check
+        // or case target variable declaration needs to be nested in its own immediately-executed closure, and its implicit return values
+        // need to be made into explicit return statements
+        if let kif = node as? KotlinIf {
+            let type = valueExpressionType(for: kif)
+            if type == .expression {
+                kif.requiresNestingClosure = true
+            }
+            if type != .none {
+                // Make return values explicit unless we're just nesting another if/when, in which case we'll end up making its return
+                // values explicit already
+                if !kif.body.isSingleIfWhenExpression {
+                    if kif.body.updateWithExpectedReturn(.yes) {
+                        kif.body.updateWithExpectedReturn(.labelIfPresent(KotlinClosure.returnLabel))
+                    }
+                }
+                if let elseBody = kif.elseBody, !elseBody.isSingleIfWhenExpression {
+                    if elseBody.updateWithExpectedReturn(.yes) {
+                        elseBody.updateWithExpectedReturn(.labelIfPresent(KotlinClosure.returnLabel))
+                    }
+                }
+            }
+        } else if let kwhen = node as? KotlinWhen {
+            let type = valueExpressionType(for: kwhen)
+            if type == .expression {
+                kwhen.requiresNestingClosure = true
+            }
+            if type != .none {
+                for kcase in kwhen.cases {
+                    if !kcase.body.isSingleIfWhenExpression {
+                        if kcase.body.updateWithExpectedReturn(.yes) {
+                            kcase.body.updateWithExpectedReturn(.labelIfPresent(KotlinClosure.returnLabel))
+                        }
+                    }
+                }
+            }
+        }
+        return .recurse(nil)
+    }
+
+    private func valueExpressionType(for node: KotlinSyntaxNode?) -> ValueExpressionType {
+        if !(node is KotlinIf) && !(node is KotlinWhen) {
+            return .none
+        }
+        guard let parent = node?.parent else {
+            return .none
+        }
+        if !(parent is KotlinExpressionStatement) || parent is KotlinReturn {
+            return valueExpressionType(forUsedAsExpression: node)
+        }
+        // Traverse through KotlinExpressionStatement parent to code block
+        if let codeBlock = parent.parent as? KotlinCodeBlock, codeBlock.isSingleIfWhenExpression {
+            if let kclosure = codeBlock.parent as? KotlinClosure {
+                // If the closure has a return type but no return statements, we must be a value expression. We don't need
+                // to do this for functions because we always make their return statements explicit
+                if !kclosure.isAnonymousFunction && !kclosure.hasReturnLabel && ((kclosure.returnType != .none && kclosure.returnType != .void) || (kclosure.inferredReturnType != .none && kclosure.inferredReturnType != .void)) {
+                    return valueExpressionType(forUsedAsExpression: node)
+                }
+            } else {
+                // Handle nested if/switch expressions
+                switch valueExpressionType(for: codeBlock.parent) {
+                case .none:
+                    return .none
+                case .expression, .nestedExpression:
+                    return .nestedExpression
+                }
+            }
+        }
+        return .none
+    }
+
+    private func valueExpressionType(forUsedAsExpression node: KotlinSyntaxNode?) -> ValueExpressionType {
+        return (node as? KotlinIf)?.ifCheckVariable != nil || (node as? KotlinWhen)?.caseTargetVariable != nil ? .expression : .none
+    }
+}
+
+private enum ValueExpressionType {
+    case none
+    case expression
+    case nestedExpression
 }
 
 /// Uniquify identifiers we've added for if statements.
@@ -161,7 +248,7 @@ private class UnreachableVisitor {
             } else if hasReturnValue == nil, let kret = node as? KotlinReturn {
                 hasReturnValue = kret.expression != nil
                 return .skip
-            } else if !hasIfCheckVariable, let kif = node as? KotlinIf, !kif.isUsedAsExpression {
+            } else if !hasIfCheckVariable, let kif = node as? KotlinIf, !kif.requiresNestingClosure {
                 hasIfCheckVariable = kif.ifCheckVariable != nil
                 return .recurse(nil)
             } else {
@@ -174,5 +261,14 @@ private class UnreachableVisitor {
         let errorStatement = KotlinRawStatement(sourceCode: "error(\"Unreachable\")")
         errorStatement.parent = codeBlock
         codeBlock.statements.append(errorStatement)
+    }
+}
+
+extension KotlinCodeBlock {
+    fileprivate var isSingleIfWhenExpression: Bool {
+        guard statements.count == 1, let expressionStatement = statements[0] as? KotlinExpressionStatement else {
+            return false
+        }
+        return expressionStatement.expression is KotlinIf || expressionStatement.expression is KotlinWhen
     }
 }

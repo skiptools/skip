@@ -164,7 +164,7 @@ extension Message {
     }
 
     static func kotlinOptionalNoneSome(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "Kotlin optionals are not enums. Use nil or a value rather than .none or .some. In switch statements, use the moden 'case nil', 'case <value>?', and 'case let <binding>?'", sourceDerived: sourceDerived, source: source)
+        return Message(kind: .error, message: "Kotlin optionals are not enums. Use nil or a value rather than .none or .some. In switch statements, use the modern 'case nil', 'case <value>?', and 'case let <binding>?'", sourceDerived: sourceDerived, source: source)
     }
 
     static func kotlinOptionSetRawValue(_ sourceDerived: SourceDerived, source: Source) -> Message {
