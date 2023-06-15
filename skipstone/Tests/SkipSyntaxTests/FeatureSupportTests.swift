@@ -249,7 +249,7 @@ final class FeatureSupportTests: XCTestCase {
     func testUnicodeCombiningCharacters() async throws {
         // "cafe" appending "COMBINING ACUTE ACCENT, U+0301" should still have `.count` of 4.
         // This will be tricky to get right, since Swift's count is built-in, but to get equivalent
-        // behavior we'd need to use java.text.BreakIterator or com.ibm.icu.text.StringCharacterIterator
+        // behavior we'd need to use java.text.BreakIterator or java.text.StringCharacterIterator
         // to get the correct character count. We could, perhaps, have a `count`
         // implementation that does an initial check for combining characters, and if any are
         // detected, use the slow-track method for getting the count.
@@ -430,6 +430,7 @@ final class FeatureSupportTests: XCTestCase {
             var x: Int8
             var y: UInt32
             var z: Double
+            
             x = 1
             y = 2
             z = 3
