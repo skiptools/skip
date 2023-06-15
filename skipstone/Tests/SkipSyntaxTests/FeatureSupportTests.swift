@@ -72,10 +72,7 @@ final class FeatureSupportTests: XCTestCase {
             return ""
         }, kotlin: """
         class Opts: OptionSet<Opts, UInt> {
-            var rawValue: UInt
-            constructor(rawValue: UInt) {
-                this.rawValue = rawValue
-            }
+            var rawValue: UInt = init(rawValue = UInt) { this.rawValue = rawValue }
         
             override val rawvaluelong: Long
                 get() = Long(rawValue)
@@ -584,6 +581,7 @@ final class FeatureSupportTests: XCTestCase {
         #endif
     }
 }
+
 
 
 
