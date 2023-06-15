@@ -426,11 +426,11 @@ final class FeatureSupportTests: XCTestCase {
         // see the very end of SkipFoundation/…/TestNSNumberBridging.swift for examples of number literals initializers we might want to support
 
         // error: the integer literal does not conform to the expected type Double
-        try await check(compiler: nil, swiftCode: {
+        try await check(expectFailure: true, compiler: nil, swiftCode: {
             var x: Int8
             var y: UInt32
             var z: Double
-            
+
             x = 1
             y = 2
             z = 3
