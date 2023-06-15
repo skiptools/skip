@@ -79,7 +79,7 @@ let package = Package(
 import class Foundation.ProcessInfo
 if let localPath = ProcessInfo.processInfo.environment["SKIPLOCAL"] {
     // locally linking SwiftSyntax requires min platform targets
-    package.platforms = [.iOS(.v15), .macOS(.v12), .tvOS(.v15), .watchOS(.v8), .macCatalyst(.v15)]
+    package.platforms = [.iOS(.v16), .macOS(.v13), .tvOS(.v16), .watchOS(.v9), .macCatalyst(.v16)]
     // build against the local relative packages in the peer folders by running: SKIPLOCAL=.. xed Skip.xcworkspace
     package.dependencies += [.package(path: localPath + "/skiptool")]
     package.targets += [.executableTarget(name: "skiptool", dependencies: [.product(name: "SkipBuild", package: "skiptool")], path: "Sources/SkipTool", sources: ["skiptool.swift"])]
