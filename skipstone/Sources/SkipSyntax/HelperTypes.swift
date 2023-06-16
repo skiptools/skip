@@ -493,7 +493,7 @@ struct Generics: Equatable, Codable {
         }
         var entries: [Generic] = []
         if let syntax {
-            for parameter in syntax.genericParameterList {
+            for parameter in syntax.parameters {
                 let name = parameter.name.text
                 var inherits: [TypeSignature] = []
                 if let inheritedType = parameter.inheritedType {

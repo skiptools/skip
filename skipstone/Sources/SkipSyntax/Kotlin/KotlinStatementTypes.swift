@@ -1113,10 +1113,11 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
+        let owningClassDeclaration = parent as? KotlinClassDeclaration
         output.append(indentation)
         if let declaration = extras?.declaration {
             output.append(declaration)
-        } else if let owningClassDeclaration = parent as? KotlinClassDeclaration, owningClassDeclaration.isSealedClassesEnum {
+        } else if let owningClassDeclaration = owningClassDeclaration, owningClassDeclaration.isSealedClassesEnum {
             output.append("class \(Self.sealedClassName(for: name))")
             generics.append(to: output, indentation: indentation)
             if !associatedValues.isEmpty {
@@ -1148,7 +1149,12 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
         } else {
             output.append(caseName ?? name)
             if let rawValue {
-                output.append("(").append(rawValue, indentation: indentation).append(")")
+                if let rawValueType = owningClassDeclaration?.enumInheritedRawValueType, rawValueType == .float || rawValueType.isUnsigned {
+                    // Explicitly cast to expected type to avoid Kotlin errors
+                    output.append("(").append(rawValueType.kotlin).append("(").append(rawValue, indentation: indentation).append("))")
+                } else {
+                    output.append("(").append(rawValue, indentation: indentation).append(")")
+                }
             }
             if isLastDeclaration {
                 output.append(";\n")

@@ -67,6 +67,48 @@ final class EnumTests: XCTestCase {
         """)
     }
 
+    func testExtendsCastRequiredTypes() async throws {
+        try await check(swift: """
+        enum E : UInt32 {
+            case a = 10
+            case b = 20
+        }
+        """, kotlin: """
+        internal enum class E(override val rawValue: UInt, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): RawRepresentable<UInt> {
+            a(UInt(10)),
+            b(UInt(20));
+        }
+
+        internal fun E(rawValue: UInt): E? {
+            return when (rawValue) {
+                UInt(10) -> E.a
+                UInt(20) -> E.b
+                else -> null
+            }
+        }
+        """)
+
+        try await check(swift: """
+        enum E : Float {
+            case a = 10
+            case b = 20
+        }
+        """, kotlin: """
+        internal enum class E(override val rawValue: Float, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): RawRepresentable<Float> {
+            a(Float(10)),
+            b(Float(20));
+        }
+
+        internal fun E(rawValue: Float): E? {
+            return when (rawValue) {
+                Float(10) -> E.a
+                Float(20) -> E.b
+                else -> null
+            }
+        }
+        """)
+    }
+
     func testFunction() async throws {
         try await check(swift: """
         enum E: Int {

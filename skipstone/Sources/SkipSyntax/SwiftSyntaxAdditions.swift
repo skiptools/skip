@@ -280,7 +280,7 @@ extension ExprSyntaxProtocol {
                 return nil
             }
             var identifierPatterns: [IdentifierPattern] = []
-            for element in tupleExpr.elementList {
+            for element in tupleExpr.elements {
                 guard let elementPatterns = element.expression.identifierPatterns(in: syntaxTree) else {
                     return nil
                 }

@@ -904,9 +904,9 @@ final class TypeDeclarationTests: XCTestCase {
         internal class S: OptionSet<S, Int> {
             override var rawValue: Int
 
-            override val rawvaluelong: Long
-                get() = Long(rawValue)
-            override fun makeoptionset(rawvaluelong: Long): S = S(rawValue = Int(rawvaluelong))
+            override val rawvaluelong: ULong
+                get() = ULong(rawValue)
+            override fun makeoptionset(rawvaluelong: ULong): S = S(rawValue = Int(rawvaluelong))
             override fun assignoptionset(target: S) = assignfrom(target)
 
             constructor(rawValue: Int) {
@@ -935,22 +935,22 @@ final class TypeDeclarationTests: XCTestCase {
 
         try await check(swift: """
         struct S: OptionSet {
-            let rawValue: Int64
+            let rawValue: UInt64
 
             static let s1 = S(rawValue: 1 << 0)
             static let s2 = S(rawValue: 1 << 1)
             static let all: S = [.s1, .s2]
         }
         """, kotlin: """
-        internal class S: OptionSet<S, Long> {
-            internal var rawValue: Long
+        internal class S: OptionSet<S, ULong> {
+            internal var rawValue: ULong
 
-            override val rawvaluelong: Long
+            override val rawvaluelong: ULong
                 get() = rawValue
-            override fun makeoptionset(rawvaluelong: Long): S = S(rawValue = rawvaluelong)
+            override fun makeoptionset(rawvaluelong: ULong): S = S(rawValue = rawvaluelong)
             override fun assignoptionset(target: S) = assignfrom(target)
 
-            constructor(rawValue: Long) {
+            constructor(rawValue: ULong) {
                 this.rawValue = rawValue
             }
 
@@ -965,48 +965,7 @@ final class TypeDeclarationTests: XCTestCase {
                 internal val all: S = S.of(S.s1, S.s2)
 
                 fun of(vararg options: S): S {
-                    val value = options.fold(Long(0)) { result, option -> result or option.rawValue }
-                    return S(rawValue = value)
-                }
-            }
-        }
-        """)
-
-        try await check(swift: """
-        struct S: OptionSet {
-            let rawValue: UInt
-
-            static let s1 = S(rawValue: 1 << 0)
-            static let s2 = S(rawValue: UInt(1 << 1))
-            static let all: S = [.s1, .s2]
-        }
-        """, kotlin: """
-        internal class S: OptionSet<S, UInt> {
-            internal var rawValue: UInt
-
-            override val rawvaluelong: Long
-                get() = Long(rawValue)
-            override fun makeoptionset(rawvaluelong: Long): S = S(rawValue = UInt(rawvaluelong))
-            override fun assignoptionset(target: S) = assignfrom(target)
-            constructor(rawValue: Long): this(rawValue = UInt(rawValue)) {
-            }
-
-            constructor(rawValue: UInt) {
-                this.rawValue = rawValue
-            }
-
-            private fun assignfrom(target: S) {
-                this.rawValue = target.rawValue
-            }
-
-            companion object {
-
-                internal val s1 = S(rawValue = 1 shl 0)
-                internal val s2 = S(rawValue = UInt(1 shl 1))
-                internal val all: S = S.of(S.s1, S.s2)
-
-                fun of(vararg options: S): S {
-                    val value = options.fold(UInt(0)) { result, option -> result or option.rawValue }
+                    val value = options.fold(ULong(0)) { result, option -> result or option.rawValue }
                     return S(rawValue = value)
                 }
             }
@@ -1028,46 +987,19 @@ final class TypeDeclarationTests: XCTestCase {
     }
 
     func testOptionSetInitFromEmptyArrayLiteral() async throws {
-        try await check(swift: """
+        try await check(supportingSwift: """
         struct Opts : OptionSet {
             let rawValue: Int
             static let a = Opts(rawValue: 1 << 0)
             static let b = Opts(rawValue: 1 << 1)
         }
-
+        """, swift: """
         func f(opts: Opts) {
         }
         func g() {
             f(opts: [])
         }
         """, kotlin: """
-        internal class Opts: OptionSet<Opts, Int> {
-            internal var rawValue: Int
-
-            override val rawvaluelong: Long
-                get() = Long(rawValue)
-            override fun makeoptionset(rawvaluelong: Long): Opts = Opts(rawValue = Int(rawvaluelong))
-            override fun assignoptionset(target: Opts) = assignfrom(target)
-
-            constructor(rawValue: Int) {
-                this.rawValue = rawValue
-            }
-
-            private fun assignfrom(target: Opts) {
-                this.rawValue = target.rawValue
-            }
-
-            companion object {
-                internal val a = Opts(rawValue = 1 shl 0)
-                internal val b = Opts(rawValue = 1 shl 1)
-
-                fun of(vararg options: Opts): Opts {
-                    val value = options.fold(Int(0)) { result, option -> result or option.rawValue }
-                    return Opts(rawValue = value)
-                }
-            }
-        }
-
         internal fun f(opts: Opts) = Unit
         internal fun g() = f(opts = Opts.of())
         """)
@@ -1101,9 +1033,9 @@ final class TypeDeclarationTests: XCTestCase {
             internal class S: OptionSet<Outer.S, Int> {
                 override var rawValue: Int
 
-                override val rawvaluelong: Long
-                    get() = Long(rawValue)
-                override fun makeoptionset(rawvaluelong: Long): Outer.S = S(rawValue = Int(rawvaluelong))
+                override val rawvaluelong: ULong
+                    get() = ULong(rawValue)
+                override fun makeoptionset(rawvaluelong: ULong): Outer.S = S(rawValue = Int(rawvaluelong))
                 override fun assignoptionset(target: Outer.S) = assignfrom(target)
 
                 constructor(rawValue: Int) {

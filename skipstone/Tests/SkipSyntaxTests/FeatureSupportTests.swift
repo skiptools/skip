@@ -284,31 +284,6 @@ final class FeatureSupportTests: XCTestCase {
             """)
     }
 
-    func testUnsignedEnumConstants() async throws {
-        // compile error: conversion of signed constants to unsigned ones is prohibited ten(10), twenty(20)
-        try await check(compiler: nil, swiftCode: {
-            enum UnsignedEnum : UInt32, Equatable {
-                case ten = 10
-                case twenty = 20
-            }
-            return ""
-        }, kotlin: """
-            enum class UnsignedEnum(override val rawValue: UInt, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): RawRepresentable<UInt> {
-                ten(10),
-                twenty(20);
-            }
-
-            fun UnsignedEnum(rawValue: UInt): UnsignedEnum? {
-                return when (rawValue) {
-                    10 -> UnsignedEnum.ten
-                    20 -> UnsignedEnum.twenty
-                    else -> null
-                }
-            }
-            return ""
-            """)
-    }
-
     func testNestedSimpleEnumInFunction() async throws {
         // error: Skip does not support type declarations within functions. Consider making this an independent type
         // error: modifier 'enum' is not applicable to 'local class'

@@ -1252,7 +1252,7 @@ class TypeDeclaration: Statement {
         let (inherits, inheritsMessages) = enumDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], [])
         let attributes = Attributes.for(syntax: enumDecl.attributes, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: enumDecl.modifiers)
-        let (generics, genericsMessages) = Generics.for(syntax: enumDecl.genericParameters, where: enumDecl.genericWhereClause, in: syntaxTree)
+        let (generics, genericsMessages) = Generics.for(syntax: enumDecl.genericParameterClause, where: enumDecl.genericWhereClause, in: syntaxTree)
         let members = StatementDecoder.decode(syntaxListContainer: enumDecl.memberBlock, in: syntaxTree)
         let statement = TypeDeclaration(type: .enumDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: enumDecl, sourceFile: syntaxTree.source.file, sourceRange: enumDecl.range(in: syntaxTree.source), extras: extras)
         statement.messages = inheritsMessages + genericsMessages

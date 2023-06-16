@@ -687,32 +687,26 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     /// Whether this is a number type.
     var isNumeric: Bool {
         switch self {
-        case .double:
+        case .double, .float:
             return true
-        case .float:
+        case .int, .int8, .int16, .int32, .int64:
             return true
-        case .int:
-            return true
-        case .int8:
-            return true
-        case .int16:
-            return true
-        case .int32:
-            return true
-        case .int64:
-            return true
-        case .uint:
-            return true
-        case .uint8:
-            return true
-        case .uint16:
-            return true
-        case .uint32:
-            return true
-        case .uint64:
+        case .uint, .uint8, .uint16, .uint32, .uint64:
             return true
         case .module(_, let type):
             return type.isNumeric
+        default:
+            return false
+        }
+    }
+
+    /// Whether this is an unsigned number type.
+    var isUnsigned: Bool {
+        switch self {
+        case .uint, .uint8, .uint16, .uint32, .uint64:
+            return true
+        case .module(_, let type):
+            return type.isUnsigned
         default:
             return false
         }
@@ -1026,12 +1020,12 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                 return .none
             }
             var parameters: [Parameter] = []
-            for argumentSyntax in functionType.arguments {
-                let label = argumentSyntax.name?.text
-                let type = self.for(syntax: argumentSyntax.type)
-                let isInOut = isInOut(syntax: argumentSyntax.type)
-                let isVariadic = argumentSyntax.ellipsis != nil
-                let hasDefaultValue = argumentSyntax.initializer != nil
+            for parameterSyntax in functionType.parameters {
+                let label = parameterSyntax.name?.text
+                let type = self.for(syntax: parameterSyntax.type)
+                let isInOut = isInOut(syntax: parameterSyntax.type)
+                let isVariadic = parameterSyntax.ellipsis != nil
+                let hasDefaultValue = parameterSyntax.initializer != nil
                 parameters.append(Parameter(label: label, type: type, isInOut: isInOut, isVariadic: isVariadic, hasDefaultValue: hasDefaultValue))
             }
             let returnType = self.for(syntax: functionType.output.returnType)

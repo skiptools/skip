@@ -38,25 +38,19 @@ final class KotlinOptionSetTransformer: KotlinTransformer {
         classDeclaration.inherits[inheritsIndex] = .named("OptionSet", [classDeclaration.signature, valueType])
         addOptionSetInterfaceMembers(to: classDeclaration, rawValueType: valueType)
         addOptionSetVarargsFactory(to: classDeclaration, rawValueType: valueType)
-        switch valueType {
-        case .uint, .uint8, .uint16, .uint32, .uint64:
-            addSignedRawValueConstructor(to: classDeclaration, rawValueType: valueType)
-        default:
-            break
-        }
     }
 
     private func addOptionSetInterfaceMembers(to classDeclaration: KotlinClassDeclaration, rawValueType: TypeSignature) {
-        let rawValueVar = KotlinVariableDeclaration(names: ["rawvaluelong"], variableTypes: [.int64])
+        let rawValueVar = KotlinVariableDeclaration(names: ["rawvaluelong"], variableTypes: [.uint64])
         rawValueVar.extras = .singleNewline
         rawValueVar.isProperty = true
         rawValueVar.modifiers.visibility = .public
         rawValueVar.modifiers.isOverride = true
-        rawValueVar.declaredType = .int64
+        rawValueVar.declaredType = .uint64
         rawValueVar.isReadOnly = true
         rawValueVar.isGenerated = true
 
-        let rawValueCode = rawValueType == .int64 ? "return rawValue" : "return Long(rawValue)"
+        let rawValueCode = rawValueType == .uint64 ? "return rawValue" : "return ULong(rawValue)"
         let rawValueStatement = KotlinRawStatement(sourceCode: rawValueCode)
         rawValueVar.getter = Accessor(body: KotlinCodeBlock(statements: [rawValueStatement]))
 
@@ -69,9 +63,9 @@ final class KotlinOptionSetTransformer: KotlinTransformer {
         make.modifiers.isOverride = true
         make.isGenerated = true
         make.returnType = classDeclaration.signature
-        make.parameters = [Parameter<KotlinExpression>(externalLabel: "rawvaluelong", declaredType: .int64)]
+        make.parameters = [Parameter<KotlinExpression>(externalLabel: "rawvaluelong", declaredType: .uint64)]
 
-        let makeCode = rawValueType == .int64 ? "return \(classDeclaration.name)(rawValue = rawvaluelong)" : "return \(classDeclaration.name)(rawValue = \(rawValueType.kotlin)(rawvaluelong))"
+        let makeCode = rawValueType == .uint64 ? "return \(classDeclaration.name)(rawValue = rawvaluelong)" : "return \(classDeclaration.name)(rawValue = \(rawValueType.kotlin)(rawvaluelong))"
         let makeStatement = KotlinRawStatement(sourceCode: makeCode)
         make.body = KotlinCodeBlock(statements: [makeStatement])
 
@@ -115,19 +109,5 @@ final class KotlinOptionSetTransformer: KotlinTransformer {
         classDeclaration.members.append(factory)
         factory.parent = classDeclaration
         factory.assignParentReferences()
-    }
-
-    private func addSignedRawValueConstructor(to classDeclaration: KotlinClassDeclaration, rawValueType: TypeSignature) {
-        // When using an unsigned rawValue type, create a signed constructor too because Kotlin won't do unsigned to signed conversions
-        let constructor = KotlinFunctionDeclaration(name: "constructor")
-        constructor.modifiers.visibility = .public
-        constructor.isGenerated = true
-        constructor.parameters = [Parameter<KotlinExpression>(externalLabel: "rawValue", declaredType: .int64)]
-        constructor.delegatingConstructorCall = KotlinRawExpression(sourceCode: "this(rawValue = \(rawValueType.kotlin)(rawValue))")
-        constructor.body = KotlinCodeBlock()
-
-        classDeclaration.members.append(constructor)
-        constructor.parent = classDeclaration
-        constructor.assignParentReferences()
     }
 }

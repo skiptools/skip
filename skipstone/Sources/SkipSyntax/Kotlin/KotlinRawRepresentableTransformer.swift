@@ -48,8 +48,13 @@ final class KotlinRawRepresentableTransformer: KotlinTransformer {
         var cases = classDeclaration.members
             .compactMap { $0 as? KotlinEnumCaseDeclaration }
             .compactMap { (enumCase: KotlinEnumCaseDeclaration) -> KotlinCase? in
-                guard let rawValue = enumCase.rawValue else {
+                guard var rawValue = enumCase.rawValue else {
                     return nil
+                }
+                if classDeclaration.enumInheritedRawValueType == .float || classDeclaration.enumInheritedRawValueType.isUnsigned {
+                    // Kotlin requires us to cast Float and unsigned types explicitly
+                    let identifier = KotlinIdentifier(name: classDeclaration.enumInheritedRawValueType.kotlin)
+                    rawValue = KotlinFunctionCall(function: identifier, arguments: [LabeledValue(value: rawValue)])
                 }
                 let statement = KotlinRawStatement(sourceCode: "\(classDeclaration.name).\(enumCase.name)\(callString)")
                 return KotlinCase(patterns: [rawValue], body: KotlinCodeBlock(statements: [statement]))

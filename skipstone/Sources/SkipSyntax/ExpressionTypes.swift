@@ -1235,7 +1235,7 @@ class Parenthesized: Expression {
     }
 
     override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
-        guard syntax.kind == .tupleExpr, let tupleExpr = syntax.as(TupleExprSyntax.self), tupleExpr.elementList.count == 1, let exprSyntax = tupleExpr.elementList.first?.expression else {
+        guard syntax.kind == .tupleExpr, let tupleExpr = syntax.as(TupleExprSyntax.self), tupleExpr.elements.count == 1, let exprSyntax = tupleExpr.elements.first?.expression else {
             return nil
         }
         let content = ExpressionDecoder.decode(syntax: exprSyntax, in: syntaxTree)
@@ -1758,7 +1758,7 @@ class TupleLiteral: Expression {
         }
         var labels: [String?] = []
         var values: [Expression] = []
-        for element in tupleExpr.elementList {
+        for element in tupleExpr.elements {
             labels.append(element.label?.text)
             values.append(ExpressionDecoder.decode(syntax: element.expression, in: syntaxTree))
         }
