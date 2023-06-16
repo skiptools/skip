@@ -97,26 +97,25 @@ final class FeatureSupportTests: XCTestCase {
     /// Trying to reproduce `UUID(uuidString: "Invalid UUID")` in `TestUUID.swift` throwing a `NullReturnException`.
     /// But this works fine…
     func testInferredNilConstructor() async throws {
-        try await check(compiler: nil, swiftCode: {
-            class Foo {
-                init?() {
-                    return nil
-                }
+        try await check(swift: """
+        class Foo {
+            init?() {
+                return nil
             }
+        }
 
-            let foo = Foo()
-            assert(foo == nil)
-            return ""
-        }, kotlin: """
-            open class Foo {
-                constructor() {
-                    throw NullReturnException()
-                }
+        let foo = Foo()
+        assert(foo == nil)
+        """, kotlin: """
+        internal open class Foo {
+            internal constructor() {
+                throw NullReturnException()
             }
-            val foo = (try { Foo() } catch (_: NullReturnException) { null })
-            assert(foo == null)
-            return ""
-            """)
+        }
+
+        internal val foo = (try { Foo() } catch (_: NullReturnException) { null })
+        assert(foo == null)
+        """)
     }
 
     func testEnumRawValueKeywords() async throws {
