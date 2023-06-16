@@ -171,6 +171,28 @@ final class BuiltinTypeTests: XCTestCase {
         """)
     }
 
+    func testNumericCastRequired() async throws {
+        try await check(swift: """
+        let x: Float = Float(1.0)
+        """, kotlin: """
+        internal val x: Float = Float(1.0)
+        """)
+
+        try await checkProducesMessage(swift: """
+        let x: Float = 1.0
+        """)
+
+        try await check(swift: """
+        let x: UInt = UInt(1)
+        """, kotlin: """
+        internal val x: UInt = UInt(1)
+        """)
+
+        try await checkProducesMessage(swift: """
+        let x: UInt = 1
+        """)
+    }
+
     func testHexLiteral() async throws {
         try await check(swift: """
         0xABABAB
@@ -223,10 +245,6 @@ final class BuiltinTypeTests: XCTestCase {
         try await check(swift: #""\u{2665}""# , kotlin: #""\u2665""#)
         try await check(swift: #""\\u{2665}""# , kotlin: #""\\u{2665}""#)
         try await check(swift: #""\u2665""# , kotlin: #""\u2665""#)
-    }
-
-    func testFormFeedInStringLiteral() async throws {
-
     }
 
     func testRawStringLiteral() async throws {

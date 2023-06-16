@@ -154,6 +154,10 @@ extension Message {
         return Message(kind: .error, message: "Skip is unable to determine the owning type for member '\(member)'. Add the owning type (e.g. MyType.\(member))", sourceDerived: sourceDerived, source: source)
     }
 
+    static func kotlinNumericCast(_ sourceDerived: SourceDerived, source: Source, type: String) -> Message {
+        return Message(kind: .error, message: "Cast required, e.g. \(type)(<value>). Kotlin requires specific type matching when dealing with Floats and unsigned types. We generally recommend avoiding them in favor of Double and signed types.", sourceDerived: sourceDerived, source: source)
+    }
+
     // Idea: translate to equivalent Kotlin operator functions
     static func kotlinOperatorFunction(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Skip does not support custom operators. Consider using a standard function", sourceDerived: sourceDerived, source: source)

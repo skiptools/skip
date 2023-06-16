@@ -2072,6 +2072,9 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
 
         // Warnings and fixups
         kstatement.declaredType.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source)
+        if kstatement.declaredType == .float || kstatement.declaredType.isUnsigned, kstatement.value is KotlinNumericLiteral {
+            kstatement.messages.append(.kotlinNumericCast(kstatement, source: translator.syntaxTree.source, type: kstatement.declaredType.kotlin))
+        }
         if (kstatement.isProperty || kstatement.isGlobal), case .unwrappedOptional(let type) = kstatement.propertyType, type.kotlinIsNative(primitive: true) {
             kstatement.messages.append(.kotlinLateinitPrimitive(kstatement, source: translator.syntaxTree.source))
         }
