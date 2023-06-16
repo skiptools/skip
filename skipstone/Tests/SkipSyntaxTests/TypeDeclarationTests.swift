@@ -986,6 +986,52 @@ final class TypeDeclarationTests: XCTestCase {
         """)
     }
 
+    func testOptionSetInitFromEmptyArrayLiteral() async throws {
+        try await check(swift: """
+        struct Opts : OptionSet {
+            let rawValue: Int
+            static let a = Opts(rawValue: 1 << 0)
+            static let b = Opts(rawValue: 1 << 1)
+        }
+
+        func f(opts: Opts) {
+        }
+        func g() {
+            f(opts: [])
+        }
+        """, kotlin: """
+        internal class Opts: OptionSet<Opts, Int> {
+            internal var rawValue: Int
+
+            override val rawvaluelong: Long
+                get() = Long(rawValue)
+            override fun makeoptionset(rawvaluelong: Long): Opts = Opts(rawValue = Int(rawvaluelong))
+            override fun assignoptionset(target: Opts) = assignfrom(target)
+
+            constructor(rawValue: Int) {
+                this.rawValue = rawValue
+            }
+
+            private fun assignfrom(target: Opts) {
+                this.rawValue = target.rawValue
+            }
+
+            companion object {
+                internal val a = Opts(rawValue = 1 shl 0)
+                internal val b = Opts(rawValue = 1 shl 1)
+
+                fun of(vararg options: Opts): Opts {
+                    val value = options.fold(Int(0)) { result, option -> result or option.rawValue }
+                    return Opts(rawValue = value)
+                }
+            }
+        }
+
+        internal fun f(opts: Opts) = Unit
+        internal fun g() = f(opts = Opts.of())
+        """)
+    }
+
     func testNestedClassOptionSet() async throws {
         try await check(supportingSwift: """
         protocol RawRepresentable {

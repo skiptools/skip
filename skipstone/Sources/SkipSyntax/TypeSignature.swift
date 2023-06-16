@@ -796,6 +796,12 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                 }
                 return (2.0 + elementScore) / 2.0
             }
+            if codebaseInfo.global.protocolSignatures(forNamed: target).contains(where: { $0.isNamed("OptionSet", moduleName: "Swift") }) {
+                guard let elementScore = element.compatibilityScore(target: element, codebaseInfo: codebaseInfo) else {
+                    return nil
+                }
+                return (2.0 + elementScore) / 2.0
+            }
         case .character:
             if target.isStringy {
                 return 1.0

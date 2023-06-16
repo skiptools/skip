@@ -8,54 +8,6 @@ fileprivate extension String {
 
 /// A test case that verifies that transpilation are *not* working as hoped.
 final class FeatureSupportTests: XCTestCase {
-    func testOptionSetInitFromEmptyArrayLiteral() async throws {
-        // note the incorrect:
-        //   f(opts = arrayOf())
-        // should be:
-        //   f(opts = Opts.of())
-        try await check(compiler: nil, swiftCode: {
-            struct Opts : OptionSet {
-                let rawValue: Int
-                init(rawValue: Int) { self.rawValue = rawValue }
-
-                static let a = Opts(rawValue: 1 << 0)
-                static let b = Opts(rawValue: 1 << 1)
-            }
-
-            func f(opts: Opts = []) {
-            }
-
-            f(opts: [])
-            return ""
-        }, kotlin: """
-        class Opts: OptionSet<Opts, Int> {
-            var rawValue: Int = init(rawValue = Int) { this.rawValue = rawValue }
-        
-            override val rawvaluelong: Long
-                get() = Long(rawValue)
-            override fun makeoptionset(rawvaluelong: Long): Opts = Opts(rawValue = Int(rawvaluelong))
-            override fun assignoptionset(target: Opts) = assignfrom(target)
-        
-            private fun assignfrom(target: Opts) {
-                this.rawValue = target.rawValue
-            }
-        
-            companion object {
-                val a = Opts(rawValue = 1 shl 0)
-                val b = Opts(rawValue = 1 shl 1)
-        
-                fun of(vararg options: Opts): Opts {
-                    val value = options.fold(Int(0)) { result, option -> result or option.rawValue }
-                    return Opts(rawValue = value)
-                }
-            }
-        }
-        fun f(opts: Opts = Opts.of()) = Unit
-        f(opts = arrayOf())
-        return ""
-        """)
-    }
-
     func testOptionSetUInt() async throws {
         // error: conversion of signed constants to unsigned ones is prohibited
 
