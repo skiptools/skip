@@ -972,6 +972,47 @@ final class TypeDeclarationTests: XCTestCase {
         }
         """)
 
+        try await check(swift: """
+        struct S: OptionSet {
+            let rawValue: UInt
+
+            static let s1 = S(rawValue: 1 << 0)
+            static let s2 = S(rawValue: UInt(1 << 1))
+            static let all: S = [.s1, .s2]
+        }
+        """, kotlin: """
+        internal class S: OptionSet<S, UInt> {
+            internal var rawValue: UInt
+
+            override val rawvaluelong: Long
+                get() = Long(rawValue)
+            override fun makeoptionset(rawvaluelong: Long): S = S(rawValue = UInt(rawvaluelong))
+            override fun assignoptionset(target: S) = assignfrom(target)
+            constructor(rawValue: Long): this(rawValue = UInt(rawValue)) {
+            }
+
+            constructor(rawValue: UInt) {
+                this.rawValue = rawValue
+            }
+
+            private fun assignfrom(target: S) {
+                this.rawValue = target.rawValue
+            }
+
+            companion object {
+
+                internal val s1 = S(rawValue = 1 shl 0)
+                internal val s2 = S(rawValue = UInt(1 shl 1))
+                internal val all: S = S.of(S.s1, S.s2)
+
+                fun of(vararg options: S): S {
+                    val value = options.fold(UInt(0)) { result, option -> result or option.rawValue }
+                    return S(rawValue = value)
+                }
+            }
+        }
+        """)
+
         try await checkProducesMessage(swift: """
         class C: OptionSet {
             let rawValue: Int

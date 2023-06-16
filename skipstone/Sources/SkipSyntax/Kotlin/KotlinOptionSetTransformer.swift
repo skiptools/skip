@@ -38,6 +38,12 @@ final class KotlinOptionSetTransformer: KotlinTransformer {
         classDeclaration.inherits[inheritsIndex] = .named("OptionSet", [classDeclaration.signature, valueType])
         addOptionSetInterfaceMembers(to: classDeclaration, rawValueType: valueType)
         addOptionSetVarargsFactory(to: classDeclaration, rawValueType: valueType)
+        switch valueType {
+        case .uint, .uint8, .uint16, .uint32, .uint64:
+            addSignedRawValueConstructor(to: classDeclaration, rawValueType: valueType)
+        default:
+            break
+        }
     }
 
     private func addOptionSetInterfaceMembers(to classDeclaration: KotlinClassDeclaration, rawValueType: TypeSignature) {
@@ -109,5 +115,19 @@ final class KotlinOptionSetTransformer: KotlinTransformer {
         classDeclaration.members.append(factory)
         factory.parent = classDeclaration
         factory.assignParentReferences()
+    }
+
+    private func addSignedRawValueConstructor(to classDeclaration: KotlinClassDeclaration, rawValueType: TypeSignature) {
+        // When using an unsigned rawValue type, create a signed constructor too because Kotlin won't do unsigned to signed conversions
+        let constructor = KotlinFunctionDeclaration(name: "constructor")
+        constructor.modifiers.visibility = .public
+        constructor.isGenerated = true
+        constructor.parameters = [Parameter<KotlinExpression>(externalLabel: "rawValue", declaredType: .int64)]
+        constructor.delegatingConstructorCall = KotlinRawExpression(sourceCode: "this(rawValue = \(rawValueType.kotlin)(rawValue))")
+        constructor.body = KotlinCodeBlock()
+
+        classDeclaration.members.append(constructor)
+        constructor.parent = classDeclaration
+        constructor.assignParentReferences()
     }
 }
