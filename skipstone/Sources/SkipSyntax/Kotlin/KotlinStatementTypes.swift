@@ -859,7 +859,7 @@ class KotlinClassDeclaration: KotlinStatement {
 
             // Move extensions of this type into the type itself rather than use Kotlin extension functions.
             // Kotlin extension functions act like static functions, which can lead to different behavior
-            for (extInfo, extDeclaration) in codebaseInfo.extensions(of: statement.signature) where extDeclaration.canMoveIntoExtendedType {
+            for (extInfo, extDeclaration) in codebaseInfo.moveableExtensions(of: statement.signature, in: translator.syntaxTree) {
                 kstatement.inherits += extInfo.inherits
                 members += extDeclaration.members.flatMap { translator.translateStatement($0) }
             }
@@ -1766,7 +1766,7 @@ class KotlinInterfaceDeclaration: KotlinStatement {
         // act like static functions, which can lead to different behavior
         var originalMembers = kstatement.members
         var newMembers: [KotlinStatement] = []
-        for (extInfo, extDeclaration) in codebaseInfo.extensions(of: statement.signature) where extDeclaration.canMoveIntoExtendedType {
+        for (extInfo, extDeclaration) in codebaseInfo.moveableExtensions(of: statement.signature, in: translator.syntaxTree) {
             kstatement.inherits += extInfo.inherits
             for extMember in extDeclaration.members.flatMap({ translator.translateStatement($0) }) {
                 if !replaceMember(in: &originalMembers, with: extMember) {

@@ -11,11 +11,14 @@ extension CodebaseInfo {
 }
 
 extension CodebaseInfo.Context {
-    /// Return all extensions of a given type.
-    func extensions(of type: TypeSignature) -> [(CodebaseInfo.TypeInfo, ExtensionDeclaration)] {
+    /// Return all extensions of a given type that can move into its definition.
+    func moveableExtensions(of type: TypeSignature, in syntaxTree: SyntaxTree) -> [(CodebaseInfo.TypeInfo, ExtensionDeclaration)] {
         assert(global.kotlin != nil)
         return typeInfos(forNamed: type).compactMap { typeInfo in
-            guard let extensionDeclaration = typeInfo.languageAdditions as? ExtensionDeclaration else {
+            guard let extensionAdditions = typeInfo.languageAdditions as? ExtensionAdditions else {
+                return nil
+            }
+            guard let extensionDeclaration = extensionAdditions.moveableExtensionDeclaration(codebaseInfo: global, in: syntaxTree) else {
                 return nil
             }
             return (typeInfo, extensionDeclaration)
@@ -184,15 +187,79 @@ public class KotlinCodebaseInfo: CodebaseInfoLanguageAdditions, CodebaseInfoLang
         self.packageName = packageName
     }
 
-    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather typeInfo: CodebaseInfo.TypeInfo, from statement: ExtensionDeclaration) {
+    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather typeInfo: CodebaseInfo.TypeInfo, from statement: ExtensionDeclaration, syntaxTree: SyntaxTree) {
         // Keep the extension statement around so we can move it to the extended declarations
-        typeInfo.languageAdditions = statement
+        typeInfo.languageAdditions = ExtensionAdditions(extensionDeclaration: statement, syntaxTree: syntaxTree)
     }
 
-    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather functionInfo: inout CodebaseInfo.FunctionInfo, from statement: FunctionDeclaration) {
+    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather functionInfo: inout CodebaseInfo.FunctionInfo, from statement: FunctionDeclaration, syntaxTree: SyntaxTree) {
         // Track init parameter default values so that we can transfer them to subclass constructors we generate
         if functionInfo.declarationType == .initDeclaration {
             functionInfo.languageAdditions = statement.parameters.map(\.defaultValue)
         }
+    }
+}
+
+private class ExtensionAdditions {
+    let extensionDeclaration: ExtensionDeclaration?
+    let importedModuleNames: [String]
+    let source: Source?
+    var hasInferredTypes = false
+    let statementIndex: Int?
+
+    init(extensionDeclaration: ExtensionDeclaration, syntaxTree: SyntaxTree) {
+        // If we're in the same file as the extended declaration, we'll be able to find this extension in the
+        // syntax tree given on lookup, so just record the statement index. Otherwise we have to save the entire
+        // extension declaration
+        let statements = syntaxTree.root.statements
+        if statements.containsDeclaration(of: extensionDeclaration.extends), let index = statements.firstIndex(where: { $0 === extensionDeclaration }) {
+            self.statementIndex = index
+            self.extensionDeclaration = nil
+            self.importedModuleNames = []
+            self.source = nil
+        } else {
+            self.extensionDeclaration = extensionDeclaration
+            self.importedModuleNames = statements.importedModuleNames
+            self.source = syntaxTree.source
+            self.statementIndex = nil
+        }
+    }
+
+    func moveableExtensionDeclaration(codebaseInfo: CodebaseInfo, in syntaxTree: SyntaxTree) -> ExtensionDeclaration? {
+        // Recover the extension declaration
+        if let statementIndex {
+            guard statementIndex < syntaxTree.root.statements.count, let extensionDeclaration = syntaxTree.root.statements[statementIndex] as? ExtensionDeclaration else {
+                assert(false)
+                return nil
+            }
+            return extensionDeclaration.canMoveIntoExtendedType ? extensionDeclaration : nil
+        } else if let extensionDeclaration, let source {
+            guard extensionDeclaration.canMoveIntoExtendedType else {
+                return nil
+            }
+            if !hasInferredTypes {
+                let context = codebaseInfo.context(importedModuleNames: importedModuleNames, source: source)
+                let typeInferenceContext = TypeInferenceContext(codebaseInfo: context, unavailableAPI: nil, source: syntaxTree.source)
+                let _ = extensionDeclaration.inferTypes(context: typeInferenceContext, expecting: .none)
+                hasInferredTypes = true
+            }
+            return extensionDeclaration
+        } else {
+            return nil
+        }
+    }
+}
+
+extension Array where Element == Statement {
+    func containsDeclaration(of signature: TypeSignature) -> Bool {
+        let name = signature.name
+        for statement in self {
+            if statement.type != .extensionDeclaration, let typeDeclaration = statement as? TypeDeclaration {
+                if typeDeclaration.name == name || typeDeclaration.members.containsDeclaration(of: signature) {
+                    return true
+                }
+            }
+        }
+        return false
     }
 }

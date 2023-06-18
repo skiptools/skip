@@ -478,6 +478,10 @@ class CasePattern: Expression, BindingExpression {
         return valueType
     }
 
+    override var children: [SyntaxNode] {
+        return [value]
+    }
+
     override var prettyPrintAttributes: [PrettyPrintTree] {
         return isVar ? ["var"] : []
     }

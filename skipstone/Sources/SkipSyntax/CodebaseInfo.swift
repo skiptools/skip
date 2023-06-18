@@ -42,24 +42,24 @@ public class CodebaseInfo: Codable {
         for statement in syntaxTree.root.statements {
             switch statement.type {
             case .actorDeclaration, .classDeclaration, .enumDeclaration, .protocolDeclaration, .structDeclaration:
-                let typeInfo = TypeInfo(statement: statement as! TypeDeclaration, codebaseInfo: self)
+                let typeInfo = TypeInfo(statement: statement as! TypeDeclaration, codebaseInfo: self, syntaxTree: syntaxTree)
                 typeInfo.importedModuleNames = importedModuleNames
                 rootTypes.append(typeInfo)
                 needsVariableTypeInference = needsVariableTypeInference || typeInfo.needsVariableTypeInference
             case .extensionDeclaration:
-                let typeInfo = TypeInfo(statement: statement as! ExtensionDeclaration, codebaseInfo: self)
+                let typeInfo = TypeInfo(statement: statement as! ExtensionDeclaration, codebaseInfo: self, syntaxTree: syntaxTree)
                 typeInfo.importedModuleNames = importedModuleNames
                 rootExtensions.append(typeInfo)
             case .functionDeclaration, .initDeclaration, .deinitDeclaration:
-                var functionInfo = FunctionInfo(statement: statement as! FunctionDeclaration, codebaseInfo: self)
+                var functionInfo = FunctionInfo(statement: statement as! FunctionDeclaration, codebaseInfo: self, syntaxTree: syntaxTree)
                 functionInfo.importedModuleNames = importedModuleNames
                 rootFunctions.append(functionInfo)
             case .typealiasDeclaration:
-                var typealiasInfo = TypealiasInfo(statement: statement as! TypealiasDeclaration, codebaseInfo: self)
+                var typealiasInfo = TypealiasInfo(statement: statement as! TypealiasDeclaration, codebaseInfo: self, syntaxTree: syntaxTree)
                 typealiasInfo.importedModuleNames = importedModuleNames
                 rootTypealiases.append(typealiasInfo)
             case .variableDeclaration:
-                var variableInfo = VariableInfo(statement: statement as! VariableDeclaration, codebaseInfo: self)
+                var variableInfo = VariableInfo(statement: statement as! VariableDeclaration, codebaseInfo: self, syntaxTree: syntaxTree)
                 variableInfo.importedModuleNames = importedModuleNames
                 rootVariables.append(variableInfo)
                 needsVariableTypeInference = needsVariableTypeInference || variableInfo.needsTypeInference
@@ -1119,7 +1119,7 @@ public class CodebaseInfo: Codable {
             case name, declarationType, signature, moduleName, sourceFile, declaringType, modifiers, availability, generics, inherits, types, typealiases, cases, variables, functions, subscripts
         }
 
-        fileprivate init(statement: TypeDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo) {
+        fileprivate init(statement: TypeDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo, syntaxTree: SyntaxTree) {
             self.name = statement.name
             self.declarationType = statement.type
             self.signature = statement.signature
@@ -1130,11 +1130,11 @@ public class CodebaseInfo: Codable {
             self.availability = Availability(attributes: statement.attributes)
             self.generics = statement.generics
             self.inherits = statement.inherits
-            addMembers(statement.members, codebaseInfo: codebaseInfo)
-            (codebaseInfo.languageAdditions as? CodebaseInfoLanguageAdditionsGatherDelegate)?.codebaseInfo(codebaseInfo, didGather: self, from: statement)
+            addMembers(statement.members, codebaseInfo: codebaseInfo, syntaxTree: syntaxTree)
+            (codebaseInfo.languageAdditions as? CodebaseInfoLanguageAdditionsGatherDelegate)?.codebaseInfo(codebaseInfo, didGather: self, from: statement, syntaxTree: syntaxTree)
         }
 
-        fileprivate init(statement: ExtensionDeclaration, codebaseInfo: CodebaseInfo) {
+        fileprivate init(statement: ExtensionDeclaration, codebaseInfo: CodebaseInfo, syntaxTree: SyntaxTree) {
             self.name = statement.name
             self.declarationType = statement.type
             self.signature = statement.signature
@@ -1149,8 +1149,8 @@ public class CodebaseInfo: Codable {
             self.availability = Availability(attributes: statement.attributes)
             self.generics = statement.generics
             self.inherits = statement.inherits
-            addMembers(statement.members, codebaseInfo: codebaseInfo)
-            (codebaseInfo.languageAdditions as? CodebaseInfoLanguageAdditionsGatherDelegate)?.codebaseInfo(codebaseInfo, didGather: self, from: statement)
+            addMembers(statement.members, codebaseInfo: codebaseInfo, syntaxTree: syntaxTree)
+            (codebaseInfo.languageAdditions as? CodebaseInfoLanguageAdditionsGatherDelegate)?.codebaseInfo(codebaseInfo, didGather: self, from: statement, syntaxTree: syntaxTree)
         }
 
         fileprivate var needsVariableTypeInference: Bool {
@@ -1201,21 +1201,21 @@ public class CodebaseInfo: Codable {
             //~~~
         }
 
-        private func addMembers(_ statements: [Statement], codebaseInfo: CodebaseInfo) {
+        private func addMembers(_ statements: [Statement], codebaseInfo: CodebaseInfo, syntaxTree: SyntaxTree) {
             for statement in statements {
                 switch statement.type {
                 case .actorDeclaration, .classDeclaration, .enumDeclaration, .structDeclaration:
-                    types.append(TypeInfo(statement: statement as! TypeDeclaration, in: signature, codebaseInfo: codebaseInfo))
+                    types.append(TypeInfo(statement: statement as! TypeDeclaration, in: signature, codebaseInfo: codebaseInfo, syntaxTree: syntaxTree))
                 case .enumCaseDeclaration:
-                    cases.append(EnumCaseInfo(statement: statement as! EnumCaseDeclaration, in: signature, codebaseInfo: codebaseInfo))
+                    cases.append(EnumCaseInfo(statement: statement as! EnumCaseDeclaration, in: signature, codebaseInfo: codebaseInfo, syntaxTree: syntaxTree))
                 case .functionDeclaration, .initDeclaration, .deinitDeclaration:
-                    functions.append(FunctionInfo(statement: statement as! FunctionDeclaration, in: signature, codebaseInfo: codebaseInfo))
+                    functions.append(FunctionInfo(statement: statement as! FunctionDeclaration, in: signature, codebaseInfo: codebaseInfo, syntaxTree: syntaxTree))
                 case .subscriptDeclaration:
-                    subscripts.append(SubscriptInfo(statement: statement as! SubscriptDeclaration, in: signature, codebaseInfo: codebaseInfo))
+                    subscripts.append(SubscriptInfo(statement: statement as! SubscriptDeclaration, in: signature, codebaseInfo: codebaseInfo, syntaxTree: syntaxTree))
                 case .typealiasDeclaration:
-                    typealiases.append(TypealiasInfo(statement: statement as! TypealiasDeclaration, in: signature, codebaseInfo: codebaseInfo))
+                    typealiases.append(TypealiasInfo(statement: statement as! TypealiasDeclaration, in: signature, codebaseInfo: codebaseInfo, syntaxTree: syntaxTree))
                 case .variableDeclaration:
-                    variables.append(VariableInfo(statement: statement as! VariableDeclaration, in: signature, codebaseInfo: codebaseInfo))
+                    variables.append(VariableInfo(statement: statement as! VariableDeclaration, in: signature, codebaseInfo: codebaseInfo, syntaxTree: syntaxTree))
                 default:
                     break
                 }
@@ -1251,7 +1251,7 @@ public class CodebaseInfo: Codable {
             case name, signature, moduleName, sourceFile, declaringType, modifiers, availability, apiFlags, isInitializable, hasValue
         }
 
-        fileprivate init(statement: VariableDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo) {
+        fileprivate init(statement: VariableDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo, syntaxTree: SyntaxTree) {
             self.name = statement.propertyName
             self.signature = statement.propertyType
             self.moduleName = codebaseInfo.moduleName
@@ -1279,7 +1279,7 @@ public class CodebaseInfo: Codable {
                 // We'll try to infer the type after gathering all info
                 self.value = statement.value
             }
-            (codebaseInfo.languageAdditions as? CodebaseInfoLanguageAdditionsGatherDelegate)?.codebaseInfo(codebaseInfo, didGather: &self, from: statement)
+            (codebaseInfo.languageAdditions as? CodebaseInfoLanguageAdditionsGatherDelegate)?.codebaseInfo(codebaseInfo, didGather: &self, from: statement, syntaxTree: syntaxTree)
         }
 
         fileprivate var needsTypeInference: Bool {
@@ -1345,7 +1345,7 @@ public class CodebaseInfo: Codable {
             case name, declarationType, signature, moduleName, sourceFile, declaringType, modifiers, availability, generics, apiFlags, isMutating, isGenerated
         }
 
-        fileprivate init(statement: FunctionDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo) {
+        fileprivate init(statement: FunctionDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo, syntaxTree: SyntaxTree) {
             self.name = statement.name
             self.declarationType = statement.type
             self.signature = statement.functionType
@@ -1367,7 +1367,7 @@ public class CodebaseInfo: Codable {
             }
             self.apiFlags = apiFlags
             self.isMutating = statement.modifiers.isMutating
-            (codebaseInfo.languageAdditions as? CodebaseInfoLanguageAdditionsGatherDelegate)?.codebaseInfo(codebaseInfo, didGather: &self, from: statement)
+            (codebaseInfo.languageAdditions as? CodebaseInfoLanguageAdditionsGatherDelegate)?.codebaseInfo(codebaseInfo, didGather: &self, from: statement, syntaxTree: syntaxTree)
         }
 
         fileprivate init(name: String, declarationType: StatementType, signature: TypeSignature, moduleName: String?, sourceFile: Source.FilePath? = nil, declaringType: TypeSignature? = nil, modifiers: Modifiers, availability: Availability, generics: Generics = Generics(), apiFlags: APIFlags = [], isMutating: Bool = false) {
@@ -1420,7 +1420,7 @@ public class CodebaseInfo: Codable {
             case signature, moduleName, sourceFile, declaringType, modifiers, availability, generics, apiFlags, isReadOnly
         }
 
-        fileprivate init(statement: SubscriptDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo) {
+        fileprivate init(statement: SubscriptDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo, syntaxTree: SyntaxTree) {
             self.signature = statement.getterType
             self.moduleName = codebaseInfo.moduleName
             self.sourceFile = statement.sourceFile
@@ -1440,7 +1440,7 @@ public class CodebaseInfo: Codable {
             }
             self.apiFlags = apiFlags
             self.isReadOnly = statement.setter == nil
-            (codebaseInfo.languageAdditions as? CodebaseInfoLanguageAdditionsGatherDelegate)?.codebaseInfo(codebaseInfo, didGather: &self, from: statement)
+            (codebaseInfo.languageAdditions as? CodebaseInfoLanguageAdditionsGatherDelegate)?.codebaseInfo(codebaseInfo, didGather: &self, from: statement, syntaxTree: syntaxTree)
         }
 
         fileprivate mutating func resolveModuleTypeSignatures(codebaseInfo: CodebaseInfo) {
@@ -1475,7 +1475,7 @@ public class CodebaseInfo: Codable {
             case name, signature, moduleName, sourceFile, declaringType, modifiers, availability, generics
         }
 
-        fileprivate init(statement: TypealiasDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo) {
+        fileprivate init(statement: TypealiasDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo, syntaxTree: SyntaxTree) {
             self.name = statement.name
             self.signature = statement.aliasedType
             self.moduleName = codebaseInfo.moduleName
@@ -1484,7 +1484,7 @@ public class CodebaseInfo: Codable {
             self.modifiers = statement.modifiers
             self.availability = Availability(attributes: statement.attributes)
             self.generics = statement.generics
-            (codebaseInfo.languageAdditions as? CodebaseInfoLanguageAdditionsGatherDelegate)?.codebaseInfo(codebaseInfo, didGather: &self, from: statement)
+            (codebaseInfo.languageAdditions as? CodebaseInfoLanguageAdditionsGatherDelegate)?.codebaseInfo(codebaseInfo, didGather: &self, from: statement, syntaxTree: syntaxTree)
         }
 
         fileprivate mutating func resolveModuleTypeSignatures(codebaseInfo: CodebaseInfo) {
@@ -1517,7 +1517,7 @@ public class CodebaseInfo: Codable {
             case name, signature, moduleName, sourceFile, declaringType, modifiers, availability
         }
 
-        fileprivate init(statement: EnumCaseDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo) {
+        fileprivate init(statement: EnumCaseDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo, syntaxTree: SyntaxTree) {
             self.name = statement.name
             self.signature = statement.signature
             self.moduleName = codebaseInfo.moduleName
@@ -1525,7 +1525,7 @@ public class CodebaseInfo: Codable {
             self.declaringType = declaringType
             self.modifiers = statement.modifiers
             self.availability = Availability(attributes: statement.attributes)
-            (codebaseInfo.languageAdditions as? CodebaseInfoLanguageAdditionsGatherDelegate)?.codebaseInfo(codebaseInfo, didGather: &self, from: statement)
+            (codebaseInfo.languageAdditions as? CodebaseInfoLanguageAdditionsGatherDelegate)?.codebaseInfo(codebaseInfo, didGather: &self, from: statement, syntaxTree: syntaxTree)
         }
 
         fileprivate mutating func resolveModuleTypeSignatures(codebaseInfo: CodebaseInfo) {
@@ -1582,13 +1582,13 @@ protocol CodebaseInfoLanguageAdditions {
 /// Optional protocol the `CodebaseInfoLanguageAdditions` can implement to receive info gathering callbacks.
 protocol CodebaseInfoLanguageAdditionsGatherDelegate {
     func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGatherFrom syntaxTree: SyntaxTree)
-    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather typeInfo: CodebaseInfo.TypeInfo, from statement: TypeDeclaration)
-    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather typeInfo: CodebaseInfo.TypeInfo, from statement: ExtensionDeclaration)
-    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather variableInfo: inout CodebaseInfo.VariableInfo, from statement: VariableDeclaration)
-    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather functionInfo: inout CodebaseInfo.FunctionInfo, from statement: FunctionDeclaration)
-    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather subscriptInfo: inout CodebaseInfo.SubscriptInfo, from statement: SubscriptDeclaration)
-    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather typealiasInfo: inout CodebaseInfo.TypealiasInfo, from statement: TypealiasDeclaration)
-    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather enumCaseInfo: inout CodebaseInfo.EnumCaseInfo, from statement: EnumCaseDeclaration)
+    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather typeInfo: CodebaseInfo.TypeInfo, from statement: TypeDeclaration, syntaxTree: SyntaxTree)
+    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather typeInfo: CodebaseInfo.TypeInfo, from statement: ExtensionDeclaration, syntaxTree: SyntaxTree)
+    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather variableInfo: inout CodebaseInfo.VariableInfo, from statement: VariableDeclaration, syntaxTree: SyntaxTree)
+    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather functionInfo: inout CodebaseInfo.FunctionInfo, from statement: FunctionDeclaration, syntaxTree: SyntaxTree)
+    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather subscriptInfo: inout CodebaseInfo.SubscriptInfo, from statement: SubscriptDeclaration, syntaxTree: SyntaxTree)
+    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather typealiasInfo: inout CodebaseInfo.TypealiasInfo, from statement: TypealiasDeclaration, syntaxTree: SyntaxTree)
+    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather enumCaseInfo: inout CodebaseInfo.EnumCaseInfo, from statement: EnumCaseDeclaration, syntaxTree: SyntaxTree)
 }
 
 extension CodebaseInfoLanguageAdditionsGatherDelegate {
@@ -1602,24 +1602,24 @@ extension CodebaseInfoLanguageAdditionsGatherDelegate {
     func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGatherFrom syntaxTree: SyntaxTree) {
     }
 
-    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather typeInfo: CodebaseInfo.TypeInfo, from statement: TypeDeclaration) {
+    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather typeInfo: CodebaseInfo.TypeInfo, from statement: TypeDeclaration, syntaxTree: SyntaxTree) {
     }
 
-    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather typeInfo: CodebaseInfo.TypeInfo, from statement: ExtensionDeclaration) {
+    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather typeInfo: CodebaseInfo.TypeInfo, from statement: ExtensionDeclaration, syntaxTree: SyntaxTree) {
     }
 
-    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather variableInfo: inout CodebaseInfo.VariableInfo, from statement: VariableDeclaration) {
+    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather variableInfo: inout CodebaseInfo.VariableInfo, from statement: VariableDeclaration, syntaxTree: SyntaxTree) {
     }
 
-    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather functionInfo: inout CodebaseInfo.FunctionInfo, from statement: FunctionDeclaration) {
+    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather functionInfo: inout CodebaseInfo.FunctionInfo, from statement: FunctionDeclaration, syntaxTree: SyntaxTree) {
     }
 
-    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather subscriptInfo: inout CodebaseInfo.SubscriptInfo, from statement: SubscriptDeclaration) {
+    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather subscriptInfo: inout CodebaseInfo.SubscriptInfo, from statement: SubscriptDeclaration, syntaxTree: SyntaxTree) {
     }
 
-    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather typealiasInfo: inout CodebaseInfo.TypealiasInfo, from statement: TypealiasDeclaration) {
+    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather typealiasInfo: inout CodebaseInfo.TypealiasInfo, from statement: TypealiasDeclaration, syntaxTree: SyntaxTree) {
     }
 
-    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather enumCaseInfo: inout CodebaseInfo.EnumCaseInfo, from statement: EnumCaseDeclaration) {
+    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather enumCaseInfo: inout CodebaseInfo.EnumCaseInfo, from statement: EnumCaseDeclaration, syntaxTree: SyntaxTree) {
     }
 }
