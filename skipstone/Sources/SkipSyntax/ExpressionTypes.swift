@@ -1048,16 +1048,16 @@ class MemberAccess: Expression, APICallExpression {
         // Don't output unavailable messages here if this is part of a function call. There could be other
         // member matches. The function call node will have more type information
         if let match = context.member(member, in: baseType, messagesNode: isCalledAsFunction ? nil : self) {
-            memberType = match.signature
             apiFlags = match.apiFlags
-        }
-        if let generics {
-            memberType = memberType.withGenerics(generics)
-        }
-        // Were we able to resolve the member by treating our unknown base identifier as a module name?
-        if self.baseType == .none, memberType != .none, let baseIdentifier {
-            baseIdentifier.isModuleNameFor = memberType
-            self.baseType = .module(baseIdentifier.name, .none)
+            memberType = match.signature
+            if let generics {
+                memberType = memberType.withGenerics(generics)
+            }
+            // Were we able to resolve the member by treating our unknown base identifier as a module name?
+            if self.baseType == .none, memberType != .none, let baseIdentifier {
+                baseIdentifier.isModuleNameFor = memberType
+                self.baseType = .module(baseIdentifier.name, .none)
+            }
         }
         memberType = memberType.or(expecting)
         return context

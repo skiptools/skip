@@ -719,4 +719,26 @@ final class TypeInferenceTests: XCTestCase {
         }
         """)
     }
+
+    func testCastCausingModuleNameFalsePositive() async throws {
+        // The fact that the 'callingClass.kotlin' member access type is known due to the cast even though the
+        // base type of the expression is unknown was causing us to think that callingClass was a module name.
+        // We restructured the code to require a type inference match rather than just a known member type
+        try await check(swift: """
+        class Bundle {
+            var module: Bundle {
+                let callingClass = Class.forName("name")
+                return Bundle(callingClass.kotlin as AnyClass)
+            }
+        }
+        """, kotlin: """
+        internal open class Bundle {
+            internal open val module: Bundle
+                get() {
+                    val callingClass = Class.forName("name")
+                    return Bundle(callingClass.kotlin as AnyClass)
+                }
+        }
+        """)
+    }
 }
