@@ -671,4 +671,52 @@ final class TypeInferenceTests: XCTestCase {
         }
         """)
     }
+
+    func testExtensionInSameFile() async throws {
+        try await check(supportingSwift: """
+        enum E {
+            case a, b
+        }
+        """, swift: """
+        class C {
+            func f() -> E {
+                return .a
+            }
+        }
+        extension C {
+            func g() -> Bool {
+                return C().f() == .a
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal open fun f(): E = E.a
+            internal open fun g(): Boolean = C().f() == E.a
+        }
+        """)
+    }
+
+    func testExtensionInDifferentFile() async throws {
+        try await check(supportingSwift: """
+        enum E {
+            case a, b
+        }
+        extension C {
+            func g() -> Bool {
+                return C().f() == .a
+            }
+        }
+        """, swift: """
+        class C {
+            func f() -> E {
+                return .a
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal open fun f(): E = E.a
+            internal open fun g(): Boolean = C().f() == E.a
+        }
+        """)
+    }
 }
