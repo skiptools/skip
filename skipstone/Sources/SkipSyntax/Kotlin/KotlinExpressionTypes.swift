@@ -662,6 +662,7 @@ class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting {
     var arguments: [LabeledValue<KotlinExpression>] = []
     var isOptionalInit = false
     var inferredType: TypeSignature = .none
+    var signature: TypeSignature?
     var apiFlags: APIFlags?
     var mayBeSharedMutableStructType = false
     var useTrailingClosureFormatting = true
@@ -675,6 +676,7 @@ class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting {
         }
         kexpression.isOptionalInit = expression.isInit && expression.inferredType.isOptional
         kexpression.inferredType = expression.inferredType
+        kexpression.signature = expression.signature
         kexpression.apiFlags = expression.apiFlags
         kexpression.mayBeSharedMutableStructType = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
         return kexpression
@@ -756,9 +758,18 @@ class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting {
         if forceParentheses || !arguments.isEmpty {
             output.append("(")
         }
+        let parameters: [TypeSignature.Parameter]?
+        if let signature, signature.parameters.count == arguments.count {
+            parameters = signature.parameters
+        } else {
+            parameters = nil
+        }
         for (index, argument) in arguments.enumerated() {
             if let label = argument.label {
-                output.append(label).append(" = ")
+                // Kotlin does not label variadic lists
+                if parameters?[index].isVariadic != true && parameters?[index].isVariadicContinuation != true {
+                    output.append(label).append(" = ")
+                }
             } else if isReduceFunction, index == 0, self.arguments.count == 2 {
                 // The Kotlin compiler can't differentiate calls to the two reduce() versions without labels.
                 // reduce(into:...) is always labeled, so insert a label for reduce(_ initialResult:...)

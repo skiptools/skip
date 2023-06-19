@@ -96,9 +96,15 @@ extension ParameterClauseSyntax {
     }
 
     fileprivate func parameters(in syntaxTree: SyntaxTree, messages: inout [Message]) -> [Parameter<Expression>] {
-        return parameterList.map { parameterSyntax in
+        let parameters = parameterList.map { parameterSyntax in
             Parameter<Expression>(firstName: parameterSyntax.firstName.text, secondName: parameterSyntax.secondName?.text, typeSyntax: parameterSyntax.type, ellipses: parameterSyntax.ellipsis?.text, defaultArgument: parameterSyntax.defaultArgument, in: syntaxTree, messages: &messages)
         }
+        for (index, parameter) in parameters.enumerated() {
+            if parameter.externalLabel == nil && index > 0 && parameters[index - 1].isVariadic {
+                messages.append(.variadicParameterLabel(parameterList, source: syntaxTree.source))
+            }
+        }
+        return parameters
     }
 }
 

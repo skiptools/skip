@@ -146,4 +146,9 @@ extension Message {
     static func variableNeedsTypeDeclaration(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .warning, message: "Skip is unable to determine the type of this expression. Consider declaring the variable type explicitly, i.e. 'var v: <Type> = ...'", sourceDerived: sourceDerived, source: source)
     }
+
+    static func variadicParameterLabel(_ syntax: SyntaxProtocol, source: Source) -> Message {
+        let range = syntax.range(in: source)
+        return Message(kind: .warning, message: "Skip may not be able to properly match calls to this function. Add an external label to any parameter that follows a variadic parameter", source: source, sourceRange: range)
+    }
 }

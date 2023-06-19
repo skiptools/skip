@@ -1094,28 +1094,37 @@ final class MemberDeclarationTests: XCTestCase {
 
     func testVariadicFunctionParameter() async throws {
         try await check(swift: """
-        func f(v: Int...) -> [Int] {
+        func f(v: Int..., s: String) -> [Int] {
             let a = [0] + v
             return a
         }
+        f(v: 1, 2, 3, s: "")
         """, kotlin: """
-        internal fun f(vararg v: Int): Array<Int> {
+        internal fun f(vararg v: Int, s: String): Array<Int> {
             val v = Array(v.asIterable())
             val a = (arrayOf(0) + v).sref()
             return a.sref()
         }
+        f(1, 2, 3, s = "")
         """)
 
         try await check(swift: """
-        func f(_ v: Int...) -> [Int] {
+        func f(_ v: Int..., s: String) -> [Int] {
             let a = [0] + v
             return a
         }
+        f(1, 2, 3, s: "")
         """, kotlin: """
-        internal fun f(vararg v: Int): Array<Int> {
+        internal fun f(vararg v: Int, s: String): Array<Int> {
             val v = Array(v.asIterable())
             val a = (arrayOf(0) + v).sref()
             return a.sref()
+        }
+        f(1, 2, 3, s = "")
+        """)
+
+        try await checkProducesMessage(swift: """
+        func f(v: Int..., _ s: String) {
         }
         """)
     }

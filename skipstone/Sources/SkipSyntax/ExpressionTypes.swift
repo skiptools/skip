@@ -667,7 +667,6 @@ class FunctionCall: Expression, APICallExpression {
                 returnType = function.inferredType.or(expecting)
             }
             isInit = true
-            apiFlags = APIFlags()
             return context
         case .dictionaryLiteral:
             // Must be a constructor call, e.g. [String: Int]()
@@ -678,7 +677,6 @@ class FunctionCall: Expression, APICallExpression {
                 returnType = function.inferredType.or(expecting)
             }
             isInit = true
-            apiFlags = APIFlags()
             return context
         case .identifier:
             let identifier = function as! Identifier
@@ -708,11 +706,13 @@ class FunctionCall: Expression, APICallExpression {
             name = memberAccess.member
         default:
             function.inferTypes(context: context, expecting: .none)
-            if case .function(_, var returnType) = function.inferredType.asOptional(false) {
+            let functionType = function.inferredType.asOptional(false)
+            if case .function(_, var returnType) = functionType {
                 if function.inferredType.isOptional {
                     returnType = returnType.asOptional(true)
                 }
                 self.returnType = returnType.or(expecting)
+                signature = functionType
                 apiFlags = (function as? APICallExpression)?.apiFlags
             } else {
                 returnType = expecting
@@ -736,6 +736,7 @@ class FunctionCall: Expression, APICallExpression {
                 }
             }
             isInit = match.declarationType == .initDeclaration
+            signature = match.signature
             apiFlags = match.apiFlags
             returnType = match.signature.returnType.or(expecting)
         } else {
@@ -758,6 +759,7 @@ class FunctionCall: Expression, APICallExpression {
     override var inferredType: TypeSignature {
         return returnType
     }
+    var signature: TypeSignature?
     var apiFlags: APIFlags?
 
     override var children: [SyntaxNode] {

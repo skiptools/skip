@@ -602,8 +602,10 @@ public class CodebaseInfo: Codable {
             guard case .function(let parameters, let returnType) = signature else {
                 return nil
             }
-            guard parameters.count >= arguments.count else {
-                return nil
+            if !parameters.contains(where: { $0.isVariadic }) {
+                guard parameters.count >= arguments.count else {
+                    return nil
+                }
             }
 
             // Constrain the parameters using available generic information so that we can match against them
@@ -622,13 +624,16 @@ public class CodebaseInfo: Codable {
             constrainedParameters = constrainedParameters.map { $0.constrainedTypeWithGenerics(generics) }
 
             // Match each argument to a parameter
+            let isSubscript = declarationType == .subscriptDeclaration
             var matchingParameters: [TypeSignature.Parameter] = []
             var matchingOriginalParameters: [TypeSignature.Parameter] = []
             var parameterIndex = 0
+            var argumentIndex = 0
             var totalScore = 0.0
-            for argument in arguments {
+            while argumentIndex < arguments.count {
+                let argument = arguments[argumentIndex]
                 let resolvedArgument = LabeledValue(label: argument.label, value: resolveTypealias(for: argument.value))
-                guard let (matchingIndex, score) = matchArgument(resolvedArgument, to: constrainedParameters, isSubscript: declarationType == .subscriptDeclaration, startIndex: parameterIndex) else {
+                guard let (matchingIndex, score) = matchArgument(resolvedArgument, to: constrainedParameters, isSubscript: isSubscript, startIndex: parameterIndex) else {
                     return nil
                 }
                 // If the parameter type was constrained (i.e. is generic), the argument value will likely be more specific
@@ -642,6 +647,26 @@ public class CodebaseInfo: Codable {
                 matchingOriginalParameters.append(matchingParameter)
                 matchingParameter.type = parameterType
                 matchingParameters.append(matchingParameter)
+                argumentIndex += 1
+                // Greedily consume any variadic arguments
+                if matchingParameter.isVariadic {
+                    while argumentIndex < arguments.count {
+                        let argument = arguments[argumentIndex]
+                        let resolvedArgument = LabeledValue(label: argument.label, value: resolveTypealias(for: argument.value))
+                        if matchArgument(resolvedArgument, isVariadicContinuation: true, to: constrainedParameters, isSubscript: isSubscript, startIndex: parameterIndex) != nil {
+                            argumentIndex += 1
+                            // Model variadic continuation arguments as additional unlabeled parameters
+                            var continuationOriginalParameter = parameters[matchingIndex]
+                            continuationOriginalParameter.isVariadicContinuation = true
+                            var continuationParameter = matchingParameter
+                            continuationParameter.isVariadicContinuation = true
+                            matchingOriginalParameters.append(continuationOriginalParameter)
+                            matchingParameters.append(continuationParameter)
+                        } else {
+                            break
+                        }
+                    }
+                }
                 parameterIndex = matchingIndex + 1
                 totalScore += score
             }
@@ -666,11 +691,14 @@ public class CodebaseInfo: Codable {
             return FunctionCandidate(match: match, score: totalScore, level: level)
         }
 
-        private func matchArgument(_ argument: LabeledValue<TypeSignature>, to parameters: [TypeSignature.Parameter], isSubscript: Bool = false, startIndex: Int) -> (index: Int, score: Double)? {
+        private func matchArgument(_ argument: LabeledValue<TypeSignature>, isVariadicContinuation: Bool = false, to parameters: [TypeSignature.Parameter], isSubscript: Bool = false, startIndex: Int) -> (index: Int, score: Double)? {
             // Note: in the algorith below we give an extra point for matching a label (or absence of one), as opposed to
             // being a trailing closure that omits the label
             for (index, parameter) in parameters[startIndex...].enumerated() {
                 if let label = argument.label {
+                    if isVariadicContinuation {
+                        return nil
+                    }
                     // If there is a label, then it either has to match or we have to be able to skip this parameter
                     if label == parameter.label, let score = argument.value.compatibilityScore(target: parameter.type, codebaseInfo: self) {
                         return (startIndex + index, 1.0 + score)
@@ -678,8 +706,8 @@ public class CodebaseInfo: Codable {
                         return nil
                     }
                 } else {
-                    // If there is no label, then either this parameter has to have no label or it has to be a trailing closure
-                    if (parameter.label == nil || isSubscript), let score = argument.value.compatibilityScore(target: parameter.type, codebaseInfo: self) {
+                    // If there is no label, then either this parameter has to have no label, be a variadic continuation, or be a trailing closure
+                    if (isVariadicContinuation || parameter.label == nil || isSubscript), let score = argument.value.compatibilityScore(target: parameter.type, codebaseInfo: self) {
                         return (startIndex + index, 1.0 + score)
                     } else if case .function = parameter.type, let score = argument.value.compatibilityScore(target: parameter.type, codebaseInfo: self) {
                         return (startIndex + index, score)

@@ -546,7 +546,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .dictionary(let keyType, let valueType):
             return .dictionary(keyType.qualified(in: node, context: context), valueType.qualified(in: node, context: context))
         case .function(let parameters, let returnType):
-            let qualifiedParameters = parameters.map { Parameter(label: $0.label, type: $0.type.qualified(in: node, context: context), isInOut: $0.isInOut, isVariadic: $0.isVariadic, hasDefaultValue: $0.hasDefaultValue) }
+            let qualifiedParameters = parameters.map { Parameter(label: $0.label, type: $0.type.qualified(in: node, context: context), isInOut: $0.isInOut, isVariadic: $0.isVariadic, isVariadicContinuation: $0.isVariadicContinuation, hasDefaultValue: $0.hasDefaultValue) }
             return .function(qualifiedParameters, returnType.qualified(in: node, context: context))
         case .member(let baseType, let type):
             let base = baseType.qualified(in: node, context: context)
@@ -1302,6 +1302,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         var type: TypeSignature
         var isInOut = false
         var isVariadic = false
+        var isVariadicContinuation = false
         var hasDefaultValue = false
 
         func or(_ parameter: Parameter, replaceAny: Bool) -> Parameter {
@@ -1353,7 +1354,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         // Leave default values out of equality and hash values, just as Swift does not include default values in type comparisons
 
         static func ==(lhs: Parameter, rhs: Parameter) -> Bool {
-            return lhs.label == rhs.label && lhs.type == rhs.type && lhs.isInOut == rhs.isInOut && lhs.isVariadic == rhs.isVariadic
+            return lhs.label == rhs.label && lhs.type == rhs.type && lhs.isInOut == rhs.isInOut && lhs.isVariadic == rhs.isVariadic && lhs.isVariadicContinuation == rhs.isVariadicContinuation
         }
 
         func hash(into hasher: inout Hasher) {
