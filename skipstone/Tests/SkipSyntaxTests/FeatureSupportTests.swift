@@ -8,6 +8,28 @@ fileprivate extension String {
 
 /// A test case that verifies that transpilation are *not* working as hoped.
 final class FeatureSupportTests: XCTestCase {
+    func testReifiedTypes() async throws {
+        // Could we turn every function that takes a generic into an inline function with reified type parameters? This would let us check for instances of generic types in a way that is impossible with Java's erased generics. E.g., checking `if let strings = object as? Array<String> { … }` is fairly common and doesn't have any good equivlaent in pure Java.
+
+        // So this function doesn't compile:
+        // fun <T> nameOf(value: T): String { return "${T::class.java}" }
+        // without `reified`: cannot use 'T' as reified type parameter. Use a class instead.
+        // without `inline`: only type parameters of inline functions can be reified
+        //
+        // but with reified types it could look like:
+        // inline fun <reified T> nameOf(value: T): String { return "${T::class.java}" }
+
+        // DoubleString
+        try await check(expectFailure: true, swiftCode: {
+            // SKIP REPLACE: inline fun <reified T> nameOf(value: T): String { return "${T::class.java}" }
+            func nameOf<T>(_ value: T) -> String { "\(T.self)" }
+            return nameOf(1.0) + nameOf("ABC")
+        }, kotlin: """
+            inline fun <reified T> nameOf(value: T): String { return "${T::class.java}" }
+            return (nameOf(1.0) + nameOf("ABC")).replace("class java.lang.", "")
+            """)
+    }
+
     func testCaseStatementsIgnoreIfSkip() async throws {
         // It is very useful to be able to handle individual case statements separately in a Skip, but we don't seem to support #if SKIP statements around case statements:
         // error: Skip does not support this Swift syntax [missingExpr]
@@ -415,6 +437,9 @@ final class FeatureSupportTests: XCTestCase {
         #endif
     }
 }
+
+
+
 
 
 
