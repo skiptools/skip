@@ -8,6 +8,33 @@ fileprivate extension String {
 
 /// A test case that verifies that transpilation are *not* working as hoped.
 final class FeatureSupportTests: XCTestCase {
+    func testCaseStatementsIgnoreIfSkip() async throws {
+        // It is very useful to be able to handle individual case statements separately in a Skip, but we don't seem to support #if SKIP statements around case statements:
+        // error: Skip does not support this Swift syntax [missingExpr]
+        throw XCTSkip("transpiler warnings")
+
+        try await check(swiftCode: {
+            let x = { 1 }()
+            switch x {
+            case 0: return "zero"
+            #if SKIP
+            case 1: return "one"
+            #endif
+            default: return "other"
+            }
+        }, kotlin: """
+            var x = 0
+            x += 1
+            when (x) {
+                0 -> {
+                    return "zero"
+                    
+                }
+                else -> return "other"
+            }
+            """)
+    }
+
     func testWhileOptionalBinding() async throws {
         // currently bindings in if loops are disallowed:
         // error: Kotlin does not support optional bindings in loop conditions. Consider using an if statement before or within your loop
@@ -388,6 +415,7 @@ final class FeatureSupportTests: XCTestCase {
         #endif
     }
 }
+
 
 
 
