@@ -8,6 +8,64 @@ fileprivate extension String {
 
 /// A test case that verifies that transpilation are *not* working as hoped.
 final class FeatureSupportTests: XCTestCase {
+    func testWhileLetWithDictionaryEntries() async throws {
+        // these won't compile because they rely on SkipLib
+        // but they highlight the issue: the dictionary entries enumeration won't compile because it is checking for null for each of the individual tuple entries rather than the whole tuple itself
+
+        // Array iteration works
+        try await check(expectMessages: true, compiler: nil, swiftCode: {
+            let array: [Int] = [1, 2, 3]
+            var iterator = array.makeIterator()
+            while let next = iterator.next() {
+                print(next)
+            }
+            return ""
+        }, kotlin: """
+            val array: Array<Int> = arrayOf(1, 2, 3)
+                get() = field
+            var iterator = array.makeIterator()
+                get() = field.sref({ iterator = it })
+                set(newValue) {
+                    field = newValue
+                }
+            while (true) {
+                val next_0 = iterator.next()
+                if (next_0 == null) {
+                    break
+                }
+                print(next_0)
+            }
+            return ""
+            """)
+
+
+        // Dictionary while iteration doesn't compile: we shouldn't check for (key_0 == null || value_0 == null), but instead check for whether the entries tuple itself is null
+        try await check(expectMessages: true, compiler: nil, swiftCode: {
+            let dict: Dictionary<String, Int> = ["x":1,"y":2,"z":3]
+            var iterator = dict.makeIterator()
+            while let (key, value) = iterator.next() {
+                print("\(key)=\(value)")
+            }
+            return ""
+        }, kotlin: """
+            val dict: Dictionary<String, Int> = dictionaryOf(Tuple2("x", 1), Tuple2("y", 2), Tuple2("z", 3))
+                get() = field
+            var iterator = dict.makeIterator()
+                get() = field.sref({ iterator = it })
+                set(newValue) {
+                    field = newValue
+                }
+            while (true) {
+                val (key_0, value_0) = iterator.next()
+                if (key_0 == null || value_0 == null) {
+                    break
+                }
+                print("${key_0}=${value_0}")
+            }
+            return ""
+            """)
+    }
+
     func testReifiedTypes() async throws {
         // Could we turn every function that takes a generic into an inline function with reified type parameters? This would let us check for instances of generic types in a way that is impossible with Java's erased generics. E.g., checking `if let strings = object as? Array<String> { … }` is fairly common and doesn't have any good equivlaent in pure Java.
 
@@ -397,13 +455,3 @@ final class FeatureSupportTests: XCTestCase {
         #endif
     }
 }
-
-
-
-
-
-
-
-
-
-
