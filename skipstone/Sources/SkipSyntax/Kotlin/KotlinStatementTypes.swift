@@ -39,6 +39,10 @@ class KotlinBreak: KotlinStatement, KotlinSingleStatementAppendable {
         super.init(type: .break, statement: statement)
     }
 
+    init() {
+        super.init(type: .break)
+    }
+
     override func append(to output: OutputGenerator, indentation: Indentation) {
         output.append(indentation)
         appendAsSingleStatement(to: output, indentation: indentation, mode: .closure)
@@ -733,43 +737,45 @@ class KotlinTryCatch: KotlinStatement {
 class KotlinWhileLoop: KotlinStatement {
     var conditions: [KotlinExpression]
     var caseBindingVariables: [KotlinBindingVariable]
+    var guardStatement: KotlinStatement?
     var body: KotlinCodeBlock
     var isDoWhile = false
 
     static func translate(statement: WhileLoop, translator: KotlinTranslator) -> KotlinWhileLoop {
-        let (kconditions, caseBindingVariables, messages) = translate(conditions: statement.conditions, translator: translator)
+        let kstatement: KotlinWhileLoop
         let kbody = KotlinCodeBlock.translate(statement: statement.body, translator: translator)
-        let kstatement = KotlinWhileLoop(statement: statement, conditions: kconditions, caseBindingVariables: caseBindingVariables, body: kbody)
+        if let (kconditions, caseBindingVariables) = translate(conditions: statement.conditions, translator: translator) {
+            kstatement = KotlinWhileLoop(statement: statement, conditions: kconditions, caseBindingVariables: caseBindingVariables, body: kbody)
+        } else {
+            let guardStatement = KotlinIf.translateAsLoopGuard(statement: statement, translator: translator)
+            kstatement = KotlinWhileLoop(statement: statement, guardStatement: guardStatement, body: kbody)
+        }
         kstatement.isDoWhile = statement.isRepeatWhile
-        kstatement.messages += messages
         return kstatement
     }
 
-    private static func translate(conditions: [Expression], translator: KotlinTranslator) -> ([KotlinExpression], [KotlinBindingVariable], [Message]) {
+    private static func translate(conditions: [Expression], translator: KotlinTranslator) -> ([KotlinExpression], [KotlinBindingVariable])? {
         var kconditions: [KotlinExpression] = []
         var caseBindingVariables: [KotlinBindingVariable] = []
-        var messages: [Message] = []
         for condition in conditions {
-            // We could copy the binding value from the condition in order to bind variables in the loop body, but this would cause
-            // re-execution of the expression code, which could have side effects
             if let optionalBinding = condition as? OptionalBinding {
                 let (variable, optionalCondition) = KotlinOptionalBinding.translate(expression: optionalBinding, translator: translator)
-                kconditions.append(optionalCondition)
                 if variable != nil {
-                    messages.append(.kotlinLoopOptionalBinding(optionalBinding, source: translator.syntaxTree.source))
+                    return nil
                 }
+                kconditions.append(optionalCondition)
             } else if let matchingCase = condition as? MatchingCase {
                 let (targetVariable, bindingVariables, caseCondition) = KotlinMatchingCase.translate(expression: matchingCase, translator: translator)
+                if targetVariable != nil {
+                    return nil
+                }
                 kconditions.append(caseCondition)
                 caseBindingVariables += bindingVariables
-                if targetVariable != nil {
-                    messages.append(.kotlinLoopCaseValue(matchingCase, source: translator.syntaxTree.source))
-                }
             } else {
                 kconditions.append(translator.translateExpression(condition))
             }
         }
-        return (kconditions, caseBindingVariables, messages)
+        return (kconditions, caseBindingVariables)
     }
 
     private init(statement: WhileLoop, conditions: [KotlinExpression], caseBindingVariables: [KotlinBindingVariable], body: KotlinCodeBlock) {
@@ -779,26 +785,53 @@ class KotlinWhileLoop: KotlinStatement {
         super.init(type: .whileLoop, statement: statement)
     }
 
+    private init(statement: WhileLoop, guardStatement: KotlinStatement, body: KotlinCodeBlock) {
+        self.conditions = []
+        self.caseBindingVariables = []
+        self.guardStatement = guardStatement
+        self.body = body
+        super.init(type: .whileLoop, statement: statement)
+    }
+
     override var children: [KotlinSyntaxNode] {
-        return conditions + [body]
+        var children: [KotlinSyntaxNode] = conditions
+        if let guardStatement {
+            children.append(guardStatement)
+        }
+        children.append(body)
+        return children
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
+        let bodyIndentation = indentation.inc()
         if isDoWhile {
             output.append(indentation).append("do {\n")
-            output.append(body, indentation: indentation.inc())
+            output.append(body, indentation: bodyIndentation)
+            if let guardStatement {
+                output.append(guardStatement, indentation: bodyIndentation)
+            }
             output.append(indentation).append("} while (")
-            conditions.appendAsLogicalConditions(to: output, indentation: indentation)
+            if guardStatement != nil {
+                output.append("true")
+            } else {
+                conditions.appendAsLogicalConditions(to: output, indentation: indentation)
+            }
             output.append(")\n")
         } else {
             output.append(indentation).append("while (")
-            conditions.appendAsLogicalConditions(to: output, indentation: indentation)
+            if guardStatement != nil {
+                output.append("true")
+            } else {
+                conditions.appendAsLogicalConditions(to: output, indentation: indentation)
+            }
             output.append(") {\n")
-            let bodyIndentation = indentation.inc()
             for caseBindingVariable in caseBindingVariables {
                 output.append(bodyIndentation)
                 caseBindingVariable.append(to: output, indentation: bodyIndentation)
                 output.append("\n")
+            }
+            if let guardStatement {
+                output.append(guardStatement, indentation: bodyIndentation)
             }
             output.append(body, indentation: bodyIndentation)
             output.append(indentation).append("}\n")

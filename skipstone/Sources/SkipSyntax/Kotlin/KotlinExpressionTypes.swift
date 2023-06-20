@@ -936,6 +936,17 @@ class KotlinIf: KotlinExpression {
         return kstatement
     }
 
+    static func translateAsLoopGuard(statement: WhileLoop, translator: KotlinTranslator) -> KotlinStatement {
+        let kconditionSets = translate(conditions: statement.conditions, isGuard: true, translator: translator)
+        let kbody = KotlinCodeBlock(statements: [KotlinBreak()])
+        let kexpression = KotlinIf(conditionSets: kconditionSets, body: kbody)
+        kexpression.isGuard = true
+
+        let kstatement = KotlinExpressionStatement(type: .expression)
+        kstatement.expression = kexpression
+        return kstatement
+    }
+
     private static func translate(conditions: [Expression], isGuard: Bool = false, translator: KotlinTranslator) -> [ConditionSet] {
         var conditionSets: [ConditionSet] = []
         var currentOptionalBindingVariable: KotlinBindingVariable? = nil

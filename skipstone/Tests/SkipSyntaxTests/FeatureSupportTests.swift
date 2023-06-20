@@ -57,46 +57,6 @@ final class FeatureSupportTests: XCTestCase {
             """)
     }
 
-    func testWhileOptionalBinding() async throws {
-        // currently bindings in if loops are disallowed:
-        // error: Kotlin does not support optional bindings in loop conditions. Consider using an if statement before or within your loop
-
-        // we might be able to support it by transpiling:
-        // `while let actual = optional { … }`
-        // as:
-        // `while true { if let actual = optional { … } else { break } }`
-        try await check(expectFailure: true, swiftCode: {
-            func positive(number: Int) -> Int? {
-                number > 0 ? number : nil
-            }
-
-            var index = 10
-            var sum = 0
-
-            while let number = positive(number: index) {
-                sum += number
-                index -= 1
-            }
-            return "\(sum)"
-        }, kotlin: """
-            fun positive(number: Int): Int? = if (number > 0) number else null
-            var index = 10
-            var sum = 0
-            while (true) {
-                var letexec_0 = false
-                positive(number = index)?.let { number ->
-                    letexec_0 = true
-                    sum += number
-                    index -= 1
-                }
-                if (!letexec_0) {
-                    break
-                }
-            }
-            return "${sum}"
-            """)
-    }
-
     func testCheckSwiftCompiledSource() async throws {
         try await check(swiftCode: {
             return "\(1 + 2)"

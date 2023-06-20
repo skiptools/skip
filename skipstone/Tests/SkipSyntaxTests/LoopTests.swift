@@ -66,6 +66,30 @@ final class LoopTests: XCTestCase {
         """)
     }
 
+    func testWhileTranslatedGuard() async throws {
+        try await check(supportingSwift: """
+        func f() -> Int? {
+            return 0
+        }
+        """, swift: """
+        {
+            while let x = f(), x < 5 {
+                doSomething()
+            }
+        }
+        """, kotlin: """
+        {
+            while (true) {
+                val x_0 = f()
+                if ((x_0 == null) || (x_0 >= 5)) {
+                    break
+                }
+                doSomething()
+            }
+        }
+        """)
+    }
+
     func testRepeatWhileLoop() async throws {
         try await check(swift: """
         repeat {
@@ -104,6 +128,36 @@ final class LoopTests: XCTestCase {
         while (e is E.Case2Case) {
             val i = e.associated0
             print(i)
+        }
+        """)
+    }
+
+    func testWhileCaseTranslatedToGuard() async throws {
+        try await check(supportingSwift: """
+        enum E {
+            case case1
+            case case2(Int, String)
+        }
+        func f() -> E {
+            return .case1
+        }
+        """, swift: """
+        let x = 0
+        while x > 1, case .case2(let i, _) = f() {
+            print(i)
+        }
+        """, kotlin: """
+        internal val x = 0
+        while (true) {
+            if (x <= 1) {
+                break
+            }
+            val matchtarget_0 = f()
+            if (matchtarget_0 !is E.Case2Case) {
+                break
+            }
+            val i_0 = matchtarget_0.associated0
+            print(i_0)
         }
         """)
     }
