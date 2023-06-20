@@ -8,6 +8,105 @@ fileprivate extension String {
 
 /// A test case that verifies that transpilation are *not* working as hoped.
 final class FeatureSupportTests: XCTestCase {
+    func testJetpackCompose() async throws {
+        //@Composable
+        func JetpackCompose() {
+            Card {
+                var expanded = remember { mutableStateof(false) }
+                Column(Modifier.clickable { expanded.value = !expanded.value }) {
+                    Image(painterResource(R.drawable.jetpack_compose))
+                    AnimatedVisibility(expanded) {
+                        Text(text: "Jetpack Compose", style: MaterialTheme.typography.bodyLarge)
+                    }
+                }
+            }
+        }
+
+
+        func remember<T>(_ f: () -> T) -> T {
+            return f()
+        }
+
+        struct MutableStateOf<T> {
+            var value: T
+        }
+
+        func mutableStateof<T>(_ value: T) -> MutableStateOf<T> {
+            return MutableStateOf(value: value)
+        }
+
+        @resultBuilder struct Card {
+            @discardableResult init(_ block: () -> ()) {
+            }
+
+            static func buildBlock(_ components: Any...) {
+            }
+        }
+
+        @resultBuilder struct AnimatedVisibility {
+            @discardableResult init(_ value: MutableStateOf<Bool>, _ block: () -> ()) {
+            }
+
+            static func buildBlock(_ components: Any...) {
+            }
+        }
+
+        @resultBuilder struct Column {
+            @discardableResult init(_ modifier: Modifier, _ block: () -> ()) {
+            }
+
+            static func buildBlock(_ components: Any...) {
+            }
+        }
+
+        struct Modifier {
+            static func clickable(_ block: () -> ()) -> Modifier {
+                return Modifier()
+            }
+        }
+
+        struct Image {
+            @discardableResult init<T>(_ resource: PainterResource<T>) {
+            }
+        }
+
+        struct Text {
+            let text: String
+            let style: MaterialTheme.Typography.Value
+
+            @discardableResult init(text: String, style: MaterialTheme.Typography.Value) {
+                self.text = text
+                self.style = style
+            }
+        }
+
+        func painterResource(_ drawable: R.Drawable.Value) -> PainterResource<R.Drawable.Value> {
+            return PainterResource()
+        }
+
+        struct PainterResource<T> {
+        }
+
+        struct MaterialTheme {
+            static var typography = Typography()
+
+            struct Typography {
+                let bodyLarge: Value = Value()
+                struct Value { }
+            }
+        }
+
+        struct R {
+            static let drawable: Drawable = Drawable()
+
+            struct Drawable {
+                let jetpack_compose: Value = Value()
+                struct Value { }
+            }
+        }
+
+    }
+
     func testWhileLetWithDictionaryEntries() async throws {
         // these won't compile because they rely on SkipLib
         // but they highlight the issue: the dictionary entries enumeration won't compile because it is checking for null for each of the individual tuple entries rather than the whole tuple itself
