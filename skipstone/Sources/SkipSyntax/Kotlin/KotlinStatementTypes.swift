@@ -672,7 +672,7 @@ class KotlinTryCatch: KotlinStatement {
         matchOn.isLocalOrSelfIdentifier = true
         var kcatches: [KotlinCase] = []
         var messages: [Message] = []
-        var caseTargetVariable: KotlinCaseTargetVariable? = nil
+        var caseTargetVariable: KotlinTargetVariable? = nil
         for catchCase in statement.catches {
             // Every enum that conforms to Error is translated to sealed classes, so we pass isSealedClassesEnum: true
             // here even without knowing the enum class and consulting codebase info
@@ -759,18 +759,18 @@ class KotlinWhileLoop: KotlinStatement {
         var caseBindingVariables: [KotlinBindingVariable] = []
         for condition in conditions {
             if let optionalBinding = condition as? OptionalBinding {
-                let (variable, optionalCondition) = KotlinOptionalBinding.translate(expression: optionalBinding, translator: translator)
-                if variable != nil {
+                let kbinding = KotlinOptionalBinding.translate(expression: optionalBinding, translator: translator)
+                if kbinding.bindingVariable != nil {
                     return nil
                 }
-                kconditions.append(optionalCondition)
+                kconditions.append(kbinding.condition)
             } else if let matchingCase = condition as? MatchingCase {
-                let (targetVariable, bindingVariables, caseCondition) = KotlinMatchingCase.translate(expression: matchingCase, translator: translator)
-                if targetVariable != nil {
+                let kcase = KotlinMatchingCase.translate(expression: matchingCase, translator: translator)
+                if kcase.targetVariable != nil {
                     return nil
                 }
-                kconditions.append(caseCondition)
-                caseBindingVariables += bindingVariables
+                kconditions.append(kcase.condition)
+                caseBindingVariables += kcase.bindingVariables
             } else {
                 kconditions.append(translator.translateExpression(condition))
             }

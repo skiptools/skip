@@ -275,7 +275,7 @@ struct KotlinCase {
     var caseBindingVariables: [KotlinBindingVariable] = []
     var body: KotlinCodeBlock
 
-    static func translate(expression: SwitchCase, matchingOn: KotlinExpression, isSealedClassesEnum: Bool, caseTargetVariable: inout KotlinCaseTargetVariable?, translator: KotlinTranslator) -> (KotlinCase, [Message]) {
+    static func translate(expression: SwitchCase, matchingOn: KotlinExpression, isSealedClassesEnum: Bool, caseTargetVariable: inout KotlinTargetVariable?, translator: KotlinTranslator) -> (KotlinCase, [Message]) {
         var messages: [Message] = []
         let caseValues: [(KotlinExpression?, [KotlinBindingVariable])] = expression.patterns.map { pattern in
             if let whereGuard = pattern.whereGuard {
@@ -301,8 +301,8 @@ struct KotlinCase {
 
 /// - Note: This type is used to translate the ``CasePattern`` expression, but is not itself a `KotlinExpression`.
 struct KotlinCasePattern {
-    static func translate(expression: CasePattern, target: KotlinExpression, isSealedClassesEnum: Bool, translator: KotlinTranslator) -> (targetVariable: KotlinCaseTargetVariable?, bindingVariables: [KotlinBindingVariable], condition: KotlinExpression?, messages: [Message]) {
-        var targetVariable: KotlinCaseTargetVariable? = nil
+    static func translate(expression: CasePattern, target: KotlinExpression, isSealedClassesEnum: Bool, translator: KotlinTranslator) -> (targetVariable: KotlinTargetVariable?, bindingVariables: [KotlinBindingVariable], condition: KotlinExpression?, messages: [Message]) {
+        var targetVariable: KotlinTargetVariable? = nil
         var bindingVariables: [KotlinBindingVariable] = []
         var messages: [Message] = []
         func updateVariables(for identifierPatterns: [IdentifierPattern], types: [TypeSignature], member: String? = nil) {
@@ -312,7 +312,7 @@ struct KotlinCasePattern {
             // If we have bindings and our target is not a simple local identifier, create a new target variable so
             // that re-evaluating the target for our binding values won't cause side effects
             if targetVariable == nil, (target as? KotlinIdentifier)?.isLocalOrSelfIdentifier != true {
-                targetVariable = KotlinCaseTargetVariable(value: target)
+                targetVariable = KotlinTargetVariable(value: target)
             }
             let bindingBase = targetVariable.map { KotlinSharedExpressionPointer(shared: $0.identifier) } ?? target
             var bindingValue: KotlinExpression
@@ -905,9 +905,11 @@ class KotlinIf: KotlinExpression {
 
     struct ConditionSet {
         var optionalBindingVariable: KotlinBindingVariable?
-        var caseTargetVariable: KotlinCaseTargetVariable?
+        var caseTargetVariable: KotlinTargetVariable?
         var caseBindingVariables: [KotlinBindingVariable]
         var conditions: [KotlinExpression]
+        var guardTargetVariable: KotlinTargetVariable?
+        var isGuardConditionBeforeBinding: Bool
     }
 
     static func translate(expression: If, translator: KotlinTranslator) -> KotlinIf {
@@ -950,9 +952,11 @@ class KotlinIf: KotlinExpression {
     private static func translate(conditions: [Expression], isGuard: Bool = false, translator: KotlinTranslator) -> [ConditionSet] {
         var conditionSets: [ConditionSet] = []
         var currentOptionalBindingVariable: KotlinBindingVariable? = nil
-        var currentCaseTargetVariable: KotlinCaseTargetVariable? = nil
+        var currentCaseTargetVariable: KotlinTargetVariable? = nil
         var currentCaseBindingVariables: [KotlinBindingVariable] = []
         var currentConditions: [KotlinExpression] = []
+        var currentGuardTargetVariable: KotlinTargetVariable? = nil
+        var currentIsGuardConditionBeforeBinding = false
         func appendCurrentConditionSet() {
             guard currentOptionalBindingVariable != nil || !currentConditions.isEmpty else {
                 return
@@ -961,43 +965,52 @@ class KotlinIf: KotlinExpression {
             if isGuard {
                 conditions = conditions.map { $0.logicalNegated() }
             }
-            let conditionSet = ConditionSet(optionalBindingVariable: currentOptionalBindingVariable, caseTargetVariable: currentCaseTargetVariable, caseBindingVariables: currentCaseBindingVariables, conditions: conditions)
+            let conditionSet = ConditionSet(optionalBindingVariable: currentOptionalBindingVariable, caseTargetVariable: currentCaseTargetVariable, caseBindingVariables: currentCaseBindingVariables, conditions: conditions, guardTargetVariable: currentGuardTargetVariable, isGuardConditionBeforeBinding: currentIsGuardConditionBeforeBinding)
             currentOptionalBindingVariable = nil
             currentCaseTargetVariable = nil
             currentCaseBindingVariables = []
             currentConditions = []
+            currentGuardTargetVariable = nil
+            currentIsGuardConditionBeforeBinding = false
             conditionSets.append(conditionSet)
         }
 
         for condition in conditions {
             if let optionalBinding = condition as? OptionalBinding {
-                let (variable, optionalCondition) = KotlinOptionalBinding.translate(expression: optionalBinding, translator: translator)
-                if let variable {
-                    // Whenever we need an optional binding variable, create a new nested condition set for it
+                let kbinding = KotlinOptionalBinding.translate(expression: optionalBinding, isGuard: isGuard, translator: translator)
+                if let variable = kbinding.bindingVariable {
+                    // Whenever we need an optional binding variable, create a new nested condition set for it. Note that this
+                    // will also catch uses of guard target variables, as they only exist in pairs with an optional binding
                     appendCurrentConditionSet()
                     currentOptionalBindingVariable = variable
+                    currentGuardTargetVariable = kbinding.guardTargetVariable
+                    currentIsGuardConditionBeforeBinding = kbinding.isGuardConditionBeforeBinding
                     if isGuard {
-                        // for ifs our call to 'value?.let' filters nils; for guards we have to add nil checks
-                        currentConditions.append(optionalCondition)
+                        // For ifs our call to 'value?.let' filters nils; for guards we have to add nil checks
+                        currentConditions.append(kbinding.condition)
+                        // If the conditions have to come after the binding, we can't include any other conditions that might use previous bindings
+                        if kbinding.isGuardConditionBeforeBinding {
+                            appendCurrentConditionSet()
+                        }
                     } else {
                         // for ifs our call to 'value?.let' can't include any other conditions
                         appendCurrentConditionSet()
                     }
                 } else {
-                    currentConditions.append(optionalCondition)
+                    currentConditions.append(kbinding.condition)
                 }
             } else if let matchingCase = condition as? MatchingCase {
-                let (targetVariable, bindingVariables, caseCondition) = KotlinMatchingCase.translate(expression: matchingCase, translator: translator)
+                let kcase = KotlinMatchingCase.translate(expression: matchingCase, translator: translator)
                 // Whenever we need a case value variable, create a new nested condition set for it.
                 // Otherwise we'd have to evaluate the case value eagerly, and it should only evaluate after any
                 // previous conditions have passed to match the behavior of the original code
-                if targetVariable != nil {
+                if kcase.targetVariable != nil {
                     appendCurrentConditionSet()
                 }
-                currentCaseTargetVariable = targetVariable
-                currentCaseBindingVariables = bindingVariables
-                currentConditions.append(caseCondition)
-                if !bindingVariables.isEmpty {
+                currentCaseTargetVariable = kcase.targetVariable
+                currentCaseBindingVariables = kcase.bindingVariables
+                currentConditions.append(kcase.condition)
+                if !kcase.bindingVariables.isEmpty {
                     // Whenever we need case variables, we can't include any other conditions until they're declared
                     appendCurrentConditionSet()
                 }
@@ -1031,6 +1044,9 @@ class KotlinIf: KotlinExpression {
                 children += [caseTargetVariable.identifier, caseTargetVariable.value]
             }
             children += conditionSet.caseBindingVariables.map(\.value)
+            if let guardTargetVariable = conditionSet.guardTargetVariable {
+                children += [guardTargetVariable.identifier, guardTargetVariable.value]
+            }
             return children
         }
         children.append(body)
@@ -1053,6 +1069,10 @@ class KotlinIf: KotlinExpression {
             appendGuardConditionSet(conditionSet, to: output, indentation: indentation)
             output.append(body, indentation: indentation.inc())
             output.append(indentation).append("}")
+            if conditionSet.isGuardConditionBeforeBinding, let optionalBindingVariable = conditionSet.optionalBindingVariable {
+                output.append("\n")
+                optionalBindingVariable.append(to: output, indentation: indentation)
+            }
             if !conditionSet.caseBindingVariables.isEmpty {
                 output.append("\n")
                 appendCaseBindingVariables(conditionSet.caseBindingVariables, to: output, indentation: indentation)
@@ -1180,7 +1200,10 @@ class KotlinIf: KotlinExpression {
     }
 
     private func appendGuardConditionSet(_ conditionSet: ConditionSet, to output: OutputGenerator, indentation: Indentation) {
-        if let optionalBindingVariable = conditionSet.optionalBindingVariable {
+        if let guardTargetVariable = conditionSet.guardTargetVariable {
+            guardTargetVariable.append(to: output, indentation: indentation)
+            output.append("\n").append(indentation)
+        } else if !conditionSet.isGuardConditionBeforeBinding, let optionalBindingVariable = conditionSet.optionalBindingVariable {
             optionalBindingVariable.append(to: output, indentation: indentation)
             output.append("\n").append(indentation)
         }
@@ -1229,14 +1252,18 @@ class KotlinInOut: KotlinExpression {
 
 /// - Note: This type is used to translate the ``MatchingCase`` expression, but is not itself a `KotlinExpression`.
 struct KotlinMatchingCase {
-    static func translate(expression: MatchingCase, translator: KotlinTranslator) -> (targetVariable: KotlinCaseTargetVariable?, bindingVariables: [KotlinBindingVariable], condition: KotlinExpression) {
+    var targetVariable: KotlinTargetVariable?
+    var bindingVariables: [KotlinBindingVariable]
+    var condition: KotlinExpression
+
+    static func translate(expression: MatchingCase, translator: KotlinTranslator) -> KotlinMatchingCase {
         let ktarget = translator.translateExpression(expression.target)
         let inferredType = expression.declaredType.or(expression.target.inferredType)
         let isSealedClassesEnum = inferredType.kotlinIsSealedClassesEnum(codebaseInfo: translator.codebaseInfo)
         let (targetVariable, bindingVariables, condition, messages) = KotlinCasePattern.translate(expression: expression.pattern, target: ktarget, isSealedClassesEnum: isSealedClassesEnum, translator: translator)
         let kcondition = condition ?? KotlinBooleanLiteral(literal: true)
         kcondition.messages += messages
-        return (targetVariable, bindingVariables, kcondition)
+        return KotlinMatchingCase(targetVariable: targetVariable, bindingVariables: bindingVariables, condition: kcondition)
     }
 }
 
@@ -1514,33 +1541,61 @@ class KotlinNumericLiteral: KotlinExpression {
 
 /// - Note: This type is used to translate the ``OptionalBinding`` expression, but is not itself a `KotlinExpression`.
 struct KotlinOptionalBinding {
-    static func translate(expression: OptionalBinding, translator: KotlinTranslator) -> (bindingVariable: KotlinBindingVariable?, condition: KotlinExpression) {
-        let comparisons: [KotlinExpression] = expression.names.compactMap {
-            guard let name = $0 else {
-                return nil
+    var bindingVariable: KotlinBindingVariable?
+    var condition: KotlinExpression
+    var guardTargetVariable: KotlinTargetVariable?
+    var isGuardConditionBeforeBinding = false
+
+    static func translate(expression: OptionalBinding, isGuard: Bool = false, translator: KotlinTranslator) -> KotlinOptionalBinding {
+        var bindingValue: KotlinExpression? = nil
+        let nullLiteral = KotlinNullLiteral()
+        let condition: KotlinExpression
+        var guardTargetVariable: KotlinTargetVariable? = nil
+        var isGuardConditionBeforeBinding = false
+        if isGuard && expression.names.count > 1, let value = expression.value {
+            let kvalue = translator.translateExpression(value)
+            if let identifier = kvalue as? KotlinIdentifier, identifier.isLocalOrSelfIdentifier {
+                // If the value is a local identifier, we can compare it directly
+                bindingValue = identifier
+            } else {
+                // We need to assign the tuple value to a target variable in order to check the tuple for nil
+                guardTargetVariable = KotlinTargetVariable(value: kvalue)
+                bindingValue = guardTargetVariable!.identifier
             }
-            // x != null
-            let identifier = KotlinIdentifier(name: name)
-            identifier.isLocalOrSelfIdentifier = true
-            let nullLiteral = KotlinNullLiteral()
-            return KotlinBinaryOperator(op: .with(symbol: "!="), lhs: identifier, rhs: nullLiteral, sourceFile: expression.sourceFile, sourceRange: expression.sourceRange)
+            condition = KotlinBinaryOperator(op: .with(symbol: "!="), lhs: bindingValue!, rhs: nullLiteral, sourceFile: expression.sourceFile, sourceRange: expression.sourceRange)
+            isGuardConditionBeforeBinding = true
+        } else {
+            let comparisons: [KotlinExpression] = expression.names.compactMap {
+                guard let name = $0 else {
+                    return nil
+                }
+                // x != null
+                let identifier = KotlinIdentifier(name: name)
+                identifier.isLocalOrSelfIdentifier = true
+                let nullLiteral = KotlinNullLiteral()
+                return KotlinBinaryOperator(op: .with(symbol: "!="), lhs: identifier, rhs: nullLiteral, sourceFile: expression.sourceFile, sourceRange: expression.sourceRange)
+            }
+            condition = comparisons.asLogicalExpression()
+            if let value = expression.value {
+                bindingValue = translator.translateExpression(value)
+            }
         }
-        let bindingVariable = translateVariable(expression: expression, translator: translator)
-        return (bindingVariable, comparisons.asLogicalExpression())
+        let bindingVariable = translateBindingVariable(expression: expression, value: bindingValue, codebaseInfo: translator.codebaseInfo)
+        return KotlinOptionalBinding(bindingVariable: bindingVariable, condition: condition, guardTargetVariable: guardTargetVariable, isGuardConditionBeforeBinding: isGuardConditionBeforeBinding)
     }
 
     /// If the given optional binding requires us to declare a new Kotlin variable, return it.
-    private static func translateVariable(expression: OptionalBinding, translator: KotlinTranslator) -> KotlinBindingVariable? {
-        guard requiresVariable(expression: expression) else {
+    private static func translateBindingVariable(expression: OptionalBinding, value: KotlinExpression?, codebaseInfo: CodebaseInfo.Context?) -> KotlinBindingVariable? {
+        guard requiresBindingVariable(expression: expression, value: value) else {
             return nil
         }
 
         let kvalue: KotlinExpression
-        if let value = expression.value {
-            kvalue = translator.translateExpression(value).sref()
+        if let value {
+            kvalue = value.sref()
         } else if let name = expression.names[0] {
             let identifier = KotlinIdentifier(name: name)
-            identifier.mayBeSharedMutableStruct = expression.variableTypes.first?.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo) ?? false
+            identifier.mayBeSharedMutableStruct = expression.variableTypes.first?.kotlinMayBeSharedMutableStruct(codebaseInfo: codebaseInfo) ?? false
             identifier.isLocalOrSelfIdentifier = true
             kvalue = identifier.sref()
         } else {
@@ -1549,17 +1604,17 @@ struct KotlinOptionalBinding {
         return KotlinBindingVariable(names: expression.names, value: kvalue, isLet: expression.isLet)
     }
 
-    private static func requiresVariable(expression: OptionalBinding) -> Bool {
+    private static func requiresBindingVariable(expression: OptionalBinding, value: KotlinExpression?) -> Bool {
         // We need a new var to make the reference mutable
         guard expression.isLet else {
             return true
         }
         // 'let x' doesn't need a new var unless 'x' is unstable
-        guard let value = expression.value else {
+        guard let value else {
             return expression.nameShadowsUnstableValue
         }
         // We need a new var if we're binding to anything other than 'let x = x'
-        guard let identifier = value as? Identifier else {
+        guard let identifier = value as? KotlinIdentifier else {
             return true
         }
         // 'let x = x' doesn't need a new var unless 'x' is unstable
@@ -2110,7 +2165,7 @@ class KotlinWhen: KotlinExpression {
 
     var on: KotlinExpression
     var cases: [KotlinCase]
-    var caseTargetVariable: KotlinCaseTargetVariable?
+    var caseTargetVariable: KotlinTargetVariable?
     var hasNonNilMatches = false
     var hasBreakLabel = false
     var requiresNestingClosure = false
@@ -2118,11 +2173,11 @@ class KotlinWhen: KotlinExpression {
     static func translate(expression: Switch, translator: KotlinTranslator) -> KotlinWhen {
         var kon = translator.translateExpression(expression.on)
         let isSealedClassesEnum = expression.on.inferredType.kotlinIsSealedClassesEnum(codebaseInfo: translator.codebaseInfo)
-        var caseTargetVariable: KotlinCaseTargetVariable? = nil
+        var caseTargetVariable: KotlinTargetVariable? = nil
         let hasNonNilMatches = expression.cases.contains { $0.patterns.contains { $0.pattern.isNonNilMatch } }
         // When we have to compare the switch expression to nil we'll be executing it repeatedly, so store it in a var
         if hasNonNilMatches && (kon as? KotlinIdentifier)?.isLocalOrSelfIdentifier != true {
-            caseTargetVariable = KotlinCaseTargetVariable(value: kon)
+            caseTargetVariable = KotlinTargetVariable(value: kon)
         }
 
         var kcases: [KotlinCase] = []

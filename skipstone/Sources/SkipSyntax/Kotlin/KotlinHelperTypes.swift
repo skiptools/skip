@@ -37,7 +37,7 @@ struct KotlinBindingVariable {
 }
 
 /// A variable we decoare to hold the expression we're matching on for repeated evaluation without side effects.
-struct KotlinCaseTargetVariable {
+struct KotlinTargetVariable {
     var identifier: KotlinIdentifier
     var value: KotlinExpression
 

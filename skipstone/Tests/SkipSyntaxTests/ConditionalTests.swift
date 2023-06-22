@@ -488,6 +488,59 @@ final class ConditionalTests: XCTestCase {
         """)
     }
 
+    func testOptionalBindingTuple() async throws {
+        let supportingSwift = """
+        func f() -> (Int, String)? {
+            return nil
+        }
+        """
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        let a = f()
+        if let (x, y) = a {
+            print(x)
+            print(y)
+        }
+        """, kotlin: """
+        internal val a = f()
+        a?.let { (x, y) ->
+            print(x)
+            print(y)
+        }
+        """)
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        if let (x, y) = f() {
+            print(x)
+            print(y)
+        }
+        """, kotlin: """
+        f()?.let { (x, y) ->
+            print(x)
+            print(y)
+        }
+        """)
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        if let (x, y) = f() {
+            print(x)
+            print(y)
+        } else {
+            print("nope")
+        }
+        """, kotlin: """
+        var letexec_0 = false
+        f()?.let { (x, y) ->
+            letexec_0 = true
+            print(x)
+            print(y)
+        }
+        if (!letexec_0) {
+            print("nope")
+        }
+        """)
+    }
+
     func testAddUnreachableErrorIfReturnRequired() async throws {
         try await check(swift: """
         func f(i: Int?) -> Int {
@@ -1546,6 +1599,78 @@ final class ConditionalTests: XCTestCase {
             }
             print(i_1)
         }
+        """)
+    }
+
+    func testGuardOptionalBindingTuple() async throws {
+        let supportingSwift = """
+        func f() -> (Int, String)? {
+            return nil
+        }
+        """
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        let a = f()
+        guard let (x, y) = a else {
+            return
+        }
+        print(x)
+        print(y)
+        """, kotlin: """
+        internal val a = f()
+        if (a == null) {
+            return
+        }
+        val (x_0, y_0) = a
+        print(x_0)
+        print(y_0)
+        """)
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        guard let (x, y) = f() else {
+            return
+        }
+        print(x)
+        print(y)
+        """, kotlin: """
+        val matchtarget_0 = f()
+        if (matchtarget_0 == null) {
+            return
+        }
+        val (x_0, y_0) = matchtarget_0
+        print(x_0)
+        print(y_0)
+        """)
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        let a = 1
+        guard a >= 1, let (x, y) = f(), x >= y, let (z, _) = f() else {
+            return
+        }
+        print(x)
+        print(y)
+        print(z)
+        """, kotlin: """
+        internal val a = 1
+        if (a < 1) {
+            return
+        }
+        val matchtarget_0 = f()
+        if (matchtarget_0 == null) {
+            return
+        }
+        val (x_0, y_0) = matchtarget_0
+        if (x_0 < y_0) {
+            return
+        }
+        val matchtarget_1 = f()
+        if (matchtarget_1 == null) {
+            return
+        }
+        val (z_0, _) = matchtarget_1
+        print(x_0)
+        print(y_0)
+        print(z_0)
         """)
     }
 

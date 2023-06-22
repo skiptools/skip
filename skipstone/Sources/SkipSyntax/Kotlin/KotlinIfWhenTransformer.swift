@@ -115,7 +115,10 @@ private class IdentifiersVisitor {
         } else if let kif = node as? KotlinIf {
             for conditionSet in kif.conditionSets {
                 if let caseTargetVariable = conditionSet.caseTargetVariable {
-                    caseTargetVariable.identifier.name = newCaseTargetVariableName()
+                    caseTargetVariable.identifier.name = newTargetVariableName()
+                }
+                if let guardTargetVariable = conditionSet.guardTargetVariable {
+                    guardTargetVariable.identifier.name = newTargetVariableName()
                 }
             }
             if kif.ifCheckVariable != nil {
@@ -160,7 +163,7 @@ private class IdentifiersVisitor {
             }
         } else if let kwhen = node as? KotlinWhen {
             if let caseTargetVariable = kwhen.caseTargetVariable {
-                caseTargetVariable.identifier.name = newCaseTargetVariableName()
+                caseTargetVariable.identifier.name = newTargetVariableName()
             }
             return .recurse(nil)
         } else {
@@ -178,7 +181,7 @@ private class IdentifiersVisitor {
         return name
     }
 
-    private func newCaseTargetVariableName() -> String {
+    private func newTargetVariableName() -> String {
         let name = "matchtarget_\(caseTargetCount)"
         caseTargetCount += 1
         return name

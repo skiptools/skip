@@ -187,6 +187,22 @@ final class TupleTests: XCTestCase {
             print(s)
         }
         """)
+
+        try await check(supportingSwift: """
+        func f() -> (Int, String)? {
+            return nil
+        }
+        """, swift: """
+        if let (i, s) = f() {
+            print(i)
+            print(s)
+        }
+        """, kotlin: """
+        f()?.let { (i, s) ->
+            print(i)
+            print(s)
+        }
+        """)
     }
 
     func testDestructuringOptionalBindingSharedMutableStruct() async throws {
