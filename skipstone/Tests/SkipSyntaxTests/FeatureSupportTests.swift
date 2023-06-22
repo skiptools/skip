@@ -9,64 +9,163 @@ fileprivate extension String {
 /// A test case that verifies that transpilation are *not* working as hoped.
 final class FeatureSupportTests: XCTestCase {
     func testJetpackCompose() async throws {
-        //@Composable
-        func JetpackCompose() {
-            Card {
-                var expanded = remember { mutableStateof(false) }
-                Column(Modifier.clickable { expanded.value = !expanded.value }) {
-                    Image(painterResource(R.drawable.jetpack_compose))
-                    AnimatedVisibility(expanded) {
-                        Text(text: "Jetpack Compose", style: MaterialTheme.typography.bodyLarge)
+        try await check(compiler: nil, swiftCode: {
+            func JetpackCompose() {
+                Card {
+                    var expanded = remember { mutableStateOf(false) }
+                    Column(Modifier.clickable { expanded.value = !expanded.value }) {
+                        Image(painterResource(R.drawable.jetpack_compose))
+                        AnimatedVisibility(expanded) {
+                            Text(text: "Jetpack Compose", style: MaterialTheme.typography.bodyLarge)
+                        }
                     }
                 }
             }
+            return ""
+        }, kotlin: """
+            fun JetpackCompose() {
+                Card {
+                    var expanded = remember { mutableStateOf(false) }
+                    Column(Modifier.clickable { expanded.value = !expanded.value }) {
+                        Image(painterResource(R.drawable.jetpack_compose))
+                        AnimatedVisibility(expanded) { Text(text = "Jetpack Compose", style = MaterialTheme.typography.bodyLarge) }
+                    }
+                }
+            }
+            return ""
+            """)
+
+        try await check(expectMessages: true, compiler: nil, swiftCode: {
+            class MyViewModel : ViewModel {
+                let myProperty = mutableStateOf("Initial value")
+            }
+            return ""
+        }, kotlin: """
+            open class MyViewModel: ViewModel {
+                val myProperty = mutableStateOf("Initial value")
+                    get() = field
+            }
+            return ""
+            """)
+
+        //@Observable
+        try await check(swiftCode: {
+            class Car {
+               var name: String = ""
+               var needsRepairs: Bool = false
+
+               init(name: String, needsRepairs: Bool = false) {
+                   self.name = name
+                   self.needsRepairs = needsRepairs
+               }
+            }
+            return ""
+        }, kotlin: """
+            open class Car {
+                var name: String = ""
+                var needsRepairs: Boolean = false
+                constructor(name: String, needsRepairs: Boolean = false) {
+                    this.name = name
+                    this.needsRepairs = needsRepairs
+                }
+            }
+            return ""
+            """)
+
+        // This is what it might look like if we converted @Swift.Observable to use mutableStateOf
+        // https://developer.apple.com/documentation/Observation
+        // https://developer.apple.com/documentation/observation/observable-swift.macro
+        // https://developer.apple.com/documentation/swiftui/migrating-from-the-observable-object-protocol-to-the-observable-macro
+        //
+        // Note the @android.compose.Model annotation might have a better fit, but it is deprecated
+        try await check(expectFailure: true, compiler: nil, swiftCode: {
+            /* @Observable */ class Car {
+               var name: String = ""
+               var needsRepairs: Bool = false
+
+               init(name: String, needsRepairs: Bool = false) {
+                   self.name = name
+                   self.needsRepairs = needsRepairs
+               }
+            }
+            return ""
+        }, kotlin: """
+            data class Car {
+                private var _name by remember { mutableStateOf("") }
+                var name: String
+                    get() = _name.value
+                    set(newValue) {
+                        _name.value = newValue
+                    }
+                private var _needsRepairs by remember { mutableStateOf(false) }
+                var : Bool
+                    get() = _needsRepairs.value
+                    set(newValue) {
+                        _needsRepairs.value = newValue
+                    }
+
+                constructor(name: String, needsRepairs: Boolean = false) {
+                    this.name = name
+                    this.needsRepairs = needsRepairs
+                }
+            }
+            return ""
+            """)
+
+        /// Remember the value produced by calculation. calculation will only be evaluated during the composition. Recomposition will always return the value produced by composition.
+        ///
+        /// https://developer.android.com/reference/kotlin/androidx/compose/runtime/package-summary#remember(kotlin.Function0)
+        func remember<T>(_ calculation: () -> T) -> T {
+            return calculation()
         }
 
-
-        func remember<T>(_ f: () -> T) -> T {
-            return f()
+        /// Return a new MutableState initialized with the passed in value
+        ///
+        /// The MutableState class is a single value holder whose reads and writes are observed by Compose. Additionally, writes to it are transacted as part of the Snapshot system.
+        /// https://developer.android.com/reference/kotlin/androidx/compose/runtime/package-summary#mutableStateOf(kotlin.Any,androidx.compose.runtime.SnapshotMutationPolicy)
+        func mutableStateOf<T>(_ value: T) -> MutableState<T> {
+            return MutableState(value: value)
         }
 
-        struct MutableStateOf<T> {
+        struct MutableState<T> {
             var value: T
         }
 
-        func mutableStateof<T>(_ value: T) -> MutableStateOf<T> {
-            return MutableStateOf(value: value)
+        /// ViewModel is a class that is responsible for preparing and managing the data for an Activity or a Fragment. It also handles the communication of the Activity / Fragment with the rest of the application (e.g. calling the business logic classes).
+        /// https://developer.android.com/reference/androidx/lifecycle/ViewModel
+        class ViewModel {
         }
 
-        @resultBuilder struct Card {
-            @discardableResult init(_ block: () -> ()) {
-            }
+        // MARK: Composable Layouts
+        // https://developer.android.com/jetpack/compose/layouts
 
-            static func buildBlock(_ components: Any...) {
-            }
-        }
+        /// Component that represents an empty space layout, whose size can be defined using Modifier.width, Modifier.height and Modifier.size modifiers.
+        /// https://developer.android.com/reference/kotlin/androidx/compose/foundation/layout/package-summary#Spacer(androidx.compose.ui.Modifier)
+        func Spacer(_ modifier: Modifier) { }
 
-        @resultBuilder struct AnimatedVisibility {
-            @discardableResult init(_ value: MutableStateOf<Bool>, _ block: () -> ()) {
-            }
+        /// A layout composable that places its children in a horizontal sequence.
+        /// https://developer.android.com/reference/kotlin/androidx/compose/foundation/layout/package-summary#Row(androidx.compose.ui.Modifier,androidx.compose.foundation.layout.Arrangement.Horizontal,androidx.compose.ui.Alignment.Vertical,kotlin.Function1)
+        func Row(_ modifier: Modifier, _ content: () -> ()) { }
 
-            static func buildBlock(_ components: Any...) {
-            }
-        }
+        /// A layout composable that places its children in a vertical sequence.
+        /// https://developer.android.com/reference/kotlin/androidx/compose/foundation/layout/package-summary#Column(androidx.compose.ui.Modifier,androidx.compose.foundation.layout.Arrangement.Vertical,androidx.compose.ui.Alignment.Horizontal,kotlin.Function1)
+        func Column(_ modifier: Modifier, _ content: () -> ()) { }
 
-        @resultBuilder struct Column {
-            @discardableResult init(_ modifier: Modifier, _ block: () -> ()) {
-            }
+        /// A layout composable with content. The Box will size itself to fit the content, subject to the incoming constraints.
+        /// https://developer.android.com/reference/kotlin/androidx/compose/foundation/layout/package-summary#Box(androidx.compose.ui.Modifier,androidx.compose.ui.Alignment,kotlin.Boolean,kotlin.Function1)
+        func Box(_ modifier: Modifier, _ content: () -> ()) { }
 
-            static func buildBlock(_ components: Any...) {
-            }
-        }
+        func Card(_ content: () -> ()) { }
 
+        func Image(_ resource: PainterResource) { }
+
+        func AnimatedVisibility(_ value: MutableState<Bool>, _ block: () -> ()) { }
+
+        /// An ordered, immutable collection of modifier elements that decorate or add behavior to Compose UI elements. For example, backgrounds, padding and click event listeners decorate or add behavior to rows, text or buttons.
+        /// https://developer.android.com/reference/kotlin/androidx/compose/ui/Modifier
         struct Modifier {
             static func clickable(_ block: () -> ()) -> Modifier {
                 return Modifier()
-            }
-        }
-
-        struct Image {
-            @discardableResult init<T>(_ resource: PainterResource<T>) {
             }
         }
 
@@ -80,11 +179,13 @@ final class FeatureSupportTests: XCTestCase {
             }
         }
 
-        func painterResource(_ drawable: R.Drawable.Value) -> PainterResource<R.Drawable.Value> {
+        /// Create a Painter from an Android resource id
+        /// https://developer.android.com/reference/kotlin/androidx/compose/ui/res/package-summary#painterResource(kotlin.Int)
+        func painterResource(_ id: Int) -> PainterResource {
             return PainterResource()
         }
 
-        struct PainterResource<T> {
+        struct PainterResource {
         }
 
         struct MaterialTheme {
@@ -97,11 +198,8 @@ final class FeatureSupportTests: XCTestCase {
         }
 
         struct R {
-            static let drawable: Drawable = Drawable()
-
-            struct Drawable {
-                let jetpack_compose: Value = Value()
-                struct Value { }
+            struct drawable {
+                static let jetpack_compose: Int = 0
             }
         }
 
