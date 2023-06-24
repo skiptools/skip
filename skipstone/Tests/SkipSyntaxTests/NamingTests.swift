@@ -42,9 +42,9 @@ final class NamingTests: XCTestCase {
             open class KeywordHolder {
                 val null_ = "ABC"
                 val null__ = "DEF"
-                var interface_: Int = 2
-                var this_ = 1.234
-                var enum: EnumType = EnumType.null_
+                open var interface_: Int = 2
+                open var this_ = 1.234
+                open var enum: EnumType = EnumType.null_
                 fun packageFunction(package_: String) = Unit
                 fun objectArgFunction(object_: EnumType) = Unit
             }

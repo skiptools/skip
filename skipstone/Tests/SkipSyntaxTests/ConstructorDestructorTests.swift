@@ -450,14 +450,14 @@ final class ConstructorDestructorTests: XCTestCase {
         }
         """, kotlin: """
         internal open class A {
-            internal var i = 1
+            internal open var i = 1
                 set(newValue) {
                     if (!suppresssideeffects) {
                         print(newValue)
                     }
                     field = newValue
                 }
-            internal var j = 2
+            internal open var j = 2
                 set(newValue) {
                     field = newValue
                     if (!suppresssideeffects) {

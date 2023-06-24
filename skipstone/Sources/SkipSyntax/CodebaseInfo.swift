@@ -1049,7 +1049,7 @@ public class CodebaseInfo: Codable {
     }
 
     private func addMemberwiseConstructor(to typeInfo: TypeInfo) {
-        let parameters = typeInfo.variables.compactMap { (variable) -> TypeSignature.Parameter? in
+        let parameters = typeInfo.declarationType != .structDeclaration ? [] : typeInfo.variables.compactMap { (variable) -> TypeSignature.Parameter? in
             guard variable.isInitializable else {
                 return nil
             }
@@ -1301,7 +1301,7 @@ public class CodebaseInfo: Codable {
                 apiFlags.insert(.writeable)
             }
             self.apiFlags = apiFlags
-            self.isInitializable = !statement.modifiers.isStatic && statement.getter == nil && (!statement.isLet || statement.value == nil)
+            self.isInitializable = !statement.modifiers.isStatic && !statement.modifiers.isOverride && statement.getter == nil && (!statement.isLet || statement.value == nil)
             self.hasValue = self.signature.isOptional || statement.value != nil
             if !self.signature.isFullySpecified, self.sourceFile != nil {
                 // We'll try to infer the type after gathering all info

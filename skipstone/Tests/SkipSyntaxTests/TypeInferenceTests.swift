@@ -267,7 +267,7 @@ final class TypeInferenceTests: XCTestCase {
         }
         """, kotlin: """
         internal open class C<T> where T: P {
-            internal var v: T
+            internal open var v: T
             internal open fun f(): Boolean = v.pfunc() == Int.myZero
         }
         """)

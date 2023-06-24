@@ -62,8 +62,8 @@ final class FeatureSupportTests: XCTestCase {
             return ""
         }, kotlin: """
             open class Car {
-                var name: String = ""
-                var needsRepairs: Boolean = false
+                open var name: String = ""
+                open var needsRepairs: Boolean = false
                 constructor(name: String, needsRepairs: Boolean = false) {
                     this.name = name
                     this.needsRepairs = needsRepairs

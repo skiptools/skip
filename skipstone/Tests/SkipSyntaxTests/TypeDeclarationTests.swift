@@ -38,7 +38,7 @@ final class TypeDeclarationTests: XCTestCase {
             internal open class B {
             }
 
-            internal var b: A.B
+            internal open var b: A.B
         }
         """)
     }
@@ -114,7 +114,7 @@ final class TypeDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal open class TypeDeclarationTestsClass: TypeDeclarationTestsProtocol {
-            internal var i = 0
+            internal open var i = 0
             override fun f() = Unit
             internal open fun g() = Unit
         }

@@ -2005,6 +2005,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var isAsync = false
     var isProperty = false
     var isProtocolProperty = false
+    var isSuperclassPropertyOverride = false
     var isGlobal = false
     var isMainActor: Bool? // Populated if needed by transformer
     var isOpen = false
@@ -2057,12 +2058,14 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 // Kotlin uses default public visibility on all interface members
                 kstatement.modifiers.visibility = .public
             } else {
-                if !kstatement.modifiers.isOverride && translator.codebaseInfo?.isImplementingKotlinInterfaceMember(declaration: statement, in: owningTypeDeclaration.signature) == true {
+                if kstatement.modifiers.isOverride {
+                    kstatement.isSuperclassPropertyOverride = true
+                } else if translator.codebaseInfo?.isImplementingKotlinInterfaceMember(declaration: statement, in: owningTypeDeclaration.signature) == true {
                     kstatement.modifiers.isOverride = true
                 }
-                kstatement.isOpen = !kstatement.modifiers.isOverride && !statement.modifiers.isFinal && statement.modifiers.visibility != .private && owningDeclarationType == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
+                kstatement.isOpen = !kstatement.isLet && !kstatement.modifiers.isOverride && !statement.modifiers.isFinal && statement.modifiers.visibility != .private && owningDeclarationType == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
             }
-            // Kotlin does not all you to decrease visibility when overriding a member, so we simply make all overrides public to prevent errors
+            // Kotlin does not allow you to decrease visibility when overriding a member, so we simply make all overrides public to prevent errors
             if kstatement.modifiers.isOverride {
                 kstatement.modifiers.visibility = .public
             }
@@ -2173,9 +2176,8 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             attributes.append(to: output, indentation: indentation)
             output.append(indentation)
             if isProperty || isGlobal {
-                // We can't override stored properties in Swift, so only need to mark open if computed
-                output.append(modifiers.kotlinMemberString(isOpen: isOpen && getter != nil, suffix: " "))
-                if !usesStorageProperty, case .unwrappedOptional = declaredType {
+                output.append(modifiers.kotlinMemberString(isOpen: isOpen, suffix: " "))
+                if !usesStorageProperty && !isSuperclassPropertyOverride, case .unwrappedOptional = declaredType {
                     output.append("lateinit ")
                 }
             }
@@ -2222,7 +2224,9 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 output.append(getterIndentation).append("}\n")
             }
         } else if (isProperty || isGlobal) && !isProtocolProperty {
-            if usesStorageProperty || mayBeSharedMutableStruct {
+            if isSuperclassPropertyOverride {
+                output.append(indentation.inc()).append("get() = super.\(propertyName)\n")
+            } else if usesStorageProperty || mayBeSharedMutableStruct {
                 let getterIndentation = indentation.inc()
                 let isSingleStatement = (!modifiers.isLazy || mutationFunctionNames == nil) && getFieldIsSingleStatementAppendable
                 output.append(getterIndentation).append("get()")
@@ -2253,14 +2257,15 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
 
         let hasCustomSet = setter?.body != nil || willSet?.body != nil || didSet?.body != nil
         if hasCustomSet || mutationFunctionNames != nil {
+            let isStoredOverride = getter?.body == nil && isSuperclassPropertyOverride
             let setterIndentation = indentation.inc()
             let setterBodyIndentation = setterIndentation.inc()
             output.append(setterIndentation).append("set(newValue) {\n")
-            if mayBeSharedMutableStruct {
+            if mayBeSharedMutableStruct && !isStoredOverride {
                 output.append(setterBodyIndentation).append("@Suppress(\"NAME_SHADOWING\") val newValue = newValue.sref()\n")
             }
             var setIndentation = setterBodyIndentation
-            if let mutationFunctionNames {
+            if let mutationFunctionNames, !isStoredOverride {
                 output.append(setterBodyIndentation).append("\(mutationFunctionNames.willMutate)()\n")
                 if hasCustomSet {
                     output.append(setterBodyIndentation).append("try {\n")
@@ -2270,7 +2275,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
 
             if let willSetBody = willSet?.body {
                 var willSetIndentation = setIndentation
-                if let suppressSideEffectsPropertyName {
+                if let suppressSideEffectsPropertyName, !isStoredOverride {
                     output.append(setIndentation).append("if (!\(suppressSideEffectsPropertyName)) {\n")
                     willSetIndentation = willSetIndentation.inc()
                 }
@@ -2278,7 +2283,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                     output.append(willSetIndentation).append("val \(parameterName) = newValue\n")
                 }
                 output.append(willSetBody, indentation: willSetIndentation)
-                if suppressSideEffectsPropertyName != nil {
+                if suppressSideEffectsPropertyName != nil, !isStoredOverride {
                     output.append(setIndentation).append("}\n")
                 }
             }
@@ -2290,27 +2295,33 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 output.append(setterBody, indentation: setIndentation)
             } else {
                 if didSetUsesOldValue {
-                    if usesStorageProperty {
+                    if isStoredOverride {
+                        output.append(setIndentation).append("val oldValue = super.\(propertyName)\n")
+                    } else if usesStorageProperty {
                         output.append(setIndentation).append("val oldValue = this.\(propertyName)\n")
                     } else {
                         output.append(setIndentation).append("val oldValue = field\n")
                     }
                 }
-                appendSetField(to: output, indentation: setIndentation, usesStorageProperty: usesStorageProperty, isCopy: true)
+                if isStoredOverride {
+                    output.append(setIndentation).append("super.\(propertyName) = newValue\n")
+                } else {
+                    appendSetField(to: output, indentation: setIndentation, usesStorageProperty: usesStorageProperty, isCopy: true)
+                }
             }
 
             if let didSetBody = didSet?.body {
                 var didSetIndentation = setIndentation
-                if let suppressSideEffectsPropertyName {
+                if let suppressSideEffectsPropertyName, !isStoredOverride {
                     output.append(setIndentation).append("if (!\(suppressSideEffectsPropertyName)) {\n")
                     didSetIndentation = didSetIndentation.inc()
                 }
                 output.append(didSetBody, indentation: didSetIndentation)
-                if suppressSideEffectsPropertyName != nil {
+                if suppressSideEffectsPropertyName != nil, !isStoredOverride {
                     output.append(setIndentation).append("}\n")
                 }
             }
-            if let mutationFunctionNames {
+            if let mutationFunctionNames, !isStoredOverride {
                 if hasCustomSet {
                     output.append(setterBodyIndentation).append("} finally {\n")
                     output.append(setterBodyIndentation.inc()).append("\(mutationFunctionNames.didMutate)()\n")
@@ -2395,7 +2406,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
 
     private var usesStorageProperty: Bool {
-        guard !isProtocolProperty, isProperty || isGlobal else {
+        guard !isProtocolProperty, isProperty || isGlobal, !isSuperclassPropertyOverride else {
             return false
         }
         if modifiers.isLazy {

@@ -11,9 +11,9 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal open class A {
-            internal var i: Int? = null
-            internal var j: Int? = null
-            internal var k = 10
+            internal open var i: Int? = null
+            internal open var j: Int? = null
+            internal open var k = 10
         }
         """)
     }
@@ -33,7 +33,7 @@ final class MemberDeclarationTests: XCTestCase {
         """, kotlin: """
         internal open class A {
 
-            internal var i = 1
+            internal open var i = 1
 
             companion object {
                 internal val staticLet = 1
@@ -198,6 +198,56 @@ final class MemberDeclarationTests: XCTestCase {
         """)
     }
 
+    func testOverrideComputedProperty() async throws {
+        try await check(swift: """
+        class C {
+            var x: Int {
+                return 1
+            }
+            var y: String {
+                get {
+                    return "C"
+                }
+                set {
+                    print("set")
+                }
+            }
+        }
+        class S: C {
+            override var x: Int {
+                return 2
+            }
+            override var y: String {
+                get {
+                    return "S"
+                }
+                set {
+                    print("set2")
+                }
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal open val x: Int
+                get() = 1
+            internal open var y: String
+                get() = "C"
+                set(newValue) {
+                    print("set")
+                }
+        }
+        internal open class S: C() {
+            override val x: Int
+                get() = 2
+            override var y: String
+                get() = "S"
+                set(newValue) {
+                    print("set2")
+                }
+        }
+        """)
+    }
+
     func testVariableWillDidSet() async throws {
         try await check(swift: """
         class A {
@@ -214,12 +264,12 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal open class A {
-            internal var i = 1
+            internal open var i = 1
                 set(newValue) {
                     print(newValue)
                     field = newValue
                 }
-            internal var j = 2
+            internal open var j = 2
                 set(newValue) {
                     field = newValue
                     print(j == 2)
@@ -227,48 +277,48 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """)
 
-//        // Custom willSet label
-//        try await check(swift: """
-//        class A {
-//            var i = 1 {
-//                willSet(value) {
-//                    print(value)
-//                }
-//            }
-//        }
-//        """, kotlin: """
-//        internal open class A {
-//            internal var i = 1
-//                set(newValue) {
-//                    val value = newValue
-//                    print(value)
-//                    field = newValue
-//                }
-//        }
-//        """)
-//
-//        try await check(swift: """
-//        class A {
-//            var i = 1 {
-//                didSet {
-//                    if newValue != oldValue {
-//                        print(newValue)
-//                    }
-//                }
-//            }
-//        }
-//        """, kotlin: """
-//        internal open class A {
-//            internal var i = 1
-//                set(newValue) {
-//                    val oldValue = field
-//                    field = newValue
-//                    if (newValue != oldValue) {
-//                        print(newValue)
-//                    }
-//                }
-//        }
-//        """)
+        // Custom willSet label
+        try await check(swift: """
+        class A {
+            var i = 1 {
+                willSet(value) {
+                    print(value)
+                }
+            }
+        }
+        """, kotlin: """
+        internal open class A {
+            internal open var i = 1
+                set(newValue) {
+                    val value = newValue
+                    print(value)
+                    field = newValue
+                }
+        }
+        """)
+
+        try await check(swift: """
+        class A {
+            var i = 1 {
+                didSet {
+                    if newValue != oldValue {
+                        print(newValue)
+                    }
+                }
+            }
+        }
+        """, kotlin: """
+        internal open class A {
+            internal open var i = 1
+                set(newValue) {
+                    val oldValue = field
+                    field = newValue
+                    if (newValue != oldValue) {
+                        print(newValue)
+                    }
+                }
+        }
+        """)
     }
 
     func testMutableStructVariableWillDidSet() async throws {
@@ -331,12 +381,114 @@ final class MemberDeclarationTests: XCTestCase {
         """)
     }
 
+    func testOverrideWillDidSet() async throws {
+        try await check(swift: """
+        class C {
+            var i = 1
+        }
+        class S: C {
+            override var i: Int {
+                willSet {
+                    print("subwillset: \\(newValue)")
+                }
+                didSet {
+                    print("subdidset: \\(i)")
+                }
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal open var i = 1
+        }
+        internal open class S: C() {
+            override var i: Int
+                get() = super.i
+                set(newValue) {
+                    print("subwillset: ${newValue}")
+                    super.i = newValue
+                    print("subdidset: ${i}")
+                }
+        }
+        """)
+
+        try await check(swift: """
+        class C {
+            var a: [Int] = []
+        }
+        class S: C {
+            override var a: [Int] {
+                willSet {
+                    print("subwillset: \\(newValue)")
+                }
+                didSet {
+                    print("subdidset: \\(a)")
+                }
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal open var a: Array<Int> = arrayOf()
+                get() = field.sref({ this.a = it })
+                set(newValue) {
+                    field = newValue.sref()
+                }
+        }
+        internal open class S: C() {
+            override var a: Array<Int>
+                get() = super.a
+                set(newValue) {
+                    print("subwillset: ${newValue}")
+                    super.a = newValue
+                    print("subdidset: ${a}")
+                }
+        }
+        """)
+
+        try await check(swift: """
+        class A {}
+        class C {
+            var a: A!
+        }
+        class S: C {
+            override var a: A! {
+                willSet {
+                    print("subwillset: \\(newValue)")
+                }
+                didSet {
+                    print("subdidset: \\(a)")
+                }
+            }
+        }
+        """, kotlin: """
+        internal open class A {
+        }
+        internal open class C {
+            internal open lateinit var a: A
+        }
+        internal open class S: C() {
+            override var a: A
+                get() = super.a
+                set(newValue) {
+                    print("subwillset: ${newValue}")
+                    super.a = newValue
+                    print("subdidset: ${a}")
+                }
+        }
+        """)
+    }
+
     func testPropertySideEffectOrdering() {
         sideEffectOrdering = []
         let cls = MemberDeclarationTestsSideEffectsClass()
         XCTAssertEqual([], sideEffectOrdering)
         cls.sideEffectsStruct.i += 1
         XCTAssertEqual(["willSetI", "didSetI", "willSetOwner", "didSetOwner"], sideEffectOrdering)
+
+        sideEffectOrdering = []
+        let subcls = MemberDeclarationTestsSideEffectsSubclass()
+        XCTAssertEqual([], sideEffectOrdering)
+        subcls.sideEffectsStruct.i += 1
+        XCTAssertEqual(["willSetI", "didSetI", "willSetSubclass", "willSetOwner", "didSetOwner", "didSetSubclass"], sideEffectOrdering)
 
         sideEffectOrdering = []
         cls.sideEffectsStruct.j += 1
@@ -390,7 +542,7 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal open class C {
-            internal var v: V
+            internal open var v: V
                 get() {
                     if (!vinitialized) {
                         vstorage = V()
@@ -417,7 +569,7 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal open class C {
-            internal var s: S
+            internal open var s: S
                 get() {
                     if (!sinitialized) {
                         sstorage = S()
@@ -449,7 +601,7 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal open class C {
-            internal var v: V
+            internal open var v: V
                 get() {
                     if (!vinitialized) {
                         vstorage = V()
@@ -520,7 +672,7 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal open class C {
-            internal var f: Int
+            internal open var f: Int
                 get() {
                     if (!finitialized) {
                         fstorage = factorial(100)
@@ -552,7 +704,7 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal open class C {
-            internal lateinit var v: V
+            internal open lateinit var v: V
             internal open fun setUp() {
                 v = V()
             }
@@ -572,7 +724,7 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal open class C {
-            internal var s: S
+            internal open var s: S
                 get() = sstorage.sref({ this.s = it })
                 set(newValue) {
                     sstorage = newValue.sref()
@@ -600,7 +752,7 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal open class C {
-            internal var v: V
+            internal open var v: V
                 get() = vstorage
                 set(newValue) {
                     vstorage = newValue
@@ -1068,7 +1220,7 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal open class C<T> {
-            internal var v: C<T>
+            internal open var v: C<T>
             internal open fun f(p: Array<C<T>>): C<T>? = null
         }
         """)
@@ -1167,7 +1319,7 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal open class C<T> where T: Any {
-            internal var t: T
+            internal open var t: T
             internal constructor(t: T) {
                 this.t = t
             }
@@ -1201,7 +1353,7 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal open class C<T> where T: Any {
-            internal var t: T
+            internal open var t: T
             internal constructor(t: T) {
                 this.t = t
             }
@@ -1236,7 +1388,7 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal open class C<T>: Comparable<C<T>> where T: Any, T: Comparable<T> {
-            internal var t: T
+            internal open var t: T
             internal constructor(t: T) {
                 this.t = t
             }
@@ -1334,7 +1486,7 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal open class C {
-            internal var i: Int
+            internal open var i: Int
 
             internal open fun f(s: String) {
                 fun doSomething(with: String): String = String.myValue
@@ -1389,6 +1541,17 @@ private class MemberDeclarationTestsSideEffectsClass {
         }
         didSet {
             sideEffectOrdering.append("didSetOwner")
+        }
+    }
+}
+
+private class MemberDeclarationTestsSideEffectsSubclass: MemberDeclarationTestsSideEffectsClass {
+    fileprivate override var sideEffectsStruct: MemberDeclarationTestsSideEffectsStruct {
+        willSet {
+            sideEffectOrdering.append("willSetSubclass")
+        }
+        didSet {
+            sideEffectOrdering.append("didSetSubclass")
         }
     }
 }

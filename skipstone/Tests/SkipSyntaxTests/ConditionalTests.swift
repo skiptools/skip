@@ -170,7 +170,7 @@ final class ConditionalTests: XCTestCase {
         }
         """, kotlin: """
         internal open class C {
-            internal var i: Int? = null
+            internal open var i: Int? = null
             internal val j: Int?
             internal open fun f() {
                 i?.let { i ->
@@ -198,7 +198,7 @@ final class ConditionalTests: XCTestCase {
         }
         """, kotlin: """
         internal open class C {
-            internal var i: Int? = null
+            internal open var i: Int? = null
             internal val j: Int?
             internal open fun f() {
                 i?.let { i ->
@@ -226,7 +226,7 @@ final class ConditionalTests: XCTestCase {
         }
         """, kotlin: """
         internal open class C {
-            internal var i: Int? = null
+            internal open var i: Int? = null
             internal val j: Int?
             internal open fun f() {
                 i?.let { x ->
@@ -1401,7 +1401,7 @@ final class ConditionalTests: XCTestCase {
         }
         """, kotlin: """
         internal open class C {
-            internal var i: Int? = null
+            internal open var i: Int? = null
             internal val j: Int?
             internal open fun f() {
                 val i_0 = i
@@ -1436,7 +1436,7 @@ final class ConditionalTests: XCTestCase {
         }
         """, kotlin: """
         internal open class C {
-            internal var i: Int? = null
+            internal open var i: Int? = null
             internal val j: Int?
             internal open fun f() {
                 val i_0 = i
@@ -1471,7 +1471,7 @@ final class ConditionalTests: XCTestCase {
         }
         """, kotlin: """
         internal open class C {
-            internal var i: Int? = null
+            internal open var i: Int? = null
             internal val j: Int?
             internal open fun f() {
                 var i_0 = i

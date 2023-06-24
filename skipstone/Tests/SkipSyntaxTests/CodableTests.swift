@@ -608,7 +608,7 @@ final class CodableTests: XCTestCase {
         }
         """, kotlin: """
         internal open class Sub: Base, Codable {
-            internal var s = "string"
+            internal open var s = "string"
 
             private enum class CodingKeys(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 s("s");
