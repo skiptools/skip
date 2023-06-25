@@ -43,7 +43,7 @@ final class KotlinOptionSetTransformer: KotlinTransformer {
     private func addOptionSetInterfaceMembers(to classDeclaration: KotlinClassDeclaration, rawValueType: TypeSignature) {
         let rawValueVar = KotlinVariableDeclaration(names: ["rawvaluelong"], variableTypes: [.uint64])
         rawValueVar.extras = .singleNewline
-        rawValueVar.isProperty = true
+        rawValueVar.role = .property
         rawValueVar.modifiers.visibility = .public
         rawValueVar.modifiers.isOverride = true
         rawValueVar.declaredType = .uint64

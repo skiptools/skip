@@ -74,7 +74,7 @@ final class KotlinStructTransformer: KotlinTransformer {
         let supdateType: TypeSignature = .optional(.function([TypeSignature.Parameter(type: .any)], .void))
         let supdate = KotlinVariableDeclaration(names: ["supdate"], variableTypes: [supdateType])
         supdate.declaredType = supdateType
-        supdate.isProperty = true
+        supdate.role = .property
         supdate.isGenerated = true
         supdate.modifiers = Modifiers(visibility: .public, isOverride: true)
         supdate.extras = .singleNewline
@@ -84,7 +84,7 @@ final class KotlinStructTransformer: KotlinTransformer {
 
         let scount = KotlinVariableDeclaration(names: ["smutatingcount"], variableTypes: [.int])
         scount.value = KotlinNumericLiteral(literal: "0")
-        scount.isProperty = true
+        scount.role = .property
         scount.isGenerated = true
         scount.modifiers = Modifiers(visibility: .public, isOverride: true)
         scount.parent = classDeclaration

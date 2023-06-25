@@ -1315,8 +1315,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var isAsync = false
     var isAsyncReturning = false
     var isOpen = false
-    var isGlobal = false
-    var isLocal = false
+    var role: Role = .member
     var isMainActor: Bool? // Populated if needed by transformer
     var isOptionalInit = false
     var annotations: [String] = []
@@ -1357,6 +1356,12 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         return name == "<" && modifiers.isStatic && parameters.count == 2
     }
 
+    enum Role {
+        case local
+        case global
+        case member
+    }
+
     // KotlinMemberDeclaration
     var extends: (TypeSignature, Generics)? {
         didSet {
@@ -1380,7 +1385,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         kstatement.attributes = kstatement.processAttributes(statement.attributes, translator: translator)
         var owningDeclarationType: StatementType? = nil
         if statement.parent?.owningFunctionDeclaration != nil {
-            kstatement.isLocal = true
+            kstatement.role = .local
         } else if let owningTypeDeclaration = statement.parent as? TypeDeclaration {
             // Use codebaseInfo rather than .type directly so that extension API is also handled correctly
             owningDeclarationType = translator.codebaseInfo?.declarationType(forNamed: owningTypeDeclaration.signature) ?? owningTypeDeclaration.type
@@ -1431,7 +1436,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 }
             }
         } else if statement.isGlobal {
-            kstatement.isGlobal = true
+            kstatement.role = .global
         }
         if let body = statement.body {
             kstatement.body = KotlinCodeBlock.translate(statement: body, translator: translator)
@@ -1540,7 +1545,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
 
     private func appendFunctionDeclaration(to output: OutputGenerator, indentation: Indentation) {
-        if !isLocal {
+        if role != .local {
             output.append(modifiers.kotlinMemberString(isOpen: isOpen, suffix: " "))
         }
         let isTestFunction = annotations.contains("@Test")
@@ -2003,10 +2008,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var declaredType: TypeSignature = .none
     var isLet = false
     var isAsync = false
-    var isProperty = false
-    var isProtocolProperty = false
-    var isSuperclassPropertyOverride = false
-    var isGlobal = false
+    var role: Role = .local
     var isMainActor: Bool? // Populated if needed by transformer
     var isOpen = false
     var modifiers = Modifiers()
@@ -2025,7 +2027,19 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var mutationFunctionNames: (willMutate: String, didMutate: String)?
     var isGenerated = false
     var isDescriptionImplementation: Bool {
-        return isProperty && propertyName == "description" && propertyType == .string
+        return role.isProperty && propertyName == "description" && propertyType == .string
+    }
+
+    enum Role {
+        case local
+        case global
+        case property
+        case protocolProperty
+        case superclassOverrideProperty
+
+        var isProperty: Bool {
+            return self == .property || self == .protocolProperty || self == .superclassOverrideProperty
+        }
     }
 
     // KotlinMemberDeclaration
@@ -2052,14 +2066,14 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             owningDeclarationType = translator.codebaseInfo?.declarationType(forNamed: owningTypeDeclaration.signature) ?? owningTypeDeclaration.type
             let owningSignature = translator.codebaseInfo?.primaryTypeInfo(forNamed: owningTypeDeclaration.signature)?.signature ?? owningTypeDeclaration.signature
 
-            kstatement.isProperty = true
+            kstatement.role = .property
             if owningDeclarationType == .protocolDeclaration {
-                kstatement.isProtocolProperty = true
+                kstatement.role = .protocolProperty
                 // Kotlin uses default public visibility on all interface members
                 kstatement.modifiers.visibility = .public
             } else {
                 if kstatement.modifiers.isOverride {
-                    kstatement.isSuperclassPropertyOverride = true
+                    kstatement.role = .superclassOverrideProperty
                 } else if translator.codebaseInfo?.isImplementingKotlinInterfaceMember(declaration: statement, in: owningTypeDeclaration.signature) == true {
                     kstatement.modifiers.isOverride = true
                 }
@@ -2080,7 +2094,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 kstatement.declaredType = kstatement.declaredType.mappingTypes(from: [withoutGenerics], to: [owningSignature])
             }
         } else if statement.isGlobal {
-            kstatement.isGlobal = true
+            kstatement.role = .global
         }
         if let value = statement.value {
             // Kotlin does not call the setter for the assigned initial value, so sref() ourselves
@@ -2097,7 +2111,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             kstatement.mayBeSharedMutableStruct = true
         }
         if kstatement.mayBeSharedMutableStruct {
-            kstatement.onUpdate = kstatement.isReadOnly ? nil : kstatement.isProperty ? "{ this.\(kstatement.names[0] ?? "") = it }" : "{ \(kstatement.names[0] ?? "") = it }"
+            kstatement.onUpdate = kstatement.isReadOnly ? nil : kstatement.role.isProperty ? "{ this.\(kstatement.propertyName) = it }" : "{ \(kstatement.propertyName) = it }"
             kstatement.getter = statement.getter?.translate(translator: translator, expectedReturn: .sref(kstatement.onUpdate))
         } else {
             kstatement.getter = statement.getter?.translate(translator: translator, expectedReturn: .yes)
@@ -2111,7 +2125,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if kstatement.declaredType == .float || kstatement.declaredType.isUnsigned, kstatement.value is KotlinNumericLiteral {
             kstatement.messages.append(.kotlinNumericCast(kstatement, source: translator.syntaxTree.source, type: kstatement.declaredType.kotlin))
         }
-        if (kstatement.isProperty || kstatement.isGlobal), case .unwrappedOptional(let type) = kstatement.propertyType, type.kotlinIsNative(primitive: true) {
+        if (kstatement.role.isProperty || kstatement.role == .global), case .unwrappedOptional(let type) = kstatement.propertyType, type.kotlinIsNative(primitive: true) {
             kstatement.messages.append(.kotlinLateinitPrimitive(kstatement, source: translator.syntaxTree.source))
         }
         if statement.isAsync {
@@ -2175,9 +2189,9 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         } else {
             attributes.append(to: output, indentation: indentation)
             output.append(indentation)
-            if isProperty || isGlobal {
+            if role.isProperty || role == .global {
                 output.append(modifiers.kotlinMemberString(isOpen: isOpen, suffix: " "))
-                if !usesStorageProperty && !isSuperclassPropertyOverride, case .unwrappedOptional = declaredType {
+                if !usesStorageProperty && role != .superclassOverrideProperty, case .unwrappedOptional = declaredType {
                     output.append("lateinit ")
                 }
             }
@@ -2223,41 +2237,39 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 output.append(getterBody, indentation: getterIndentation.inc())
                 output.append(getterIndentation).append("}\n")
             }
-        } else if (isProperty || isGlobal) && !isProtocolProperty {
-            if isSuperclassPropertyOverride {
-                output.append(indentation.inc()).append("get() = super.\(propertyName)\n")
-            } else if usesStorageProperty || mayBeSharedMutableStruct {
-                let getterIndentation = indentation.inc()
-                let isSingleStatement = (!modifiers.isLazy || mutationFunctionNames == nil) && getFieldIsSingleStatementAppendable
-                output.append(getterIndentation).append("get()")
-                if isSingleStatement {
-                    output.append(" = ")
-                    appendGetField(to: output, indentation: getterIndentation, usesStorageProperty: usesStorageProperty, isSingleStatement: isSingleStatement)
-                } else {
-                    let getterBodyIndentation = getterIndentation.inc()
-                    var getIndentation = getterBodyIndentation
-                    output.append(" {\n")
-                    if let mutationFunctionNames, modifiers.isLazy {
-                        // Lazy getters are considered mutable
-                        output.append(getterBodyIndentation).append("val isinitialized = \(lazyInitInitializedName)\n")
-                        output.append(getterBodyIndentation).append("if (!isinitialized) \(mutationFunctionNames.willMutate)()\n")
-                        output.append(getterBodyIndentation).append("try {\n")
-                        getIndentation = getterBodyIndentation.inc()
-                    }
-                    appendGetField(to: output, indentation: getIndentation, usesStorageProperty: usesStorageProperty)
-                    if let mutationFunctionNames, modifiers.isLazy {
-                        output.append(getterBodyIndentation).append("} finally {\n")
-                        output.append(getIndentation).append("if (!isinitialized) \(mutationFunctionNames.didMutate)()\n")
-                        output.append(getterBodyIndentation).append("}\n")
-                    }
-                    output.append(getterIndentation).append("}\n")
+        } else if role == .superclassOverrideProperty {
+            output.append(indentation.inc()).append("get() = super.\(propertyName)\n")
+        } else if (role.isProperty && role != .protocolProperty) || role == .global, usesStorageProperty || mayBeSharedMutableStruct {
+            let getterIndentation = indentation.inc()
+            let isSingleStatement = (!modifiers.isLazy || mutationFunctionNames == nil) && getFieldIsSingleStatementAppendable
+            output.append(getterIndentation).append("get()")
+            if isSingleStatement {
+                output.append(" = ")
+                appendGetField(to: output, indentation: getterIndentation, usesStorageProperty: usesStorageProperty, isSingleStatement: isSingleStatement)
+            } else {
+                let getterBodyIndentation = getterIndentation.inc()
+                var getIndentation = getterBodyIndentation
+                output.append(" {\n")
+                if let mutationFunctionNames, modifiers.isLazy {
+                    // Lazy getters are considered mutable
+                    output.append(getterBodyIndentation).append("val isinitialized = \(lazyInitInitializedName)\n")
+                    output.append(getterBodyIndentation).append("if (!isinitialized) \(mutationFunctionNames.willMutate)()\n")
+                    output.append(getterBodyIndentation).append("try {\n")
+                    getIndentation = getterBodyIndentation.inc()
                 }
+                appendGetField(to: output, indentation: getIndentation, usesStorageProperty: usesStorageProperty)
+                if let mutationFunctionNames, modifiers.isLazy {
+                    output.append(getterBodyIndentation).append("} finally {\n")
+                    output.append(getIndentation).append("if (!isinitialized) \(mutationFunctionNames.didMutate)()\n")
+                    output.append(getterBodyIndentation).append("}\n")
+                }
+                output.append(getterIndentation).append("}\n")
             }
         }
 
         let hasCustomSet = setter?.body != nil || willSet?.body != nil || didSet?.body != nil
         if hasCustomSet || mutationFunctionNames != nil {
-            let isStoredOverride = getter?.body == nil && isSuperclassPropertyOverride
+            let isStoredOverride = getter?.body == nil && role == .superclassOverrideProperty
             let setterIndentation = indentation.inc()
             let setterBodyIndentation = setterIndentation.inc()
             output.append(setterIndentation).append("set(newValue) {\n")
@@ -2331,7 +2343,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 }
             }
             output.append(setterIndentation).append("}\n")
-        } else if (!isReadOnly || isAssignFromWriteable) && (isProperty || isGlobal) && !isProtocolProperty {
+        } else if !isReadOnly || isAssignFromWriteable, (role.isProperty && role != .protocolProperty) || role == .global {
             if usesStorageProperty || mayBeSharedMutableStruct {
                 let setterIndentation = indentation.inc()
                 output.append(setterIndentation).append("set(newValue) {\n")
@@ -2364,7 +2376,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             output.append(" = ").append(value, indentation: indentation)
         } else {
             // In Swift an optional var defaults to nil, but not so in Kotlin
-            if (isProperty || isGlobal), !isProtocolProperty, declaredType.isOptional, !isLet, getter == nil {
+            if (role.isProperty && role != .protocolProperty) || role == .global, declaredType.isOptional, !isLet, getter == nil {
                 output.append(" = null")
             }
         }
@@ -2406,7 +2418,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
 
     private var usesStorageProperty: Bool {
-        guard !isProtocolProperty, isProperty || isGlobal, !isSuperclassPropertyOverride else {
+        guard role == .property || role == .global else {
             return false
         }
         if modifiers.isLazy {

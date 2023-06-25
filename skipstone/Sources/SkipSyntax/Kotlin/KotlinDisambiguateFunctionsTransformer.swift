@@ -45,7 +45,7 @@ final class KotlinDisambiguateFunctionsTransformer: KotlinTransformer {
             let functionDeclarations = interfaceDeclaration.members.compactMap { $0 as? KotlinFunctionDeclaration }
             functionDeclarations.forEach { disambiguateFunctionDeclaration($0, in: interfaceDeclaration.signature, codebaseInfo: codebaseInfo) }
         } else if let functionDeclaration = node as? KotlinFunctionDeclaration {
-            if functionDeclaration.isGlobal || functionDeclaration.extends != nil {
+            if functionDeclaration.role == .global || functionDeclaration.extends != nil {
                 disambiguateFunctionDeclaration(functionDeclaration, in: functionDeclaration.extends?.0, codebaseInfo: codebaseInfo)
             }
         }

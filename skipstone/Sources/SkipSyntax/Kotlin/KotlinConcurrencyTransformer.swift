@@ -77,9 +77,9 @@ fileprivate extension CodebaseInfo.Context {
             return true
         }
         let match: APIMatch?
-        if declaration.isProperty, let owningType = owningType(of: declaration) {
+        if declaration.role.isProperty, let owningType = owningType(of: declaration) {
             match = matchIdentifier(name: declaration.propertyName, inConstrained: owningType)
-        } else if declaration.isGlobal {
+        } else if declaration.role == .global {
             match = matchIdentifier(name: declaration.propertyName)
         } else {
             match = nil

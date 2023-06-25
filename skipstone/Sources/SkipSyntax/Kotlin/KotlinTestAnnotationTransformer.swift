@@ -20,7 +20,7 @@ final class KotlinTestAnnotationTransformer: KotlinTransformer {
         guard let owningClass else {
             return false
         }
-        guard functionDeclaration.name.hasPrefix("test") && !functionDeclaration.isStatic && !functionDeclaration.isGlobal else {
+        guard functionDeclaration.name.hasPrefix("test") && !functionDeclaration.isStatic && functionDeclaration.role != .global else {
             return false
         }
         if !functionDeclaration.parameters.isEmpty {
