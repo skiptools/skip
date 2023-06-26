@@ -623,6 +623,8 @@ class FunctionCall: Expression, APICallExpression {
     let function: Expression
     let arguments: [LabeledValue<Expression>]
     private(set) var isInit = false
+    /// Whether this is a call on the `Optional` type, e.g. `Optional<T>.map`.
+    private(set) var isCallOnOptional = false
 
     init(function: Expression, arguments: [LabeledValue<Expression>], syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.function = function
@@ -657,6 +659,7 @@ class FunctionCall: Expression, APICallExpression {
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
         let baseType: TypeSignature?
         let name: String
+        var isUnchainedOptional = false
         switch function.type {
         case .arrayLiteral:
             // Must be a constructor call, e.g. [String]()
@@ -704,6 +707,7 @@ class FunctionCall: Expression, APICallExpression {
             }
             baseType = memberAccess.baseType
             name = memberAccess.member
+            isUnchainedOptional = Self.isUnchainedOptional(expression: memberAccess.base)
         default:
             function.inferTypes(context: context, expecting: .none)
             let functionType = function.inferredType.asOptional(false)
@@ -712,7 +716,7 @@ class FunctionCall: Expression, APICallExpression {
                     returnType = returnType.asOptional(true)
                 }
                 self.returnType = returnType.or(expecting)
-                signature = functionType
+                apiSignature = functionType
                 apiFlags = (function as? APICallExpression)?.apiFlags
             } else {
                 returnType = expecting
@@ -723,35 +727,66 @@ class FunctionCall: Expression, APICallExpression {
         // First we infer argument types without knowing the function, so we expect .none
         arguments.forEach { $0.value.inferTypes(context: context, expecting: .none) }
         let argumentTypes = arguments.map { $0.value.inferredType }
-        if var match = matchFunction(name: name, arguments: arguments, in: baseType, context: context, expecting: expecting, message: true) {
+        let match: (TypeSignature, APIMatch)?
+        let matchBaseType: TypeSignature?
+        if isUnchainedOptional, let baseType, baseType != .none, let optionalMatch = matchFunction(name: name, arguments: arguments, in: .named("Optional", [baseType]), context: context, expecting: expecting, message: false) {
+            match = optionalMatch
+            matchBaseType = .named("Optional", [baseType])
+        } else {
+            match = matchFunction(name: name, arguments: arguments, in: baseType, context: context, expecting: expecting, message: true)
+            matchBaseType = baseType
+        }
+        if var match {
             // Re-infer arguments now that we know the parameter types
             for (index, argument) in arguments.enumerated() {
-                argument.value.inferTypes(context: context, expecting: match.signature.parameters[index].type)
+                argument.value.inferTypes(context: context, expecting: match.0.parameters[index].type)
             }
             // If any argument types changed, it could affect the return type of a generic function
             let refinedArgumentTypes = arguments.map({ $0.value.inferredType })
             if argumentTypes != refinedArgumentTypes {
-                if let refinedMatch = matchFunction(name: name, arguments: arguments, in: baseType, context: context, expecting: expecting, message: false) {
+                if let refinedMatch = matchFunction(name: name, arguments: arguments, in: matchBaseType, context: context, expecting: expecting, message: false) {
                     match = refinedMatch
                 }
             }
-            isInit = match.declarationType == .initDeclaration
-            signature = match.signature
-            apiFlags = match.apiFlags
-            returnType = match.signature.returnType.or(expecting)
+            isInit = match.1.declarationType == .initDeclaration
+            apiSignature = match.1.signature
+            apiFlags = match.1.apiFlags
+            returnType = match.0.returnType.or(expecting)
+            if isUnchainedOptional {
+                isCallOnOptional = true
+            }
         } else {
             returnType = expecting
         }
         return context
     }
 
-    private func matchFunction(name: String, arguments: [LabeledValue<Expression>], in baseType: TypeSignature?, context: TypeInferenceContext, expecting: TypeSignature, message: Bool) -> APIMatch? {
+    private func matchFunction(name: String, arguments: [LabeledValue<Expression>], in baseType: TypeSignature?, context: TypeInferenceContext, expecting: TypeSignature, message: Bool) -> (TypeSignature, APIMatch)? {
         let parameters = arguments.map { LabeledValue<TypeSignature>(label: $0.label, value: $0.value.inferredType) }
         let matches = context.function(name, in: baseType, parameters: parameters, messagesNode: message ? self : nil)
         guard !matches.isEmpty else {
             return nil
         }
-        return matches.first { $0.signature.returnType == expecting } ?? matches[0]
+        return matches.first { $0.0.returnType == expecting } ?? matches[0]
+    }
+
+    private static func isUnchainedOptional(expression: Expression?) -> Bool {
+        guard let expression else {
+            return false
+        }
+        guard expression.inferredType.isOptional else {
+            return false
+        }
+        guard (expression as? PostfixOperator)?.operatorSymbol != "?" else {
+            return false
+        }
+        guard let apiCallExpression = expression as? APICallExpression else {
+            return true // Any optional that isn't an identifier, member access, or function call would normally need to be chained
+        }
+        guard let apiSignature = apiCallExpression.apiSignature else {
+            return false // Unknown defaults to false
+        }
+        return apiSignature.isOptional || apiSignature.returnType.isOptional
     }
 
     private var returnType: TypeSignature = .none
@@ -759,7 +794,7 @@ class FunctionCall: Expression, APICallExpression {
     override var inferredType: TypeSignature {
         return returnType
     }
-    var signature: TypeSignature?
+    var apiSignature: TypeSignature?
     var apiFlags: APIFlags?
 
     override var children: [SyntaxNode] {
@@ -822,7 +857,10 @@ class Identifier: Expression, APICallExpression {
     override var inferredType: TypeSignature {
         return identifierType
     }
-    var apiFlags: APIFlags? = nil
+    var apiSignature: TypeSignature? {
+        return inferredType
+    }
+    var apiFlags: APIFlags?
 
     override var prettyPrintAttributes: [PrettyPrintTree] {
         var children: [PrettyPrintTree] = []
@@ -1049,9 +1087,10 @@ class MemberAccess: Expression, APICallExpression {
         }
         // Don't output unavailable messages here if this is part of a function call. There could be other
         // member matches. The function call node will have more type information
-        if let match = context.member(member, in: baseType, messagesNode: isCalledAsFunction ? nil : self) {
+        if let (signature, match) = context.member(member, in: baseType, messagesNode: isCalledAsFunction ? nil : self) {
+            memberType = signature
             apiFlags = match.apiFlags
-            memberType = match.signature
+            apiSignature = match.signature
             if let generics {
                 memberType = memberType.withGenerics(generics)
             }
@@ -1070,6 +1109,7 @@ class MemberAccess: Expression, APICallExpression {
     override var inferredType: TypeSignature {
         return memberType
     }
+    var apiSignature: TypeSignature?
     var apiFlags: APIFlags?
 
     override var children: [SyntaxNode] {
@@ -1488,13 +1528,14 @@ class Subscript: Expression, APICallExpression {
         let parameters = arguments.map { LabeledValue<TypeSignature>(label: $0.label, value: $0.value.inferredType) }
         let matches = context.subscript(in: base.inferredType, parameters: parameters, messagesNode: self)
         if !matches.isEmpty {
-            let match = matches.first { $0.signature.returnType == expecting } ?? matches[0]
+            let match = matches.first { $0.0.returnType == expecting } ?? matches[0]
             // Re-infer arguments now that we know the parameter types
             for (index, argument) in arguments.enumerated() {
-                argument.value.inferTypes(context: context, expecting: match.signature.parameters[index].type)
+                argument.value.inferTypes(context: context, expecting: match.0.parameters[index].type)
             }
-            returnType = match.signature.returnType.or(expecting)
-            apiFlags = match.apiFlags
+            returnType = match.0.returnType.or(expecting)
+            apiSignature = match.1.signature
+            apiFlags = match.1.apiFlags
         } else {
             returnType = expecting
         }
@@ -1506,6 +1547,7 @@ class Subscript: Expression, APICallExpression {
     override var inferredType: TypeSignature {
         return returnType
     }
+    var apiSignature: TypeSignature?
     var apiFlags: APIFlags?
 
     override var children: [SyntaxNode] {

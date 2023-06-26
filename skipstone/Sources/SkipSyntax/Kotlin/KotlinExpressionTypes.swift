@@ -662,7 +662,7 @@ class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting {
     var arguments: [LabeledValue<KotlinExpression>] = []
     var isOptionalInit = false
     var inferredType: TypeSignature = .none
-    var signature: TypeSignature?
+    var apiSignature: TypeSignature?
     var apiFlags: APIFlags?
     var mayBeSharedMutableStructType = false
     var useTrailingClosureFormatting = true
@@ -676,9 +676,13 @@ class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting {
         }
         kexpression.isOptionalInit = expression.isInit && expression.inferredType.isOptional
         kexpression.inferredType = expression.inferredType
-        kexpression.signature = expression.signature
+        kexpression.apiSignature = expression.apiSignature
         kexpression.apiFlags = expression.apiFlags
         kexpression.mayBeSharedMutableStructType = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
+        // Give Optional function names the 'optional' prefix to avoid conflicts with other API, e.g. T?.optionalmap(...)
+        if expression.isCallOnOptional, let memberAccess = kexpression.function as? KotlinMemberAccess, !memberAccess.member.hasPrefix("optional") {
+            memberAccess.member = "optional" + memberAccess.member
+        }
         return kexpression
     }
 
@@ -759,8 +763,8 @@ class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting {
             output.append("(")
         }
         let parameters: [TypeSignature.Parameter]?
-        if let signature, signature.parameters.count == arguments.count {
-            parameters = signature.parameters
+        if let apiSignature, apiSignature.parameters.count == arguments.count {
+            parameters = apiSignature.parameters
         } else {
             parameters = nil
         }

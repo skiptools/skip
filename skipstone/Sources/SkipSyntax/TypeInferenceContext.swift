@@ -7,7 +7,6 @@ struct TypeInferenceContext {
     private struct PathEntry {
         var typeDeclaration: TypeDeclaration? = nil
         var isStatic = false
-        var identifiers: [String: TypeSignature] = [:]
     }
 
     /// Context source.
@@ -41,22 +40,20 @@ struct TypeInferenceContext {
 
     /// Return a context for evaluating the code of the given function.
     func pushing(_ functionDeclaration: FunctionDeclaration) -> TypeInferenceContext {
-        var context = self
         let parameterDictionary = functionDeclaration.parameters.reduce(into: [String: TypeSignature]()) { result, parameter in
             result[parameter.internalLabel] = parameter.declaredType
         }
+        var context = addingIdentifiers(parameterDictionary)
         context.expectedReturn = functionDeclaration.returnType
         if functionDeclaration.modifiers.isStatic, let lastTypePathIndex = context.path.lastIndex(where: { $0.typeDeclaration != nil }) {
             context.path[lastTypePathIndex].isStatic = true
         }
-        context.path.append(PathEntry(identifiers: parameterDictionary))
         context.generics = context.generics.merge(overrides: functionDeclaration.generics, addNew: true)
         return context
     }
 
     /// Return a context for evaluating the code of the given closure.
     func pushing(_ closure: Closure) -> TypeInferenceContext {
-        var context = self
         var parameterDictionary: [String: TypeSignature] = [:]
         // Use the inferred type because we'll already have done our best if the parameter types are not declared
         if !closure.inferredType.parameters.isEmpty {
@@ -69,7 +66,7 @@ struct TypeInferenceContext {
                 }
             }
         }
-        context.path.append(PathEntry(identifiers: parameterDictionary))
+        var context = addingIdentifiers(parameterDictionary)
         context.expectedReturn = closure.returnType.or(closure.inferredType.returnType)
         return context
     }
@@ -79,9 +76,7 @@ struct TypeInferenceContext {
         guard !identifiers.isEmpty else {
             return self
         }
-        var context = self
-        context.path.append(PathEntry(identifiers: identifiers))
-        return context
+        return addingIdentifiers(identifiers)
     }
 
     /// Return a context expecting the given type to be returned from the current code block.
@@ -127,15 +122,9 @@ struct TypeInferenceContext {
 
     /// Return the type of the given identifier.
     func identifier(_ name: String, messagesNode: SyntaxNode?) -> APIMatch? {
-        // First check local identifiers
+        // Check local identifiers and bindings
         if let identifierType = localIdentifierTypes[name] {
             return APIMatch(signature: identifierType.constrainedTypeWithGenerics(generics))
-        }
-        // Next check function / closure / block bindings
-        for pathEntry in path.reversed() {
-            if let identifierType = pathEntry.identifiers[name] {
-                return APIMatch(signature: identifierType.constrainedTypeWithGenerics(generics))
-            }
         }
         if name == "self" || name == "Self" || name == "super" {
             guard let pathEntry = path.last(where: { $0.typeDeclaration != nil }), let typeDeclaration = pathEntry.typeDeclaration else {
@@ -192,25 +181,25 @@ struct TypeInferenceContext {
         if localIdentifierTypes.keys.contains(name) {
             return true
         }
-        for pathEntry in path.reversed() {
-            if pathEntry.identifiers.keys.contains(name) {
-                return true
-            }
-        }
         return false
     }
 
     /// Return the type of the given member.
-    func member(_ name: String, in type: TypeSignature, messagesNode: SyntaxNode?) -> APIMatch? {
+    ///
+    /// The returned signature may be different than the returned `APIMatch.signature` due to optional chaining.
+    func member(_ name: String, in type: TypeSignature, messagesNode: SyntaxNode?) -> (TypeSignature, APIMatch)? {
         if type.isOptional {
-            if var match = member(name, inNonOptional: type.asOptional(false), messagesNode: messagesNode) {
-                match.signature = match.signature.asOptional(true)
-                return match
+            if let match = member(name, inNonOptional: type.asOptional(false), messagesNode: messagesNode) {
+                return (match.signature.asOptional(true), match)
             } else {
                 return nil
             }
         } else {
-            return member(name, inNonOptional: type, messagesNode: messagesNode)
+            if let match = member(name, inNonOptional: type, messagesNode: messagesNode) {
+                return (match.signature, match)
+            } else {
+                return nil
+            }
         }
     }
 
@@ -238,19 +227,18 @@ struct TypeInferenceContext {
 
     /// Return the signatures of the functions matching the given parameters, and whether each is an init call.
     ///
-    /// The match on the parameter types will attempt to allow for unknown types.
+    /// The match on the parameter types will attempt to allow for unknown types. The returned signatures may be different than the returned `APIMatch.signatures` due to optional chaining.
     ///
     /// - Parameters:
     ///   - type: The function's owning type if this is a member function, or nil if not.
-    func function(_ name: String, in type: TypeSignature?, parameters: [LabeledValue<TypeSignature>], messagesNode: SyntaxNode?) -> [APIMatch] {
+    func function(_ name: String, in type: TypeSignature?, parameters: [LabeledValue<TypeSignature>], messagesNode: SyntaxNode?) -> [(TypeSignature, APIMatch)] {
         if let type, type.isOptional {
-            return function(name, inNonOptional: type.asOptional(false), parameters: parameters, messagesNode: messagesNode).map {
-                var match = $0
-                match.signature = .function(match.signature.parameters, match.signature.returnType.asOptional(true))
-                return match
+            return function(name, inNonOptional: type.asOptional(false), parameters: parameters, messagesNode: messagesNode).map { match in
+                let signature: TypeSignature = .function(match.signature.parameters, match.signature.returnType.asOptional(true))
+                return (signature, match)
             }
         } else {
-            return function(name, inNonOptional: type, parameters: parameters, messagesNode: messagesNode)
+            return function(name, inNonOptional: type, parameters: parameters, messagesNode: messagesNode).map { ($0.signature, $0) }
         }
     }
 
@@ -309,19 +297,18 @@ struct TypeInferenceContext {
 
     /// Return the signatures of the subscripts matching the given parameters.
     ///
-    /// The match on the parameter types will attempt to allow for unknown types.
+    /// The match on the parameter types will attempt to allow for unknown types. The returned signatures may be different than the returned `APIMatch.signatures` due to optional chaining.
     ///
     /// - Parameters:
     ///   - type: The subscript's owning type.
-    func `subscript`(in type: TypeSignature, parameters: [LabeledValue<TypeSignature>], messagesNode: SyntaxNode?) -> [APIMatch] {
+    func `subscript`(in type: TypeSignature, parameters: [LabeledValue<TypeSignature>], messagesNode: SyntaxNode?) -> [(TypeSignature, APIMatch)] {
         if case .optional = type {
-            return self.subscript(inNonOptional: type.asOptional(false), parameters: parameters, messagesNode: messagesNode).map {
-                var match = $0
-                match.signature = .function(match.signature.parameters, match.signature.returnType.asOptional(true))
-                return match
+            return self.subscript(inNonOptional: type.asOptional(false), parameters: parameters, messagesNode: messagesNode).map { match in
+                let signature: TypeSignature = .function(match.signature.parameters, match.signature.returnType.asOptional(true))
+                return (signature, match)
             }
         } else {
-            return self.subscript(inNonOptional: type, parameters: parameters, messagesNode: messagesNode)
+            return self.subscript(inNonOptional: type, parameters: parameters, messagesNode: messagesNode).map { ($0.signature, $0) }
         }
     }
 
