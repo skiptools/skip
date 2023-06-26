@@ -155,6 +155,14 @@ extension Message {
         return Message(kind: .error, message: "Skip does not support custom operators. Consider using a standard function", sourceDerived: sourceDerived, source: source)
     }
 
+    static func kotlinOperatorUnsupported(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Kotlin does not support this operator", sourceDerived: sourceDerived, source: source)
+    }
+
+    static func kotlinOperatorUnsupportedAssignment(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Kotlin does not support this as a compound assignment operator. Turn this into a standard x = x + y format", sourceDerived: sourceDerived, source: source)
+    }
+
     static func kotlinOptionalChainUnwrap(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .warning, message: "In Kotlin, force unwrapping any part of an optional chain unwraps the entire chain up to that point. This is different than Swift's force unwrap operator, which only applies to the link of the chain on which it is applied. Consider breaking up this chain or using either ? or ! consistently through it", sourceDerived: sourceDerived, source: source)
     }

@@ -300,4 +300,36 @@ final class OperatorTests: XCTestCase {
         }
         """)
     }
+
+    func testBitwiseOperators() async throws {
+        try await check(swift: """
+        func f(i: Int) -> Int {
+            var r = i
+            r = r | 100
+            r = r & 100
+            r = ~r
+            r = r << 1
+            r = r >> 2
+            return r
+        }
+        """, kotlin: """
+        internal fun f(i: Int): Int {
+            var r = i
+            r = r or 100
+            r = r and 100
+            r = r.inv()
+            r = r shl 1
+            r = r shr 2
+            return r
+        }
+        """)
+
+        try await checkProducesMessage(swift: """
+        func f(i: Int) -> Int {
+            var r = i
+            r |= 100
+            return r
+        }
+        """)
+    }
 }

@@ -172,6 +172,15 @@ class KotlinBinaryOperator: KotlinExpression {
         }
         let kexpression = KotlinBinaryOperator(expression: expression, lhs: klhs, rhs: krhs)
         kexpression.mayBeSharedMutableStruct = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
+
+        switch expression.op.symbol {
+        case "<<=", ">>=", "&=", "|=", "^=", "~=":
+            kexpression.messages.append(.kotlinOperatorUnsupportedAssignment(kexpression, source: translator.syntaxTree.source))
+        case ".==", ".!=", ".<", ".<=", ".>", ".>=", "&+", "&-", "&*":
+            kexpression.messages.append(.kotlinOperatorUnsupported(kexpression, source: translator.syntaxTree.source))
+        default:
+            break
+        }
         return kexpression
     }
 
@@ -1771,17 +1780,30 @@ class KotlinPrefixOperator: KotlinExpression {
         case "as", "is":
             // Kotlin will smart cast with 'is' test
             output.append("is ")
+            output.append(target, indentation: indentation)
         case "in":
             // Used as unary prefix operators in when expressions
             output.append(operatorSymbol).append(" ")
+            output.append(target, indentation: indentation)
         case "..<":
             output.append(targetType.kotlin).append(".min until ")
+            output.append(target, indentation: indentation)
         case "...":
             output.append(targetType.kotlin).append(".min..")
+            output.append(target, indentation: indentation)
+        case "~":
+            if target.isCompoundExpression {
+                output.append("(")
+            }
+            output.append(target, indentation: indentation)
+            if target.isCompoundExpression {
+                output.append(")")
+            }
+            output.append(".inv()")
         default:
             output.append(operatorSymbol)
+            output.append(target, indentation: indentation)
         }
-        output.append(target, indentation: indentation)
     }
 }
 

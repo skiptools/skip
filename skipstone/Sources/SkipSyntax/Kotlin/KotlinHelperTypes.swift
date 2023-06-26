@@ -88,6 +88,8 @@ extension Operator {
             return "or"
         case "&":
             return "and"
+        case "^":
+            return "xor"
         case "<<":
             return "shl"
         case ">>":
