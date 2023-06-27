@@ -27,7 +27,7 @@ extension Message {
     }
 
     static func kotlinAttributeUnsupported(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .warning, message: "Kotlin does not support this Swift attribute or property wrapper", sourceDerived: sourceDerived, source: source)
+        return Message(kind: .warning, message: "Kotlin does not support this Swift attribute, macro, or property wrapper", sourceDerived: sourceDerived, source: source)
     }
 
     static func kotlinAttributeOnParameterUnsupported(_ sourceDerived: SourceDerived, source: Source) -> Message {
@@ -120,6 +120,14 @@ extension Message {
         let function = "\(type?.description ?? "").\(name)(\(parameters.map(\.description).joined(separator: ", ")))"
         let message = "Function \(function) has the same name and parameter types as a conflicting function, but Skip is unable to change its signature because it is part of a protocol that may be implemented by other types. Kotlin does not disambiguate functions on parameter labels. Consider changing the name of this function"
         return Message(kind: .warning, message: message, sourceFile: sourceFile)
+    }
+
+    static func kotlinGenericCast(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .warning, message: "Kotlin does not preserve generics at runtime. The generic portion of this cast will act as a force cast, which may not be your desired behavior", sourceDerived: sourceDerived, source: source)
+    }
+
+    static func kotlinGenericCheck(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .warning, message: "Kotlin does not preserve generics at runtime. The generic types will be ignored in this comparison, which may not be your desired behavior", sourceDerived: sourceDerived, source: source)
     }
 
     static func kotlinGenericExtensionStaticMember(_ sourceDerived: SourceDerived, source: Source) -> Message {

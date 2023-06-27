@@ -164,12 +164,13 @@ class KotlinBinaryOperator: KotlinExpression {
         
         let klhs = translator.translateExpression(expression.lhs)
         var krhs = translator.translateExpression(expression.rhs)
-        // We need to sref() on assigning to a local var, but members sref() on assignment already.
-        // This won't catch implicit members, however (i.e. 'x' in place of 'self.x'). We also don't
-        // need to sref() on assignment to self, which will be translated to a special function call
         if expression.op.precedence == .assignment && !(klhs is KotlinMemberAccess) && !((klhs as? KotlinIdentifier)?.name == "self") {
+            // We need to sref() on assigning to a local var, but members sref() on assignment already.
+            // This won't catch implicit members, however (i.e. 'x' in place of 'self.x'). We also don't
+            // need to sref() on assignment to self, which will be translated to a special function call
             krhs = krhs.sref()
         }
+
         let kexpression = KotlinBinaryOperator(expression: expression, lhs: klhs, rhs: krhs)
         kexpression.mayBeSharedMutableStruct = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
 
@@ -180,6 +181,15 @@ class KotlinBinaryOperator: KotlinExpression {
             kexpression.messages.append(.kotlinOperatorUnsupported(kexpression, source: translator.syntaxTree.source))
         default:
             break
+        }
+        if expression.op.precedence == .cast && expression.op.symbol != "as!", var castTarget = krhs as? KotlinCastTarget, let castGenerics = castTarget.generics, !castGenerics.isEmpty {
+            // Kotlin type erases generics at runtime, so we typically can't use them in casts
+            if expression.op.symbol == "is" {
+                castTarget.isGenericsTypeErased = true
+                krhs.messages.append(.kotlinGenericCheck(krhs, source: translator.syntaxTree.source))
+            } else {
+                krhs.messages.append(.kotlinGenericCast(krhs, source: translator.syntaxTree.source))
+            }
         }
         return kexpression
     }
@@ -815,9 +825,8 @@ class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting {
     }
 }
 
-class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting {
+class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTarget {
     var name: String
-    var generics: [TypeSignature]?
     var apiFlags: APIFlags?
     var mayBeSharedMutableStruct = false
     var isLocalOrSelfIdentifier = false
@@ -864,6 +873,9 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting {
         return .isolated
     }
 
+    var generics: [TypeSignature]?
+    var isGenericsTypeErased = false
+
     override func mayBeSharedMutableStructExpression(orType: Bool) -> Bool {
         return mayBeSharedMutableStruct
     }
@@ -887,6 +899,10 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting {
             if isFunctionReference {
                 // To refer to a function rather than call it, Kotlin uses ::
                 output.append("::")
+            }
+            var generics = self.generics
+            if isGenericsTypeErased {
+                generics = generics?.map { _ in TypeSignature.named("*", []) }
             }
             let builtinType = TypeSignature.for(name: name, genericTypes: generics ?? [], allowNamed: false)
             if builtinType != .none {
@@ -1280,11 +1296,10 @@ struct KotlinMatchingCase {
     }
 }
 
-class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting {
+class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinCastTarget {
     var base: KotlinExpression?
     var baseKClass: TypeSignature?
     var member: String
-    var generics: [TypeSignature]?
     var apiFlags: APIFlags?
     var useMultlineFormatting = false
     var baseType: TypeSignature = .none
@@ -1416,6 +1431,9 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting {
         return isBaseIncludedInMainActor ? .isolated : .none
     }
 
+    var generics: [TypeSignature]?
+    var isGenericsTypeErased = false
+
     override func mayBeSharedMutableStructExpression(orType: Bool) -> Bool {
         // Though we sref() when returning property values, any returned mutable struct may have its onUpdate block
         // set, and we need to sref() again on assignment to get an unowned copy
@@ -1498,7 +1516,10 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting {
         } else {
             output.append(member)
         }
-        if let generics, !generics.isEmpty {
+        if var generics, !generics.isEmpty {
+            if isGenericsTypeErased {
+                generics = generics.map { _ in TypeSignature.named("*", []) }
+            }
             output.append("<\(generics.map(\.kotlin).joined(separator: ", "))>")
         }
         if mainActorOutputMode == .isolated {
@@ -2167,13 +2188,18 @@ class KotlinTupleLiteral: KotlinExpression {
     }
 }
 
-class KotlinTypeLiteral: KotlinExpression {
+class KotlinTypeLiteral: KotlinExpression, KotlinCastTarget {
     var literal: TypeSignature
 
     init(expression: TypeLiteral) {
         self.literal = expression.literal
         super.init(type: .typeLiteral, expression: expression)
     }
+
+    var generics: [TypeSignature]? {
+        return literal.generics
+    }
+    var isGenericsTypeErased = false
 
     override func insertDependencies(into dependencies: inout KotlinDependencies) {
         if literal.kotlinReferencesKClass {
@@ -2182,7 +2208,12 @@ class KotlinTypeLiteral: KotlinExpression {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
-        output.append(literal.kotlin)
+        if isGenericsTypeErased && !literal.generics.isEmpty {
+            let typeErasedLiteral = literal.withGenerics(literal.generics.map { _ in TypeSignature.named("*", []) })
+            output.append(typeErasedLiteral.kotlin)
+        } else {
+            output.append(literal.kotlin)
+        }
     }
 }
 

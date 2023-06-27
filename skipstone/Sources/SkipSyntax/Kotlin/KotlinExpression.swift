@@ -129,6 +129,12 @@ extension KotlinMainActorTargeting where Self: KotlinSyntaxNode {
     }
 }
 
+/// An expression that can act as the target of a cast operation.
+protocol KotlinCastTarget {
+    var generics: [TypeSignature]? { get }
+    var isGenericsTypeErased: Bool { get set }
+}
+
 class KotlinRawExpression: KotlinExpression {
     let sourceCode: String
 

@@ -130,6 +130,79 @@ final class OperatorTests: XCTestCase {
         """)
     }
 
+    func testGenericCastBehavior() async throws  {
+        let a: Any = [1, 2, 3]
+        XCTAssertTrue(a is [Int])
+        XCTAssertTrue(a is [Any])
+
+        struct S<T> {
+        }
+        let s: Any = S<Int>()
+        XCTAssertTrue(s is S<Int>)
+        XCTAssertFalse(s is S<Any>) // OK... but why does the Array case above pass?
+    }
+
+    func testGenericCast() async throws {
+        try await check(expectMessages: true, swift: """
+        func f(o: Any) -> Bool {
+            return o is [Int]
+        }
+        """, kotlin: """
+        internal fun f(o: Any): Boolean = o is Array<*>
+        """)
+
+        try await check(expectMessages: true, swift: """
+        func f(o: Any) -> Bool {
+            return o is Array<Int>
+        }
+        """, kotlin: """
+        internal fun f(o: Any): Boolean = o is Array<*>
+        """)
+
+        try await check(expectMessages: true, swift: """
+        func f<T>(o: [T]) -> Bool {
+            return o is Array<Int>
+        }
+        """, kotlin: """
+        internal fun <T> f(o: Array<T>): Boolean = o is Array<*>
+        """)
+
+        try await check(expectMessages: true, swift: """
+        func f<T>(o: [T]) -> Bool {
+            return o is Collection<T>
+        }
+        """, kotlin: """
+        internal fun <T> f(o: Array<T>): Boolean = o is Collection<*>
+        """)
+
+        try await check(expectMessages: true, swift: """
+        struct S<T> {}
+        func f(o: Any) -> Bool {
+            return o is S<Int>
+        }
+        """, kotlin: """
+        internal class S<T> {
+        }
+        internal fun f(o: Any): Boolean = o is S<*>
+        """)
+
+        try await check(swift: """
+        func f(o: Any) -> [Int] {
+            return o as! [Int]
+        }
+        """, kotlin: """
+        internal fun f(o: Any): Array<Int> = (o as Array<Int>).sref()
+        """)
+
+        try await check(expectMessages: true, swift: """
+        func f(o: Any) -> [Int]? {
+            return o as? [Int]
+        }
+        """, kotlin: """
+        internal fun f(o: Any): Array<Int>? = (o as? Array<Int>).sref()
+        """)
+    }
+
     func testNilCoalescing() async throws {
         try await check(supportingSwift: """
         extension Int {
