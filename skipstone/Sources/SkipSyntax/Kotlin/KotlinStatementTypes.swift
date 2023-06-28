@@ -1012,7 +1012,7 @@ class KotlinClassDeclaration: KotlinStatement {
             } else {
                 output.append("class ").append(name)
             }
-            generics.append(to: output, indentation: indentation, outParameters: isSealedClassesEnum)
+            generics.append(to: output, indentation: indentation, modifier: isSealedClassesEnum ? "out" : nil)
 
             var inherits = inherits
             if enumInheritedRawValueType != .none {
@@ -1554,12 +1554,24 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             output.append("suspend ")
         }
 
+
+        let generics = functionGenerics.filterWhereEqual()
+
+        let inline = attributes.contains(.inlineAlways)
+            && !isOpen  // 'inline' modifier is not allowed on virtual members. Only private or final members can be inlined
+            && (modifiers.visibility == .internal || modifiers.visibility == .private)
+
+        // if we can inline the function, then we can also reify the type parameters
+        let reify = inline && !generics.isEmpty
+
         if type != .constructorDeclaration {
+            if inline {
+                output.append("inline ")
+            }
             output.append("fun ")
         }
-        let generics = functionGenerics.filterWhereEqual()
         if !generics.isEmpty {
-            generics.append(to: output, indentation: indentation)
+            generics.append(to: output, indentation: indentation, modifier: reify ? "reified" : nil)
             output.append(" ")
         }
         appendExtends(to: output, indentation: indentation)

@@ -377,6 +377,7 @@ struct Attribute: Equatable {
         case indirect
         case inlinable
         case mainActor
+        case inlineAlways
         case unavailable
         case unknown
     }
@@ -409,6 +410,9 @@ struct Attribute: Equatable {
             return .inlinable
         case "MainActor":
             return .mainActor
+        case "inline":
+            // the two known parameters are `@inline(__always)` and `@inline(never)`, but we seem to not have access to the parameter, so we assume it is "always"
+            return .inlineAlways
         default:
             return .unknown
         }

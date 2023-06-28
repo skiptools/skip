@@ -190,12 +190,12 @@ extension Generics {
         return generics
     }
 
-    func append(to output: OutputGenerator, indentation: Indentation, outParameters: Bool = false) {
+    func append(to output: OutputGenerator, indentation: Indentation, modifier: String? = nil) {
         if entries.isEmpty {
             return
         }
         output.append("<")
-        output.append(entries.map { $0.whereEqual?.kotlin ?? (outParameters ? "out \($0.name)" : $0.name) }.joined(separator: ", "))
+        output.append(entries.map { $0.whereEqual?.kotlin ?? (modifier != nil ? "\(modifier!) \($0.name)" : $0.name) }.joined(separator: ", "))
         output.append(">")
     }
 
