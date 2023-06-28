@@ -187,6 +187,10 @@ public class KotlinCodebaseInfo: CodebaseInfoLanguageAdditions, CodebaseInfoLang
         self.packageName = packageName
     }
 
+    var shouldResolveTypealiases: Bool {
+        return true
+    }
+
     func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather typeInfo: CodebaseInfo.TypeInfo, from statement: ExtensionDeclaration, syntaxTree: SyntaxTree) {
         // Keep the extension statement around so we can move it to the extended declarations
         typeInfo.languageAdditions = ExtensionAdditions(extensionDeclaration: statement, syntaxTree: syntaxTree)
@@ -238,7 +242,7 @@ private class ExtensionAdditions {
                 return nil
             }
             if !hasInferredTypes {
-                let context = codebaseInfo.context(importedModuleNames: importedModuleNames, source: source)
+                let context = codebaseInfo.context(importedModuleNames: importedModuleNames, sourceFile: source.file)
                 let typeInferenceContext = TypeInferenceContext(codebaseInfo: context, unavailableAPI: nil, source: syntaxTree.source)
                 let _ = extensionDeclaration.inferTypes(context: typeInferenceContext, expecting: .none)
                 hasInferredTypes = true

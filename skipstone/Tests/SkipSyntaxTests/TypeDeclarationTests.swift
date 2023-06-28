@@ -223,77 +223,6 @@ final class TypeDeclarationTests: XCTestCase {
         """)
     }
 
-    func testTypealias() async throws {
-        try await check(swift: """
-        private typealias IArray = Array<Bool>
-        """, kotlin: """
-        private typealias IArray = Array<Boolean>
-        """)
-
-        try await check(swift: """
-        typealias SkipUUID = java.util.UUID
-        {
-            let u = SkipUUID.uuidString()
-        }
-        """, kotlin: """
-        internal typealias SkipUUID = java.util.UUID
-        {
-            val u = SkipUUID.uuidString()
-        }
-        """)
-    }
-
-    func testTypealiasToSelf() async throws {
-        // Note: this is invalid Swift, so it doesn't really matter that the output is also invalid
-        try await check(swift: """
-        typealias A = A
-
-        class A {
-        }
-
-        class B : A {
-        }
-        """, kotlin: """
-        internal typealias A = A
-
-        internal open class A {
-        }
-
-        internal open class B: A {
-
-            internal constructor(): super() {
-            }
-
-            internal constructor(): super() {
-            }
-
-            internal constructor(): super() {
-            }
-
-            internal constructor(): super() {
-            }
-
-            internal constructor(): super() {
-            }
-
-            internal constructor(): super() {
-            }
-
-            internal constructor(): super() {
-            }
-
-            internal constructor(): super() {
-            }
-
-            internal constructor(): super() {
-            }
-
-            internal constructor(): super() {
-            }
-        }
-        """)
-    }
-
     func testGenericClass() async throws {
         try await check(swift: """
         class C<T, U> {
@@ -472,16 +401,6 @@ final class TypeDeclarationTests: XCTestCase {
             internal open fun add(x: Double) = Unit
         }
         """)
-
-        try await checkProducesMessage(swift: """
-        protocol P {
-        }
-        class C: P {
-            typealias T = Int
-            func f(t: [T]) {
-            }
-        }
-        """)
     }
 
     func testGenericInheritance() async throws {
@@ -615,18 +534,6 @@ final class TypeDeclarationTests: XCTestCase {
             func f(p: Int) {
             }
         }
-        """)
-    }
-
-    func testGenericTypealias() async throws {
-        try await check(swift: """
-        private typealias EArray<E> = Array<E>
-        """, kotlin: """
-        private typealias EArray<E> = Array<E>
-        """)
-
-        try await checkProducesMessage(swift: """
-        private typealias EArray<E> = Array<E> where E: Comparable
         """)
     }
 

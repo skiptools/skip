@@ -4,22 +4,22 @@ final class KotlinErrorToExceptionTransformer: KotlinTransformer {
         guard let codebaseInfo = translator.codebaseInfo else {
             return
         }
-        syntaxTree.root.visit { visit($0, codebaseInfo: codebaseInfo) }
+        syntaxTree.root.visit { visit($0, codebaseInfo: codebaseInfo, source: translator.syntaxTree.source) }
     }
 
-    private func visit(_ node: KotlinSyntaxNode, codebaseInfo: CodebaseInfo.Context) -> VisitResult<KotlinSyntaxNode> {
+    private func visit(_ node: KotlinSyntaxNode, codebaseInfo: CodebaseInfo.Context, source: Source) -> VisitResult<KotlinSyntaxNode> {
         if let classDeclaration = node as? KotlinClassDeclaration {
-            processClassDeclaration(classDeclaration, codebaseInfo: codebaseInfo)
+            processClassDeclaration(classDeclaration, codebaseInfo: codebaseInfo, source: source)
         }
         return .recurse(nil)
     }
 
-    private func processClassDeclaration(_ classDeclaration: KotlinClassDeclaration, codebaseInfo: CodebaseInfo.Context) {
+    private func processClassDeclaration(_ classDeclaration: KotlinClassDeclaration, codebaseInfo: CodebaseInfo.Context, source: Source) {
         guard codebaseInfo.conformsToError(type: classDeclaration.signature) else {
             return
         }
         if let firstInherits = classDeclaration.inherits.first, codebaseInfo.declarationType(forNamed: firstInherits) == .classDeclaration {
-            classDeclaration.messages.append(.kotlinErrorCannotExtendClass(classDeclaration, source: codebaseInfo.source))
+            classDeclaration.messages.append(.kotlinErrorCannotExtendClass(classDeclaration, source: source))
             return
         }
 

@@ -681,8 +681,7 @@ class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting {
     var arguments: [LabeledValue<KotlinExpression>] = []
     var isOptionalInit = false
     var inferredType: TypeSignature = .none
-    var apiSignature: TypeSignature?
-    var apiFlags: APIFlags?
+    var apiMatch: APIMatch?
     var mayBeSharedMutableStructType = false
     var useTrailingClosureFormatting = true
 
@@ -695,8 +694,7 @@ class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting {
         }
         kexpression.isOptionalInit = expression.isInit && expression.inferredType.isOptional
         kexpression.inferredType = expression.inferredType
-        kexpression.apiSignature = expression.apiSignature
-        kexpression.apiFlags = expression.apiFlags
+        kexpression.apiMatch = expression.apiMatch
         kexpression.mayBeSharedMutableStructType = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
         // Give Optional function names the 'optional' prefix to avoid conflicts with other API, e.g. T?.optionalmap(...)
         if expression.isCallOnOptional, let memberAccess = kexpression.function as? KotlinMemberAccess, !memberAccess.member.hasPrefix("optional") {
@@ -718,6 +716,9 @@ class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting {
 
     var isInAwait = false
     var isInMainActorContext = false
+    var apiFlags: APIFlags? {
+        return apiMatch?.apiFlags
+    }
 
     func mainActorMode(for child: KotlinSyntaxNode) -> KotlinMainActorMode {
         return child === function ? .isolatedFunctionReference : .isolated
@@ -782,8 +783,8 @@ class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting {
             output.append("(")
         }
         let parameters: [TypeSignature.Parameter]?
-        if let apiSignature, apiSignature.parameters.count == arguments.count {
-            parameters = apiSignature.parameters
+        if let apiMatch, apiMatch.signature.parameters.count == arguments.count {
+            parameters = apiMatch.signature.parameters
         } else {
             parameters = nil
         }
@@ -834,17 +835,20 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
     var isInOut = false
     var isFunctionReference = false
     var isModuleNameFor: TypeSignature = .none
+    var isTypealiasFor: TypeSignature = .none
 
     static func translate(expression: Identifier, translator: KotlinTranslator) -> KotlinIdentifier {
         let kexpression = KotlinIdentifier(expression: expression)
         kexpression.generics = expression.generics
-        kexpression.apiFlags = expression.apiFlags
+        kexpression.apiFlags = expression.apiMatch?.apiFlags
         kexpression.isOperatorIdentifier = !Operator.with(symbol: expression.name).isUnknown
         kexpression.mayBeSharedMutableStruct = !kexpression.isOperatorIdentifier && expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
         kexpression.isLocalOrSelfIdentifier = expression.isLocalOrSelfIdentifier
         kexpression.isModuleNameFor = expression.isModuleNameFor
         if case .function = expression.inferredType {
             kexpression.isFunctionReference = !expression.isLocalOrSelfIdentifier && !expression.isCalledAsFunction && translator.codebaseInfo?.isFunctionName(expression.name, in: expression.owningTypeDeclaration?.signature) == true
+        } else if expression.inferredType.isMetaType && expression.apiMatch?.declarationType == .typealiasDeclaration {
+            kexpression.isTypealiasFor = expression.inferredType.asMetaType(false)
         }
         return kexpression
     }
@@ -904,16 +908,24 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
             if isGenericsTypeErased {
                 generics = generics?.map { _ in TypeSignature.named("*", []) }
             }
-            let builtinType = TypeSignature.for(name: name, genericTypes: generics ?? [], allowNamed: false)
-            if builtinType != .none {
-                output.append(builtinType.kotlin)
-            } else {
-                output.append(Self.translateName(name))
+            if isTypealiasFor != .none {
+                var type = isTypealiasFor
                 if let generics, !generics.isEmpty {
-                    output.append("<\(generics.map(\.kotlin).joined(separator: ", "))>")
+                    type = type.withGenerics(generics)
                 }
-                if isInOut {
-                    output.append(".value")
+                output.append(type.kotlin)
+            } else {
+                let builtinType = TypeSignature.for(name: name, genericTypes: generics ?? [], allowNamed: false)
+                if builtinType != .none {
+                    output.append(builtinType.kotlin)
+                } else {
+                    output.append(Self.translateName(name))
+                    if let generics, !generics.isEmpty {
+                        output.append("<\(generics.map(\.kotlin).joined(separator: ", "))>")
+                    }
+                    if isInOut {
+                        output.append(".value")
+                    }
                 }
             }
         }
@@ -1306,6 +1318,7 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinCast
     var mayBeSharedMutableStruct = false
     var isFunctionReference = false
     var isStaticReferenceOrTypeName = false
+    var isTypealiasFor: TypeSignature = .none
 
     static func translate(expression: MemberAccess, translator: KotlinTranslator) -> KotlinMemberAccess {
         let kexpression = KotlinMemberAccess(expression: expression)
@@ -1319,15 +1332,18 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinCast
             }
             if case .function = expression.inferredType {
                 kexpression.isFunctionReference = !expression.isCalledAsFunction && translator.codebaseInfo?.isFunctionName(expression.member, in: base.inferredType) == true
+            } else if expression.inferredType.isMetaType, expression.apiMatch?.declarationType == .typealiasDeclaration {
+                kexpression.isTypealiasFor = expression.inferredType.asMetaType(false)
+            } else {
+                kexpression.baseKClass = kclass(for: base, accessingMember: expression.member, codebaseInfo: translator.codebaseInfo)
             }
-            kexpression.baseKClass = kclass(for: base, accessingMember: expression.member, codebaseInfo: translator.codebaseInfo)
         } else if expression.baseType == .none && translator.codebaseInfo != nil {
             kexpression.messages.append(.kotlinMemberAccessUnknownBaseType(expression, source: translator.syntaxTree.source, member: expression.member))
         } else if expression.inferredType.isOptional, expression.member == "none" || expression.member == "some" {
             kexpression.messages.append(.kotlinOptionalNoneSome(expression, source: translator.syntaxTree.source))
         }
         kexpression.generics = expression.generics
-        kexpression.apiFlags = expression.apiFlags
+        kexpression.apiFlags = expression.apiMatch?.apiFlags
         kexpression.baseType = expression.baseType.asMetaType(false)
         if case .tuple = expression.baseType {
             // Tuples sref() their members on the way out and do not set an onUpdate block, so no need to sref() again
@@ -1360,6 +1376,15 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinCast
         // A type literal is not the same as KClass<Type>
         if expression is TypeLiteral {
             return nil
+        }
+        // Type declaration?
+        if let declarationType = (expression as? APICallExpression)?.apiMatch?.declarationType {
+            switch declarationType {
+            case .actorDeclaration, .classDeclaration, .enumDeclaration, .protocolDeclaration, .structDeclaration, .typealiasDeclaration:
+                return nil
+            default:
+                break
+            }
         }
         // Is this a nested or module-qualified class type name?
         if let memberAccess = expression as? MemberAccess {
@@ -1463,7 +1488,9 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinCast
             // MainActor.run { self... or Type.... }
             output.append("MainActor.run { ")
         }
-        if let base {
+        if isTypealiasFor != .none {
+            output.append(isTypealiasFor.kotlin)
+        } else if let base {
             if baseKClass != nil {
                 output.append("(")
             }
@@ -1991,7 +2018,7 @@ class KotlinSubscript: KotlinExpression, KotlinMainActorTargeting {
             let kargumentExpression = translator.translateExpression($0.value)
             return LabeledValue(label: $0.label, value: kargumentExpression)
         }
-        kexpression.apiFlags = expression.apiFlags
+        kexpression.apiFlags = expression.apiMatch?.apiFlags
         kexpression.mayBeSharedMutableStructType = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
         if case .dictionary = expression.base.inferredType {
             kexpression.isDictionarySubscript = true

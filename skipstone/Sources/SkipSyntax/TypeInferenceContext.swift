@@ -121,10 +121,11 @@ struct TypeInferenceContext {
     }
 
     /// Return the type of the given identifier.
-    func identifier(_ name: String, messagesNode: SyntaxNode?) -> APIMatch? {
+    func identifier(_ name: String, messagesNode: SyntaxNode?) -> (TypeSignature, APIMatch)? {
         // Check local identifiers and bindings
         if let identifierType = localIdentifierTypes[name] {
-            return APIMatch(signature: identifierType.constrainedTypeWithGenerics(generics))
+            let signature = identifierType.constrainedTypeWithGenerics(generics)
+            return (signature, APIMatch(signature: signature))
         }
         if name == "self" || name == "Self" || name == "super" {
             guard let pathEntry = path.last(where: { $0.typeDeclaration != nil }), let typeDeclaration = pathEntry.typeDeclaration else {
@@ -132,14 +133,16 @@ struct TypeInferenceContext {
             }
             if name == "super" {
                 if let superType = typeDeclaration.inherits.first?.constrainedTypeWithGenerics(generics) {
-                    return APIMatch(signature: superType)
+                    return (superType, APIMatch(signature: superType))
                 } else {
                     return nil
                 }
             } else if name == "Self" || pathEntry.isStatic {
-                return APIMatch(signature: typeDeclaration.signature.constrainedTypeWithGenerics(generics).asMetaType(true))
+                let signature = typeDeclaration.signature.constrainedTypeWithGenerics(generics).asMetaType(true)
+                return (signature, APIMatch(signature: signature))
             } else {
-                return APIMatch(signature: typeDeclaration.signature.constrainedTypeWithGenerics(generics))
+                let signature = typeDeclaration.signature.constrainedTypeWithGenerics(generics)
+                return (signature, APIMatch(signature: signature))
             }
         }
 
@@ -151,29 +154,30 @@ struct TypeInferenceContext {
             if let codebaseInfo {
                 if let match = codebaseInfo.matchIdentifier(name: name, inConstrained: signature.constrainedTypeWithGenerics(generics)) {
                     addMessages(to: messagesNode, for: [match.availability])
-                    return match
+                    return (resolveSignature(match: match), match)
                 }
             } else if let match = unavailableAPI?.knownUnavailableMember(name, in: signature) {
                 addMessages(to: messagesNode, for: [match.availability])
-                return match
+                return (resolveSignature(match: match), match)
             }
         }
         let genericType = generics.constrainedType(of: name)
         if genericType != .none {
-            return APIMatch(signature: genericType)
+            return (genericType, APIMatch(signature: genericType))
         }
         if let codebaseInfo {
             if let match = codebaseInfo.matchIdentifier(name: name) {
                 addMessages(to: messagesNode, for: [match.availability])
-                return match
+                return (resolveSignature(match: match), match)
             } else {
                 return nil
             }
         } else if let match = unavailableAPI?.knownUnavailableIdentifier(name) {
             addMessages(to: messagesNode, for: [match.availability])
-            return match
+            return (resolveSignature(match: match), match)
         } else {
-            return APIMatch(signature: TypeSignature.for(name: name, genericTypes: [], allowNamed: false).asMetaType(true))
+            let signature = TypeSignature.for(name: name, genericTypes: [], allowNamed: false).asMetaType(true)
+            return signature == .none ? nil : (signature, APIMatch(signature: signature))
         }
     }
 
@@ -190,17 +194,17 @@ struct TypeInferenceContext {
 
     /// Return the type of the given member.
     ///
-    /// The returned signature may be different than the returned `APIMatch.signature` due to optional chaining.
+    /// The returned signature may be different than the returned `APIMatch.signature` due to optional chaining and type aliasing.
     func member(_ name: String, in type: TypeSignature, messagesNode: SyntaxNode?) -> (TypeSignature, APIMatch)? {
         if type.isOptional {
             if let match = member(name, inNonOptional: type.asOptional(false), messagesNode: messagesNode) {
-                return (match.signature.asOptional(true), match)
+                return (resolveSignature(match: match).asOptional(true), match)
             } else {
                 return nil
             }
         } else {
             if let match = member(name, inNonOptional: type, messagesNode: messagesNode) {
-                return (match.signature, match)
+                return (resolveSignature(match: match), match)
             } else {
                 return nil
             }
@@ -238,11 +242,11 @@ struct TypeInferenceContext {
     func function(_ name: String, in type: TypeSignature?, parameters: [LabeledValue<TypeSignature>], messagesNode: SyntaxNode?) -> [(TypeSignature, APIMatch)] {
         if let type, type.isOptional {
             return function(name, inNonOptional: type.asOptional(false), parameters: parameters, messagesNode: messagesNode).map { match in
-                let signature: TypeSignature = .function(match.signature.parameters, match.signature.returnType.asOptional(true))
-                return (signature, match)
+                let signature = resolveSignature(match: match)
+                return (.function(signature.parameters, signature.returnType.asOptional(true)), match)
             }
         } else {
-            return function(name, inNonOptional: type, parameters: parameters, messagesNode: messagesNode).map { ($0.signature, $0) }
+            return function(name, inNonOptional: type, parameters: parameters, messagesNode: messagesNode).map { (resolveSignature(match: $0), $0) }
         }
     }
 
@@ -308,11 +312,11 @@ struct TypeInferenceContext {
     func `subscript`(in type: TypeSignature, parameters: [LabeledValue<TypeSignature>], messagesNode: SyntaxNode?) -> [(TypeSignature, APIMatch)] {
         if case .optional = type {
             return self.subscript(inNonOptional: type.asOptional(false), parameters: parameters, messagesNode: messagesNode).map { match in
-                let signature: TypeSignature = .function(match.signature.parameters, match.signature.returnType.asOptional(true))
-                return (signature, match)
+                let signature = resolveSignature(match: match)
+                return (.function(signature.parameters, signature.returnType.asOptional(true)), match)
             }
         } else {
-            return self.subscript(inNonOptional: type, parameters: parameters, messagesNode: messagesNode).map { ($0.signature, $0) }
+            return self.subscript(inNonOptional: type, parameters: parameters, messagesNode: messagesNode).map { (resolveSignature(match: $0), $0) }
         }
     }
 
@@ -402,6 +406,13 @@ struct TypeInferenceContext {
         default:
             return type1
         }
+    }
+
+    private func resolveSignature(match: APIMatch) -> TypeSignature {
+        guard match.declarationType == .typealiasDeclaration, let codebaseInfo, codebaseInfo.global.languageAdditions?.shouldResolveTypealiases == true else {
+            return match.signature
+        }
+        return codebaseInfo.resolveTypealias(for: match.signature)
     }
 
     private func addMessages(to messagesNode: SyntaxNode?, for availability: [Availability]) {

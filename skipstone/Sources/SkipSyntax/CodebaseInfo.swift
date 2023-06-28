@@ -81,7 +81,7 @@ public class CodebaseInfo: Codable {
         isInUse = true
         buildItemsByName() // We use this for lookups in subsequent steps
         inferVariableTypes() // May need variable types to match signatures to protocol generics
-        resolveModuleTypeSignatures()
+        resolveTypeSignatures()
         fixupGenericsInfo()
         addGeneratedConstructors()
         addMainActorFlags()
@@ -90,9 +90,9 @@ public class CodebaseInfo: Codable {
     }
     
     /// Create a context that can access the given imported modules.
-    func context(importedModuleNames: [String] = [], source: Source) -> Context {
+    func context(importedModuleNames: [String] = [], sourceFile: Source.FilePath? = nil) -> Context {
         let mappedModuleNames = importedModuleNames.map { Self.moduleNameMap[$0] ?? $0 }
-        return Context(global: self, importedModuleNames: Set(mappedModuleNames), source: source)
+        return Context(global: self, importedModuleNames: Set(mappedModuleNames), sourceFile: sourceFile)
     }
 
     /// The items for the given name.
@@ -210,12 +210,12 @@ public class CodebaseInfo: Codable {
     /// A context for accessing visible codebase information.
     struct Context {
         let global: CodebaseInfo
-        let source: Source
-        private let importedModuleNames: Set<String>
+        let importedModuleNames: Set<String>
+        let sourceFile: Source.FilePath?
 
-        fileprivate init(global: CodebaseInfo, importedModuleNames: Set<String>, source: Source) {
+        fileprivate init(global: CodebaseInfo, importedModuleNames: Set<String>, sourceFile: Source.FilePath?) {
             self.global = global
-            self.source = source
+            self.sourceFile = sourceFile
             self.importedModuleNames = importedModuleNames
         }
         
@@ -233,7 +233,7 @@ public class CodebaseInfo: Codable {
         ///
         /// A score of 0 indicates that the item is not visible.
         func rankScore(of item: CodebaseInfoItem) -> Int {
-            return item.rankScore(moduleName: global.moduleName, importedModuleNames: importedModuleNames, sourceFile: source.file)
+            return item.rankScore(moduleName: global.moduleName, importedModuleNames: importedModuleNames, sourceFile: sourceFile)
         }
         
         /// Return all type infos visible for the given type.
@@ -247,7 +247,11 @@ public class CodebaseInfo: Codable {
         }
 
         /// Whether the given type is a class, struct, etc, optionally limiting results to this module.
-        func declarationType(forNamed type: TypeSignature, unknownTypealiasFallback: StatementType = .classDeclaration, mustBeInModule: Bool = false) -> StatementType? {
+        func declarationType(forNamed type: TypeSignature, resolveTypealias: Bool = true, unknownTypealiasFallback: StatementType = .classDeclaration, mustBeInModule: Bool = false) -> StatementType? {
+            if !resolveTypealias {
+                let members = ranked(global.lookup(name: type.name, qualifiedMatch: true))
+                return members.first { $0 is TypeInfo || $0 is TypealiasInfo }?.declarationType
+            }
             guard let typeInfo = primaryTypeInfo(forNamed: type) else {
                 guard let typealiasInfo = crossPlatformTypealias(forUnknownNamed: type) else {
                     return nil
@@ -260,10 +264,34 @@ public class CodebaseInfo: Codable {
             return typeInfo.declarationType
         }
 
+        /// Resolve typealiases in the given type.
+        func resolveTypealias(for type: TypeSignature) -> TypeSignature {
+            return resolveTypealias(for: type, recursionDepth: 0)
+        }
+
+        private func resolveTypealias(for type: TypeSignature, recursionDepth: Int) -> TypeSignature {
+            // Invalid Swift code containing circular typealiases can cause infinite recursion
+            guard recursionDepth < 10 else {
+                return type
+            }
+            return type.mappingTypes {
+                switch $0 {
+                case .named, .member:
+                    if let alias = ranked(global.lookup(name: $0.name, qualifiedMatch: true).filter { $0.declarationType == .typealiasDeclaration }).first {
+                        return resolveTypealias(for: $0.generics.isEmpty ? alias.signature : alias.signature.withGenerics($0.generics), recursionDepth: recursionDepth + 1)
+                    }
+                    return $0
+                default:
+                    break
+                }
+                return nil
+            }
+        }
+
         /// Cross platform library code may create typealiases to unknown types. Return any typealias for the given unknown type.
         func crossPlatformTypealias(forUnknownNamed type: TypeSignature) -> CodebaseInfo.TypealiasInfo? {
             let members = ranked(global.lookup(name: type.name, qualifiedMatch: true))
-            return members.first(where: { $0.declarationType == .typealiasDeclaration }) as? CodebaseInfo.TypealiasInfo
+            return members.first(where: { $0.declarationType == .typealiasDeclaration }) as? TypealiasInfo
         }
 
         /// Return API information for the given identifier.
@@ -281,15 +309,13 @@ public class CodebaseInfo: Codable {
                 let type = moduleName == nil || moduleName == "Swift" ? TypeSignature.for(name: name, genericTypes: [], allowNamed: false).asMetaType(true) : .none
                 return type == .none ? nil : APIMatch(signature: type)
             }
-            let type = topRanked.signature
-            if let typeInfo = topRanked as? TypeInfo {
-                let matchSignature = type.constrainedTypeWithGenerics(typeInfo.generics).asMetaType(true)
-                return APIMatch(signature: matchSignature, declarationType: topRanked.declarationType, availability: topRanked.availability)
-            } else {
-                let matchSignature = type.asMetaType(topRanked.declarationType != .variableDeclaration && topRanked.declarationType != .enumCaseDeclaration && topRanked.declarationType != .functionDeclaration)
-                let apiFlags: APIFlags = (topRanked as? FunctionInfo)?.apiFlags ?? (topRanked as? VariableInfo)?.apiFlags ?? []
-                return APIMatch(signature: matchSignature, apiFlags: apiFlags, declarationType: topRanked.declarationType, availability: topRanked.availability)
+            var matchSignature = topRanked.signature
+            if let generics = (topRanked as? TypeInfo)?.generics ?? (topRanked as? TypealiasInfo)?.generics {
+                matchSignature = matchSignature.constrainedTypeWithGenerics(generics)
             }
+            matchSignature = matchSignature.asMetaType(topRanked.declarationType != .variableDeclaration && topRanked.declarationType != .enumCaseDeclaration && topRanked.declarationType != .functionDeclaration)
+            let apiFlags: APIFlags = (topRanked as? FunctionInfo)?.apiFlags ?? (topRanked as? VariableInfo)?.apiFlags ?? []
+            return APIMatch(signature: matchSignature, apiFlags: apiFlags, declarationType: topRanked.declarationType, availability: topRanked.availability)
         }
         
         /// Return API information for the given member.
@@ -319,14 +345,11 @@ public class CodebaseInfo: Codable {
                     return match
                 }
             }
-            // Is this a nested type name?
-            let nested: TypeSignature = .member(type, .named(name, []))
-            if let nestedTypeInfo = global.primaryTypeInfo(forNamed: nested) {
-                return APIMatch(signature: nestedTypeInfo.signature.asMetaType(true), declarationType: nestedTypeInfo.declarationType, availability: nestedTypeInfo.availability)
-            }
-            // Is it a module name?
-            if case .named(let moduleName, []) = type {
-                // Is type a module name?
+            if let match = matchIdentifier(name: type.name + "." + name) {
+                // Is this a nested type name?
+                return match
+            } else if case .named(let moduleName, []) = type {
+                // Is it a module name?
                 return matchIdentifier(name: name, moduleName: moduleName)
             } else {
                 return nil
@@ -718,20 +741,6 @@ public class CodebaseInfo: Codable {
             }
             return nil
         }
-
-        private func resolveTypealias(for type: TypeSignature) -> TypeSignature {
-            return type.mappingTypes {
-                switch $0 {
-                case .named, .member:
-                    if let alias = ranked(global.lookup(name: $0.name, qualifiedMatch: true).filter { $0.declarationType == .typealiasDeclaration }).first {
-                        return alias.signature.withGenerics($0.generics)
-                    }
-                default:
-                    break
-                }
-                return nil
-            }
-        }
     }
 
     private func candidateTypeNames(for type: TypeSignature) -> [(String, String?)] {
@@ -957,7 +966,7 @@ public class CodebaseInfo: Codable {
                 if let existingContext = typeInferenceContexts[sourceFile] {
                     context = existingContext
                 } else {
-                    let codebaseInfoContext = self.context(importedModuleNames: syntaxTree.root.statements.importedModuleNames, source: syntaxTree.source)
+                    let codebaseInfoContext = self.context(importedModuleNames: syntaxTree.root.statements.importedModuleNames, sourceFile: syntaxTree.source.file)
                     context = TypeInferenceContext(codebaseInfo: codebaseInfoContext, unavailableAPI: nil, source: syntaxTree.source)
                     typeInferenceContexts[sourceFile] = context
                 }
@@ -996,13 +1005,14 @@ public class CodebaseInfo: Codable {
         }
     }
 
-    private func resolveModuleTypeSignatures() {
-        // Now that we've gathered complete type information, we can differentiate between nested and module-qualified types
-        for i in 0..<rootTypes.count { rootTypes[i].resolveModuleTypeSignatures(codebaseInfo: self) }
-        for i in 0..<rootTypealiases.count { rootTypealiases[i].resolveModuleTypeSignatures(codebaseInfo: self) }
-        for i in 0..<rootVariables.count { rootVariables[i].resolveModuleTypeSignatures(codebaseInfo: self) }
-        for i in 0..<rootFunctions.count { rootFunctions[i].resolveModuleTypeSignatures(codebaseInfo: self) }
-        for i in 0..<rootExtensions.count { rootExtensions[i].resolveModuleTypeSignatures(codebaseInfo: self) }
+    private func resolveTypeSignatures() {
+        // Now that we've gathered complete type information, we can recognize typealiases and differentiate
+        // between nested and module-qualified types
+        for i in 0..<rootTypes.count { rootTypes[i].resolveTypeSignatures(codebaseInfo: self) }
+        for i in 0..<rootTypealiases.count { rootTypealiases[i].resolveTypeSignatures(codebaseInfo: self) }
+        for i in 0..<rootVariables.count { rootVariables[i].resolveTypeSignatures(codebaseInfo: self) }
+        for i in 0..<rootFunctions.count { rootFunctions[i].resolveTypeSignatures(codebaseInfo: self) }
+        for i in 0..<rootExtensions.count { rootExtensions[i].resolveTypeSignatures(codebaseInfo: self) }
     }
 
     private func addGeneratedConstructors() {
@@ -1213,20 +1223,20 @@ public class CodebaseInfo: Codable {
             types.forEach { $0.cleanupTypeInference(source: source, messages: &messages) }
         }
 
-        fileprivate func resolveModuleTypeSignatures(codebaseInfo: CodebaseInfo) {
-            let moduleContext = ModuleContext(codebaseInfo: codebaseInfo, importedModuleNames: importedModuleNames ?? [], sourceFile: sourceFile)
-            generics = generics.qualified(context: moduleContext)
-            inherits = inherits.map { $0.qualified(context: moduleContext) }
-            for i in 0..<types.count { types[i].resolveModuleTypeSignatures(codebaseInfo: codebaseInfo) }
-            for i in 0..<typealiases.count { typealiases[i].resolveModuleTypeSignatures(codebaseInfo: codebaseInfo) }
-            for i in 0..<cases.count { cases[i].resolveModuleTypeSignatures(codebaseInfo: codebaseInfo) }
-            for i in 0..<variables.count { variables[i].resolveModuleTypeSignatures(codebaseInfo: codebaseInfo) }
-            for i in 0..<functions.count { functions[i].resolveModuleTypeSignatures(codebaseInfo: codebaseInfo) }
-            for i in 0..<subscripts.count { subscripts[i].resolveModuleTypeSignatures(codebaseInfo: codebaseInfo) }
+        fileprivate func resolveTypeSignatures(codebaseInfo: CodebaseInfo) {
+            let context = TypeResolutionContext(codebaseInfo: codebaseInfo.context(importedModuleNames: importedModuleNames ?? [], sourceFile: sourceFile))
+            generics = generics.resolved(context: context)
+            inherits = inherits.map { $0.resolved(context: context) }
+            for i in 0..<types.count { types[i].resolveTypeSignatures(codebaseInfo: codebaseInfo) }
+            for i in 0..<typealiases.count { typealiases[i].resolveTypeSignatures(codebaseInfo: codebaseInfo) }
+            for i in 0..<cases.count { cases[i].resolveTypeSignatures(codebaseInfo: codebaseInfo) }
+            for i in 0..<variables.count { variables[i].resolveTypeSignatures(codebaseInfo: codebaseInfo) }
+            for i in 0..<functions.count { functions[i].resolveTypeSignatures(codebaseInfo: codebaseInfo) }
+            for i in 0..<subscripts.count { subscripts[i].resolveTypeSignatures(codebaseInfo: codebaseInfo) }
         }
 
         fileprivate func addMainActorFlags(codebaseInfo: CodebaseInfo) {
-            //~~~
+            //~~~ main actor rules
         }
 
         private func addMembers(_ statements: [Statement], codebaseInfo: CodebaseInfo, syntaxTree: SyntaxTree) {
@@ -1341,9 +1351,9 @@ public class CodebaseInfo: Codable {
             return v
         }
 
-        fileprivate mutating func resolveModuleTypeSignatures(codebaseInfo: CodebaseInfo) {
-            let moduleContext = ModuleContext(codebaseInfo: codebaseInfo, importedModuleNames: importedModuleNames ?? [], sourceFile: sourceFile)
-            signature = signature.qualified(context: moduleContext)
+        fileprivate mutating func resolveTypeSignatures(codebaseInfo: CodebaseInfo) {
+            let context = TypeResolutionContext(codebaseInfo: codebaseInfo.context(importedModuleNames: importedModuleNames ?? [], sourceFile: sourceFile))
+            signature = signature.resolved(context: context)
         }
     }
 
@@ -1412,10 +1422,10 @@ public class CodebaseInfo: Codable {
             self.isMutating = isMutating
         }
 
-        fileprivate mutating func resolveModuleTypeSignatures(codebaseInfo: CodebaseInfo) {
-            let moduleContext = ModuleContext(codebaseInfo: codebaseInfo, importedModuleNames: importedModuleNames ?? [], sourceFile: sourceFile)
-            generics = generics.qualified(context: moduleContext)
-            signature = signature.qualified(context: moduleContext)
+        fileprivate mutating func resolveTypeSignatures(codebaseInfo: CodebaseInfo) {
+            let context = TypeResolutionContext(codebaseInfo: codebaseInfo.context(importedModuleNames: importedModuleNames ?? [], sourceFile: sourceFile))
+            generics = generics.resolved(context: context)
+            signature = signature.resolved(context: context)
         }
     }
 
@@ -1471,10 +1481,10 @@ public class CodebaseInfo: Codable {
             (codebaseInfo.languageAdditions as? CodebaseInfoLanguageAdditionsGatherDelegate)?.codebaseInfo(codebaseInfo, didGather: &self, from: statement, syntaxTree: syntaxTree)
         }
 
-        fileprivate mutating func resolveModuleTypeSignatures(codebaseInfo: CodebaseInfo) {
-            let moduleContext = ModuleContext(codebaseInfo: codebaseInfo, importedModuleNames: importedModuleNames ?? [], sourceFile: sourceFile)
-            generics = generics.qualified(context: moduleContext)
-            signature = signature.qualified(context: moduleContext)
+        fileprivate mutating func resolveTypeSignatures(codebaseInfo: CodebaseInfo) {
+            let context = TypeResolutionContext(codebaseInfo: codebaseInfo.context(importedModuleNames: importedModuleNames ?? [], sourceFile: sourceFile))
+            generics = generics.resolved(context: context)
+            signature = signature.resolved(context: context)
         }
     }
 
@@ -1515,10 +1525,10 @@ public class CodebaseInfo: Codable {
             (codebaseInfo.languageAdditions as? CodebaseInfoLanguageAdditionsGatherDelegate)?.codebaseInfo(codebaseInfo, didGather: &self, from: statement, syntaxTree: syntaxTree)
         }
 
-        fileprivate mutating func resolveModuleTypeSignatures(codebaseInfo: CodebaseInfo) {
-            let moduleContext = ModuleContext(codebaseInfo: codebaseInfo, importedModuleNames: importedModuleNames ?? [], sourceFile: sourceFile)
-            generics = generics.qualified(context: moduleContext)
-            signature = signature.qualified(context: moduleContext)
+        fileprivate mutating func resolveTypeSignatures(codebaseInfo: CodebaseInfo) {
+            let context = TypeResolutionContext(codebaseInfo: codebaseInfo.context(importedModuleNames: importedModuleNames ?? [], sourceFile: sourceFile))
+            generics = generics.resolved(context: context)
+            signature = signature.resolved(context: context)
         }
     }
 
@@ -1556,9 +1566,9 @@ public class CodebaseInfo: Codable {
             (codebaseInfo.languageAdditions as? CodebaseInfoLanguageAdditionsGatherDelegate)?.codebaseInfo(codebaseInfo, didGather: &self, from: statement, syntaxTree: syntaxTree)
         }
 
-        fileprivate mutating func resolveModuleTypeSignatures(codebaseInfo: CodebaseInfo) {
-            let moduleContext = ModuleContext(codebaseInfo: codebaseInfo, importedModuleNames: importedModuleNames ?? [], sourceFile: sourceFile)
-            signature = signature.qualified(context: moduleContext)
+        fileprivate mutating func resolveTypeSignatures(codebaseInfo: CodebaseInfo) {
+            let context = TypeResolutionContext(codebaseInfo: codebaseInfo.context(importedModuleNames: importedModuleNames ?? [], sourceFile: sourceFile))
+            signature = signature.resolved(context: context)
         }
     }
 }
@@ -1600,11 +1610,27 @@ extension CodebaseInfoItem {
 
 /// Helper to track target language additions.
 protocol CodebaseInfoLanguageAdditions {
+    /// Whether to resolve typealiases back to their original type names when resolving types.
+    var shouldResolveTypealiases: Bool { get }
+
     /// Any issues encountered during information gathering.
     func messages(for sourceFile: Source.FilePath) -> [Message]
 
     /// Prepare language additions for use.
     func prepareForUse(codebaseInfo: CodebaseInfo)
+}
+
+extension CodebaseInfoLanguageAdditions {
+    var shouldResolveTypealiases: Bool {
+        return false
+    }
+
+    func messages(for sourceFile: Source.FilePath) -> [Message] {
+        return []
+    }
+
+    func prepareForUse(codebaseInfo: CodebaseInfo) {
+    }
 }
 
 /// Optional protocol the `CodebaseInfoLanguageAdditions` can implement to receive info gathering callbacks.
@@ -1620,13 +1646,6 @@ protocol CodebaseInfoLanguageAdditionsGatherDelegate {
 }
 
 extension CodebaseInfoLanguageAdditionsGatherDelegate {
-    func messages(for sourceFile: Source.FilePath) -> [Message] {
-        return []
-    }
-
-    func prepareForUse(codebaseInfo: CodebaseInfo) {
-    }
-
     func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGatherFrom syntaxTree: SyntaxTree) {
     }
 

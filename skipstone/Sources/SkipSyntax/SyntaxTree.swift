@@ -17,18 +17,18 @@ public class SyntaxTree: PrettyPrintable {
 
         // Resolve nodes breadth first so that a child can use information from its parent's siblings
         let importedModuleNames = root.statements.importedModuleNames
-        let moduleContext = ModuleContext(codebaseInfo: codebaseInfo, importedModuleNames: importedModuleNames, sourceFile: source.file)
+        let codebaseContext = codebaseInfo?.context(importedModuleNames: importedModuleNames, sourceFile: source.file)
+        let typeResolutionContext = TypeResolutionContext(codebaseInfo: codebaseContext)
         var resolveQueue: [SyntaxNode] = [root]
         while !resolveQueue.isEmpty {
             let node = resolveQueue.removeFirst()
-            node.resolveAttributes(in: self, context: moduleContext)
+            node.resolveAttributes(in: self, context: typeResolutionContext)
             node.children.forEach { $0.parent = node }
             resolveQueue += node.children
         }
 
-        let codebaseContext = codebaseInfo?.context(importedModuleNames: importedModuleNames, source: source)
-        let typeContext = TypeInferenceContext(codebaseInfo: codebaseContext, unavailableAPI: unavailableAPI, source: source)
-        let _ = root.inferTypes(context: typeContext, expecting: .none)
+        let typeInferenceContext = TypeInferenceContext(codebaseInfo: codebaseContext, unavailableAPI: unavailableAPI, source: source)
+        let _ = root.inferTypes(context: typeInferenceContext, expecting: .none)
     }
 
     /// Whether this syntax tree content is used to provide the transpiler with Swift symbols and is not a transpilation target.

@@ -47,7 +47,7 @@ public class KotlinTranslator {
     /// Translate and transpile to source code.
     public func transpile(codebaseInfo: CodebaseInfo, transformers: [KotlinTransformer], startTime: TimeInterval) -> Transpilation {
         let importedModuleNames = syntaxTree.root.statements.importedModuleNames
-        let codebaseInfoContext = codebaseInfo.context(importedModuleNames: importedModuleNames, source: syntaxTree.source)
+        let codebaseInfoContext = codebaseInfo.context(importedModuleNames: importedModuleNames, sourceFile: syntaxTree.source.file)
         self.codebaseInfo = codebaseInfoContext
         self.packageName = codebaseInfo.kotlin?.packageName
 
@@ -61,7 +61,7 @@ public class KotlinTranslator {
         let startTime = Date().timeIntervalSinceReferenceDate
         let syntaxTree = SyntaxTree(source: Source(file: sourceFile, content: ""))
         let translator = KotlinTranslator(syntaxTree: syntaxTree)
-        let codebaseInfoContext = codebaseInfo.context(source: syntaxTree.source)
+        let codebaseInfoContext = codebaseInfo.context(sourceFile: sourceFile)
         translator.codebaseInfo = codebaseInfoContext
         translator.packageName = codebaseInfo.kotlin?.packageName
 
@@ -147,11 +147,8 @@ public class KotlinTranslator {
             case .subscriptDeclaration:
                 return KotlinFunctionDeclaration.translate(statement: statement as! SubscriptDeclaration, translator: self)
             case .typealiasDeclaration:
-                if let typealiasDeclaration = KotlinTypealiasDeclaration.translate(statement: statement as! TypealiasDeclaration, translator: self) {
-                    return [typealiasDeclaration]
-                } else {
-                    return []
-                }
+                // We resolve typealiases back to the original type name
+                return KotlinTypealiasDeclaration.validate(statement: statement as! TypealiasDeclaration, translator: self)
             case .variableDeclaration:
                 return [KotlinVariableDeclaration.translate(statement: statement as! VariableDeclaration, translator: self)]
             case .raw:

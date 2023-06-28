@@ -8,13 +8,13 @@ final class KotlinCommonProtocolsTransformer: KotlinTransformer {
         guard let codebaseInfo = translator.codebaseInfo else {
             return
         }
-        syntaxTree.root.visit { visit($0, codebaseInfo: codebaseInfo) }
+        syntaxTree.root.visit { visit($0, codebaseInfo: codebaseInfo, source: translator.syntaxTree.source) }
     }
 
-    private func visit(_ node: KotlinSyntaxNode, codebaseInfo: CodebaseInfo.Context) -> VisitResult<KotlinSyntaxNode> {
+    private func visit(_ node: KotlinSyntaxNode, codebaseInfo: CodebaseInfo.Context, source: Source) -> VisitResult<KotlinSyntaxNode> {
         if let classDeclaration = node as? KotlinClassDeclaration {
             synthesizeToString(for: classDeclaration, codebaseInfo: codebaseInfo)
-            synthesizeConformances(for: classDeclaration, codebaseInfo: codebaseInfo)
+            synthesizeConformances(for: classDeclaration, codebaseInfo: codebaseInfo, source: source)
             classDeclaration.inherits = fixupInherits(classDeclaration.inherits, for: classDeclaration.signature)
             classDeclaration.generics = fixupGenerics(classDeclaration.generics)
         } else if let interfaceDeclaration = node as? KotlinInterfaceDeclaration {
@@ -85,7 +85,7 @@ final class KotlinCommonProtocolsTransformer: KotlinTransformer {
         toStringFunction.assignParentReferences()
     }
 
-    private func synthesizeConformances(for classDeclaration: KotlinClassDeclaration, codebaseInfo: CodebaseInfo.Context) {
+    private func synthesizeConformances(for classDeclaration: KotlinClassDeclaration, codebaseInfo: CodebaseInfo.Context, source: Source) {
         // Kotlin enums have built-in non-overridable ordering, so we have to convert regular enums to use sealed
         // classes if they want custom ordering
         let isEnum = classDeclaration.declarationType == .enumDeclaration
@@ -110,7 +110,7 @@ final class KotlinCommonProtocolsTransformer: KotlinTransformer {
         }
 
         if isEnum && !isEnumWithLessThan && protocols.contains(where: \.isComparable) {
-            classDeclaration.messages.append(.kotlinEnumSealedClassComparableConformance(classDeclaration, source: codebaseInfo.source))
+            classDeclaration.messages.append(.kotlinEnumSealedClassComparableConformance(classDeclaration, source: source))
         }
     }
 

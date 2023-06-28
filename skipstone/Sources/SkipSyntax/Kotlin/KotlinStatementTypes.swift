@@ -1892,7 +1892,7 @@ class KotlinInterfaceDeclaration: KotlinStatement {
             case .open:
                 fallthrough
             case .public:
-                output.append("public ")
+                break
             case .private:
                 output.append("private ")
             }
@@ -1909,94 +1909,12 @@ class KotlinInterfaceDeclaration: KotlinStatement {
     }
 }
 
-class KotlinTypealiasDeclaration: KotlinStatement, KotlinMemberDeclaration {
-    var name: String
-    var attributes = Attributes()
-    var modifiers = Modifiers()
-    var generics = Generics()
-    var aliasedType: TypeSignature = .none
-
-    // KotlinMemberDeclaration
-    var extends: (TypeSignature, Generics)?
-    var isStatic: Bool {
-        return false
-    }
-
-    static func translate(statement: TypealiasDeclaration, translator: KotlinTranslator) -> KotlinTypealiasDeclaration? {
-        let kstatement = KotlinTypealiasDeclaration(statement: statement)
-        kstatement.modifiers = statement.modifiers
-        kstatement.generics = statement.generics
-        kstatement.aliasedType = statement.aliasedType
-        kstatement.attributes = kstatement.processAttributes(statement.attributes, translator: translator)
-
-        var isNested = false
-        if statement.owningFunctionDeclaration != nil {
-            isNested = true
-        } else if let owningTypeDeclaration = statement.owningTypeDeclaration {
-            // This might be a typealias that specifies one of our protocol's associatedtypes. But we can only detect that case if we have full
-            // codebase info, which we don't have during pre-checks. Compromise and warn if the typealias is used anywhere in our API
-            if owningTypeDeclaration.type == .protocolDeclaration || owningTypeDeclaration.inherits.isEmpty {
-                isNested = true
-            } else if let codebaseInfo = translator.codebaseInfo {
-                let protocolSignatures = codebaseInfo.global.protocolSignatures(forNamed: owningTypeDeclaration.signature)
-                if protocolSignatures.contains(where: { $0.generics.contains { $0.name == statement.name } }) {
-                    return nil
-                } else {
-                    isNested = true
-                }
-            } else {
-                for member in owningTypeDeclaration.members {
-                    if memberDeclaration(member, usesTypealias: statement.name) {
-                        isNested = true
-                        break
-                    }
-                }
-            }
-        }
-        if isNested {
-            kstatement.messages.append(.kotlinTypeAliasNested(statement, source: translator.syntaxTree.source))
-        }
+struct KotlinTypealiasDeclaration {
+    static func validate(statement: TypealiasDeclaration, translator: KotlinTranslator) -> [KotlinStatement] {
         if statement.generics.entries.contains(where: { !$0.inherits.isEmpty || $0.whereEqual != nil }) {
-            kstatement.messages.append(.kotlinTypeAliasConstrainedGenerics(statement, source: translator.syntaxTree.source))
+            return [KotlinMessageStatement(message: .kotlinTypeAliasConstrainedGenerics(statement, source: translator.syntaxTree.source))]
         }
-        return kstatement
-    }
-
-    /// Check whether the given member uses the given type.
-    ///
-    /// - Note: This is not a comprehensive check.
-    private static func memberDeclaration(_ member: Statement, usesTypealias aliasName: String) -> Bool {
-        let aliasType: TypeSignature = .named(aliasName, [])
-        if let variableDeclaration = member as? VariableDeclaration {
-            return variableDeclaration.variableTypes.contains { $0.referencesType(aliasType) }
-        } else if let functionDeclaration = member as? FunctionDeclaration {
-            return functionDeclaration.functionType.referencesType(aliasType)
-        } else {
-            return false
-        }
-    }
-
-    private init(statement: TypealiasDeclaration) {
-        self.name = statement.name
-        super.init(type: .typealiasDeclaration, statement: statement)
-    }
-
-    override func insertDependencies(into dependencies: inout KotlinDependencies) {
-        if aliasedType.kotlinReferencesKClass {
-            dependencies.insertReflect()
-        }
-    }
-
-    override func append(to output: OutputGenerator, indentation: Indentation) {
-        if let declaration = extras?.declaration {
-            output.append(indentation).append(declaration).append("\n")
-        } else {
-            attributes.append(to: output, indentation: indentation)
-            output.append(indentation).append(modifiers.kotlinMemberString(isOpen: false, suffix: " "))
-            output.append("typealias ").append(name)
-            generics.append(to: output, indentation: indentation)
-            output.append(" = ").append(aliasedType.kotlin).append("\n")
-        }
+        return []
     }
 }
 

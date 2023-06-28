@@ -536,48 +536,49 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         }
     }
 
-    /// Qualify local type names with any enclosing types.
-    func qualified(in node: SyntaxNode? = nil, context: ModuleContext) -> TypeSignature {
+    /// Qualify local type names with any enclosing types, resolve typealiases and module-qualified types.
+    func resolved(in node: SyntaxNode? = nil, context: TypeResolutionContext) -> TypeSignature {
         switch self {
         case .array(let elementType):
-            return .array(elementType.qualified(in: node, context: context))
+            return .array(elementType.resolved(in: node, context: context))
         case .composition(let types):
-            return .composition(types.map { $0.qualified(in: node, context: context) })
+            return .composition(types.map { $0.resolved(in: node, context: context) })
         case .dictionary(let keyType, let valueType):
-            return .dictionary(keyType.qualified(in: node, context: context), valueType.qualified(in: node, context: context))
+            return .dictionary(keyType.resolved(in: node, context: context), valueType.resolved(in: node, context: context))
         case .function(let parameters, let returnType):
-            let qualifiedParameters = parameters.map { Parameter(label: $0.label, type: $0.type.qualified(in: node, context: context), isInOut: $0.isInOut, isVariadic: $0.isVariadic, isVariadicContinuation: $0.isVariadicContinuation, hasDefaultValue: $0.hasDefaultValue) }
-            return .function(qualifiedParameters, returnType.qualified(in: node, context: context))
+            let qualifiedParameters = parameters.map { Parameter(label: $0.label, type: $0.type.resolved(in: node, context: context), isInOut: $0.isInOut, isVariadic: $0.isVariadic, isVariadicContinuation: $0.isVariadicContinuation, hasDefaultValue: $0.hasDefaultValue) }
+            return .function(qualifiedParameters, returnType.resolved(in: node, context: context))
         case .member(let baseType, let type):
-            let base = baseType.qualified(in: node, context: context)
+            let base = baseType.resolved(in: node, context: context)
             if case .named(let name, let generics) = type {
-                let generics = generics.map { $0.qualified(in: node, context: context) }
-                return context.resolve(.named(name, generics), in: base)
+                let generics = generics.map { $0.resolved(in: node, context: context) }
+                return context.resolve(name: name, generics: generics, in: base)
             } else {
                 return .member(base, type)
             }
         case .metaType(let type):
-            return .metaType(type.qualified(in: node, context: context))
-        case .module:
-            // Already fully qualified
-            return self
+            return .metaType(type.resolved(in: node, context: context))
+        case .module(let moduleName, let type):
+            // Type will already be qualified, but may need typealias resolution
+            return .module(moduleName, type.resolved(context: context))
         case .named(let name, let generics):
-            let generics = generics.map { $0.qualified(in: node, context: context) }
+            let generics = generics.map { $0.resolved(in: node, context: context) }
             if let node {
-                return node.qualifyReferencedNamedType(name: name, generics: generics)
+                let qualified = node.qualifyReferencedNamedType(name: name, generics: generics)
+                return qualified.resolved(context: context)
             } else {
-                return .named(name, generics)
+                return context.resolve(name: name, generics: generics)
             }
         case .optional(let type):
-            return .optional(type.qualified(in: node, context: context))
+            return .optional(type.resolved(in: node, context: context))
         case .range(let elementType):
-            return .range(elementType.qualified(in: node, context: context))
+            return .range(elementType.resolved(in: node, context: context))
         case .set(let elementType):
-            return .set(elementType.qualified(in: node, context: context))
+            return .set(elementType.resolved(in: node, context: context))
         case .tuple(let labels, let types):
-            return .tuple(labels, types.map { $0.qualified(in: node, context: context) })
+            return .tuple(labels, types.map { $0.resolved(in: node, context: context) })
         case .unwrappedOptional(let type):
-            return .unwrappedOptional(type.qualified(in: node, context: context))
+            return .unwrappedOptional(type.resolved(in: node, context: context))
         default:
             return self
         }
@@ -1049,7 +1050,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                     return .none
                 }
             }
-            return ModuleContext().resolve(.named(name, genericTypes), in: baseType)
+            return TypeResolutionContext().resolve(name: name, generics: genericTypes, in: baseType)
         case .metatypeType:
             guard let metaType = syntax.as(MetatypeTypeSyntax.self) else {
                 return .none

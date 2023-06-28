@@ -15,7 +15,7 @@ class SyntaxNode: SourceDerived, PrettyPrintable {
     }
 
     /// Resolve contextual information about this node's attributes after the parent node is set.
-    func resolveAttributes(in syntaxTree: SyntaxTree, context: ModuleContext) {
+    func resolveAttributes(in syntaxTree: SyntaxTree, context: TypeResolutionContext) {
     }
 
     /// Perform type inference.
@@ -126,8 +126,10 @@ class SyntaxNode: SourceDerived, PrettyPrintable {
                 break
             }
             // Look for any direct child of that type with a matching qualified name
-            if let referencedType = owningType.children.first(where: { ($0 as? TypeDeclaration)?.signature.name.hasSuffix(suffix) == true }) {
+            if let referencedType = owningType.members.first(where: { ($0 as? TypeDeclaration)?.signature.name.hasSuffix(suffix) == true }) {
                 return (referencedType as! TypeDeclaration).signature.withGenerics(generics)
+            } else if owningType.members.contains(where: { ($0 as? TypealiasDeclaration)?.name == name }) {
+                return .member(owningType.signature, .named(name, generics))
             }
             // Move up to the next owning type and repeat
             current = owningType.parent

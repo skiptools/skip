@@ -716,8 +716,7 @@ class FunctionCall: Expression, APICallExpression {
                     returnType = returnType.asOptional(true)
                 }
                 self.returnType = returnType.or(expecting)
-                apiSignature = functionType
-                apiFlags = (function as? APICallExpression)?.apiFlags
+                apiMatch = APIMatch(signature: functionType, apiFlags: (function as? APICallExpression)?.apiMatch?.apiFlags ?? APIFlags())
             } else {
                 returnType = expecting
             }
@@ -749,8 +748,7 @@ class FunctionCall: Expression, APICallExpression {
                 }
             }
             isInit = match.1.declarationType == .initDeclaration
-            apiSignature = match.1.signature
-            apiFlags = match.1.apiFlags
+            apiMatch = match.1
             returnType = match.0.returnType.or(expecting)
             if isUnchainedOptional {
                 isCallOnOptional = true
@@ -783,10 +781,10 @@ class FunctionCall: Expression, APICallExpression {
         guard let apiCallExpression = expression as? APICallExpression else {
             return true // Any optional that isn't an identifier, member access, or function call would normally need to be chained
         }
-        guard let apiSignature = apiCallExpression.apiSignature else {
+        guard let apiMatch = apiCallExpression.apiMatch else {
             return false // Unknown defaults to false
         }
-        return apiSignature.isOptional || apiSignature.returnType.isOptional
+        return apiMatch.signature.isOptional || apiMatch.signature.returnType.isOptional
     }
 
     private var returnType: TypeSignature = .none
@@ -794,8 +792,7 @@ class FunctionCall: Expression, APICallExpression {
     override var inferredType: TypeSignature {
         return returnType
     }
-    var apiSignature: TypeSignature?
-    var apiFlags: APIFlags?
+    var apiMatch: APIMatch?
 
     override var children: [SyntaxNode] {
         return [function] + arguments.map { $0.value }
@@ -833,14 +830,14 @@ class Identifier: Expression, APICallExpression {
         return Identifier(name: name, generics: generics, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
-    override func resolveAttributes(in syntaxTree: SyntaxTree, context: ModuleContext) {
-        generics = generics?.map { $0.qualified(in: self, context: context) }
+    override func resolveAttributes(in syntaxTree: SyntaxTree, context: TypeResolutionContext) {
+        generics = generics?.map { $0.resolved(in: self, context: context) }
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
-        if let match = context.identifier(name, messagesNode: self) {
-            identifierType = match.signature
-            apiFlags = match.apiFlags
+        if let (signature, match) = context.identifier(name, messagesNode: self) {
+            identifierType = signature
+            apiMatch = match
         }
         if let generics, !generics.isEmpty {
             identifierType = identifierType.withGenerics(generics.map { $0.constrainedTypeWithGenerics(context.generics) })
@@ -857,10 +854,7 @@ class Identifier: Expression, APICallExpression {
     override var inferredType: TypeSignature {
         return identifierType
     }
-    var apiSignature: TypeSignature? {
-        return inferredType
-    }
-    var apiFlags: APIFlags?
+    var apiMatch: APIMatch?
 
     override var prettyPrintAttributes: [PrettyPrintTree] {
         var children: [PrettyPrintTree] = []
@@ -1000,8 +994,8 @@ class MatchingCase: Expression, BindingExpression {
         return MatchingCase(pattern: pattern, declaredType: declaredType, target: target, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
-    override func resolveAttributes(in syntaxTree: SyntaxTree, context: ModuleContext) {
-        declaredType = declaredType.qualified(in: self, context: context)
+    override func resolveAttributes(in syntaxTree: SyntaxTree, context: TypeResolutionContext) {
+        declaredType = declaredType.resolved(in: self, context: context)
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
@@ -1065,9 +1059,9 @@ class MemberAccess: Expression, APICallExpression {
         return MemberAccess(base: base, member: member, generics: generics, useMultlineFormatting: useMultlineFormatting, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
-    override func resolveAttributes(in syntaxTree: SyntaxTree, context: ModuleContext) {
-        baseType = baseType.qualified(in: self, context: context)
-        generics = generics?.map { $0.qualified(in: self, context: context) }
+    override func resolveAttributes(in syntaxTree: SyntaxTree, context: TypeResolutionContext) {
+        baseType = baseType.resolved(in: self, context: context)
+        generics = generics?.map { $0.resolved(in: self, context: context) }
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
@@ -1089,9 +1083,8 @@ class MemberAccess: Expression, APICallExpression {
         // member matches. The function call node will have more type information
         if let (signature, match) = context.member(member, in: baseType, messagesNode: isCalledAsFunction ? nil : self) {
             memberType = signature
-            apiFlags = match.apiFlags
-            apiSignature = match.signature
-            if let generics {
+            apiMatch = match
+            if let generics, !generics.isEmpty {
                 memberType = memberType.withGenerics(generics)
             }
             // Were we able to resolve the member by treating our unknown base identifier as a module name?
@@ -1109,8 +1102,7 @@ class MemberAccess: Expression, APICallExpression {
     override var inferredType: TypeSignature {
         return memberType
     }
-    var apiSignature: TypeSignature?
-    var apiFlags: APIFlags?
+    var apiMatch: APIMatch?
 
     override var children: [SyntaxNode] {
         return base == nil ? [] : [base!]
@@ -1230,8 +1222,8 @@ class OptionalBinding: Expression, BindingExpression {
         return OptionalBinding(names: names, declaredType: declaredType, isLet: isLet, value: value, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
-    override func resolveAttributes(in syntaxTree: SyntaxTree, context: ModuleContext) {
-        declaredType = declaredType.qualified(in: self, context: context)
+    override func resolveAttributes(in syntaxTree: SyntaxTree, context: TypeResolutionContext) {
+        declaredType = declaredType.resolved(in: self, context: context)
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
@@ -1241,14 +1233,14 @@ class OptionalBinding: Expression, BindingExpression {
             if let value {
                 variableType = value.inferredType
             } else {
-                variableType = TypeSignature.for(labels: names, types: names.map { $0.map { context.identifier($0, messagesNode: self)?.signature ?? .none } ?? .none })
+                variableType = TypeSignature.for(labels: names, types: names.map { $0.map { context.identifier($0, messagesNode: self)?.0 ?? .none } ?? .none })
             }
         }
         // Flow will only continue when the value is non-optional
         variableType = variableType.asOptional(false)
 
         if names.count == 1, let name = names[0], !context.isLocalOrSelfIdentifier(name), value == nil || (value as? Identifier)?.name == name {
-            if let match = context.identifier(name, messagesNode: nil) {
+            if let (_, match) = context.identifier(name, messagesNode: nil) {
                 nameShadowsUnstableValue = match.apiFlags.contains(.writeable)
             } else {
                 nameShadowsUnstableValue = true // Better safe than sorry
@@ -1534,8 +1526,7 @@ class Subscript: Expression, APICallExpression {
                 argument.value.inferTypes(context: context, expecting: match.0.parameters[index].type)
             }
             returnType = match.0.returnType.or(expecting)
-            apiSignature = match.1.signature
-            apiFlags = match.1.apiFlags
+            apiMatch = match.1
         } else {
             returnType = expecting
         }
@@ -1547,8 +1538,7 @@ class Subscript: Expression, APICallExpression {
     override var inferredType: TypeSignature {
         return returnType
     }
-    var apiSignature: TypeSignature?
-    var apiFlags: APIFlags?
+    var apiMatch: APIMatch?
 
     override var children: [SyntaxNode] {
         return [base] + arguments.map { $0.value }
