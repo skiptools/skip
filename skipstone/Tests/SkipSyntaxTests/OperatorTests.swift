@@ -405,4 +405,28 @@ final class OperatorTests: XCTestCase {
         }
         """)
     }
+
+    func testReifiedTypeComparisons() async throws {
+        try await check(swift: """
+        @inline(__always) func nameOf<T>(_ value: T) -> String {
+            if T.self == String.self {
+                return "String"
+            } else if T.self == Int.self {
+                return "Int"
+            } else {
+                return "Other"
+            }
+        }
+        """, kotlin: """
+        internal inline fun <reified T> nameOf(value: T): String {
+            if (T::class == String::class) {
+                return "String"
+            } else if (T::class == Int::class) {
+                return "Int"
+            } else {
+                return "Other"
+            }
+        }
+        """)
+    }
 }

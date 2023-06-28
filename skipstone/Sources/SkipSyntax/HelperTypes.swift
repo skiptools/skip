@@ -350,7 +350,10 @@ struct Attribute: Equatable {
         guard signature != .none else {
             return nil
         }
-        switch syntax.argument {
+        guard let argument = syntax.argument else {
+            return Attribute(signature: signature)
+        }
+        switch argument {
         case .availability(let availabilitySyntax):
             let tokens = availabilitySyntax.map {
                 let str = $0.sourceCode(in: syntaxTree.source)
@@ -361,6 +364,8 @@ struct Attribute: Equatable {
                 }
             }
             return Attribute(signature: signature, tokens: tokens)
+        case .token(let tokenSyntax):
+            return Attribute(signature: signature, tokens: [tokenSyntax.text])
         default:
             return Attribute(signature: signature)
         }
@@ -378,6 +383,7 @@ struct Attribute: Equatable {
         case inlinable
         case mainActor
         case inlineAlways
+        case inlineNever
         case unavailable
         case unknown
     }
@@ -411,8 +417,13 @@ struct Attribute: Equatable {
         case "MainActor":
             return .mainActor
         case "inline":
-            // the two known parameters are `@inline(__always)` and `@inline(never)`, but we seem to not have access to the parameter, so we assume it is "always"
-            return .inlineAlways
+            if tokens.contains("__always") {
+                return .inlineAlways
+            } else if tokens.contains("never") {
+                return .inlineNever
+            } else {
+                return .unknown
+            }
         default:
             return .unknown
         }

@@ -158,6 +158,10 @@ struct TypeInferenceContext {
                 return match
             }
         }
+        let genericType = generics.constrainedType(of: name)
+        if genericType != .none {
+            return APIMatch(signature: genericType)
+        }
         if let codebaseInfo {
             if let match = codebaseInfo.matchIdentifier(name: name) {
                 addMessages(to: messagesNode, for: [match.availability])
