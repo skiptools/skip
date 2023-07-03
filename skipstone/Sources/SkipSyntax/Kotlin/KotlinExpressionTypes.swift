@@ -1330,12 +1330,11 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinCast
                 // f({ ... })?.member is cleaner and simpler for us than (f() { ... })?.member
                 functionCall.useTrailingClosureFormatting = false
             }
+            kexpression.baseKClass = kclass(for: base, accessingMember: expression.member, codebaseInfo: translator.codebaseInfo)
             if case .function = expression.inferredType {
                 kexpression.isFunctionReference = !expression.isCalledAsFunction && translator.codebaseInfo?.isFunctionName(expression.member, in: base.inferredType) == true
             } else if expression.inferredType.isMetaType, expression.apiMatch?.declarationType == .typealiasDeclaration {
                 kexpression.isTypealiasFor = expression.inferredType.asMetaType(false)
-            } else {
-                kexpression.baseKClass = kclass(for: base, accessingMember: expression.member, codebaseInfo: translator.codebaseInfo)
             }
         } else if expression.baseType == .none && translator.codebaseInfo != nil {
             kexpression.messages.append(.kotlinMemberAccessUnknownBaseType(expression, source: translator.syntaxTree.source, member: expression.member))
@@ -1370,7 +1369,7 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinCast
     /// Return the `KClass` instance the given expression evaluates to, if any.
     private static func kclass(for expression: Expression, accessingMember: String, codebaseInfo: CodebaseInfo.Context?) -> TypeSignature? {
         // Must evaluate to X.Type
-        guard case .metaType(let type) = expression.inferredType, type != .none, accessingMember != "self" else {
+        guard expression.inferredType.isMetaType, accessingMember != "self" else {
             return nil
         }
         // A type literal is not the same as KClass<Type>
@@ -1387,16 +1386,9 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinCast
             }
         }
         // Is this a nested or module-qualified class type name?
+        let type = expression.inferredType.asMetaType(false)
         if let memberAccess = expression as? MemberAccess {
-            let typeName: String?
-            switch type {
-            case .member(_, let nestedType):
-                typeName = nestedType.name
-            case .module(_, let unqualifiedType):
-                typeName = unqualifiedType.name
-            default:
-                typeName = type.name
-            }
+            let typeName = type.memberType.withModuleName(nil).name
             if memberAccess.member == typeName {
                 return nil
             }
@@ -1413,7 +1405,7 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinCast
             return nil
         }
         // Nested type that is not fully qualified?
-        if case .member(_, let nestedType) = type, nestedType.name == identifier.name {
+        if type.baseType != .none, type.memberType.name == identifier.name {
             return nil
         }
         // Builtin type?

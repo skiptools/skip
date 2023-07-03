@@ -118,14 +118,13 @@ extension CodebaseInfo.Context {
         assert(global.kotlin != nil)
         let typeInfos = typeInfos(forNamed: type)
         if let structInfo = typeInfos.first(where: { $0.declarationType == .structDeclaration }) {
-            return structInfo.variables.contains(where: { $0.apiFlags.contains(.writeable) }) || structInfo.functions.contains(where: \.isMutating)
+            return structInfo.variables.contains(where: { $0.apiFlags?.contains(.writeable) == true }) || structInfo.functions.contains(where: \.isMutating)
         } else if typeInfos.contains(where: { $0.declarationType == .protocolDeclaration }) {
             // If this is a protocol that is constrained to class impls, then it isn't a mutable struct. Otherwise it could be
             return !global.protocolSignatures(forNamed: type).contains(.anyObject)
         } else if typeInfos.isEmpty {
             // Assume an unknown type could be a mutable struct
-            let type = type.asOptional(false)
-            switch type {
+            switch type.asTypealiased(nil).withoutOptionality() {
             case .named, .member, .module:
                 // Cross platform typealiases should not be treated as mutable structs
                 return crossPlatformTypealias(forUnknownNamed: type) == nil
@@ -160,7 +159,6 @@ extension CodebaseInfo.Context {
     /// Whether the given name corresponds to a function in the given type.
     func isFunctionName(_ name: String, in owningType: TypeSignature?) -> Bool {
         assert(global.kotlin != nil)
-        let owningType = owningType?.asOptional(false)
         if owningType != nil && name == "init" {
             return true
         }

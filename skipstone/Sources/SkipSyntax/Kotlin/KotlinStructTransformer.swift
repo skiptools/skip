@@ -42,7 +42,7 @@ final class KotlinStructTransformer: KotlinTransformer {
                     variableDeclaration.mutationFunctionNames = mutationFunctionNames
                     isMutable = true
                 }
-                if case .unwrappedOptional = variableDeclaration.declaredType {
+                if variableDeclaration.declaredType.isUnwrappedOptional {
                     // Not initialized
                 } else if !variableDeclaration.modifiers.isStatic && variableDeclaration.getter == nil && (!variableDeclaration.isLet || variableDeclaration.value == nil) && !variableDeclaration.modifiers.isLazy && !variableDeclaration.isGenerated {
                     initializableVariableDeclarations.append(variableDeclaration)
@@ -71,7 +71,7 @@ final class KotlinStructTransformer: KotlinTransformer {
     }
 
     private func addMutableStructAPI(to classDeclaration: KotlinClassDeclaration, variableDeclarations: [KotlinVariableDeclaration], useMemberwiseConstructor: Bool) {
-        let supdateType: TypeSignature = .optional(.function([TypeSignature.Parameter(type: .any)], .void))
+        let supdateType: TypeSignature = .function([TypeSignature.Parameter(type: .any)], .void).asOptional(true)
         let supdate = KotlinVariableDeclaration(names: ["supdate"], variableTypes: [supdateType])
         supdate.declaredType = supdateType
         supdate.role = .property

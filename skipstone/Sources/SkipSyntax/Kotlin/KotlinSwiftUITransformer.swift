@@ -97,7 +97,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
 
     private func isView(_ classDeclaration: KotlinClassDeclaration) -> Bool {
         // TODO: Ask codebase info
-        return classDeclaration.inherits.contains(.named("View", []))
+        return classDeclaration.inherits.contains(where: { $0.isNamed("View", moduleName: "SwiftUI", generics: []) })
     }
 
     private func viewForBody(_ variableDeclaration: KotlinVariableDeclaration) -> KotlinClassDeclaration? {

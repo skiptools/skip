@@ -199,7 +199,7 @@ final class KotlinCommonProtocolsTransformer: KotlinTransformer {
 
     private func equalsFunction(for className: String, generics: Generics, properties: [String]) -> KotlinFunctionDeclaration {
         let equalsFunction = KotlinFunctionDeclaration(name: "equals")
-        equalsFunction.parameters = [.init(externalLabel: "other", declaredType: .optional(.any))]
+        equalsFunction.parameters = [.init(externalLabel: "other", declaredType: .any.asOptional(true))]
         equalsFunction.returnType = .bool
         equalsFunction.modifiers.visibility = .public
         equalsFunction.modifiers.isOverride = true

@@ -310,7 +310,7 @@ struct TypeInferenceContext {
     /// - Parameters:
     ///   - type: The subscript's owning type.
     func `subscript`(in type: TypeSignature, parameters: [LabeledValue<TypeSignature>], messagesNode: SyntaxNode?) -> [(TypeSignature, APIMatch)] {
-        if case .optional = type {
+        if type.isOptional {
             return self.subscript(inNonOptional: type.asOptional(false), parameters: parameters, messagesNode: messagesNode).map { match in
                 let signature = resolveSignature(match: match)
                 return (.function(signature.parameters, signature.returnType.asOptional(true)), match)
@@ -336,8 +336,8 @@ struct TypeInferenceContext {
 
     /// For an operation on two types, return the probable result type.
     func operationResult(_ type1: TypeSignature, _ type2: TypeSignature) -> TypeSignature {
-        let type1 = type1.constrainedTypeWithGenerics(generics)
-        let type2 = type2.constrainedTypeWithGenerics(generics)
+        let type1 = type1.constrainedTypeWithGenerics(generics).asTypealiased(nil).withoutOptionality().withModuleName(nil)
+        let type2 = type2.constrainedTypeWithGenerics(generics).asTypealiased(nil).withoutOptionality().withModuleName(nil)
         if type1 == type2 {
             return type1
         }
@@ -398,21 +398,13 @@ struct TypeInferenceContext {
             return type2.isFloatingPoint ? type2 : type1
         case .uint64:
             return type2.isFloatingPoint ? type2 : type1
-        case .unwrappedOptional(let baseType1):
-            if case .unwrappedOptional(let baseType2) = type2 {
-                return operationResult(baseType1, baseType2)
-            }
-            return operationResult(baseType1, type2)
         default:
             return type1
         }
     }
 
     private func resolveSignature(match: APIMatch) -> TypeSignature {
-        guard match.declarationType == .typealiasDeclaration, let codebaseInfo, codebaseInfo.global.languageAdditions?.shouldResolveTypealiases == true else {
-            return match.signature
-        }
-        return codebaseInfo.resolveTypealias(for: match.signature)
+        return codebaseInfo?.resolveTypealias(for: match.signature) ?? match.signature
     }
 
     private func addMessages(to messagesNode: SyntaxNode?, for availability: [Availability]) {

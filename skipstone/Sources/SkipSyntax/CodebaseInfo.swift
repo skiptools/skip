@@ -147,13 +147,13 @@ public class CodebaseInfo: Codable {
         guard recursionDepth < 10 else {
             return []
         }
-        return candidateTypeNames(for: type.asOptional(false)).flatMap { (name, moduleName) in
+        return candidateTypeNames(for: type).flatMap { (name, moduleName) in
             let candidates = candidateMap(lookup(name: name, moduleName: moduleName, qualifiedMatch: true))
             return candidates.flatMap { candidate in
                 if let typeInfo = candidate as? TypeInfo {
                     return [typeInfo]
                 } else if let typealiasInfo = candidate as? TypealiasInfo {
-                    return typeInfos(forNamed: typealiasInfo.signature, candidateMap: candidateMap, recursionDepth: recursionDepth + 1)
+                    return typeInfos(forNamed: typealiasInfo.targetSignature, candidateMap: candidateMap, recursionDepth: recursionDepth + 1)
                 } else {
                     return []
                 }
@@ -177,15 +177,15 @@ public class CodebaseInfo: Codable {
     }
 
     // We need these in testing because SkipLib isn't available
-    private static let builtinProtocols: Set<TypeSignature> = [
-        .named("CustomStringConvertible", []), .module("Swift", .named("CustomStringConvertible", [])),
-        .named("Equatable", []), .module("Swift", .named("Equatable", [])),
-        .named("Error", []), .module("Swift", .named("Error", [])),
-        .named("OptionSet", []), .module("Swift", .named("OptionSet", [])),
+    private static let builtinProtocols: [TypeSignature] = [
+        .module("Swift", .named("CustomStringConvertible", [])),
+        .module("Swift", .named("Equatable", [])),
+        .module("Swift", .named("Error", [])),
+        .module("Swift", .named("OptionSet", [])),
     ]
-    private static let builtinEquatableSubprotocols: Set<TypeSignature> = [
-        .named("Comparable", []), .module("Swift", .named("Comparable", [])),
-        .named("Hashable", []), .module("Swift", .named("Hashable", [])),
+    private static let builtinEquatableSubprotocols: [TypeSignature] = [
+        .module("Swift", .named("Comparable", [])),
+        .module("Swift", .named("Hashable", [])),
     ]
 
     /// Return the protocols the given type conforms to, including inherited protocols.
@@ -193,9 +193,9 @@ public class CodebaseInfo: Codable {
     /// If the type itself is a protocol, it is included.
     func protocolSignatures(forNamed type: TypeSignature) -> [TypeSignature] {
         let type = type.asOptional(false)
-        if type == .anyObject || Self.builtinProtocols.contains(type) {
+        if type == .anyObject || Self.builtinProtocols.contains(where: { $0.isSameType(as: type) }) {
             return [type]
-        } else if Self.builtinEquatableSubprotocols.contains(type) {
+        } else if Self.builtinEquatableSubprotocols.contains(where: { $0.isSameType(as: type) }) {
             return [type, .named("Equatable", [])]
         }
         // Gather inherited signatures, then insert the given type at the front if it is also a protocol
@@ -250,7 +250,7 @@ public class CodebaseInfo: Codable {
         func declarationType(forNamed type: TypeSignature, resolveTypealias: Bool = true, unknownTypealiasFallback: StatementType = .classDeclaration, mustBeInModule: Bool = false) -> StatementType? {
             if !resolveTypealias {
                 let members = ranked(global.lookup(name: type.name, qualifiedMatch: true))
-                return members.first { $0 is TypeInfo || $0 is TypealiasInfo }?.declarationType
+                return members.first { ($0 is TypeInfo || $0 is TypealiasInfo) && (!mustBeInModule || $0.moduleName == global.moduleName) }?.declarationType
             }
             guard let typeInfo = primaryTypeInfo(forNamed: type) else {
                 guard let typealiasInfo = crossPlatformTypealias(forUnknownNamed: type) else {
@@ -266,10 +266,10 @@ public class CodebaseInfo: Codable {
 
         /// Resolve typealiases in the given type.
         func resolveTypealias(for type: TypeSignature) -> TypeSignature {
-            return resolveTypealias(for: type, recursionDepth: 0)
+            return resolveTypealias(for: type, moduleName: nil, recursionDepth: 0)
         }
 
-        private func resolveTypealias(for type: TypeSignature, recursionDepth: Int) -> TypeSignature {
+        private func resolveTypealias(for type: TypeSignature, moduleName: String?, recursionDepth: Int) -> TypeSignature {
             // Invalid Swift code containing circular typealiases can cause infinite recursion
             guard recursionDepth < 10 else {
                 return type
@@ -277,10 +277,23 @@ public class CodebaseInfo: Codable {
             return type.mappingTypes {
                 switch $0 {
                 case .named, .member:
-                    if let alias = ranked(global.lookup(name: $0.name, qualifiedMatch: true).filter { $0.declarationType == .typealiasDeclaration }).first {
-                        return resolveTypealias(for: $0.generics.isEmpty ? alias.signature : alias.signature.withGenerics($0.generics), recursionDepth: recursionDepth + 1)
+                    if let info = ranked(global.lookup(name: $0.name, moduleName: moduleName, qualifiedMatch: true)).first(where: { $0.declarationType == .typealiasDeclaration }) as? TypealiasInfo {
+                        let typealiasSignature = TypeSignature.Typealias(from: info.signature, to: info.targetSignature)
+                        var aliasedSignature: TypeSignature = .typealiased(typealiasSignature, info.targetSignature)
+                        if !$0.generics.isEmpty {
+                            aliasedSignature = aliasedSignature.withGenerics($0.generics)
+                        }
+                        return resolveTypealias(for: aliasedSignature, moduleName: nil, recursionDepth: recursionDepth + 1)
                     }
-                    return $0
+                    if let moduleName {
+                        return $0.withModuleName(moduleName)
+                    } else {
+                        return $0
+                    }
+                case .module(let moduleName, let type):
+                    return resolveTypealias(for: type, moduleName: moduleName, recursionDepth: recursionDepth)
+                case .typealiased(let alias, let type):
+                    return resolveTypealias(for: type, moduleName: nil, recursionDepth: recursionDepth).asTypealiased(alias)
                 default:
                     break
                 }
@@ -290,8 +303,12 @@ public class CodebaseInfo: Codable {
 
         /// Cross platform library code may create typealiases to unknown types. Return any typealias for the given unknown type.
         func crossPlatformTypealias(forUnknownNamed type: TypeSignature) -> CodebaseInfo.TypealiasInfo? {
-            let members = ranked(global.lookup(name: type.name, qualifiedMatch: true))
-            return members.first(where: { $0.declarationType == .typealiasDeclaration }) as? TypealiasInfo
+            if let typealiasSignature = type.typealiased {
+                return crossPlatformTypealias(forUnknownNamed: typealiasSignature.from)
+            } else {
+                let members = ranked(global.lookup(name: type.name, qualifiedMatch: true))
+                return members.first(where: { $0.declarationType == .typealiasDeclaration }) as? TypealiasInfo
+            }
         }
 
         /// Return API information for the given identifier.
@@ -313,14 +330,16 @@ public class CodebaseInfo: Codable {
             if let generics = (topRanked as? TypeInfo)?.generics ?? (topRanked as? TypealiasInfo)?.generics {
                 matchSignature = matchSignature.constrainedTypeWithGenerics(generics)
             }
-            matchSignature = matchSignature.asMetaType(topRanked.declarationType != .variableDeclaration && topRanked.declarationType != .enumCaseDeclaration && topRanked.declarationType != .functionDeclaration)
-            let apiFlags: APIFlags = (topRanked as? FunctionInfo)?.apiFlags ?? (topRanked as? VariableInfo)?.apiFlags ?? []
-            return APIMatch(signature: matchSignature, apiFlags: apiFlags, declarationType: topRanked.declarationType, availability: topRanked.availability)
+            var match = topRanked.apiMatch
+            match.signature = matchSignature.asMetaType(topRanked.declarationType != .variableDeclaration && topRanked.declarationType != .enumCaseDeclaration && topRanked.declarationType != .functionDeclaration)
+            return match
         }
         
         /// Return API information for the given member.
+        ///
+        /// - Note: Assumes that the constrained `type` has been resolved.
         func matchIdentifier(name: String, inConstrained type: TypeSignature, excludeConstrainedExtensions: Bool = false) -> APIMatch? {
-            var type = type.asOptional(false)
+            var type = type.asTypealiased(nil).asOptional(false)
             if case .tuple(let labels, let types) = type {
                 for (index, label) in labels.enumerated() {
                     if name == label || name == "\(index)" {
@@ -382,8 +401,10 @@ public class CodebaseInfo: Codable {
         /// Return the signatures of the possible member functions being called with the given arguments.
         ///
         /// This function also works for the creation of an enum case with associated values.
+        ///
+        /// - Note: Assumes that the constrained `type` has been resolved.
         func matchFunction(name: String, inConstrained type: TypeSignature, arguments: [LabeledValue<TypeSignature>], excludeConstrainedExtensions: Bool = false) -> [APIMatch] {
-            var type = type.asOptional(false)
+            var type = type.asTypealiased(nil).asOptional(false)
             if case .tuple(let labels, let types) = type {
                 for (index, label) in labels.enumerated() {
                     if name == label || name == "\(index)" {
@@ -433,8 +454,10 @@ public class CodebaseInfo: Codable {
         }
         
         /// Return the signatures of the possible subscripts being called with the given arguments.
+        ///
+        /// - Note: Assumes that the constrained `type` has been resolved.
         func matchSubscript(inConstrained type: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> [APIMatch] {
-            var type = type.asOptional(false)
+            var type = type.asTypealiased(nil).asOptional(false)
             if case .array(let elementType) = type, arguments.count == 1 {
                 if case .range = arguments[0].value {
                     // Slice - fall through to symbols
@@ -479,17 +502,18 @@ public class CodebaseInfo: Codable {
             if let memberInfo = typeInfo.visibleMembers(context: self).first(where: { $0.name == name && ($0.declarationType == .initDeclaration || $0.isStatic == isStatic) }) {
                 let availability = memberInfo.availability.least(typeInfo.availability)
                 // Enum cases with associated values are modeled as functions, but can also be used as identifiers
+                let signature: TypeSignature
                 if memberInfo.declarationType == .enumCaseDeclaration {
-                    let signature = typeInfo.signature.mappingTypes(from: typeInfo.signature.generics, to: constrainedGenerics)
-                    return APIMatch(signature: signature, declarationType: .enumCaseDeclaration, availability: availability)
+                    signature = typeInfo.signature.mappingTypes(from: typeInfo.signature.generics, to: constrainedGenerics)
                 } else if memberInfo is TypeInfo || memberInfo.declarationType == .typealiasDeclaration {
-                    let signature = memberInfo.signature.mappingTypes(from: typeInfo.signature.generics, to: constrainedGenerics).asMetaType(true)
-                    return APIMatch(signature: signature, declarationType: memberInfo.declarationType, availability: availability)
+                    signature = memberInfo.signature.mappingTypes(from: typeInfo.signature.generics, to: constrainedGenerics).asMetaType(true)
                 } else {
-                    let signature = memberInfo.signature.mappingTypes(from: typeInfo.signature.generics, to: constrainedGenerics)
-                    let apiFlags: APIFlags = (memberInfo as? FunctionInfo)?.apiFlags ?? (memberInfo as? VariableInfo)?.apiFlags ?? []
-                    return APIMatch(signature: signature, apiFlags: apiFlags, declarationType: memberInfo.declarationType, availability: availability)
+                    signature = memberInfo.signature.mappingTypes(from: typeInfo.signature.generics, to: constrainedGenerics)
                 }
+                var match = memberInfo.apiMatch
+                match.signature = signature
+                match.availability = availability
+                return match
             }
             for inherits in typeInfo.inherits {
                 for inheritsInfo in typeInfos(forNamed: inherits) {
@@ -614,7 +638,7 @@ public class CodebaseInfo: Codable {
         private func matchFunction(_ item: CodebaseInfoItem, in typeInfo: TypeInfo? = nil, constrainedGenerics: [TypeSignature] = [], arguments: [LabeledValue<TypeSignature>], level: Int) -> FunctionCandidate? {
             let generics = (item as? FunctionInfo)?.generics
             if var candidate = matchFunction(signature: item.signature, generics: generics, declarationType: item.declarationType, availability: item.availability, in: typeInfo, constrainedGenerics: constrainedGenerics, arguments: arguments, level: level) {
-                candidate.match.apiFlags = (item as? FunctionInfo)?.apiFlags ?? (item as? VariableInfo)?.apiFlags ?? []
+                candidate.match.apiFlags = item.apiFlags ?? []
                 return candidate
             } else {
                 return nil
@@ -637,9 +661,11 @@ public class CodebaseInfo: Codable {
             var availability = availability
             if let typeInfo {
                 constrainedParameters = parameters.map {
-                    var resolvedParameter = $0
-                    resolvedParameter.type = resolveTypealias(for: $0.type)
-                    return resolvedParameter.mappingTypes(from: typeInfo.signature.generics, to: constrainedGenerics)
+                    $0.mappingTypes(from: typeInfo.signature.generics, to: constrainedGenerics)
+                    //~~~
+//                    var resolvedParameter = $0
+//                    resolvedParameter.type = resolveTypealias(for: $0.type)
+//                    return resolvedParameter.mappingTypes(from: typeInfo.signature.generics, to: constrainedGenerics)
                 }
                 generics = typeInfo.generics.merge(overrides: generics, addNew: true).merge(overrides: Generics(typeInfo.signature.generics, whereEqual: constrainedGenerics), addNew: true)
                 availability = availability.least(typeInfo.availability)
@@ -655,7 +681,7 @@ public class CodebaseInfo: Codable {
             var totalScore = 0.0
             while argumentIndex < arguments.count {
                 let argument = arguments[argumentIndex]
-                let resolvedArgument = LabeledValue(label: argument.label, value: resolveTypealias(for: argument.value))
+                let resolvedArgument = argument//~~~LabeledValue(label: argument.label, value: resolveTypealias(for: argument.value))
                 guard let (matchingIndex, score) = matchArgument(resolvedArgument, to: constrainedParameters, isSubscript: isSubscript, startIndex: parameterIndex) else {
                     return nil
                 }
@@ -675,7 +701,7 @@ public class CodebaseInfo: Codable {
                 if matchingParameter.isVariadic {
                     while argumentIndex < arguments.count {
                         let argument = arguments[argumentIndex]
-                        let resolvedArgument = LabeledValue(label: argument.label, value: resolveTypealias(for: argument.value))
+                        let resolvedArgument = argument//~~~LabeledValue(label: argument.label, value: resolveTypealias(for: argument.value))
                         if matchArgument(resolvedArgument, isVariadicContinuation: true, to: constrainedParameters, isSubscript: isSubscript, startIndex: parameterIndex) != nil {
                             argumentIndex += 1
                             // Model variadic continuation arguments as additional unlabeled parameters
@@ -753,14 +779,14 @@ public class CodebaseInfo: Codable {
             return [("Dictionary", nil)]
         case .function:
             return []
-        case .member(let base, let type):
-            let typeNames = candidateTypeNames(for: type)
+        case .member(let base, let member):
+            let typeNames = candidateTypeNames(for: member)
             let baseName = base.name
             return typeNames.map { ("\(baseName).\($0.0)", nil as String?) }
         case .metaType(let type):
             return candidateTypeNames(for: type)
-        case .module(let module, let type):
-            return candidateTypeNames(for: type).map { ($0.0, module) }
+        case .module(let moduleName, let type):
+            return candidateTypeNames(for: type).map { ($0.0, moduleName) }
         case .named(let name, _):
             return [(name, nil)]
         case .none:
@@ -769,6 +795,8 @@ public class CodebaseInfo: Codable {
             return candidateTypeNames(for: type)
         case .set:
             return [("Set", nil)]
+        case .typealiased(_, let type):
+            return candidateTypeNames(for: type)
         case .unwrappedOptional(let type):
             return candidateTypeNames(for: type)
         case .void:
@@ -910,7 +938,7 @@ public class CodebaseInfo: Codable {
         for typealiasInfo in typeInfo.typealiases {
             let generic: TypeSignature = .named(typealiasInfo.name, [])
             if mappings.keys.contains(generic) {
-                mappings[generic] = typealiasInfo.signature
+                mappings[generic] = typealiasInfo.targetSignature
             }
         }
         let unmapped = mappings.keys.filter { mappings[$0] == $0 }
@@ -1088,6 +1116,9 @@ public class CodebaseInfo: Codable {
         let declaringType: TypeSignature?
         let modifiers: Modifiers
         let availability: Availability
+        var apiFlags: APIFlags? {
+            return nil
+        }
         var isStatic: Bool {
             return true
         }
@@ -1273,13 +1304,13 @@ public class CodebaseInfo: Codable {
         let declaringType: TypeSignature?
         let modifiers: Modifiers
         let availability: Availability
+        let apiFlags: APIFlags?
         var isStatic: Bool {
             return modifiers.isStatic
         }
         var languageAdditions: Any?
         var importedModuleNames: [String]?
 
-        let apiFlags: APIFlags
         let isInitializable: Bool
         let hasValue: Bool
         var value: Expression?
@@ -1367,6 +1398,7 @@ public class CodebaseInfo: Codable {
         var declaringType: TypeSignature?
         let modifiers: Modifiers
         let availability: Availability
+        let apiFlags: APIFlags?
         var isStatic: Bool {
             return modifiers.isStatic
         }
@@ -1374,13 +1406,12 @@ public class CodebaseInfo: Codable {
         var importedModuleNames: [String]?
 
         var generics: Generics
-        let apiFlags: APIFlags
         let isMutating: Bool
         var isGenerated = false
 
         private enum CodingKeys: String, CodingKey {
             // Exclude language additions, importedModuleNames
-            case name, declarationType, signature, moduleName, sourceFile, declaringType, modifiers, availability, generics, apiFlags, isMutating, isGenerated
+            case name, declarationType, signature, moduleName, sourceFile, declaringType, modifiers, availability, apiFlags, generics, isMutating, isGenerated
         }
 
         fileprivate init(statement: FunctionDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo, syntaxTree: SyntaxTree) {
@@ -1392,7 +1423,6 @@ public class CodebaseInfo: Codable {
             self.declaringType = declaringType
             self.modifiers = statement.modifiers
             self.availability = Availability(attributes: statement.attributes)
-            self.generics = statement.generics
             var apiFlags: APIFlags = []
             if statement.isAsync {
                 apiFlags.insert(.async)
@@ -1404,6 +1434,7 @@ public class CodebaseInfo: Codable {
                 apiFlags.insert(.mainActor)
             }
             self.apiFlags = apiFlags
+            self.generics = statement.generics
             self.isMutating = statement.modifiers.isMutating
             (codebaseInfo.languageAdditions as? CodebaseInfoLanguageAdditionsGatherDelegate)?.codebaseInfo(codebaseInfo, didGather: &self, from: statement, syntaxTree: syntaxTree)
         }
@@ -1443,6 +1474,7 @@ public class CodebaseInfo: Codable {
         var declaringType: TypeSignature?
         let modifiers: Modifiers
         let availability: Availability
+        let apiFlags: APIFlags?
         var isStatic: Bool {
             return modifiers.isStatic
         }
@@ -1450,12 +1482,11 @@ public class CodebaseInfo: Codable {
         var importedModuleNames: [String]?
 
         var generics: Generics
-        let apiFlags: APIFlags
         let isReadOnly: Bool
 
         private enum CodingKeys: String, CodingKey {
             // Exclude language additions, importedModuleNames
-            case signature, moduleName, sourceFile, declaringType, modifiers, availability, generics, apiFlags, isReadOnly
+            case signature, moduleName, sourceFile, declaringType, modifiers, availability, apiFlags, generics, isReadOnly
         }
 
         fileprivate init(statement: SubscriptDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo, syntaxTree: SyntaxTree) {
@@ -1465,7 +1496,6 @@ public class CodebaseInfo: Codable {
             self.declaringType = declaringType
             self.modifiers = statement.modifiers
             self.availability = Availability(attributes: statement.attributes)
-            self.generics = statement.generics
             var apiFlags: APIFlags = []
             if statement.isAsync {
                 apiFlags.insert(.async)
@@ -1477,6 +1507,7 @@ public class CodebaseInfo: Codable {
                 apiFlags.insert(.mainActor)
             }
             self.apiFlags = apiFlags
+            self.generics = statement.generics
             self.isReadOnly = statement.setter == nil
             (codebaseInfo.languageAdditions as? CodebaseInfoLanguageAdditionsGatherDelegate)?.codebaseInfo(codebaseInfo, didGather: &self, from: statement, syntaxTree: syntaxTree)
         }
@@ -1500,6 +1531,9 @@ public class CodebaseInfo: Codable {
         let declaringType: TypeSignature?
         let modifiers: Modifiers
         let availability: Availability
+        var apiFlags: APIFlags? {
+            return nil
+        }
         var isStatic: Bool {
             return true
         }
@@ -1507,28 +1541,30 @@ public class CodebaseInfo: Codable {
         var importedModuleNames: [String]?
 
         var generics: Generics
+        var targetSignature: TypeSignature
 
         private enum CodingKeys: String, CodingKey {
             // Exclude language additions, importedModuleNames
-            case name, signature, moduleName, sourceFile, declaringType, modifiers, availability, generics
+            case name, signature, moduleName, sourceFile, declaringType, modifiers, availability, generics, targetSignature
         }
 
         fileprivate init(statement: TypealiasDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo, syntaxTree: SyntaxTree) {
             self.name = statement.name
-            self.signature = statement.aliasedType
+            self.signature = statement.signature
             self.moduleName = codebaseInfo.moduleName
             self.sourceFile = statement.sourceFile
             self.declaringType = declaringType
             self.modifiers = statement.modifiers
             self.availability = Availability(attributes: statement.attributes)
             self.generics = statement.generics
+            self.targetSignature = statement.aliasedType
             (codebaseInfo.languageAdditions as? CodebaseInfoLanguageAdditionsGatherDelegate)?.codebaseInfo(codebaseInfo, didGather: &self, from: statement, syntaxTree: syntaxTree)
         }
 
         fileprivate mutating func resolveTypeSignatures(codebaseInfo: CodebaseInfo) {
             let context = TypeResolutionContext(codebaseInfo: codebaseInfo.context(importedModuleNames: importedModuleNames ?? [], sourceFile: sourceFile))
             generics = generics.resolved(context: context)
-            signature = signature.resolved(context: context)
+            targetSignature = targetSignature.resolved(context: context)
         }
     }
 
@@ -1544,6 +1580,9 @@ public class CodebaseInfo: Codable {
         let declaringType: TypeSignature?
         let modifiers: Modifiers
         let availability: Availability
+        var apiFlags: APIFlags? {
+            return nil
+        }
         var isStatic: Bool {
             return true
         }
@@ -1583,11 +1622,18 @@ protocol CodebaseInfoItem {
     var declaringType: TypeSignature? { get }
     var modifiers: Modifiers { get }
     var availability: Availability { get }
+    var apiFlags: APIFlags? { get }
     var isStatic: Bool { get }
     /// Not serialized.
     var languageAdditions: Any? { get set }
     /// Not serialized.
     var importedModuleNames: [String]? { get set }
+}
+
+extension CodebaseInfoItem {
+    fileprivate var apiMatch: APIMatch {
+        return APIMatch(signature: signature, apiFlags: apiFlags ?? [], declarationType: declarationType, availability: availability)
+    }
 }
 
 extension CodebaseInfoItem {

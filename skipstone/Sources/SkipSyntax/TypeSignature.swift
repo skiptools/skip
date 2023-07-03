@@ -4,7 +4,6 @@ import SwiftSyntax
 ///
 /// Type signatures are nested, with some types acting as modifiers to their child types. The nesting of these modifiers is:
 /// `typealiased(optional(meta(module(member(T)))))`
-/// The `typealiased` modifier is outermost because a typealias only applies to specific values of optionality, etc.
 ///
 /// - Warning: Use the factory methods of this enum to extract and apply modifiers rather than attempting to create enums by hand.
 /// - Note: `Codable` for use in `CodebaseInfo`.
@@ -34,7 +33,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     case set(TypeSignature)
     case string
     case tuple([String?], [TypeSignature]) // (a: A, b: B)
-    case typealiased(TypeSignature, TypeSignature) // typealias A = B
+    case typealiased(Typealias, TypeSignature) // typealias (A = B), Type
     case uint
     case uint8
     case uint16
@@ -53,28 +52,28 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         guard withoutOptionality || (isOptional == other.isOptional && isUnwrappedOptional == other.isUnwrappedOptional) else {
             return false
         }
-        return asTypealiased(from: .none).withoutOptionality().withModuleName(nil) == other.asTypealiased(from: .none).withoutOptionality().withModuleName(nil)
+        return asTypealiased(nil).withoutOptionality().withModuleName(nil) == other.asTypealiased(nil).withoutOptionality().withModuleName(nil)
     }
 
     /// What type this was typealiased from, if any.
-    var typealiasedFrom: TypeSignature {
+    var typealiased: Typealias? {
         switch self {
         case .typealiased(let alias, _):
             return alias
         default:
-            return .none
+            return nil
         }
     }
 
     /// Mark this type as typealiased from another.
-    func asTypealiased(from alias: TypeSignature) -> TypeSignature {
+    func asTypealiased(_ alias: Typealias?) -> TypeSignature {
         switch self {
         case .none:
             return self
         case .typealiased(_, let type):
-            return alias == .none ? type : .typealiased(alias, type)
+            return alias == nil ? type : .typealiased(alias!, type)
         default:
-            return alias == .none ? self : .typealiased(alias, self)
+            return alias == nil ? self : .typealiased(alias!, self)
         }
     }
 
@@ -97,8 +96,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return .none
         case .optional(let type):
             return optional ? self : type
-        case .typealiased(_, let type):
-            return type.isOptional == optional ? self : type.asOptional(optional)
+        case .typealiased(let alias, let type):
+            return .typealiased(alias, type.asOptional(optional))
         case .unwrappedOptional(let type):
             return optional ? .optional(type) : self
         default:
@@ -125,8 +124,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return .none
         case .optional(let type):
             return unwrapped ? .unwrappedOptional(type) : self
-        case .typealiased(_, let type):
-            return type.isUnwrappedOptional == unwrapped ? self : type.asUnwrappedOptional(unwrapped)
+        case .typealiased(let alias, let type):
+            return .typealiased(alias, type.asUnwrappedOptional(unwrapped))
         case .unwrappedOptional(let type):
             return unwrapped ? self : type
         default:
@@ -139,9 +138,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         switch self {
         case .optional(let type):
             return type
-        case .typealiased(_, let type):
-            let without = type.withoutOptionality()
-            return without == type ? self : without
+        case .typealiased(let alias, let type):
+            return .typealiased(alias, type.withoutOptionality())
         case .unwrappedOptional(let type):
             return type
         default:
@@ -174,8 +172,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return .none
         case .optional(let type):
             return .optional(type.asMetaType(meta))
-        case .typealiased(_, let type):
-            return type.isMetaType == meta ? self : type.asMetaType(meta)
+        case .typealiased(let alias, let type):
+            return .typealiased(alias, type.asMetaType(meta))
         case .unwrappedOptional(let type):
             return .unwrappedOptional(type.asMetaType(meta))
         default:
@@ -204,6 +202,12 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     /// Add a module name to this type.
     func withModuleName(_ moduleName: String?) -> TypeSignature {
         switch self {
+        case .member, .named:
+            if let moduleName {
+                return .module(moduleName, self)
+            } else {
+                return self
+            }
         case .metaType(let type):
             return .metaType(type.withModuleName(moduleName))
         case .module(_, let type):
@@ -217,11 +221,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .unwrappedOptional(let type):
             return .unwrappedOptional(type.withModuleName(moduleName))
         default:
-            if let moduleName {
-                return .module(moduleName, self)
-            } else {
-                return self
-            }
+            return self
         }
     }
 
@@ -281,8 +281,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         let isMetaType = baseType.isMetaType || self.isMetaType
         let moduleName = baseType.moduleName ?? self.moduleName
 
-        let baseType = baseType.asTypealiased(from: .none).withoutOptionality().asMetaType(false).withModuleName(nil)
-        let memberType = self.asTypealiased(from: .none).withoutOptionality().asMetaType(false).withModuleName(nil)
+        let baseType = baseType.asTypealiased(nil).withoutOptionality().asMetaType(false).withModuleName(nil)
+        let memberType = self.asTypealiased(nil).withoutOptionality().asMetaType(false).withModuleName(nil)
         let ret: TypeSignature
         switch memberType {
         case .member(let intermediate, let type):
@@ -293,7 +293,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         return ret.withModuleName(moduleName).asMetaType(isMetaType).asUnwrappedOptional(isUnwrappedOptional).asOptional(isOptional)
     }
 
-    /// The name of this type without generics.
+    /// The name of this type without generics and optionals.
     var name: String {
         switch self {
         case .array:
@@ -302,10 +302,14 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return "Dictionary"
         case .named(let name, _):
             return name
+        case .optional(let type):
+            return type.descriptionUsing(\.name)
         case .range:
             return "Range"
         case .set:
             return "Set"
+        case .unwrappedOptional(let type):
+            return type.descriptionUsing(\.name)
         default:
             return descriptionUsing(\.name)
         }
@@ -493,7 +497,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                 return .set(generics[0])
             }
         case .typealiased(let alias, let type):
-            return .typealiased(alias.withGenerics(generics), type.withGenerics(generics))
+            //~~~ use alias from/to to apply partial generics if needed
+            return .typealiased(alias, type.withGenerics(generics))
         case .unwrappedOptional(let type):
             return .unwrappedOptional(type.withGenerics(generics))
         default:
@@ -534,7 +539,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .tuple(let labels, let types):
             return .tuple(labels, types.map { $0.constrainedTypeWithGenerics(generics) })
         case .typealiased(let alias, let type):
-            return .typealiased(alias.constrainedTypeWithGenerics(generics), type.constrainedTypeWithGenerics(generics))
+            return .typealiased(alias, type.constrainedTypeWithGenerics(generics))
         case .unwrappedOptional(let type):
             return .unwrappedOptional(type.constrainedTypeWithGenerics(generics))
         default:
@@ -697,8 +702,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             element.visit(visitor)
         case .set(let element):
             element.visit(visitor)
-        case .typealiased(let alias, let type):
-            alias.visit(visitor)
+        case .typealiased(_, let type):
             type.visit(visitor)
         case .tuple(_, let types):
             types.forEach { $0.visit(visitor) }
@@ -773,7 +777,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return .tuple(labels, types.map { $0.mappingTypes(with: map) })
         case .typealiased(let alias, let type):
             let mapped = type.mappingTypes(with: map)
-            return mapped.isSameType(as: type) ? mapped.asTypealiased(from: alias) : mapped
+            return mapped.isSameType(as: type, withoutOptionality: true) ? mapped.asTypealiased(alias) : mapped
         case .unwrappedOptional(let type):
             return type.mappingTypes(with: map).asUnwrappedOptional(true)
         default:
@@ -828,7 +832,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .tuple(let labels, let types):
             return .tuple(labels, types.map { $0.resolved(in: node, context: context) })
         case .typealiased(let alias, let type):
-            return type.resolved(in: node, moduleName: moduleName, context: context).asTypealiased(from: alias)
+            return type.resolved(in: node, moduleName: moduleName, context: context).asTypealiased(alias)
         case .unwrappedOptional(let type):
             return type.resolved(in: node, moduleName: moduleName, context: context).asUnwrappedOptional(true)
         default:
@@ -839,7 +843,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     /// Attempt to replace `.none` cases in this type signature with information from the given signature.
     func or(_ typeSignature: TypeSignature, replaceAny: Bool = false) -> TypeSignature {
         let typeModule = typeSignature.moduleName
-        let strippedTypeSignature = typeSignature.asTypealiased(from: .none).withoutOptionality().withModuleName(nil)
+        let strippedTypeSignature = typeSignature.asTypealiased(nil).withoutOptionality().withModuleName(nil)
 
         switch self {
         case .any:
@@ -870,7 +874,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             }
         case .member(let base, let type):
             if case .member(let base2, let type2) = strippedTypeSignature {
-                if base.asTypealiased(from: .none) == base2.asTypealiased(from: .none) {
+                if base.isSameType(as: base2) {
                     return type.or(type2, replaceAny: replaceAny).asMember(of: base)
                 }
             }
@@ -901,6 +905,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                 let resolvedTypes = zip(types, types2).map { $0.0.or($0.1, replaceAny: replaceAny) }
                 return .tuple(labels, resolvedTypes)
             }
+        case .typealiased(let alias, let type):
+            return type.or(typeSignature).asTypealiased(alias)
         case .unwrappedOptional(let type):
             return type.or(typeSignature).asUnwrappedOptional(true)
         default:
@@ -1005,7 +1011,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .optional(let type):
             return type.isNamed(name, moduleName: moduleName, generics: generics)
         case .typealiased(let alias, let type):
-            return type.isNamed(name, moduleName: moduleName, generics: generics) || alias.isNamed(name, moduleName: moduleName, generics: generics)
+            return type.isNamed(name, moduleName: moduleName, generics: generics) || alias.from.isNamed(name, moduleName: moduleName, generics: generics)
         case .unwrappedOptional(let type):
             return type.isNamed(name, moduleName: moduleName, generics: generics)
         default:
@@ -1023,11 +1029,11 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     /// Compound types with multiple elements return an average of their elements' scores.
     func compatibilityScore(target: TypeSignature, codebaseInfo: CodebaseInfo.Context) -> Double? {
         let moduleName = self.moduleName
-        let type = asTypealiased(from: .none).withModuleName(nil)
+        let type = asTypealiased(nil).withModuleName(nil)
         let targetIsOptional = target.isOptional
         let targetModuleName = target.moduleName
         let maybeSameModule = moduleName == nil || targetModuleName == nil || moduleName == targetModuleName
-        let strippedTarget = target.asTypealiased(from: .none).withoutOptionality().withModuleName(nil)
+        let strippedTarget = target.asTypealiased(nil).withoutOptionality().withModuleName(nil)
         if type == target && maybeSameModule {
             return 2.0
         }
@@ -1142,7 +1148,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             break
         }
 
-        switch target {
+        switch strippedTarget {
         case .any, .anyObject:
             return 1.0
         case .none:
@@ -1543,6 +1549,12 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .void:
             return "Void"
         }
+    }
+
+    /// Typealias information.
+    struct Typealias: Hashable, Codable {
+        var from: TypeSignature
+        var to: TypeSignature
     }
 
     /// A parameter in a function signature.

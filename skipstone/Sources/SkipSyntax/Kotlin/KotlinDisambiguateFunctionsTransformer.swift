@@ -228,7 +228,7 @@ final class KotlinDisambiguateFunctionsTransformer: KotlinTransformer {
             guard let functionInfo = info as? CodebaseInfo.FunctionInfo else {
                 return nil
             }
-            return key.parameterTypes == functionInfo.signature.parameters.map(\.type) ? functionInfo: nil
+            return key.parameterTypes.isSameTypes(as: functionInfo.signature.parameters.map(\.type)) ? functionInfo: nil
         }
     }
 }
@@ -268,10 +268,10 @@ private struct ParameterCount {
         guard let declaringType else {
             return false
         }
-        if type == declaringType {
+        if type.isSameType(as: declaringType) {
             return true
         }
-        return !isInit && (codebaseInfo.global.inheritanceChainSignatures(forNamed: type).contains(declaringType) || codebaseInfo.global.protocolSignatures(forNamed: type).contains(declaringType))
+        return !isInit && (codebaseInfo.global.inheritanceChainSignatures(forNamed: type).contains(where: { $0.isSameType(as: declaringType) }) || codebaseInfo.global.protocolSignatures(forNamed: type).contains(where: { $0.isSameType(as: declaringType) }))
     }
 }
 

@@ -23,7 +23,7 @@ struct TypeResolutionContext {
         guard baseOrModule.moduleName == nil else {
             return type.asMember(of: baseOrModule)
         }
-        guard case .named(let baseName, []) = baseOrModule.asTypealiased(from: .none) else {
+        guard case .named(let baseName, []) = baseOrModule.asTypealiased(nil) else {
             return type.asMember(of: baseOrModule)
         }
         // Swift.xxx builtin type?
@@ -38,13 +38,18 @@ struct TypeResolutionContext {
         }
         
         let qualifiedTypeName = "\(baseName).\(type.name)"
-        guard let typeInfo = codebaseInfo.primaryTypeInfo(forNamed: .named(qualifiedTypeName, [])) else {
-            // If we can't locate type info, assume an unknown type
-            return type.asMember(of: baseOrModule)
+        for info in codebaseInfo.ranked(codebaseInfo.global.lookup(name: qualifiedTypeName)) {
+            if info is CodebaseInfo.TypeInfo || info is CodebaseInfo.TypealiasInfo, info.declarationType != .extensionDeclaration {
+                let signature = info.signature.withGenerics(type.generics)
+                // Detect whether the lookup used the base name as a module name
+                if info.moduleName == (CodebaseInfo.moduleNameMap[baseName] ?? baseName) && signature.name != qualifiedTypeName {
+                    return signature.withModuleName(baseName)
+                } else {
+                    return signature
+                }
+            }
         }
-        // The returned info's signature may have module and typealias info, so use it as a base
-        let signature = typeInfo.signature
-        let generics = type.generics
-        return generics.isEmpty ? signature : signature.withGenerics(generics)
+        // If we can't locate type info, assume an unknown type
+        return type.asMember(of: baseOrModule)
     }
 }

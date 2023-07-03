@@ -63,6 +63,7 @@ extension TypeSignature {
             return "Long"
         case .member(let baseType, let type):
             let typeName = "\(baseType.kotlin).\(type.kotlin)"
+            //~~~ No more need for innerExtensions
             return Self.innerExtensions[typeName] ?? typeName
         case .metaType(let baseType):
             return "KClass<\(baseType.kotlin)>"
@@ -108,6 +109,8 @@ extension TypeSignature {
             } else {
                 return "Any"
             }
+        case .typealiased(_, let type):
+            return type.kotlin
         case .uint:
             return "UInt"
         case .uint8:
@@ -181,23 +184,16 @@ extension TypeSignature {
             return false
         case .int64:
             return false
-        case .named:
-            guard let codebaseInfo else {
-                return true
-            }
-            return codebaseInfo.mayBeMutableStruct(type: self)
-        case .none:
-            return true
-        case .optional(let type):
-            return type.kotlinMayBeSharedMutableStruct(codebaseInfo: codebaseInfo)
-        case .member:
+        case .member, .module, .named:
             guard let codebaseInfo else {
                 return true
             }
             return codebaseInfo.mayBeMutableStruct(type: self)
         case .metaType:
             return false
-        case .module(_, let type):
+        case .none:
+            return true
+        case .optional(let type):
             return type.kotlinMayBeSharedMutableStruct(codebaseInfo: codebaseInfo)
         case .range:
             return false
@@ -209,6 +205,8 @@ extension TypeSignature {
             // We consider a tuple with a shared mutable type to itself be a shared mutable type because code may
             // use destructuring assignment to extract values without copying them, so we have to copy the whole tuple
             return types.contains { $0.kotlinMayBeSharedMutableStruct(codebaseInfo: codebaseInfo) }
+        case .typealiased(_, let type):
+            return type.kotlinMayBeSharedMutableStruct(codebaseInfo: codebaseInfo)
         case .uint:
             return false
         case .uint8:
@@ -279,6 +277,8 @@ extension TypeSignature {
             return !primitive
         case .tuple:
             return false
+        case .typealiased(_, let type):
+            return type.kotlinIsNative(primitive: primitive)
         case .uint:
             return true
         case .uint8:
@@ -301,6 +301,8 @@ extension TypeSignature {
         switch asOptional(false) {
         case .named, .member, .module:
             return codebaseInfo?.isSealedClassesEnum(type: self) == true
+        case .typealiased(_, let type):
+            return type.kotlinIsSealedClassesEnum(codebaseInfo: codebaseInfo)
         default:
             return false
         }

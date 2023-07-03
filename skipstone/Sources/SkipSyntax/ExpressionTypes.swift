@@ -128,7 +128,7 @@ class ArrayLiteral: Expression {
             elementType = expecting.elementType
             elements.forEach { $0.inferTypes(context: context, expecting: elementType) }
         } else {
-            switch expecting {
+            switch expecting.asTypealiased(nil).withoutOptionality() {
             case .named, .member, .module:
                 // An array literal that maps to a named type is likely an option set
                 elementType = expecting
@@ -141,7 +141,7 @@ class ArrayLiteral: Expression {
             }
         }
         // We support initializing Sets from array literals
-        if case .set = expecting {
+        if case .set = expecting.asTypealiased(nil).withoutOptionality() {
             collectionType = .set(elementType)
         } else {
             collectionType = .array(elementType)
@@ -710,13 +710,13 @@ class FunctionCall: Expression, APICallExpression {
             isUnchainedOptional = Self.isUnchainedOptional(expression: memberAccess.base)
         default:
             function.inferTypes(context: context, expecting: .none)
-            let functionType = function.inferredType.asOptional(false)
+            let functionType = function.inferredType.asTypealiased(nil).asOptional(false).withoutOptionality()
             if case .function(_, var returnType) = functionType {
                 if function.inferredType.isOptional {
                     returnType = returnType.asOptional(true)
                 }
                 self.returnType = returnType.or(expecting)
-                apiMatch = APIMatch(signature: functionType, apiFlags: (function as? APICallExpression)?.apiMatch?.apiFlags ?? APIFlags())
+                apiMatch = APIMatch(signature: functionType, apiFlags: (function as? APICallExpression)?.apiMatch?.apiFlags ?? [])
             } else {
                 returnType = expecting
             }
@@ -1065,11 +1065,11 @@ class MemberAccess: Expression, APICallExpression {
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
-        // When the base type is missing we assume it's the class of the expected result type
         if let base {
             base.inferTypes(context: context, expecting: .none)
             baseType = baseType.or(base.inferredType)
         } else {
+            // When the base is missing we assume it's the class of the expected result type
             baseType = baseType.or(expecting.asMetaType(true).asOptional(false))
         }
         // If we don't recognize the base type, perhaps it's a module name. Treat it as a type name and
@@ -1088,7 +1088,7 @@ class MemberAccess: Expression, APICallExpression {
                 memberType = memberType.withGenerics(generics)
             }
             // Were we able to resolve the member by treating our unknown base identifier as a module name?
-            if self.baseType == .none, memberType != .none, let baseIdentifier {
+            if self.baseType == .none, memberType != .none, let baseIdentifier, baseIdentifier.generics?.isEmpty != false {
                 baseIdentifier.isModuleNameFor = memberType
                 self.baseType = .module(baseIdentifier.name, .none)
             }

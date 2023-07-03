@@ -789,8 +789,8 @@ class ExtensionDeclaration: TypeDeclaration {
     init(extends: TypeSignature, inherits: [TypeSignature] = [], attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), members: [Statement] = [], syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.extends = extends
         let name: String
-        if case .member(_, let type) = extends {
-            name = type.name
+        if extends.baseType != .none {
+            name = extends.memberType.name
         } else {
             name = extends.name
         }

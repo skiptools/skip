@@ -22,7 +22,6 @@ enum KotlinStatementType {
     case functionDeclaration
     case importDeclaration
     case interfaceDeclaration
-    case typealiasDeclaration
     case variableDeclaration
 
     // Special statements
@@ -2055,7 +2054,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if kstatement.declaredType == .float || kstatement.declaredType.isUnsigned, kstatement.value is KotlinNumericLiteral {
             kstatement.messages.append(.kotlinNumericCast(kstatement, source: translator.syntaxTree.source, type: kstatement.declaredType.kotlin))
         }
-        if (kstatement.role.isProperty || kstatement.role == .global), case .unwrappedOptional(let type) = kstatement.propertyType, type.kotlinIsNative(primitive: true) {
+        if (kstatement.role.isProperty || kstatement.role == .global), kstatement.propertyType.isUnwrappedOptional, kstatement.propertyType.kotlinIsNative(primitive: true) {
             kstatement.messages.append(.kotlinLateinitPrimitive(kstatement, source: translator.syntaxTree.source))
         }
         if statement.isAsync {
@@ -2121,7 +2120,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             output.append(indentation)
             if role.isProperty || role == .global {
                 output.append(modifiers.kotlinMemberString(isOpen: isOpen, suffix: " "))
-                if !usesStorageProperty && role != .superclassOverrideProperty, case .unwrappedOptional = declaredType {
+                if !usesStorageProperty && role != .superclassOverrideProperty, declaredType.isUnwrappedOptional {
                     output.append("lateinit ")
                 }
             }
@@ -2354,7 +2353,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if modifiers.isLazy {
             return true
         }
-        if case .unwrappedOptional = declaredType {
+        if declaredType.isUnwrappedOptional {
             // We only need a separate storage var if we need custom get or set logic
             return mayBeSharedMutableStruct || mutationFunctionNames != nil || setter?.body != nil || willSet?.body != nil || didSet?.body != nil
         }
