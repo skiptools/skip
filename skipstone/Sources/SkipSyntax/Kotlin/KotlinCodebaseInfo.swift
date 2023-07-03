@@ -187,10 +187,6 @@ public class KotlinCodebaseInfo: CodebaseInfoLanguageAdditions, CodebaseInfoLang
         self.packageName = packageName
     }
 
-    var shouldResolveTypealiases: Bool {
-        return true
-    }
-
     func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather typeInfo: CodebaseInfo.TypeInfo, from statement: ExtensionDeclaration, syntaxTree: SyntaxTree) {
         // Keep the extension statement around so we can move it to the extended declarations
         typeInfo.languageAdditions = ExtensionAdditions(extensionDeclaration: statement, syntaxTree: syntaxTree)

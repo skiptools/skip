@@ -233,8 +233,8 @@ final class KotlinCommonProtocolsTransformer: KotlinTransformer {
 
 extension KotlinCommonProtocolsTransformer: KotlinTypeSignatureOutputTransformer {
     static func outputSignature(for signature: TypeSignature) -> TypeSignature {
-        if case .named("Comparable", []) = signature {
-            return .named("Comparable", [.named("*", [])])
+        if signature.isNamed("Comparable", moduleName: "Swift", generics: []) {
+            return signature.withGenerics([.named("*", [])])
         } else {
             return signature
         }

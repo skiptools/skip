@@ -6,27 +6,25 @@ struct TypeResolutionContext {
         self.codebaseInfo = codebaseInfo
     }
 
-    /// If the given type represents a typealias and/or module-qualified type, return it as such.
-    func resolve(name: String, generics: [TypeSignature], in baseOrModule: TypeSignature? = nil) -> TypeSignature {
-        let type = resolveModuleQualifiedType(name: name, generics: generics, in: baseOrModule)
-        guard let codebaseInfo, codebaseInfo.global.languageAdditions?.shouldResolveTypealiases == true else {
-            return type
-        }
-        return codebaseInfo.resolveTypealias(for: type)
+    /// If the given type represents a typealias and/or module-qualified type, resolve it to the proper `.typealiased` and/or `.module` form.
+    func resolve(_ type: TypeSignature, moduleName: String? = nil, in baseOrModule: TypeSignature = .none) -> TypeSignature {
+        let type = resolveModuleQualifiedType(type, moduleName: moduleName, in: baseOrModule)
+        return codebaseInfo?.resolveTypealias(for: type) ?? type
     }
 
-    private func resolveModuleQualifiedType(name: String, generics: [TypeSignature], in baseOrModule: TypeSignature?) -> TypeSignature {
-        let type: TypeSignature = .named(name, generics)
-        guard let baseOrModule else {
-            return type
+    private func resolveModuleQualifiedType(_ type: TypeSignature, moduleName: String?, in baseOrModule: TypeSignature = .none) -> TypeSignature {
+        if let moduleName {
+            if baseOrModule != .none {
+                return type.asMember(of: baseOrModule.withModuleName(moduleName))
+            } else {
+                return type.withModuleName(moduleName)
+            }
         }
-        if case .module(let moduleName, let base) = baseOrModule {
-            return .module(moduleName, .member(base, type))
+        guard baseOrModule.moduleName == nil else {
+            return type.asMember(of: baseOrModule)
         }
-
-        let member: TypeSignature = .member(baseOrModule, type)
-        guard case .named(let baseName, let baseGenerics) = baseOrModule, baseGenerics.isEmpty else {
-            return member
+        guard case .named(let baseName, []) = baseOrModule.asTypealiased(from: .none) else {
+            return type.asMember(of: baseOrModule)
         }
         // Swift.xxx builtin type?
         if baseName == "Swift" {
@@ -36,16 +34,17 @@ struct TypeResolutionContext {
             }
         }
         guard let codebaseInfo else {
-            return member
+            return type.asMember(of: baseOrModule)
         }
         
         let qualifiedTypeName = "\(baseName).\(type.name)"
         guard let typeInfo = codebaseInfo.primaryTypeInfo(forNamed: .named(qualifiedTypeName, [])) else {
-            return member
+            // If we can't locate type info, assume an unknown type
+            return type.asMember(of: baseOrModule)
         }
-        guard typeInfo.signature.name != qualifiedTypeName, typeInfo.moduleName == CodebaseInfo.moduleNameMap[baseName, default: baseName] else {
-            return member
-        }
-        return .module(baseName, type)
+        // The returned info's signature may have module and typealias info, so use it as a base
+        let signature = typeInfo.signature
+        let generics = type.generics
+        return generics.isEmpty ? signature : signature.withGenerics(generics)
     }
 }

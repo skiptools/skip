@@ -49,8 +49,8 @@ final class KotlinConcurrencyTransformer: KotlinTransformer {
 
 extension KotlinConcurrencyTransformer: KotlinTypeSignatureOutputTransformer {
     static func outputSignature(for signature: TypeSignature) -> TypeSignature {
-        if case .named("Task", let generics) = signature, generics.count == 2 {
-            return .named("Task", [generics[0]])
+        if signature.isNamed("Task", moduleName: "Swift") && signature.generics.count == 2 {
+            return signature.withGenerics([signature.generics[0]])
         } else {
             return signature
         }

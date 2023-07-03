@@ -116,8 +116,10 @@ class SyntaxNode: SourceDerived, PrettyPrintable {
     }
 
     /// Traverse up the syntax tree to fully qualify a type.
+    ///
+    /// - Returns: A qualified type or a qualified type signature whose type must then be resolved.
     final func qualifyReferencedNamedType(name: String, generics: [TypeSignature]) -> TypeSignature {
-        // Look for a qualified name whose last token(s) are the given type name
+        // Look for a qualified name whose last token is the given type name
         let suffix = ".\(name)"
         var current: SyntaxNode? = self
         while current != nil {
@@ -128,8 +130,10 @@ class SyntaxNode: SourceDerived, PrettyPrintable {
             // Look for any direct child of that type with a matching qualified name
             if let referencedType = owningType.members.first(where: { ($0 as? TypeDeclaration)?.signature.name.hasSuffix(suffix) == true }) {
                 return (referencedType as! TypeDeclaration).signature.withGenerics(generics)
-            } else if owningType.members.contains(where: { ($0 as? TypealiasDeclaration)?.name == name }) {
-                return .member(owningType.signature, .named(name, generics))
+            } else if let typealiasDeclaration = owningType.members.first(where: { ($0 as? TypealiasDeclaration)?.name == name }) {
+                let typealiasType: TypeSignature = .named(name, []).asMember(of: owningType.signature)
+                let typealiasedType = (typealiasDeclaration as! TypealiasDeclaration).signature.asTypealiased(from: typealiasType)
+                return typealiasedType.withGenerics(generics)
             }
             // Move up to the next owning type and repeat
             current = owningType.parent
@@ -140,7 +144,7 @@ class SyntaxNode: SourceDerived, PrettyPrintable {
     /// Traverse up the syntax tree to fully qualify a type name declared by a class, struct, etc.
     final func qualifyDeclaredType(_ type: TypeSignature) -> TypeSignature {
         if let typeDeclaration = parent?.owningTypeDeclaration {
-            return .member(typeDeclaration.signature, type)
+            return type.asMember(of: typeDeclaration.signature)
         }
         return type
     }

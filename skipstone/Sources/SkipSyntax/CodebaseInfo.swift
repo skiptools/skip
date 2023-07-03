@@ -1610,9 +1610,6 @@ extension CodebaseInfoItem {
 
 /// Helper to track target language additions.
 protocol CodebaseInfoLanguageAdditions {
-    /// Whether to resolve typealiases back to their original type names when resolving types.
-    var shouldResolveTypealiases: Bool { get }
-
     /// Any issues encountered during information gathering.
     func messages(for sourceFile: Source.FilePath) -> [Message]
 
@@ -1621,10 +1618,6 @@ protocol CodebaseInfoLanguageAdditions {
 }
 
 extension CodebaseInfoLanguageAdditions {
-    var shouldResolveTypealiases: Bool {
-        return false
-    }
-
     func messages(for sourceFile: Source.FilePath) -> [Message] {
         return []
     }
