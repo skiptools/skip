@@ -100,7 +100,8 @@ CHECKSUM=$(shasum -a 256 ${ARTIFACTBUNDLE}.zip | cut -f 1 -d ' ')
 du -skh "${ARTIFACTBUNDLE}.zip"
 
 # the location of the download once we have uploaded it
-ARTIFACT_URL="https://github.com/skiptools/skip/releases/download/${SEMVER_NEXT}/${ARTIFACTBUNDLE}.zip"
+#ARTIFACT_URL="https://github.com/skiptools/skip/releases/download/${SEMVER_NEXT}/${ARTIFACTBUNDLE}.zip"
+ARTIFACT_URL="https://skip.tools/skiptools/skip/releases/download/${SEMVER_NEXT}/${ARTIFACTBUNDLE}.zip"
 
 #gh release -R github.com/skiptools/skip delete "main-${RELNAME}" --yes || true
 
@@ -113,8 +114,8 @@ sed -I '' 's;package.targets += \[.binaryTarget.*;package.targets += [.binaryTar
 # this aligns the 
 cd ${SKIPPKGDIR}
 
-sed -I '' 's;.package(url: "https://github.com/skiptools/skip", from: ".*");.package(url: "https://github.com/skiptools/skip", from: "'${SEMVER_NEXT}'");g' "README.md"
-sed -I '' 's;.package(url: "https://github.com/skiptools/skip", from: ".*");.package(url: "https://github.com/skiptools/skip", from: "'${SEMVER_NEXT}'");g' "${SKIPHUBPKG}"
+sed -I '' 's;.package(url: "https://.*/skiptools/skip", from: ".*");.package(url: "https://skip.tools/skiptools/skip", from: "'${SEMVER_NEXT}'");g' "README.md"
+sed -I '' 's;.package(url: "https://.*/skiptools/skip", from: ".*");.package(url: "https://skip.tools/skiptools/skip", from: "'${SEMVER_NEXT}'");g' "${SKIPHUBPKG}"
 
 # also grab the latest skiphub version and update it in the README
 SKIPHUB_VERSION=`git ls-remote --tags https://github.com/skiptools/skiphub | awk -F/ '$NF ~ /^v?[0-9]+\.[0-9]+\.[0-9]+$/ {print $NF}' | sort -V | tail -n1`
