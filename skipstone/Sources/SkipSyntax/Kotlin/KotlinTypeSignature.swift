@@ -2,10 +2,6 @@ extension TypeSignature {
     /// The types from the standard library that should be re-mapped to a joined form of the name.
     /// For example, Swift references to `String.Encoding.utf8` will be converted to `StringEncoding.utf8`.
     static let innerExtensions: [String: String] = [
-        "Array.Index": "ArrayIndex",
-        "Collection.Index": "CollectionIndex",
-        "Dictionary.Index": "DictionaryIndex",
-        "Set.Index": "SetIndex",
         "String.Encoding": "StringEncoding",
         "String.Index": "StringIndex",
     ]
