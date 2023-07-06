@@ -43,7 +43,7 @@ jobs:
       #  run: KOTLINC=kotlinc swift test -v --configuration debug --parallel
 
       - name: Swift Test (Release)
-        run: KOTLINC=kotlinc swift test -v --configuration release -Xswiftc -enable-testing --parallel
+        run: KOTLINC=kotlinc swift test -v --configuration release -Xswiftc -enable-testing -Xswiftc -static-stdlib --parallel
 
       #- name: Build SkipRunner (Debug)
       #  run: swift build -v --configuration debug -Xswiftc -enable-testing
@@ -51,9 +51,14 @@ jobs:
       - name: Show skiptool output
         run: find .build/
 
+      - name: Create output folder
+        run: mkdir -p .build/dist/skiptool/x86_64-unknown-linux-gnu
+
+      - name: Copy executable
+        run: cp -a .build/x86_64-unknown-linux-gnu/release/SkipRunner .build/dist/skiptool/x86_64-unknown-linux-gnu/skiptool
+
       - name: "Upload Build Artifacts"
         uses: actions/upload-artifact@v3
         with: 
-          path: .build/x86_64-unknown-linux-gnu/release
-
+          path: .build/dist
 
