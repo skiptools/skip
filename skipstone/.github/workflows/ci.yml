@@ -54,7 +54,6 @@ jobs:
       - name: "Upload Build Artifacts"
         uses: actions/upload-artifact@v3
         with: 
-          #path: .build/
-          #path: .build/x86_64-unknown-linux-gnu/release
+          path: .build/x86_64-unknown-linux-gnu/release
 
 
