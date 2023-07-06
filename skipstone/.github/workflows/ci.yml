@@ -39,11 +39,11 @@ jobs:
       - name: Check kotlinc
         run: which kotlinc
 
-      #- name: Swift Test (Debug)
-      #  run: KOTLINC=kotlinc swift test -v --configuration debug --parallel
+      - name: Swift Test (Debug)
+        run: KOTLINC=kotlinc swift test -v -c debug --parallel
 
-      - name: Swift Test (Release)
-        run: KOTLINC=kotlinc swift test -v --configuration release -Xswiftc -enable-testing -Xswiftc -static-stdlib --parallel
+      - name: Swift Build (Release)
+        run: swift build --product SkipRunner -c release -Xswiftc -static-stdlib
 
       #- name: Build SkipRunner (Debug)
       #  run: swift build -v --configuration debug -Xswiftc -enable-testing
