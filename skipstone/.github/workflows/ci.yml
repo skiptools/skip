@@ -42,8 +42,11 @@ jobs:
       - name: Build skiptool (release)
         run: swift build -v --configuration release
 
-      - name: Check skiptool
-        run: ./build/
+      - name: Show skiptool output
+        run: find ./build/
+
+      #- name: Check skiptool
+      #  run: ./build/
 
       #- name: Swift Test Linux (Debug)
       #  run: KOTLINC=kotlinc swift test -v --configuration debug --parallel
