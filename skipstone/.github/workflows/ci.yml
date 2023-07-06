@@ -16,7 +16,10 @@ jobs:
     #uses: skiptools/skiphub/.github/workflows/ci.yml@main
 
   ci-linux:
-    runs-on: ubuntu-latest
+    #runs-on: ubuntu-18.4
+    runs-on: ubuntu-20.04
+    #runs-on: ubuntu-22.04
+    #runs-on: ubuntu-latest
     timeout-minutes: 30
 
     steps:
@@ -36,11 +39,22 @@ jobs:
       - name: Check kotlinc
         run: which kotlinc
 
-      - name: Swift Test Linux (Debug)
-        run: KOTLINC=kotlinc swift test -v --configuration debug --parallel
+      - name: Build skiptool (release)
+        run: swift build -v --configuration release
 
-      - name: Swift Test Linux (Release)
-        # disabled for CI speed (release build of dependencies is slow)
-        if: false
-        run: swift test -v --configuration release -Xswiftc -enable-testing --parallel
+      - name: Check skiptool
+        run: ./build/
+
+      #- name: Swift Test Linux (Debug)
+      #  run: KOTLINC=kotlinc swift test -v --configuration debug --parallel
+
+      - name: Swift Test (Release)
+        run: KOTLINC=kotlinc swift test -v --configuration release -Xswiftc -enable-testing --parallel
+
+      - name: "Upload Build Artifacts"
+        uses: actions/upload-artifact@v3
+        with: 
+          path: .build/
+          #path: .build/arm64-apple-macosx/release/SkipRunner
+
 
