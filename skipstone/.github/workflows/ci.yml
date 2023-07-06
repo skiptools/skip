@@ -43,7 +43,7 @@ jobs:
         run: swift build -v --configuration release
 
       - name: Show skiptool output
-        run: find ./build/
+        run: find .build/
 
       #- name: Check skiptool
       #  run: ./build/
