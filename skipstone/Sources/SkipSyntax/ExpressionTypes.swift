@@ -658,7 +658,7 @@ class FunctionCall: Expression, APICallExpression {
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
         let baseType: TypeSignature?
-        let name: String
+        let name: String?
         var isUnchainedOptional = false
         switch function.type {
         case .arrayLiteral:
@@ -688,11 +688,7 @@ class FunctionCall: Expression, APICallExpression {
                 // Assume the call is a constructor. Do not assume return type is the same, however, as we might use the
                 // constructor params to resolve generics
                 baseType = identifier.inferredType.asMetaType(false)
-                name = "init"
-            } else if let generics = identifier.generics, !generics.isEmpty {
-                // If generics are specified, assume the identifier is a type name and this call is a constructor
-                baseType = TypeSignature.for(name: identifier.name, genericTypes: generics)
-                name = "init"
+                name = nil
             } else {
                 baseType = nil
                 name = identifier.name
@@ -705,9 +701,14 @@ class FunctionCall: Expression, APICallExpression {
             } else {
                 _ = memberAccess.inferTypes(context: context, expecting: .none)
             }
-            baseType = memberAccess.baseType
-            name = memberAccess.member
-            isUnchainedOptional = Self.isUnchainedOptional(expression: memberAccess.base)
+            if memberAccess.inferredType.isMetaType {
+                baseType = memberAccess.inferredType.asMetaType(false)
+                name = nil
+            } else {
+                baseType = memberAccess.baseType // Note: our type inference differentiates between .none and nil
+                name = memberAccess.member
+                isUnchainedOptional = Self.isUnchainedOptional(expression: memberAccess.base)
+            }
         default:
             function.inferTypes(context: context, expecting: .none)
             let functionType = function.inferredType.asTypealiased(nil).asOptional(false).withoutOptionality()
@@ -728,7 +729,7 @@ class FunctionCall: Expression, APICallExpression {
         let argumentTypes = arguments.map { $0.value.inferredType }
         let match: (TypeSignature, APIMatch)?
         let matchBaseType: TypeSignature?
-        if isUnchainedOptional, let baseType, baseType != .none, let optionalMatch = matchFunction(name: name, arguments: arguments, in: .named("Optional", [baseType]), context: context, expecting: expecting, message: false) {
+        if isUnchainedOptional, let name, let baseType, baseType.withModuleName(nil) != .none, let optionalMatch = matchFunction(name: name, arguments: arguments, in: .named("Optional", [baseType]), context: context, expecting: expecting, message: false) {
             match = optionalMatch
             matchBaseType = .named("Optional", [baseType])
         } else {
@@ -759,7 +760,7 @@ class FunctionCall: Expression, APICallExpression {
         return context
     }
 
-    private func matchFunction(name: String, arguments: [LabeledValue<Expression>], in baseType: TypeSignature?, context: TypeInferenceContext, expecting: TypeSignature, message: Bool) -> (TypeSignature, APIMatch)? {
+    private func matchFunction(name: String?, arguments: [LabeledValue<Expression>], in baseType: TypeSignature?, context: TypeInferenceContext, expecting: TypeSignature, message: Bool) -> (TypeSignature, APIMatch)? {
         let parameters = arguments.map { LabeledValue<TypeSignature>(label: $0.label, value: $0.value.inferredType) }
         let matches = context.function(name, in: baseType, parameters: parameters, messagesNode: message ? self : nil)
         guard !matches.isEmpty else {
@@ -840,7 +841,11 @@ class Identifier: Expression, APICallExpression {
             apiMatch = match
         }
         if let generics, !generics.isEmpty {
-            identifierType = identifierType.withGenerics(generics.map { $0.constrainedTypeWithGenerics(context.generics) })
+            if identifierType == .none {
+                identifierType = TypeSignature.for(name: name, genericTypes: generics).asMetaType(true)
+            } else {
+                identifierType = identifierType.withGenerics(generics)
+            }
         }
         identifierType = identifierType.or(expecting)
         if !isLocalOrSelfIdentifier {
@@ -1079,7 +1084,7 @@ class MemberAccess: Expression, APICallExpression {
         if baseType == .none, let baseIdentifier {
             baseType = .named(baseIdentifier.name, baseIdentifier.generics ?? []).asMetaType(true)
         }
-        // Don't output unavailable messages here if this is part of a function call. There could be other
+        // Don't output availability messages here if this is part of a function call. There could be other
         // member matches. The function call node will have more type information
         if let (signature, match) = context.member(member, in: baseType, messagesNode: isCalledAsFunction ? nil : self) {
             memberType = signature
@@ -1092,6 +1097,8 @@ class MemberAccess: Expression, APICallExpression {
                 baseIdentifier.isModuleNameFor = memberType
                 self.baseType = .module(baseIdentifier.name, .none)
             }
+        } else if let generics, !generics.isEmpty {
+            memberType = .named(member, generics).asMember(of: self.baseType)
         }
         memberType = memberType.or(expecting)
         return context
@@ -1827,7 +1834,7 @@ class TupleLiteral: Expression {
 
 /// `Int`
 class TypeLiteral: Expression {
-    let literal: TypeSignature
+    private(set) var literal: TypeSignature
 
     init(literal: TypeSignature, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.literal = literal
@@ -1839,6 +1846,10 @@ class TypeLiteral: Expression {
             return nil
         }
         return TypeLiteral(literal: TypeSignature.for(syntax: typeExpr.type), sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+    }
+
+    override func resolveAttributes(in syntaxTree: SyntaxTree, context: TypeResolutionContext) {
+        literal = literal.resolved(in: self, context: context)
     }
 
     override var inferredType: TypeSignature {

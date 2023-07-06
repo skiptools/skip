@@ -248,7 +248,7 @@ final class MemberDeclarationTests: XCTestCase {
         """)
     }
 
-    func testVariableWillDidSet() async throws {
+    func testPropertyWillDidSet() async throws {
         try await check(swift: """
         class A {
             var i = 1 {
@@ -321,7 +321,7 @@ final class MemberDeclarationTests: XCTestCase {
         """)
     }
 
-    func testMutableStructVariableWillDidSet() async throws {
+    func testMutableStructPropertyWillDidSet() async throws {
         try await check(swift: """
         struct A {
               var i = 1 {

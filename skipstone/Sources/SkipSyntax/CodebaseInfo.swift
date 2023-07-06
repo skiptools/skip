@@ -24,7 +24,12 @@ public class CodebaseInfo: Codable {
 
     /// Map between Swift modules and the equivalent Skip modules.
     static let moduleNameMap: [String: String] = [
+        "CoreFoundation": "SkipFoundation",
+        "CryptoKit": "SkipFoundation",
+        "Dispatch": "SkipFoundation",
         "Foundation": "SkipFoundation",
+        "JavaScriptCore": "SkipKit",
+        "OSLog": "SkipFoundation",
         "Swift": "SkipLib",
         "XCTest": "SkipUnit",
     ]
@@ -376,26 +381,12 @@ public class CodebaseInfo: Codable {
         }
 
         /// Return API information for the possible functions being called with the given arguments.
-        func matchFunction(name: String, arguments: [LabeledValue<TypeSignature>], moduleName: String? = nil) -> [APIMatch] {
-            let lookup = global.lookup(name: name, moduleName: moduleName, qualifiedMatch: true)
-            let items = ranked(lookup)
-            let funcs = items.filter { $0.declarationType == .functionDeclaration }
-            let funcsCandidates = funcs.compactMap { matchFunction($0, arguments: arguments, level: 0) }
-            let typeInfos = items.flatMap { (item) -> [TypeInfo] in
-                if let typeInfo = item as? TypeInfo {
-                    return [typeInfo]
-                } else if let typealiasInfo = item as? TypealiasInfo {
-                    return self.typeInfos(forNamed: typealiasInfo.signature)
-                } else {
-                    return []
-                }
-            }
-            let initsCandidates = initCandidates(for: typeInfos, arguments: arguments)
-            let sortedCandidates = Set(funcsCandidates + initsCandidates).sorted { $0.score > $1.score }
-            guard let topCandidate = sortedCandidates.first else {
+        func matchFunction(name: String, moduleName: String? = nil, arguments: [LabeledValue<TypeSignature>]) -> [APIMatch] {
+            let candidates = Set(functionCandidates(name: name, moduleName: moduleName, arguments: arguments)).sorted { $0.score > $1.score }
+            guard let topCandidate = candidates.first else {
                 return []
             }
-            return sortedCandidates.filter { $0.score >= topCandidate.score }.map(\.match)
+            return candidates.filter { $0.score >= topCandidate.score }.map(\.match)
         }
         
         /// Return the signatures of the possible member functions being called with the given arguments.
@@ -403,9 +394,9 @@ public class CodebaseInfo: Codable {
         /// This function also works for the creation of an enum case with associated values.
         ///
         /// - Note: Assumes that the constrained `type` has been resolved.
-        func matchFunction(name: String, inConstrained type: TypeSignature, arguments: [LabeledValue<TypeSignature>], excludeConstrainedExtensions: Bool = false) -> [APIMatch] {
-            var type = type.asTypealiased(nil).asOptional(false)
-            if case .tuple(let labels, let types) = type {
+        func matchFunction(name: String?, inConstrained type: TypeSignature, arguments: [LabeledValue<TypeSignature>], excludeConstrainedExtensions: Bool = false) -> [APIMatch] {
+            let type = type.asOptional(false)
+            if case .tuple(let labels, let types) = type.asTypealiased(nil) {
                 for (index, label) in labels.enumerated() {
                     if name == label || name == "\(index)" {
                         let function = matchTuple(types[index], arguments: arguments)
@@ -414,29 +405,18 @@ public class CodebaseInfo: Codable {
                 }
                 return []
             } else if case .module(let module, .none) = type {
-                return matchFunction(name: name, arguments: arguments, moduleName: module)
-            }
-            let isStatic = type.isMetaType
-            type = type.asMetaType(false)
-
-            var candidates: Set<FunctionCandidate> = []
-            let typeInfos = typeInfos(forNamed: type)
-            let primaryTypeInfo = typeInfos.first { $0.declarationType != .extensionDeclaration }
-            if name == "init" {
-                initCandidates(for: typeInfos, in: primaryTypeInfo, constrainedGenerics: type.generics, arguments: arguments).forEach { candidates.insert($0) }
-            } else {
-                for typeInfo in typeInfos {
-                    if excludeConstrainedExtensions && typeInfo.declarationType == .extensionDeclaration, let primaryTypeInfo, typeInfo.generics != primaryTypeInfo.generics {
-                        continue
-                    }
-                    functionCandidates(for: name, in: typeInfo, constrainedGenerics: type.generics, arguments: arguments, isStatic: isStatic).forEach { candidates.insert($0) }
+                guard let name else {
+                    return []
                 }
+                return matchFunction(name: name, moduleName: module, arguments: arguments)
             }
+
+            let candidates = Set(functionCandidates(name: name, in: type, constrainedGenerics: type.generics, arguments: arguments, excludeConstrainedExtensions: excludeConstrainedExtensions))
             let sortedCandidates = candidates.sorted { $0.score > $1.score || ($0.score == $1.score && $0.level < $1.level) }
             guard let topCandidate = sortedCandidates.first else {
-                if case .named(let moduleName, []) = type {
+                if let name, case .named(let moduleName, []) = type {
                     // Is type a module name?
-                    return matchFunction(name: name, arguments: arguments, moduleName: moduleName)
+                    return matchFunction(name: name, moduleName: moduleName, arguments: arguments)
                 } else {
                     return []
                 }
@@ -527,7 +507,60 @@ public class CodebaseInfo: Codable {
         }
 
         /// - Note: Returns unsorted, un-deduped results.
-        private func functionCandidates(for name: String, in typeInfo: TypeInfo, constrainedGenerics: [TypeSignature], arguments: [LabeledValue<TypeSignature>], isStatic: Bool, level: Int = 0) -> [FunctionCandidate] {
+        private func functionCandidates(name: String, moduleName: String?, constrainedGenerics: [TypeSignature] = [], arguments: [LabeledValue<TypeSignature>], includeTypes: Bool = true) -> [FunctionCandidate] {
+            let lookup = global.lookup(name: name, moduleName: moduleName, qualifiedMatch: true)
+            let items = ranked(lookup)
+            let funcs = items.filter { $0.declarationType == .functionDeclaration }
+            let funcsCandidates = funcs.compactMap { matchFunction($0, constrainedGenerics: constrainedGenerics, arguments: arguments, level: 0) }
+            guard includeTypes else {
+                return funcsCandidates
+            }
+
+            let typeInfos = items.flatMap { (item) -> [TypeInfo] in
+                if let typeInfo = item as? TypeInfo {
+                    return [typeInfo]
+                } else if let typealiasInfo = item as? TypealiasInfo {
+                    return self.typeInfos(forNamed: typealiasInfo.signature)
+                } else {
+                    return []
+                }
+            }
+            let initsCandidates = initCandidates(for: typeInfos, constrainedGenerics: constrainedGenerics, arguments: arguments)
+            return funcsCandidates + initsCandidates
+        }
+
+        /// - Note: Returns unsorted, un-deduped results.
+        private func functionCandidates(name: String?, in type: TypeSignature, constrainedGenerics: [TypeSignature], arguments: [LabeledValue<TypeSignature>], excludeConstrainedExtensions: Bool) -> [FunctionCandidate] {
+            let isStatic = type.isMetaType
+            let type = type.asMetaType(false)
+
+            var candidates: [FunctionCandidate] = []
+            let typeInfos = typeInfos(forNamed: type)
+            let primaryTypeInfo = typeInfos.first { $0.declarationType != .extensionDeclaration }
+            if name == nil || name == "init" {
+                candidates += initCandidates(for: typeInfos, in: primaryTypeInfo, constrainedGenerics: constrainedGenerics, arguments: arguments)
+                if name == nil {
+                    // Look for free functions that match the type name
+                    candidates += typeNameFunctionCandidates(for: type, constrainedGenerics: constrainedGenerics, arguments: arguments, excludeConstrainedExtensions: excludeConstrainedExtensions)
+                }
+                // If this is a typealias to an unknown type with no matching named functions, assume it's
+                // a constructor of the unknown type
+                if candidates.isEmpty, let typealiasSignature = type.typealiased {
+                    candidates.append(syntheticInitCandidate(for: typealiasSignature.to, arguments: arguments, availability: .available))
+                }
+            } else if let name {
+                for typeInfo in typeInfos {
+                    if excludeConstrainedExtensions && typeInfo.declarationType == .extensionDeclaration, let primaryTypeInfo, typeInfo.generics != primaryTypeInfo.generics {
+                        continue
+                    }
+                    candidates += functionCandidates(name: name, in: typeInfo, constrainedGenerics: constrainedGenerics, arguments: arguments, isStatic: isStatic)
+                }
+            }
+            return candidates
+        }
+
+        /// - Note: Returns unsorted, un-deduped results.
+        private func functionCandidates(name: String, in typeInfo: TypeInfo, constrainedGenerics: [TypeSignature], arguments: [LabeledValue<TypeSignature>], isStatic: Bool, level: Int = 0) -> [FunctionCandidate] {
             guard typeInfo.isApplicable(toConstrainedGenerics: constrainedGenerics, codebaseInfo: self) else {
                 return []
             }
@@ -552,7 +585,7 @@ public class CodebaseInfo: Codable {
             for inherits in typeInfo.inherits {
                 for inheritsInfo in typeInfos(forNamed: inherits) {
                     let inheritsConstraints = inherits.mappingTypes(from: typeInfo.signature.generics, to: constrainedGenerics).generics
-                    candidates += functionCandidates(for: name, in: inheritsInfo, constrainedGenerics: inheritsConstraints, arguments: arguments, isStatic: isStatic, level: level + 1)
+                    candidates += functionCandidates(name: name, in: inheritsInfo, constrainedGenerics: inheritsConstraints, arguments: arguments, isStatic: isStatic, level: level + 1)
                 }
             }
             return candidates
@@ -608,11 +641,29 @@ public class CodebaseInfo: Codable {
             // If we don't have any matches and this appears to be a constructor, treat it as one. We take advantage of this
             // while inferring the types of variable values in prepareForUse(), before we've called generateConstructors()
             if initSignatures.isEmpty {
-                let initParameters = arguments.map { TypeSignature.Parameter(label: $0.label, type: $0.value) }
-                let match = APIMatch(signature: .function(initParameters, primaryTypeInfo.signature), declarationType: .initDeclaration, availability: primaryTypeInfo.availability)
-                initSignatures.append(FunctionCandidate(match: match, score: 0.0, level: 0))
+                initSignatures.append(syntheticInitCandidate(for: primaryTypeInfo.signature, arguments: arguments, availability: primaryTypeInfo.availability))
             }
             return initSignatures
+        }
+
+        private func syntheticInitCandidate(for type: TypeSignature, arguments: [LabeledValue<TypeSignature>], availability: Availability) -> FunctionCandidate {
+            let initParameters = arguments.map { TypeSignature.Parameter(label: $0.label, type: $0.value) }
+            let match = APIMatch(signature: .function(initParameters, type), declarationType: .initDeclaration, availability: availability)
+            return FunctionCandidate(match: match, score: 0.0, level: 0)
+        }
+
+        /// - Note: Returns unsorted results.
+        private func typeNameFunctionCandidates(for type: TypeSignature, moduleName: String? = nil, constrainedGenerics: [TypeSignature], arguments: [LabeledValue<TypeSignature>], excludeConstrainedExtensions: Bool) -> [FunctionCandidate] {
+            switch type.withoutOptionality() {
+            case .member(let baseType, let type):
+                return functionCandidates(name: type.name, in: baseType.asMetaType(true), constrainedGenerics: constrainedGenerics, arguments: arguments, excludeConstrainedExtensions: excludeConstrainedExtensions)
+            case .module(let moduleName, let type):
+                return typeNameFunctionCandidates(for: type, moduleName: moduleName, constrainedGenerics: constrainedGenerics, arguments: arguments, excludeConstrainedExtensions: excludeConstrainedExtensions)
+            case .typealiased(let alias, _):
+                return typeNameFunctionCandidates(for: alias.from, constrainedGenerics: constrainedGenerics, arguments: arguments, excludeConstrainedExtensions: excludeConstrainedExtensions)
+            default:
+                return functionCandidates(name: type.name, moduleName: moduleName, constrainedGenerics: constrainedGenerics, arguments: arguments, includeTypes: false)
+            }
         }
         
         private func associatedValueSignatures(of member: String, in typeInfo: TypeInfo, constrainedGenerics: [TypeSignature]) -> [TypeSignature.Parameter]? {
@@ -662,10 +713,6 @@ public class CodebaseInfo: Codable {
             if let typeInfo {
                 constrainedParameters = parameters.map {
                     $0.mappingTypes(from: typeInfo.signature.generics, to: constrainedGenerics)
-                    //~~~
-//                    var resolvedParameter = $0
-//                    resolvedParameter.type = resolveTypealias(for: $0.type)
-//                    return resolvedParameter.mappingTypes(from: typeInfo.signature.generics, to: constrainedGenerics)
                 }
                 generics = typeInfo.generics.merge(overrides: generics, addNew: true).merge(overrides: Generics(typeInfo.signature.generics, whereEqual: constrainedGenerics), addNew: true)
                 availability = availability.least(typeInfo.availability)
@@ -681,16 +728,15 @@ public class CodebaseInfo: Codable {
             var totalScore = 0.0
             while argumentIndex < arguments.count {
                 let argument = arguments[argumentIndex]
-                let resolvedArgument = argument//~~~LabeledValue(label: argument.label, value: resolveTypealias(for: argument.value))
-                guard let (matchingIndex, score) = matchArgument(resolvedArgument, to: constrainedParameters, isSubscript: isSubscript, startIndex: parameterIndex) else {
+                guard let (matchingIndex, score) = matchArgument(argument, to: constrainedParameters, isSubscript: isSubscript, startIndex: parameterIndex) else {
                     return nil
                 }
                 // If the parameter type was constrained (i.e. is generic), the argument value will likely be more specific
                 let parameterType: TypeSignature
-                if parameters[matchingIndex].type != constrainedParameters[matchingIndex].type && resolvedArgument.value != .any {
-                    parameterType = resolvedArgument.value.or(constrainedParameters[matchingIndex].type)
+                if parameters[matchingIndex].type != constrainedParameters[matchingIndex].type && argument.value != .any {
+                    parameterType = argument.value.or(constrainedParameters[matchingIndex].type)
                 } else {
-                    parameterType = constrainedParameters[matchingIndex].type.or(resolvedArgument.value)
+                    parameterType = constrainedParameters[matchingIndex].type.or(argument.value)
                 }
                 var matchingParameter = parameters[matchingIndex]
                 matchingOriginalParameters.append(matchingParameter)
@@ -701,8 +747,7 @@ public class CodebaseInfo: Codable {
                 if matchingParameter.isVariadic {
                     while argumentIndex < arguments.count {
                         let argument = arguments[argumentIndex]
-                        let resolvedArgument = argument//~~~LabeledValue(label: argument.label, value: resolveTypealias(for: argument.value))
-                        if matchArgument(resolvedArgument, isVariadicContinuation: true, to: constrainedParameters, isSubscript: isSubscript, startIndex: parameterIndex) != nil {
+                        if matchArgument(argument, isVariadicContinuation: true, to: constrainedParameters, isSubscript: isSubscript, startIndex: parameterIndex) != nil {
                             argumentIndex += 1
                             // Model variadic continuation arguments as additional unlabeled parameters
                             var continuationOriginalParameter = parameters[matchingIndex]
@@ -1642,13 +1687,21 @@ extension CodebaseInfoItem {
         if self.moduleName == moduleName {
             if let itemSourcePath = self.sourceFile?.path, let sourcePath = sourceFile?.path, itemSourcePath.hasSuffix(sourcePath) {
                 // Favor a symbol in this file
-                score += 3
+                score = 3
             } else if modifiers.visibility != .private {
                 // Favor a symbol in this module
-                score += 2
+                score = 2
             }
         } else if let itemModuleName = self.moduleName, itemModuleName == "SkipLib" || importedModuleNames.contains(itemModuleName) {
-            score += 1
+            score = 1
+        }
+        if score > 0 {
+            // Always favor types over other items, even overwhelming locality. This solves the issue of type-named functions that
+            // act as factories compete with constructors - e.g. a call to func A(...) and a call to an A(...) constructor. We're smart
+            // enough to find type-named functions when looking for constructors
+            if self is CodebaseInfo.TypeInfo || self is CodebaseInfo.TypealiasInfo {
+                score += 3
+            }
         }
         return score
     }

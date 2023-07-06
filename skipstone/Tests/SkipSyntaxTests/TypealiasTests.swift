@@ -17,7 +17,6 @@ final class TypealiasTests: XCTestCase {
         """, kotlin: """
         internal open class Sub: a.b.C() {
             internal val a: a.b.C = a.b.C()
-                get() = field.sref()
             internal val b: B = a.b.C.f()
                 get() = field.sref()
 
@@ -72,6 +71,31 @@ final class TypealiasTests: XCTestCase {
         }
         """, kotlin: """
         internal fun f(a: Array<Int>): Boolean = a[0] == Int.max
+        """)
+    }
+
+    func testProtocolGenericsResolutionUsingUnknownTypealiasMember() async throws {
+        // Figure out generic type of P based on S.v
+        try await check(swift: """
+        typealias Alias<T> = java.util.A<T>
+        protocol P {
+            associatedtype T
+            var v: Alias<T> { get }
+        }
+        struct S: P {
+            let v: Alias<Int>
+        }
+        """, kotlin: """
+        internal interface P<T> {
+            val v: java.util.A<T>
+        }
+        internal class S: P<Int> {
+            override val v: java.util.A<Int>
+
+            constructor(v: java.util.A<Int>) {
+                this.v = v
+            }
+        }
         """)
     }
 
@@ -164,6 +188,74 @@ final class TypealiasTests: XCTestCase {
 
             internal constructor(): super() {
             }
+        }
+        """)
+    }
+
+    func testTypealiasConstructorCall() async throws {
+        try await check(swift: """
+        typealias A = S
+        func A(p1: String) -> A {
+        }
+        class S {
+            init(p2: String) {
+            }
+        }
+        func f() {
+            let s1 = A(p1: "")
+            let s2 = A(p2: "")
+        }
+        """, kotlin: """
+        internal fun A(p1: String): S = Unit
+        internal open class S {
+            internal constructor(p2: String) {
+            }
+        }
+        internal fun f() {
+            val s1 = A(p1 = "")
+            val s2 = S(p2 = "")
+        }
+        """)
+
+        try await check(swift: """
+        typealias A = java.util.S
+        func A(p1: String) -> A {
+        }
+        func f() {
+            let s1 = A(p1: "")
+            let s2 = A(p2: "")
+        }
+        """, kotlin: """
+        internal fun A(p1: String): java.util.S = Unit
+        internal fun f() {
+            val s1 = A(p1 = "")
+            val s2 = java.util.S(p2 = "")
+        }
+        """)
+    }
+
+    func testLocalFunctionDoesNotOverrideType() async throws {
+        // Make sure that a function name in the current file does not override all consideration of a same-named type
+        try await check(supportingSwift: """
+        typealias A = AA
+        struct AA {
+            init(a: String) {
+            }
+        }
+        """, swift: """
+        func A(b: String) -> AA? {
+        }
+        func f() {
+            let string = ""
+            let a = A(a: string)
+            let b = A(b: string)
+        }
+        """, kotlin: """
+        internal fun A(b: String): AA? = Unit
+        internal fun f() {
+            val string = ""
+            val a = AA(a = string)
+            val b = A(b = string)
         }
         """)
     }

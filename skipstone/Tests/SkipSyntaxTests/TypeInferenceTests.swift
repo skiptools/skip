@@ -164,6 +164,30 @@ final class TypeInferenceTests: XCTestCase {
             cParamFunc(C(v = 101))
         }
         """)
+
+        // Test several things including meta type argument matching, differentiating .init from embedding type constructor, etc
+        try await check(supportingSwift: """
+        enum E: Error {
+            case err(Any.Type, E.Context)
+
+            struct Context {
+                init(a: String, b: Int, c: String? = nil) {
+                }
+            }
+        }
+        """, swift: """
+        struct S {
+            func f() throws {
+                throw E.err(E.self, .init(a: "", b: 1))
+            }
+        }
+        """, kotlin: """
+        internal class S {
+            internal fun f() {
+                throw E.err(E::class, E.Context(a = "", b = 1))
+            }
+        }
+        """)
     }
 
     func testStaticVsInstanceContext() async throws {

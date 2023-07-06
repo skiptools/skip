@@ -238,8 +238,9 @@ struct TypeInferenceContext {
     /// The match on the parameter types will attempt to allow for unknown types. The returned signatures may be different than the returned `APIMatch.signatures` due to optional chaining.
     ///
     /// - Parameters:
+    ///   - name: The function name, or `nil` if none, as in constructor calls.
     ///   - type: The function's owning type if this is a member function, or nil if not.
-    func function(_ name: String, in type: TypeSignature?, parameters: [LabeledValue<TypeSignature>], messagesNode: SyntaxNode?) -> [(TypeSignature, APIMatch)] {
+    func function(_ name: String?, in type: TypeSignature?, parameters: [LabeledValue<TypeSignature>], messagesNode: SyntaxNode?) -> [(TypeSignature, APIMatch)] {
         if let type, type.isOptional {
             return function(name, inNonOptional: type.asOptional(false), parameters: parameters, messagesNode: messagesNode).map { match in
                 let signature = resolveSignature(match: match)
@@ -250,19 +251,22 @@ struct TypeInferenceContext {
         }
     }
 
-    private func function(_ name: String, inNonOptional type: TypeSignature?, parameters: [LabeledValue<TypeSignature>], messagesNode: SyntaxNode?) -> [APIMatch] {
+    private func function(_ name: String?, inNonOptional type: TypeSignature?, parameters: [LabeledValue<TypeSignature>], messagesNode: SyntaxNode?) -> [APIMatch] {
         let constrainedArguments = parameters.map { LabeledValue(label: $0.label, value: $0.value.constrainedTypeWithGenerics(generics)) }
         if let type {
             if let codebaseInfo {
                 let matches = codebaseInfo.matchFunction(name: name, inConstrained: type.constrainedTypeWithGenerics(generics), arguments: constrainedArguments)
                 addMessages(to: messagesNode, for: matches.map(\.availability))
                 return matches
-            } else if let match = unavailableAPI?.knownUnavailableFunction(name, in: type, parameters: parameters) {
+            } else if let match = unavailableAPI?.knownUnavailableFunction(name ?? "init", in: type, parameters: parameters) {
                 addMessages(to: messagesNode, for: [match.availability])
                 return [match]
             } else {
                 return []
             }
+        }
+        guard let name else {
+            return []
         }
 
         // Not a known member function. Check functions that can be invoked without a target type

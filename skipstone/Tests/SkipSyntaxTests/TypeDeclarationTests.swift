@@ -752,6 +752,26 @@ final class TypeDeclarationTests: XCTestCase {
             val strindex: StringIndex = 0
         }
         """)
+
+        try await check(supportingSwift: """
+        typealias PlatformStringEncoding = String.Encoding
+        struct StringEncoding {
+            static let utf8 = StringEncoding()
+        }
+        struct String {
+        }
+        """, swift: """
+        struct Data {
+        }
+        func String(data: Data, encoding: PlatformStringEncoding) -> String {
+        }
+        String(data: Data(), encoding: .utf8)
+        """, kotlin: """
+        internal class Data {
+        }
+        internal fun String(data: Data, encoding: StringEncoding): String = Unit
+        String(data = Data(), encoding = StringEncoding.utf8)
+        """)
     }
 
     func testActor() async throws {

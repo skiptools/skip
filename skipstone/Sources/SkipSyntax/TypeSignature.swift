@@ -557,6 +557,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     }
 
     private func addGenericMappings(to: TypeSignature, into generics: inout Generics) {
+        let to = to.asTypealiased(nil)
         guard !to.isSameType(as: self) else {
             return
         }
@@ -1097,6 +1098,10 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             }
             if let score = inheritanceCompatibilityScore(target: target, codebaseInfo: codebaseInfo) {
                 return score
+            }
+        case .metaType(let type):
+            if target.isMetaType {
+                return type.compatibilityScore(target: target.asMetaType(false), codebaseInfo: codebaseInfo)
             }
         case .none:
             return 0.0

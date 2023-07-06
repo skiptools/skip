@@ -63,7 +63,6 @@ extension TypeSignature {
             return "Long"
         case .member(let baseType, let type):
             let typeName = "\(baseType.kotlin).\(type.kotlin)"
-            //~~~ No more need for innerExtensions
             return Self.innerExtensions[typeName] ?? typeName
         case .metaType(let baseType):
             return "KClass<\(baseType.kotlin)>"
@@ -206,7 +205,10 @@ extension TypeSignature {
             // use destructuring assignment to extract values without copying them, so we have to copy the whole tuple
             return types.contains { $0.kotlinMayBeSharedMutableStruct(codebaseInfo: codebaseInfo) }
         case .typealiased(_, let type):
-            return type.kotlinMayBeSharedMutableStruct(codebaseInfo: codebaseInfo)
+            guard let codebaseInfo else {
+                return type.kotlinMayBeSharedMutableStruct(codebaseInfo: codebaseInfo)
+            }
+            return codebaseInfo.mayBeMutableStruct(type: self)
         case .uint:
             return false
         case .uint8:

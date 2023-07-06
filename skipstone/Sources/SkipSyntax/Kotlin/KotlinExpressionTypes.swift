@@ -696,6 +696,12 @@ class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting {
         kexpression.inferredType = expression.inferredType
         kexpression.apiMatch = expression.apiMatch
         kexpression.mayBeSharedMutableStructType = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
+        // If we resolved our function to a type but this function call is not a type constructor, it must be a free function with a
+        // type or typealias's name. Turn off typealias mapping so that we use the function name as-is
+        if !expression.isInit {
+            (kfunction as? KotlinIdentifier)?.isTypealiasFor = .none
+            (kfunction as? KotlinMemberAccess)?.isTypealiasFor = .none
+        }
         // Give Optional function names the 'optional' prefix to avoid conflicts with other API, e.g. T?.optionalmap(...)
         if expression.isCallOnOptional, let memberAccess = kexpression.function as? KotlinMemberAccess, !memberAccess.member.hasPrefix("optional") {
             memberAccess.member = "optional" + memberAccess.member
