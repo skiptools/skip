@@ -99,6 +99,59 @@ final class TypealiasTests: XCTestCase {
         """)
     }
 
+    func testPartialTypealiaseGenerics() async throws {
+        let supportingSwift = """
+        extension Int {
+            static let max = 1
+        }
+        """
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        typealias StringIntDict = Dictionary<String, Int>
+        func f(dict: StringIntDict) -> Bool {
+            return dict["a"] == .max
+        }
+        """, kotlin: """
+        internal fun f(dict: Dictionary<String, Int>): Boolean = dict["a"] == Int.max
+        """)
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        typealias StringDict<T> = Dictionary<String, T>
+        func f(dict: StringDict<Int>) -> Bool {
+            return dict["a"] == .max
+        }
+        """, kotlin: """
+        internal fun f(dict: Dictionary<String, Int>): Boolean = dict["a"] == Int.max
+        """)
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        typealias IntValueDict<T> = Dictionary<T, Int>
+        func f(dict: IntValueDict<String>) -> Bool {
+            return dict["a"] == .max
+        }
+        """, kotlin: """
+        internal fun f(dict: Dictionary<String, Int>): Boolean = dict["a"] == Int.max
+        """)
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        typealias MixedDict<V, K> = Dictionary<K, V>
+        func f(dict: MixedDict<Int, String>) -> Bool {
+            return dict["a"] == .max
+        }
+        """, kotlin: """
+        internal fun f(dict: Dictionary<String, Int>): Boolean = dict["a"] == Int.max
+        """)
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        typealias ArraysDict<T> = Dictionary<[T], [T]>
+        func f(dict: ArraysDict<Int>) -> Bool {
+            return dict[[1]]?[0] == .max
+        }
+        """, kotlin: """
+        internal fun f(dict: Dictionary<Array<Int>, Array<Int>>): Boolean = dict[arrayOf(1)]?.get(0) == Int.max
+        """)
+    }
+
     func testRecursivelyNamedUnknownTypealias() async throws {
         try await check(swift: """
         public typealias MessageDigest = java.security.MessageDigest

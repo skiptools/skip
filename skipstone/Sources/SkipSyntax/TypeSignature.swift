@@ -497,14 +497,22 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                 return .set(generics[0])
             }
         case .typealiased(let alias, let type):
-            //~~~ use alias from/to to apply partial generics if needed
-            return .typealiased(alias, type.withGenerics(generics))
+            return Self.typealiasedWithGenerics(alias: alias, type: type, generics: generics)
         case .unwrappedOptional(let type):
             return .unwrappedOptional(type.withGenerics(generics))
         default:
             break
         }
         return self
+    }
+
+    private static func typealiasedWithGenerics(alias: Typealias, type: TypeSignature, generics: [TypeSignature]) -> TypeSignature {
+        guard generics.count == alias.from.generics.count else {
+            return .typealiased(alias, type.withGenerics(generics))
+        }
+        // Map from alias generics to result type generics
+        let mappedGenerics = alias.to.generics.map { $0.mappingTypes(from: alias.from.generics, to: generics) }
+        return .typealiased(alias, type.withGenerics(mappedGenerics))
     }
 
     /// Apply the given generic types to form a constrained type with generics replaced by their constraints.
