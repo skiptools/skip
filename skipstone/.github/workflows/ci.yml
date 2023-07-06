@@ -39,20 +39,20 @@ jobs:
       - name: Check kotlinc
         run: which kotlinc
 
-      - name: Build skiptool (release)
-        run: swift build -v --configuration release
-
-      - name: Show skiptool output
-        run: find .build/
-
       #- name: Check skiptool
       #  run: ./build/
 
-      #- name: Swift Test Linux (Debug)
-      #  run: KOTLINC=kotlinc swift test -v --configuration debug --parallel
+      - name: Swift Test (Debug)
+        run: KOTLINC=kotlinc swift test -v --configuration debug --parallel
 
-      - name: Swift Test (Release)
-        run: KOTLINC=kotlinc swift test -v --configuration release -Xswiftc -enable-testing --parallel
+      #- name: Swift Test (Release)
+      #run: KOTLINC=kotlinc swift test -v --configuration release -Xswiftc -enable-testing --parallel
+
+      - name: Build SkipRunner (Debug)
+        run: swift build -v --configuration debug -Xswiftc -enable-testing
+
+      - name: Show skiptool output
+        run: find .build/
 
       - name: "Upload Build Artifacts"
         uses: actions/upload-artifact@v3
