@@ -46,10 +46,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         run: swift build --product SkipRunner -c release -Xswiftc -static-stdlib
 
-      - name: Create output folder
-        if: startsWith(github.ref, 'refs/tags/')
-
-      - name: Copy executable
+      - name: Copy skiptool
         if: startsWith(github.ref, 'refs/tags/')
         run: |
           mkdir -p .build/dist/skiptool/x86_64-unknown-linux-gnu/
