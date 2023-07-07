@@ -17,7 +17,7 @@ let package = Package(
         .executable(name: "SkipRunner", targets: ["SkipRunner"])
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-syntax.git", revision: "ee21d9cddb639a87bd58c8ced7347a3b1788fccf"),
+        .package(url: "https://github.com/apple/swift-syntax.git", branch: "main"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.2.2"),
         .package(url: "https://github.com/apple/swift-tools-support-core.git", from: "0.5.1"),
         .package(url: "https://github.com/marcprux/universal.git", from: "5.2.0"),
