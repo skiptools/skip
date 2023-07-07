@@ -1,8 +1,8 @@
 import SwiftSyntax
 
 /// An Xcode-formatted message for the user.
-public struct Message: Error, CustomStringConvertible, Encodable {
-    public enum Kind: String, Encodable, Equatable {
+public struct Message: Error, CustomStringConvertible, Codable {
+    public enum Kind: String, Codable, Equatable {
         /// A trace-level statement that will only be emitted in debug mode
         case trace
         case note // SwiftSyntax.DiagnosticSeverity.note

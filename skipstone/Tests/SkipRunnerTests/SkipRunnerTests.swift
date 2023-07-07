@@ -1,7 +1,7 @@
 import XCTest
 import SkipBuild
 import SkipRunner
-import var SkipSyntax.skipVersion
+import SkipSyntax
 import struct JSON.JSON
 import TSCBasic
 
@@ -32,6 +32,98 @@ public class SkipRunnerTests : XCTestCase {
         #endif
 
         try await XCTAssertEqualX(debug, tool("info", "-JA").json().array?.last?["debug"]?.boolean)
+    }
+
+    public func testSnippets() async throws {
+        func snippet(swift: String, kotlin: String?, messages: [String]? = nil) async throws {
+            let srcFile = try tmpFile(named: "Source.swift", contents: swift)
+            let (out, err, json) = try await tool("snippet", "-jM", srcFile.path)
+            struct SnippetResult : Decodable {
+                let kotlin: String?
+                let messages: [Message]?
+                let duration: TimeInterval
+            }
+
+            let result = try SnippetResult(json: json())
+            XCTAssertEqual(kotlin, result.kotlin?.trimmingCharacters(in: .whitespacesAndNewlines))
+            XCTAssertEqual(messages, result.messages?.isEmpty == true ? nil : result.messages?.map(\.message))
+            XCTAssertNotEqual("", out)
+            XCTAssertEqual("", err)
+        }
+
+        try await snippet(swift: "// SKIP INSERT: abc", kotlin: "abc")
+
+        try await snippet(swift: "struct SomeStruct { }", kotlin: """
+        internal class SomeStruct {
+        }
+        """)
+
+        try await snippet(swift: "class SomeClass { }", kotlin: """
+        internal open class SomeClass {
+        }
+        """)
+
+        try await snippet(swift: "enum SomeEnum { }", kotlin: """
+        internal enum class SomeEnum {
+        }
+        """)
+
+        try await snippet(swift: "func abc() { }", kotlin: """
+        internal fun abc() = Unit
+        """)
+
+        try await snippet(swift: "func num() : Int64 { Int64(1) }", kotlin: """
+        internal fun num() = Long(1)
+        """)
+
+        try await snippet(swift: """
+        class C {
+            init(i: Int) {
+            }
+            convenience init(x: Double) {
+                if x < 0.0 {
+                    self.init(i: -1)
+                } else {
+                    self.init(i: Int(x))
+                }
+                print("double")
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal constructor(i: Int) {
+            }
+            internal constructor(x: Double) {
+                if (x < 0.0) {
+                    this(i = -1)
+                } else {
+                    this(i = Int(x))
+                }
+                print("double")
+            }
+        }
+        """, messages: [
+            "A Kotlin constructor can only include a single top-level call to another \'this\' or \'super\' constructor\n            self.init(i: -1)\n            ^~~~~~~~~~~~~~~~",
+            "A Kotlin constructor can only include a single top-level call to another \'this\' or \'super\' constructor\n            self.init(i: Int(x))\n            ^~~~~~~~~~~~~~~~~~~~"
+        ])
+
+
+        // check maximum snippet size errors
+        try await snippet(swift: String(repeating: " ", count: (1024 * 10)), kotlin: "")
+        try await snippet(swift: String(repeating: " ", count: (1024 * 10) + 1), kotlin: nil, messages: [
+            "Snippet too large 10 KB"
+        ])
+    }
+
+    /// Creates a temporary file with the given name and optional contents.
+    func tmpFile(named fileName: String, contents: String? = nil) throws -> URL {
+        let tmpDir = URL(fileURLWithPath: UUID().uuidString, isDirectory: true, relativeTo: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true))
+        try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+        let tmpFile = URL(fileURLWithPath: fileName, isDirectory: false, relativeTo: tmpDir)
+        if let contents = contents {
+            try contents.write(to: tmpFile, atomically: true, encoding: .utf8)
+        }
+        return tmpFile
     }
 
     /// Demo of reproducing a transpiler crash in-process by taking the arguments from the xcode plug-in log and running them manually

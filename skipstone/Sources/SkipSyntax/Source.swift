@@ -105,7 +105,7 @@ public struct Source : Encodable {
     }
 
     /// A line and column-based range in the source, appropriate for Xcode reporting.
-    public struct Range: Equatable, Encodable {
+    public struct Range: Equatable, Codable {
         public let start: Position
         public let end: Position
 
@@ -117,7 +117,7 @@ public struct Source : Encodable {
 
     /// A line and column-based position in the source, appropriate for Xcode reporting.
     /// Line and column numbers start with 1 rather than 0.
-    public struct Position: Equatable, Comparable, Encodable {
+    public struct Position: Equatable, Comparable, Codable {
         public let line: Int
         public let column: Int
 

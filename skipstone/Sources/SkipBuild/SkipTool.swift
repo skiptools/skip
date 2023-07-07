@@ -24,6 +24,7 @@ public struct SkipCommandExecutor: AsyncParsableCommand {
                                                             InfoCommand.self,
                                                             PreflightAction.self,
                                                             TranspileAction.self,
+                                                            SnippetAction.self,
                                                             PrintSwiftASTAction.self,
                                                             PrintSkipASTAction.self,
                                                             //DoctorAction.self, // TODO: check installation status, like `brew doctor` and `flutter doctor`
@@ -267,6 +268,11 @@ protocol SkipPhase : AsyncParsableCommand {
     var outputOptions: OutputOptions { get }
 }
 
+extension SkipPhase {
+    /// The total size of all input source files, below which we will not enforce either license key or valid header comments
+    /// this is meant to be large enough to accomodate simple demos and experiments without requiring any license
+    static var codebaseThresholdSize: Int { 10 * 1024 }
+}
 
 /// The condition under which the phase should be run
 enum PhaseGuard : String, Decodable, CaseIterable {
@@ -281,7 +287,8 @@ extension PhaseGuard : ExpressibleByArgument {
 // MARK: CheckPhase
 
 protocol CheckPhase : SkipPhase {
-    var preflightOptions: CheckPhaseOptions { get }
+    var checkOptions: CheckPhaseOptions { get }
+    var licenseOptions: LicenseOptions { get }
 }
 
 struct CheckPhaseOptions: ParsableArguments {
@@ -304,6 +311,51 @@ extension CheckPhase {
     }
 }
 
+extension CheckPhase where Self : StreamingCommand {
+    /// Validate the license key if it is present in the tool or environment; otherwise scan the sources above the given codebase threshold size for approved headers
+    func validateLicense(sourceURLs: [URL], against now: Date = Date.now) async throws {
+
+        // the list of header match expressions that we permit for codebases above the given threshold
+        let validLicenseHeaders = [
+            try! NSRegularExpression(pattern: ".*GNU.*General Public License.*"),
+        ]
+
+        /// Loads the `.skip.yml` at the root of the project and checks for a "skip-license" key
+        func parseLicenseConfig() throws -> String? {
+            try YAML.parse(Data(contentsOf: URL(fileURLWithPath: ".skip.yml")))["skip-license"]?.string
+        }
+
+        let licenseString = licenseOptions.skipLicense ?? ProcessInfo.processInfo.environment["SKIP_LICENSE"] ?? (try? parseLicenseConfig())
+
+        do {
+            let license = try licenseString.flatMap { try LicenseKey(licenseString: $0) }
+
+            if let license = license {
+                let exp = DateFormatter.localizedString(from: license.expiration, dateStyle: .short, timeStyle: .none)
+                let daysLeft = Int(ceil(license.expiration.timeIntervalSince(now) / (12 * 60 * 60)))
+
+                // allow padding the license expiration for up to 14 days
+                if daysLeft + min(licenseOptions.skipGracePeriod ?? 0, 14) < 0 {
+                    error("Skip license expired on \(exp)")
+                } else if daysLeft < 10 { // warn when the license is about to expire
+                    warn("Skip license will expire in \(daysLeft) day\(daysLeft == 1 ? "" : "s") on \(exp)")
+                } else {
+                    info("Skip license valid through \(exp)")
+                }
+            } else {
+                let scanSourceStart = Date().timeIntervalSinceReferenceDate
+                let (codebaseSize, validated) = try await SourceValidator.scanSources(from: sourceURLs, codebaseThreshold: Self.codebaseThresholdSize, headerExpressions: validLicenseHeaders)
+                let scanSourceEnd = Date().timeIntervalSinceReferenceDate
+                info("Codebase (\(byteCount(for: .init(codebaseSize)))) \(validated ? " scanned for non-commercial license headers" : " scanned") in (\(Int64((scanSourceEnd - scanSourceStart) * 1000)) ms)")
+            }
+        } catch let e as LicenseError {
+            // issue an error with the offending file
+            error(e.localizedDescription, sourceFile: e.sourceFile)
+            throw e
+        }
+    }
+}
+
 struct CheckResult {
 
 }
@@ -312,13 +364,16 @@ struct PreflightAction: AsyncParsableCommand, CheckPhase {
     static var configuration = CommandConfiguration(commandName: "preflight", abstract: "Perform transpilation preflights")
 
     @OptionGroup(title: "Check Options")
-    var preflightOptions: CheckPhaseOptions
+    var checkOptions: CheckPhaseOptions
 
     @OptionGroup(title: "Output Options")
     var outputOptions: OutputOptions
 
+    @OptionGroup(title: "License Options")
+    var licenseOptions: LicenseOptions
+
     func run() async throws {
-        try await perform(on: preflightOptions.files.map({ Source.FilePath(path: $0) }), options: preflightOptions)
+        try await perform(on: checkOptions.files.map({ Source.FilePath(path: $0) }), options: checkOptions)
     }
 
     func perform(on sourceFiles: [Source.FilePath], options: CheckPhaseOptions) async throws {
@@ -350,6 +405,76 @@ struct PreflightAction: AsyncParsableCommand, CheckPhase {
         }
         outputFileName += "_preflight.swift"
         return outputDir.appendingPathComponent(outputFileName)
+    }
+}
+
+// MARK: SnippetPhase
+
+protocol SnippetPhase: SkipPhase {
+    var snippetOptions: SnippetPhaseOptions { get }
+}
+
+struct SnippetPhaseOptions: ParsableArguments {
+    @Option(help: ArgumentHelp("Condition for snippet phase", valueName: "force/no"))
+    var snippet: PhaseGuard = .onDemand // --snippet
+}
+
+struct SnippetResult {
+}
+
+struct SnippetAction: SnippetPhase, StreamingCommand {
+    static var configuration = CommandConfiguration(commandName: "snippet", abstract: "Transpile a snippet of Swift to Kotlin")
+
+    @OptionGroup(title: "Snippet Options")
+    var snippetOptions: SnippetPhaseOptions
+
+    @OptionGroup(title: "Output Options")
+    var outputOptions: OutputOptions
+
+    @Argument(help: ArgumentHelp("List of files to process"))
+    var files: [String]
+
+    struct Output : MessageConvertible {
+        let kotlin: String?
+        let version: String = skipVersion
+        let messages: [Message]?
+        let duration: TimeInterval?
+
+        /// The raw description is just the Kotlin, with error messages preceeding it
+        var description: String {
+            var comments = "// Generated by skip.tools \(version)\n"
+
+            for msg in messages ?? [] {
+                comments += msg.description.split(separator: "\n").map({ "//" + $0 }).joined(separator: "\n")
+            }
+            return comments + (kotlin ?? "")
+        }
+    }
+
+    func performCommand(with continuation: AsyncThrowingStream<OutputMessage, Error>.Continuation) async throws {
+        let totalSize = try files.compactMap({ try URL(fileURLWithPath: $0).resourceValues(forKeys: [.fileSizeKey]).fileSize }).reduce(0, +)
+
+        // snippets are hardwired to not exceed the default codebase threshold size
+        if totalSize > Self.codebaseThresholdSize {
+            continuation.yield(OutputMessage(Output(kotlin: nil, messages: [Message(kind: .error, message: "Snippet too large \(byteCount(for: .init(totalSize)))")], duration: 0)))
+            continuation.finish()
+            return
+        }
+
+        let sourceFiles = files.map(Source.FilePath.init(path:))
+        try await self.transpile(fs: localFileSystem, sourceFiles: sourceFiles, with: continuation)
+    }
+
+    private func transpile(fs: FileSystem, sourceFiles: Array<Source.FilePath>, with continuation: AsyncThrowingStream<OutputMessage, Error>.Continuation) async throws {
+        let codebaseInfo = CodebaseInfo()
+        let transpiler = Transpiler(packageName: nil, sourceFiles: sourceFiles, codebaseInfo: codebaseInfo, transformers: builtinKotlinTransformers())
+        try await transpiler.transpile { transpilation in
+            // note that transpilation messages are included as part of the output itself, rather than being logged as a message
+            let msgs = transpilation.messages
+            let output = Output(kotlin: transpilation.output.content, messages: msgs, duration: transpilation.duration)
+            continuation.yield(OutputMessage(output))
+        }
+        continuation.finish()
     }
 }
 
@@ -408,7 +533,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
     static var configuration = CommandConfiguration(commandName: "transpile", abstract: "Transpile Swift to Kotlin")
 
     @OptionGroup(title: "Check Options")
-    var preflightOptions: CheckPhaseOptions
+    var checkOptions: CheckPhaseOptions
 
     @OptionGroup(title: "Transpile Options")
     var transpileOptions: TranspilePhaseOptions
@@ -430,10 +555,6 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         }
     }
 
-    static func byteCount(for size: Int) -> String {
-        ByteCountFormatter.string(fromByteCount: .init(size), countStyle: .file)
-    }
-
     var moduleNamePaths: [(module: String, path: String)] {
         transpileOptions.moduleNames.map({
             let parts = $0.split(separator: ":")
@@ -449,7 +570,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
     }
 
     func performCommand(with continuation: AsyncThrowingStream<OutputMessage, Error>.Continuation) async throws {
-        let sourceFiles = try preflightOptions.files.map(AbsolutePath.init(validating:))
+        let sourceFiles = try checkOptions.files.map(AbsolutePath.init(validating:))
         #if DEBUG
         let v = skipVersion + "*" // * indicated debug version
         #else
@@ -554,7 +675,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
         try await validateLicense(sourceURLs: sourceURLs)
 
-        let transpiler = Transpiler(packageName: packageName, sourceFiles: sources, codebaseInfo: codebaseInfo, preprocessorSymbols: Set(preflightOptions.symbols), transformers: transformers)
+        let transpiler = Transpiler(packageName: packageName, sourceFiles: sources, codebaseInfo: codebaseInfo, preprocessorSymbols: Set(checkOptions.symbols), transformers: transformers)
         try await transpiler.transpile(handler: handleTranspilation)
         try saveCodebaseInfo() // save out the ModuleName.skipcode.json
 
@@ -628,7 +749,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
                     let cbinfo = try decoder.decode(CodebaseInfo.self, from: cbdata)
                     dependentCodebaseInfos.append(cbinfo)
                     let codebaseLoadEnd = Date().timeIntervalSinceReferenceDate
-                    info("\(dependencyCodebaseInfo.basename) codebase (\(Self.byteCount(for: .init(cbdata.count)))) loaded (\(Int64((codebaseLoadEnd - codebaseLoadStart) * 1000)) ms) for \(linkModuleName)", sourceFile: dependencyCodebaseInfo.sourceFile)
+                    info("\(dependencyCodebaseInfo.basename) codebase (\(byteCount(for: .init(cbdata.count)))) loaded (\(Int64((codebaseLoadEnd - codebaseLoadStart) * 1000)) ms) for \(linkModuleName)", sourceFile: dependencyCodebaseInfo.sourceFile)
                 } catch let e {
                     error("error loading codebase for linkModuleName: \(linkModuleName) from: \(dependencyCodebaseInfo.pathString) error: \(e.localizedDescription)", sourceFile: dependencyCodebaseInfo.sourceFile)
                 }
@@ -651,7 +772,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
             let codebaseBytes = ByteString(Array(try encoder.encode(codebaseInfo)))
 
             let codebaseWritten = try fs.writeChanges(path: outputFilePath, checkSize: true, makeReadOnly: true, bytes: codebaseBytes)
-            info("\(outputFilePath.basename) (\(Self.byteCount(for: .init(codebaseBytes.count)))) codebase \(!codebaseWritten ? "unchanged" : "saved")", sourceFile: outputFilePath.sourceFile)
+            info("\(outputFilePath.basename) (\(byteCount(for: .init(codebaseBytes.count)))) codebase \(!codebaseWritten ? "unchanged" : "saved")", sourceFile: outputFilePath.sourceFile)
         }
 
         func generateGradle(for sourceModules: [String], with skipConfig: SkipConfig) throws {
@@ -674,7 +795,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
                 """ + buildContents
 
                 let changed = try fs.writeChanges(path: buildGradle, makeReadOnly: true, bytes: ByteString(encodingAsUTF8: contents))
-                info("\(buildGradle.basename) (\(Self.byteCount(for: .init(contents.count)))) \(!changed ? "unchanged" : "saved")", sourceFile: buildGradle.sourceFile)
+                info("\(buildGradle.basename) (\(byteCount(for: .init(contents.count)))) \(!changed ? "unchanged" : "saved")", sourceFile: buildGradle.sourceFile)
             }
 
             func generateSettingsGradle() throws {
@@ -703,7 +824,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
                 }
 
                 let changed = try fs.writeChanges(path: settingsPath, makeReadOnly: true, bytes: ByteString(encodingAsUTF8: settingsContents))
-                info("\(settingsPath.basename) (\(Self.byteCount(for: .init(settingsContents.count)))) \(!changed ? "unchanged" : "written")", sourceFile: settingsPath.sourceFile)
+                info("\(settingsPath.basename) (\(byteCount(for: .init(settingsContents.count)))) \(!changed ? "unchanged" : "written")", sourceFile: settingsPath.sourceFile)
             }
 
             /// Create the gradle-wrapper.properties file, which will dictate which version of Gradle that Android Studio should use to build the project.
@@ -716,7 +837,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
                 """
 
                 let changed = try fs.writeChanges(path: gradleWrapperPath, makeReadOnly: true, bytes: ByteString(encodingAsUTF8: gradeWrapperContents))
-                info("\(gradleWrapperPath.basename) (\(Self.byteCount(for: .init(gradeWrapperContents.count)))) \(!changed ? "unchanged" : "written")", sourceFile: gradleWrapperPath.sourceFile)
+                info("\(gradleWrapperPath.basename) (\(byteCount(for: .init(gradeWrapperContents.count)))) \(!changed ? "unchanged" : "written")", sourceFile: gradleWrapperPath.sourceFile)
             }
 
             func generateGradleProperties() throws {
@@ -729,7 +850,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
                 """
 
                 let changed = try fs.writeChanges(path: gradlePropertiesPath, makeReadOnly: true, bytes: ByteString(encodingAsUTF8: gradePropertiesContents))
-                info("\(gradlePropertiesPath.basename) (\(Self.byteCount(for: .init(gradePropertiesContents.count)))) \(!changed ? "unchanged" : "written")", sourceFile: gradlePropertiesPath.sourceFile)
+                info("\(gradlePropertiesPath.basename) (\(byteCount(for: .init(gradePropertiesContents.count)))) \(!changed ? "unchanged" : "written")", sourceFile: gradlePropertiesPath.sourceFile)
             }
         }
 
@@ -914,10 +1035,10 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
             // 2 separate log messages, one linking to the source swift and the second linking to the kotlin
             if !transpilation.isSourceFileSynthetic {
-                info("\(sourcePath.basename) (\(Self.byteCount(for: .init(sourceSize)))) transpiling to \(outputFile.basename)", sourceFile: transpilation.sourceFile)
+                info("\(sourcePath.basename) (\(byteCount(for: .init(sourceSize)))) transpiling to \(outputFile.basename)", sourceFile: transpilation.sourceFile)
             }
 
-            info("\(outputFile.basename) (\(Self.byteCount(for: transpilation.output.content.lengthOfBytes(using: .utf8)))) transpilation \(overridden ? "overridden" : !changed ? "unchanged" : "saved") from \(sourcePath.basename) (\(Self.byteCount(for: .init(sourceSize)))) in \(Int64(transpilation.duration * 1000)) ms", sourceFile: overridden ? transpilation.sourceFile : outputFile.sourceFile)
+            info("\(outputFile.basename) (\(byteCount(for: transpilation.output.content.lengthOfBytes(using: .utf8)))) transpilation \(overridden ? "overridden" : !changed ? "unchanged" : "saved") from \(sourcePath.basename) (\(byteCount(for: .init(sourceSize)))) in \(Int64(transpilation.duration * 1000)) ms", sourceFile: overridden ? transpilation.sourceFile : outputFile.sourceFile)
 
             for message in transpilation.messages {
                 //writeMessage(message)
@@ -1074,52 +1195,6 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         //}
 
         return transformers
-    }
-
-    /// Validate the license key if it is present in the tool or environment; otherwise scan the sources above the given codebase threshold size for approved headers
-    func validateLicense(sourceURLs: [URL], against now: Date = Date.now) async throws {
-        // the total size of all input source files, below which we will not enforce either license key or valid header comments
-        // this is meant to be large enough to accomodate simple demos and experiments without requiring any license
-        let codebaseThresholdSize: Int = 10 * 1024
-
-        // the list of header match expressions that we permit for codebases above the given threshold
-        let validLicenseHeaders = [
-            try! NSRegularExpression(pattern: ".*GNU.*General Public License.*"),
-        ]
-
-        /// Loads the `.skip.yml` at the root of the project and checks for a "skip-license" key
-        func parseLicenseConfig() throws -> String? {
-            try YAML.parse(Data(contentsOf: URL(fileURLWithPath: ".skip.yml")))["skip-license"]?.string
-        }
-
-        let licenseString = licenseOptions.skipLicense ?? ProcessInfo.processInfo.environment["SKIP_LICENSE"] ?? (try? parseLicenseConfig())
-
-        do {
-            let license = try licenseString.flatMap { try LicenseKey(licenseString: $0) }
-
-            if let license = license {
-                let exp = DateFormatter.localizedString(from: license.expiration, dateStyle: .short, timeStyle: .none)
-                let daysLeft = Int(ceil(license.expiration.timeIntervalSince(now) / (12 * 60 * 60)))
-
-                // allow padding the license expiration for up to 14 days
-                if daysLeft + min(licenseOptions.skipGracePeriod ?? 0, 14) < 0 {
-                    error("Skip license expired on \(exp)")
-                } else if daysLeft < 10 { // warn when the license is about to expire
-                    warn("Skip license will expire in \(daysLeft) day\(daysLeft == 1 ? "" : "s") on \(exp)")
-                } else {
-                    info("Skip license valid through \(exp)")
-                }
-            } else {
-                let scanSourceStart = Date().timeIntervalSinceReferenceDate
-                let (codebaseSize, validated) = try await SourceValidator.scanSources(from: sourceURLs, codebaseThreshold: codebaseThresholdSize, headerExpressions: validLicenseHeaders)
-                let scanSourceEnd = Date().timeIntervalSinceReferenceDate
-                info("Codebase (\(Self.byteCount(for: .init(codebaseSize)))) \(validated ? " scanned for non-commercial license headers" : " scanned") in (\(Int64((scanSourceEnd - scanSourceStart) * 1000)) ms)")
-            }
-        } catch let e as LicenseError {
-            // issue an error with the offending file
-            error(e.localizedDescription, sourceFile: e.sourceFile)
-            throw e
-        }
     }
 
 }
@@ -1285,8 +1360,9 @@ struct ForwardingCommand<Base: ParsableCommand, Name: RawRepresentable & CaseIte
     }
 }
 
-//enum SkippyCommandName : String, CaseIterable { case skippy }
-//typealias SkippyAction = ForwardingCommand<PreflightAction, SkippyCommandName>
+func byteCount(for size: Int) -> String {
+    ByteCountFormatter.string(fromByteCount: .init(size), countStyle: .file)
+}
 
 
 // MARK: Streaming command support
