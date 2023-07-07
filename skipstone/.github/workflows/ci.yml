@@ -43,21 +43,20 @@ jobs:
         run: KOTLINC=kotlinc swift test -v -c debug --parallel
 
       - name: Swift Build (Release)
+        if: startsWith(github.ref, 'refs/tags/')
         run: swift build --product SkipRunner -c release -Xswiftc -static-stdlib
 
-      #- name: Build SkipRunner (Debug)
-      #  run: swift build -v --configuration debug -Xswiftc -enable-testing
-
-      - name: Show skiptool output
-        run: find .build/
-
       - name: Create output folder
-        run: mkdir -p .build/dist/skiptool/x86_64-unknown-linux-gnu
+        if: startsWith(github.ref, 'refs/tags/')
 
       - name: Copy executable
-        run: cp -a .build/x86_64-unknown-linux-gnu/release/SkipRunner .build/dist/skiptool/x86_64-unknown-linux-gnu/skiptool
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          mkdir -p .build/dist/skiptool/x86_64-unknown-linux-gnu/
+          cp -a .build/x86_64-unknown-linux-gnu/release/SkipRunner .build/dist/skiptool/x86_64-unknown-linux-gnu/skiptool
 
       - name: "Upload Build Artifacts"
+        if: startsWith(github.ref, 'refs/tags/')
         uses: actions/upload-artifact@v3
         with: 
           path: .build/dist
