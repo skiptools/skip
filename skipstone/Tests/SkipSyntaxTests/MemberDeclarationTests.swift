@@ -496,7 +496,7 @@ final class MemberDeclarationTests: XCTestCase {
     }
 
     func testAsyncProperty() async throws {
-        try await checkProducesMessage(swift: """
+        try await check(swift: """
         class C {
             var v: Int {
                 get async {
@@ -505,6 +505,15 @@ final class MemberDeclarationTests: XCTestCase {
             }
             func f() async -> Int {
                 return 0
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal open suspend fun v(): Int = Task.run l@{
+                return@l f()
+            }
+            internal open suspend fun f(): Int = Task.run l@{
+                return@l 0
             }
         }
         """)

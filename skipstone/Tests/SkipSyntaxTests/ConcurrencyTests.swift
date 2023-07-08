@@ -5,7 +5,7 @@ final class ConcurrencyTests: XCTestCase {
     //~~~ test Swift.Task?
     func testTaskValueAsFunction() async throws {
         try await check(swift: """
-        func f() -> Int async {
+        func f() async -> Int {
             let task: Task = Task { 10 }
             // SKIP NOWARN
             return await task.value
@@ -14,6 +14,17 @@ final class ConcurrencyTests: XCTestCase {
         internal suspend fun f(): Int = Task.run l@{
             val task: Task = Task { 10 }
             return@l task.value()
+        }
+        """)
+
+        try await check(swift: """
+        func f() async -> Int {
+            // SKIP NOWARN
+            await Task { 10 }.value
+        }
+        """, kotlin: """
+        internal suspend fun f(): Int = Task.run l@{
+            return@l Task { 10 }.value.sref()
         }
         """)
     }

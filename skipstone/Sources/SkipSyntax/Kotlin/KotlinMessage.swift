@@ -16,11 +16,6 @@ extension Message {
         return Message(kind: .error, message: "Kotlin does not support async constructors. Consider using a factory function", sourceDerived: sourceDerived, source: source)
     }
 
-    // Idea: auto-translate to function?
-    static func kotlinAsyncProperties(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "Kotlin does not support async properties. Consider using a function", sourceDerived: sourceDerived, source: source)
-    }
-
     // FIXME: should be (and was) an .error, but turned into a warning for async testing
     static func kotlinAsyncAwaitTypeInference(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .warning, message: "Skip is unable to match this API call to determine the correct actor on which to run it. Consider adding additional type information", sourceDerived: sourceDerived, source: source)

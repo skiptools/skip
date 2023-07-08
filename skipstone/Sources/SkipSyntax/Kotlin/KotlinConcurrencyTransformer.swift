@@ -7,13 +7,13 @@ final class KotlinConcurrencyTransformer: KotlinTransformer {
         syntaxTree.root.visit { node in
             if let functionDeclaration = node as? KotlinFunctionDeclaration {
                 // Async implementations change for main actor
-                if functionDeclaration.isAsync {
-                    functionDeclaration.isMainActor = codebaseInfo.isMainActor(declaration: functionDeclaration)
+                if functionDeclaration.asyncOptions.contains(.async) && codebaseInfo.isMainActor(declaration: functionDeclaration) {
+                    functionDeclaration.asyncOptions.insert(.mainActor)
                 }
             } else if let variableDeclaration = node as? KotlinVariableDeclaration {
                 // Async implementations change for main actor
-                if variableDeclaration.isAsync {
-                    variableDeclaration.isMainActor = codebaseInfo.isMainActor(declaration: variableDeclaration)
+                if variableDeclaration.asyncOptions.contains(.async) && codebaseInfo.isMainActor(declaration: variableDeclaration) {
+                    variableDeclaration.asyncOptions.insert(.mainActor)
                 }
             } else if let identifier = node as? KotlinIdentifier {
                 if identifier.name == "Task", let functionCall = identifier.parent as? KotlinFunctionCall, identifier === functionCall.function {

@@ -16,6 +16,15 @@ enum KotlinExpectedReturn {
     case throwIfNull
 }
 
+/// Async options for a Kotlin member declaration.
+struct KotlinAsyncOptions: OptionSet {
+    let rawValue: Int
+
+    static let async = KotlinAsyncOptions(rawValue: 1 << 0)
+    static let mainActor = KotlinAsyncOptions(rawValue: 1 << 1)
+    static let explicitReturn = KotlinAsyncOptions(rawValue: 1 << 3)
+}
+
 /// A variable we declare to mirror a Swift binding pattern.
 struct KotlinBindingVariable {
     var names: [String?]

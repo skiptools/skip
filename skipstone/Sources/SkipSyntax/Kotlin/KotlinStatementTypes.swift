@@ -221,13 +221,15 @@ class KotlinCodeBlock: KotlinStatement, KotlinSingleStatementAppendable {
         }
 
         // If this was an implicit return, replace it with an explicit one if a return is required
-        guard returnRequired, statements.count == 1, statements[0].type == .expression, var expression = (statements[0] as! KotlinExpressionStatement).expression else {
+        guard returnRequired, statements.count == 1, statements[0].type == .expression, let expressionStatement = statements[0] as? KotlinExpressionStatement, var expression = expressionStatement.expression else {
             return false
         }
         if sref {
             expression = expression.sref(onUpdate: onUpdate)
         }
-        statements = [KotlinReturn(expression: expression)]
+        let returnStatement = KotlinReturn(expression: expression)
+        returnStatement.extras = expressionStatement.extras
+        statements = [returnStatement]
         return true
     }
 
@@ -1311,17 +1313,15 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var name: String
     var returnType: TypeSignature = .void
     var parameters: [Parameter<KotlinExpression>] = []
-    var isAsync = false
-    var isAsyncReturning = false
     var isOpen = false
     var role: Role = .member
-    var isMainActor: Bool? // Populated if needed by transformer
     var isOptionalInit = false
     var annotations: [String] = []
     var attributes = Attributes()
     var modifiers = Modifiers()
     var generics = Generics()
     var convertedGenerics: Generics? = nil
+    var asyncOptions: KotlinAsyncOptions = []
     var body: KotlinCodeBlock?
     var delegatingConstructorCall: KotlinExpression?
     var mutationFunctionNames: (willMutate: String, didMutate: String)?
@@ -1375,13 +1375,15 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
 
     static func translate(statement: FunctionDeclaration, translator: KotlinTranslator) -> KotlinFunctionDeclaration {
         let kstatement = KotlinFunctionDeclaration(statement: statement)
-        kstatement.isAsync = statement.isAsync
         kstatement.isOptionalInit = statement.isOptionalInit
         kstatement.modifiers = statement.modifiers
         kstatement.generics = statement.generics
         kstatement.returnType = statement.returnType
         kstatement.parameters = statement.parameters.map { $0.translate(translator: translator) }
         kstatement.attributes = kstatement.processAttributes(statement.attributes, translator: translator)
+        if statement.isAsync {
+            kstatement.asyncOptions.insert(.async)
+        }
         var owningDeclarationType: StatementType? = nil
         if statement.parent?.owningFunctionDeclaration != nil {
             kstatement.role = .local
@@ -1444,8 +1446,8 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 if statement.returnType != .void {
                     kstatement.body?.updateWithExpectedReturn(.sref(nil))
                 }
-                if kstatement.isAsync {
-                    kstatement.isAsyncReturning = kstatement.body?.updateWithExpectedReturn(.labelIfPresent(KotlinClosure.returnLabel)) == true
+                if statement.isAsync && kstatement.body?.updateWithExpectedReturn(.labelIfPresent(KotlinClosure.returnLabel)) == true {
+                    kstatement.asyncOptions.insert(.explicitReturn)
                 }
             }
             for parameter in kstatement.parameters where parameter.isInOut {
@@ -1547,20 +1549,18 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if role != .local {
             output.append(modifiers.kotlinMemberString(isOpen: isOpen, suffix: " "))
         }
+        //~~~ Move test to transformer
         let isTestFunction = annotations.contains("@Test")
-        if isAsync && !isTestFunction {
+        if asyncOptions.contains(.async) && !isTestFunction {
             // JUnit test functions are not marked suspend
             output.append("suspend ")
         }
 
-
         let generics = functionGenerics.filterWhereEqual()
-
         let inline = attributes.contains(.inlineAlways)
             && !isOpen  // 'inline' modifier is not allowed on virtual members. Only private or final members can be inlined
             && (modifiers.visibility == .internal || modifiers.visibility == .private)
-
-        // if we can inline the function, then we can also reify the type parameters
+        // If we can inline the function, then we can also reify the type parameters
         let reify = inline && !generics.isEmpty
 
         if type != .constructorDeclaration {
@@ -1642,24 +1642,25 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         }
 
         // Append Kotlin single statement format if possible
-        guard isConstructor || isAsync || callSuperFinalize || !parameterVals.isEmpty || suppressSideEffects || mutationFunctionNames != nil || !body.isSingleStatementAppendable(mode: .function) else {
+        guard isConstructor || asyncOptions.contains(.async) || callSuperFinalize || !parameterVals.isEmpty || suppressSideEffects || mutationFunctionNames != nil || !body.isSingleStatementAppendable(mode: .function) else {
             output.append(" = ")
             body.appendAsSingleStatement(to: output, indentation: indentation, mode: .function)
             output.append("\n")
             return
         }
 
-        if isAsync {
+        if asyncOptions.contains(.async) {
+            //~~~ Test should be in test transformer if possible.
             let isTestFunction = annotations.contains("@Test")
             if isTestFunction == true {
                 // JUnit coroutine test cases use `runTest`
                 output.append(" = kotlinx.coroutines.test.runTest ")
-            } else if isMainActor == true {
+            } else if asyncOptions.contains(.mainActor) {
                 output.append(" = MainActor.run ")
             } else {
                 output.append(" = Task.run ")
             }
-            if isAsyncReturning {
+            if asyncOptions.contains(.explicitReturn) {
                 output.append("\(KotlinClosure.returnLabel)@")
             }
             output.append("{\n")
@@ -1936,12 +1937,11 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
     var declaredType: TypeSignature = .none
     var isLet = false
-    var isAsync = false
     var role: Role = .local
-    var isMainActor: Bool? // Populated if needed by transformer
     var isOpen = false
     var modifiers = Modifiers()
     var attributes = Attributes()
+    var asyncOptions: KotlinAsyncOptions = []
     var value: KotlinExpression?
     var getter: Accessor<KotlinCodeBlock>?
     var setter: Accessor<KotlinCodeBlock>?
@@ -1986,7 +1986,6 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     static func translate(statement: VariableDeclaration, translator: KotlinTranslator) -> KotlinVariableDeclaration {
         let kstatement = KotlinVariableDeclaration(statement: statement)
         kstatement.isLet = statement.isLet
-        kstatement.isAsync = statement.isAsync
         kstatement.modifiers = statement.modifiers
         kstatement.declaredType = statement.declaredType
         var owningDeclarationType: StatementType? = nil
@@ -2049,6 +2048,13 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         kstatement.willSet = statement.willSet?.translate(translator: translator, expectedReturn: .no)
         kstatement.didSet = statement.didSet?.translate(translator: translator, expectedReturn: .no)
 
+        if statement.isAsync {
+            kstatement.asyncOptions.insert(.async)
+            if statement.isAsync && kstatement.getter?.body?.updateWithExpectedReturn(.labelIfPresent(KotlinClosure.returnLabel)) == true {
+                kstatement.asyncOptions.insert(.explicitReturn)
+            }
+        }
+
         // Warnings and fixups
         kstatement.declaredType.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source)
         if kstatement.declaredType == .float || kstatement.declaredType.isUnsigned, kstatement.value is KotlinNumericLiteral {
@@ -2056,9 +2062,6 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         }
         if (kstatement.role.isProperty || kstatement.role == .global), kstatement.propertyType.isUnwrappedOptional, kstatement.propertyType.kotlinIsNative(primitive: true) {
             kstatement.messages.append(.kotlinLateinitPrimitive(kstatement, source: translator.syntaxTree.source))
-        }
-        if statement.isAsync {
-            kstatement.messages.append(.kotlinAsyncProperties(kstatement, source: translator.syntaxTree.source))
         }
         if owningDeclarationType == .protocolDeclaration {
             if statement.modifiers.isStatic {
@@ -2107,7 +2110,6 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
-        let usesStorageProperty = self.usesStorageProperty
         if let declaration = extras?.declaration {
             output.append(indentation).append(declaration)
         } else if names.count == 1 && names[0] == nil {
@@ -2116,44 +2118,79 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 output.append(indentation).append(value, indentation: indentation)
             }
         } else {
-            attributes.append(to: output, indentation: indentation)
-            output.append(indentation)
-            if role.isProperty || role == .global {
-                output.append(modifiers.kotlinMemberString(isOpen: isOpen, suffix: " "))
-                if !usesStorageProperty && role != .superclassOverrideProperty, declaredType.isUnwrappedOptional {
-                    output.append("lateinit ")
-                }
-            }
-            if isReadOnly && !isAssignFromWriteable {
-                output.append("val ")
-            } else {
-                output.append("var ")
-            }
-            if let generics = extends?.1.filterWhereEqual(), !generics.isEmpty {
-                generics.append(to: output, indentation: indentation)
-                output.append(" ")
-            }
-            appendExtends(to: output, indentation: indentation)
-            if names.count > 1 {
-                output.append("(")
-            }
-            output.append(names.map { $0 ?? "_" }.joined(separator: ", "))
-            if names.count > 1 {
-                output.append(")")
-            }
-
-            if declaredType != .none {
-                output.append(": ").append(declaredType.kotlin)
-            } else if usesStorageProperty {
-                output.append(": ").append(propertyType.kotlin)
-            }
-            if !usesStorageProperty {
-                appendInitialValue(to: output, indentation: indentation)
-            }
-            extends?.1.appendWhere(to: output, indentation: indentation)
+            appendDeclaration(to: output, indentation: indentation)
         }
-        output.append("\n")
 
+        if asyncOptions.contains(.async), let getterBody = getter?.body {
+            appendAsyncGet(getterBody, to: output, indentation: indentation)
+        } else {
+            appendPropertyDefinition(to: output, indentation: indentation)
+        }
+    }
+
+    private func appendDeclaration(to output: OutputGenerator, indentation: Indentation) {
+        let usesStorageProperty = self.usesStorageProperty
+        attributes.append(to: output, indentation: indentation)
+        output.append(indentation)
+        if role.isProperty || role == .global {
+            output.append(modifiers.kotlinMemberString(isOpen: isOpen, suffix: " "))
+            if asyncOptions.contains(.async) {
+                output.append("suspend ")
+            } else if !usesStorageProperty && role != .superclassOverrideProperty && declaredType.isUnwrappedOptional {
+                output.append("lateinit ")
+            }
+        }
+        if asyncOptions.contains(.async) {
+            output.append("fun ")
+        } else if isReadOnly && !isAssignFromWriteable {
+            output.append("val ")
+        } else {
+            output.append("var ")
+        }
+        if let generics = extends?.1.filterWhereEqual(), !generics.isEmpty {
+            generics.append(to: output, indentation: indentation)
+            output.append(" ")
+        }
+        appendExtends(to: output, indentation: indentation)
+        if names.count > 1 {
+            output.append("(")
+        }
+        output.append(names.map { $0 ?? "_" }.joined(separator: ", "))
+        if names.count > 1 {
+            output.append(")")
+        }
+        if asyncOptions.contains(.async) {
+            output.append("()")
+        }
+
+        if declaredType != .none {
+            output.append(": ").append(declaredType.kotlin)
+        } else if usesStorageProperty {
+            output.append(": ").append(propertyType.kotlin)
+        }
+        if !asyncOptions.contains(.async) && !usesStorageProperty {
+            appendInitialValue(to: output, indentation: indentation)
+        }
+        extends?.1.appendWhere(to: output, indentation: indentation)
+    }
+
+    private func appendAsyncGet(_ body: KotlinCodeBlock, to output: OutputGenerator, indentation: Indentation) {
+        if asyncOptions.contains(.mainActor) {
+            output.append(" = MainActor.run ")
+        } else {
+            output.append(" = Task.run ")
+        }
+        if asyncOptions.contains(.explicitReturn) {
+            output.append("\(KotlinClosure.returnLabel)@")
+        }
+        output.append("{\n")
+        output.append(body, indentation: indentation.inc())
+        output.append(indentation).append("}\n")
+    }
+
+    private func appendPropertyDefinition(to output: OutputGenerator, indentation: Indentation) {
+        let usesStorageProperty = self.usesStorageProperty
+        output.append("\n")
         if let getterBody = getter?.body {
             let getterIndentation = indentation.inc()
             output.append(getterIndentation).append("get()")
@@ -2347,6 +2384,9 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
 
     private var usesStorageProperty: Bool {
+        guard !asyncOptions.contains(.async) else {
+            return false
+        }
         guard role == .property || role == .global else {
             return false
         }

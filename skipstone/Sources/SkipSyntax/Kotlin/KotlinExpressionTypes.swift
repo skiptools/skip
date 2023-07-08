@@ -834,7 +834,7 @@ class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting {
 
 class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTarget {
     var name: String
-    var apiFlags: APIFlags?
+    var apiMatch: APIMatch?
     var mayBeSharedMutableStruct = false
     var isLocalOrSelfIdentifier = false
     var isOperatorIdentifier = false
@@ -846,7 +846,7 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
     static func translate(expression: Identifier, translator: KotlinTranslator) -> KotlinIdentifier {
         let kexpression = KotlinIdentifier(expression: expression)
         kexpression.generics = expression.generics
-        kexpression.apiFlags = expression.apiMatch?.apiFlags
+        kexpression.apiMatch = expression.apiMatch
         kexpression.isOperatorIdentifier = !Operator.with(symbol: expression.name).isUnknown
         kexpression.mayBeSharedMutableStruct = !kexpression.isOperatorIdentifier && expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
         kexpression.isLocalOrSelfIdentifier = expression.isLocalOrSelfIdentifier
@@ -878,6 +878,9 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
 
     var isInAwait = false
     var isInMainActorContext = false
+    var apiFlags: APIFlags? {
+        return apiMatch?.apiFlags
+    }
 
     func mainActorMode(for child: KotlinSyntaxNode) -> KotlinMainActorMode {
         return .isolated
@@ -928,6 +931,10 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
                     output.append(Self.translateName(name))
                     if let generics, !generics.isEmpty {
                         output.append("<\(generics.map(\.kotlin).joined(separator: ", "))>")
+                    }
+                    if let apiMatch, apiMatch.declarationType == .variableDeclaration, apiMatch.apiFlags.contains(.async) {
+                        // Async properties are converted to Kotlin functions
+                        output.append("()")
                     }
                     if isInOut {
                         output.append(".value")
@@ -1318,7 +1325,7 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinCast
     var base: KotlinExpression?
     var baseKClass: TypeSignature?
     var member: String
-    var apiFlags: APIFlags?
+    var apiMatch: APIMatch?
     var useMultlineFormatting = false
     var baseType: TypeSignature = .none
     var mayBeSharedMutableStruct = false
@@ -1348,7 +1355,7 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinCast
             kexpression.messages.append(.kotlinOptionalNoneSome(expression, source: translator.syntaxTree.source))
         }
         kexpression.generics = expression.generics
-        kexpression.apiFlags = expression.apiMatch?.apiFlags
+        kexpression.apiMatch = expression.apiMatch
         kexpression.baseType = expression.baseType.asMetaType(false)
         if case .tuple = expression.baseType {
             // Tuples sref() their members on the way out and do not set an onUpdate block, so no need to sref() again
@@ -1449,6 +1456,9 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinCast
 
     var isInAwait = false
     var isInMainActorContext = false
+    var apiFlags: APIFlags? {
+        return apiMatch?.apiFlags
+    }
 
     func mainActorMode(for child: KotlinSyntaxNode) -> KotlinMainActorMode {
         return isBaseIncludedInMainActor ? .isolated : .none
@@ -1546,6 +1556,10 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinCast
                 generics = generics.map { _ in TypeSignature.named("*", []) }
             }
             output.append("<\(generics.map(\.kotlin).joined(separator: ", "))>")
+        }
+        if let apiMatch, apiMatch.declarationType == .variableDeclaration, apiMatch.apiFlags.contains(.async) {
+            // Async properties are converted to Kotlin functions
+            output.append("()")
         }
         if mainActorOutputMode == .isolated {
             // If this isn't a function reference that will be invoked with () or [], end the main actor closure
@@ -2005,7 +2019,7 @@ class KotlinStringLiteral: KotlinExpression {
 class KotlinSubscript: KotlinExpression, KotlinMainActorTargeting {
     var base: KotlinExpression
     var arguments: [LabeledValue<KotlinExpression>] = []
-    var apiFlags: APIFlags?
+    var apiMatch: APIMatch?
     var mayBeSharedMutableStructType = false
     var isDictionarySubscript = false // Special case support for dict[key, default: @autoclosure]
 
@@ -2016,7 +2030,7 @@ class KotlinSubscript: KotlinExpression, KotlinMainActorTargeting {
             let kargumentExpression = translator.translateExpression($0.value)
             return LabeledValue(label: $0.label, value: kargumentExpression)
         }
-        kexpression.apiFlags = expression.apiMatch?.apiFlags
+        kexpression.apiMatch = expression.apiMatch
         kexpression.mayBeSharedMutableStructType = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
         if case .dictionary = expression.base.inferredType {
             kexpression.isDictionarySubscript = true
@@ -2031,6 +2045,9 @@ class KotlinSubscript: KotlinExpression, KotlinMainActorTargeting {
 
     var isInAwait = false
     var isInMainActorContext = false
+    var apiFlags: APIFlags? {
+        return apiMatch?.apiFlags
+    }
 
     func mainActorMode(for child: KotlinSyntaxNode) -> KotlinMainActorMode {
         return child === base ? .isolatedFunctionReference : .isolated
