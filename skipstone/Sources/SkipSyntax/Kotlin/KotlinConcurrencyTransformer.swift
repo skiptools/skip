@@ -20,10 +20,7 @@ final class KotlinConcurrencyTransformer: KotlinTransformer {
                     updateTaskConstructor(functionCall, codebaseInfo: codebaseInfo)
                 }
             } else if let memberAccess = node as? KotlinMemberAccess {
-                if memberAccess.member == "value" && memberAccess.baseType.isNamed("Task", moduleName: "Swift") {
-                    // Special case for Task.value -> Task.value() in our Kotlin implementation
-                    memberAccess.member = "value()"
-                } else if memberAccess.member == "Task", case .module("Swift", _) = memberAccess.baseType, let functionCall = memberAccess.parent as? KotlinFunctionCall, memberAccess === functionCall.function {
+                if memberAccess.member == "Task", case .module("Swift", _) = memberAccess.baseType, let functionCall = memberAccess.parent as? KotlinFunctionCall, memberAccess === functionCall.function {
                     updateTaskConstructor(functionCall, codebaseInfo: codebaseInfo)
                 } else if memberAccess.member == "detached" && memberAccess.baseType.isNamed("Task", moduleName: "Swift"), let functionCall = memberAccess.parent as? KotlinFunctionCall, memberAccess === functionCall.function {
                     updateTaskConstructor(functionCall, isDetached: true, codebaseInfo: codebaseInfo)
