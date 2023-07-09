@@ -13,7 +13,7 @@ final class ConcurrencyTests: XCTestCase {
         """, kotlin: """
         internal suspend fun f(): Int = Task.run l@{
             val task: Task = Task { 10 }
-            return@l task.value()
+            return@l task.value
         }
         """)
 
