@@ -799,7 +799,7 @@ class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting {
                     isReduceFunction = memberAccess.member == "reduce"
                 }
             }
-            let hasTrailingClosure = useTrailingClosureFormatting && arguments.last?.value.type == .closure && (arguments.last?.value as? KotlinClosure)?.isAnonymousFunction == false
+            let hasTrailingClosure = useTrailingClosureFormatting && arguments.last?.value.type == .closure && arguments.last?.label == nil && (arguments.last?.value as? KotlinClosure)?.isAnonymousFunction == false
             if hasTrailingClosure {
                 trailingClosure = arguments[arguments.count - 1].value
                 arguments = Array(arguments[0..<(arguments.count - 1)])

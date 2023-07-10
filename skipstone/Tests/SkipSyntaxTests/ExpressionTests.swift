@@ -360,4 +360,17 @@ final class ExpressionTests: XCTestCase {
         internal fun g(): String = Foo().barf()!!.bazf().str
         """)
     }
+
+    func testTrailingClosureCalls() async throws {
+        try await check(supportingSwift: """
+        func f(s: String, a: (Int) -> Int, b: () -> Int) {
+        }
+        """, swift: """
+        f(s: "") { _ in 1 }
+        f(s: "", b: { 2 })
+        """, kotlin: """
+        f(s = "") { _ -> 1 }
+        f(s = "", b = { 2 })
+        """)
+    }
 }
