@@ -124,7 +124,7 @@ extension AccessorBlockSyntax {
                 body = CodeBlock(statements: statements)
             }
 
-            switch accessorSyntax.accessorKind.text {
+            switch accessorSyntax.accessorSpecifier.text {
             case "get":
                 accessors.getter = Accessor(body: body)
             case "set":
@@ -235,7 +235,7 @@ extension PatternSyntax {
             guard let identifierPatterns = valueBindingSyntax.valuePattern.identifierPatterns(in: syntaxTree) else {
                 return nil
             }
-            let isVar = valueBindingSyntax.bindingKeyword.text == "var"
+            let isVar = valueBindingSyntax.bindingSpecifier.text == "var"
             return identifierPatterns.map { IdentifierPattern(name: $0.name, isVar: $0.isVar || isVar) }
         case .wildcardPattern:
             return [IdentifierPattern(name: nil)]
@@ -257,7 +257,7 @@ extension PatternSyntax {
         case .valueBindingPattern:
             if let valueBindingSyntax = self.as(ValueBindingPatternSyntax.self) {
                 let (expression, _) = valueBindingSyntax.valuePattern.expression(in: syntaxTree)
-                let isVar = valueBindingSyntax.bindingKeyword.text == "var"
+                let isVar = valueBindingSyntax.bindingSpecifier.text == "var"
                 return (expression, isVar)
             }
         default:
@@ -351,7 +351,7 @@ extension SourceFileSyntax: SyntaxListContainer {
     }
 
     var endOfListSyntax: SyntaxProtocol {
-        return self.eofToken
+        return self.endOfFileToken
     }
 }
 

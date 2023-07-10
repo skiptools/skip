@@ -18,7 +18,6 @@ final class TypealiasTests: XCTestCase {
         internal open class Sub: a.b.C() {
             internal val a: a.b.C = a.b.C()
             internal val b: B = a.b.C.f()
-                get() = field.sref()
 
             internal open fun subf(p: a.b.C): Array<a.b.C>? = null
         }

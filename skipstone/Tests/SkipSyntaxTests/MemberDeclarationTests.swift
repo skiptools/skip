@@ -706,6 +706,32 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """, swift: """
         class C {
+            var v: V! {
+                return a() ?? b()
+            }
+            private func a() -> V? {
+                return nil
+            }
+            private func b() -> V? {
+                return nil
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal open val v: V
+                get() = vstorage!!
+            private val vstorage: V?
+                get() = a() ?: b()
+            private fun a(): V? = null
+            private fun b(): V? = null
+        }
+        """)
+
+        try await check(supportingSwift: """
+        class V {
+        }
+        """, swift: """
+        class C {
             var v: V!
             setUp() {
                 v = V()
@@ -846,7 +872,11 @@ final class MemberDeclarationTests: XCTestCase {
         """)
 
         // Test struct references
-        try await check(swift: """
+        try await check(supportingSwift: """
+        struct Struct {
+            var member: Struct
+        }
+        """, swift: """
         func f(param s: inout Struct) -> Struct {
             s.member = Struct()
             var s2 = s

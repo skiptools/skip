@@ -43,7 +43,6 @@ final class FeatureSupportTests: XCTestCase {
         }, kotlin: """
             open class MyViewModel: ViewModel {
                 val myProperty = mutableStateOf("Initial value")
-                    get() = field
             }
             return ""
             """)
@@ -202,32 +201,6 @@ final class FeatureSupportTests: XCTestCase {
                 static let jetpack_compose: Int = 0
             }
         }
-
-    }
-
-    func testCaseStatementsIgnoreIfSkip() async throws {
-        // It is very useful to be able to handle individual case statements separately in a Skip, but we don't seem to support #if SKIP statements around case statements:
-        // error: Skip does not support this Swift syntax [missingExpr]
-
-        try await check(expectFailure: false, expectMessages: true, compiler: nil, swiftCode: {
-            let x = { 1 }()
-            switch x {
-            case 0: return "zero"
-            #if SKIP
-            case 1: return "one"
-            #endif
-            default: return "other"
-            }
-        }, kotlin: """
-            val x = { 1 }()
-            when (x) {
-                0 -> {
-                    return "zero"
-                    
-                }
-                else -> return "other"
-            }
-            """)
     }
 
     func testCheckSwiftCompiledSource() async throws {
@@ -460,7 +433,6 @@ final class FeatureSupportTests: XCTestCase {
             return "\(doubles)"
         }, kotlin: """
             val doubles: Array<Double> = arrayOf(1, 2, 3, 4)
-                get() = field
             return "${doubles}"
             """)
     }

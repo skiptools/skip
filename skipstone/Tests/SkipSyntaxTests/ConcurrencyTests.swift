@@ -17,6 +17,7 @@ final class ConcurrencyTests: XCTestCase {
         }
         """)
 
+        //~~~ Why the extra sref here but not above?
         try await check(swift: """
         func f() async -> Int {
             // SKIP NOWARN

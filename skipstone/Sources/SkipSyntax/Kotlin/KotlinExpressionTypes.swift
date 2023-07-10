@@ -164,10 +164,7 @@ class KotlinBinaryOperator: KotlinExpression {
         
         let klhs = translator.translateExpression(expression.lhs)
         var krhs = translator.translateExpression(expression.rhs)
-        if expression.op.precedence == .assignment && !(klhs is KotlinMemberAccess) && !((klhs as? KotlinIdentifier)?.name == "self") {
-            // We need to sref() on assigning to a local var, but members sref() on assignment already.
-            // This won't catch implicit members, however (i.e. 'x' in place of 'self.x'). We also don't
-            // need to sref() on assignment to self, which will be translated to a special function call
+        if expression.op.precedence == .assignment && assignmentRequiresSref(expression: expression) {
             krhs = krhs.sref()
         }
 
@@ -192,6 +189,33 @@ class KotlinBinaryOperator: KotlinExpression {
             }
         }
         return kexpression
+    }
+
+    private static func assignmentRequiresSref(expression: BinaryOperator) -> Bool {
+        let identifier = expression.lhs as? Identifier
+        let memberAccess = expression.lhs as? MemberAccess
+
+        if expression.owningFunctionDeclaration?.type == .initDeclaration {
+            // Within a constructor, look for assignments to an identifier or 'self.identifier'
+            if (identifier != nil && identifier?.name != "self") || (memberAccess?.base as? Identifier)?.name == "self" {
+                // If the assignment target is a 'let' member, sref() it
+                if (expression.lhs as? APICallExpression)?.apiMatch?.apiFlags.contains(.writeable) != true {
+                    return true
+                }
+            }
+        }
+
+        // Apart from constructor 'let' assignments above, we can assume that any member assignment does not
+        // need an sref because the property will sref the value it gets. We have no direct detection of members
+        // that are simple identifiers (e.g. 'x' rather than 'self.x'), but only members get the 'writeable' API
+        // flag and we can only be assigning to something writeable, so it's a good proxy
+        if memberAccess != nil {
+            return false
+        } else if identifier?.name == "self" || identifier?.apiMatch?.apiFlags.contains(.writeable) == true {
+            return false
+        } else {
+            return true
+        }
     }
 
     init(op: Operator, lhs: KotlinExpression, rhs: KotlinExpression, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
@@ -1468,7 +1492,7 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinCast
     var isGenericsTypeErased = false
 
     override func mayBeSharedMutableStructExpression(orType: Bool) -> Bool {
-        // Though we sref() when returning property values, any returned mutable struct may have its onUpdate block
+        // Though we sref() when returning writable property values, any returned mutable struct may have its onUpdate block
         // set, and we need to sref() again on assignment to get an unowned copy
         return mayBeSharedMutableStruct
     }
@@ -2316,7 +2340,7 @@ class KotlinWhen: KotlinExpression {
         kexpression.caseTargetVariable = caseTargetVariable
         kexpression.hasNonNilMatches = hasNonNilMatches
         kexpression.hasBreakLabel = hasBreakLabel
-        kexpression.messages = messages
+        kexpression.messages += messages
         return kexpression
     }
 

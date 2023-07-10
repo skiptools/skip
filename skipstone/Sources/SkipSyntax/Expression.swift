@@ -90,7 +90,7 @@ struct ExpressionDecoder {
                 guard let binaryOperatorExpr = syntax.as(BinaryOperatorExprSyntax.self) else {
                     break
                 }
-                op = Operator.with(symbol: binaryOperatorExpr.operatorToken.text)
+                op = Operator.with(symbol: binaryOperatorExpr.operator.text)
             case .ternaryExpr:
                 fallthrough
             case .unresolvedTernaryExpr:

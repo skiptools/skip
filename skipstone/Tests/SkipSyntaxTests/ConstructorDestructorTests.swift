@@ -519,11 +519,10 @@ final class ConstructorDestructorTests: XCTestCase {
         """, kotlin: """
         internal class S<T, U> where U: Any {
             internal val t: T
-                get() = field.sref()
             internal val u: U
 
             constructor(t: T, u: U) {
-                this.t = t
+                this.t = t.sref()
                 this.u = u
             }
         }
@@ -610,13 +609,9 @@ final class ConstructorDestructorTests: XCTestCase {
         """, kotlin: """
         internal class S {
             internal var a: Array<Int>
-                get() = field.sref()
-                set(newValue) {
-                    field = newValue.sref()
-                }
 
             internal constructor(a: Array<Int>) {
-                this.a = a
+                this.a = a.sref()
             }
 
             internal constructor(copy: S) {

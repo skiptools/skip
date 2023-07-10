@@ -1025,12 +1025,13 @@ final class ConditionalTests: XCTestCase {
                 0
             }
         }
-        func g(i: Int?) {
+        func g(i: Int? = nil) -> Int {
             if let x = i {
                 print(x)
             } else {
                 print("Nil")
             }
+            return 1
         }
         """, kotlin: """
         internal fun f(i: Int?): Int {
@@ -1053,7 +1054,7 @@ final class ConditionalTests: XCTestCase {
                 error("Unreachable")
             }
         }
-        internal fun g(i: Int?) {
+        internal fun g(i: Int? = null): Int {
             var letexec_2 = false
             i?.let { x ->
                 letexec_2 = true
@@ -1062,6 +1063,7 @@ final class ConditionalTests: XCTestCase {
             if (!letexec_2) {
                 print("Nil")
             }
+            return 1
         }
         """)
 
@@ -1758,7 +1760,7 @@ final class ConditionalTests: XCTestCase {
         """)
     }
 
-    func testIfPreprocessor() async throws {
+    func testIfDefined() async throws {
         try await check(swift: """
         #if SKIP
         doSomething()
@@ -1857,6 +1859,33 @@ final class ConditionalTests: XCTestCase {
         #if (os(Android) || DEBUG) && SKIP
         doSomething()
         #endif
+        """)
+    }
+
+    func testIfDefinedCaseList() async throws {
+        try await check(swift: """
+        let x = { 1 }()
+        switch x {
+        case 0: return "zero"
+        #if SKIP
+        case 1: return "one"
+        #else
+        case 1: return "1"
+        #endif
+        case 2: return "two"
+        #if !SKIP
+        case 3: return "three"
+        #endif
+        default: return "other"
+        }
+        """, kotlin: """
+        internal val x = { 1 }()
+        when (x) {
+            0 -> return "zero"
+            1 -> return "one"
+            2 -> return "two"
+            else -> return "other"
+        }
         """)
     }
 }

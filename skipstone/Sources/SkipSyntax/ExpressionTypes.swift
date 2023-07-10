@@ -248,11 +248,11 @@ class BinaryOperator: Expression {
         switch syntax.kind {
         case .assignmentExpr:
             if let assignmentExpr = syntax.as(AssignmentExprSyntax.self) {
-                return Operator.with(symbol: assignmentExpr.assignToken.text)
+                return Operator.with(symbol: assignmentExpr.equal.text)
             }
         case .binaryOperatorExpr:
             if let binaryOperatorExpr = syntax.as(BinaryOperatorExprSyntax.self) {
-                return Operator.with(symbol: binaryOperatorExpr.operatorToken.text)
+                return Operator.with(symbol: binaryOperatorExpr.operator.text)
             }
         case .unresolvedAsExpr:
             if let asExpr = syntax.as(UnresolvedAsExprSyntax.self) {
@@ -409,7 +409,7 @@ class BooleanLiteral: Expression {
         guard syntax.kind == .booleanLiteralExpr, let booleanLiteralExpr = syntax.as(BooleanLiteralExprSyntax.self) else {
             return nil
         }
-        let literal = booleanLiteralExpr.booleanLiteral.text == "true"
+        let literal = booleanLiteralExpr.literal.text == "true"
         return BooleanLiteral(literal: literal, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
@@ -1053,7 +1053,7 @@ class MemberAccess: Expression, APICallExpression {
             base = ExpressionDecoder.decode(syntax: baseSyntax, in: syntaxTree)
         }
         let member = memberAccessExpr.name.text
-        let useMultlineFormatting = base != nil && memberAccessExpr.dot.leadingTrivia.contains {
+        let useMultlineFormatting = base != nil && memberAccessExpr.period.leadingTrivia.contains {
             switch $0 {
             case .newlines:
                 return true
@@ -1160,7 +1160,7 @@ class NumericLiteral: Expression {
         let literal: String
         let isFloatingPoint: Bool
         if syntax.kind == .floatLiteralExpr, let floatLiteralExpr = syntax.as(FloatLiteralExprSyntax.self) {
-            literal = floatLiteralExpr.floatingDigits.text
+            literal = floatLiteralExpr.digits.text
             isFloatingPoint = true
         } else if syntax.kind == .integerLiteralExpr, let integerLiteralExpr = syntax.as(IntegerLiteralExprSyntax.self) {
             literal = integerLiteralExpr.digits.text
@@ -1217,7 +1217,7 @@ class OptionalBinding: Expression, BindingExpression {
         guard let names = optionalBindingExpr.pattern.identifierPatterns(in: syntaxTree)?.map(\.name) else {
             throw Message.unsupportedSyntax(optionalBindingExpr.pattern, source: syntaxTree.source)
         }
-        let isLet = optionalBindingExpr.bindingKeyword.text == "let"
+        let isLet = optionalBindingExpr.bindingSpecifier.text == "let"
         var declaredType: TypeSignature = .none
         if let typeSyntax = optionalBindingExpr.typeAnnotation?.type {
             declaredType = TypeSignature.for(syntax: typeSyntax)
@@ -1322,7 +1322,7 @@ class PostfixOperator: Expression {
             operatorSymbol = "?"
             target = ExpressionDecoder.decode(syntax: optionalChainingExpr.expression, in: syntaxTree)
         } else if syntax.kind == .postfixUnaryExpr, let postfixExpr = syntax.as(PostfixUnaryExprSyntax.self) {
-            operatorSymbol = postfixExpr.operatorToken.text
+            operatorSymbol = postfixExpr.operator.text
             target = ExpressionDecoder.decode(syntax: postfixExpr.expression, in: syntaxTree)
         } else {
             return nil
@@ -1371,7 +1371,7 @@ class PrefixOperator: Expression {
     override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
         if syntax.kind == .prefixOperatorExpr, let prefixOperatorExpr = syntax.as(PrefixOperatorExprSyntax.self) {
             let target = ExpressionDecoder.decode(syntax: prefixOperatorExpr.postfixExpression, in: syntaxTree)
-            guard let operatorSymbol = prefixOperatorExpr.operatorToken?.text else {
+            guard let operatorSymbol = prefixOperatorExpr.operator?.text else {
                 return target
             }
             return PrefixOperator(operatorSymbol: operatorSymbol, target: target, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
@@ -1568,18 +1568,30 @@ class Switch: Expression {
             return nil
         }
         let on = ExpressionDecoder.decode(syntax: switchExpr.expression, in: syntaxTree)
-        var switchCases: [SwitchCase] = []
-        var messages: [Message] = []
-        for caseItem in switchExpr.cases {
-            guard let switchCase = ExpressionDecoder.decode(syntax: caseItem, in: syntaxTree) as? SwitchCase else {
-                messages.append(.unsupportedSyntax(caseItem, source: syntaxTree.source))
-                continue
-            }
-            switchCases.append(switchCase)
-        }
+        let (switchCases, messages) = decodeCaseList(syntax: switchExpr.cases, in: syntaxTree)
         let expression = Switch(on: on, cases: switchCases, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
         expression.messages = messages
         return expression
+    }
+
+    static func decodeCaseList(syntax: SwitchCaseListSyntax, in syntaxTree: SyntaxTree) -> ([SwitchCase], [Message]) {
+        var switchCases: [SwitchCase] = []
+        var messages: [Message] = []
+        for caseItem in syntax {
+            switch caseItem {
+            case .ifConfigDecl(let syntax):
+                let (ifCases, ifMessages) = IfDefined.decodeCaseList(syntax: syntax, in: syntaxTree)
+                switchCases += ifCases
+                messages += ifMessages
+            case .switchCase(let syntax):
+                if let switchCase = ExpressionDecoder.decode(syntax: syntax, in: syntaxTree) as? SwitchCase {
+                    switchCases.append(switchCase)
+                } else {
+                    messages.append(.unsupportedSyntax(caseItem, source: syntaxTree.source))
+                }
+            }
+        }
+        return (switchCases, messages)
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {

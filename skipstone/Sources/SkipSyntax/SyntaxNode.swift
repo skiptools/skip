@@ -97,7 +97,7 @@ class SyntaxNode: SourceDerived, PrettyPrintable {
         while current != nil {
             if let statement = current as? Statement {
                 switch statement.type {
-                case .functionDeclaration, .subscriptDeclaration, .variableDeclaration:
+                case .functionDeclaration, .initDeclaration, .subscriptDeclaration, .variableDeclaration:
                     return statement
                 case .classDeclaration, .enumDeclaration, .extensionDeclaration, .protocolDeclaration, .structDeclaration:
                     return nil

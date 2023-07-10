@@ -430,26 +430,7 @@ class IfDefined: Statement {
             return nil
         }
 
-        // Look for a clause that matches a defined symbol, or an 'else'
-        var clause: IfConfigClauseSyntax? = nil
-        for ifConfigClause in ifConfigDecl.clauses {
-            if ifConfigClause.poundKeyword.text == "#else" {
-                // If we reach an else, all previous clauses must have been false
-                clause = ifConfigClause
-                break
-            }
-
-            let clauseSymbol = ifConfigClause.condition?.description ?? ""
-            let (isSupported, isTrue) = processConditions(symbol: clauseSymbol, preprocessorSymbols: syntaxTree.preprocessorSymbols)
-            if !isSupported {
-                syntaxTree.root.messages.append(.preprocessorTooComplex(ifConfigClause, source: syntaxTree.source))
-                break
-            }
-            if isTrue {
-                clause = ifConfigClause
-                break
-            }
-        }
+        let clause = extractClause(from: ifConfigDecl, in: syntaxTree)
         var statements = try extractStatements(from: clause, in: syntaxTree)
         guard let extras else {
             return statements
@@ -465,6 +446,38 @@ class IfDefined: Statement {
             statements.append(Empty(extras: trailingExtras))
         }
         return statements
+    }
+
+    /// Decode an `#if` surrounding a set of switch cases.
+    static func decodeCaseList(syntax: IfConfigDeclSyntax, in syntaxTree: SyntaxTree) -> ([SwitchCase], [Message]) {
+        guard let elements = extractClause(from: syntax, in: syntaxTree)?.elements else {
+            return ([], [])
+        }
+        guard case .switchCases(let caseList) = elements else {
+            return ([], [Message.ifDeclPlacement(syntax, source: syntaxTree.source)])
+        }
+        return Switch.decodeCaseList(syntax: caseList, in: syntaxTree)
+    }
+
+    private static func extractClause(from syntax: IfConfigDeclSyntax, in syntaxTree: SyntaxTree) -> IfConfigClauseSyntax? {
+        // Look for a clause that matches a defined symbol, or an 'else'
+        for ifConfigClause in syntax.clauses {
+            if ifConfigClause.poundKeyword.text == "#else" {
+                // If we reach an else, all previous clauses must have been false
+                return ifConfigClause
+            }
+
+            let clauseSymbol = ifConfigClause.condition?.description ?? ""
+            let (isSupported, isTrue) = processConditions(symbol: clauseSymbol, preprocessorSymbols: syntaxTree.preprocessorSymbols)
+            if !isSupported {
+                syntaxTree.root.messages.append(.preprocessorTooComplex(ifConfigClause, source: syntaxTree.source))
+                break
+            }
+            if isTrue {
+                return ifConfigClause
+            }
+        }
+        return nil
     }
 
     private static func processConditions(symbol: String, preprocessorSymbols: Set<String>) -> (isSupported: Bool, isTrue: Bool) {
@@ -548,7 +561,7 @@ class LabeledStatement: Statement {
             return nil
         }
 
-        let label = labeledStmnt.labelName.text
+        let label = labeledStmnt.label.text
         guard let target = StatementDecoder.decode(syntax: labeledStmnt.statement, in: syntaxTree).first else {
             throw Message.unsupportedSyntax(labeledStmnt.statement, source: syntaxTree.source)
         }
@@ -1360,7 +1373,7 @@ class VariableDeclaration: Statement {
             return nil
         }
 
-        let isLet = variableDecl.bindingKeyword.text == "let"
+        let isLet = variableDecl.bindingSpecifier.text == "let"
         let attributes = Attributes.for(syntax: variableDecl.attributes, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: variableDecl.modifiers)
         var statements: [Statement] = []

@@ -138,7 +138,11 @@ final class KotlinStructTransformer: KotlinTransformer {
 
         var bodyStatements: [KotlinStatement] = []
         bodyStatements += variableDeclarations.map { variableDeclaration in
-            return KotlinRawStatement(sourceCode: "this.\(variableDeclaration.names[0] ?? "") = \(variableDeclaration.names[0] ?? "")")
+            var assignment = "this.\(variableDeclaration.names[0] ?? "") = \(variableDeclaration.names[0] ?? "")"
+            if variableDeclaration.isReadOnly && variableDeclaration.mayBeSharedMutableStruct {
+                assignment += ".sref()"
+            }
+            return KotlinRawStatement(sourceCode: assignment)
         }
         constructor.body = KotlinCodeBlock(statements: bodyStatements)
         constructor.parent = classDeclaration

@@ -273,10 +273,9 @@ final class CodableTests: XCTestCase {
         """, kotlin: """
         internal class S: Codable {
             internal val a: Array<Int>
-                get() = field.sref()
 
             constructor(a: Array<Int>) {
-                this.a = a
+                this.a = a.sref()
             }
 
             private enum class CodingKeys(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
@@ -556,10 +555,6 @@ final class CodableTests: XCTestCase {
         internal class S: Codable {
             internal val i: Int
             internal var a = arrayOf("foo")
-                get() = field.sref()
-                set(newValue) {
-                    field = newValue.sref()
-                }
 
             constructor(i: Int) {
                 this.i = i
