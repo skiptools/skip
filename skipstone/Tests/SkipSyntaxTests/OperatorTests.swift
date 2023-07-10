@@ -353,7 +353,8 @@ final class OperatorTests: XCTestCase {
 
     func testSlice() async throws {
         // Note that without symbols we don't understand slice types
-        try await check(swift: """
+        try await check(supportingSwift: """
+        """, swift: """
         func slice() {
             let a = [0, 1, 2, 3, 4]
             let s1 = a[1...3]

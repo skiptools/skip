@@ -2044,7 +2044,7 @@ class KotlinSubscript: KotlinExpression, KotlinMainActorTargeting {
     var base: KotlinExpression
     var arguments: [LabeledValue<KotlinExpression>] = []
     var apiMatch: APIMatch?
-    var mayBeSharedMutableStructType = false
+    var mayBeSharedMutableStruct = false
     var isDictionarySubscript = false // Special case support for dict[key, default: @autoclosure]
 
     static func translate(expression: Subscript, translator: KotlinTranslator) -> KotlinSubscript {
@@ -2055,7 +2055,12 @@ class KotlinSubscript: KotlinExpression, KotlinMainActorTargeting {
             return LabeledValue(label: $0.label, value: kargumentExpression)
         }
         kexpression.apiMatch = expression.apiMatch
-        kexpression.mayBeSharedMutableStructType = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
+        if expression.arguments.count == 1, case .range(let elementType) =  expression.arguments[0].value.inferredType, elementType.isNumeric {
+            // Special case: we don't support mutating slices
+            kexpression.mayBeSharedMutableStruct = false
+        } else {
+            kexpression.mayBeSharedMutableStruct = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
+        }
         if case .dictionary = expression.base.inferredType {
             kexpression.isDictionarySubscript = true
         }
@@ -2078,8 +2083,9 @@ class KotlinSubscript: KotlinExpression, KotlinMainActorTargeting {
     }
 
     override func mayBeSharedMutableStructExpression(orType: Bool) -> Bool {
-        // The result of a subscript is never a shared value because we always sref() on return
-        return orType && mayBeSharedMutableStructType
+        // Subscripts sref() on the way out, but they do so with an onUpdate to support e.g. 'a[0].i += 1'. So unlike a
+        // function, we do have to sref() subscript values again on assignment to erase the onUpdate action
+        return mayBeSharedMutableStruct
     }
 
     override var optionalChain: KotlinOptionalChain {
