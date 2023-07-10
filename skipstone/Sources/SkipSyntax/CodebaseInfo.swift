@@ -382,27 +382,11 @@ public class CodebaseInfo: Codable {
 
         /// Return API information for the possible functions being called with the given arguments.
         func matchFunction(name: String, moduleName: String? = nil, arguments: [LabeledValue<TypeSignature>]) -> [APIMatch] {
-            let candidates = dedupe(functionCandidates(name: name, moduleName: moduleName, arguments: arguments)).sorted { $0.score > $1.score }
+            let candidates = Self.dedupe(functionCandidates(name: name, moduleName: moduleName, arguments: arguments)).sorted { $0.score > $1.score }
             guard let topCandidate = candidates.first else {
                 return []
             }
             return candidates.filter { $0.score >= topCandidate.score }.map(\.match)
-        }
-
-        func dedupe<T: Hashable>(_ array: [T]) -> [T] {
-            if array.count <= 1 {
-                return array
-            }
-            var uniqueElements = Set<T>()
-            var result = [T]()
-
-            for element in array {
-                if uniqueElements.insert(element).inserted {
-                    result.append(element)
-                }
-            }
-
-            return result
         }
 
         /// Return the signatures of the possible member functions being called with the given arguments.
@@ -427,7 +411,7 @@ public class CodebaseInfo: Codable {
                 return matchFunction(name: name, moduleName: module, arguments: arguments)
             }
 
-            let candidates = dedupe(functionCandidates(name: name, in: type, constrainedGenerics: type.generics, arguments: arguments, excludeConstrainedExtensions: excludeConstrainedExtensions))
+            let candidates = Self.dedupe(functionCandidates(name: name, in: type, constrainedGenerics: type.generics, arguments: arguments, excludeConstrainedExtensions: excludeConstrainedExtensions))
             let sortedCandidates = candidates.sorted { $0.score > $1.score || ($0.score == $1.score && $0.level < $1.level) }
             guard let topCandidate = sortedCandidates.first else {
                 if let name, case .named(let moduleName, []) = type {
@@ -827,6 +811,21 @@ public class CodebaseInfo: Codable {
                 }
             }
             return nil
+        }
+
+        // Maintain order rather than dumping in a Set for consistent output
+        private static func dedupe<T: Hashable>(_ array: [T]) -> [T] {
+            if array.count <= 1 {
+                return array
+            }
+            var uniqueElements = Set<T>()
+            var result = [T]()
+            for element in array {
+                if uniqueElements.insert(element).inserted {
+                    result.append(element)
+                }
+            }
+            return result
         }
     }
 
