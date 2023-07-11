@@ -48,8 +48,8 @@ extension FunctionSignatureSyntax {
     /// The return type and parameters in this signature, and optional messages warning of any issues.
     func typeSignatures(in syntaxTree: SyntaxTree) -> (TypeSignature, [Parameter<Expression>], [Message]) {
         var messages: [Message] = []
-        let returnType = output?.typeSignature(in: syntaxTree, messages: &messages) ?? .void
-        let parameters = input.parameters(in: syntaxTree, messages: &messages)
+        let returnType = returnClause?.typeSignature(in: syntaxTree, messages: &messages) ?? .void
+        let parameters = parameterClause.parameters(in: syntaxTree, messages: &messages)
         return (returnType, parameters, messages)
     }
 }
@@ -157,12 +157,12 @@ extension ClosureSignatureSyntax {
     /// The return type and parameters in this signature, and optional messages warning of any issues.
     func typeSignatures(in syntaxTree: SyntaxTree) -> (TypeSignature, [Parameter<Void>], [Message]) {
         var messages: [Message] = []
-        let returnType = output?.typeSignature(in: syntaxTree, messages: &messages) ?? .none
+        let returnType = returnClause?.typeSignature(in: syntaxTree, messages: &messages) ?? .none
         let parameters: [Parameter<Void>]
-        switch input {
+        switch parameterClause {
         case .simpleInput(let syntax):
             parameters = syntax.map { Parameter<Void>(externalLabel: $0.name.text) }
-        case .input(let syntax):
+        case .parameterClause(let syntax):
             parameters = syntax.parameters(in: syntaxTree, messages: &messages).map {
                 return Parameter<Void>(externalLabel: $0.externalLabel, declaredType: $0.declaredType, isVariadic: $0.isVariadic)
             }
