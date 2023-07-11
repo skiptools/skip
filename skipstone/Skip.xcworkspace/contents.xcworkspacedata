@@ -14,6 +14,9 @@
       location = "group:../skip-template">
    </FileRef>
    <FileRef
-      location = "group:../skipapp.swiftpm">
+      location = "group:../skipapp">
+   </FileRef>
+   <FileRef
+      location = "group:../skipapp/App.xcodeproj">
    </FileRef>
 </Workspace>

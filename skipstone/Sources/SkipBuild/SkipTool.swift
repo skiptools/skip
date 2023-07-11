@@ -1007,6 +1007,9 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         func linkSkipFolder(_ path: AbsolutePath, to outputFilePath: AbsolutePath, topLevel: Bool, makeLinks: Bool = true) throws -> Set<AbsolutePath> {
             var copiedFiles: Set<AbsolutePath> = []
             for fileName in try fs.getDirectoryContents(path) {
+                if fileName.hasPrefix(".") {
+                    continue // skip hidden files
+                }
                 let sourcePath = AbsolutePath(path, fileName)
                 let outputPath = AbsolutePath(outputFilePath, fileName)
 
