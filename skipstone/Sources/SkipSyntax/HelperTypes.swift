@@ -217,14 +217,16 @@ struct Modifiers: PrettyPrintable, Codable {
     var isFinal: Bool
     var isOverride: Bool
     var isLazy: Bool
+    var isNonisolated: Bool
 
-    init(visibility: Visibility = .default, isStatic: Bool = false, isMutating: Bool = false, isFinal: Bool = false, isOverride: Bool = false, isLazy: Bool = false) {
+    init(visibility: Visibility = .default, isStatic: Bool = false, isMutating: Bool = false, isFinal: Bool = false, isOverride: Bool = false, isLazy: Bool = false, isNonisolated: Bool = false) {
         self.visibility = visibility
         self.isStatic = isStatic
         self.isMutating = isMutating
         self.isFinal = isFinal
         self.isOverride = isOverride
         self.isLazy = isLazy
+        self.isNonisolated = isNonisolated
     }
 
     /// Decode the modifier information in the given syntax.
@@ -238,6 +240,7 @@ struct Modifiers: PrettyPrintable, Codable {
         var isFinal = false
         var isOverride = false
         var isLazy = false
+        var isNonisolated = false
         for modifier in syntax {
             guard modifier.detail == nil else {
                 // Ignore e.g. 'private(set)' for now
@@ -264,15 +267,17 @@ struct Modifiers: PrettyPrintable, Codable {
                 isOverride = true
             case "lazy":
                 isLazy = true
+            case "nonisolated":
+                isNonisolated = true
             default:
                 break
             }
         }
-        return Modifiers(visibility: visibility, isStatic: isStatic, isMutating: isMutating, isFinal: isFinal, isOverride: isOverride, isLazy: isLazy)
+        return Modifiers(visibility: visibility, isStatic: isStatic, isMutating: isMutating, isFinal: isFinal, isOverride: isOverride, isLazy: isLazy, isNonisolated: isNonisolated)
     }
 
     var isEmpty: Bool {
-        return visibility == .default && !isStatic && !isFinal && !isOverride && !isLazy
+        return visibility == .default && !isStatic && !isFinal && !isOverride && !isLazy && !isNonisolated
     }
 
     var prettyPrintTree: PrettyPrintTree {
@@ -294,6 +299,9 @@ struct Modifiers: PrettyPrintable, Codable {
         }
         if isLazy {
             children.append(PrettyPrintTree(root: "lazy"))
+        }
+        if isNonisolated {
+            children.append(PrettyPrintTree(root: "nonisolated"))
         }
         return PrettyPrintTree(root: "modifiers", children: children)
     }
@@ -713,8 +721,8 @@ struct APIFlags: OptionSet, Codable {
 
     static let async = APIFlags(rawValue: 1 << 0)
     static let mainActor = APIFlags(rawValue: 1 << 1)
-    static let `throws` = APIFlags(rawValue: 1 << 2)
-    static let writeable = APIFlags(rawValue: 1 << 3)
+    static let `throws` = APIFlags(rawValue: 1 << 3)
+    static let writeable = APIFlags(rawValue: 1 << 4)
 }
 
 /// The result of visiting a syntax node.

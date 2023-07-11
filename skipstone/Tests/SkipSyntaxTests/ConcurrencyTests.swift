@@ -1,7 +1,32 @@
 import Foundation
+@testable import SkipSyntax
 import XCTest
 
 final class ConcurrencyTests: XCTestCase {
+    private func setUpContext(swift: String) async throws -> CodebaseInfo.Context {
+        let srcFile = try tmpFile(named: "Source.swift", contents: swift)
+        let source = Source(file: Source.FilePath(path: srcFile.path), content: swift)
+        let syntaxTree = SyntaxTree(source: source)
+
+        let codebaseInfo = CodebaseInfo()
+        codebaseInfo.gather(from: syntaxTree)
+        codebaseInfo.prepareForUse()
+        return codebaseInfo.context(importedModuleNames: [], sourceFile: source.file)
+    }
+
+    func testNonisolated() async throws {
+        let context = try await setUpContext(swift: """
+        @MainActor class C {
+            nonisolated func f() {
+            }
+        }
+        """)
+        let infos = context.global.lookup(name: "f")
+        XCTAssertEqual(infos.count, 1)
+        XCTAssertTrue(infos[0] is CodebaseInfo.FunctionInfo)
+        XCTAssertTrue(infos[0].modifiers.isNonisolated)
+    }
+
     func testTaskValueAsFunction() async throws {
         let supportingSwift = """
         struct Task<Success, Failure> where Failure: Error {
