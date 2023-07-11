@@ -1,31 +1,43 @@
+import Foundation
 import XCTest
 
 final class ConcurrencyTests: XCTestCase {
-    //~~~ change 'let task: Task...' to supportingSwift: struct Task { }...
-    //~~~ test Swift.Task?
     func testTaskValueAsFunction() async throws {
-        try await check(swift: """
-        func f() async -> Int {
-            let task: Task = Task { 10 }
+        let supportingSwift = """
+        struct Task<Success, Failure> where Failure: Error {
+            var value: Success {
+                get async throws { fatalError() }
+            }
+
+            init(priority: TaskPriority? = nil, operation: @escaping () async throws -> Success) {
+            }
+
             // SKIP NOWARN
+            static func detached(priority: TaskPriority? = nil, operation: @escaping () async -> Success) -> Task<Success, Failure> {
+                fatalError()
+            }
+        }
+        """
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        func f() async -> Int {
+            let task = Task { 10 }
             return await task.value
         }
         """, kotlin: """
         internal suspend fun f(): Int = Task.run l@{
-            val task: Task = Task { 10 }
-            return@l task.value
+            val task = Task { 10 }
+            return@l task.value()
         }
         """)
 
-        //~~~ Why the extra sref here but not above?
-        try await check(swift: """
+        try await check(supportingSwift: supportingSwift, swift: """
         func f() async -> Int {
-            // SKIP NOWARN
             await Task { 10 }.value
         }
         """, kotlin: """
         internal suspend fun f(): Int = Task.run l@{
-            return@l Task { 10 }.value.sref()
+            return@l Task { 10 }.value()
         }
         """)
     }
@@ -305,4 +317,47 @@ final class ConcurrencyTests: XCTestCase {
         }
         """)
     }
+
+    // Running this and observing the output verifies that Swift hops to the main thread when required by @MainActor, but does
+    // not stay there for chained calls. Commented out to avoid warnings about using Thread.isMainThread within async code.
+//    func testMainActorBehavior() async throws {
+//        print("testMainActorBehavior: \(Thread.isMainThread)")
+//        let _ = await MainS().anys().f().mains().f()
+//    }
+//
+//    @MainActor
+//    private struct MainS {
+//        init() {
+//            print("MainS.init: \(Thread.isMainThread)")
+//        }
+//
+//        func f() async -> MainS {
+//            print("MainS.f: \(Thread.isMainThread)")
+//            return self
+//        }
+//
+//        func anys() async -> AnyS {
+//            print("MainS.anys: \(Thread.isMainThread)")
+//            let anys = AnyS()
+//            print("Now MainS.anys: \(Thread.isMainThread)")
+//            return anys
+//        }
+//    }
+//    private struct AnyS {
+//        init() {
+//            print("AnyS.init: \(Thread.isMainThread)")
+//        }
+//
+//        func f() async -> AnyS {
+//            print("AnyS.f: \(Thread.isMainThread)")
+//            return self
+//        }
+//
+//        func mains() async -> MainS {
+//            print("AnyS.mains: \(Thread.isMainThread)")
+//            let mains = await MainS()
+//            print("Now AnyS.mains: \(Thread.isMainThread)")
+//            return mains
+//        }
+//    }
 }
