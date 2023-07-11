@@ -114,13 +114,13 @@ sed -I '' 's;package.targets += \[.binaryTarget.*;package.targets += [.binaryTar
 # this aligns the 
 cd ${SKIPPKGDIR}
 
-sed -I '' 's;.package(url: "https://.*/skiptools/skip", from: ".*");.package(url: "https://skip.tools/skiptools/skip", from: "'${SEMVER_NEXT}'");g' "README.md"
-sed -I '' 's;.package(url: "https://.*/skiptools/skip", from: ".*");.package(url: "https://skip.tools/skiptools/skip", from: "'${SEMVER_NEXT}'");g' "${SKIPHUBPKG}"
+sed -I '' 's;.package(url: "https://.*/skiptools/skip.git", from: ".*");.package(url: "https://skip.tools/skiptools/skip.git", from: "'${SEMVER_NEXT}'");g' "README.md"
+sed -I '' 's;.package(url: "https://.*/skiptools/skip.git", from: ".*");.package(url: "https://skip.tools/skiptools/skip.git", from: "'${SEMVER_NEXT}'");g' "${SKIPHUBPKG}"
 
 # also grab the latest skiphub version and update it in the README
 SKIPHUB_VERSION=`git ls-remote --tags https://github.com/skiptools/skiphub | awk -F/ '$NF ~ /^v?[0-9]+\.[0-9]+\.[0-9]+$/ {print $NF}' | sort -V | tail -n1`
 
-sed -I '' 's;.package(url: "https://github.com/skiptools/skiphub", from: ".*");.package(url: "https://github.com/skiptools/skiphub", from: "'${SKIPHUB_VERSION}'");g' "README.md"
+#sed -I '' 's;.package(url: "https://github.com/skiptools/skiphub.git", from: ".*");.package(url: "https://github.com/skiptools/skiphub.git", from: "'${SKIPHUB_VERSION}'");g' "README.md"
 
 git add Package.swift ${README_PATH}
 git add .
