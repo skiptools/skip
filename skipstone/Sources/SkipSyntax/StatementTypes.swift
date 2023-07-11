@@ -1040,8 +1040,8 @@ class SubscriptDeclaration: Statement {
         guard syntax.kind == .subscriptDecl, let subscriptDecl = syntax.as(SubscriptDeclSyntax.self) else {
             return nil
         }
-        let elementType = TypeSignature.for(syntax: subscriptDecl.result.returnType)
-        let (parameters, parametersMessages) = subscriptDecl.indices.parameters(in: syntaxTree)
+        let elementType = TypeSignature.for(syntax: subscriptDecl.returnClause.returnType)
+        let (parameters, parametersMessages) = subscriptDecl.parameterClause.parameters(in: syntaxTree)
         let attributes = Attributes.for(syntax: subscriptDecl.attributes, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: subscriptDecl.modifiers)
         let (generics, genericsMessages) = Generics.for(syntax: subscriptDecl.genericParameterClause, where: subscriptDecl.genericWhereClause, in: syntaxTree)

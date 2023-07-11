@@ -1294,7 +1294,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                 let hasDefaultValue = parameterSyntax.initializer != nil
                 parameters.append(Parameter(label: label, type: type, isInOut: isInOut, isVariadic: isVariadic, hasDefaultValue: hasDefaultValue))
             }
-            let returnType = self.for(syntax: functionType.output.returnType)
+            let returnType = self.for(syntax: functionType.returnClause.returnType)
             guard !parameters.contains(where: { $0.type == .none }) && returnType != .none else {
                 return .none
             }
