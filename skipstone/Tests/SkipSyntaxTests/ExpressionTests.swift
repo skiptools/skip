@@ -104,6 +104,7 @@ final class ExpressionTests: XCTestCase {
                 internal fun staticFunc() = Unit
             }
         }
+        internal typealias X = C
 
         internal fun f() {
             g(c = C::class)

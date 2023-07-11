@@ -15,6 +15,8 @@ final class TypealiasTests: XCTestCase {
             }
         }
         """, kotlin: """
+        internal typealias AA = a.b.C
+
         internal open class Sub: a.b.C() {
             internal val a: a.b.C = a.b.C()
             internal val b: B = a.b.C.f()
@@ -69,6 +71,7 @@ final class TypealiasTests: XCTestCase {
             return a[0] == .max
         }
         """, kotlin: """
+        internal typealias AA = Array<Int>
         internal fun f(a: Array<Int>): Boolean = a[0] == Int.max
         """)
     }
@@ -85,6 +88,7 @@ final class TypealiasTests: XCTestCase {
             let v: Alias<Int>
         }
         """, kotlin: """
+        internal typealias Alias<T> = java.util.A<T>
         internal interface P<T> {
             val v: java.util.A<T>
         }
@@ -111,6 +115,7 @@ final class TypealiasTests: XCTestCase {
             return dict["a"] == .max
         }
         """, kotlin: """
+        internal typealias StringIntDict = Dictionary<String, Int>
         internal fun f(dict: Dictionary<String, Int>): Boolean = dict["a"] == Int.max
         """)
 
@@ -120,6 +125,7 @@ final class TypealiasTests: XCTestCase {
             return dict["a"] == .max
         }
         """, kotlin: """
+        internal typealias StringDict<T> = Dictionary<String, T>
         internal fun f(dict: Dictionary<String, Int>): Boolean = dict["a"] == Int.max
         """)
 
@@ -129,6 +135,7 @@ final class TypealiasTests: XCTestCase {
             return dict["a"] == .max
         }
         """, kotlin: """
+        internal typealias IntValueDict<T> = Dictionary<T, Int>
         internal fun f(dict: Dictionary<String, Int>): Boolean = dict["a"] == Int.max
         """)
 
@@ -138,6 +145,7 @@ final class TypealiasTests: XCTestCase {
             return dict["a"] == .max
         }
         """, kotlin: """
+        internal typealias MixedDict<V, K> = Dictionary<K, V>
         internal fun f(dict: Dictionary<String, Int>): Boolean = dict["a"] == Int.max
         """)
 
@@ -147,6 +155,7 @@ final class TypealiasTests: XCTestCase {
             return dict[[1]]?[0] == .max
         }
         """, kotlin: """
+        internal typealias ArraysDict<T> = Dictionary<Array<T>, Array<T>>
         internal fun f(dict: Dictionary<Array<Int>, Array<Int>>): Boolean = dict[arrayOf(1)]?.get(0) == Int.max
         """)
     }
@@ -158,6 +167,7 @@ final class TypealiasTests: XCTestCase {
             var digest: MessageDigest { get }
         }
         """, kotlin: """
+        typealias MessageDigest = java.security.MessageDigest
         interface NamedHashFunction {
             val digest: java.security.MessageDigest
         }
@@ -206,6 +216,8 @@ final class TypealiasTests: XCTestCase {
         class B : A {
         }
         """, kotlin: """
+        internal typealias A = A
+
         internal open class A {
         }
 
@@ -258,6 +270,7 @@ final class TypealiasTests: XCTestCase {
             let s2 = A(p2: "")
         }
         """, kotlin: """
+        internal typealias A = S
         internal fun A(p1: String): S = Unit
         internal open class S {
             internal constructor(p2: String) {
@@ -278,6 +291,7 @@ final class TypealiasTests: XCTestCase {
             let s2 = A(p2: "")
         }
         """, kotlin: """
+        internal typealias A = java.util.S
         internal fun A(p1: String): java.util.S = Unit
         internal fun f() {
             val s1 = A(p1 = "")

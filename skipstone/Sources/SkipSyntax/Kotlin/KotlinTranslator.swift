@@ -147,8 +147,7 @@ public class KotlinTranslator {
             case .subscriptDeclaration:
                 return KotlinFunctionDeclaration.translate(statement: statement as! SubscriptDeclaration, translator: self)
             case .typealiasDeclaration:
-                // We resolve typealiases back to the original type name
-                return KotlinTypealiasDeclaration.validate(statement: statement as! TypealiasDeclaration, translator: self)
+                return KotlinTypealiasDeclaration.translate(statement: statement as! TypealiasDeclaration, translator: self)
             case .variableDeclaration:
                 return [KotlinVariableDeclaration.translate(statement: statement as! VariableDeclaration, translator: self)]
             case .raw:

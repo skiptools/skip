@@ -22,6 +22,7 @@ enum KotlinStatementType {
     case functionDeclaration
     case importDeclaration
     case interfaceDeclaration
+    case typealiasDeclaration
     case variableDeclaration
 
     // Special statements
@@ -1913,12 +1914,59 @@ class KotlinInterfaceDeclaration: KotlinStatement {
     }
 }
 
-struct KotlinTypealiasDeclaration {
-    static func validate(statement: TypealiasDeclaration, translator: KotlinTranslator) -> [KotlinStatement] {
+/// - Note: We perform full typealias resolution when transpiling. We do not actually use any typealiases in our generated Kotlin. We do translate typealiases, however,
+///  so that any manually-written Kotlin has access to them.
+class KotlinTypealiasDeclaration: KotlinStatement {
+    var name: String
+    var attributes = Attributes()
+    var modifiers = Modifiers()
+    var generics = Generics()
+    var aliasedType: TypeSignature = .none
+
+    static func translate(statement: TypealiasDeclaration, translator: KotlinTranslator) -> [KotlinStatement] {
+        let messages = validate(statement: statement, translator: translator)
+        if statement.owningTypeDeclaration != nil {
+            // Kotln does not support nested typealiases
+            return messages.map { KotlinMessageStatement(message: $0) }
+        }
+
+        let kstatement = KotlinTypealiasDeclaration(statement: statement)
+        kstatement.modifiers = statement.modifiers
+        kstatement.generics = statement.generics
+        kstatement.aliasedType = statement.aliasedType
+        kstatement.attributes = kstatement.processAttributes(statement.attributes, translator: translator)
+        kstatement.messages += messages
+        return [kstatement]
+    }
+
+    private static func validate(statement: TypealiasDeclaration, translator: KotlinTranslator) -> [Message] {
         if statement.generics.entries.contains(where: { !$0.inherits.isEmpty || $0.whereEqual != nil }) {
-            return [KotlinMessageStatement(message: .kotlinTypeAliasConstrainedGenerics(statement, source: translator.syntaxTree.source))]
+            return [.kotlinTypeAliasConstrainedGenerics(statement, source: translator.syntaxTree.source)]
         }
         return []
+    }
+
+    private init(statement: TypealiasDeclaration) {
+        self.name = statement.name
+        super.init(type: .typealiasDeclaration, statement: statement)
+    }
+
+    override func insertDependencies(into dependencies: inout KotlinDependencies) {
+        if aliasedType.kotlinReferencesKClass {
+            dependencies.insertReflect()
+        }
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        if let declaration = extras?.declaration {
+            output.append(indentation).append(declaration).append("\n")
+        } else {
+            attributes.append(to: output, indentation: indentation)
+            output.append(indentation).append(modifiers.kotlinMemberString(isOpen: false, suffix: " "))
+            output.append("typealias ").append(name)
+            generics.append(to: output, indentation: indentation)
+            output.append(" = ").append(aliasedType.kotlin).append("\n")
+        }
     }
 }
 
