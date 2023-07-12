@@ -737,14 +737,34 @@ enum VisitResult<N> {
 }
 
 extension Array where Element == Statement {
-    /// Parse import statmeents for imported module names.
-    var importedModuleNames: [String] {
+    /// Parse import statements for imported module paths.
+    var importedModulePaths: [[String]] {
         return compactMap { statement in
             guard statement.type == .importDeclaration, let importDeclaration = statement as? ImportDeclaration else {
                 return nil
             }
-            return importDeclaration.modulePath.first
+            return importDeclaration.modulePath
         }
+    }
+
+    /// Whether these statements include a declaration of the given type (no extensions).
+    func containsDeclaration(of signature: TypeSignature) -> Bool {
+        let name = signature.name
+        for statement in self {
+            if statement.type != .extensionDeclaration, let typeDeclaration = statement as? TypeDeclaration {
+                if typeDeclaration.name == name || typeDeclaration.members.containsDeclaration(of: signature) {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+}
+
+extension Array where Element == String {
+    /// Filter single-element import paths.
+    var moduleName: String? {
+        return count == 1 ? self[0] : nil
     }
 }
 

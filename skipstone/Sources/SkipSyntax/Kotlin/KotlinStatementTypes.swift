@@ -854,6 +854,7 @@ class KotlinClassDeclaration: KotlinStatement {
     var generics = Generics()
     var declarationType: StatementType
     var members: [KotlinStatement] = []
+    var movedExtensionImportModulePaths: [[String]] = []
     var suppressSideEffectsPropertyName: String?
     var enumInheritedRawValueType: TypeSignature {
         guard let inherits = inherits.first else {
@@ -894,9 +895,10 @@ class KotlinClassDeclaration: KotlinStatement {
 
             // Move extensions of this type into the type itself rather than use Kotlin extension functions.
             // Kotlin extension functions act like static functions, which can lead to different behavior
-            for (extInfo, extDeclaration) in codebaseInfo.moveableExtensions(of: statement.signature, in: translator.syntaxTree) {
+            for (extInfo, extDeclaration, extImportModulePaths) in codebaseInfo.moveableExtensions(of: statement.signature, in: translator.syntaxTree) {
                 kstatement.inherits += extInfo.inherits
                 members += extDeclaration.members.flatMap { translator.translateStatement($0) }
+                kstatement.movedExtensionImportModulePaths += extImportModulePaths
             }
         }
         kstatement.members = members
@@ -1264,19 +1266,22 @@ struct KotlinExtensionDeclaration {
     static func translate(statement: ExtensionDeclaration, translator: KotlinTranslator) -> [KotlinStatement] {
         // If the extension can't move into its extended type or is on a type outside this module, use Kotlin extension
         // functions. Otherwise do not translate the extension - instead we'll move its members into the extended type
-        guard !statement.canMoveIntoExtendedType || (translator.codebaseInfo != nil && translator.codebaseInfo?.declarationType(forNamed: statement.extends, mustBeInModule: true) == nil) else {
-            return []
+        let canMove = statement.canMoveIntoExtendedType
+        let isInSameFile = statement.isInSameFileAsExtendedType
+        let visibilityAllowsMove = isInSameFile || statement.visibilityAllowsMoveIntoExtendedType
+        let isInModule = translator.codebaseInfo == nil ? nil : translator.codebaseInfo?.declarationType(forNamed: statement.extends, mustBeInModule: true) != nil
+        guard !canMove || !visibilityAllowsMove || isInModule != true else {
+            if !isInSameFile && mayUseFilePrivateAPI(statement: statement, in: translator.syntaxTree) {
+                let message: Message = .kotlinExtensionUsingFileprivateAPI(statement, source: translator.syntaxTree.source)
+                return [KotlinMessageStatement(message: message, statement: statement)]
+            } else {
+                return []
+            }
         }
 
-        var kotlinStatements: [KotlinStatement] = []
-        if !statement.inherits.isEmpty && translator.codebaseInfo != nil {
-            let message: Message
-            if !statement.canMoveIntoExtendedType {
-                message = Message.kotlinExtensionAddProtocolsToUnmovable(statement, source: translator.syntaxTree.source)
-            } else {
-                message = Message.kotlinExtensionAddProtocolsToOutsideType(statement, source: translator.syntaxTree.source)
-            }
-            kotlinStatements.append(KotlinMessageStatement(message: message, statement: statement))
+        var kstatements: [KotlinStatement] = []
+        if !statement.inherits.isEmpty, let message = Message.kotlinExtensionAddProtocols(statement, canMove: canMove, visibilityAllowsMove: visibilityAllowsMove, isInModule: isInModule, source: translator.syntaxTree.source) {
+            kstatements.append(KotlinMessageStatement(message: message, statement: statement))
         }
         var extends = statement.extends
         var generics = statement.generics
@@ -1286,29 +1291,60 @@ struct KotlinExtensionDeclaration {
             generics = extendedTypeInfo.generics.merge(extension: statement.extends, generics: statement.generics)
         }
         for member in statement.members {
-            if !statement.canMoveIntoExtendedType {
+            if !canMove {
                 // Check that an extension that will be implemented as extension functions because it has generic constraints, etc is not
                 // attempting to override member functions. Kotlin extension functions can never override members
-                if let variableDeclaration = member as? VariableDeclaration, translator.codebaseInfo?.isImplementingKotlinMember(declaration: variableDeclaration, inExtension: extends, with: generics) == true {
-                    kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionImplementMember(member, source: translator.syntaxTree.source), statement: member))
-                } else if let functionDeclaration = member as? FunctionDeclaration, translator.codebaseInfo?.isImplementingKotlinMember(declaration: functionDeclaration, inExtension: extends, with: generics) == true {
-                    kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionImplementMember(member, source: translator.syntaxTree.source), statement: member))
+                if let variableDeclaration = member as? VariableDeclaration, translator.codebaseInfo?.isImplementingKotlinMember(declaration: variableDeclaration, inExtension: extends, withConstrainingGenerics: generics) == true, let message = Message.kotlinExtensionImplementMember(member, canMove: canMove, visibilityAllowsMove: visibilityAllowsMove, isInModule: isInModule, source: translator.syntaxTree.source) {
+                    kstatements.append(KotlinMessageStatement(message: message, statement: member))
+                } else if let functionDeclaration = member as? FunctionDeclaration, translator.codebaseInfo?.isImplementingKotlinMember(declaration: functionDeclaration, inExtension: extends, withConstrainingGenerics: generics) == true, let message = Message.kotlinExtensionImplementMember(member, canMove: canMove, visibilityAllowsMove: visibilityAllowsMove, isInModule: isInModule, source: translator.syntaxTree.source) {
+                    kstatements.append(KotlinMessageStatement(message: message, statement: member))
                 }
             }
             for kmember in translator.translateStatement(member) {
                 guard let memberDeclaration = kmember as? KotlinMemberDeclaration else {
-                    kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionUnsupportedMember(member, source: translator.syntaxTree.source), statement: member))
+                    if let message = Message.kotlinExtensionUnsupportedMember(member, canMove: canMove, visibilityAllowsMove: visibilityAllowsMove, isInModule: isInModule, source: translator.syntaxTree.source) {
+                        kstatements.append(KotlinMessageStatement(message: message, statement: member))
+                    }
                     continue
                 }
                 guard kmember.type != .constructorDeclaration else {
-                    kotlinStatements.append(KotlinMessageStatement(message: .kotlinExtensionAddConstructorsToOutsideType(member, source: translator.syntaxTree.source), statement: member))
+                    if let message = Message.kotlinExtensionAddConstructors(member, canMove: canMove, visibilityAllowsMove: visibilityAllowsMove, isInModule: isInModule, source: translator.syntaxTree.source) {
+                        kstatements.append(KotlinMessageStatement(message: message, statement: member))
+                    }
                     continue
                 }
                 memberDeclaration.extends = (extends, generics)
-                kotlinStatements.append(kmember)
+                kstatements.append(kmember)
             }
         }
-        return kotlinStatements
+        return kstatements
+    }
+
+    private static func mayUseFilePrivateAPI(statement: ExtensionDeclaration, in syntaxTree: SyntaxTree) -> Bool {
+        var hasFilePrivateAPI = false
+        syntaxTree.root.visit { node in
+            guard !hasFilePrivateAPI, node !== statement else {
+                return .skip
+            }
+            let modifiers: Modifiers
+            let skip: Bool
+            if let typeDeclaration = node as? TypeDeclaration {
+                modifiers = typeDeclaration.modifiers
+                skip = false // Look for nested API
+            } else if let variableDeclaration = node as? VariableDeclaration {
+                modifiers = variableDeclaration.modifiers
+                skip = true
+            } else if let functionDeclaration = node as? FunctionDeclaration {
+                modifiers = functionDeclaration.modifiers
+                skip = true
+            } else {
+                return .recurse(nil)
+            }
+            // Anything using fileprivate visibility or any non-member using private visibility is effectively file-private
+            hasFilePrivateAPI = modifiers.visibility == .fileprivate || (modifiers.visibility == .private && node.parent?.owningTypeDeclaration == nil)
+            return hasFilePrivateAPI || skip ? .skip : .recurse(nil)
+        }
+        return hasFilePrivateAPI
     }
 }
 
@@ -1800,6 +1836,7 @@ class KotlinInterfaceDeclaration: KotlinStatement {
     var modifiers = Modifiers()
     var generics = Generics()
     var members: [KotlinStatement] = []
+    var movedExtensionImportModulePaths: [[String]] = []
 
     static func translate(statement: TypeDeclaration, translator: KotlinTranslator) -> KotlinInterfaceDeclaration {
         let kstatement = KotlinInterfaceDeclaration(statement: statement)
@@ -1824,13 +1861,14 @@ class KotlinInterfaceDeclaration: KotlinStatement {
         // act like static functions, which can lead to different behavior
         var originalMembers = kstatement.members
         var newMembers: [KotlinStatement] = []
-        for (extInfo, extDeclaration) in codebaseInfo.moveableExtensions(of: statement.signature, in: translator.syntaxTree) {
+        for (extInfo, extDeclaration, extImportModulePaths) in codebaseInfo.moveableExtensions(of: statement.signature, in: translator.syntaxTree) {
             kstatement.inherits += extInfo.inherits
             for extMember in extDeclaration.members.flatMap({ translator.translateStatement($0) }) {
                 if !replaceMember(in: &originalMembers, with: extMember) {
                     newMembers.append(extMember)
                 }
             }
+            kstatement.movedExtensionImportModulePaths += extImportModulePaths
         }
         kstatement.members = originalMembers + newMembers
         return kstatement
@@ -1928,7 +1966,7 @@ class KotlinTypealiasDeclaration: KotlinStatement {
         let messages = validate(statement: statement, translator: translator)
         if statement.owningTypeDeclaration != nil {
             // Kotln does not support nested typealiases
-            return messages.map { KotlinMessageStatement(message: $0) }
+            return messages.map { KotlinMessageStatement(message: $0, statement: statement) }
         }
 
         let kstatement = KotlinTypealiasDeclaration(statement: statement)

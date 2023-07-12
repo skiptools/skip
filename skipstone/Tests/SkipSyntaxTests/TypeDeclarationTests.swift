@@ -75,6 +75,150 @@ final class TypeDeclarationTests: XCTestCase {
         """)
     }
 
+    func testExtensionMove() async throws {
+        try await check(supportingSwift: """
+        import Module1
+
+        extension S: I {
+            func f() {
+            }
+        }
+        """, swift: """
+        struct S {
+        }
+        """, kotlin: """
+        import module1.*
+        internal class S: I {
+            internal fun f() = Unit
+        }
+        """)
+
+        try await check(supportingSwift: """
+        import Module1
+        import Module2
+
+        extension S: I {
+            func f() {
+            }
+        }
+        """, swift: """
+        import Module1
+
+        struct S {
+        }
+        """, kotlin: """
+        import module1.*
+        import module2.*
+
+        internal class S: I {
+            internal fun f() = Unit
+        }
+        """)
+
+        try await check(supportingSwift: """
+        struct S {
+        }
+        """, swift: """
+        import Module1
+
+        private extension S {
+            private func f() {
+            }
+        }
+        """, kotlin: """
+        import module1.*
+        private fun S.f() = Unit
+        """)
+
+        try await check(swift: """
+        import Module1
+
+        private extension S {
+            private func f() {
+            }
+        }
+        struct S {
+        }
+        """, kotlin: """
+        import module1.*
+        internal class S {
+            private fun f() = Unit
+        }
+        """)
+
+        try await check(supportingSwift: """
+        extension S {
+            func f() {
+            }
+        }
+        class T {
+            private func f() {
+            }
+        }
+        """, swift: """
+        struct S {
+        }
+        """, kotlin: """
+        internal class S {
+            internal fun f() = Unit
+        }
+        """)
+
+        try await check(expectMessages: true, supportingSwift: """
+        extension S {
+            func f() {
+            }
+        }
+        class T {
+            fileprivate func f() {
+            }
+        }
+        """, swift: """
+        struct S {
+        }
+        """, kotlin: """
+        internal class S {
+            internal fun f() = Unit
+        }
+        """)
+
+        try await check(expectMessages: true, supportingSwift: """
+        extension S {
+            func f() {
+            }
+        }
+        private class T {
+            func f() {
+            }
+        }
+        """, swift: """
+        struct S {
+        }
+        """, kotlin: """
+        internal class S {
+            internal fun f() = Unit
+        }
+        """)
+
+        try await check(supportingSwift: """
+        extension S {
+            func f() {
+            }
+        }
+        class T {
+            private class R {
+            }
+        }
+        """, swift: """
+        struct S {
+        }
+        """, kotlin: """
+        internal class S {
+            internal fun f() = Unit
+        }
+        """)
+    }
+
     func testProtocol() async throws {
         try await check(swift: """
         protocol P {

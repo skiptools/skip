@@ -67,6 +67,25 @@ extension ExtensionDeclaration {
     var canMoveIntoExtendedType: Bool {
         return extends.generics.isEmpty && !generics.entries.contains { $0.whereEqual != nil || !$0.inherits.isEmpty }
     }
+
+    /// Whether this extension's visibility allows it to be moved into its extended type definition.
+    ///
+    /// We do not move extensions marked `private` or `fileprivate` as a way for the user to veto movement.
+    var visibilityAllowsMoveIntoExtendedType: Bool {
+        return modifiers.visibility != .private && modifiers.visibility != .fileprivate
+    }
+
+    /// Whether this extension is in the same file as its extended type.
+    var isInSameFileAsExtendedType: Bool {
+        var root = parent
+        while let next = root?.parent {
+            root = next
+        }
+        guard let codeBlock = root as? CodeBlock else {
+            return false
+        }
+        return codeBlock.statements.containsDeclaration(of: extends)
+    }
 }
 
 extension Accessor where B: CodeBlock {

@@ -46,7 +46,7 @@ public class KotlinTranslator {
 
     /// Translate and transpile to source code.
     public func transpile(codebaseInfo: CodebaseInfo, transformers: [KotlinTransformer], startTime: TimeInterval) -> Transpilation {
-        let importedModuleNames = syntaxTree.root.statements.importedModuleNames
+        let importedModuleNames = syntaxTree.root.statements.importedModulePaths.compactMap(\.moduleName)
         let codebaseInfoContext = codebaseInfo.context(importedModuleNames: importedModuleNames, sourceFile: syntaxTree.source.file)
         self.codebaseInfo = codebaseInfoContext
         self.packageName = codebaseInfo.kotlin?.packageName

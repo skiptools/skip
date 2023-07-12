@@ -81,28 +81,52 @@ extension Message {
     }
 
     // Idea: factory function with class name?
-    static func kotlinExtensionAddConstructorsToOutsideType(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "Cannot use an extension to add additional constructors to a Kotlin type defined outside of this module", sourceDerived: sourceDerived, source: source)
+    static func kotlinExtensionAddConstructors(_ sourceDerived: SourceDerived, canMove: Bool, visibilityAllowsMove: Bool, isInModule: Bool?, source: Source) -> Message? {
+        guard let unmovableExplanation = extensionUnmovableExplanation(canMove: canMove, visibilityAllowsMove: visibilityAllowsMove, isInModule: isInModule) else {
+            return nil
+        }
+        return Message(kind: .error, message: "\(unmovableExplanation) Therefore it cannot add additional constructors", sourceDerived: sourceDerived, source: source)
     }
 
-    static func kotlinExtensionAddProtocolsToOutsideType(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "Cannot use an extension to add additional protocols to a Kotlin type defined outside of this module", sourceDerived: sourceDerived, source: source)
+    static func kotlinExtensionAddProtocols(_ sourceDerived: SourceDerived, canMove: Bool, visibilityAllowsMove: Bool, isInModule: Bool?, source: Source) -> Message? {
+        guard let unmovableExplanation = extensionUnmovableExplanation(canMove: canMove, visibilityAllowsMove: visibilityAllowsMove, isInModule: isInModule) else {
+            return nil
+        }
+        return Message(kind: .error, message: "\(unmovableExplanation) Therefore it cannot add additional protocols", sourceDerived: sourceDerived, source: source)
     }
 
-    static func kotlinExtensionAddProtocolsToUnmovable(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "This extension cannot be merged into its extended Kotlin type definition. Therefore it cannot add additional protocols", sourceDerived: sourceDerived, source: source)
+    static func kotlinExtensionUsingFileprivateAPI(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .warning, message: "This extension will be moved into its extended type definition when translated to Kotlin. It will not be able to access this file's private types or fileprivate members", sourceDerived: sourceDerived, source: source)
     }
 
-    static func kotlinExtensionImplementMember(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "This extension cannot be merged into its extended Kotlin type definition. Therefore it can add new properties and functions, but it cannot be used to override members or implement protocol requirements", sourceDerived: sourceDerived, source: source)
+    static func kotlinExtensionImplementMember(_ sourceDerived: SourceDerived, canMove: Bool, visibilityAllowsMove: Bool, isInModule: Bool?, source: Source) -> Message? {
+        guard let unmovableExplanation = extensionUnmovableExplanation(canMove: canMove, visibilityAllowsMove: visibilityAllowsMove, isInModule: isInModule) else {
+            return nil
+        }
+        return Message(kind: .error, message: "\(unmovableExplanation) Therefore it can add new properties and functions, but it cannot be used to override members or implement protocol requirements", sourceDerived: sourceDerived, source: source)
     }
 
     static func kotlinExtensionSelfAssignment(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "This extension cannot be merged into its extended Kotlin type definition. Therefore you cannot assign a new value to self", sourceDerived: sourceDerived, source: source)
+        return Message(kind: .error, message: "This extension cannot be merged into its extended Kotlin type. Therefore you cannot assign a new value to self", sourceDerived: sourceDerived, source: source)
     }
 
-    static func kotlinExtensionUnsupportedMember(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "The declaring extension cannot be merged into its extended Kotlin type definition. Therefore the extension can only include properties and functions", sourceDerived: sourceDerived, source: source)
+    static func kotlinExtensionUnsupportedMember(_ sourceDerived: SourceDerived, canMove: Bool, visibilityAllowsMove: Bool, isInModule: Bool?, source: Source) -> Message? {
+        guard let unmovableExplanation = extensionUnmovableExplanation(canMove: canMove, visibilityAllowsMove: visibilityAllowsMove, isInModule: isInModule) else {
+            return nil
+        }
+        return Message(kind: .error, message: "\(unmovableExplanation) Therefore the extension can only include properties and functions", sourceDerived: sourceDerived, source: source)
+    }
+
+    private static func extensionUnmovableExplanation(canMove: Bool, visibilityAllowsMove: Bool, isInModule: Bool?) -> String? {
+        if isInModule == false {
+            return "This extension cannot be merged into its extended Kotlin type, because its type is defined outside of this module."
+        } else if !canMove {
+            return "This extension cannot be merged into its extended Kotlin type definition because it has generic constraints."
+        } else if !visibilityAllowsMove {
+            return "This extension will not be merged into its extended Kotlin type definition because it is declared as private or fileprivate."
+        } else {
+            return nil
+        }
     }
 
     static func kotlinFunctionDisambiguateImplementable(name: String, parameters: [TypeSignature], in type: TypeSignature?, sourceFile: Source.FilePath) -> Message {
@@ -209,7 +233,7 @@ extension Message {
     }
 
     static func kotlinTupleConflictingLabel(label: String, arity: Int, sourceFile: Source.FilePath) -> Message {
-        return Message(kind: .error, message: "This module uses tuple label '\(label)' at different positions in different \(arity)-tuples. Kotlin does not have native tuples, and Skip's solution requires that each label is only used in one position in any tuple arity. Consider changing your label names or using positional element access", sourceFile: sourceFile)
+        return Message(kind: .error, message: "This module uses tuple label '\(label)' at different positions in different \(arity)-tuples. Kotlin does not have native tuples, and Skip's solution requires that each label is only used in one position in any tuple arity. Consider changing your label names or using positional element access (i.e. tuple.0, tuple.1, etc)", sourceFile: sourceFile)
     }
 
     static func kotlinTypeAliasConstrainedGenerics(_ sourceDerived: SourceDerived, source: Source) -> Message {

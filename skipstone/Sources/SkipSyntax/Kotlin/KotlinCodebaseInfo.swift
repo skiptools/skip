@@ -12,16 +12,16 @@ extension CodebaseInfo {
 
 extension CodebaseInfo.Context {
     /// Return all extensions of a given type that can move into its definition.
-    func moveableExtensions(of type: TypeSignature, in syntaxTree: SyntaxTree) -> [(CodebaseInfo.TypeInfo, ExtensionDeclaration)] {
+    func moveableExtensions(of type: TypeSignature, in syntaxTree: SyntaxTree) -> [(CodebaseInfo.TypeInfo, ExtensionDeclaration, [[String]])] {
         assert(global.kotlin != nil)
         return typeInfos(forNamed: type).compactMap { typeInfo in
             guard let extensionAdditions = typeInfo.languageAdditions as? ExtensionAdditions else {
                 return nil
             }
-            guard let extensionDeclaration = extensionAdditions.moveableExtensionDeclaration(codebaseInfo: global, in: syntaxTree) else {
+            guard let extensionDeclaration = extensionAdditions.moveableExtensionDeclaration(codebaseInfo: self, in: syntaxTree) else {
                 return nil
             }
-            return (typeInfo, extensionDeclaration)
+            return (typeInfo, extensionDeclaration, extensionAdditions.importedModulePaths)
         }
     }
 
@@ -59,8 +59,8 @@ extension CodebaseInfo.Context {
         }
     }
 
-    /// Whether this declaration is implementing a property of the given type, excluding Kotlin extension properties and functions.
-    func isImplementingKotlinMember(declaration: VariableDeclaration, inExtension type: TypeSignature, with generics: Generics) -> Bool {
+    /// Whether this constrained declaration is implementing an existing property of the given type, excluding Kotlin extension properties and functions.
+    func isImplementingKotlinMember(declaration: VariableDeclaration, inExtension type: TypeSignature, withConstrainingGenerics generics: Generics) -> Bool {
         assert(global.kotlin != nil)
         guard !declaration.names.isEmpty, let name = declaration.names[0] else {
             return false
@@ -68,8 +68,8 @@ extension CodebaseInfo.Context {
         return matchIdentifier(name: name, inConstrained: type.constrainedTypeWithGenerics(generics), excludeConstrainedExtensions: true) != nil
     }
 
-    /// Whether this declaration is implementing a function of the given type, excluding Kotlin extension properties and functions.
-    func isImplementingKotlinMember(declaration: FunctionDeclaration, inExtension type: TypeSignature, with generics: Generics) -> Bool {
+    /// Whether this constrained declaration is implementing a function of the given type, excluding Kotlin extension properties and functions.
+    func isImplementingKotlinMember(declaration: FunctionDeclaration, inExtension type: TypeSignature, withConstrainingGenerics generics: Generics) -> Bool {
         assert(global.kotlin != nil)
         let constrainedSignature = declaration.functionType.constrainedTypeWithGenerics(generics)
         let parameters = constrainedSignature.parameters
@@ -200,7 +200,7 @@ public class KotlinCodebaseInfo: CodebaseInfoLanguageAdditions, CodebaseInfoLang
 
 private class ExtensionAdditions {
     let extensionDeclaration: ExtensionDeclaration?
-    let importedModuleNames: [String]
+    let importedModulePaths: [[String]]
     let source: Source?
     var hasInferredTypes = false
     let statementIndex: Int?
@@ -213,17 +213,17 @@ private class ExtensionAdditions {
         if statements.containsDeclaration(of: extensionDeclaration.extends), let index = statements.firstIndex(where: { $0 === extensionDeclaration }) {
             self.statementIndex = index
             self.extensionDeclaration = nil
-            self.importedModuleNames = []
+            self.importedModulePaths = []
             self.source = nil
         } else {
             self.extensionDeclaration = extensionDeclaration
-            self.importedModuleNames = statements.importedModuleNames
+            self.importedModulePaths = statements.importedModulePaths
             self.source = syntaxTree.source
             self.statementIndex = nil
         }
     }
 
-    func moveableExtensionDeclaration(codebaseInfo: CodebaseInfo, in syntaxTree: SyntaxTree) -> ExtensionDeclaration? {
+    func moveableExtensionDeclaration(codebaseInfo: CodebaseInfo.Context, in syntaxTree: SyntaxTree) -> ExtensionDeclaration? {
         // Recover the extension declaration
         if let statementIndex {
             guard statementIndex < syntaxTree.root.statements.count, let extensionDeclaration = syntaxTree.root.statements[statementIndex] as? ExtensionDeclaration else {
@@ -232,11 +232,11 @@ private class ExtensionAdditions {
             }
             return extensionDeclaration.canMoveIntoExtendedType ? extensionDeclaration : nil
         } else if let extensionDeclaration, let source {
-            guard extensionDeclaration.canMoveIntoExtendedType else {
+            guard extensionDeclaration.canMoveIntoExtendedType && extensionDeclaration.visibilityAllowsMoveIntoExtendedType else {
                 return nil
             }
             if !hasInferredTypes {
-                let context = codebaseInfo.context(importedModuleNames: importedModuleNames, sourceFile: source.file)
+                let context = codebaseInfo.global.context(importedModuleNames: importedModulePaths.compactMap(\.moduleName), sourceFile: source.file)
                 let typeInferenceContext = TypeInferenceContext(codebaseInfo: context, unavailableAPI: nil, source: syntaxTree.source)
                 let _ = extensionDeclaration.inferTypes(context: typeInferenceContext, expecting: .none)
                 hasInferredTypes = true
@@ -245,19 +245,5 @@ private class ExtensionAdditions {
         } else {
             return nil
         }
-    }
-}
-
-extension Array where Element == Statement {
-    func containsDeclaration(of signature: TypeSignature) -> Bool {
-        let name = signature.name
-        for statement in self {
-            if statement.type != .extensionDeclaration, let typeDeclaration = statement as? TypeDeclaration {
-                if typeDeclaration.name == name || typeDeclaration.members.containsDeclaration(of: signature) {
-                    return true
-                }
-            }
-        }
-        return false
     }
 }

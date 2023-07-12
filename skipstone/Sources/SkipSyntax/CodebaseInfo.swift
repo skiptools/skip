@@ -42,7 +42,7 @@ public class CodebaseInfo: Codable {
     /// Gather codebase-level information from the given syntax tree.
     func gather(from syntaxTree: SyntaxTree) {
         assert(!isInUse)
-        let importedModuleNames = syntaxTree.root.statements.importedModuleNames
+        let importedModuleNames = syntaxTree.root.statements.importedModulePaths.compactMap(\.moduleName)
         var needsVariableTypeInference = false
         for statement in syntaxTree.root.statements {
             switch statement.type {
@@ -361,7 +361,8 @@ public class CodebaseInfo: Codable {
             let typeInfos = typeInfos(forNamed: type)
             let primaryTypeInfo = typeInfos.first { $0.declarationType != .extensionDeclaration }
             for typeInfo in typeInfos {
-                if excludeConstrainedExtensions && typeInfo.declarationType == .extensionDeclaration, let primaryTypeInfo, typeInfo.generics != primaryTypeInfo.generics {
+                if excludeConstrainedExtensions && typeInfo.declarationType == .extensionDeclaration && typeInfo.generics != primaryTypeInfo?.generics {
+                    // We intentionally leave out cases where primaryTypeInfo is unknown so that extensions to unknown types are excluded
                     continue
                 }
                 if var match = matchIdentifier(name: name, in: typeInfo, constrainedGenerics: type.generics, isStatic: isStatic) {
@@ -550,7 +551,8 @@ public class CodebaseInfo: Codable {
                 }
             } else if let name {
                 for typeInfo in typeInfos {
-                    if excludeConstrainedExtensions && typeInfo.declarationType == .extensionDeclaration, let primaryTypeInfo, typeInfo.generics != primaryTypeInfo.generics {
+                    if excludeConstrainedExtensions && typeInfo.declarationType == .extensionDeclaration && typeInfo.generics != primaryTypeInfo?.generics {
+                        // We intentionally leave out cases where primaryTypeInfo is unknown so that extensions to unknown types are excluded
                         continue
                     }
                     candidates += functionCandidates(name: name, in: typeInfo, constrainedGenerics: constrainedGenerics, arguments: arguments, isStatic: isStatic)
@@ -1054,7 +1056,7 @@ public class CodebaseInfo: Codable {
                 if let existingContext = typeInferenceContexts[sourceFile] {
                     context = existingContext
                 } else {
-                    let codebaseInfoContext = self.context(importedModuleNames: syntaxTree.root.statements.importedModuleNames, sourceFile: syntaxTree.source.file)
+                    let codebaseInfoContext = self.context(importedModuleNames: syntaxTree.root.statements.importedModulePaths.compactMap(\.moduleName), sourceFile: syntaxTree.source.file)
                     context = TypeInferenceContext(codebaseInfo: codebaseInfoContext, unavailableAPI: nil, source: syntaxTree.source)
                     typeInferenceContexts[sourceFile] = context
                 }

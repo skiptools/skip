@@ -374,4 +374,23 @@ final class ExpressionTests: XCTestCase {
         f(s = "", b = { 2 })
         """)
     }
+
+    func testImport() async throws {
+        try await check(swift: """
+        import Swift
+        import Foundation
+        import Foo
+        import FooBar
+        import com.xyz.Bar
+        """, kotlin: """
+        import skip.foundation.*
+        import foo.*
+        import foo.bar.*
+        import com.xyz.Bar
+        """)
+
+        try await checkProducesMessage(swift: """
+        import func Foundation.x
+        """)
+    }
 }
