@@ -12,19 +12,6 @@ final class TypeDeclarationTests: XCTestCase {
         """)
     }
 
-    func testPublicClass() async throws {
-        try await check(swift: """
-        public class A {
-        }
-        """, kotlin: """
-        open class A {
-
-            companion object {
-            }
-        }
-        """)
-    }
-
     func testNestedClass() async throws {
         try await check(swift: """
         class A {

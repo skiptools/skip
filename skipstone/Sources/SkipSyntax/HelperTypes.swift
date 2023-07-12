@@ -205,6 +205,7 @@ struct Modifiers: PrettyPrintable, Codable {
     /// - Note: `Codable` for use in `CodebaseInfo`.
     enum Visibility: Equatable, Comparable, Codable {
         case `private`
+        case `fileprivate`
         case `default`
         case `internal`
         case `public`
@@ -253,6 +254,8 @@ struct Modifiers: PrettyPrintable, Codable {
                 visibility = .public
             case "internal":
                 visibility = .internal
+            case "fileprivate":
+                visibility = .fileprivate
             case "private":
                 visibility = .private
             case "static":

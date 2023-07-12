@@ -112,12 +112,10 @@ extension Operator {
 
 extension Modifiers {
     /// Kotlin modifier string for a member.
-    func kotlinMemberString(isOpen: Bool, suffix: String) -> String {
+    func kotlinMemberString(isGlobal: Bool, isOpen: Bool, suffix: String) -> String {
         var string: String
         switch visibility {
-        case .default:
-            fallthrough
-        case .internal:
+        case .default, .internal:
             string = "internal"
         case .open:
             string = ""
@@ -125,6 +123,8 @@ extension Modifiers {
             string = ""
         case .private:
             string = "private"
+        case .fileprivate:
+            string = isGlobal ? "private" : "internal"
         }
         if isOverride {
             string = string.isEmpty ? "override" : "\(string) override"

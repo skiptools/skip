@@ -1,7 +1,105 @@
 @testable import SkipSyntax
 import XCTest
 
-final class AttributeTests: XCTestCase {
+final class AttributeAndModifierTests: XCTestCase {
+    func testVisibility() async throws {
+        try await check(swift: """
+        class A {
+        }
+        open class A {
+        }
+        public class A {
+        }
+        internal class A {
+        }
+        fileprivate class A {
+        }
+        private class A {
+        }
+        """, kotlin: """
+        internal open class A {
+        }
+        open class A {
+
+            companion object {
+            }
+        }
+        open class A {
+
+            companion object {
+            }
+        }
+        internal open class A {
+        }
+        private open class A {
+        }
+        private open class A {
+        }
+        """)
+
+        try await check(swift: """
+        class A {
+            open class A {
+            }
+            public class A {
+            }
+            internal class A {
+            }
+            fileprivate class A {
+            }
+            private class A {
+            }
+        }
+        """, kotlin: """
+        internal open class A {
+            open class A {
+
+                companion object {
+                }
+            }
+            open class A {
+
+                companion object {
+                }
+            }
+            internal open class A {
+            }
+            internal open class A {
+            }
+            private open class A {
+            }
+        }
+        """)
+
+        try await check(swift: """
+        class A {
+            let v = 1
+            public let v = 1
+            internal let v = 1
+            fileprivate let v = 1
+            private let v = 1
+        }
+        let v = 1
+        public let v = 1
+        internal let v = 1
+        fileprivate let v = 1
+        private let v = 1
+        """, kotlin: """
+        internal open class A {
+            internal val v = 1
+            val v = 1
+            internal val v = 1
+            internal val v = 1
+            private val v = 1
+        }
+        internal val v = 1
+        val v = 1
+        internal val v = 1
+        private val v = 1
+        private val v = 1
+        """)
+    }
+    
     func testAvailableAttributeIgnored() async throws {
         try await check(swift: """
         class C {

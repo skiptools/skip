@@ -983,9 +983,7 @@ class KotlinClassDeclaration: KotlinStatement {
             attributes.append(to: output, indentation: indentation)
             output.append(indentation)
             switch modifiers.visibility {
-            case .default:
-                fallthrough
-            case .internal:
+            case .default, .internal:
                 output.append("internal ")
                 if declarationType == .classDeclaration && !modifiers.isFinal {
                     output.append("open ")
@@ -1000,6 +998,11 @@ class KotlinClassDeclaration: KotlinStatement {
                 }
             case .private:
                 output.append("private ")
+                if declarationType == .classDeclaration && !modifiers.isFinal {
+                    output.append("open ")
+                }
+            case .fileprivate:
+                output.append(signature.baseType == .none ? "private " : "internal ")
                 if declarationType == .classDeclaration && !modifiers.isFinal {
                     output.append("open ")
                 }
@@ -1552,7 +1555,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
 
     private func appendFunctionDeclaration(to output: OutputGenerator, indentation: Indentation) {
         if role != .local {
-            output.append(modifiers.kotlinMemberString(isOpen: isOpen, suffix: " "))
+            output.append(modifiers.kotlinMemberString(isGlobal: role == .global, isOpen: isOpen, suffix: " "))
         }
         //~~~ Move test to transformer
         let isTestFunction = annotations.contains("@Test")
@@ -1890,15 +1893,13 @@ class KotlinInterfaceDeclaration: KotlinStatement {
             output.append(declaration)
         } else {
             switch modifiers.visibility {
-            case .default:
-                fallthrough
-            case .internal:
+            case .default, .internal:
                 output.append("internal ")
             case .open:
                 fallthrough
             case .public:
                 break
-            case .private:
+            case .private, .fileprivate:
                 output.append("private ")
             }
             output.append("interface ").append(name)
@@ -1962,7 +1963,7 @@ class KotlinTypealiasDeclaration: KotlinStatement {
             output.append(indentation).append(declaration).append("\n")
         } else {
             attributes.append(to: output, indentation: indentation)
-            output.append(indentation).append(modifiers.kotlinMemberString(isOpen: false, suffix: " "))
+            output.append(indentation).append(modifiers.kotlinMemberString(isGlobal: true, isOpen: false, suffix: " "))
             output.append("typealias ").append(name)
             generics.append(to: output, indentation: indentation)
             output.append(" = ").append(aliasedType.kotlin).append("\n")
@@ -2185,7 +2186,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         attributes.append(to: output, indentation: indentation)
         output.append(indentation)
         if role.isProperty || role == .global {
-            output.append(modifiers.kotlinMemberString(isOpen: isOpen, suffix: " "))
+            output.append(modifiers.kotlinMemberString(isGlobal: role == .global, isOpen: isOpen, suffix: " "))
             if asyncOptions.contains(.async) {
                 output.append("suspend ")
             } else if !usesStorageProperty && role != .superclassOverrideProperty && declaredType.isUnwrappedOptional {
