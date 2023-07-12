@@ -195,7 +195,7 @@ public class CodebaseInfo: Codable {
 
     /// Return the protocols the given type conforms to, including inherited protocols.
     ///
-    /// If the type itself is a protocol, it is included.
+    /// If the type itself is a protocol, it is included first in the list.
     func protocolSignatures(forNamed type: TypeSignature) -> [TypeSignature] {
         let type = type.asOptional(false)
         if type == .anyObject || Self.builtinProtocols.contains(where: { $0.isSameType(as: type) }) {
@@ -1160,8 +1160,13 @@ public class CodebaseInfo: Codable {
     }
 
     private func addMainActorFlags() {
-        for i in 0..<rootTypes.count { rootTypes[i].addMainActorFlags(codebaseInfo: self) }
-        for i in 0..<rootExtensions.count { rootExtensions[i].addMainActorFlags(codebaseInfo: self) }
+        // First add type-level flags
+        for i in 0..<rootTypes.count { rootTypes[i].addMainActorTypeFlags(codebaseInfo: self) }
+        for i in 0..<rootExtensions.count { rootExtensions[i].addMainActorTypeFlags(codebaseInfo: self) }
+
+        // Then add individual member flags as needed
+        for i in 0..<rootTypes.count { rootTypes[i].addMainActorMemberFlags(codebaseInfo: self) }
+        for i in 0..<rootExtensions.count { rootExtensions[i].addMainActorMemberFlags(codebaseInfo: self) }
     }
 
     /// Information about a declared type.
@@ -1176,9 +1181,7 @@ public class CodebaseInfo: Codable {
         let declaringType: TypeSignature?
         let modifiers: Modifiers
         let availability: Availability
-        var apiFlags: APIFlags? {
-            return nil
-        }
+        var apiFlags: APIFlags?
         var isStatic: Bool {
             return true
         }
@@ -1245,7 +1248,7 @@ public class CodebaseInfo: Codable {
 
         private enum CodingKeys: String, CodingKey {
             // Exclude language additions, importedModuleNames
-            case name, declarationType, signature, moduleName, sourceFile, declaringType, modifiers, availability, generics, inherits, types, typealiases, cases, variables, functions, subscripts
+            case name, declarationType, signature, moduleName, sourceFile, declaringType, modifiers, availability, apiFlags, generics, inherits, types, typealiases, cases, variables, functions, subscripts
         }
 
         fileprivate init(statement: TypeDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo, syntaxTree: SyntaxTree) {
@@ -1257,6 +1260,7 @@ public class CodebaseInfo: Codable {
             self.declaringType = declaringType
             self.modifiers = statement.modifiers
             self.availability = Availability(attributes: statement.attributes)
+            self.apiFlags = statement.attributes.contains(.mainActor) ? .mainActor : []
             self.generics = statement.generics
             self.inherits = statement.inherits
             addMembers(statement.members, codebaseInfo: codebaseInfo, syntaxTree: syntaxTree)
@@ -1276,6 +1280,7 @@ public class CodebaseInfo: Codable {
             }
             self.modifiers = statement.modifiers
             self.availability = Availability(attributes: statement.attributes)
+            self.apiFlags = statement.attributes.contains(.mainActor) ? .mainActor : []
             self.generics = statement.generics
             self.inherits = statement.inherits
             addMembers(statement.members, codebaseInfo: codebaseInfo, syntaxTree: syntaxTree)
@@ -1326,8 +1331,95 @@ public class CodebaseInfo: Codable {
             for i in 0..<subscripts.count { subscripts[i].resolveTypeSignatures(codebaseInfo: codebaseInfo) }
         }
 
-        fileprivate func addMainActorFlags(codebaseInfo: CodebaseInfo) {
-            //~~~ main actor rules
+        fileprivate func addMainActorTypeFlags(codebaseInfo: CodebaseInfo) {
+            for i in 0..<types.count { types[i].addMainActorTypeFlags(codebaseInfo: codebaseInfo) }
+            guard isMainActorType(codebaseInfo: codebaseInfo) else {
+                return
+            }
+            apiFlags?.insert(.mainActor)
+            for i in 0..<variables.count { variables[i].addMainActorFlag() }
+            for i in 0..<functions.count { functions[i].addMainActorFlag() }
+            for i in 0..<subscripts.count { subscripts[i].addMainActorFlag() }
+        }
+
+        fileprivate func addMainActorMemberFlags(codebaseInfo: CodebaseInfo) {
+            for i in 0..<types.count { types[i].addMainActorMemberFlags(codebaseInfo: codebaseInfo) }
+            guard apiFlags?.contains(.mainActor) != true else {
+                return
+            }
+            guard !inherits.isEmpty else {
+                return
+            }
+
+            let concreteTypeInfos = codebaseInfo.inheritanceChainSignatures(forNamed: signature)
+                .dropFirst() // Drop this type
+                .flatMap { codebaseInfo.typeInfos(forNamed: $0) }
+            let protocolTypeInfos = codebaseInfo.protocolSignatures(forNamed: signature)
+                .compactMap { codebaseInfo.primaryTypeInfo(forNamed: $0) } // What are the rules for protocol extensions?
+                .filter { $0.name != signature.name } // Filter this type if protocol
+            let typeInfos = concreteTypeInfos + protocolTypeInfos
+            for i in 0..<variables.count {
+                if Self.isMainActorInferred(variables[i], in: typeInfos) {
+                    variables[i].addMainActorFlag()
+                }
+            }
+            for i in 0..<functions.count {
+                if Self.isMainActorInferred(functions[i], in: typeInfos) {
+                    functions[i].addMainActorFlag()
+                }
+            }
+            for i in 0..<subscripts.count {
+                if Self.isMainActorInferred(subscripts[i], in: typeInfos) {
+                    subscripts[i].addMainActorFlag()
+                }
+            }
+        }
+
+        private func isMainActorType(codebaseInfo: CodebaseInfo) -> Bool {
+            guard !modifiers.isNonisolated else {
+                return false
+            }
+            guard apiFlags?.contains(.mainActor) != true else {
+                return true
+            }
+            if declarationType == .extensionDeclaration {
+                // Is extension's extended type @MainActor?
+                return codebaseInfo.primaryTypeInfo(forNamed: signature)?.isMainActorType(codebaseInfo: codebaseInfo) == true
+            } else {
+                // NOTE: If we supported property wrappers, we'd make this a @MainActor type if it had any @MainActor property wrappers
+
+                // Do we extend a class or conform to a protocol that is @MainActor?
+                return inherits.contains { codebaseInfo.primaryTypeInfo(forNamed: $0)?.isMainActorType(codebaseInfo: codebaseInfo) == true }
+            }
+        }
+
+        private static func isMainActorInferred(_ item: CodebaseInfoItem, in typeInfos: [TypeInfo]) -> Bool {
+            guard !item.modifiers.isNonisolated, item.apiFlags?.contains(.mainActor) != true, item.modifiers.visibility != .private else {
+                return false
+            }
+            for typeInfo in typeInfos {
+                guard typeInfo.declarationType == .protocolDeclaration || item.modifiers.isOverride else {
+                    // If this is a concrete type, we'd have to be an explicit override
+                    continue
+                }
+                switch item.declarationType {
+                case .variableDeclaration:
+                    if typeInfo.variables.contains(where: { $0.apiFlags?.contains(.mainActor) == true && $0.modifiers.visibility != .private && $0.isStatic == item.isStatic && $0.name == item.name }) {
+                        return true
+                    }
+                case .functionDeclaration, .initDeclaration:
+                    if typeInfo.functions.contains(where: { $0.apiFlags?.contains(.mainActor) == true && $0.modifiers.visibility != .private && $0.isStatic == item.isStatic && $0.name == item.name && $0.signature.parameters.map(\.label) == item.signature.parameters.map(\.label) }) {
+                        return true
+                    }
+                case .subscriptDeclaration:
+                    if typeInfo.subscripts.contains(where: { $0.apiFlags?.contains(.mainActor) == true && $0.modifiers.visibility != .private && $0.isStatic == item.isStatic && $0.signature.parameters.map(\.label) == item.signature.parameters.map(\.label) }) {
+                        return true
+                    }
+                default:
+                    break
+                }
+            }
+            return false
         }
 
         private func addMembers(_ statements: [Statement], codebaseInfo: CodebaseInfo, syntaxTree: SyntaxTree) {
@@ -1364,7 +1456,7 @@ public class CodebaseInfo: Codable {
         let declaringType: TypeSignature?
         let modifiers: Modifiers
         let availability: Availability
-        let apiFlags: APIFlags?
+        var apiFlags: APIFlags?
         var isStatic: Bool {
             return modifiers.isStatic
         }
@@ -1446,6 +1538,12 @@ public class CodebaseInfo: Codable {
             let context = TypeResolutionContext(codebaseInfo: codebaseInfo.context(importedModuleNames: importedModuleNames ?? [], sourceFile: sourceFile))
             signature = signature.resolved(context: context)
         }
+
+        fileprivate mutating func addMainActorFlag() {
+            if !modifiers.isNonisolated {
+                apiFlags?.insert(.mainActor)
+            }
+        }
     }
 
     /// Information about a declared function.
@@ -1458,7 +1556,7 @@ public class CodebaseInfo: Codable {
         var declaringType: TypeSignature?
         let modifiers: Modifiers
         let availability: Availability
-        let apiFlags: APIFlags?
+        var apiFlags: APIFlags?
         var isStatic: Bool {
             return modifiers.isStatic
         }
@@ -1518,6 +1616,12 @@ public class CodebaseInfo: Codable {
             generics = generics.resolved(context: context)
             signature = signature.resolved(context: context)
         }
+
+        fileprivate mutating func addMainActorFlag() {
+            if !modifiers.isNonisolated {
+                apiFlags?.insert(.mainActor)
+            }
+        }
     }
 
     /// Information about a declared subscript function.
@@ -1534,7 +1638,7 @@ public class CodebaseInfo: Codable {
         var declaringType: TypeSignature?
         let modifiers: Modifiers
         let availability: Availability
-        let apiFlags: APIFlags?
+        var apiFlags: APIFlags?
         var isStatic: Bool {
             return modifiers.isStatic
         }
@@ -1576,6 +1680,12 @@ public class CodebaseInfo: Codable {
             let context = TypeResolutionContext(codebaseInfo: codebaseInfo.context(importedModuleNames: importedModuleNames ?? [], sourceFile: sourceFile))
             generics = generics.resolved(context: context)
             signature = signature.resolved(context: context)
+        }
+
+        fileprivate mutating func addMainActorFlag() {
+            if !modifiers.isNonisolated {
+                apiFlags?.insert(.mainActor)
+            }
         }
     }
 

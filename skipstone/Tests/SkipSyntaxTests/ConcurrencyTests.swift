@@ -27,6 +27,124 @@ final class ConcurrencyTests: XCTestCase {
         XCTAssertTrue(infos[0].modifiers.isNonisolated)
     }
 
+    func testMainActorSubclassInference() async throws {
+        let context = try await setUpContext(swift: """
+        class A {
+        }
+        @MainActor class B: A {
+        }
+        class C: B {
+        }
+        class D: C {
+        }
+        class E: A {
+        }
+        """)
+        let a = context.primaryTypeInfo(forNamed: .named("A", []))
+        XCTAssertTrue(a?.apiFlags?.contains(.mainActor) == false)
+        let b = context.primaryTypeInfo(forNamed: .named("B", []))
+        XCTAssertTrue(b?.apiFlags?.contains(.mainActor) == true)
+        let c = context.primaryTypeInfo(forNamed: .named("C", []))
+        XCTAssertTrue(c?.apiFlags?.contains(.mainActor) == true)
+        let d = context.primaryTypeInfo(forNamed: .named("D", []))
+        XCTAssertTrue(d?.apiFlags?.contains(.mainActor) == true)
+        let e = context.primaryTypeInfo(forNamed: .named("E", []))
+        XCTAssertTrue(e?.apiFlags?.contains(.mainActor) == false)
+    }
+
+    func testMainActorProtocolInference() async throws {
+        let context = try await setUpContext(swift: """
+        @MainActor protocol PA {
+        }
+        protocol PB: PA {
+        }
+        class A: PB {
+        }
+        class B: A {
+        }
+        class C {
+        }
+        extension C: PA {
+        }
+        """)
+        let pa = context.primaryTypeInfo(forNamed: .named("PA", []))
+        XCTAssertTrue(pa?.apiFlags?.contains(.mainActor) == true)
+        let pb = context.primaryTypeInfo(forNamed: .named("PB", []))
+        XCTAssertTrue(pb?.apiFlags?.contains(.mainActor) == true)
+        let a = context.primaryTypeInfo(forNamed: .named("A", []))
+        XCTAssertTrue(a?.apiFlags?.contains(.mainActor) == true)
+        let b = context.primaryTypeInfo(forNamed: .named("B", []))
+        XCTAssertTrue(b?.apiFlags?.contains(.mainActor) == true)
+        let c = context.primaryTypeInfo(forNamed: .named("C", []))
+        XCTAssertTrue(c?.apiFlags?.contains(.mainActor) == false)
+    }
+
+    func testMainActorOverrideMemberInference() async throws {
+        let context = try await setUpContext(swift: """
+        class A {
+            @MainActor var v: Int { 1 }
+            @MainActor func f() {}
+        }
+        class B: A {
+        }
+        class C: B {
+            override var v: Int { 2 }
+            override func f() {}
+        }
+        class D: C {
+        }
+        class E: A {
+        }
+        """)
+        let a = context.primaryTypeInfo(forNamed: .named("A", []))
+        XCTAssertTrue(a?.apiFlags?.contains(.mainActor) == false)
+        let v = a?.variables.first
+        XCTAssertTrue(v?.apiFlags?.contains(.mainActor) == true)
+        let f = a?.functions.first
+        XCTAssertTrue(f?.apiFlags?.contains(.mainActor) == true)
+
+        let c = context.primaryTypeInfo(forNamed: .named("C", []))
+        XCTAssertTrue(c?.apiFlags?.contains(.mainActor) == false)
+        let v1 = c?.variables.first
+        XCTAssertTrue(v1?.apiFlags?.contains(.mainActor) == true)
+        let f1 = c?.functions.first
+        XCTAssertTrue(f1?.apiFlags?.contains(.mainActor) == true)
+    }
+
+    func testMainActorProtocolMemberInference() async throws {
+        let context = try await setUpContext(swift: """
+        protocol P {
+            @MainActor var v: Int
+            @MainActor func f()
+        }
+        protocol P2: P {
+        }
+        class A: P2 {
+            var v: Int { 1 }
+            func f() {}
+        }
+        class B {
+        }
+        extension B: P {
+            var v: Int { 1 }
+            func f() {}
+        }
+        """)
+        let a = context.primaryTypeInfo(forNamed: .named("A", []))
+        XCTAssertTrue(a?.apiFlags?.contains(.mainActor) == false)
+        let v = a?.variables.first
+        XCTAssertTrue(v?.apiFlags?.contains(.mainActor) == true)
+        let f = a?.functions.first
+        XCTAssertTrue(f?.apiFlags?.contains(.mainActor) == true)
+
+        let b = context.typeInfos(forNamed: .named("B", [])).first { $0.declarationType == .extensionDeclaration }
+        XCTAssertTrue(b?.apiFlags?.contains(.mainActor) == false)
+        let v1 = b?.variables.first
+        XCTAssertTrue(v1?.apiFlags?.contains(.mainActor) == true)
+        let f1 = b?.functions.first
+        XCTAssertTrue(f1?.apiFlags?.contains(.mainActor) == true)
+    }
+
     func testTaskValueAsFunction() async throws {
         let supportingSwift = """
         struct Task<Success, Failure> where Failure: Error {
