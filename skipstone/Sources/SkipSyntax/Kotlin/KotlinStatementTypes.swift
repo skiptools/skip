@@ -1864,6 +1864,7 @@ class KotlinInterfaceDeclaration: KotlinStatement {
         for (extInfo, extDeclaration, extImportModulePaths) in codebaseInfo.moveableExtensions(of: statement.signature, in: translator.syntaxTree) {
             kstatement.inherits += extInfo.inherits
             for extMember in extDeclaration.members.flatMap({ translator.translateStatement($0) }) {
+
                 if !replaceMember(in: &originalMembers, with: extMember) {
                     newMembers.append(extMember)
                 }
@@ -2090,6 +2091,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 kstatement.role = .protocolProperty
                 // Kotlin uses default public visibility on all interface members
                 kstatement.modifiers.visibility = .public
+                kstatement.modifiers.setVisibility = .public
             } else {
                 if kstatement.modifiers.isOverride {
                     kstatement.role = .superclassOverrideProperty
@@ -2097,10 +2099,20 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                     kstatement.modifiers.isOverride = true
                 }
                 kstatement.isOpen = !kstatement.isLet && !kstatement.modifiers.isOverride && !statement.modifiers.isFinal && statement.modifiers.visibility != .private && owningDeclarationType == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
+                if kstatement.isOpen && statement.modifiers.setVisibility == .private {
+                    // Stored properties with private setters can't be overridden in either language. Computed properties with private
+                    // setters can be overridden in Swift, but not Kotlin. Lift the restriction by promoting the Kotlin visibility
+                    if statement.getter == nil {
+                        kstatement.isOpen = false
+                    } else {
+                        kstatement.modifiers.setVisibility = .internal
+                    }
+                }
             }
             // Kotlin does not allow you to decrease visibility when overriding a member, so we simply make all overrides public to prevent errors
             if kstatement.modifiers.isOverride {
                 kstatement.modifiers.visibility = .public
+                kstatement.modifiers.setVisibility = .public
             }
             if !owningSignature.generics.isEmpty {
                 if kstatement.isStatic && owningSignature.generics.contains(where: { kstatement.declaredType.referencesType($0) }) {
@@ -2319,12 +2331,13 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             }
         }
 
+        let setVisibilityString = modifiers.kotlinSetVisibilityString(isGlobal: role == .global, suffix: " ")
         let hasCustomSet = setter?.body != nil || willSet?.body != nil || didSet?.body != nil
         if hasCustomSet || mutationFunctionNames != nil {
             let isStoredOverride = getter?.body == nil && role == .superclassOverrideProperty
             let setterIndentation = indentation.inc()
             let setterBodyIndentation = setterIndentation.inc()
-            output.append(setterIndentation).append("set(newValue) {\n")
+            output.append(setterIndentation).append(setVisibilityString).append("set(newValue) {\n")
             if mayBeSharedMutableStruct && !isStoredOverride {
                 output.append(setterBodyIndentation).append("@Suppress(\"NAME_SHADOWING\") val newValue = newValue.sref()\n")
             }
@@ -2398,9 +2411,11 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         } else if (role.isProperty && role != .protocolProperty) || role == .global, !isReadOnly || isAssignFromWriteable {
             if usesStorageProperty || (mayBeSharedMutableStruct && !isReadOnly) {
                 let setterIndentation = indentation.inc()
-                output.append(setterIndentation).append("set(newValue) {\n")
+                output.append(setterIndentation).append(setVisibilityString).append("set(newValue) {\n")
                 appendSetField(to: output, indentation: setterIndentation.inc(), usesStorageProperty: usesStorageProperty, isCopy: false)
                 output.append(setterIndentation).append("}\n")
+            } else if !setVisibilityString.isEmpty {
+                output.append(indentation.inc()).append(setVisibilityString).append("set\n")
             }
         }
         if usesStorageProperty {

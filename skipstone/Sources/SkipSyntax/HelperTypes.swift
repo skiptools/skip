@@ -213,6 +213,7 @@ struct Modifiers: PrettyPrintable, Codable {
     }
 
     var visibility: Visibility
+    var setVisibility: Visibility
     var isStatic: Bool
     var isMutating: Bool
     var isFinal: Bool
@@ -220,8 +221,9 @@ struct Modifiers: PrettyPrintable, Codable {
     var isLazy: Bool
     var isNonisolated: Bool
 
-    init(visibility: Visibility = .default, isStatic: Bool = false, isMutating: Bool = false, isFinal: Bool = false, isOverride: Bool = false, isLazy: Bool = false, isNonisolated: Bool = false) {
+    init(visibility: Visibility = .default, setVisibility: Visibility = .default, isStatic: Bool = false, isMutating: Bool = false, isFinal: Bool = false, isOverride: Bool = false, isLazy: Bool = false, isNonisolated: Bool = false) {
         self.visibility = visibility
+        self.setVisibility = setVisibility
         self.isStatic = isStatic
         self.isMutating = isMutating
         self.isFinal = isFinal
@@ -236,6 +238,7 @@ struct Modifiers: PrettyPrintable, Codable {
             return Modifiers()
         }
         var visibility: Visibility = .default
+        var setVisibility: Visibility = .default
         var isStatic = false
         var isMutating = false
         var isFinal = false
@@ -243,21 +246,37 @@ struct Modifiers: PrettyPrintable, Codable {
         var isLazy = false
         var isNonisolated = false
         for modifier in syntax {
-            guard modifier.detail == nil else {
-                // Ignore e.g. 'private(set)' for now
-                continue
-            }
             switch modifier.name.text {
             case "open":
-                visibility = .open
+                if modifier.detail?.detail.text == "set" {
+                    setVisibility = .open
+                } else {
+                    visibility = .open
+                }
             case "public":
-                visibility = .public
+                if modifier.detail?.detail.text == "set" {
+                    setVisibility = .public
+                } else {
+                    visibility = .public
+                }
             case "internal":
-                visibility = .internal
+                if modifier.detail?.detail.text == "set" {
+                    setVisibility = .internal
+                } else {
+                    visibility = .internal
+                }
             case "fileprivate":
-                visibility = .fileprivate
+                if modifier.detail?.detail.text == "set" {
+                    setVisibility = .fileprivate
+                } else {
+                    visibility = .fileprivate
+                }
             case "private":
-                visibility = .private
+                if modifier.detail?.detail.text == "set" {
+                    setVisibility = .private
+                } else {
+                    visibility = .private
+                }
             case "static":
                 isStatic = true
             case "class":
@@ -276,17 +295,20 @@ struct Modifiers: PrettyPrintable, Codable {
                 break
             }
         }
-        return Modifiers(visibility: visibility, isStatic: isStatic, isMutating: isMutating, isFinal: isFinal, isOverride: isOverride, isLazy: isLazy, isNonisolated: isNonisolated)
+        return Modifiers(visibility: visibility, setVisibility: setVisibility, isStatic: isStatic, isMutating: isMutating, isFinal: isFinal, isOverride: isOverride, isLazy: isLazy, isNonisolated: isNonisolated)
     }
 
     var isEmpty: Bool {
-        return visibility == .default && !isStatic && !isFinal && !isOverride && !isLazy && !isNonisolated
+        return visibility == .default && setVisibility == .default && !isStatic && !isFinal && !isOverride && !isLazy && !isNonisolated
     }
 
     var prettyPrintTree: PrettyPrintTree {
         var children: [PrettyPrintTree] = []
         if visibility != .default {
             children.append(PrettyPrintTree(root: String(describing: visibility)))
+        }
+        if setVisibility != .default {
+            children.append(PrettyPrintTree(root: "\(visibility) set"))
         }
         if isStatic {
             children.append(PrettyPrintTree(root: "static"))

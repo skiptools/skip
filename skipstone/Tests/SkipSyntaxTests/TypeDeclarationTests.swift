@@ -285,6 +285,8 @@ final class TypeDeclarationTests: XCTestCase {
             func h() {
                 print("h")
             }
+            private func helper() {
+            }
         }
         """, kotlin: """
         internal interface P: I {
@@ -296,6 +298,7 @@ final class TypeDeclarationTests: XCTestCase {
             val k: Int
                 get() = 2
             fun h() = print("h")
+            fun helper() = Unit
         }
         """)
     }

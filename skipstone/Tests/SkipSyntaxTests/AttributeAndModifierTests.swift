@@ -98,8 +98,56 @@ final class AttributeAndModifierTests: XCTestCase {
         private val v = 1
         private val v = 1
         """)
+
+        try await check(swift: """
+        class C {
+            public internal(set) var v1 = 1
+            private(set) var v2 = 1
+            private(set) var a = [1]
+            private(set) var b: [Int] {
+                get {
+                    return [1]
+                }
+                set {
+                }
+            }
+        }
+        class D: C {
+            private(set) override var b: [Int] {
+                get {
+                    return [2]
+                }
+                set {
+                }
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            open var v1 = 1
+                internal set
+            internal var v2 = 1
+                private set
+            internal var a = arrayOf(1)
+                get() = field.sref({ this.a = it })
+                private set(newValue) {
+                    field = newValue.sref()
+                }
+            internal open var b: Array<Int>
+                get() = arrayOf(1).sref({ this.b = it })
+                set(newValue) {
+                    @Suppress("NAME_SHADOWING") val newValue = newValue.sref()
+                }
+        }
+        internal open class D: C() {
+            override var b: Array<Int>
+                get() = arrayOf(2).sref({ this.b = it })
+                set(newValue) {
+                    @Suppress("NAME_SHADOWING") val newValue = newValue.sref()
+                }
+        }
+        """)
     }
-    
+
     func testAvailableAttributeIgnored() async throws {
         try await check(swift: """
         class C {

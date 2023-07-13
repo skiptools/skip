@@ -136,9 +136,7 @@ extension Modifiers {
         switch visibility {
         case .default, .internal:
             string = "internal"
-        case .open:
-            string = ""
-        case .public:
+        case .open, .public:
             string = ""
         case .private:
             string = "private"
@@ -149,6 +147,25 @@ extension Modifiers {
             string = string.isEmpty ? "override" : "\(string) override"
         } else if isOpen && !isStatic {
             string = string.isEmpty ? "open" : "\(string) open"
+        }
+        return string.isEmpty || suffix.isEmpty ? string : "\(string)\(suffix)"
+    }
+
+    /// Kotlin modifier for a setter.
+    func kotlinSetVisibilityString(isGlobal: Bool, suffix: String) -> String {
+        guard setVisibility != .default && setVisibility != visibility else {
+            return ""
+        }
+        var string: String
+        switch setVisibility {
+        case .default, .internal:
+            string = "internal"
+        case .open, .public:
+            string = "public"
+        case .private:
+            string = "private"
+        case .fileprivate:
+            string = isGlobal ? "private" : "internal"
         }
         return string.isEmpty || suffix.isEmpty ? string : "\(string)\(suffix)"
     }
