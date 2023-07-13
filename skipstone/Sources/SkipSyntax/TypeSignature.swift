@@ -17,7 +17,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     case dictionary(TypeSignature, TypeSignature)
     case double
     case float
-    case function([Parameter], TypeSignature)
+    case function([Parameter], TypeSignature, APIFlags)
     case int
     case int8
     case int16
@@ -52,7 +52,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         guard withoutOptionality || (isOptional == other.isOptional && isUnwrappedOptional == other.isUnwrappedOptional) else {
             return false
         }
-        return asTypealiased(nil).withoutOptionality().withModuleName(nil) == other.asTypealiased(nil).withoutOptionality().withModuleName(nil)
+        return asTypealiased(nil).withoutOptionality().withModuleName(nil).withAPIFlags([]) == other.asTypealiased(nil).withoutOptionality().withModuleName(nil).withAPIFlags([])
     }
 
     /// What type this was typealiased from, if any.
@@ -346,7 +346,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     /// The parameter types of this function.
     var parameters: [Parameter] {
         switch self {
-        case .function(let parameters, _):
+        case .function(let parameters, _, _):
             return parameters
         case .member(_, let type):
             return type.parameters
@@ -366,7 +366,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     /// The return type of this function.
     var returnType: TypeSignature {
         switch self {
-        case .function(_, let returnType):
+        case .function(_, let returnType, _):
             return returnType
         case .member(_, let type):
             return type.returnType
@@ -380,6 +380,46 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return type.returnType
         default:
             return .none
+        }
+    }
+
+    /// The API flags for this function.
+    var apiFlags: APIFlags {
+        switch self {
+        case .function(_, _, let apiFlags):
+            return apiFlags
+        case .member(_, let type):
+            return type.apiFlags
+        case .module(_, let type):
+            return type.apiFlags
+        case .optional(let type):
+            return type.apiFlags
+        case .typealiased(_, let type):
+            return type.apiFlags
+        case .unwrappedOptional(let type):
+            return type.apiFlags
+        default:
+            return []
+        }
+    }
+
+    /// Set the API flags for this function.
+    func withAPIFlags(_ apiFlags: APIFlags) -> TypeSignature {
+        switch self {
+        case .function(let parameters, let returnType, _):
+            return .function(parameters, returnType, apiFlags)
+        case .member(let base, let type):
+            return .member(base, type.withAPIFlags(apiFlags))
+        case .module(let moduleName, let type):
+            return .module(moduleName, type.withAPIFlags(apiFlags))
+        case .optional(let type):
+            return .optional(type.withAPIFlags(apiFlags))
+        case .typealiased(let alias, let type):
+            return .typealiased(alias, type.withAPIFlags(apiFlags))
+        case .unwrappedOptional(let type):
+            return .unwrappedOptional(type.withAPIFlags(apiFlags))
+        default:
+            return self
         }
     }
 
@@ -528,8 +568,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return .composition(types.map { $0.constrainedTypeWithGenerics(generics) })
         case .dictionary(let key, let value):
             return .dictionary(key.constrainedTypeWithGenerics(generics), value.constrainedTypeWithGenerics(generics))
-        case .function(let parameters, let returnType):
-            return .function(parameters.map { $0.constrainedTypeWithGenerics(generics) }, returnType.constrainedTypeWithGenerics(generics))
+        case .function(let parameters, let returnType, let apiFlags):
+            return .function(parameters.map { $0.constrainedTypeWithGenerics(generics) }, returnType.constrainedTypeWithGenerics(generics), apiFlags)
         case .member(let base, let type):
             return .member(base.constrainedTypeWithGenerics(generics), type.constrainedTypeWithGenerics(generics))
         case .metaType(let type):
@@ -597,8 +637,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                 key.addGenericMappings(to: key2, into: &generics)
                 value.addGenericMappings(to: value2, into: &generics)
             }
-        case .function(let parameters, let returnType):
-            if case .function(let parameters2, let returnType2) = to, parameters.count == parameters2.count {
+        case .function(let parameters, let returnType, _):
+            if case .function(let parameters2, let returnType2, _) = to, parameters.count == parameters2.count {
                 zip(parameters, parameters2).forEach { $0.0.type.addGenericMappings(to: $0.1.type, into: &generics) }
                 returnType.addGenericMappings(to: returnType2, into: &generics)
             }
@@ -693,7 +733,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .dictionary(let key, let value):
             key.visit(visitor)
             value.visit(visitor)
-        case .function(let parameters, let returnType):
+        case .function(let parameters, let returnType, _):
             parameters.forEach { $0.type.visit(visitor) }
             returnType.visit(visitor)
         case .member(let base, let type):
@@ -764,8 +804,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return .composition(types.map { $0.mappingTypes(with: map) })
         case .dictionary(let key, let value):
             return .dictionary(key.mappingTypes(with: map), value.mappingTypes(with: map))
-        case .function(let parameters, let returnType):
-            return .function(parameters.map { $0.mappingTypes(with: map) }, returnType.mappingTypes(with: map))
+        case .function(let parameters, let returnType, let apiFlags):
+            return .function(parameters.map { $0.mappingTypes(with: map) }, returnType.mappingTypes(with: map), apiFlags)
         case .member(let base, let type):
             return type.mappingTypes(with: map).asMember(of: base.mappingTypes(with: map))
         case .metaType(let type):
@@ -803,9 +843,9 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return .composition(types.map { $0.resolved(in: node, context: context) })
         case .dictionary(let keyType, let valueType):
             return .dictionary(keyType.resolved(in: node, context: context), valueType.resolved(in: node, context: context))
-        case .function(let parameters, let returnType):
+        case .function(let parameters, let returnType, let apiFlags):
             let resolvedParameters = parameters.map { Parameter(label: $0.label, type: $0.type.resolved(in: node, context: context), isInOut: $0.isInOut, isVariadic: $0.isVariadic, isVariadicContinuation: $0.isVariadicContinuation, hasDefaultValue: $0.hasDefaultValue) }
-            return .function(resolvedParameters, returnType.resolved(in: node, context: context))
+            return .function(resolvedParameters, returnType.resolved(in: node, context: context), apiFlags)
         case .member(let baseType, let type):
             let resolvedBase = baseType.resolved(in: node, moduleName: moduleName, context: context)
             if case .named(let name, let generics) = type {
@@ -870,8 +910,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                 let resolvedValueType = valueType.or(valueType2, replaceAny: replaceAny)
                 return .dictionary(resolvedKeyType, resolvedValueType)
             }
-        case .function(let parameters, let returnType):
-            if case .function(let parameters2, let returnType2) = strippedTypeSignature {
+        case .function(let parameters, let returnType, let apiFlags):
+            if case .function(let parameters2, let returnType2, let apiFlags2) = strippedTypeSignature {
                 // We may use an empty parameters array to represent .none
                 var resolvedParameters: [Parameter] = parameters
                 if parameters.isEmpty {
@@ -879,7 +919,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                 } else if parameters.count == parameters2.count {
                     resolvedParameters = zip(parameters, parameters2).map { $0.0.or($0.1, replaceAny: replaceAny) }
                 }
-                return .function(resolvedParameters, returnType.or(returnType2, replaceAny: replaceAny))
+                return .function(resolvedParameters, returnType.or(returnType2, replaceAny: replaceAny), apiFlags.union(apiFlags2))
             }
         case .member(let base, let type):
             if case .member(let base2, let type2) = strippedTypeSignature {
@@ -1298,7 +1338,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             guard !parameters.contains(where: { $0.type == .none }) && returnType != .none else {
                 return .none
             }
-            return .function(parameters, returnType)
+            let apiFlags = functionType.effectSpecifiers?.apiFlags ?? []
+            return .function(parameters, returnType, apiFlags)
         case .memberTypeIdentifier:
             guard let memberType = syntax.as(MemberTypeIdentifierSyntax.self) else {
                 return .none
@@ -1486,8 +1527,15 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return "Double"
         case .float:
             return "Float"
-        case .function(let parameters, let returnType):
-            return "(\(parameters.map { $0.descriptionUsing(keyPath) }.joined(separator: ", "))) -> \(returnType[keyPath: keyPath])"
+        case .function(let parameters, let returnType, let apiFlags):
+            var apiFlagsString = ""
+            if apiFlags.contains(.async) {
+                apiFlagsString += "async "
+            }
+            if apiFlags.contains(.throws) {
+                apiFlagsString += "throws "
+            }
+            return "(\(parameters.map { $0.descriptionUsing(keyPath) }.joined(separator: ", ")))\(apiFlagsString) -> \(returnType[keyPath: keyPath])"
         case .int:
             return "Int"
         case .int8:

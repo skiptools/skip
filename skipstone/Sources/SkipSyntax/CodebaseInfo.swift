@@ -443,11 +443,11 @@ public class CodebaseInfo: Codable {
                 if case .range = arguments[0].value {
                     // Slice - fall through to symbols
                 } else {
-                    let signature: TypeSignature = .function([TypeSignature.Parameter(type: .int)], elementType.mappingSelf(to: type))
+                    let signature: TypeSignature = .function([TypeSignature.Parameter(type: .int)], elementType.mappingSelf(to: type), [])
                     return [APIMatch(signature: signature)]
                 }
             } else if case .dictionary(let keyType, let valueType) = type, arguments.count == 1 {
-                let signature: TypeSignature = .function([TypeSignature.Parameter(type: keyType)], valueType.mappingSelf(to: type).asOptional(true))
+                let signature: TypeSignature = .function([TypeSignature.Parameter(type: keyType)], valueType.mappingSelf(to: type).asOptional(true), [])
                 return [APIMatch(signature: signature)]
             }
             let isStatic = type.isMetaType
@@ -547,7 +547,7 @@ public class CodebaseInfo: Codable {
                 // If this is a typealias to an unknown type with no matching named functions, assume it's
                 // a constructor of the unknown type
                 if candidates.isEmpty, let typealiasSignature = type.typealiased {
-                    candidates.append(syntheticInitCandidate(for: typealiasSignature.to, arguments: arguments, availability: .available))
+                    candidates.append(syntheticInitCandidate(for: typealiasSignature.to, arguments: arguments))
                 }
             } else if let name {
                 for typeInfo in typeInfos {
@@ -643,14 +643,14 @@ public class CodebaseInfo: Codable {
             // If we don't have any matches and this appears to be a constructor, treat it as one. We take advantage of this
             // while inferring the types of variable values in prepareForUse(), before we've called generateConstructors()
             if initSignatures.isEmpty {
-                initSignatures.append(syntheticInitCandidate(for: primaryTypeInfo.signature, arguments: arguments, availability: primaryTypeInfo.availability))
+                initSignatures.append(syntheticInitCandidate(for: primaryTypeInfo.signature, arguments: arguments, apiFlags: primaryTypeInfo.apiFlags ?? [], availability: primaryTypeInfo.availability))
             }
             return initSignatures
         }
 
-        private func syntheticInitCandidate(for type: TypeSignature, arguments: [LabeledValue<TypeSignature>], availability: Availability) -> FunctionCandidate {
+        private func syntheticInitCandidate(for type: TypeSignature, arguments: [LabeledValue<TypeSignature>], apiFlags: APIFlags = [], availability: Availability = .available) -> FunctionCandidate {
             let initParameters = arguments.map { TypeSignature.Parameter(label: $0.label, type: $0.value) }
-            let match = APIMatch(signature: .function(initParameters, type), declarationType: .initDeclaration, availability: availability)
+            let match = APIMatch(signature: .function(initParameters, type, apiFlags), apiFlags: apiFlags, declarationType: .initDeclaration, availability: availability)
             return FunctionCandidate(match: match, score: 0.0, level: 0)
         }
 
@@ -675,14 +675,14 @@ public class CodebaseInfo: Codable {
             guard let memberInfo = typeInfo.visibleMembers(context: self).first(where: { $0.name == member && $0.declarationType == .enumCaseDeclaration }) else {
                 return nil
             }
-            guard case .function(let parameters, _) = memberInfo.signature else {
+            guard case .function(let parameters, _, _) = memberInfo.signature else {
                 return nil
             }
             return parameters.map { $0.mappingTypes(from: typeInfo.signature.generics, to: constrainedGenerics) }
         }
 
         private func matchTuple(_ signature: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> TypeSignature {
-            guard case .function(let parameterTypes, _) = signature, parameterTypes.count == arguments.count else {
+            guard case .function(let parameterTypes, _, _) = signature, parameterTypes.count == arguments.count else {
                 return .none
             }
             return signature
@@ -690,16 +690,11 @@ public class CodebaseInfo: Codable {
         
         private func matchFunction(_ item: CodebaseInfoItem, in typeInfo: TypeInfo? = nil, constrainedGenerics: [TypeSignature] = [], arguments: [LabeledValue<TypeSignature>], level: Int) -> FunctionCandidate? {
             let generics = (item as? FunctionInfo)?.generics
-            if var candidate = matchFunction(signature: item.signature, generics: generics, declarationType: item.declarationType, availability: item.availability, in: typeInfo, constrainedGenerics: constrainedGenerics, arguments: arguments, level: level) {
-                candidate.match.apiFlags = item.apiFlags ?? []
-                return candidate
-            } else {
-                return nil
-            }
+            return matchFunction(signature: item.signature, generics: generics, declarationType: item.declarationType, availability: item.availability, in: typeInfo, constrainedGenerics: constrainedGenerics, arguments: arguments, level: level)
         }
 
         private func matchFunction(signature: TypeSignature, generics: Generics? = nil, declarationType: StatementType, availability: Availability, in typeInfo: TypeInfo? = nil, constrainedGenerics: [TypeSignature] = [], arguments: [LabeledValue<TypeSignature>], level: Int) -> FunctionCandidate? {
-            guard case .function(let parameters, let returnType) = signature else {
+            guard case .function(let parameters, let returnType, let apiFlags) = signature else {
                 return nil
             }
             if !parameters.contains(where: { $0.isVariadic }) {
@@ -775,15 +770,15 @@ public class CodebaseInfo: Codable {
 
             // Apply the generic types we determined from parameter matching and the given constraint information to the original function,
             // using the result to fill in generic types in the return type and matching parameters
-            let matchingOriginalSignature: TypeSignature = .function(matchingOriginalParameters, signature.returnType)
-            let matchingParameterSignature: TypeSignature = .function(matchingParameters, returnType)
+            let matchingOriginalSignature: TypeSignature = .function(matchingOriginalParameters, signature.returnType, apiFlags)
+            let matchingParameterSignature: TypeSignature = .function(matchingParameters, returnType, apiFlags)
             let matchingGenerics = matchingOriginalSignature.mergeGenericMappings(in: matchingParameterSignature, with: generics)
             let mappedSignature = matchingOriginalSignature.constrainedTypeWithGenerics(matchingGenerics)
             let mappedParameters = mappedSignature.parameters
             for i in 0..<matchingParameters.count {
                 matchingParameters[i] = matchingParameters[i].or(mappedParameters[i], replaceAny: true)
             }
-            let match = APIMatch(signature: .function(matchingParameters, mappedSignature.returnType), declarationType: declarationType, availability: availability)
+            let match = APIMatch(signature: .function(matchingParameters, mappedSignature.returnType, apiFlags), apiFlags: apiFlags, declarationType: declarationType, availability: availability)
             return FunctionCandidate(match: match, score: totalScore, level: level)
         }
 
@@ -1155,7 +1150,7 @@ public class CodebaseInfo: Codable {
             }
             return TypeSignature.Parameter(label: variable.name, type: variable.signature, hasDefaultValue: variable.hasValue)
         }
-        let initSignature: TypeSignature = .function(parameters, typeInfo.signature)
+        let initSignature: TypeSignature = .function(parameters, typeInfo.signature, typeInfo.apiFlags ?? [])
         var initInfo = FunctionInfo(name: "init", declarationType: .initDeclaration, signature: initSignature, moduleName: typeInfo.moduleName, sourceFile: typeInfo.sourceFile, declaringType: typeInfo.signature, modifiers: typeInfo.modifiers, availability: .available)
         initInfo.isGenerated = true
         typeInfo.functions.append(initInfo)
@@ -1482,20 +1477,7 @@ public class CodebaseInfo: Codable {
             self.declaringType = declaringType
             self.modifiers = statement.modifiers
             self.availability = Availability(attributes: statement.attributes)
-            var apiFlags: APIFlags = []
-            if statement.isAsync {
-                apiFlags.insert(.async)
-            }
-            if statement.isThrows {
-                apiFlags.insert(.throws)
-            }
-            if statement.attributes.contains(.mainActor) {
-                apiFlags.insert(.mainActor)
-            }
-            if !statement.isLet && (statement.getter == nil || statement.setter != nil) {
-                apiFlags.insert(.writeable)
-            }
-            self.apiFlags = apiFlags
+            self.apiFlags = APIFlags(isAsync: statement.isAsync, isThrows: statement.isThrows, isMainActor: statement.attributes.contains(.mainActor), isWriteable: !statement.isLet && (statement.getter == nil || statement.setter != nil))
             self.isInitializable = !statement.modifiers.isStatic && !statement.modifiers.isOverride && statement.getter == nil && (!statement.isLet || statement.value == nil)
             self.hasValue = self.signature.isOptional || statement.value != nil
             if !self.signature.isFullySpecified, self.sourceFile != nil {
@@ -1558,7 +1540,9 @@ public class CodebaseInfo: Codable {
         var declaringType: TypeSignature?
         let modifiers: Modifiers
         let availability: Availability
-        var apiFlags: APIFlags?
+        var apiFlags: APIFlags? {
+            return signature.apiFlags
+        }
         var isStatic: Bool {
             return modifiers.isStatic
         }
@@ -1571,7 +1555,7 @@ public class CodebaseInfo: Codable {
 
         private enum CodingKeys: String, CodingKey {
             // Exclude language additions, importedModuleNames
-            case name, declarationType, signature, moduleName, sourceFile, declaringType, modifiers, availability, apiFlags, generics, isMutating, isGenerated
+            case name, declarationType, signature, moduleName, sourceFile, declaringType, modifiers, availability, generics, isMutating, isGenerated
         }
 
         fileprivate init(statement: FunctionDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo, syntaxTree: SyntaxTree) {
@@ -1583,17 +1567,6 @@ public class CodebaseInfo: Codable {
             self.declaringType = declaringType
             self.modifiers = statement.modifiers
             self.availability = Availability(attributes: statement.attributes)
-            var apiFlags: APIFlags = []
-            if statement.isAsync {
-                apiFlags.insert(.async)
-            }
-            if statement.isThrows {
-                apiFlags.insert(.throws)
-            }
-            if statement.attributes.contains(.mainActor) {
-                apiFlags.insert(.mainActor)
-            }
-            self.apiFlags = apiFlags
             self.generics = statement.generics
             self.isMutating = statement.modifiers.isMutating
             (codebaseInfo.languageAdditions as? CodebaseInfoLanguageAdditionsGatherDelegate)?.codebaseInfo(codebaseInfo, didGather: &self, from: statement, syntaxTree: syntaxTree)
@@ -1609,7 +1582,6 @@ public class CodebaseInfo: Codable {
             self.modifiers = modifiers
             self.availability = availability
             self.generics = generics
-            self.apiFlags = apiFlags
             self.isMutating = isMutating
         }
 
@@ -1621,7 +1593,9 @@ public class CodebaseInfo: Codable {
 
         fileprivate mutating func addMainActorFlag() {
             if !modifiers.isNonisolated {
-                apiFlags?.insert(.mainActor)
+                var apiFlags = signature.apiFlags
+                apiFlags.insert(.mainActor)
+                signature = signature.withAPIFlags(apiFlags)
             }
         }
     }
@@ -1640,7 +1614,9 @@ public class CodebaseInfo: Codable {
         var declaringType: TypeSignature?
         let modifiers: Modifiers
         let availability: Availability
-        var apiFlags: APIFlags?
+        var apiFlags: APIFlags? {
+            return signature.apiFlags
+        }
         var isStatic: Bool {
             return modifiers.isStatic
         }
@@ -1652,7 +1628,7 @@ public class CodebaseInfo: Codable {
 
         private enum CodingKeys: String, CodingKey {
             // Exclude language additions, importedModuleNames
-            case signature, moduleName, sourceFile, declaringType, modifiers, availability, apiFlags, generics, isReadOnly
+            case signature, moduleName, sourceFile, declaringType, modifiers, availability, generics, isReadOnly
         }
 
         fileprivate init(statement: SubscriptDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo, syntaxTree: SyntaxTree) {
@@ -1662,17 +1638,6 @@ public class CodebaseInfo: Codable {
             self.declaringType = declaringType
             self.modifiers = statement.modifiers
             self.availability = Availability(attributes: statement.attributes)
-            var apiFlags: APIFlags = []
-            if statement.isAsync {
-                apiFlags.insert(.async)
-            }
-            if statement.isThrows {
-                apiFlags.insert(.throws)
-            }
-            if statement.attributes.contains(.mainActor) {
-                apiFlags.insert(.mainActor)
-            }
-            self.apiFlags = apiFlags
             self.generics = statement.generics
             self.isReadOnly = statement.setter == nil
             (codebaseInfo.languageAdditions as? CodebaseInfoLanguageAdditionsGatherDelegate)?.codebaseInfo(codebaseInfo, didGather: &self, from: statement, syntaxTree: syntaxTree)
@@ -1686,7 +1651,9 @@ public class CodebaseInfo: Codable {
 
         fileprivate mutating func addMainActorFlag() {
             if !modifiers.isNonisolated {
-                apiFlags?.insert(.mainActor)
+                var apiFlags = signature.apiFlags
+                apiFlags.insert(.mainActor)
+                signature = signature.withAPIFlags(apiFlags)
             }
         }
     }

@@ -741,13 +741,34 @@ struct APIMatch {
 /// Flags that affect API calls.
 ///
 /// - Note: `Codable` for use in `CodebaseInfo`.
-struct APIFlags: OptionSet, Codable {
+struct APIFlags: OptionSet, Hashable, Codable {
     let rawValue: Int
 
     static let async = APIFlags(rawValue: 1 << 0)
     static let mainActor = APIFlags(rawValue: 1 << 1)
     static let `throws` = APIFlags(rawValue: 1 << 3)
     static let writeable = APIFlags(rawValue: 1 << 4)
+
+    init(rawValue: Int) {
+        self.rawValue = rawValue
+    }
+
+    init(isAsync: Bool = false, isThrows: Bool = false, isMainActor: Bool = false, isWriteable: Bool = false) {
+        var apiFlags: APIFlags = []
+        if isAsync {
+            apiFlags.insert(.async)
+        }
+        if isThrows {
+            apiFlags.insert(.throws)
+        }
+        if isMainActor {
+            apiFlags.insert(.mainActor)
+        }
+        if isWriteable {
+            apiFlags.insert(.writeable)
+        }
+        self = apiFlags
+    }
 }
 
 /// The result of visiting a syntax node.

@@ -145,7 +145,7 @@ final class ConcurrencyTests: XCTestCase {
         XCTAssertTrue(f1?.apiFlags?.contains(.mainActor) == true)
     }
 
-    func testTaskValueAsFunction() async throws {
+    func testTaskValue() async throws {
         let supportingSwift = """
         struct Task<Success, Failure> where Failure: Error {
             var value: Success {
@@ -153,11 +153,6 @@ final class ConcurrencyTests: XCTestCase {
             }
 
             init(priority: TaskPriority? = nil, operation: @escaping () async throws -> Success) {
-            }
-
-            // SKIP NOWARN
-            static func detached(priority: TaskPriority? = nil, operation: @escaping () async -> Success) -> Task<Success, Failure> {
-                fatalError()
             }
         }
         """
@@ -457,6 +452,46 @@ final class ConcurrencyTests: XCTestCase {
         internal suspend fun f() = Task.run {
             val c = C()
             c.mainactor { it.f(i = i()) }
+        }
+        """)
+    }
+
+    //~~~
+    func ff(c: () async -> Void) {
+        
+    }
+    func gg() {
+        ff { @MainActor in print("x") }
+    }
+
+    func testMainActorClosure() async throws {
+        try await check(swift: """
+        @MainActor func m(p: Int) {
+            print(p)
+        }
+        func f1(c: () async -> Void) {
+        }
+        func f2(c: (Int) async -> Void) {
+        }
+        func g() {
+            let c1: () async -> Void = { @MainActor in m(p: 1) }
+            f1(c: c1)
+            f1(c: { @MainActor in m(p: 1) })
+            let c2: (Int) async -> Void = { @MainActor in m(p: $0) }
+            f2(c: c2)
+            f2(c: { @MainActor in m(p: $0) })
+        }
+        """, kotlin: """
+        internal fun m(p: Int) = print(p)
+        internal fun f1(c: suspend () -> Unit) = Unit
+        internal fun f2(c: suspend (Int) -> Unit) = Unit
+        internal fun g() {
+            val c1: suspend () -> Unit = { MainActor.run { m(p = 1) } }
+            f1(c = c1)
+            f1(c = { MainActor.run { m(p = 1) } })
+            val c2: suspend (Int) -> Unit = { MainActor.run { m(p = it) } }
+            f2(c = c2)
+            f2(c = { MainActor.run { m(p = it) } })
         }
         """)
     }

@@ -727,7 +727,7 @@ class EnumCaseDeclaration: Statement {
         let parameters = associatedValues.map {
             TypeSignature.Parameter(label: $0.externalLabel, type: $0.declaredType, isInOut: $0.isInOut, isVariadic: $0.isVariadic, hasDefaultValue: $0.defaultValue != nil)
         }
-        return .function(parameters, owningTypeDeclaration.signature)
+        return .function(parameters, owningTypeDeclaration.signature, [])
     }
 
     init(name: String, associatedValues: [Parameter<Expression>], rawValue: Expression? = nil, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
@@ -842,7 +842,8 @@ class FunctionDeclaration: Statement {
     private(set) var generics: Generics
     let body: CodeBlock?
     var functionType: TypeSignature {
-        return .function(parameters.map(\.signature), returnType)
+        let apiFlags = APIFlags(isAsync: isAsync, isThrows: isThrows, isMainActor: attributes.contains(.mainActor))
+        return .function(parameters.map(\.signature), returnType, apiFlags)
     }
 
     init(type: StatementType, name: String, isOptionalInit: Bool = false, returnType: TypeSignature = .void, parameters: [Parameter<Expression>] = [], isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), body: CodeBlock? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
@@ -1020,10 +1021,11 @@ class SubscriptDeclaration: Statement {
     let getter: Accessor<CodeBlock>?
     let setter: Accessor<CodeBlock>?
     var getterType: TypeSignature {
-        return .function(parameters.map(\.signature), elementType)
+        let apiFlags = APIFlags(isAsync: isAsync, isThrows: isThrows, isMainActor: attributes.contains(.mainActor))
+        return .function(parameters.map(\.signature), elementType, apiFlags)
     }
     var setterType: TypeSignature {
-        return .function(parameters.map(\.signature), .void)
+        return .function(parameters.map(\.signature), .void, APIFlags(isMainActor: attributes.contains(.mainActor)))
     }
 
     init(elementType: TypeSignature, parameters: [Parameter<Expression>], isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), getter: Accessor<CodeBlock>? = nil, setter: Accessor<CodeBlock>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {

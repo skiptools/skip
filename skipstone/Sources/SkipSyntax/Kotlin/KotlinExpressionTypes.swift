@@ -513,10 +513,10 @@ class KotlinClosure: KotlinExpression {
     var isMainActor: Bool? // Populated if needed by transformer
 
     static func translate(expression: Closure, translator: KotlinTranslator) -> KotlinClosure {
-        // If there is an explicit return type we'll use an anonymous function rather than a closure,
-        // as Kotlin closures cannot declare a return type
+        // If there is an explicit return type we'll use an anonymous function rather than a closure, as Kotlin
+        // closures cannot declare a return type. Kotlin does not support anonymous suspend functions, though
         let kbody = KotlinCodeBlock.translate(statement: expression.body, translator: translator)
-        let isAnonymousFunction = expression.returnType != .none
+        let isAnonymousFunction = !expression.isAsync && expression.returnType != .none
         var implicitParameterLabels: [String] = []
         var hasReturnLabel = false
         if isAnonymousFunction {
@@ -624,8 +624,12 @@ class KotlinClosure: KotlinExpression {
             output.append(Self.returnLabel).append("@")
         }
         output.append("{")
+        let isMainActor = attributes.contains(.mainActor)
         let isSingleStatement = body.isSingleStatementAppendable(mode: .closure)
         if parameters.isEmpty && implicitParameterLabels.isEmpty {
+            if isMainActor {
+                output.append(" MainActor.run {")
+            }
             output.append(isSingleStatement ? " " : "\n")
         } else {
             // We never have both explicit and implicit parameters
@@ -645,6 +649,9 @@ class KotlinClosure: KotlinExpression {
                 output.append(" ").append(implicitParameterLabels.joined(separator: ", "))
             }
             output.append(" ->")
+            if isMainActor {
+                output.append(" MainActor.run {")
+            }
             output.append(isSingleStatement ? " " : "\n")
         }
         if isSingleStatement {
@@ -653,6 +660,9 @@ class KotlinClosure: KotlinExpression {
         } else {
             output.append(body, indentation: indentation.inc())
             output.append(indentation).append("}")
+        }
+        if isMainActor {
+            output.append(" }")
         }
     }
 }

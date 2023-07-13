@@ -526,16 +526,17 @@ class Closure: Expression {
         let parameterSignatures = parameters.map { parameter in
             TypeSignature.Parameter(label: parameter.externalLabel, type: parameter.declaredType, isInOut: parameter.isInOut, isVariadic: parameter.isVariadic, hasDefaultValue: parameter.defaultValue != nil )
         }
-        functionType = .function(parameterSignatures, returnType).or(expecting)
+        let apiFlags = APIFlags(isAsync: isAsync, isThrows: isThrows, isMainActor: attributes.contains(.mainActor))
+        functionType = .function(parameterSignatures, returnType, apiFlags).or(expecting)
 
         let bodyContext = context.pushing(self)
         let _ = body.inferTypes(context: bodyContext, expecting: .none)
         // Use any type information we can glean from return statements in the body
-        functionType = .function(functionType.parameters, functionType.returnType.or(body.returnType, replaceAny: true))
+        functionType = .function(functionType.parameters, functionType.returnType.or(body.returnType, replaceAny: true), functionType.apiFlags)
         return context
     }
 
-    var functionType: TypeSignature = .function([], .none)
+    var functionType: TypeSignature = .function([], .none, [])
 
     override var inferredType: TypeSignature {
         return functionType
@@ -712,12 +713,12 @@ class FunctionCall: Expression, APICallExpression {
         default:
             function.inferTypes(context: context, expecting: .none)
             let functionType = function.inferredType.asTypealiased(nil).asOptional(false).withoutOptionality()
-            if case .function(_, var returnType) = functionType {
+            if case .function(_, var returnType, let apiFlags) = functionType {
                 if function.inferredType.isOptional {
                     returnType = returnType.asOptional(true)
                 }
                 self.returnType = returnType.or(expecting)
-                apiMatch = APIMatch(signature: functionType, apiFlags: (function as? APICallExpression)?.apiMatch?.apiFlags ?? [])
+                apiMatch = APIMatch(signature: functionType, apiFlags: apiFlags)
             } else {
                 returnType = expecting
             }

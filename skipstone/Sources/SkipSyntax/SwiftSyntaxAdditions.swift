@@ -305,6 +305,13 @@ extension ExprSyntaxProtocol {
     }
 }
 
+extension TypeEffectSpecifiersSyntax {
+    /// Return the API flags in these specifiers.
+    var apiFlags: APIFlags {
+        return APIFlags(isAsync: asyncSpecifier?.text != nil, isThrows: throwsSpecifier?.text != nil)
+    }
+}
+
 private class PrettyPrintVisitor: SyntaxVisitor {
     init() {
         super.init(viewMode: .sourceAccurate)

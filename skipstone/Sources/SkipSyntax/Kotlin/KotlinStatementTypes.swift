@@ -1369,7 +1369,8 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var suppressSideEffects = false
     var isGenerated = false
     var functionType: TypeSignature {
-        return .function(parameters.map(\.signature), returnType)
+        let apiFlags: APIFlags = asyncOptions.contains(.async) ? [.async] : []
+        return .function(parameters.map(\.signature), returnType, apiFlags)
     }
     var functionGenerics: Generics {
         get {
