@@ -178,6 +178,20 @@ final class ConcurrencyTests: XCTestCase {
             return@l Task { 10 }.value()
         }
         """)
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        func f() async -> Int {
+            let task = Task { @MainActor in
+                return 10
+            }
+            return await task.value
+        }
+        """, kotlin: """
+        internal suspend fun f(): Int = Task.run l@{
+            val task = Task { MainActor.run l@{ return@l 10 } }
+            return@l task.value()
+        }
+        """)
     }
 
     func testAwaitMainActorGlobal() async throws {
@@ -456,14 +470,6 @@ final class ConcurrencyTests: XCTestCase {
         """)
     }
 
-    //~~~
-    func ff(c: () async -> Void) {
-        
-    }
-    func gg() {
-        ff { @MainActor in print("x") }
-    }
-
     func testMainActorClosure() async throws {
         try await check(swift: """
         @MainActor func m(p: Int) {
@@ -492,6 +498,25 @@ final class ConcurrencyTests: XCTestCase {
             val c2: suspend (Int) -> Unit = { MainActor.run { m(p = it) } }
             f2(c = c2)
             f2(c = { MainActor.run { m(p = it) } })
+        }
+        """)
+
+        // Normally when we specify a return type we use an anonymous function, but they don't support suspend
+        try await check(swift: """
+        func f1(c: () -> Int) {
+        }
+        func f2(c: () async -> Int) {
+        }
+        func g() {
+            f1(c: { () -> Int in 1 })
+            f2(c: { () async -> Int in 1 })
+        }
+        """, kotlin: """
+        internal fun f1(c: () -> Int) = Unit
+        internal fun f2(c: suspend () -> Int) = Unit
+        internal fun g() {
+            f1(c = fun(): Int = 1)
+            f2(c = { 1 })
         }
         """)
     }

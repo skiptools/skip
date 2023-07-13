@@ -620,15 +620,16 @@ class KotlinClosure: KotlinExpression {
     }
 
     private func appendClosure(to output: OutputGenerator, indentation: Indentation) {
-        if hasReturnLabel {
-            output.append(Self.returnLabel).append("@")
+        let returnLabel = hasReturnLabel ? "\(Self.returnLabel)@" : ""
+        let isMainActor = attributes.contains(.mainActor)
+        if !isMainActor {
+            output.append(returnLabel)
         }
         output.append("{")
-        let isMainActor = attributes.contains(.mainActor)
         let isSingleStatement = body.isSingleStatementAppendable(mode: .closure)
         if parameters.isEmpty && implicitParameterLabels.isEmpty {
             if isMainActor {
-                output.append(" MainActor.run {")
+                output.append(" MainActor.run \(returnLabel){")
             }
             output.append(isSingleStatement ? " " : "\n")
         } else {
@@ -650,7 +651,7 @@ class KotlinClosure: KotlinExpression {
             }
             output.append(" ->")
             if isMainActor {
-                output.append(" MainActor.run {")
+                output.append(" MainActor.run \(returnLabel){")
             }
             output.append(isSingleStatement ? " " : "\n")
         }
