@@ -58,7 +58,6 @@ final class KotlinEnumTransformer: KotlinTransformer {
             allCasesVar.extras = .singleNewline
         }
         allCasesVar.declaredType = .array(classDeclaration.signature)
-        allCasesVar.isReadOnly = true
         allCasesVar.isGenerated = true
 
         let caseSuffix = classDeclaration.alwaysCreateNewSealedClassInstances ? "()" : ""

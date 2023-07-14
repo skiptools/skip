@@ -14,7 +14,7 @@ final class KotlinStructTransformer: KotlinTransformer {
                 updateStructDeclaration(classDeclaration, translator: translator)
             }
         } else if let variableDeclaration = node as? KotlinVariableDeclaration {
-            if !variableDeclaration.isStatic, !variableDeclaration.isReadOnly, let extends = variableDeclaration.extends, translator.codebaseInfo?.declarationType(forNamed: extends.0) == .structDeclaration {
+            if !variableDeclaration.isStatic, variableDeclaration.apiFlags.contains(.writeable), let extends = variableDeclaration.extends, translator.codebaseInfo?.declarationType(forNamed: extends.0) == .structDeclaration {
                 variableDeclaration.mutationFunctionNames = mutationFunctionNames
             }
             return .skip
@@ -38,7 +38,7 @@ final class KotlinStructTransformer: KotlinTransformer {
         var initializableVariableDeclarations: [KotlinVariableDeclaration] = []
         for member in classDeclaration.members {
             if let variableDeclaration = member as? KotlinVariableDeclaration {
-                if !variableDeclaration.isStatic && (!variableDeclaration.isReadOnly || variableDeclaration.modifiers.isLazy) && !variableDeclaration.isGenerated {
+                if !variableDeclaration.isStatic && (variableDeclaration.apiFlags.contains(.writeable) || variableDeclaration.modifiers.isLazy) && !variableDeclaration.isGenerated {
                     variableDeclaration.mutationFunctionNames = mutationFunctionNames
                     isMutable = true
                 }
@@ -77,6 +77,7 @@ final class KotlinStructTransformer: KotlinTransformer {
         supdate.role = .property
         supdate.isGenerated = true
         supdate.modifiers = Modifiers(visibility: .public, isOverride: true)
+        supdate.apiFlags = [.writeable]
         supdate.extras = .singleNewline
         supdate.parent = classDeclaration
         supdate.assignParentReferences()
@@ -87,6 +88,7 @@ final class KotlinStructTransformer: KotlinTransformer {
         scount.role = .property
         scount.isGenerated = true
         scount.modifiers = Modifiers(visibility: .public, isOverride: true)
+        scount.apiFlags = [.writeable]
         scount.parent = classDeclaration
         scount.assignParentReferences()
         classDeclaration.members.append(scount)
@@ -139,7 +141,7 @@ final class KotlinStructTransformer: KotlinTransformer {
         var bodyStatements: [KotlinStatement] = []
         bodyStatements += variableDeclarations.map { variableDeclaration in
             var assignment = "this.\(variableDeclaration.names[0] ?? "") = \(variableDeclaration.names[0] ?? "")"
-            if variableDeclaration.isReadOnly && variableDeclaration.mayBeSharedMutableStruct {
+            if !variableDeclaration.apiFlags.contains(.writeable) && variableDeclaration.mayBeSharedMutableStruct {
                 assignment += ".sref()"
             }
             return KotlinRawStatement(sourceCode: assignment)

@@ -47,7 +47,6 @@ final class KotlinOptionSetTransformer: KotlinTransformer {
         rawValueVar.modifiers.visibility = .public
         rawValueVar.modifiers.isOverride = true
         rawValueVar.declaredType = .uint64
-        rawValueVar.isReadOnly = true
         rawValueVar.isGenerated = true
 
         let rawValueCode = rawValueType == .uint64 ? "return rawValue" : "return ULong(rawValue)"

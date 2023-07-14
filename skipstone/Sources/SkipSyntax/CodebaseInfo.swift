@@ -1477,7 +1477,7 @@ public class CodebaseInfo: Codable {
             self.declaringType = declaringType
             self.modifiers = statement.modifiers
             self.availability = Availability(attributes: statement.attributes)
-            self.apiFlags = APIFlags(isAsync: statement.isAsync, isThrows: statement.isThrows, isMainActor: statement.attributes.contains(.mainActor), isWriteable: !statement.isLet && (statement.getter == nil || statement.setter != nil))
+            self.apiFlags = statement.apiFlags
             self.isInitializable = !statement.modifiers.isStatic && !statement.modifiers.isOverride && statement.getter == nil && (!statement.isLet || statement.value == nil)
             self.hasValue = self.signature.isOptional || statement.value != nil
             if !self.signature.isFullySpecified, self.sourceFile != nil {

@@ -509,10 +509,10 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal open class C {
-            internal open suspend fun v(): Int = Task.run l@{
+            internal open suspend fun v(): Int = Detached.run l@{
                 return@l f()
             }
-            internal open suspend fun f(): Int = Task.run l@{
+            internal open suspend fun f(): Int = Detached.run l@{
                 return@l 0
             }
         }

@@ -1357,19 +1357,19 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var role: Role = .member
     var isOptionalInit = false
     var annotations: [String] = []
-    var attributes = Attributes()
     var modifiers = Modifiers()
+    var attributes = Attributes()
+    var apiFlags: APIFlags = []
     var generics = Generics()
     var convertedGenerics: Generics? = nil
-    var asyncOptions: KotlinAsyncOptions = []
     var body: KotlinCodeBlock?
     var delegatingConstructorCall: KotlinExpression?
     var mutationFunctionNames: (willMutate: String, didMutate: String)?
     var disambiguatingParameterCount = 0
+    var hasAsyncExplicitReturn = false
     var suppressSideEffects = false
     var isGenerated = false
     var functionType: TypeSignature {
-        let apiFlags: APIFlags = asyncOptions.contains(.async) ? [.async] : []
         return .function(parameters.map(\.signature), returnType, apiFlags)
     }
     var functionGenerics: Generics {
@@ -1422,9 +1422,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         kstatement.returnType = statement.returnType
         kstatement.parameters = statement.parameters.map { $0.translate(translator: translator) }
         kstatement.attributes = kstatement.processAttributes(statement.attributes, translator: translator)
-        if statement.isAsync {
-            kstatement.asyncOptions.insert(.async)
-        }
+        kstatement.apiFlags = statement.functionType.apiFlags
         var owningDeclarationType: StatementType? = nil
         if statement.parent?.owningFunctionDeclaration != nil {
             kstatement.role = .local
@@ -1492,7 +1490,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                     kstatement.body?.updateWithExpectedReturn(.sref(nil))
                 }
                 if statement.isAsync && kstatement.body?.updateWithExpectedReturn(.labelIfPresent(KotlinClosure.returnLabel)) == true {
-                    kstatement.asyncOptions.insert(.explicitReturn)
+                    kstatement.hasAsyncExplicitReturn = true
                 }
             }
             for parameter in kstatement.parameters where parameter.isInOut {
@@ -1596,7 +1594,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         }
         //~~~ Move test to transformer
         let isTestFunction = annotations.contains("@Test")
-        if asyncOptions.contains(.async) && !isTestFunction {
+        if apiFlags.contains(.async) && !isTestFunction {
             // JUnit test functions are not marked suspend
             output.append("suspend ")
         }
@@ -1687,25 +1685,25 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         }
 
         // Append Kotlin single statement format if possible
-        guard isConstructor || asyncOptions.contains(.async) || callSuperFinalize || !parameterVals.isEmpty || suppressSideEffects || mutationFunctionNames != nil || !body.isSingleStatementAppendable(mode: .function) else {
+        guard isConstructor || apiFlags.contains(.async) || callSuperFinalize || !parameterVals.isEmpty || suppressSideEffects || mutationFunctionNames != nil || !body.isSingleStatementAppendable(mode: .function) else {
             output.append(" = ")
             body.appendAsSingleStatement(to: output, indentation: indentation, mode: .function)
             output.append("\n")
             return
         }
 
-        if asyncOptions.contains(.async) {
+        if apiFlags.contains(.async) {
             //~~~ Test should be in test transformer if possible.
             let isTestFunction = annotations.contains("@Test")
             if isTestFunction == true {
                 // JUnit coroutine test cases use `runTest`
                 output.append(" = kotlinx.coroutines.test.runTest ")
-            } else if asyncOptions.contains(.mainActor) {
+            } else if apiFlags.contains(.mainActor) {
                 output.append(" = MainActor.run ")
             } else {
-                output.append(" = Task.run ")
+                output.append(" = Detached.run ")
             }
-            if asyncOptions.contains(.explicitReturn) {
+            if hasAsyncExplicitReturn {
                 output.append("\(KotlinClosure.returnLabel)@")
             }
             output.append("{\n")
@@ -2034,15 +2032,15 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var isOpen = false
     var modifiers = Modifiers()
     var attributes = Attributes()
-    var asyncOptions: KotlinAsyncOptions = []
+    var apiFlags: APIFlags = []
     var value: KotlinExpression?
     var getter: Accessor<KotlinCodeBlock>?
     var setter: Accessor<KotlinCodeBlock>?
     var willSet: Accessor<KotlinCodeBlock>?
     var didSet: Accessor<KotlinCodeBlock>?
     var variableTypes: [TypeSignature]
+    var hasAsyncExplicitReturn = false
     var mayBeSharedMutableStruct = false
-    var isReadOnly = false
     var isAssignFromWriteable = false
     var onUpdate: String?
     var suppressSideEffectsPropertyName: String?
@@ -2134,7 +2132,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         }
 
         kstatement.attributes = kstatement.processAttributes(statement.attributes, translator: translator)
-        kstatement.isReadOnly = statement.isLet || (statement.getter != nil && statement.setter == nil)
+        kstatement.apiFlags = statement.apiFlags
         if kstatement.declaredType != .none {
             kstatement.mayBeSharedMutableStruct = statement.constrainedDeclaredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
         } else if let kvalue = kstatement.value {
@@ -2142,7 +2140,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         } else {
             kstatement.mayBeSharedMutableStruct = true
         }
-        if !kstatement.isReadOnly && kstatement.mayBeSharedMutableStruct {
+        if statement.apiFlags.contains(.writeable) && kstatement.mayBeSharedMutableStruct {
             kstatement.onUpdate = kstatement.role.isProperty ? "{ this.\(kstatement.propertyName) = it }" : "{ \(kstatement.propertyName) = it }"
             kstatement.getter = statement.getter?.translate(translator: translator, expectedReturn: .sref(kstatement.onUpdate))
         } else {
@@ -2152,11 +2150,8 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         kstatement.willSet = statement.willSet?.translate(translator: translator, expectedReturn: .no)
         kstatement.didSet = statement.didSet?.translate(translator: translator, expectedReturn: .no)
 
-        if statement.isAsync {
-            kstatement.asyncOptions.insert(.async)
-            if statement.isAsync && kstatement.getter?.body?.updateWithExpectedReturn(.labelIfPresent(KotlinClosure.returnLabel)) == true {
-                kstatement.asyncOptions.insert(.explicitReturn)
-            }
+        if statement.isAsync && kstatement.getter?.body?.updateWithExpectedReturn(.labelIfPresent(KotlinClosure.returnLabel)) == true {
+            kstatement.hasAsyncExplicitReturn = true
         }
 
         // Warnings and fixups
@@ -2225,7 +2220,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             appendDeclaration(to: output, indentation: indentation)
         }
 
-        if asyncOptions.contains(.async), let getterBody = getter?.body {
+        if apiFlags.contains(.async), let getterBody = getter?.body {
             appendAsyncGet(getterBody, to: output, indentation: indentation)
         } else {
             appendPropertyDefinition(to: output, indentation: indentation)
@@ -2238,15 +2233,15 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         output.append(indentation)
         if role.isProperty || role == .global {
             output.append(modifiers.kotlinMemberString(isGlobal: role == .global, isOpen: isOpen, suffix: " "))
-            if asyncOptions.contains(.async) {
+            if apiFlags.contains(.async) {
                 output.append("suspend ")
             } else if !usesStorageProperty && role != .superclassOverrideProperty && declaredType.isUnwrappedOptional {
                 output.append("lateinit ")
             }
         }
-        if asyncOptions.contains(.async) {
+        if apiFlags.contains(.async) {
             output.append("fun ")
-        } else if isReadOnly && !isAssignFromWriteable {
+        } else if !apiFlags.contains(.writeable) && !isAssignFromWriteable {
             output.append("val ")
         } else {
             output.append("var ")
@@ -2263,7 +2258,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if names.count > 1 {
             output.append(")")
         }
-        if asyncOptions.contains(.async) {
+        if apiFlags.contains(.async) {
             output.append("()")
         }
 
@@ -2272,19 +2267,19 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         } else if usesStorageProperty {
             output.append(": ").append(propertyType.kotlin)
         }
-        if !asyncOptions.contains(.async) && !usesStorageProperty {
+        if !apiFlags.contains(.async) && !usesStorageProperty {
             appendInitialValue(to: output, indentation: indentation)
         }
         extends?.1.appendWhere(to: output, indentation: indentation)
     }
 
     private func appendAsyncGet(_ body: KotlinCodeBlock, to output: OutputGenerator, indentation: Indentation) {
-        if asyncOptions.contains(.mainActor) {
+        if apiFlags.contains(.mainActor) {
             output.append(" = MainActor.run ")
         } else {
-            output.append(" = Task.run ")
+            output.append(" = Detached.run ")
         }
-        if asyncOptions.contains(.explicitReturn) {
+        if hasAsyncExplicitReturn {
             output.append("\(KotlinClosure.returnLabel)@")
         }
         output.append("{\n")
@@ -2304,7 +2299,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             }
         } else if role == .superclassOverrideProperty {
             output.append(indentation.inc()).append("get() = super.\(propertyName)\n")
-        } else if (role.isProperty && role != .protocolProperty) || role == .global, usesStorageProperty || (mayBeSharedMutableStruct && !isReadOnly) {
+        } else if (role.isProperty && role != .protocolProperty) || role == .global, usesStorageProperty || (mayBeSharedMutableStruct && apiFlags.contains(.writeable)) {
             let getterIndentation = indentation.inc()
             let isSingleStatement = (!modifiers.isLazy || mutationFunctionNames == nil) && getFieldIsSingleStatementAppendable
             output.append(getterIndentation).append("get()")
@@ -2409,8 +2404,8 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 }
             }
             output.append(setterIndentation).append("}\n")
-        } else if (role.isProperty && role != .protocolProperty) || role == .global, !isReadOnly || isAssignFromWriteable {
-            if usesStorageProperty || (mayBeSharedMutableStruct && !isReadOnly) {
+        } else if (role.isProperty && role != .protocolProperty) || role == .global, apiFlags.contains(.writeable) || isAssignFromWriteable {
+            if usesStorageProperty || (mayBeSharedMutableStruct && apiFlags.contains(.writeable)) {
                 let setterIndentation = indentation.inc()
                 output.append(setterIndentation).append(setVisibilityString).append("set(newValue) {\n")
                 appendSetField(to: output, indentation: setterIndentation.inc(), usesStorageProperty: usesStorageProperty, isCopy: false)
@@ -2430,7 +2425,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                     defaultValue = "\(propertyType.kotlin)(0)"
                 }
                 output.append(indentation).append("private var \(storagePropertyName) = \(defaultValue)\n")
-            } else if isReadOnly, let getterBody = getter?.body {
+            } else if !apiFlags.contains(.writeable), let getterBody = getter?.body {
                 output.append(indentation).append("private val \(storagePropertyName): \(propertyType.asOptional(true).kotlin)\n")
                 appendGetterBody(getterBody, to: output, indentation: indentation.inc())
             } else {
@@ -2472,7 +2467,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
 
     private func appendGetField(to output: OutputGenerator, indentation: Indentation, usesStorageProperty: Bool, isSingleStatement: Bool = false) {
         let fieldName = usesStorageProperty ? storagePropertyName : "field"
-        let storageValue = !isReadOnly && mayBeSharedMutableStruct ? "\(fieldName).sref(\(onUpdate ?? ""))" : fieldName
+        let storageValue = apiFlags.contains(.writeable) && mayBeSharedMutableStruct ? "\(fieldName).sref(\(onUpdate ?? ""))" : fieldName
         if modifiers.isLazy && value != nil {
             output.append(indentation).append("if (!\(lazyInitInitializedName)) {\n")
             let initializeIndentation = indentation.inc()
@@ -2502,7 +2497,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
 
     private var usesStorageProperty: Bool {
-        guard !asyncOptions.contains(.async) else {
+        guard !apiFlags.contains(.async) else {
             return false
         }
         guard role == .property || role == .global else {
@@ -2513,7 +2508,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         }
         if declaredType.isUnwrappedOptional {
             // We only need a separate storage var if we need custom get or set logic
-            return (mayBeSharedMutableStruct && !isReadOnly) || mutationFunctionNames != nil || getter?.body != nil || setter?.body != nil || willSet?.body != nil || didSet?.body != nil
+            return (mayBeSharedMutableStruct && apiFlags.contains(.writeable)) || mutationFunctionNames != nil || getter?.body != nil || setter?.body != nil || willSet?.body != nil || didSet?.body != nil
         }
         return false
     }

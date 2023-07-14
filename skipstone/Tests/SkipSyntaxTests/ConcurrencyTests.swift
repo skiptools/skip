@@ -145,6 +145,14 @@ final class ConcurrencyTests: XCTestCase {
         XCTAssertTrue(f1?.apiFlags?.contains(.mainActor) == true)
     }
 
+    func testMainActorRun() async throws {
+        //~~~
+    }
+
+    func testTaskRun() async throws {
+        //~~~
+    }
+
     func testTaskValue() async throws {
         let supportingSwift = """
         struct Task<Success, Failure> where Failure: Error {
@@ -163,7 +171,7 @@ final class ConcurrencyTests: XCTestCase {
             return await task.value
         }
         """, kotlin: """
-        internal suspend fun f(): Int = Task.run l@{
+        internal suspend fun f(): Int = Detached.run l@{
             val task = Task { 10 }
             return@l task.value()
         }
@@ -174,7 +182,7 @@ final class ConcurrencyTests: XCTestCase {
             await Task { 10 }.value
         }
         """, kotlin: """
-        internal suspend fun f(): Int = Task.run l@{
+        internal suspend fun f(): Int = Detached.run l@{
             return@l Task { 10 }.value()
         }
         """)
@@ -187,8 +195,8 @@ final class ConcurrencyTests: XCTestCase {
             return await task.value
         }
         """, kotlin: """
-        internal suspend fun f(): Int = Task.run l@{
-            val task = Task { MainActor.run l@{ return@l 10 } }
+        internal suspend fun f(): Int = Detached.run l@{
+            val task = Task(isMainActor = true) l@{ return@l 10 }
             return@l task.value()
         }
         """)
@@ -213,7 +221,7 @@ final class ConcurrencyTests: XCTestCase {
             a()
             b()
         }
-        internal suspend fun f() = Task.run {
+        internal suspend fun f() = Detached.run {
             MainActor.run { a() }
             b()
         }
@@ -249,7 +257,7 @@ final class ConcurrencyTests: XCTestCase {
             val c = C()
             val i = C.Inner()
         }
-        internal suspend fun g() = Task.run {
+        internal suspend fun g() = Detached.run {
             val c = MainActor.run { C() }
             val i = MainActor.run { C.Inner() }
         }
@@ -268,7 +276,7 @@ final class ConcurrencyTests: XCTestCase {
         """, kotlin: """
         internal fun a(c: C, i: C.Inner): Int = 1
         internal fun b(c: C, i: C.Inner): Int = 1
-        internal suspend fun f() = Task.run {
+        internal suspend fun f() = Detached.run {
             val sum = a(c = MainActor.run { C() }, i = MainActor.run { C.Inner() }) + MainActor.run { b(c = C(), i = C.Inner()) }
         }
         """)
@@ -312,7 +320,7 @@ final class ConcurrencyTests: XCTestCase {
             val f = C.f()
             val j = C.Inner.j
         }
-        internal suspend fun g() = Task.run {
+        internal suspend fun g() = Detached.run {
             val x = C.x
             val i = MainActor.run { C.i }
             val f = MainActor.run { C.f() }
@@ -326,7 +334,7 @@ final class ConcurrencyTests: XCTestCase {
             await f(i: C.Inner.j + C.f() - C.i)
         }
         """, kotlin: """
-        internal suspend fun f(i: Int) = Task.run {
+        internal suspend fun f(i: Int) = Detached.run {
             f(i = MainActor.run { C.i })
             f(i = MainActor.run { C.Inner.j } + MainActor.run { C.f() } - MainActor.run { C.i })
         }
@@ -352,7 +360,7 @@ final class ConcurrencyTests: XCTestCase {
             let mainCci = await c.mainC.c.i
         }
         """, kotlin: """
-        internal suspend fun f(c: C) = Task.run {
+        internal suspend fun f(c: C) = Detached.run {
             val i = C().mainactor { it.i }
             val mainCi = c.mainactor { it.mainC }.mainactor { it.i }
             val ci = c.c.mainactor { it.i }
@@ -390,7 +398,7 @@ final class ConcurrencyTests: XCTestCase {
             let mainCci = await c.mainC().c().i()
         }
         """, kotlin: """
-        internal suspend fun f(c: C) = Task.run {
+        internal suspend fun f(c: C) = Detached.run {
             val i = C().mainactor { it.i() }
             val mainCi = c.mainactor { it.mainC() }.mainactor { it.i() }
             val ci = c.c().mainactor { it.i() }
@@ -403,7 +411,7 @@ final class ConcurrencyTests: XCTestCase {
             let i = await c.j(i: c.i())
         }
         """, kotlin: """
-        internal suspend fun f(c: C) = Task.run {
+        internal suspend fun f(c: C) = Detached.run {
             val i = c.mainactor { it.j(i = c.i()) }
         }
         """)
@@ -434,7 +442,7 @@ final class ConcurrencyTests: XCTestCase {
             return await i + j + r.f()
         }
         """, kotlin: """
-        internal suspend fun f(): Int = Task.run l@{
+        internal suspend fun f(): Int = Detached.run l@{
             val r = S().mainactor { it.r }.sref()
             val i = S().mainactor { it.r }.mainactor { it.i }
             val j = S().mainactor { it.r }.j
@@ -463,7 +471,7 @@ final class ConcurrencyTests: XCTestCase {
             await c.f(i: i())
         }
         """, kotlin: """
-        internal suspend fun f() = Task.run {
+        internal suspend fun f() = Detached.run {
             val c = C()
             c.mainactor { it.f(i = i()) }
         }
@@ -500,7 +508,9 @@ final class ConcurrencyTests: XCTestCase {
             f2(c = { MainActor.run { m(p = it) } })
         }
         """)
+    }
 
+    func testAsyncClosure() async throws {
         // Normally when we specify a return type we use an anonymous function, but they don't support suspend
         try await check(swift: """
         func f1(c: () -> Int) {
@@ -516,9 +526,32 @@ final class ConcurrencyTests: XCTestCase {
         internal fun f2(c: suspend () -> Int) = Unit
         internal fun g() {
             f1(c = fun(): Int = 1)
-            f2(c = { 1 })
+            f2(c = { Detached.run { 1 } })
         }
         """)
+
+        try await check(swift: """
+        func f(i: Int = 0, s: String, c: (Int) async -> Int) {
+        }
+        func g() {
+            f(s: "") { i in i + 1 }
+            f(s: "", c: { i in return i + 1 })
+            let c: (Int) async -> Int = { i in i }
+            f(s: "", c: c)
+        }
+        """, kotlin: """
+        internal fun f(i: Int = 0, s: String, c: suspend (Int) -> Int) = Unit
+        internal fun g() {
+            f(s = "") { i -> Detached.run { i + 1 } }
+            f(s = "", c = { i -> Detached.run l@{ return@l i + 1 } })
+            val c: suspend (Int) -> Int = { i -> Detached.run { i } }
+            f(s = "", c = c)
+        }
+        """)
+    }
+
+    func testInMainActorContext() async throws {
+        //~~~
     }
 
     // Running this and observing the output verifies that Swift hops to the main thread when required by @MainActor, but does

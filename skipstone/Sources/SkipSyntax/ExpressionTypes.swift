@@ -496,6 +496,9 @@ class Closure: Expression {
     let isAsync: Bool
     let isThrows: Bool
     let body: CodeBlock
+    var apiFlags: APIFlags {
+        return APIFlags(isAsync: isAsync, isThrows: isThrows, isMainActor: attributes.contains(.mainActor))
+    }
 
     init(returnType: TypeSignature = .none, parameters: [Parameter<Void>], attributes: Attributes = Attributes(), isAsync: Bool = false, isThrows: Bool = false, body: CodeBlock, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.returnType = returnType

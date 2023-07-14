@@ -134,11 +134,6 @@ class KotlinAwait: KotlinExpression {
         node.visit { node in
             if var mainActorTargeting = node as? (KotlinSyntaxNode & KotlinMainActorTargeting) {
                 mainActorTargeting.isInAwait = true
-                //~~~ move to transformer
-                if mainActorTargeting.needsMainActorIsolation == nil {
-                    // FIXME: converted to a .warning for async testing
-                    node.messages.append(.kotlinAsyncAwaitTypeInference(node, source: source))
-                }
                 return .recurse(nil)
             } else if node is KotlinClosure {
                 // Async outer call doesn't affect code within a closure
@@ -505,12 +500,13 @@ class KotlinClosure: KotlinExpression {
     var returnType: TypeSignature = .none
     var parameters: [Parameter<Void>] = []
     var attributes = Attributes()
+    var apiFlags: APIFlags = []
     var inferredReturnType: TypeSignature = .none
     var implicitParameterLabels: [String] = []
     var isAnonymousFunction = false
     var body: KotlinCodeBlock
     var hasReturnLabel = false
-    var isMainActor: Bool? // Populated if needed by transformer
+    var isTaskClosure = false
 
     static func translate(expression: Closure, translator: KotlinTranslator) -> KotlinClosure {
         // If there is an explicit return type we'll use an anonymous function rather than a closure, as Kotlin
@@ -550,6 +546,8 @@ class KotlinClosure: KotlinExpression {
         kexpression.parameters = expression.parameters
         kexpression.parameters.forEach { $0.appendKotlinMessages(to: kexpression, source: translator.syntaxTree.source) }
         kexpression.attributes = expression.attributes
+        // Combine inferred flags because most closures aren't declared with explicit info
+        kexpression.apiFlags = expression.apiFlags.union(expression.inferredType.apiFlags)
         kexpression.isAnonymousFunction = isAnonymousFunction
         kexpression.inferredReturnType = expression.returnType != .none ? expression.returnType : expression.inferredType.returnType
         kexpression.implicitParameterLabels = implicitParameterLabels
@@ -621,8 +619,9 @@ class KotlinClosure: KotlinExpression {
 
     private func appendClosure(to output: OutputGenerator, indentation: Indentation) {
         let returnLabel = hasReturnLabel ? "\(Self.returnLabel)@" : ""
-        let isMainActor = attributes.contains(.mainActor)
-        if !isMainActor {
+        let isAsync = !isTaskClosure && apiFlags.contains(.async)
+        let isMainActor = isAsync && apiFlags.contains(.mainActor)
+        if !isAsync {
             output.append(returnLabel)
         }
         output.append("{")
@@ -630,6 +629,8 @@ class KotlinClosure: KotlinExpression {
         if parameters.isEmpty && implicitParameterLabels.isEmpty {
             if isMainActor {
                 output.append(" MainActor.run \(returnLabel){")
+            } else if isAsync {
+                output.append(" Detached.run \(returnLabel){")
             }
             output.append(isSingleStatement ? " " : "\n")
         } else {
@@ -652,6 +653,8 @@ class KotlinClosure: KotlinExpression {
             output.append(" ->")
             if isMainActor {
                 output.append(" MainActor.run \(returnLabel){")
+            } else if isAsync {
+                output.append(" Detached.run \(returnLabel){")
             }
             output.append(isSingleStatement ? " " : "\n")
         }
@@ -662,7 +665,7 @@ class KotlinClosure: KotlinExpression {
             output.append(body, indentation: indentation.inc())
             output.append(indentation).append("}")
         }
-        if isMainActor {
+        if isAsync {
             output.append(" }")
         }
     }
