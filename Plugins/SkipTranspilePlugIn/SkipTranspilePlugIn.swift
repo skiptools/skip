@@ -237,11 +237,13 @@ struct TranspilePlugInError : LocalizedError {
     }
 }
 
-//#if canImport(XcodeProjectPlugin)
-//import XcodeProjectPlugin
-//
-//extension SkipTranspilePlugIn: XcodeBuildToolPlugin {
-//    func createBuildCommands(context: XcodePluginContext, target: XcodeTarget) throws -> [Command] {
-//    }
-//}
-//#endif
+#if canImport(XcodeProjectPlugin)
+import XcodeProjectPlugin
+
+extension SkipTranspilePlugIn: XcodeBuildToolPlugin {
+    func createBuildCommands(context: XcodePluginContext, target: XcodeTarget) throws -> [Command] {
+        Diagnostics.warning("SkipTranspilePlugIn Xcode")
+        return []
+    }
+}
+#endif
