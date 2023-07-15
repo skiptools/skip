@@ -2,7 +2,7 @@
 import XCTest
 
 final class TransformerTests: XCTestCase {
-    func testTestTransformer() async throws {
+    func testUnitTestTransformer() async throws {
         try await check(swift: """
         import XCTest
 
@@ -27,6 +27,39 @@ final class TransformerTests: XCTestCase {
             companion object {
 
                 internal fun testDoNotTestStatic() = Unit
+            }
+        }
+        """)
+    }
+
+    func testAsyncUnitTestTransformer() async throws {
+        try await check(swift: """
+        import XCTest
+
+        class TestCase: XCTestCase {
+            func testAsync() async throws {
+                XCTAssertTrue(someCheck())
+            }
+        }
+        """, kotlin: """
+        import kotlinx.coroutines.*
+        import kotlinx.coroutines.test.*
+
+        import skip.unit.*
+
+        internal open class TestCase: XCTestCase {
+
+            @Test internal fun async_testAsync() {
+                val dispatcher = StandardTestDispatcher()
+                Dispatchers.setMain(dispatcher)
+                try {
+                    runTest { withContext(Dispatchers.Main) { testAsync() } }
+                } finally {
+                    Dispatchers.resetMain()
+                }
+            }
+            internal open suspend fun testAsync() = Detached.run {
+                XCTAssertTrue(someCheck())
             }
         }
         """)

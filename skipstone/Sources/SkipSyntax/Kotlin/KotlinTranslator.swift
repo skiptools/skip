@@ -53,6 +53,8 @@ public class KotlinTranslator {
 
         let kotlinSyntaxTree = translateSyntaxTree()
         transformers.forEach { $0.apply(to: kotlinSyntaxTree, translator: self) }
+        addPackageAndRequiredImportStatements(to: kotlinSyntaxTree)
+
         return transpilation(for: kotlinSyntaxTree, codebaseInfo: codebaseInfo, transformers: transformers, startTime: startTime)
     }
 
@@ -70,6 +72,8 @@ public class KotlinTranslator {
         guard results.contains(true) else {
             return nil
         }
+        translator.addPackageAndRequiredImportStatements(to: kotlinSyntaxTree)
+
         var transpilation = translator.transpilation(for: kotlinSyntaxTree, codebaseInfo: codebaseInfo, transformers: transformers, startTime: startTime)
         transpilation.isSourceFileSynthetic = true
         return transpilation
@@ -79,9 +83,7 @@ public class KotlinTranslator {
     public func translateSyntaxTree() -> KotlinSyntaxTree {
         let translatedStatements = syntaxTree.root.statements.flatMap { translateStatement($0) }
         let dependencies = gatherDependencies(from: translatedStatements)
-        let packageStatements = packageStatements()
-        let requiredImportStatements = requiredImportStatements(dependencies: dependencies)
-        let kotlinRoot = KotlinCodeBlock(statements: packageStatements + requiredImportStatements + translatedStatements)
+        let kotlinRoot = KotlinCodeBlock(statements: translatedStatements)
         kotlinRoot.messages = syntaxTree.root.messages
         let kotlinSyntaxTree = KotlinSyntaxTree(sourceFile: syntaxTree.source.file, root: kotlinRoot, dependencies: dependencies)
         kotlinSyntaxTree.root.assignParentReferences()
@@ -263,6 +265,12 @@ public class KotlinTranslator {
             }
         }
         return dependencies
+    }
+
+    private func addPackageAndRequiredImportStatements(to kotlinSyntaxTree: KotlinSyntaxTree) {
+        let packageStatements = packageStatements()
+        let requiredImportStatements = requiredImportStatements(dependencies: kotlinSyntaxTree.dependencies)
+        kotlinSyntaxTree.root.insert(statements: packageStatements + requiredImportStatements, after: nil)
     }
 
     private func packageStatements() -> [KotlinStatement] {

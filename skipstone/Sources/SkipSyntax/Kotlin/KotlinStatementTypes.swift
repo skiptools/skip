@@ -1592,10 +1592,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if role != .local {
             output.append(modifiers.kotlinMemberString(isGlobal: role == .global, isOpen: isOpen, suffix: " "))
         }
-        //~~~ Move test to transformer
-        let isTestFunction = annotations.contains("@Test")
-        if apiFlags.contains(.async) && !isTestFunction {
-            // JUnit test functions are not marked suspend
+        if apiFlags.contains(.async) {
             output.append("suspend ")
         }
 
@@ -1651,7 +1648,9 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         }
         output.append(")")
         if type != .constructorDeclaration {
-            if returnType != .void && type != .constructorDeclaration {
+            // Kotlin requires an explicit return type when the body is a lambda (as it is for async) and just throws, e.g.:
+            //   suspending fun f(): Unit = MainActor.run { throw Error() }
+            if returnType != .void || apiFlags.contains(.async) {
                 output.append(": ").append(returnType.kotlin)
             }
         } else if let delegatingConstructorCall {
@@ -1693,12 +1692,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         }
 
         if apiFlags.contains(.async) {
-            //~~~ Test should be in test transformer if possible.
-            let isTestFunction = annotations.contains("@Test")
-            if isTestFunction == true {
-                // JUnit coroutine test cases use `runTest`
-                output.append(" = kotlinx.coroutines.test.runTest ")
-            } else if apiFlags.contains(.mainActor) {
+            if apiFlags.contains(.mainActor) {
                 output.append(" = MainActor.run ")
             } else {
                 output.append(" = Detached.run ")

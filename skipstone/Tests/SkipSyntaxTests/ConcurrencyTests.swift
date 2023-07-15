@@ -741,6 +741,19 @@ final class ConcurrencyTests: XCTestCase {
         """)
     }
 
+    func testExplicitUnitReturnForThrowingFunction() async throws {
+        // Kotlin requires an explicit return type when the body is a lambda (as it is for async) and just throws
+        try await check(swift: """
+        func f() async {
+            throw SomeError()
+        }
+        """, kotlin: """
+        internal suspend fun f(): Unit = Detached.run {
+            throw SomeError() as Throwable
+        }
+        """)
+    }
+
     // Running this and observing the output verifies that Swift hops to the main thread when required by @MainActor, but does
     // not stay there for chained calls. Commented out to avoid warnings about using Thread.isMainThread within async code.
 //    func testMainActorBehavior() async throws {
