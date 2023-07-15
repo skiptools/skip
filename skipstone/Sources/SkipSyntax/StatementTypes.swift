@@ -342,7 +342,7 @@ class ForLoop: Statement {
         }
         var declaredType: TypeSignature = .none
         if let typeSyntax = forInStmnt.typeAnnotation?.type {
-            declaredType = TypeSignature.for(syntax: typeSyntax)
+            declaredType = TypeSignature.for(syntax: typeSyntax, in: syntaxTree)
         }
         let isTry = forInStmnt.tryKeyword != nil
         let isAwait = forInStmnt.awaitKeyword != nil
@@ -814,7 +814,7 @@ class ExtensionDeclaration: TypeDeclaration {
         guard syntax.kind == .extensionDecl, let extensionDecl = syntax.as(ExtensionDeclSyntax.self) else {
             return nil
         }
-        let extends = TypeSignature.for(syntax: extensionDecl.extendedType)
+        let extends = TypeSignature.for(syntax: extensionDecl.extendedType, in: syntaxTree)
         guard extends != .none else {
             return nil
         }
@@ -1045,7 +1045,7 @@ class SubscriptDeclaration: Statement {
         guard syntax.kind == .subscriptDecl, let subscriptDecl = syntax.as(SubscriptDeclSyntax.self) else {
             return nil
         }
-        let elementType = TypeSignature.for(syntax: subscriptDecl.returnClause.returnType)
+        let elementType = TypeSignature.for(syntax: subscriptDecl.returnClause.returnType, in: syntaxTree)
         let (parameters, parametersMessages) = subscriptDecl.parameterClause.parameters(in: syntaxTree)
         let attributes = Attributes.for(syntax: subscriptDecl.attributes, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: subscriptDecl.modifiers)
@@ -1153,7 +1153,7 @@ class TypealiasDeclaration: Statement {
         let attributes = Attributes.for(syntax: typealiasDecl.attributes, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: typealiasDecl.modifiers)
         let (generics, messages) = Generics.for(syntax: typealiasDecl.genericParameterClause, where: typealiasDecl.genericWhereClause, in: syntaxTree)
-        let aliasedType = TypeSignature.for(syntax: typealiasDecl.initializer.value)
+        let aliasedType = TypeSignature.for(syntax: typealiasDecl.initializer.value, in: syntaxTree)
         let statement = TypealiasDeclaration(name: name, attributes: attributes, modifiers: modifiers, generics: generics, aliasedType: aliasedType, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
         statement.messages = messages
         return [statement]
@@ -1396,7 +1396,7 @@ class VariableDeclaration: Statement {
     private static func decode(syntax: PatternBindingSyntax, isLet: Bool, attributes: Attributes, modifiers: Modifiers, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> Statement {
         var declaredType: TypeSignature = .none
         if let typeSyntax = syntax.typeAnnotation?.type {
-            declaredType = TypeSignature.for(syntax: typeSyntax)
+            declaredType = TypeSignature.for(syntax: typeSyntax, in: syntaxTree)
         }
         var value: Expression? = nil
         if let valueSyntax = syntax.initializer?.value {

@@ -38,20 +38,20 @@ final class KotlinConcurrencyTransformer: KotlinTransformer {
                 return closure
             }
         } else if let memberAccess = functionCall.function as? KotlinMemberAccess {
-            if memberAccess.member == "Task", case .module("Swift", _) = memberAccess.baseType {
+            if memberAccess.member == "Task" && (memberAccess.base as? KotlinIdentifier)?.name == "Swift" {
                 if let closure = taskClosure(in: functionCall, source: source) {
                     updateTaskConstructor(functionCall: functionCall, closure: closure, codebaseInfo: codebaseInfo)
                     return closure
                 }
-            } else if memberAccess.member == "detached" && memberAccess.baseType.isNamed("Task", moduleName: "Swift") {
+            } else if memberAccess.member == "detached" && memberAccess.isBaseType(named: "Task", moduleName: "Swift") {
                 if let closure = taskClosure(in: functionCall, source: source) {
                     // Task.detached always launches with the default dispatcher. Only a closure with a specified actor needs to dispatch itself
-                    if !closure.apiFlags.contains(.mainActor) {
+                    if closure.apiFlags?.contains(.mainActor) != true {
                         closure.isTaskClosure = true
                     }
                     return closure
                 }
-            } else if memberAccess.member == "run" && memberAccess.baseType.isNamed("MainActor", moduleName: "Swift") {
+            } else if memberAccess.member == "run" && memberAccess.isBaseType(named: "MainActor", moduleName: "Swift") {
                 if let closure = taskClosure(in: functionCall, source: source) {
                     // MainActor.run always uses the main dispatcher. The closure does not have to dispatch itself.
                     // NOTE: Should MainActor.run also mark the closure as .mainActor for actor inheritance within its body?
@@ -72,14 +72,15 @@ final class KotlinConcurrencyTransformer: KotlinTransformer {
             functionCall.messages.append(.kotlinAsyncTaskClosureInline(functionCall, source: source))
             return nil
         }
+        closure.apiFlags?.insert(.async)
         return closure
     }
 
     private func updateTaskConstructor(functionCall: KotlinFunctionCall, closure: KotlinClosure, codebaseInfo: CodebaseInfo.Context?) {
         // The Task will launch a coroutine with the correct dispatcher based on the main actor argument we insert
-        let isMainActorClosure = closure.apiFlags.contains(.mainActor) || (codebaseInfo != nil && isInMainActorContext(node: functionCall, codebaseInfo: codebaseInfo!))
+        let isMainActorClosure = closure.apiFlags?.contains(.mainActor) == true || (codebaseInfo != nil && isInMainActorContext(node: functionCall, codebaseInfo: codebaseInfo!))
         if isMainActorClosure {
-            closure.apiFlags.insert(.mainActor)
+            closure.apiFlags?.insert(.mainActor)
             functionCall.arguments.insert(LabeledValue(label: "isMainActor", value: KotlinBooleanLiteral(literal: true)), at: 0)
         }
         // The closure itself does not need to specify a dispatch
@@ -90,13 +91,13 @@ final class KotlinConcurrencyTransformer: KotlinTransformer {
         guard let codebaseInfo else {
             return
         }
-        guard closure.apiFlags.contains(.async) && !closure.apiFlags.contains(.mainActor) else {
+        guard closure.apiFlags?.contains(.async) == true && closure.apiFlags?.contains(.mainActor) != true else {
             return
         }
 
         // Async closures inherit actor isolation when they're created. See if this one should be isolated
         if isInMainActorContext(node: closure, codebaseInfo: codebaseInfo) {
-            closure.apiFlags.insert(.mainActor)
+            closure.apiFlags?.insert(.mainActor)
         }
     }
 
@@ -133,8 +134,8 @@ final class KotlinConcurrencyTransformer: KotlinTransformer {
                 return functionDeclaration.apiFlags.contains(.mainActor)
             } else if let variableDeclaration = contextNode as? KotlinVariableDeclaration {
                 return variableDeclaration.apiFlags.contains(.mainActor)
-            } else if let closure = contextNode as? KotlinClosure, closure.apiFlags.contains(.async) {
-                return closure.apiFlags.contains(.mainActor)
+            } else if let closure = contextNode as? KotlinClosure, closure.apiFlags?.contains(.async) == true {
+                return closure.apiFlags?.contains(.mainActor) == true
             }
         } while true
         return false
@@ -151,8 +152,8 @@ extension KotlinConcurrencyTransformer: KotlinTypeSignatureOutputTransformer {
     }
 }
 
-fileprivate extension CodebaseInfo.Context {
-    func isMainActor(declaration: KotlinFunctionDeclaration) -> Bool {
+extension CodebaseInfo.Context {
+    fileprivate func isMainActor(declaration: KotlinFunctionDeclaration) -> Bool {
         if declaration.apiFlags.contains(.mainActor) {
             return true
         }
@@ -166,7 +167,7 @@ fileprivate extension CodebaseInfo.Context {
         return matches.first?.apiFlags.contains(.mainActor) == true
     }
 
-    func isMainActor(declaration: KotlinVariableDeclaration) -> Bool {
+    fileprivate func isMainActor(declaration: KotlinVariableDeclaration) -> Bool {
         if declaration.apiFlags.contains(.mainActor) {
             return true
         }
@@ -190,6 +191,23 @@ fileprivate extension CodebaseInfo.Context {
             return memberDeclaration.extends?.0
         } else {
             return nil
+        }
+    }
+}
+
+extension KotlinMemberAccess {
+    fileprivate func isBaseType(named: String, moduleName: String) -> Bool {
+        guard baseType == .none else {
+            return baseType.isNamed(named, moduleName: moduleName)
+        }
+
+        // Try to work even without codebase info
+        if let identifier = base as? KotlinIdentifier {
+            return identifier.name == named
+        } else if let memberAccess = base as? KotlinMemberAccess {
+            return memberAccess.member == named && (memberAccess.base as? KotlinIdentifier)?.name == moduleName
+        } else {
+            return false
         }
     }
 }

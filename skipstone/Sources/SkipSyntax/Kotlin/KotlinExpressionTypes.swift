@@ -134,10 +134,7 @@ class KotlinAwait: KotlinExpression {
         node.visit { node in
             if var mainActorTargeting = node as? (KotlinSyntaxNode & KotlinMainActorTargeting) {
                 mainActorTargeting.isInAwait = true
-                return .recurse(nil)
-            } else if node is KotlinClosure {
-                // Async outer call doesn't affect code within a closure
-                return .skip
+                return node is KotlinClosure ? .skip : .recurse(nil)
             } else {
                 return .recurse(nil)
             }
@@ -494,13 +491,13 @@ struct KotlinCasePattern {
     }
 }
 
-class KotlinClosure: KotlinExpression {
+class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
     static let returnLabel = "l"
 
     var returnType: TypeSignature = .none
     var parameters: [Parameter<Void>] = []
     var attributes = Attributes()
-    var apiFlags: APIFlags = []
+    var apiFlags: APIFlags? = []
     var inferredReturnType: TypeSignature = .none
     var implicitParameterLabels: [String] = []
     var isAnonymousFunction = false
@@ -512,7 +509,7 @@ class KotlinClosure: KotlinExpression {
         // If there is an explicit return type we'll use an anonymous function rather than a closure, as Kotlin
         // closures cannot declare a return type. Kotlin does not support anonymous suspend functions, though
         let kbody = KotlinCodeBlock.translate(statement: expression.body, translator: translator)
-        let isAnonymousFunction = !expression.isAsync && expression.returnType != .none
+        let isAnonymousFunction = expression.returnType != .none && !expression.apiFlags.contains(.async) && !expression.apiFlags.contains(.mainActor)
         var implicitParameterLabels: [String] = []
         var hasReturnLabel = false
         if isAnonymousFunction {
@@ -586,6 +583,13 @@ class KotlinClosure: KotlinExpression {
         super.init(type: .closure, expression: expression)
     }
 
+    var isInAwait = false
+    var isInMainActorContext = false
+
+    func mainActorMode(for child: KotlinSyntaxNode) -> KotlinMainActorMode {
+        return .isolated
+    }
+
     override var children: [KotlinSyntaxNode] {
         return [body]
     }
@@ -618,9 +622,11 @@ class KotlinClosure: KotlinExpression {
     }
 
     private func appendClosure(to output: OutputGenerator, indentation: Indentation) {
+        // Tasks establish the correct async context on launch, so no need to output as async if we're a task closure.
+        // Otherwise, output with the correct context if we're async or if we need to jump to the main actor
+        let isAsync = !isTaskClosure && (apiFlags?.contains(.async) == true || mainActorMode.output != .none)
+        let isMainActor = isAsync && apiFlags?.contains(.mainActor) == true
         let returnLabel = hasReturnLabel ? "\(Self.returnLabel)@" : ""
-        let isAsync = !isTaskClosure && apiFlags.contains(.async)
-        let isMainActor = isAsync && apiFlags.contains(.mainActor)
         if !isAsync {
             output.append(returnLabel)
         }

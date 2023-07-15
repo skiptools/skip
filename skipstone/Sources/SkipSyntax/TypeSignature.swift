@@ -1271,19 +1271,28 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     }
 
     /// Create a type signature for the given syntax.
-    static func `for`(syntax: TypeSyntax) -> TypeSignature {
+    static func `for`(syntax: TypeSyntax, in syntaxTree: SyntaxTree) -> TypeSignature {
         switch syntax.kind {
         case .arrayType:
             guard let arrayType = syntax.as(ArrayTypeSyntax.self) else {
                 return .none
             }
-            let elementType = self.for(syntax: arrayType.elementType)
+            let elementType = self.for(syntax: arrayType.elementType, in: syntaxTree)
             return elementType == .none ? .none : .array(elementType)
         case .attributedType:
             guard let attributedType = syntax.as(AttributedTypeSyntax.self) else {
                 return .none
             }
-            return self.for(syntax: attributedType.baseType)
+            let signature = self.for(syntax: attributedType.baseType, in: syntaxTree)
+            if case .function(let parameters, let returnType, var apiFlags) = signature {
+                let attributes = Attributes.for(syntax: attributedType.attributes, in: syntaxTree)
+                if attributes.contains(.mainActor) {
+                    apiFlags.insert(.mainActor)
+                }
+                return .function(parameters, returnType, apiFlags)
+            } else {
+                return signature
+            }
         case .simpleTypeIdentifier:
             guard let simpleType = syntax.as(SimpleTypeIdentifierSyntax.self) else {
                 return .none
@@ -1291,7 +1300,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             let name = simpleType.name.text
             var genericTypes: [TypeSignature] = []
             if let generics = simpleType.genericArgumentClause?.arguments {
-                genericTypes = generics.map { self.for(syntax: $0.argumentType) }
+                genericTypes = generics.map { self.for(syntax: $0.argumentType, in: syntaxTree) }
                 guard !genericTypes.contains(.none) else {
                     return .none
                 }
@@ -1301,7 +1310,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             guard let compositionType = syntax.as(CompositionTypeSyntax.self) else {
                 return .none
             }
-            let types = compositionType.elements.map { self.for(syntax: $0.type) }
+            let types = compositionType.elements.map { self.for(syntax: $0.type, in: syntaxTree) }
             guard !types.contains(.none) else {
                 return .none
             }
@@ -1310,8 +1319,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             guard let dictionaryType = syntax.as(DictionaryTypeSyntax.self) else {
                 return .none
             }
-            let keyType = self.for(syntax: dictionaryType.keyType)
-            let valueType = self.for(syntax: dictionaryType.valueType)
+            let keyType = self.for(syntax: dictionaryType.keyType, in: syntaxTree)
+            let valueType = self.for(syntax: dictionaryType.valueType, in: syntaxTree)
             guard keyType != .none, valueType != .none else {
                 return .none
             }
@@ -1320,7 +1329,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             guard let constrainedSugarType = syntax.as(ConstrainedSugarTypeSyntax.self) else {
                 return .none
             }
-            return self.for(syntax: constrainedSugarType.baseType)
+            return self.for(syntax: constrainedSugarType.baseType, in: syntaxTree)
         case .functionType:
             guard let functionType = syntax.as(FunctionTypeSyntax.self) else {
                 return .none
@@ -1328,13 +1337,13 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             var parameters: [Parameter] = []
             for parameterSyntax in functionType.parameters {
                 let label = parameterSyntax.name?.text
-                let type = self.for(syntax: parameterSyntax.type)
+                let type = self.for(syntax: parameterSyntax.type, in: syntaxTree)
                 let isInOut = isInOut(syntax: parameterSyntax.type)
                 let isVariadic = parameterSyntax.ellipsis != nil
                 let hasDefaultValue = parameterSyntax.initializer != nil
                 parameters.append(Parameter(label: label, type: type, isInOut: isInOut, isVariadic: isVariadic, hasDefaultValue: hasDefaultValue))
             }
-            let returnType = self.for(syntax: functionType.returnClause.returnType)
+            let returnType = self.for(syntax: functionType.returnClause.returnType, in: syntaxTree)
             guard !parameters.contains(where: { $0.type == .none }) && returnType != .none else {
                 return .none
             }
@@ -1344,14 +1353,14 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             guard let memberType = syntax.as(MemberTypeIdentifierSyntax.self) else {
                 return .none
             }
-            let baseType = self.for(syntax: memberType.baseType)
+            let baseType = self.for(syntax: memberType.baseType, in: syntaxTree)
             guard baseType != .none else {
                 return .none
             }
             let name = memberType.name.text
             var genericTypes: [TypeSignature] = []
             if let generics = memberType.genericArgumentClause?.arguments {
-                genericTypes = generics.map { self.for(syntax: $0.argumentType) }
+                genericTypes = generics.map { self.for(syntax: $0.argumentType, in: syntaxTree) }
                 guard !genericTypes.contains(.none) else {
                     return .none
                 }
@@ -1361,7 +1370,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             guard let metaType = syntax.as(MetatypeTypeSyntax.self) else {
                 return .none
             }
-            let baseType = self.for(syntax: metaType.baseType)
+            let baseType = self.for(syntax: metaType.baseType, in: syntaxTree)
             guard baseType != .none else {
                 return .none
             }
@@ -1370,7 +1379,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             guard let optionalType = syntax.as(OptionalTypeSyntax.self) else {
                 return .none
             }
-            let wrappedType = self.for(syntax: optionalType.wrappedType)
+            let wrappedType = self.for(syntax: optionalType.wrappedType, in: syntaxTree)
             guard wrappedType != .none else {
                 return .none
             }
@@ -1381,7 +1390,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             }
             let elementsSyntax = tupleType.elements
             let elements = elementsSyntax.map { (syntax: TupleTypeElementSyntax) -> (String?, TypeSignature) in
-                let type = self.for(syntax: syntax.type)
+                let type = self.for(syntax: syntax.type, in: syntaxTree)
                 return (syntax.name?.text, type)
             }
             guard !elements.isEmpty else {
@@ -1398,7 +1407,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             guard let unwrappedOptionalType = syntax.as(ImplicitlyUnwrappedOptionalTypeSyntax.self) else {
                 return .none
             }
-            let wrappedType = self.for(syntax: unwrappedOptionalType.wrappedType)
+            let wrappedType = self.for(syntax: unwrappedOptionalType.wrappedType, in: syntaxTree)
             guard wrappedType != .none else {
                 return .none
             }

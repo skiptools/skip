@@ -828,7 +828,7 @@ class Identifier: Expression, APICallExpression {
             name = "super"
         } else if syntax.kind == .specializeExpr, let specializeExpr = syntax.as(SpecializeExprSyntax.self), specializeExpr.expression.kind == .identifierExpr, let identifierExpr = specializeExpr.expression.as(IdentifierExprSyntax.self) {
             name = identifierExpr.identifier.text
-            generics = specializeExpr.genericArgumentClause.arguments.map { TypeSignature.for(syntax: $0.argumentType) }
+            generics = specializeExpr.genericArgumentClause.arguments.map { TypeSignature.for(syntax: $0.argumentType, in: syntaxTree) }
         } else {
             return nil
         }
@@ -997,7 +997,7 @@ class MatchingCase: Expression, BindingExpression {
         let pattern = CasePattern(syntax: matchingPatternExpr.pattern, in: syntaxTree)
         var declaredType: TypeSignature = .none
         if let typeSyntax = matchingPatternExpr.typeAnnotation?.type {
-            declaredType = TypeSignature.for(syntax: typeSyntax)
+            declaredType = TypeSignature.for(syntax: typeSyntax, in: syntaxTree)
         }
         let target = ExpressionDecoder.decode(syntax: matchingPatternExpr.initializer.value, in: syntaxTree)
         return MatchingCase(pattern: pattern, declaredType: declaredType, target: target, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
@@ -1047,7 +1047,7 @@ class MemberAccess: Expression, APICallExpression {
         var generics: [TypeSignature]? = nil
         if syntax.kind == .specializeExpr, let specializeExpr = syntax.as(SpecializeExprSyntax.self), specializeExpr.expression.kind == .memberAccessExpr {
             syntax = specializeExpr.expression
-            generics = specializeExpr.genericArgumentClause.arguments.map { TypeSignature.for(syntax: $0.argumentType) }
+            generics = specializeExpr.genericArgumentClause.arguments.map { TypeSignature.for(syntax: $0.argumentType, in: syntaxTree) }
         }
         guard syntax.kind == .memberAccessExpr, let memberAccessExpr = syntax.as(MemberAccessExprSyntax.self) else {
             return nil
@@ -1224,7 +1224,7 @@ class OptionalBinding: Expression, BindingExpression {
         let isLet = optionalBindingExpr.bindingSpecifier.text == "let"
         var declaredType: TypeSignature = .none
         if let typeSyntax = optionalBindingExpr.typeAnnotation?.type {
-            declaredType = TypeSignature.for(syntax: typeSyntax)
+            declaredType = TypeSignature.for(syntax: typeSyntax, in: syntaxTree)
         }
         var value: Expression? = nil
         if let valueSyntax = optionalBindingExpr.initializer?.value {
@@ -1380,7 +1380,7 @@ class PrefixOperator: Expression {
             }
             return PrefixOperator(operatorSymbol: operatorSymbol, target: target, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
         } else if syntax.kind == .isTypePattern, let isTypeExpr = syntax.as(IsTypePatternSyntax.self) {
-            let typeSignature = TypeSignature.for(syntax: isTypeExpr.type)
+            let typeSignature = TypeSignature.for(syntax: isTypeExpr.type, in: syntaxTree)
             let target = TypeLiteral(literal: typeSignature, syntax: isTypeExpr.type, sourceFile: syntaxTree.source.file, sourceRange: isTypeExpr.type.range(in: syntaxTree.source))
             return PrefixOperator(operatorSymbol: "is", target: target, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
         } else {
@@ -1861,7 +1861,7 @@ class TypeLiteral: Expression {
         guard syntax.kind == .typeExpr, let typeExpr = syntax.as(TypeExprSyntax.self) else {
             return nil
         }
-        return TypeLiteral(literal: TypeSignature.for(syntax: typeExpr.type), sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+        return TypeLiteral(literal: TypeSignature.for(syntax: typeExpr.type, in: syntaxTree), sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
     override func resolveAttributes(in syntaxTree: SyntaxTree, context: TypeResolutionContext) {

@@ -273,7 +273,7 @@ struct TypeInferenceContext {
         if let localFunction = localIdentifierTypes[name], case .function = localFunction {
             if let codebaseInfo {
                 if let callSignature = codebaseInfo.callableSignature(of: localFunction, generics: generics, arguments: constrainedArguments) {
-                    return [APIMatch(signature: callSignature, declarationType: .functionDeclaration)]
+                    return [APIMatch(signature: callSignature, apiFlags: localFunction.apiFlags, declarationType: .functionDeclaration)]
                 }
             } else {
                 return []

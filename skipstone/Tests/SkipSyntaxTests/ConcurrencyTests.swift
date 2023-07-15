@@ -146,11 +146,202 @@ final class ConcurrencyTests: XCTestCase {
     }
 
     func testMainActorRun() async throws {
-        //~~~
+        let supportingSwift = """
+        class MainActor {
+            static func run<T>(body: () throws -> T) async -> T {
+                fatalError()
+            }
+        }
+        """
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        func f() async {
+            await MainActor.run { print("main") }
+            let x = await MainActor.run { 1 }
+            let y = await MainActor.run { return 1 }
+        }
+        """, kotlin: """
+        internal suspend fun f() = Detached.run {
+            MainActor.run { print("main") }
+            val x = MainActor.run { 1 }
+            val y = MainActor.run l@{ return@l 1 }
+        }
+        """)
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        func f() async {
+            await MainActor.run {
+                Task { print("here") }
+            }
+        }
+        """, kotlin: """
+        internal suspend fun f() = Detached.run {
+            MainActor.run {
+                Task { print("here") }
+            }
+        }
+        """)
+
+        try await checkProducesMessage(swift: """
+        func f() async {
+            let mainActorClosure = {}
+            await MainActor.run(body: mainActorClosure)
+        }
+        """)
     }
 
-    func testTaskRun() async throws {
-        //~~~
+    func testTask() async throws {
+        let supportingSwift = """
+        struct Task<Success, Failure> where Failure: Error {
+            init(priority: TaskPriority? = nil, operation: @escaping () async throws -> Success) {
+            }
+            static func detached<T>(operation: () throws -> T) async -> T {
+                fatalError()
+            }
+        }
+        class C {
+            func a() async -> C { return C() }
+            @MainActor func m() {}
+        }
+        """
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        func f() {
+            Task {
+                await C().a().m()
+            }
+            Task { @MainActor in
+                await C().a().m()
+            }
+            Task.detached {
+                await C().a().m()
+            }
+            Task.detached { @MainActor in
+                await C().a().m()
+            }
+        }
+        @MainActor func g() {
+            Task {
+                await C().a().m()
+            }
+            Task { @MainActor in
+                await C().a().m()
+            }
+            Task.detached {
+                await C().a().m()
+            }
+            Task.detached { @MainActor in
+                await C().a().m()
+            }
+        }
+        """, kotlin: """
+        internal fun f() {
+            Task { C().a().mainactor { it.m() } }
+            Task(isMainActor = true) { C().a().m() }
+            Task.detached { C().a().mainactor { it.m() } }
+            Task.detached { MainActor.run { C().a().m() } }
+        }
+        internal fun g() {
+            Task(isMainActor = true) { C().a().m() }
+            Task(isMainActor = true) { C().a().m() }
+            Task.detached { C().a().mainactor { it.m() } }
+            Task.detached { MainActor.run { C().a().m() } }
+        }
+        """)
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        func f() {
+            let c = { print("any") }
+            let a: () async -> Void = { print("async") }
+            let m1: @MainActor () -> Void = { print("main") }
+            let m2 = { @MainActor in print("main") }
+            let ma: @MainActor () async -> Void = { print("main") }
+
+            Task {
+                c()
+                await a()
+                await m1()
+                await m2()
+                await ma()
+            }
+            Task { @MainActor in
+                c()
+                await a()
+                m1()
+                m2()
+                await ma()
+            }
+        }
+
+        @MainActor func g(c: () -> Void, a: () async -> Void, m: @MainActor () -> Void, ma: @MainActor () async -> Void) {
+            Task {
+                c()
+                await a()
+                m()
+                await ma()
+            }
+        }
+        """, kotlin: """
+        internal fun f() {
+            val c = { print("any") }
+            val a: suspend () -> Unit = { Detached.run { print("async") } }
+            val m1: () -> Unit = { print("main") }
+            val m2 = { print("main") }
+            val ma: suspend () -> Unit = { MainActor.run { print("main") } }
+
+            Task {
+                c()
+                a()
+                MainActor.run { m1() }
+                MainActor.run { m2() }
+                ma()
+            }
+            Task(isMainActor = true) {
+                c()
+                a()
+                m1()
+                m2()
+                ma()
+            }
+        }
+
+        internal fun g(c: () -> Unit, a: suspend () -> Unit, m: () -> Unit, ma: suspend () -> Unit) {
+            Task(isMainActor = true) {
+                c()
+                a()
+                m()
+                ma()
+            }
+        }
+        """)
+
+        try await checkProducesMessage(swift: """
+        func f() {
+            let c = {}
+            Task(operation: c)
+        }
+        """)
+
+        try await checkProducesMessage(swift: """
+        func f() {
+            let c = {}
+            Swift.Task(operation: c)
+        }
+        """)
+
+        try await checkProducesMessage(swift: """
+        func f() {
+            let c = {}
+            Task.detached(operation: c)
+        }
+        """)
+
+        try await checkProducesMessage(swift: """
+        func f() {
+            let c = {}
+            Swift.Task.detached(operation: c)
+        }
+        """)
     }
 
     func testTaskValue() async throws {
@@ -548,10 +739,6 @@ final class ConcurrencyTests: XCTestCase {
             f(s = "", c = c)
         }
         """)
-    }
-
-    func testInMainActorContext() async throws {
-        //~~~
     }
 
     // Running this and observing the output verifies that Swift hops to the main thread when required by @MainActor, but does

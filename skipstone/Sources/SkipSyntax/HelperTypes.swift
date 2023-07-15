@@ -379,7 +379,7 @@ struct Attribute: Equatable {
 
     /// Decode the attribute information in the given syntax.
     static func `for`(syntax: AttributeSyntax, in syntaxTree: SyntaxTree) -> Attribute? {
-        let signature = TypeSignature.for(syntax: syntax.attributeName)
+        let signature = TypeSignature.for(syntax: syntax.attributeName, in: syntaxTree)
         guard signature != .none else {
             return nil
         }
@@ -545,7 +545,7 @@ struct Generics: Equatable, Codable {
                 let name = parameter.name.text
                 var inherits: [TypeSignature] = []
                 if let inheritedType = parameter.inheritedType {
-                    inherits.append(.for(syntax: inheritedType))
+                    inherits.append(.for(syntax: inheritedType, in: syntaxTree))
                 }
                 entries.append(Generic(name: name, inherits: inherits))
             }
@@ -554,10 +554,10 @@ struct Generics: Equatable, Codable {
             let name = associatedType.identifier.text
             var inherits: [TypeSignature] = []
             if let initializer = associatedType.initializer {
-                inherits.append(TypeSignature.for(syntax: initializer.value))
+                inherits.append(TypeSignature.for(syntax: initializer.value, in: syntaxTree))
             } else if let inheritance = associatedType.inheritanceClause {
                 inherits += inheritance.inheritedTypeCollection.map {
-                    TypeSignature.for(syntax: $0.typeName)
+                    TypeSignature.for(syntax: $0.typeName, in: syntaxTree)
                 }
             }
             entries.append(Generic(name: name, inherits: inherits))
@@ -589,8 +589,8 @@ struct Generics: Equatable, Codable {
     }
 
     private mutating func apply(entryType: TypeSyntax, constrainedTo: TypeSyntax, whereEqual: Bool, in syntaxTree: SyntaxTree, messages: inout [Message]) {
-        var type = TypeSignature.for(syntax: entryType)
-        var constrainedToType = TypeSignature.for(syntax: constrainedTo)
+        var type = TypeSignature.for(syntax: entryType, in: syntaxTree)
+        var constrainedToType = TypeSignature.for(syntax: constrainedTo, in: syntaxTree)
         let entryIndex: Int
         if case .named(let name, _) = type, let index = entries.firstIndex(where: { $0.name == name }) {
             entryIndex = index

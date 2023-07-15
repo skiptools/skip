@@ -32,7 +32,7 @@ extension InheritedTypeListSyntax {
     func typeSignatures(in syntaxTree: SyntaxTree) -> ([TypeSignature], [Message]) {
         var messages: [Message] = []
         let typeSignatures = compactMap { typeSyntax in
-            let typeSignature = TypeSignature.for(syntax: typeSyntax.typeName)
+            let typeSignature = TypeSignature.for(syntax: typeSyntax.typeName, in: syntaxTree)
             if typeSignature != .none {
                 return typeSignature
             } else {
@@ -56,7 +56,7 @@ extension FunctionSignatureSyntax {
 
 extension ReturnClauseSyntax {
     fileprivate func typeSignature(in syntaxTree: SyntaxTree, messages: inout [Message]) -> TypeSignature {
-        var signature = TypeSignature.for(syntax: returnType)
+        var signature = TypeSignature.for(syntax: returnType, in: syntaxTree)
         if signature == .none {
             signature = .void
             messages.append(.unsupportedTypeSignature(returnType, source: syntaxTree.source))
@@ -71,7 +71,7 @@ extension Parameter<Expression> {
         var isInOut = false
         var attributes: Attributes? = nil
         if let typeSyntax {
-            type = TypeSignature.for(syntax: typeSyntax)
+            type = TypeSignature.for(syntax: typeSyntax, in: syntaxTree)
             if type == .none {
                 type = .any
                 messages.append(.unsupportedTypeSignature(typeSyntax, source: syntaxTree.source))
