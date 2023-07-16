@@ -739,4 +739,53 @@ final class TypeInferenceTests: XCTestCase {
         }
         """)
     }
+
+    func testCustomSequence() async throws {
+        try await check(supportingSwift: """
+        protocol Sequence {
+            associatedtype Element
+        }
+        extension Sequence {
+            func makeIterator() -> any IteratorProtocol<Element> {
+            }
+        }
+        protocol IteratorProtocol {
+            associatedtype Element
+            func next() -> Element?
+        }
+        extension Int {
+            static let zero = 0
+        }
+        class S1: S1Base {
+        }
+        class S1Base: Sequence {
+            func makeIterator() -> IntIterator {
+                return IntIterator()
+            }
+        }
+        class IntIterator: IteratorProtocol {
+            func next() -> Int? {
+                return nil
+            }
+        }
+        """, swift: """
+        func f1(p1: S1, p2: any Sequence<Int>) {
+            for i in p1 {
+                let b = i == .zero
+            }
+            for i in p2 {
+                let b = i == .zero
+            }
+        }
+        """, kotlin: """
+        internal fun f1(p1: S1, p2: Sequence<Int>) {
+            for (i in p1) {
+                val b = i == Int.zero
+            }
+            for (i in p2.sref()) {
+                val b = i == Int.zero
+            }
+        }
+        """)
+    }
 }

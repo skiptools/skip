@@ -338,6 +338,21 @@ struct TypeInferenceContext {
         }
     }
 
+    /// Determine the element type of the given type, correctly handling custom sequences.
+    func elementType(of type: TypeSignature) -> TypeSignature {
+        let builtinType = type.elementType
+        guard builtinType == .none else {
+            return builtinType
+        }
+        guard let makeIteratorMatch = function("makeIterator", in: type, parameters: [], messagesNode: nil).first else {
+            return .none
+        }
+        guard let nextMatch = function("next", in: makeIteratorMatch.0.returnType, parameters: [], messagesNode: nil).first else {
+            return .none
+        }
+        return nextMatch.0.returnType.asOptional(false)
+    }
+
     /// For an operation on two types, return the probable result type.
     func operationResult(_ type1: TypeSignature, _ type2: TypeSignature) -> TypeSignature {
         let type1 = type1.constrainedTypeWithGenerics(generics).asTypealiased(nil).withoutOptionality().withModuleName(nil)

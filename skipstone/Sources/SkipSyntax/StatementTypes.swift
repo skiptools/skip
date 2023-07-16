@@ -358,7 +358,7 @@ class ForLoop: Statement {
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
         let _ = sequence.inferTypes(context: context, expecting: declaredType == .none ? .none : .array(declaredType))
-        var elementTypes = sequence.inferredType.elementType.tupleTypes(count: identifierPatterns.count)
+        var elementTypes = context.elementType(of: sequence.inferredType).tupleTypes(count: identifierPatterns.count)
         if isNonNilMatch {
             elementTypes = elementTypes.map { $0.asOptional(false) }
         }
