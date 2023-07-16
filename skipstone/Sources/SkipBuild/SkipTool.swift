@@ -271,7 +271,7 @@ protocol SkipPhase : AsyncParsableCommand {
 extension SkipPhase {
     /// The total size of all input source files, below which we will not enforce either license key or valid header comments
     /// this is meant to be large enough to accomodate simple demos and experiments without requiring any license
-    static var codebaseThresholdSize: Int { 10 * 1024 }
+    static var codebaseThresholdSize: Int { 15 * 1024 }
 }
 
 /// The condition under which the phase should be run
@@ -315,17 +315,21 @@ extension CheckPhase where Self : StreamingCommand {
     /// Validate the license key if it is present in the tool or environment; otherwise scan the sources above the given codebase threshold size for approved headers
     func validateLicense(sourceURLs: [URL], against now: Date = Date.now) async throws {
 
-        // the list of header match expressions that we permit for codebases above the given threshold
-        let validLicenseHeaders = [
-            try! NSRegularExpression(pattern: ".*GNU.*General Public License.*"),
-        ]
-
-        /// Loads the `.skip.yml` at the root of the project and checks for a "skip-license" key
-        func parseLicenseConfig() throws -> String? {
-            try YAML.parse(Data(contentsOf: URL(fileURLWithPath: ".skip.yml")))["skip-license"]?.string
+        /// Loads the `.skip.yml` or  `Skip.yml` at the root of the project and checks for a "skip-license" key
+        func parseLicenseConfig(inConfigurationPaths paths: [String] = [".skip.yml", "Skip.yml"], relativeTo baseFolder: URL? = nil) -> String? {
+            for path in paths {
+                let url = URL(fileURLWithPath: path, isDirectory: false, relativeTo: baseFolder)
+                // we tolerate missing config files
+                if let yaml = try? YAML.parse(Data(contentsOf: url)) {
+                    if let license = yaml["skip-license"]?.string {
+                        return license
+                    }
+                }
+            }
+            return nil
         }
 
-        let licenseString = licenseOptions.skipLicense ?? ProcessInfo.processInfo.environment["SKIP_LICENSE"] ?? (try? parseLicenseConfig())
+        let licenseString = licenseOptions.skipLicense ?? ProcessInfo.processInfo.environment["SKIP_LICENSE"] ?? parseLicenseConfig()
 
         do {
             let license = try licenseString.flatMap { try LicenseKey(licenseString: $0) }
@@ -344,9 +348,9 @@ extension CheckPhase where Self : StreamingCommand {
                 }
             } else {
                 let scanSourceStart = Date().timeIntervalSinceReferenceDate
-                let (codebaseSize, validated) = try await SourceValidator.scanSources(from: sourceURLs, codebaseThreshold: Self.codebaseThresholdSize, headerExpressions: validLicenseHeaders)
+                let (codebaseSize, validated) = try await SourceValidator.scanSources(from: sourceURLs, codebaseThreshold: Self.codebaseThresholdSize)
                 let scanSourceEnd = Date().timeIntervalSinceReferenceDate
-                info("Codebase (\(byteCount(for: .init(codebaseSize)))) \(validated ? " scanned for non-commercial license headers" : " scanned") in (\(Int64((scanSourceEnd - scanSourceStart) * 1000)) ms)")
+                info("Codebase (\(byteCount(for: .init(codebaseSize)))) \(validated ? " license" : " scanned") in (\(Int64((scanSourceEnd - scanSourceStart) * 1000)) ms)")
             }
         } catch let e as LicenseError {
             // issue an error with the offending file

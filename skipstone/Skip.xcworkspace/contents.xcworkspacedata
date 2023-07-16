@@ -11,9 +11,6 @@
       location = "group:../skiphub">
    </FileRef>
    <FileRef
-      location = "group:../skip-template">
-   </FileRef>
-   <FileRef
       location = "group:../skipapp">
    </FileRef>
    <FileRef

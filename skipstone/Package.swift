@@ -19,7 +19,8 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/apple/swift-syntax.git", branch: "main"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.2.2"),
-        .package(url: "https://github.com/apple/swift-tools-support-core.git", from: "0.5.1"),
+        .package(url: "https://github.com/apple/swift-tools-support-core.git", from: "0.5.2"),
+        .package(url: "https://github.com/apple/swift-crypto.git", from: "2.5.0"),
         .package(url: "https://github.com/marcprux/universal.git", from: "5.2.0"),
     ],
     targets: [
@@ -39,6 +40,7 @@ let package = Package(
             .product(name: "ArgumentParser", package: "swift-argument-parser"),
             .product(name: "TSCBasic", package: "swift-tools-support-core"),
             .product(name: "Universal", package: "universal"),
+            .product(name: "Crypto", package: "swift-crypto", condition: .when(platforms: [.linux])),
         ]),
         .testTarget(name: "SkipBuildTests", dependencies: ["SkipBuild"]),
 
