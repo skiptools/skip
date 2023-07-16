@@ -14,11 +14,15 @@ struct Options {
 
 // MARK: Command Executor
 
-public struct SkipCommandExecutor: AsyncParsableCommand {
-    public static let experimental = false
+public protocol SkipCommandExecutor : AsyncParsableCommand {
+
+}
+
+/// The command that is run by "SkipRunner" (aka "skiptool")
+public struct SkipRunnerExecutor: SkipCommandExecutor {
     public static var configuration = CommandConfiguration(commandName: "skip",
-                                                           abstract: "Skip: Swift Kotlin Interop \(skipVersion)",
-                                                           shouldDisplay: !experimental,
+                                                           abstract: "Skip Transpiler \(skipVersion)",
+                                                           shouldDisplay: true,
                                                            subcommands: [
                                                             VersionCommand.self,
                                                             InfoCommand.self,
@@ -27,8 +31,6 @@ public struct SkipCommandExecutor: AsyncParsableCommand {
                                                             SnippetAction.self,
                                                             PrintSwiftASTAction.self,
                                                             PrintSkipASTAction.self,
-                                                            //DoctorAction.self, // TODO: check installation status, like `brew doctor` and `flutter doctor`
-                                                            //InitAction.self, // TODO: initialize module Kotlin source folders and update Package.swift with plug-in and additional Kotlin targets
                                                            ]
     )
 
@@ -40,7 +42,88 @@ public struct SkipCommandExecutor: AsyncParsableCommand {
 
     public init() {
     }
+}
 
+
+/// The command that is run by "SkipKey", which can be used to create and verify Skip license keys
+public struct SkipKeyExecutor: SkipCommandExecutor {
+    public static var configuration = CommandConfiguration(commandName: "skipkey",
+                                                           abstract: "Skip Key Tool \(skipVersion)",
+                                                           subcommands: [
+                                                            InfoCommand.self,
+                                                            CreateCommand.self,
+                                                           ])
+
+    public init() {
+    }
+
+    struct KeyOutput : MessageConvertible {
+        var id: String
+        var expiration: Date
+        var key: String
+
+        var description: String {
+            """
+            id: \(id)
+            expiration: \(ISO8601DateFormatter.string(from: expiration, timeZone: TimeZone(secondsFromGMT: 0)!))
+            key: \(key)
+            """
+        }
+    }
+
+
+    struct InfoCommand: SingleStreamingCommand {
+        static var configuration = CommandConfiguration(commandName: "info", abstract: "Show key info")
+
+        @Option(name: [.customShort("k"), .long], help: ArgumentHelp("The key to open", valueName: "key"))
+        var key: String
+
+        @OptionGroup(title: "Output Options")
+        var outputOptions: OutputOptions
+
+        typealias Output = KeyOutput
+
+        func executeCommand() async throws -> Output {
+            //info("create key")
+            let licenseKey = try LicenseKey(licenseString: self.key)
+            return KeyOutput(id: licenseKey.id, expiration: licenseKey.expiration, key: key)
+        }
+    }
+
+    struct CreateCommand: SingleStreamingCommand {
+        static var configuration = CommandConfiguration(commandName: "create", abstract: "Create a new key")
+
+        @Option(name: [.customShort("i"), .long], help: ArgumentHelp("The identifier for the key", valueName: "id"))
+        var id: String
+
+        @Option(name: [.customShort("e"), .long], help: ArgumentHelp("The ISO-8601 key expiration date", valueName: "date"))
+        var expiration: String
+
+        @Option(name: [.long], help: ArgumentHelp("A hex-encoded 12-byte initialization vector", valueName: "nonce"))
+        var nonce: String?
+
+        @OptionGroup(title: "Output Options")
+        var outputOptions: OutputOptions
+
+        typealias Output = KeyOutput
+
+        func executeCommand() async throws -> Output {
+            guard let exp = ISO8601DateFormatter().date(from: expiration) else {
+                throw LicenseError.licenseExpirationDateInvalid
+            }
+            let key = LicenseKey(id: id, expiration: exp)
+            let iv = nonce.flatMap(Data.init(hexString:))
+            if nonce != nil && iv?.count != 12 {
+                throw LicenseError.invalidNonceFormat
+            }
+            let keyString = try key.licenseKeyString(iv: iv)
+            return KeyOutput(id: id, expiration: exp, key: keyString)
+        }
+    }
+}
+
+
+extension SkipCommandExecutor {
     /// Run the transpiler on the given arguments.
     public static func run(_ arguments: [String], basePath: AbsolutePath = localFileSystem.currentWorkingDirectory!, out: WritableByteStream? = nil, err: WritableByteStream? = nil) async throws {
         var cmd: ParsableCommand = try parseAsRoot(arguments)
@@ -63,8 +146,7 @@ public struct SkipCommandExecutor: AsyncParsableCommand {
     }
 }
 
-
-struct OutputOptions: ParsableArguments {
+public struct OutputOptions: ParsableArguments {
     @Option(name: [.customShort("o"), .long], help: ArgumentHelp("Send output to the given file (stdout: -)", valueName: "path"))
     var output: String?
 
@@ -91,6 +173,9 @@ struct OutputOptions: ParsableArguments {
 
     /// A transient handler for tool output; this acts as a temporary holder of output streams
     internal var streams: OutputHandler = OutputHandler()
+
+    public init() {
+    }
 
     internal final class OutputHandler : Decodable {
         var out: WritableByteStream = stdoutStream
@@ -189,15 +274,16 @@ struct VersionCommand: SingleStreamingCommand {
     }
 }
 
-// MARK: InfoCommand
 
 extension FileManager {
-    #if os(iOS)
+#if os(iOS)
     var homeDirectoryForCurrentUser: URL {
         URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
     }
-    #endif
+#endif
 }
+
+// MARK: InfoCommand
 
 struct InfoCommand: SingleStreamingCommand {
     static let experimental = false
@@ -350,7 +436,7 @@ extension CheckPhase where Self : StreamingCommand {
                 let scanSourceStart = Date().timeIntervalSinceReferenceDate
                 let (codebaseSize, validated) = try SourceValidator.scanSources(from: sourceURLs, codebaseThreshold: Self.codebaseThresholdSize)
                 let scanSourceEnd = Date().timeIntervalSinceReferenceDate
-                info("Codebase (\(byteCount(for: .init(codebaseSize)))) \(validated ? " license" : " scanned") in (\(Int64((scanSourceEnd - scanSourceStart) * 1000)) ms)")
+                info("Codebase (\(byteCount(for: .init(codebaseSize)))) \(validated ? " scanned" : " scanned") (\(Int64((scanSourceEnd - scanSourceStart) * 1000)) ms)")
             }
         } catch let e as LicenseError {
             // issue an error with the offending file
@@ -1401,7 +1487,7 @@ extension Message: MessageConvertible {
 }
 
 /// A command that contains options for how messages will be conveyed to the user
-protocol StreamingCommand: AsyncParsableCommand {
+public protocol StreamingCommand: AsyncParsableCommand {
     /// The structured output of this tool
     associatedtype Output : MessageConvertible
     typealias OutputMessage = Either<Output>.Or<Message>
@@ -1469,24 +1555,24 @@ extension StreamingCommand {
     }
 }
 
-protocol SingleStreamingCommand : StreamingCommand {
+public protocol SingleStreamingCommand : StreamingCommand {
     func executeCommand() async throws -> Output
 }
 
 extension SingleStreamingCommand {
-    func performCommand(with continuation: AsyncThrowingStream<OutputMessage, Error>.Continuation) async throws {
+    public func performCommand(with continuation: AsyncThrowingStream<OutputMessage, Error>.Continuation) async throws {
         yield(output: try await executeCommand())
     }
 }
 
 
 /// A type that can be output in a sequence of messages
-protocol MessageConvertible: Encodable & CustomStringConvertible {
+public protocol MessageConvertible: Encodable & CustomStringConvertible {
     /// The attributed output string, used for ANSI terminals
     // var attributedString: String { get }
 }
 
-extension StreamingCommand {
+public extension StreamingCommand {
     /// Sends the output to the hander
     func yield(output: Output) {
         outputOptions.streams.yield(Either.Or.a(output))

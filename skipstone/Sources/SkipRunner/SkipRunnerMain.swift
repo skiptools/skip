@@ -1,8 +1,8 @@
 import SkipBuild
 
 /// Command-line runner for the transpiler.
-@main public struct Runner {
+@main public struct SkipRunnerMain {
     static func main() async throws {
-        await SkipCommandExecutor.main()
+        await SkipRunnerExecutor.main()
     }
 }

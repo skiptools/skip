@@ -45,6 +45,9 @@ let package = Package(
         .testTarget(name: "SkipBuildTests", dependencies: ["SkipBuild"]),
 
         .executableTarget(name: "SkipRunner", dependencies: ["SkipBuild"]),
-        .testTarget(name: "SkipRunnerTests", dependencies: ["SkipRunner"]),
+        .testTarget(name: "SkipRunnerTests", dependencies: ["SkipBuild"]),
+
+        .executableTarget(name: "SkipKey", dependencies: ["SkipBuild"]),
+        .testTarget(name: "SkipKeyTests", dependencies: ["SkipBuild"]),
     ]
 )
