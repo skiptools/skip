@@ -10,6 +10,6 @@ import SkipBuild
 /// This is only built for local `skiptool` imported through `SKIPLOCAL` (see `Package.swift`).
 @main public struct SkipToolMain {
     static func main() async throws {
-        await SkipCommandExecutor.main()
+        await SkipRunnerExecutor.main()
     }
 }
