@@ -348,7 +348,7 @@ extension CheckPhase where Self : StreamingCommand {
                 }
             } else {
                 let scanSourceStart = Date().timeIntervalSinceReferenceDate
-                let (codebaseSize, validated) = try await SourceValidator.scanSources(from: sourceURLs, codebaseThreshold: Self.codebaseThresholdSize)
+                let (codebaseSize, validated) = try SourceValidator.scanSources(from: sourceURLs, codebaseThreshold: Self.codebaseThresholdSize)
                 let scanSourceEnd = Date().timeIntervalSinceReferenceDate
                 info("Codebase (\(byteCount(for: .init(codebaseSize)))) \(validated ? " license" : " scanned") in (\(Int64((scanSourceEnd - scanSourceStart) * 1000)) ms)")
             }
