@@ -344,7 +344,7 @@ struct TypeInferenceContext {
         guard builtinType == .none else {
             return builtinType
         }
-        guard let makeIteratorMatch = function("makeIterator", in: type, parameters: [], messagesNode: nil).first else {
+        guard let makeIteratorMatch = function("makeIterator", in: type, parameters: [], messagesNode: nil).first ?? function("makeAsyncIterator", in: type, parameters: [], messagesNode: nil).first else {
             return .none
         }
         guard let nextMatch = function("next", in: makeIteratorMatch.0.returnType, parameters: [], messagesNode: nil).first else {
