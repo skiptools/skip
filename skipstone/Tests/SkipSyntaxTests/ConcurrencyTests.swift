@@ -161,7 +161,7 @@ final class ConcurrencyTests: XCTestCase {
             let y = await MainActor.run { return 1 }
         }
         """, kotlin: """
-        internal suspend fun f() = Detached.run {
+        internal suspend fun f(): Unit = Detached.run {
             MainActor.run { print("main") }
             val x = MainActor.run { 1 }
             val y = MainActor.run l@{ return@l 1 }
@@ -175,7 +175,7 @@ final class ConcurrencyTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal suspend fun f() = Detached.run {
+        internal suspend fun f(): Unit = Detached.run {
             MainActor.run {
                 Task { print("here") }
             }
@@ -412,7 +412,7 @@ final class ConcurrencyTests: XCTestCase {
             a()
             b()
         }
-        internal suspend fun f() = Detached.run {
+        internal suspend fun f(): Unit = Detached.run {
             MainActor.run { a() }
             b()
         }
@@ -448,7 +448,7 @@ final class ConcurrencyTests: XCTestCase {
             val c = C()
             val i = C.Inner()
         }
-        internal suspend fun g() = Detached.run {
+        internal suspend fun g(): Unit = Detached.run {
             val c = MainActor.run { C() }
             val i = MainActor.run { C.Inner() }
         }
@@ -467,7 +467,7 @@ final class ConcurrencyTests: XCTestCase {
         """, kotlin: """
         internal fun a(c: C, i: C.Inner): Int = 1
         internal fun b(c: C, i: C.Inner): Int = 1
-        internal suspend fun f() = Detached.run {
+        internal suspend fun f(): Unit = Detached.run {
             val sum = a(c = MainActor.run { C() }, i = MainActor.run { C.Inner() }) + MainActor.run { b(c = C(), i = C.Inner()) }
         }
         """)
@@ -511,7 +511,7 @@ final class ConcurrencyTests: XCTestCase {
             val f = C.f()
             val j = C.Inner.j
         }
-        internal suspend fun g() = Detached.run {
+        internal suspend fun g(): Unit = Detached.run {
             val x = C.x
             val i = MainActor.run { C.i }
             val f = MainActor.run { C.f() }
@@ -525,7 +525,7 @@ final class ConcurrencyTests: XCTestCase {
             await f(i: C.Inner.j + C.f() - C.i)
         }
         """, kotlin: """
-        internal suspend fun f(i: Int) = Detached.run {
+        internal suspend fun f(i: Int): Unit = Detached.run {
             f(i = MainActor.run { C.i })
             f(i = MainActor.run { C.Inner.j } + MainActor.run { C.f() } - MainActor.run { C.i })
         }
@@ -551,7 +551,7 @@ final class ConcurrencyTests: XCTestCase {
             let mainCci = await c.mainC.c.i
         }
         """, kotlin: """
-        internal suspend fun f(c: C) = Detached.run {
+        internal suspend fun f(c: C): Unit = Detached.run {
             val i = C().mainactor { it.i }
             val mainCi = c.mainactor { it.mainC }.mainactor { it.i }
             val ci = c.c.mainactor { it.i }
@@ -589,7 +589,7 @@ final class ConcurrencyTests: XCTestCase {
             let mainCci = await c.mainC().c().i()
         }
         """, kotlin: """
-        internal suspend fun f(c: C) = Detached.run {
+        internal suspend fun f(c: C): Unit = Detached.run {
             val i = C().mainactor { it.i() }
             val mainCi = c.mainactor { it.mainC() }.mainactor { it.i() }
             val ci = c.c().mainactor { it.i() }
@@ -602,7 +602,7 @@ final class ConcurrencyTests: XCTestCase {
             let i = await c.j(i: c.i())
         }
         """, kotlin: """
-        internal suspend fun f(c: C) = Detached.run {
+        internal suspend fun f(c: C): Unit = Detached.run {
             val i = c.mainactor { it.j(i = c.i()) }
         }
         """)
@@ -662,7 +662,7 @@ final class ConcurrencyTests: XCTestCase {
             await c.f(i: i())
         }
         """, kotlin: """
-        internal suspend fun f() = Detached.run {
+        internal suspend fun f(): Unit = Detached.run {
             val c = C()
             c.mainactor { it.f(i = i()) }
         }
@@ -754,6 +754,64 @@ final class ConcurrencyTests: XCTestCase {
         """)
     }
 
+    func testAwaitWhileLoop() async throws {
+        try await check(swift: """
+        func gen() async -> Int? {
+            return nil
+        }
+        func f() async {
+            while let i = await gen() {
+                print(i)
+            }
+        }
+        """, kotlin: """
+        internal suspend fun gen(): Int? = Detached.run l@{
+            return@l null
+        }
+        internal suspend fun f(): Unit = Detached.run {
+            while (true) {
+                val i_0 = gen()
+                if (i_0 == null) {
+                    break
+                }
+                print(i_0)
+            }
+        }
+        """)
+
+        try await check(swift: """
+        @MainActor func g() -> Gen {
+            return Gen()
+        }
+        class Gen {
+            func gen() async -> Int? {
+                return nil
+            }
+        }
+        func f() async {
+            while let i = await g().gen() {
+                print(i)
+            }
+        }
+        """, kotlin: """
+        internal fun g(): Gen = Gen()
+        internal open class Gen {
+            internal open suspend fun gen(): Int? = Detached.run l@{
+                return@l null
+            }
+        }
+        internal suspend fun f(): Unit = Detached.run {
+            while (true) {
+                val i_0 = MainActor.run { g() }.gen()
+                if (i_0 == null) {
+                    break
+                }
+                print(i_0)
+            }
+        }
+        """)
+    }
+
     // Running this and observing the output verifies that Swift hops to the main thread when required by @MainActor, but does
     // not stay there for chained calls. Commented out to avoid warnings about using Thread.isMainThread within async code.
 //    func testMainActorBehavior() async throws {
@@ -796,4 +854,13 @@ final class ConcurrencyTests: XCTestCase {
 //            return mains
 //        }
 //    }
+}
+
+func f() async -> Int? {
+    return 1
+}
+func g() async {
+    while let i = await f() {
+
+    }
 }

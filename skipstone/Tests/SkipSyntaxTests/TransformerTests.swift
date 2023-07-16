@@ -49,7 +49,7 @@ final class TransformerTests: XCTestCase {
 
         internal open class TestCase: XCTestCase {
 
-            @Test internal fun async_testAsync() {
+            @Test internal fun run_testAsync() {
                 val dispatcher = StandardTestDispatcher()
                 Dispatchers.setMain(dispatcher)
                 try {
@@ -58,7 +58,7 @@ final class TransformerTests: XCTestCase {
                     Dispatchers.resetMain()
                 }
             }
-            internal open suspend fun testAsync() = Detached.run {
+            internal open suspend fun testAsync(): Unit = Detached.run {
                 XCTAssertTrue(someCheck())
             }
         }

@@ -28,7 +28,7 @@ final class KotlinUnitTestTransformer: KotlinTransformer {
         importPackages.insert("kotlinx.coroutines.test.*")
 
         // Create a wrapper @Test function that will call the original async function
-        let testFunctionDeclaration = KotlinFunctionDeclaration(name: "async_" + functionDeclaration.name)
+        let testFunctionDeclaration = KotlinFunctionDeclaration(name: "run_" + functionDeclaration.name)
         testFunctionDeclaration.annotations += ["@Test"]
         testFunctionDeclaration.extras = .singleNewline
 
