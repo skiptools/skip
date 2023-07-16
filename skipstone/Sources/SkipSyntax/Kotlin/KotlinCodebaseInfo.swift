@@ -118,8 +118,11 @@ extension CodebaseInfo.Context {
         assert(global.kotlin != nil)
         let typeInfos = typeInfos(forNamed: type)
         if let structInfo = typeInfos.first(where: { $0.declarationType == .structDeclaration }) {
+            guard !structInfo.attributes.kotlinHasDirective(.nocopy) else {
+                return false
+            }
             return structInfo.variables.contains(where: { $0.apiFlags?.contains(.writeable) == true }) || structInfo.functions.contains(where: \.isMutating)
-        } else if typeInfos.contains(where: { $0.declarationType == .protocolDeclaration }) {
+        } else if typeInfos.contains(where: { $0.declarationType == .protocolDeclaration && !$0.attributes.kotlinHasDirective(.nocopy) }) {
             // If this is a protocol that is constrained to class impls, then it isn't a mutable struct. Otherwise it could be
             return !global.protocolSignatures(forNamed: type).contains(.anyObject)
         } else if typeInfos.isEmpty {

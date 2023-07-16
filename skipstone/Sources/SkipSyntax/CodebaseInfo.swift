@@ -1151,7 +1151,7 @@ public class CodebaseInfo: Codable {
             return TypeSignature.Parameter(label: variable.name, type: variable.signature, hasDefaultValue: variable.hasValue)
         }
         let initSignature: TypeSignature = .function(parameters, typeInfo.signature, typeInfo.apiFlags ?? [])
-        var initInfo = FunctionInfo(name: "init", declarationType: .initDeclaration, signature: initSignature, moduleName: typeInfo.moduleName, sourceFile: typeInfo.sourceFile, declaringType: typeInfo.signature, modifiers: typeInfo.modifiers, availability: .available)
+        var initInfo = FunctionInfo(name: "init", declarationType: .initDeclaration, signature: initSignature, moduleName: typeInfo.moduleName, sourceFile: typeInfo.sourceFile, declaringType: typeInfo.signature, modifiers: typeInfo.modifiers, attributes: Attributes(), availability: .available)
         initInfo.isGenerated = true
         typeInfo.functions.append(initInfo)
     }
@@ -1177,6 +1177,7 @@ public class CodebaseInfo: Codable {
         let sourceFile: Source.FilePath?
         let declaringType: TypeSignature?
         let modifiers: Modifiers
+        let attributes: Attributes
         let availability: Availability
         var apiFlags: APIFlags?
         var isStatic: Bool {
@@ -1245,7 +1246,7 @@ public class CodebaseInfo: Codable {
 
         private enum CodingKeys: String, CodingKey {
             // Exclude language additions, importedModuleNames
-            case name, declarationType, signature, moduleName, sourceFile, declaringType, modifiers, availability, apiFlags, generics, inherits, types, typealiases, cases, variables, functions, subscripts
+            case name, declarationType, signature, moduleName, sourceFile, declaringType, modifiers, attributes, availability, apiFlags, generics, inherits, types, typealiases, cases, variables, functions, subscripts
         }
 
         fileprivate init(statement: TypeDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo, syntaxTree: SyntaxTree) {
@@ -1256,6 +1257,7 @@ public class CodebaseInfo: Codable {
             self.sourceFile = statement.sourceFile
             self.declaringType = declaringType
             self.modifiers = statement.modifiers
+            self.attributes = statement.attributes
             self.availability = Availability(attributes: statement.attributes)
             self.apiFlags = statement.attributes.contains(.mainActor) ? .mainActor : []
             self.generics = statement.generics
@@ -1276,6 +1278,7 @@ public class CodebaseInfo: Codable {
                 self.declaringType = nil
             }
             self.modifiers = statement.modifiers
+            self.attributes = statement.attributes
             self.availability = Availability(attributes: statement.attributes)
             self.apiFlags = statement.attributes.contains(.mainActor) ? .mainActor : []
             self.generics = statement.generics
@@ -1452,6 +1455,7 @@ public class CodebaseInfo: Codable {
         let sourceFile: Source.FilePath?
         let declaringType: TypeSignature?
         let modifiers: Modifiers
+        let attributes: Attributes
         let availability: Availability
         var apiFlags: APIFlags?
         var isStatic: Bool {
@@ -1466,7 +1470,7 @@ public class CodebaseInfo: Codable {
 
         private enum CodingKeys: String, CodingKey {
             // Exclude value expression, language additions, importedModuleNames
-            case name, signature, moduleName, sourceFile, declaringType, modifiers, availability, apiFlags, isInitializable, hasValue
+            case name, signature, moduleName, sourceFile, declaringType, modifiers, attributes, availability, apiFlags, isInitializable, hasValue
         }
 
         fileprivate init(statement: VariableDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo, syntaxTree: SyntaxTree) {
@@ -1476,6 +1480,7 @@ public class CodebaseInfo: Codable {
             self.sourceFile = statement.sourceFile
             self.declaringType = declaringType
             self.modifiers = statement.modifiers
+            self.attributes = statement.attributes
             self.availability = Availability(attributes: statement.attributes)
             self.apiFlags = statement.apiFlags
             self.isInitializable = !statement.modifiers.isStatic && !statement.modifiers.isOverride && statement.getter == nil && (!statement.isLet || statement.value == nil)
@@ -1539,6 +1544,7 @@ public class CodebaseInfo: Codable {
         var sourceFile: Source.FilePath?
         var declaringType: TypeSignature?
         let modifiers: Modifiers
+        let attributes: Attributes
         let availability: Availability
         var apiFlags: APIFlags? {
             return signature.apiFlags
@@ -1555,7 +1561,7 @@ public class CodebaseInfo: Codable {
 
         private enum CodingKeys: String, CodingKey {
             // Exclude language additions, importedModuleNames
-            case name, declarationType, signature, moduleName, sourceFile, declaringType, modifiers, availability, generics, isMutating, isGenerated
+            case name, declarationType, signature, moduleName, sourceFile, declaringType, modifiers, attributes, availability, generics, isMutating, isGenerated
         }
 
         fileprivate init(statement: FunctionDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo, syntaxTree: SyntaxTree) {
@@ -1566,13 +1572,14 @@ public class CodebaseInfo: Codable {
             self.sourceFile = statement.sourceFile
             self.declaringType = declaringType
             self.modifiers = statement.modifiers
+            self.attributes = statement.attributes
             self.availability = Availability(attributes: statement.attributes)
             self.generics = statement.generics
             self.isMutating = statement.modifiers.isMutating
             (codebaseInfo.languageAdditions as? CodebaseInfoLanguageAdditionsGatherDelegate)?.codebaseInfo(codebaseInfo, didGather: &self, from: statement, syntaxTree: syntaxTree)
         }
 
-        fileprivate init(name: String, declarationType: StatementType, signature: TypeSignature, moduleName: String?, sourceFile: Source.FilePath? = nil, declaringType: TypeSignature? = nil, modifiers: Modifiers, availability: Availability, generics: Generics = Generics(), apiFlags: APIFlags = [], isMutating: Bool = false) {
+        fileprivate init(name: String, declarationType: StatementType, signature: TypeSignature, moduleName: String?, sourceFile: Source.FilePath? = nil, declaringType: TypeSignature? = nil, modifiers: Modifiers, attributes: Attributes, availability: Availability, generics: Generics = Generics(), apiFlags: APIFlags = [], isMutating: Bool = false) {
             self.name = name
             self.declarationType = declarationType
             self.signature = signature
@@ -1580,6 +1587,7 @@ public class CodebaseInfo: Codable {
             self.sourceFile = sourceFile
             self.declaringType = declaringType
             self.modifiers = modifiers
+            self.attributes = attributes
             self.availability = availability
             self.generics = generics
             self.isMutating = isMutating
@@ -1613,6 +1621,7 @@ public class CodebaseInfo: Codable {
         var sourceFile: Source.FilePath?
         var declaringType: TypeSignature?
         let modifiers: Modifiers
+        let attributes: Attributes
         let availability: Availability
         var apiFlags: APIFlags? {
             return signature.apiFlags
@@ -1628,7 +1637,7 @@ public class CodebaseInfo: Codable {
 
         private enum CodingKeys: String, CodingKey {
             // Exclude language additions, importedModuleNames
-            case signature, moduleName, sourceFile, declaringType, modifiers, availability, generics, isReadOnly
+            case signature, moduleName, sourceFile, declaringType, modifiers, attributes, availability, generics, isReadOnly
         }
 
         fileprivate init(statement: SubscriptDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo, syntaxTree: SyntaxTree) {
@@ -1637,6 +1646,7 @@ public class CodebaseInfo: Codable {
             self.sourceFile = statement.sourceFile
             self.declaringType = declaringType
             self.modifiers = statement.modifiers
+            self.attributes = statement.attributes
             self.availability = Availability(attributes: statement.attributes)
             self.generics = statement.generics
             self.isReadOnly = statement.setter == nil
@@ -1669,6 +1679,7 @@ public class CodebaseInfo: Codable {
         let sourceFile: Source.FilePath?
         let declaringType: TypeSignature?
         let modifiers: Modifiers
+        let attributes: Attributes
         let availability: Availability
         var apiFlags: APIFlags? {
             return nil
@@ -1684,7 +1695,7 @@ public class CodebaseInfo: Codable {
 
         private enum CodingKeys: String, CodingKey {
             // Exclude language additions, importedModuleNames
-            case name, signature, moduleName, sourceFile, declaringType, modifiers, availability, generics, targetSignature
+            case name, signature, moduleName, sourceFile, declaringType, modifiers, attributes, availability, generics, targetSignature
         }
 
         fileprivate init(statement: TypealiasDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo, syntaxTree: SyntaxTree) {
@@ -1694,6 +1705,7 @@ public class CodebaseInfo: Codable {
             self.sourceFile = statement.sourceFile
             self.declaringType = declaringType
             self.modifiers = statement.modifiers
+            self.attributes = statement.attributes
             self.availability = Availability(attributes: statement.attributes)
             self.generics = statement.generics
             self.targetSignature = statement.aliasedType
@@ -1718,6 +1730,7 @@ public class CodebaseInfo: Codable {
         let sourceFile: Source.FilePath?
         let declaringType: TypeSignature?
         let modifiers: Modifiers
+        let attributes: Attributes
         let availability: Availability
         var apiFlags: APIFlags? {
             return nil
@@ -1730,7 +1743,7 @@ public class CodebaseInfo: Codable {
 
         private enum CodingKeys: String, CodingKey {
             // Exclude language additions, importedModuleNames
-            case name, signature, moduleName, sourceFile, declaringType, modifiers, availability
+            case name, signature, moduleName, sourceFile, declaringType, modifiers, attributes, availability
         }
 
         fileprivate init(statement: EnumCaseDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo, syntaxTree: SyntaxTree) {
@@ -1740,6 +1753,7 @@ public class CodebaseInfo: Codable {
             self.sourceFile = statement.sourceFile
             self.declaringType = declaringType
             self.modifiers = statement.modifiers
+            self.attributes = statement.attributes
             self.availability = Availability(attributes: statement.attributes)
             (codebaseInfo.languageAdditions as? CodebaseInfoLanguageAdditionsGatherDelegate)?.codebaseInfo(codebaseInfo, didGather: &self, from: statement, syntaxTree: syntaxTree)
         }
@@ -1760,6 +1774,7 @@ protocol CodebaseInfoItem {
     var sourceFile: Source.FilePath? { get }
     var declaringType: TypeSignature? { get }
     var modifiers: Modifiers { get }
+    var attributes: Attributes { get }
     var availability: Availability { get }
     var apiFlags: APIFlags? { get }
     var isStatic: Bool { get }

@@ -185,7 +185,16 @@ extension Parameter {
     }
 }
 
+enum KotlinDirectiveAttribute: String {
+    case nocopy
+}
+
 extension Attributes {
+    /// Whether the given directive attribute is present.
+    func kotlinHasDirective(_ directive: KotlinDirectiveAttribute) -> Bool {
+        return of(kind: .directive).contains { $0.tokens.contains(directive.rawValue) }
+    }
+
     func append(to output: OutputGenerator, indentation: Indentation) {
         attributes.forEach { $0.append(to: output, indentation: indentation) }
     }

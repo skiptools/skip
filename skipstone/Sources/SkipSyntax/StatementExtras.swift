@@ -3,6 +3,8 @@ import SwiftSyntax
 /// Extra directives and trivia derived from the trivia surrounding a statement.
 struct StatementExtras {
     enum Directive {
+        /// A language-specific attribute.
+        case attributes([String])
         /// Insert directly into the output.
         case insert(String, StatementExtras?)
         /// Replace the syntax with the given output.
@@ -33,6 +35,7 @@ struct StatementExtras {
         var triviaLines: [String] = []
         var isMultilineCommentDirective = false
         var multilineCommentDirectiveIndentation = 0
+        let attributesPrefix = "SKIP ATTRIBUTES:"
         let insertPrefix = "SKIP INSERT:"
         let replacePrefix = "SKIP REPLACE:"
         let declarationPrefix = "SKIP DECLARE:"
@@ -44,6 +47,9 @@ struct StatementExtras {
             }
             let directiveString = directiveLines.joined().trimmingCharacters(in: .whitespacesAndNewlines)
             switch currentDirective {
+            case .attributes:
+                let attributes = directiveString.components(separatedBy: .whitespaces)
+                directives.append(.attributes(attributes))
             case .insert:
                 let extras = StatementExtras(directives: [], leadingTrivia: triviaLines, trailingTrivia: [])
                 directives.append(.insert(directiveString, extras))
@@ -136,6 +142,9 @@ struct StatementExtras {
                     directiveLines.append(String(trimmedLine.dropFirst(replacePrefix.count)).trimmingCharacters(in: .whitespaces) + "\n")
                 } else if trimmedLine.hasPrefix(declarationPrefix) {
                     directive = .declaration("")
+                    directiveLines.append(String(trimmedLine.dropFirst(declarationPrefix.count)).trimmingCharacters(in: .whitespaces) + "\n")
+                } else if trimmedLine.hasPrefix(attributesPrefix) {
+                    directive = .attributes([])
                     directiveLines.append(String(trimmedLine.dropFirst(declarationPrefix.count)).trimmingCharacters(in: .whitespaces) + "\n")
                 } else if trimmedLine.hasPrefix(noWarnPrefix) {
                     directives.append(.nowarn)

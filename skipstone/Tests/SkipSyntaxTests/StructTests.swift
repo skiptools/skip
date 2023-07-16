@@ -467,4 +467,67 @@ final class StructTests: XCTestCase {
         }
         """)
     }
+
+    func testNocopyDirective() async throws {
+        try await check(swift: """
+        // SKIP ATTRIBUTES: nocopy
+        struct S {
+            var x = 1
+        }
+        struct A {
+            var s = S()
+        }
+        """, kotlin: """
+        internal class S {
+            internal var x = 1
+
+            constructor(x: Int = 1) {
+                this.x = x
+            }
+        }
+        internal class A: MutableStruct {
+            internal var s = S()
+                set(newValue) {
+                    willmutate()
+                    field = newValue
+                    didmutate()
+                }
+
+            constructor(s: S = S()) {
+                this.s = s
+            }
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct = A(s)
+        }
+        """)
+
+        try await check(swift: """
+        // SKIP ATTRIBUTES: nocopy
+        struct S {
+            var x = 1
+
+            init(p: Int) {
+                var s = S()
+                s.x = p
+                self = s
+            }
+        }
+        """, kotlin: """
+        internal class S {
+            internal var x = 1
+
+            internal constructor(p: Int) {
+                var s = S()
+                s.x = p
+                assignfrom(s)
+            }
+
+            private fun assignfrom(target: S) {
+                this.x = target.x
+            }
+        }
+        """)
+    }
 }

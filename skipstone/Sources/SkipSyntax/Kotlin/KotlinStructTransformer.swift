@@ -14,14 +14,14 @@ final class KotlinStructTransformer: KotlinTransformer {
                 updateStructDeclaration(classDeclaration, translator: translator)
             }
         } else if let variableDeclaration = node as? KotlinVariableDeclaration {
-            if !variableDeclaration.isStatic, variableDeclaration.apiFlags.contains(.writeable), let extends = variableDeclaration.extends, translator.codebaseInfo?.declarationType(forNamed: extends.0) == .structDeclaration {
+            if !variableDeclaration.isStatic, variableDeclaration.apiFlags.contains(.writeable), let extends = variableDeclaration.extends, translator.codebaseInfo?.mayBeMutableStruct(type: extends.0) == true {
                 variableDeclaration.mutationFunctionNames = mutationFunctionNames
             }
             return .skip
         } else if let functionDeclaration = node as? KotlinFunctionDeclaration {
             if functionDeclaration.modifiers.isMutating {
                 handleSelfAssignments(in: functionDeclaration, translator: translator)
-                if let extends = functionDeclaration.extends, translator.codebaseInfo?.declarationType(forNamed: extends.0) == .structDeclaration {
+                if let extends = functionDeclaration.extends, translator.codebaseInfo?.mayBeMutableStruct(type: extends.0) == true {
                     functionDeclaration.mutationFunctionNames = mutationFunctionNames
                 }
             } else if functionDeclaration.type == .constructorDeclaration, (functionDeclaration.parent as? KotlinClassDeclaration)?.declarationType == .structDeclaration {
@@ -34,11 +34,12 @@ final class KotlinStructTransformer: KotlinTransformer {
 
     private func updateStructDeclaration(_ classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) {
         var hasConstructors = false
+        var isNoCopy = classDeclaration.attributes.kotlinHasDirective(.nocopy)
         var isMutable = false
         var initializableVariableDeclarations: [KotlinVariableDeclaration] = []
         for member in classDeclaration.members {
             if let variableDeclaration = member as? KotlinVariableDeclaration {
-                if !variableDeclaration.isStatic && (variableDeclaration.apiFlags.contains(.writeable) || variableDeclaration.modifiers.isLazy) && !variableDeclaration.isGenerated {
+                if !isNoCopy && !variableDeclaration.isStatic && (variableDeclaration.apiFlags.contains(.writeable) || variableDeclaration.modifiers.isLazy) && !variableDeclaration.isGenerated {
                     variableDeclaration.mutationFunctionNames = mutationFunctionNames
                     isMutable = true
                 }
@@ -50,7 +51,7 @@ final class KotlinStructTransformer: KotlinTransformer {
             } else if let functionDeclaration = member as? KotlinFunctionDeclaration, !functionDeclaration.isGenerated {
                 if functionDeclaration.type == .constructorDeclaration {
                     hasConstructors = true
-                } else if functionDeclaration.modifiers.isMutating {
+                } else if !isNoCopy && functionDeclaration.modifiers.isMutating {
                     functionDeclaration.mutationFunctionNames = mutationFunctionNames
                     isMutable = true
                 }

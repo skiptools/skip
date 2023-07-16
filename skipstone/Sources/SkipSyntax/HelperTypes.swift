@@ -333,8 +333,10 @@ struct Modifiers: PrettyPrintable, Codable {
 }
 
 /// @Attributes on a declaration.
-struct Attributes: Equatable, PrettyPrintable {
-    let attributes: [Attribute]
+///
+/// - Note: `Codable` for use in `CodebaseInfo`.
+struct Attributes: Equatable, PrettyPrintable, Codable {
+    var attributes: [Attribute]
 
     init(attributes: [Attribute] = []) {
         self.attributes = attributes
@@ -356,8 +358,27 @@ struct Attributes: Equatable, PrettyPrintable {
         return Attributes(attributes: attributes)
     }
 
+    /// Add all the attribute directives in the given extras.
+    mutating func addDirectives(from extras: StatementExtras?) {
+        guard let extras else {
+            return
+        }
+        var attrs: [Attribute] = []
+        for directive in extras.directives {
+            guard case .attributes(let tokens) = directive else {
+                continue
+            }
+            attrs.append(Attribute(signature: .named("directive", []), tokens: tokens))
+        }
+        attributes += attrs
+    }
+
     func contains(_ kind: Attribute.Kind) -> Bool {
         return attributes.contains { $0.kind == kind }
+    }
+
+    func of(kind: Attribute.Kind) -> [Attribute] {
+        return attributes.filter { $0.kind == kind }
     }
 
     var isEmpty: Bool {
@@ -373,7 +394,9 @@ struct Attributes: Equatable, PrettyPrintable {
 }
 
 /// @Attribute on a declaration.
-struct Attribute: Equatable {
+///
+/// - Note: `Codable` for use in `CodebaseInfo`.
+struct Attribute: Equatable, Codable {
     let signature: TypeSignature
     var tokens: [String] = []
 
@@ -410,6 +433,8 @@ struct Attribute: Equatable {
         case available
         case deprecated
         case discardableResult
+        /// Recorded from `StatementExtras.attributes`
+        case directive
         case escaping
         case frozen
         case indirect
@@ -439,6 +464,8 @@ struct Attribute: Equatable {
             }
         case "discardableResult":
             return .discardableResult
+        case "directive":
+            return .directive
         case "escaping":
             return .escaping
         case "frozen":

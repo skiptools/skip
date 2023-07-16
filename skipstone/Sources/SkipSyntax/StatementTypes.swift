@@ -743,7 +743,8 @@ class EnumCaseDeclaration: Statement {
         guard syntax.kind == .enumCaseDecl, let enumCaseDecl = syntax.as(EnumCaseDeclSyntax.self) else {
             return nil
         }
-        let attributes = Attributes.for(syntax: enumCaseDecl.attributes, in: syntaxTree)
+        var attributes = Attributes.for(syntax: enumCaseDecl.attributes, in: syntaxTree)
+        attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: enumCaseDecl.modifiers)
         return enumCaseDecl.elements.enumerated().map { (index, element) in
             let name = element.identifier.text
@@ -819,7 +820,8 @@ class ExtensionDeclaration: TypeDeclaration {
             return nil
         }
         let (inherits, inheritsMessages) = extensionDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], [])
-        let attributes = Attributes.for(syntax: extensionDecl.attributes, in: syntaxTree)
+        var attributes = Attributes.for(syntax: extensionDecl.attributes, in: syntaxTree)
+        attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: extensionDecl.modifiers)
         let (generics, genericsMessages) = Generics.for(syntax: nil, where: extensionDecl.genericWhereClause, in: syntaxTree)
         let members = StatementDecoder.decode(syntaxListContainer: extensionDecl.memberBlock, in: syntaxTree)
@@ -877,7 +879,8 @@ class FunctionDeclaration: Statement {
         let (returnType, parameters, signatureMessges) = functionDecl.signature.typeSignatures(in: syntaxTree)
         let isAsync = functionDecl.signature.effectSpecifiers?.asyncSpecifier != nil
         let isThrows = functionDecl.signature.effectSpecifiers?.throwsSpecifier != nil
-        let attributes = Attributes.for(syntax: functionDecl.attributes, in: syntaxTree)
+        var attributes = Attributes.for(syntax: functionDecl.attributes, in: syntaxTree)
+        attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: functionDecl.modifiers)
         let (generics, genericsMessages) = Generics.for(syntax: functionDecl.genericParameterClause, where: functionDecl.genericWhereClause, in: syntaxTree)
         var body: CodeBlock? = nil
@@ -894,7 +897,8 @@ class FunctionDeclaration: Statement {
         let (_, parameters, signatureMessages) = initializerDecl.signature.typeSignatures(in: syntaxTree)
         let isAsync = initializerDecl.signature.effectSpecifiers?.asyncSpecifier != nil
         let isThrows = initializerDecl.signature.effectSpecifiers?.throwsSpecifier != nil
-        let attributes = Attributes.for(syntax: initializerDecl.attributes, in: syntaxTree)
+        var attributes = Attributes.for(syntax: initializerDecl.attributes, in: syntaxTree)
+        attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: initializerDecl.modifiers)
         let (generics, genericsMessages) = Generics.for(syntax: initializerDecl.genericParameterClause, where: initializerDecl.genericWhereClause, in: syntaxTree)
         var body: CodeBlock? = nil
@@ -907,7 +911,8 @@ class FunctionDeclaration: Statement {
     }
 
     private static func decodeDeinitializerDeclaration(_ deinitializerDecl: DeinitializerDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> FunctionDeclaration {
-        let attributes = Attributes.for(syntax: deinitializerDecl.attributes, in: syntaxTree)
+        var attributes = Attributes.for(syntax: deinitializerDecl.attributes, in: syntaxTree)
+        attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: deinitializerDecl.modifiers)
         var body: CodeBlock? = nil
         if let bodySyntax = deinitializerDecl.body {
@@ -1047,7 +1052,8 @@ class SubscriptDeclaration: Statement {
         }
         let elementType = TypeSignature.for(syntax: subscriptDecl.returnClause.returnType, in: syntaxTree)
         let (parameters, parametersMessages) = subscriptDecl.parameterClause.parameters(in: syntaxTree)
-        let attributes = Attributes.for(syntax: subscriptDecl.attributes, in: syntaxTree)
+        var attributes = Attributes.for(syntax: subscriptDecl.attributes, in: syntaxTree)
+        attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: subscriptDecl.modifiers)
         let (generics, genericsMessages) = Generics.for(syntax: subscriptDecl.genericParameterClause, where: subscriptDecl.genericWhereClause, in: syntaxTree)
         var accessors = Accessors()
@@ -1150,7 +1156,8 @@ class TypealiasDeclaration: Statement {
             return nil
         }
         let name = typealiasDecl.identifier.text
-        let attributes = Attributes.for(syntax: typealiasDecl.attributes, in: syntaxTree)
+        var attributes = Attributes.for(syntax: typealiasDecl.attributes, in: syntaxTree)
+        attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: typealiasDecl.modifiers)
         let (generics, messages) = Generics.for(syntax: typealiasDecl.genericParameterClause, where: typealiasDecl.genericWhereClause, in: syntaxTree)
         let aliasedType = TypeSignature.for(syntax: typealiasDecl.initializer.value, in: syntaxTree)
@@ -1230,7 +1237,8 @@ class TypeDeclaration: Statement {
     private static func decodeClassDeclaration(_ classDecl: ClassDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration {
         let name = classDecl.identifier.text
         let (inherits, inheritsMessages) = classDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], [])
-        let attributes = Attributes.for(syntax: classDecl.attributes, in: syntaxTree)
+        var attributes = Attributes.for(syntax: classDecl.attributes, in: syntaxTree)
+        attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: classDecl.modifiers)
         let (generics, genericsMessages) = Generics.for(syntax: classDecl.genericParameterClause, where: classDecl.genericWhereClause, in: syntaxTree)
         let members = StatementDecoder.decode(syntaxListContainer: classDecl.memberBlock, in: syntaxTree)
@@ -1242,7 +1250,8 @@ class TypeDeclaration: Statement {
     private static func decodeStructDeclaration(_ structDecl: StructDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration {
         let name = structDecl.identifier.text
         let (inherits, inheritsMessages) = structDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], [])
-        let attributes = Attributes.for(syntax: structDecl.attributes, in: syntaxTree)
+        var attributes = Attributes.for(syntax: structDecl.attributes, in: syntaxTree)
+        attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: structDecl.modifiers)
         let (generics, genericsMessages) = Generics.for(syntax: structDecl.genericParameterClause, where: structDecl.genericWhereClause, in: syntaxTree)
         let members = StatementDecoder.decode(syntaxListContainer: structDecl.memberBlock, in: syntaxTree)
@@ -1254,7 +1263,8 @@ class TypeDeclaration: Statement {
     private static func decodeProtocolDeclaration(_ protocolDecl: ProtocolDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration {
         let name = protocolDecl.identifier.text
         let (inherits, inheritsMessages) = protocolDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], [])
-        let attributes = Attributes.for(syntax: protocolDecl.attributes, in: syntaxTree)
+        var attributes = Attributes.for(syntax: protocolDecl.attributes, in: syntaxTree)
+        attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: protocolDecl.modifiers)
         let associatedTypeDecls = protocolDecl.memberBlock.members.compactMap { $0.decl.kind == .associatedtypeDecl ? $0.decl.as(AssociatedtypeDeclSyntax.self) : nil }
         let memberDecls = protocolDecl.memberBlock.members.compactMap { $0.decl.kind != .associatedtypeDecl ? $0.decl : nil }
@@ -1268,7 +1278,8 @@ class TypeDeclaration: Statement {
     private static func decodeEnumDeclaration(_ enumDecl: EnumDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration {
         let name = enumDecl.identifier.text
         let (inherits, inheritsMessages) = enumDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], [])
-        let attributes = Attributes.for(syntax: enumDecl.attributes, in: syntaxTree)
+        var attributes = Attributes.for(syntax: enumDecl.attributes, in: syntaxTree)
+        attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: enumDecl.modifiers)
         let (generics, genericsMessages) = Generics.for(syntax: enumDecl.genericParameterClause, where: enumDecl.genericWhereClause, in: syntaxTree)
         let members = StatementDecoder.decode(syntaxListContainer: enumDecl.memberBlock, in: syntaxTree)
@@ -1280,7 +1291,8 @@ class TypeDeclaration: Statement {
     private static func decodeActorDeclaration(_ actorDecl: ActorDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration {
         let name = actorDecl.identifier.text
         let (inherits, inheritsMessages) = actorDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], [])
-        let attributes = Attributes.for(syntax: actorDecl.attributes, in: syntaxTree)
+        var attributes = Attributes.for(syntax: actorDecl.attributes, in: syntaxTree)
+        attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: actorDecl.modifiers)
         let (generics, genericsMessages) = Generics.for(syntax: actorDecl.genericParameterClause, where: actorDecl.genericWhereClause, in: syntaxTree)
         let members = StatementDecoder.decode(syntaxListContainer: actorDecl.memberBlock, in: syntaxTree)
@@ -1382,7 +1394,8 @@ class VariableDeclaration: Statement {
         }
 
         let isLet = variableDecl.bindingSpecifier.text == "let"
-        let attributes = Attributes.for(syntax: variableDecl.attributes, in: syntaxTree)
+        var attributes = Attributes.for(syntax: variableDecl.attributes, in: syntaxTree)
+        attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: variableDecl.modifiers)
         var statements: [Statement] = []
         for (index, syntax) in variableDecl.bindings.enumerated() {
