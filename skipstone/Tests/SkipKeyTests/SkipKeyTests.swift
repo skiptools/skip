@@ -1,6 +1,5 @@
 import XCTest
 import SkipBuild
-import SkipKey
 import SkipSyntax
 import struct JSON.JSON
 import TSCBasic

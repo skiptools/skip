@@ -14,7 +14,6 @@ let package = Package(
     products: [
         .library(name: "SkipSyntax", targets: ["SkipSyntax"]),
         .library(name: "SkipBuild", targets: ["SkipBuild"]),
-        .executable(name: "SkipRunner", targets: ["SkipRunner"])
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-syntax.git", branch: "main"),

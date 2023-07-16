@@ -5,7 +5,6 @@ import SkipSyntax
 import struct JSON.JSON
 import TSCBasic
 
-#if !SKIP
 public class SkipRunnerTests : XCTestCase {
     public func testSkipRunnerCommands() async throws {
         let v = skipVersion
@@ -161,4 +160,3 @@ public func XCTAssertEqualX<T>(_ expression1: T, _ expression2: T, _ message: @a
     XCTAssertEqual(expression1, expression2, message(), file: file, line: line)
 }
 
-#endif
