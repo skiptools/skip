@@ -812,6 +812,40 @@ final class ConcurrencyTests: XCTestCase {
         """)
     }
 
+    func testAwaitForLoop() async throws {
+        try await check(swift: """
+        func f() async {
+            for await i in [1, 2, 3] {
+                print(i)
+            }
+        }
+        """, kotlin: """
+        internal suspend fun f(): Unit = Detached.run {
+            for (i in arrayOf(1, 2, 3)) {
+                print(i)
+            }
+        }
+        """)
+
+        try await check(swift: """
+        @MainActor func g() -> [Int] {
+            return [1, 2, 3]
+        }
+        func f() async {
+            for await i in g() {
+                print(i)
+            }
+        }
+        """, kotlin: """
+        internal fun g(): Array<Int> = arrayOf(1, 2, 3)
+        internal suspend fun f(): Unit = Detached.run {
+            for (i in MainActor.run { g() }) {
+                print(i)
+            }
+        }
+        """)
+    }
+
     // Running this and observing the output verifies that Swift hops to the main thread when required by @MainActor, but does
     // not stay there for chained calls. Commented out to avoid warnings about using Thread.isMainThread within async code.
 //    func testMainActorBehavior() async throws {
@@ -854,13 +888,4 @@ final class ConcurrencyTests: XCTestCase {
 //            return mains
 //        }
 //    }
-}
-
-func f() async -> Int? {
-    return 1
-}
-func g() async {
-    while let i = await f() {
-
-    }
 }
