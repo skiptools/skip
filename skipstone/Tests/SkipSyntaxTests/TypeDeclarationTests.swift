@@ -465,6 +465,8 @@ final class TypeDeclarationTests: XCTestCase {
             }
         }
         """, kotlin: """
+        import skip.lib.Array
+
         internal interface P<T> {
             fun add(t: Array<T>)
         }
@@ -497,6 +499,8 @@ final class TypeDeclarationTests: XCTestCase {
         class E: Base<Array<Custom<Bool>>> {
         }
         """, kotlin: """
+        import skip.lib.Array
+        
         internal open class Base<T> {
         }
         internal open class C<U>: Base<U>() {

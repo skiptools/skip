@@ -188,6 +188,8 @@ final class ExpressionTests: XCTestCase {
             }
         }
         """, kotlin: """
+        import skip.lib.Array
+
         internal class S: MutableStruct {
             internal var i: Int
             internal var a: Array<String> = arrayOf()
@@ -272,6 +274,8 @@ final class ExpressionTests: XCTestCase {
             let result = arr.reduce(0, +)
         }
         """, kotlin: """
+        import skip.lib.Array
+        
         {
             val arr = arrayOf(1, 2, 3)
             val result = arr.reduce(initialResult = 0, { it, it_1 -> it + it_1 })

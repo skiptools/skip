@@ -426,6 +426,8 @@ final class MemberDeclarationTests: XCTestCase {
             }
         }
         """, kotlin: """
+        import skip.lib.Array
+
         internal open class C {
             internal open var a: Array<Int> = arrayOf()
                 get() = field.sref({ this.a = it })
@@ -1258,6 +1260,8 @@ final class MemberDeclarationTests: XCTestCase {
             }
         }
         """, kotlin: """
+        import skip.lib.Array
+
         internal open class C<T> {
             internal open var v: C<T>
             internal open fun f(p: Array<C<T>>): C<T>? = null
@@ -1291,6 +1295,8 @@ final class MemberDeclarationTests: XCTestCase {
         }
         f(v: 1, 2, 3, s: "")
         """, kotlin: """
+        import skip.lib.Array
+        
         internal fun f(vararg v: Int, s: String): Array<Int> {
             val v = Array(v.asIterable())
             val a = (arrayOf(0) + v).sref()
@@ -1306,6 +1312,8 @@ final class MemberDeclarationTests: XCTestCase {
         }
         f(1, 2, 3, s: "")
         """, kotlin: """
+        import skip.lib.Array
+        
         internal fun f(vararg v: Int, s: String): Array<Int> {
             val v = Array(v.asIterable())
             val a = (arrayOf(0) + v).sref()

@@ -956,6 +956,11 @@ class KotlinClassDeclaration: KotlinStatement {
         return members
     }
 
+    override func insertDependencies(into dependencies: inout KotlinDependencies) {
+        inherits.forEach { $0.insertDependencies(into: &dependencies) }
+        generics.insertDependencies(into: &dependencies)
+    }
+
     override func insert(statements: [KotlinStatement], after statement: KotlinStatement?) {
         var index = 0
         if let statement {
@@ -1139,9 +1144,8 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
     }
 
     override func insertDependencies(into dependencies: inout KotlinDependencies) {
-        if associatedValues.contains(where: { $0.declaredType.kotlinReferencesKClass }) {
-            dependencies.insertReflect()
-        }
+        generics.insertDependencies(into: &dependencies)
+        associatedValues.forEach { $0.insertDependencies(into: &dependencies) }
     }
 
     override var children: [KotlinSyntaxNode] {
@@ -1539,8 +1543,12 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
 
     override func insertDependencies(into dependencies: inout KotlinDependencies) {
-        if returnType.kotlinReferencesKClass || parameters.contains(where: { $0.declaredType.kotlinReferencesKClass }) {
-            dependencies.insertReflect()
+        generics.insertDependencies(into: &dependencies)
+        returnType.insertDependencies(into: &dependencies)
+        parameters.forEach { $0.insertDependencies(into: &dependencies) }
+        // We use an array to represent variadic parameters
+        if parameters.contains(where: { $0.isVariadic }) {
+            dependencies.insertSkipLibImport("Array")
         }
     }
 
@@ -1919,6 +1927,11 @@ class KotlinInterfaceDeclaration: KotlinStatement {
         members = members.filter { $0 !== statement }
     }
 
+    override func insertDependencies(into dependencies: inout KotlinDependencies) {
+        inherits.forEach { $0.insertDependencies(into: &dependencies) }
+        generics.insertDependencies(into: &dependencies)
+    }
+
     override func append(to output: OutputGenerator, indentation: Indentation) {
         output.append(indentation)
         if let declaration = extras?.declaration {
@@ -1985,9 +1998,7 @@ class KotlinTypealiasDeclaration: KotlinStatement {
     }
 
     override func insertDependencies(into dependencies: inout KotlinDependencies) {
-        if aliasedType.kotlinReferencesKClass {
-            dependencies.insertReflect()
-        }
+        aliasedType.insertDependencies(into: &dependencies)
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
@@ -2177,9 +2188,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
 
     override func insertDependencies(into dependencies: inout KotlinDependencies) {
-        if declaredType.kotlinReferencesKClass {
-            dependencies.insertReflect()
-        }
+        declaredType.insertDependencies(into: &dependencies)
     }
 
     override var children: [KotlinSyntaxNode] {

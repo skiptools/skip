@@ -820,6 +820,8 @@ final class ConcurrencyTests: XCTestCase {
             }
         }
         """, kotlin: """
+        import skip.lib.Array
+
         internal suspend fun f(): Unit = Detached.run {
             for (i in arrayOf(1, 2, 3)) {
                 print(i)
@@ -837,6 +839,8 @@ final class ConcurrencyTests: XCTestCase {
             }
         }
         """, kotlin: """
+        import skip.lib.Array
+        
         internal fun g(): Array<Int> = arrayOf(1, 2, 3)
         internal suspend fun f(): Unit = Detached.run {
             for (i in MainActor.run { g() }) {

@@ -122,6 +122,8 @@ final class AttributeAndModifierTests: XCTestCase {
             }
         }
         """, kotlin: """
+        import skip.lib.Array
+        
         internal open class C {
             open var v1 = 1
                 internal set

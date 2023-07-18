@@ -64,6 +64,16 @@ class KotlinArrayLiteral: KotlinExpression {
         return elements
     }
 
+    override func insertDependencies(into dependencies: inout KotlinDependencies) {
+        if !isOptionSet {
+            if case .set = inferredType {
+                dependencies.insertSkipLibImport(inferredType.name)
+            } else if case .array = inferredType {
+                dependencies.insertSkipLibImport(inferredType.name)
+            }
+        }
+    }
+
     override func append(to output: OutputGenerator, indentation: Indentation) {
         if isOptionSet {
             output.append("\(inferredType.elementType.kotlin).of(")
@@ -594,6 +604,11 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
         return [body]
     }
 
+    override func insertDependencies(into dependencies: inout KotlinDependencies) {
+        returnType.insertDependencies(into: &dependencies)
+        parameters.forEach { $0.insertDependencies(into: &dependencies) }
+    }
+
     override func append(to output: OutputGenerator, indentation: Indentation) {
         if isAnonymousFunction {
             appendAnonymousFunction(to: output, indentation: indentation)
@@ -935,6 +950,13 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
 
     override func mayBeSharedMutableStructExpression(orType: Bool) -> Bool {
         return mayBeSharedMutableStruct
+    }
+
+    override func insertDependencies(into dependencies: inout KotlinDependencies) {
+        generics?.forEach { $0.insertDependencies(into: &dependencies) }
+        if TypeSignature.kotlinSkipLibImports.contains(name) {
+            dependencies.insertSkipLibImport(name)
+        }
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
@@ -1525,6 +1547,7 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinCast
     }
 
     override func insertDependencies(into dependencies: inout KotlinDependencies) {
+        generics?.forEach { $0.insertDependencies(into: &dependencies) }
         if baseKClass != nil {
             dependencies.insertReflectFull()
         }
@@ -1568,7 +1591,7 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinCast
                         output.append("\n").append(indentation.inc())
                     }
                     if let baseIdentifier = base as? KotlinIdentifier,
-                       TypeSignature.innerExtensions.keys.contains(baseIdentifier.name + "." + member) {
+                       TypeSignature.kotlinInnerExtensions.keys.contains(baseIdentifier.name + "." + member) {
                         output.append("") // e.g. String.Encoding to StringEncoding
                     } else {
                         output.append(".")
@@ -2294,9 +2317,7 @@ class KotlinTypeLiteral: KotlinExpression, KotlinCastTarget {
     var isGenericsTypeErased = false
 
     override func insertDependencies(into dependencies: inout KotlinDependencies) {
-        if literal.kotlinReferencesKClass {
-            dependencies.insertReflect()
-        }
+        literal.insertDependencies(into: &dependencies)
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {

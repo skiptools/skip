@@ -508,6 +508,8 @@ final class EnumTests: XCTestCase {
             case three
         }
         """, kotlin: """
+        import skip.lib.Array
+
         internal enum class E: CaseIterable {
             one,
             two,
@@ -532,6 +534,8 @@ final class EnumTests: XCTestCase {
             }
         }
         """, kotlin: """
+        import skip.lib.Array
+        
         internal enum class E: CaseIterable {
             one,
             two,
@@ -550,6 +554,8 @@ final class EnumTests: XCTestCase {
             case two
         }
         """, kotlin: """
+        import skip.lib.Array
+
         internal sealed class E: Exception(), CaseIterable, Error {
             class OneCase: E() {
                 override fun equals(other: Any?): Boolean = other is OneCase

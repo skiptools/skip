@@ -210,8 +210,8 @@ extension XCTestCase {
 
     private func trimmedContent(transpilation: Transpilation) -> String {
         let content = transpilation.output.content
-        let autoImportPrefix = "import skip.lib."
-        return content.split(separator: "\n", omittingEmptySubsequences: false).filter({ !$0.hasPrefix(autoImportPrefix) }).joined(separator: "\n")
+        let autoImport = "import skip.lib.*"
+        return content.split(separator: "\n", omittingEmptySubsequences: false).filter({ $0 != autoImport }).joined(separator: "\n")
     }
 
     /// Creates a temporary file with the given name and optional contents.

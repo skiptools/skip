@@ -4,13 +4,13 @@ final class KotlinEnumTransformer: KotlinTransformer {
         guard let codebaseInfo = translator.codebaseInfo else {
             return
         }
-        syntaxTree.root.visit { visit($0, codebaseInfo: codebaseInfo) }
+        syntaxTree.root.visit { visit($0, in: syntaxTree, codebaseInfo: codebaseInfo) }
     }
 
-    private func visit(_ node: KotlinSyntaxNode, codebaseInfo: CodebaseInfo.Context) -> VisitResult<KotlinSyntaxNode> {
+    private func visit(_ node: KotlinSyntaxNode, in syntaxTree: KotlinSyntaxTree, codebaseInfo: CodebaseInfo.Context) -> VisitResult<KotlinSyntaxNode> {
         if let classDeclaration = node as? KotlinClassDeclaration, classDeclaration.declarationType == .enumDeclaration {
             handleConstructors(for: classDeclaration)
-            synthesizeCaseIterable(for: classDeclaration, codebaseInfo: codebaseInfo)
+            synthesizeCaseIterable(for: classDeclaration, in: syntaxTree, codebaseInfo: codebaseInfo)
         } else if let functionCall = node as? KotlinFunctionCall, functionCall.isOptionalInit {
             // We change enum constructors to factory functions
             if codebaseInfo.declarationType(forNamed: functionCall.inferredType) == .enumDeclaration {
@@ -43,7 +43,7 @@ final class KotlinEnumTransformer: KotlinTransformer {
         (classDeclaration.parent as? KotlinStatement)?.insert(statements: [factory], after: classDeclaration)
     }
 
-    private func synthesizeCaseIterable(for classDeclaration: KotlinClassDeclaration, codebaseInfo: CodebaseInfo.Context) {
+    private func synthesizeCaseIterable(for classDeclaration: KotlinClassDeclaration, in syntaxTree: KotlinSyntaxTree, codebaseInfo: CodebaseInfo.Context) {
         guard codebaseInfo.global.protocolSignatures(forNamed: classDeclaration.signature).contains(where: { $0.isNamed("CaseIterable", moduleName: "Swift", generics: []) }) else {
             return
         }
@@ -51,6 +51,7 @@ final class KotlinEnumTransformer: KotlinTransformer {
         guard !typeInfos.contains(where: { $0.members.contains(where: \.isAllCasesVar) }) else {
             return
         }
+        syntaxTree.dependencies.insertSkipLibImport("Array")
 
         let allCasesVar = KotlinVariableDeclaration(names: ["allCases"], variableTypes: [.array(classDeclaration.signature)])
         allCasesVar.modifiers.isStatic = true

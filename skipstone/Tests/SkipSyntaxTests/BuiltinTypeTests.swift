@@ -68,6 +68,9 @@ final class BuiltinTypeTests: XCTestCase {
             var tis2: (Int, String, Double)
         }
         """, kotlin: """
+        import skip.lib.Array
+        import skip.lib.Set
+
         {
             var a: Array<Any>
             var ai: Array<Int>
@@ -261,6 +264,8 @@ final class BuiltinTypeTests: XCTestCase {
             let a = [1, 2, 3]
         }
         """, kotlin: """
+        import skip.lib.Array
+
         {
             val a = arrayOf(1, 2, 3)
         }
@@ -271,6 +276,8 @@ final class BuiltinTypeTests: XCTestCase {
             let a: [Int] = [x, y, z]
         }
         """, kotlin: """
+        import skip.lib.Array
+
         {
             val a: Array<Int> = arrayOf(x, y, z)
         }
@@ -281,6 +288,8 @@ final class BuiltinTypeTests: XCTestCase {
             let a = [Int]()
         }
         """, kotlin: """
+        import skip.lib.Array
+
         {
             val a = Array<Int>()
         }
@@ -330,6 +339,8 @@ final class BuiltinTypeTests: XCTestCase {
             setf(set: [1, 2, 3])
         }
         """, kotlin: """
+        import skip.lib.Set
+
         {
             val s: Set<Int> = setOf(1, 2, 3)
             setf(set = s)

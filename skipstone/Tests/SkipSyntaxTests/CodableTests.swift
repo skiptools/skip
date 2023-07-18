@@ -271,6 +271,8 @@ final class CodableTests: XCTestCase {
             let a: [Int]
         }
         """, kotlin: """
+        import skip.lib.Array
+
         internal class S: Codable {
             internal val a: Array<Int>
 
@@ -552,6 +554,8 @@ final class CodableTests: XCTestCase {
             let a = ["foo"]
         }
         """, kotlin: """
+        import skip.lib.Array
+        
         internal class S: Codable {
             internal val i: Int
             internal var a = arrayOf("foo")

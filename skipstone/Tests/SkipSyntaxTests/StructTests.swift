@@ -398,6 +398,8 @@ final class StructTests: XCTestCase {
             }
         }
         """, kotlin: """
+        import skip.lib.Array
+        
         internal class S: MutableStruct {
             internal val letms: MS
             internal var varms: MS

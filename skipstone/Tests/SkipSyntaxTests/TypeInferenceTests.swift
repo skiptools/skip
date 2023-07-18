@@ -308,6 +308,8 @@ final class TypeInferenceTests: XCTestCase {
             return c.v[1] == .myZero
         }
         """, kotlin: """
+        import skip.lib.Array
+        
         internal fun f(c: C<Array<Int>>): Boolean = c.v[1] == Int.myZero
         """)
     }
@@ -409,6 +411,8 @@ final class TypeInferenceTests: XCTestCase {
             let b = c.single == .myZero
         }
         """, kotlin: """
+        import skip.lib.Array
+
         {
             val c = C(array = arrayOf(1, 2, 3))
             val b = c.single == Int.myZero
@@ -472,6 +476,8 @@ final class TypeInferenceTests: XCTestCase {
         g(f(), [.one])
         g([.one], f())
         """, kotlin: """
+        import skip.lib.Array
+
         g(f(), arrayOf(E.one))
         g(arrayOf(E.one), f())
         """)
@@ -778,6 +784,8 @@ final class TypeInferenceTests: XCTestCase {
             }
         }
         """, kotlin: """
+        import skip.lib.Sequence
+
         internal fun f1(p1: S1, p2: Sequence<Int>) {
             for (i in p1) {
                 val b = i == Int.zero

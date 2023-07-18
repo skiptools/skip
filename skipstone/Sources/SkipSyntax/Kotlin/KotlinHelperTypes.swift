@@ -174,6 +174,11 @@ extension Parameter where V: Expression {
 }
 
 extension Parameter {
+    /// - Seealso: ``KotlinSyntaxNode/insertDependencies(into:)``
+    func insertDependencies(into dependencies: inout KotlinDependencies) {
+        declaredType.insertDependencies(into: &dependencies)
+    }
+
     /// Add messages about unsupported aspects of this parameter.
     func appendKotlinMessages(to node: KotlinSyntaxNode, source: Source) {
         declaredType.appendKotlinMessages(to: node, source: source)
@@ -233,6 +238,13 @@ extension Generics {
         var generics = self
         generics.entries = generics.entries.filter { $0.whereEqual == nil }
         return generics
+    }
+
+    func insertDependencies(into dependencies: inout KotlinDependencies) {
+        for entry in entries {
+            entry.inherits.forEach { $0.insertDependencies(into: &dependencies) }
+            entry.whereEqual?.insertDependencies(into: &dependencies)
+        }
     }
 
     func append(to output: OutputGenerator, indentation: Indentation, modifier: String? = nil) {

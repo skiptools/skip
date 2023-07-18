@@ -48,6 +48,8 @@ final class TupleTests: XCTestCase {
             return [(1, 2, 3.0)]
         }
         """, kotlin: """
+        import skip.lib.Array
+        
         internal fun f(p: Tuple2<String, Int>): Array<Tuple3<Int, Int, Double>> = arrayOf(Tuple3(1, 2, 3.0))
         """, packageSupportKotlin: """
         internal val <E0, E1, E2> Tuple3<E0, E1, E2>.x: E0

@@ -1,9 +1,18 @@
 extension TypeSignature {
     /// The types from the standard library that should be re-mapped to a joined form of the name.
     /// For example, Swift references to `String.Encoding.utf8` will be converted to `StringEncoding.utf8`.
-    static let innerExtensions: [String: String] = [
+    static let kotlinInnerExtensions: [String: String] = [
         "String.Encoding": "StringEncoding",
         "String.Index": "StringIndex",
+    ]
+
+    /// The types from the standard library that must be explicitly imported as dependencies because Kotlin implicitly imports
+    /// same-named types.
+    static let kotlinSkipLibImports: Set<String> = [
+        "Array",
+        "Collection",
+        "Sequence",
+        "Set"
     ]
 
     /// Kotlin description of this type.
@@ -60,7 +69,7 @@ extension TypeSignature {
             return "Long"
         case .member(let baseType, let type):
             let typeName = "\(baseType.kotlin).\(type.kotlin)"
-            return Self.innerExtensions[typeName] ?? typeName
+            return Self.kotlinInnerExtensions[typeName] ?? typeName
         case .metaType(let baseType):
             return "KClass<\(baseType.kotlin)>"
         case .module(let module, let type):
@@ -307,19 +316,28 @@ extension TypeSignature {
         }
     }
 
-    /// Whether this type uses `KClass`, which requires additional imports.
-    var kotlinReferencesKClass: Bool {
-        var references = false
+    /// Insert any non-standard dependencies required by this type.
+    func insertDependencies(into dependencies: inout KotlinDependencies, isModuleQualified: Bool = false) {
         visit {
-            if references {
+            switch $0 {
+            case .array:
+                dependencies.insertSkipLibImport($0.name)
+            case .metaType:
+                dependencies.insertReflect()
+            case .module(_, let type):
+                type.insertDependencies(into: &dependencies, isModuleQualified: true)
                 return .skip
-            } else if case .metaType = $0 {
-                references = true
-                return .skip
+            case .named(let name, _):
+                if !isModuleQualified && Self.kotlinSkipLibImports.contains(name) {
+                    dependencies.insertSkipLibImport(name)
+                }
+            case .set:
+                dependencies.insertSkipLibImport($0.name)
+            default:
+                break
             }
             return .recurse(nil)
         }
-        return references
     }
 }
 

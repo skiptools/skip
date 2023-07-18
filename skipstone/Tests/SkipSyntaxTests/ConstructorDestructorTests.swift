@@ -607,6 +607,8 @@ final class ConstructorDestructorTests: XCTestCase {
             }
         }
         """, kotlin: """
+        import skip.lib.Array
+        
         internal class S {
             internal var a: Array<Int>
 
@@ -642,6 +644,8 @@ final class ConstructorDestructorTests: XCTestCase {
             }
         }
         """, kotlin: """
+        import skip.lib.Array
+
         internal class S: MutableStruct {
             internal var i: Int
             internal var a: Array<String> = arrayOf()

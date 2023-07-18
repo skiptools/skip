@@ -15,6 +15,8 @@ final class TypealiasTests: XCTestCase {
             }
         }
         """, kotlin: """
+        import skip.lib.Array
+
         internal typealias AA = a.b.C
 
         internal open class Sub: a.b.C() {
@@ -71,6 +73,8 @@ final class TypealiasTests: XCTestCase {
             return a[0] == .max
         }
         """, kotlin: """
+        import skip.lib.Array
+
         internal typealias AA = Array<Int>
         internal fun f(a: Array<Int>): Boolean = a[0] == Int.max
         """)
@@ -155,6 +159,8 @@ final class TypealiasTests: XCTestCase {
             return dict[[1]]?[0] == .max
         }
         """, kotlin: """
+        import skip.lib.Array
+        
         internal typealias ArraysDict<T> = Dictionary<Array<T>, Array<T>>
         internal fun f(dict: Dictionary<Array<Int>, Array<Int>>): Boolean = dict[arrayOf(1)]?.get(0) == Int.max
         """)

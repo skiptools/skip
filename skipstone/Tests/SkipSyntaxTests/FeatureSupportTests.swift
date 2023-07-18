@@ -432,6 +432,8 @@ final class FeatureSupportTests: XCTestCase {
             let doubles: Array<Double> = [1,2,3,4]
             return "\(doubles)"
         }, kotlin: """
+            import skip.lib.Array
+            
             val doubles: Array<Double> = arrayOf(1, 2, 3, 4)
             return "${doubles}"
             """)

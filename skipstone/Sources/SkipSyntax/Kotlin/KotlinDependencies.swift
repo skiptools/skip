@@ -8,6 +8,11 @@ struct KotlinDependencies {
 
 /// Known dependency sets.
 extension KotlinDependencies {
+    /// Add an explicit import of the given `skip.lib` type.
+    mutating func insertSkipLibImport(_ typeName: String) {
+        imports.insert("skip.lib.\(typeName)")
+    }
+
     /// Add a dependency on `kotlin.reflect`.
     mutating func insertReflect() {
         imports.insert("kotlin.reflect.*")

@@ -168,6 +168,8 @@ final class LoopTests: XCTestCase {
             print(i)
         }
         """, kotlin: """
+        import skip.lib.Array
+
         for (i in arrayOf(1, 2, 3)) {
             print(i)
         }
@@ -181,6 +183,8 @@ final class LoopTests: XCTestCase {
             }
         }
         """, kotlin: """
+        import skip.lib.Array
+
         {
             val a = arrayOf(1, 2, 3)
             for (i in a.sref()) {
@@ -214,6 +218,8 @@ final class LoopTests: XCTestCase {
             }
         }
         """, kotlin: """
+        import skip.lib.Array
+
         {
             for (i in arrayOf(a, b, c)) {
                 print(i.sref())
@@ -227,6 +233,8 @@ final class LoopTests: XCTestCase {
             print(s)
         }
         """, kotlin: """
+        import skip.lib.Array
+
         for ((i, s) in arrayOf(Tuple2(1, "a"), Tuple2(2, "b"), Tuple2(3, "c"))) {
             print(i)
             print(s)
@@ -253,6 +261,8 @@ final class LoopTests: XCTestCase {
             print(i)
         }
         """, kotlin: """
+        import skip.lib.Array
+
         for (i_0 in arrayOf(1, 2, 3)) {
             var i = i_0
             i += 1
@@ -267,6 +277,8 @@ final class LoopTests: XCTestCase {
             print(i)
         }
         """, kotlin: """
+        import skip.lib.Array
+
         for (i in arrayOf(1, 2, 3)) {
             if (i % 2 != 0) {
                 continue
@@ -286,6 +298,8 @@ final class LoopTests: XCTestCase {
             }
         }
         """, kotlin: """
+        import skip.lib.Array
+
         {
             val a: Array<Int?> = arrayOf(1, null, 3)
             for (i_0 in a.sref()) {
@@ -309,6 +323,8 @@ final class LoopTests: XCTestCase {
             print(i)
         }
         """, kotlin: """
+        import skip.lib.Array
+
         for (i in arrayOf(1, 2, 3)) {
             if (i % 2 == 0) {
                 break
@@ -325,6 +341,8 @@ final class LoopTests: XCTestCase {
             print(i)
         }
         """, kotlin: """
+        import skip.lib.Array
+
         loop@
         for (i in arrayOf(1, 2, 3)) {
             if (i % 2 == 0) {
@@ -344,6 +362,8 @@ final class LoopTests: XCTestCase {
             print(i)
         }
         """, kotlin: """
+        import skip.lib.Array
+
         for (i in arrayOf(1, 2, 3)) {
             if (i % 2 == 0) {
                 continue
@@ -360,6 +380,8 @@ final class LoopTests: XCTestCase {
             print(i)
         }
         """, kotlin: """
+        import skip.lib.Array
+        
         loop@
         for (i in arrayOf(1, 2, 3)) {
             if (i % 2 == 0) {

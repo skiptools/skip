@@ -148,6 +148,8 @@ final class OperatorTests: XCTestCase {
             return o is [Int]
         }
         """, kotlin: """
+        import skip.lib.Array
+
         internal fun f(o: Any): Boolean = o is Array<*>
         """)
 
@@ -156,6 +158,8 @@ final class OperatorTests: XCTestCase {
             return o is Array<Int>
         }
         """, kotlin: """
+        import skip.lib.Array
+
         internal fun f(o: Any): Boolean = o is Array<*>
         """)
 
@@ -164,6 +168,8 @@ final class OperatorTests: XCTestCase {
             return o is Array<Int>
         }
         """, kotlin: """
+        import skip.lib.Array
+
         internal fun <T> f(o: Array<T>): Boolean = o is Array<*>
         """)
 
@@ -172,6 +178,9 @@ final class OperatorTests: XCTestCase {
             return o is Collection<T>
         }
         """, kotlin: """
+        import skip.lib.Array
+        import skip.lib.Collection
+
         internal fun <T> f(o: Array<T>): Boolean = o is Collection<*>
         """)
 
@@ -191,6 +200,8 @@ final class OperatorTests: XCTestCase {
             return o as! [Int]
         }
         """, kotlin: """
+        import skip.lib.Array
+
         internal fun f(o: Any): Array<Int> = (o as Array<Int>).sref()
         """)
 
@@ -199,6 +210,8 @@ final class OperatorTests: XCTestCase {
             return o as? [Int]
         }
         """, kotlin: """
+        import skip.lib.Array
+
         internal fun f(o: Any): Array<Int>? = (o as? Array<Int>).sref()
         """)
     }
@@ -255,6 +268,8 @@ final class OperatorTests: XCTestCase {
             let b = a![0] == .myZero
         }
         """, kotlin: """
+        import skip.lib.Array
+
         {
             val a: Array<Int>? = null
             val b = a!![0] == Int.myZero
@@ -267,6 +282,8 @@ final class OperatorTests: XCTestCase {
             let b = a[0]!.i == .myZero
         }
         """, kotlin: """
+        import skip.lib.Array
+
         {
             val a: Array<OperatorTestsOptionalHost?> = arrayOf()
             val b = a[0]!!.i == Int.myZero
@@ -304,6 +321,8 @@ final class OperatorTests: XCTestCase {
             let b = a?[0] == .myZero
         }
         """, kotlin: """
+        import skip.lib.Array
+
         {
             val a: Array<Int>? = null
             val b = a?.get(0) == Int.myZero
@@ -316,6 +335,8 @@ final class OperatorTests: XCTestCase {
             let b = a[0]?.i == .myZero
         }
         """, kotlin: """
+        import skip.lib.Array
+
         {
             val a: Array<OperatorTestsOptionalHost?> = arrayOf()
             val b = a[0]?.i == Int.myZero
@@ -364,6 +385,8 @@ final class OperatorTests: XCTestCase {
             let s5 = a[..<3]
         }
         """, kotlin: """
+        import skip.lib.Array
+        
         internal fun slice() {
             val a = arrayOf(0, 1, 2, 3, 4)
             val s1 = a[1..3]
