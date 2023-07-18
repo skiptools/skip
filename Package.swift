@@ -11,10 +11,14 @@ let package = Package(
 
         .plugin(name: "preflight", targets: ["skip-preflight"]),
         .plugin(name: "transpile", targets: ["skip-transpiler"]),
+
+        .library(name: "SkipDrive", targets: ["SkipDrive"]),
     ],
     dependencies: [
     ],
     targets: [
+        .target(name: "SkipDrive", dependencies: []),
+
         .plugin(name: "Hello Skip",
                 capability: .command(
                     intent: .custom(verb: "skip-init",  description: "Show an introduction to Skip and how it can be added to this project."),
