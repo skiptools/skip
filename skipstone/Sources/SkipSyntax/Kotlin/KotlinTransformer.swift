@@ -60,7 +60,7 @@ public let builtinKotlinTransformerTypes: [KotlinTransformer.Type] = [
     KotlinDisambiguateFunctionsTransformer.self,
     KotlinTupleLabelTransformer.self,
     KotlinSwiftUITransformer.self,
-    KotlinImportMapTransformer.self,
+    KotlinImportsTransformer.self,
     KotlinUnitTestTransformer.self,
 ]
 

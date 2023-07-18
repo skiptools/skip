@@ -281,17 +281,13 @@ public class KotlinTranslator {
     }
 
     private func requiredImportStatements(dependencies: KotlinDependencies) -> [KotlinStatement] {
-        // Manual whitelist of the packages above skip.lib: skip.core and skip.unit
+        // Manual whitelist of the packages above skip.lib
         var importStrings: [String] = []
-        if let packageName = packageName, !Set([
-            "skip.core",
+        if let packageName = packageName, ![
             "skip.unit",
             "skip.lib",
-        ]).contains(packageName) {
-            importStrings += [
-                "import skip.lib.*",
-                "import skip.lib.Array", // Override kotlin.Array
-            ]
+        ].contains(packageName) {
+            importStrings.append("import skip.lib.*")
         }
         importStrings += dependencies.imports.map { "import \($0)" }
         if !importStrings.isEmpty {

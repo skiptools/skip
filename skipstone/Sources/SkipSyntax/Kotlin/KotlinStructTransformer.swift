@@ -33,8 +33,8 @@ final class KotlinStructTransformer: KotlinTransformer {
     }
 
     private func updateStructDeclaration(_ classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) {
+        let isNoCopy = classDeclaration.attributes.kotlinHasDirective(.nocopy)
         var hasConstructors = false
-        var isNoCopy = classDeclaration.attributes.kotlinHasDirective(.nocopy)
         var isMutable = false
         var initializableVariableDeclarations: [KotlinVariableDeclaration] = []
         for member in classDeclaration.members {
