@@ -319,7 +319,7 @@ extension Source.FilePath {
     /// Synthetic source that will be translated to a file appropriate for package-level support code.
     var kotlinPackageSupport: Source.FilePath {
         var filePath = self
-        filePath.name = "PackageInternalSupport.swift"
+        filePath.name = "PackageSupport.swift"
         return filePath
     }
 }
