@@ -30,7 +30,7 @@ extension GradleHarness {
         //
         // ~/Library/Developer/Xcode/DerivedData/PROJ-ABC/Build/Products/Debug/../../../SourcePackages/plugins/skiphub.output/
         //
-        if let xcodeBuildFolder = env["__XCODE_BUILT_PRODUCTS_DIR_PATHS"] ?? env["BUILT_PRODUCTS_DIR"] {
+        if let xcodeBuildFolder = self.xcodeBuildFolder {
             let buildBaseFolder = URL(fileURLWithPath: xcodeBuildFolder, isDirectory: true)
                 .deletingLastPathComponent()
                 .deletingLastPathComponent()
@@ -270,6 +270,12 @@ extension GradleHarness {
         #endif
     }
 
+    /// The build folder for Xcode
+    var xcodeBuildFolder: String? {
+        ProcessInfo.processInfo.environment["__XCODE_BUILT_PRODUCTS_DIR_PATHS"]
+            ?? ProcessInfo.processInfo.environment["BUILT_PRODUCTS_DIR"]
+    }
+
     public func projectRoot(forModule moduleName: String, packageName: String) throws -> URL {
         let env = ProcessInfo.processInfo.environment
 
@@ -277,7 +283,6 @@ extension GradleHarness {
         //    print("ENV: \(key)=\(value)")
         //}
 
-        let xcodeBuildFolder = env["__XCODE_BUILT_PRODUCTS_DIR_PATHS"] ?? env["BUILT_PRODUCTS_DIR"]
         let isXcode = env["__CFBundleIdentifier"] == "com.apple.dt.Xcode" || xcodeBuildFolder != nil
 
         // Diagnostics.warning("ENVIRONMENT: \(env)")
@@ -290,7 +295,7 @@ extension GradleHarness {
         return URL(fileURLWithPath: "../../../SourcePackages/plugins/\(packageName)\(packageFolderExtension)/\(moduleName)/skip-transpiler/", isDirectory: true, relativeTo: URL(fileURLWithPath: buildFolder, isDirectory: true))
     }
 
-    public func launch(appName: String, appId: String, packageName: String) async throws {
+    public func launch(appName: String, appId: String, packageName: String, deviceID: String? = ProcessInfo.processInfo.environment["SKIP_TEST_DEVICE"]) async throws {
         /// The default log levels when launching the .apk
         let logLevel = [
                 "\(appId):V", // all app log messages
@@ -313,9 +318,7 @@ extension GradleHarness {
 
         // select device with: SKIP_TEST_DEVICE=emulator-5554
         // this avoids the error: adb: more than one device/emulator
-        let dev = ProcessInfo.processInfo.environment["SKIP_TEST_DEVICE"]
-
-        try await launchAPK(device: dev, appid: "\(appId)/.MainActivity", log: logLevel, apk: apk.path)
+        try await launchAPK(device: deviceID, appid: "\(appId)/.MainActivity", log: logLevel, apk: apk.path)
     }
 
     public func assemble(appName: String, packageName: String, outputPrefix: String? = "GRADLE>") async throws {
@@ -326,7 +329,7 @@ extension GradleHarness {
         let acts: [String] = releaseBuild ? ["assembleRelease"] : ["assembleDebug"]
 
         var exitCode: ProcessResult.ExitStatus? = nil
-        let (output, _) = try await driver.launchGradleProcess(in: projectRoot(forModule: moduleName, packageName: packageName), module: appName, actions: acts, arguments: args, rerunTasks: false, exitHandler: { result in
+        let (output, _) = try await driver.launchGradleProcess(in: projectRoot(forModule: moduleName, packageName: packageName), module: appName, actions: acts, arguments: args, info: true, rerunTasks: false, exitHandler: { result in
             print("GRADLE RESULT: \(result)")
             exitCode = result.exitStatus
         })

@@ -75,8 +75,11 @@ let package = Package(
 
         .plugin(name: "skip-transpiler",
                 capability: .buildTool(),
-                dependencies: ["skiptool"],
+                dependencies: ["skiptool", "skipgradle"],
                 path: "Plugins/SkipTranspilePlugIn"),
+
+        // skipgradle is the CLI interface from Skip to the Gradle tool for building, testing, and packaging Kotlin
+        .executableTarget(name: "skipgradle", dependencies: ["SkipDrive"], path: "Sources/SkipGradle"),
     ]
 )
 
