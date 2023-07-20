@@ -2164,8 +2164,14 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if kstatement.declaredType == .float || kstatement.declaredType.isUnsigned, kstatement.value is KotlinNumericLiteral {
             kstatement.messages.append(.kotlinNumericCast(kstatement, source: translator.syntaxTree.source, type: kstatement.declaredType.kotlin))
         }
-        if (kstatement.role.isProperty || kstatement.role == .global), kstatement.propertyType.isUnwrappedOptional, kstatement.propertyType.kotlinIsNative(primitive: true) {
-            kstatement.messages.append(.kotlinLateinitPrimitive(kstatement, source: translator.syntaxTree.source))
+        if kstatement.role.isProperty || kstatement.role == .global {
+            if kstatement.propertyType.isUnwrappedOptional && kstatement.propertyType.kotlinIsNative(primitive: true) {
+                kstatement.messages.append(.kotlinLateinitPrimitive(kstatement, source: translator.syntaxTree.source))
+            }
+        } else if let functionDeclaration = statement.parent?.parent as? FunctionDeclaration {
+            if functionDeclaration.parameters.contains(where: { kstatement.names.contains($0.internalLabel) && $0.internalLabel != $0.externalLabel && $0.externalLabel != nil }) {
+                kstatement.messages.append(.kotlinVariableMirrorInternalParameter(kstatement, source: translator.syntaxTree.source))
+            }
         }
         if owningDeclarationType == .protocolDeclaration {
             if statement.modifiers.isStatic {

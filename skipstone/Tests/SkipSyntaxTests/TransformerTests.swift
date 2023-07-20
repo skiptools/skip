@@ -49,7 +49,7 @@ final class TransformerTests: XCTestCase {
 
         internal open class TestCase: XCTestCase {
 
-            @Test internal fun runtestAsync() {
+            @OptIn(ExperimentalCoroutinesApi::class) @Test internal fun runtestAsync() {
                 val dispatcher = StandardTestDispatcher()
                 Dispatchers.setMain(dispatcher)
                 try {

@@ -243,6 +243,10 @@ extension Message {
         return Message(kind: .error, message: "Kotlin typealias declarations do not support constrained generic types", sourceDerived: sourceDerived, source: source)
     }
 
+    static func kotlinVariableMirrorInternalParameter(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Declaring a viarable that mirrors an internal parameter label of its enclosing function will cause an error in Kotlin. Consider renaming this variable", sourceDerived: sourceDerived, source: source)
+    }
+
     static func kotlinViewBuilderUnsupportedStatement(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "This Swift construct is not supported within a @ViewBuilder when translating to Kotlin UI", sourceDerived: sourceDerived, source: source)
     }

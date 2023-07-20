@@ -1555,6 +1555,40 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """)
     }
+
+    func testLetWithInternalLabel() async throws {
+        try await checkProducesMessage(swift: """
+        func f(ext int: Int) -> Int {
+            var int = int
+            int += 1
+            return int
+        }
+        """)
+
+        try await check(swift: """
+        func f(int: Int) -> Int {
+            var int = int
+            int += 1
+            return int
+        }
+        func f(_ int: Int) -> Int {
+            var int = int
+            int += 1
+            return int
+        }
+        """, kotlin: """
+        internal fun f(int: Int): Int {
+            var int = int
+            int += 1
+            return int
+        }
+        internal fun f(int: Int, @Suppress("UNUSED_PARAMETER") unusedp_0: Nothing? = null): Int {
+            var int = int
+            int += 1
+            return int
+        }
+        """)
+    }
 }
 
 var sideEffectOrdering: [String] = []
