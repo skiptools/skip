@@ -29,7 +29,10 @@ final class KotlinUnitTestTransformer: KotlinTransformer {
 
         // Create a wrapper @Test function that will call the original async function
         let testFunctionDeclaration = KotlinFunctionDeclaration(name: "run" + functionDeclaration.name)
-        testFunctionDeclaration.annotations += ["@Test"]
+        testFunctionDeclaration.annotations += [
+            "@OptIn(ExperimentalCoroutinesApi::class)",
+            "@Test"
+        ]
         testFunctionDeclaration.extras = .singleNewline
 
         // This wrapper code sets up and tears down the required async test environment
