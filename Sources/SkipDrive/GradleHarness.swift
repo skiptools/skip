@@ -321,15 +321,14 @@ extension GradleHarness {
         try await launchAPK(device: deviceID, appid: "\(appId)/.MainActivity", log: logLevel, apk: apk.path)
     }
 
-    public func assemble(appName: String, packageName: String, outputPrefix: String? = "GRADLE>") async throws {
+    public func assemble(appName: String, packageName: String, arguments: [String], outputPrefix: String? = "GRADLE>") async throws {
         let driver = try await GradleDriver()
 
         let moduleName = appName + "Kt"
-        let args: [String] = []
         let acts: [String] = releaseBuild ? ["assembleRelease"] : ["assembleDebug"]
 
         var exitCode: ProcessResult.ExitStatus? = nil
-        let (output, _) = try await driver.launchGradleProcess(in: projectRoot(forModule: moduleName, packageName: packageName), module: appName, actions: acts, arguments: args, info: true, rerunTasks: false, exitHandler: { result in
+        let (output, _) = try await driver.launchGradleProcess(in: projectRoot(forModule: moduleName, packageName: packageName), module: appName, actions: acts, arguments: arguments, info: false, rerunTasks: false, exitHandler: { result in
             print("GRADLE RESULT: \(result)")
             exitCode = result.exitStatus
         })
