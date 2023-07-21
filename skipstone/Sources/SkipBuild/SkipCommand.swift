@@ -357,7 +357,7 @@ protocol SkipPhase : AsyncParsableCommand {
 extension SkipPhase {
     /// The total size of all input source files, below which we will not enforce either license key or valid header comments
     /// this is meant to be large enough to accomodate simple demos and experiments without requiring any license
-    static var codebaseThresholdSize: Int { 15 * 1024 }
+    static var codebaseThresholdSize: Int { 20 * 1024 }
 }
 
 /// The condition under which the phase should be run

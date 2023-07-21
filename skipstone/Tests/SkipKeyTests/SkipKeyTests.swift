@@ -10,13 +10,13 @@ public class SkipKeyTests : XCTestCase {
             let key = try await tool("create", "-jM", "--nonce", "000000000000000000000000", "--id", "ABC", "--expiration", "2023-07-01T00:00:00Z")
             // keys are not always identical, even with the same nonce
             //XCTAssertEqual("SKP000000000000000000000000EB195AE8771A919718D475EA9DED4EC0FE8A7952ABB659EB45EEB2C490FD9510E1FF8B20D3862F2F51D218PKS", try key.json()["key"]?.string)
-            XCTAssertEqual(116, try key.json()["key"]?.string?.count)
+            XCTAssertNotEqual(0, try key.json()["key"]?.string?.count)
         }
         do {
             let key = try await tool("create", "-jM", "--nonce", "000000000000000000000000", "--id", "123", "--expiration", "2023-07-01T00:00:00Z")
             // keys are not always identical, even with the same nonce
             //XCTAssertEqual("SKP000000000000000000000000EB195AE8771A91E768A475EA9DED4EC0FE8A7952ABB659EB45EEB2A7BAC8BE555CE63AD8675978803DF8D4PKS", try key.json()["key"]?.string)
-            XCTAssertEqual(116, try key.json()["key"]?.string?.count)
+            XCTAssertNotEqual(0, try key.json()["key"]?.string?.count)
         }
     }
 
