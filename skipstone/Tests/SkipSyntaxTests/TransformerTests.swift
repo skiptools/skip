@@ -58,7 +58,7 @@ final class TransformerTests: XCTestCase {
                     Dispatchers.resetMain()
                 }
             }
-            internal open suspend fun testAsync(): Unit = Detached.run {
+            internal open suspend fun testAsync(): Unit = Async.run {
                 XCTAssertTrue(someCheck())
             }
         }

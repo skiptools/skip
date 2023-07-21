@@ -110,7 +110,7 @@ class KotlinAwait: KotlinExpression {
 
     convenience init(target: KotlinExpression, source: Source) {
         self.init(target: target)
-        setIsAsynchronous(target, source: source)
+        Self.setIsAsynchronous(target, source: source)
     }
 
     private init(target: KotlinExpression) {
@@ -140,7 +140,7 @@ class KotlinAwait: KotlinExpression {
     }
 
     /// Adjust the given Kotlin syntax for an asynchronous call.
-    private func setIsAsynchronous(_ node: KotlinSyntaxNode, source: Source) {
+    static func setIsAsynchronous(_ node: KotlinSyntaxNode, source: Source) {
         node.visit { node in
             if var mainActorTargeting = node as? (KotlinSyntaxNode & KotlinMainActorTargeting) {
                 mainActorTargeting.isInAwait = true
@@ -651,7 +651,7 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
             if isMainActor {
                 output.append(" MainActor.run \(returnLabel){")
             } else if isAsync {
-                output.append(" Detached.run \(returnLabel){")
+                output.append(" Async.run \(returnLabel){")
             }
             output.append(isSingleStatement ? " " : "\n")
         } else {
@@ -675,7 +675,7 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
             if isMainActor {
                 output.append(" MainActor.run \(returnLabel){")
             } else if isAsync {
-                output.append(" Detached.run \(returnLabel){")
+                output.append(" Async.run \(returnLabel){")
             }
             output.append(isSingleStatement ? " " : "\n")
         }
@@ -897,7 +897,7 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
     var mayBeSharedMutableStruct = false
     var isLocalOrSelfIdentifier = false
     var isOperatorIdentifier = false
-    var isInOut = false
+    var valueSuffix: String? // Suffix to append to extract value, e.g. '.value()'
     var isFunctionReference = false
     var isModuleNameFor: TypeSignature = .none
     var isTypealiasFor: TypeSignature = .none
@@ -1002,8 +1002,8 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
                         // Async properties are converted to Kotlin functions
                         output.append("()")
                     }
-                    if isInOut {
-                        output.append(".value")
+                    if let valueSuffix {
+                        output.append(valueSuffix)
                     }
                 }
             }

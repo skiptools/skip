@@ -20,6 +20,10 @@ extension Message {
         return Message(kind: .warning, message: "Skip is unable to match this API call to determine the correct actor on which to run it. Consider adding additional type information", sourceDerived: sourceDerived, source: source)
     }
 
+    static func kotlinAsyncLetAssignment(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .warning, message: "Shadowing an async let variable with a variable of the same name may produce incorrect Kotlin. Consider using a different variable name", sourceDerived: sourceDerived, source: source)
+    }
+
     static func kotlinAsyncTaskClosureInline(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .warning, message: "Skip requires that you pass Task and MainActor operations as inline closures, e.g. Task { ... }. Failure to do so may result in the code running on the wrong thread", sourceDerived: sourceDerived, source: source)
     }

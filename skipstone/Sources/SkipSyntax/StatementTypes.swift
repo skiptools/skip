@@ -1354,7 +1354,7 @@ class VariableDeclaration: Statement {
     }
     private(set) var declaredType: TypeSignature
     private(set) var constrainedDeclaredType: TypeSignature
-    let isLet: Bool
+    let isLet: Bool // True for async let local OR async get property
     let isAsync: Bool
     let isThrows: Bool
     var attributes: Attributes
@@ -1397,16 +1397,18 @@ class VariableDeclaration: Statement {
         var attributes = Attributes.for(syntax: variableDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: variableDecl.modifiers)
+        let isAsync = variableDecl.modifiers?.contains(where: { $0.name.text == "async" }) == true
+
         var statements: [Statement] = []
         for (index, syntax) in variableDecl.bindings.enumerated() {
             let bindingExtras = index == 0 ? extras : nil
-            let statement = try decode(syntax: syntax, isLet: isLet, attributes: attributes, modifiers: modifiers, extras: bindingExtras, in: syntaxTree)
+            let statement = try decode(syntax: syntax, isLet: isLet, isAsync: isAsync, attributes: attributes, modifiers: modifiers, extras: bindingExtras, in: syntaxTree)
             statements.append(statement)
         }
         return statements
     }
 
-    private static func decode(syntax: PatternBindingSyntax, isLet: Bool, attributes: Attributes, modifiers: Modifiers, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> Statement {
+    private static func decode(syntax: PatternBindingSyntax, isLet: Bool, isAsync: Bool, attributes: Attributes, modifiers: Modifiers, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> Statement {
         var declaredType: TypeSignature = .none
         if let typeSyntax = syntax.typeAnnotation?.type {
             declaredType = TypeSignature.for(syntax: typeSyntax, in: syntaxTree)
@@ -1430,7 +1432,7 @@ class VariableDeclaration: Statement {
         guard let names = syntax.pattern.identifierPatterns(in: syntaxTree)?.map(\.name) else {
             throw Message.unsupportedSyntax(syntax.pattern, source: syntaxTree.source)
         }
-        let declaration = VariableDeclaration(names: names, declaredType: declaredType, isLet: isLet, isAsync: accessors.isAsync, isThrows: accessors.isThrows, attributes: attributes, modifiers: modifiers, value: value, getter: accessors.getter, setter: accessors.setter, willSet: accessors.willSet, didSet: accessors.didSet, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
+        let declaration = VariableDeclaration(names: names, declaredType: declaredType, isLet: isLet, isAsync: isAsync || accessors.isAsync, isThrows: accessors.isThrows, attributes: attributes, modifiers: modifiers, value: value, getter: accessors.getter, setter: accessors.setter, willSet: accessors.willSet, didSet: accessors.didSet, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
         declaration.messages = accessors.messages
         return declaration
     }

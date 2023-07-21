@@ -239,7 +239,7 @@ class KotlinCodeBlock: KotlinStatement, KotlinSingleStatementAppendable {
         visit { node in
             if let identifier = node as? KotlinIdentifier {
                 if identifier.name == name {
-                    identifier.isInOut = true
+                    identifier.valueSuffix = ".value"
                 }
             } else if let variableDeclaration = node as? KotlinVariableDeclaration {
                 if variableDeclaration.names.contains(name) {
@@ -247,6 +247,31 @@ class KotlinCodeBlock: KotlinStatement, KotlinSingleStatementAppendable {
                 }
             }
             return .recurse(nil)
+        }
+    }
+
+    /// Perform any updates to handle the given 'async let' declaration.
+    ///
+    /// - Note: The declaration should be a direct child of this code block.
+    func updateWithAsyncLet(declaration: KotlinVariableDeclaration, source: Source) {
+        var hasCreatedBinding = false
+        statements.forEach {
+            $0.visit { node in
+                if !hasCreatedBinding {
+                    hasCreatedBinding = node === declaration
+                    return .skip
+                }
+                if let identifier = node as? KotlinIdentifier {
+                    if identifier.name == declaration.propertyName {
+                        identifier.valueSuffix = ".value()"
+                    }
+                } else if let variableDeclaration = node as? KotlinVariableDeclaration, !variableDeclaration.isAsyncLet {
+                    if variableDeclaration.names.contains(declaration.propertyName) {
+                        variableDeclaration.messages.append(.kotlinAsyncLetAssignment(variableDeclaration, source: source))
+                    }
+                }
+                return .recurse(nil)
+            }
         }
     }
 
@@ -1703,7 +1728,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             if apiFlags.contains(.mainActor) {
                 output.append(" = MainActor.run ")
             } else {
-                output.append(" = Detached.run ")
+                output.append(" = Async.run ")
             }
             if hasAsyncExplicitReturn {
                 output.append("\(KotlinClosure.returnLabel)@")
@@ -2034,6 +2059,9 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var declaredType: TypeSignature = .none
     var isLet = false
     var role: Role = .local
+    var isAsyncLet: Bool {
+        return isLet && apiFlags.contains(.async)
+    }
     var isOpen = false
     var modifiers = Modifiers()
     var attributes = Attributes()
@@ -2155,8 +2183,14 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         kstatement.willSet = statement.willSet?.translate(translator: translator, expectedReturn: .no)
         kstatement.didSet = statement.didSet?.translate(translator: translator, expectedReturn: .no)
 
-        if statement.isAsync && kstatement.getter?.body?.updateWithExpectedReturn(.labelIfPresent(KotlinClosure.returnLabel)) == true {
-            kstatement.hasAsyncExplicitReturn = true
+        if kstatement.apiFlags.contains(.async) {
+            if kstatement.isAsyncLet {
+                if let value = kstatement.value {
+                    KotlinAwait.setIsAsynchronous(value, source: translator.syntaxTree.source)
+                }
+            } else if kstatement.getter?.body?.updateWithExpectedReturn(.labelIfPresent(KotlinClosure.returnLabel)) == true {
+                kstatement.hasAsyncExplicitReturn = true
+            }
         }
 
         // Warnings and fixups
@@ -2248,7 +2282,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 output.append("lateinit ")
             }
         }
-        if apiFlags.contains(.async) {
+        if apiFlags.contains(.async) && !isAsyncLet {
             output.append("fun ")
         } else if !apiFlags.contains(.writeable) && !isAssignFromWriteable {
             output.append("val ")
@@ -2267,7 +2301,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if names.count > 1 {
             output.append(")")
         }
-        if apiFlags.contains(.async) {
+        if apiFlags.contains(.async) && !isAsyncLet {
             output.append("()")
         }
 
@@ -2276,7 +2310,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         } else if usesStorageProperty {
             output.append(": ").append(propertyType.kotlin)
         }
-        if !apiFlags.contains(.async) && !usesStorageProperty {
+        if (!apiFlags.contains(.async) || isAsyncLet) && !usesStorageProperty {
             appendInitialValue(to: output, indentation: indentation)
         }
         extends?.1.appendWhere(to: output, indentation: indentation)
@@ -2286,7 +2320,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if apiFlags.contains(.mainActor) {
             output.append(" = MainActor.run ")
         } else {
-            output.append(" = Detached.run ")
+            output.append(" = Async.run ")
         }
         if hasAsyncExplicitReturn {
             output.append("\(KotlinClosure.returnLabel)@")
@@ -2448,7 +2482,14 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
 
     private func appendInitialValue(to output: OutputGenerator, indentation: Indentation) {
         if let value {
-            output.append(" = ").append(value, indentation: indentation)
+            output.append(" = ")
+            if isAsyncLet {
+                output.append("Task { ")
+            }
+            output.append(value, indentation: indentation)
+            if isAsyncLet {
+                output.append(" }")
+            }
         } else {
             // In Swift an optional var defaults to nil, but not so in Kotlin
             if (role.isProperty && role != .protocolProperty) || role == .global, declaredType.isOptional, !isLet, getter == nil {

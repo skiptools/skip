@@ -11,8 +11,14 @@ final class KotlinConcurrencyTransformer: KotlinTransformer {
                 }
             } else if let variableDeclaration = node as? KotlinVariableDeclaration {
                 // Async implementations change for main actor
-                if variableDeclaration.apiFlags.contains(.async) && codebaseInfo?.isMainActor(declaration: variableDeclaration) == true {
-                    variableDeclaration.apiFlags.insert(.mainActor)
+                if variableDeclaration.apiFlags.contains(.async) {
+                    if variableDeclaration.isAsyncLet {
+                        if let codeBlock = variableDeclaration.parent as? KotlinCodeBlock {
+                            codeBlock.updateWithAsyncLet(declaration: variableDeclaration, source: translator.syntaxTree.source)
+                        }
+                    } else if codebaseInfo?.isMainActor(declaration: variableDeclaration) == true {
+                        variableDeclaration.apiFlags.insert(.mainActor)
+                    }
                 }
             } else if let closure = node as? KotlinClosure {
                 if !taskClosureIdentifiers.contains(ObjectIdentifier(closure)) {

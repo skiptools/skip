@@ -664,6 +664,10 @@ public class CodebaseInfo: Codable {
             case .typealiased(let alias, _):
                 return typeNameFunctionCandidates(for: alias.from, constrainedGenerics: constrainedGenerics, arguments: arguments, excludeConstrainedExtensions: excludeConstrainedExtensions)
             default:
+                // Is this a cast?
+                if type.isNumeric && arguments.count == 1 && arguments[0].label == nil && arguments[0].value.isNumeric {
+                    return [FunctionCandidate(match: APIMatch(signature: .function([.init(type: arguments[0].value)], type, []), apiFlags: [], declarationType: .initDeclaration, availability: .available), score: 1.0, level: 0)]
+                }
                 return functionCandidates(name: type.name, moduleName: moduleName, constrainedGenerics: constrainedGenerics, arguments: arguments, includeTypes: false)
             }
         }
