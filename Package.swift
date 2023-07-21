@@ -9,7 +9,7 @@ let package = Package(
 
         .plugin(name: "preflight", targets: ["skip-preflight"]),
         .plugin(name: "transpile", targets: ["skip-transpiler"]),
-        .plugin(name: "skipbuild", targets: ["Skip Gradle Build"]),
+        .plugin(name: "skipbuild", targets: ["skip-build"]),
 
         .library(name: "SkipDrive", targets: ["SkipDrive"]),
     ],
@@ -43,12 +43,9 @@ let package = Package(
                 dependencies: ["skiptool"],
                 path: "Plugins/SkipInit"),
 
-        .plugin(name: "Skip Gradle Build",
+        .plugin(name: "skip-build",
                 capability: .command(
-                    intent: .custom(verb: "skip", description: "Run a Skip Gradle build"),
-                    permissions: [
-                        .writeToPackageDirectory(reason: "Skip needs to create and update the Skip folder in the project."),
-                    ]),
+                    intent: .custom(verb: "skip", description: "Run a Skip Gradle build")),
                 dependencies: ["skipgradle"],
                 path: "Plugins/SkipBuild"),
 
@@ -59,7 +56,7 @@ let package = Package(
 
         .plugin(name: "skip-transpiler",
                 capability: .buildTool(),
-                dependencies: ["skiptool"],
+                dependencies: ["skiptool", "skip-build"],
                 path: "Plugins/SkipTranspilePlugIn"),
 
         // skipgradle is the CLI interface from Skip to the Gradle tool for building, testing, and packaging Kotlin
