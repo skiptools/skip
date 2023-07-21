@@ -44,8 +44,7 @@ let package = Package(
                 path: "Plugins/SkipInit"),
 
         .plugin(name: "skip-build",
-                capability: .command(
-                    intent: .custom(verb: "skip", description: "Run a Skip Gradle build")),
+                capability: .buildTool(),
                 dependencies: ["skipgradle"],
                 path: "Plugins/SkipBuild"),
 

@@ -6,27 +6,22 @@
 import Foundation
 import PackagePlugin
 
-/// Command plugin to invoke skipgradle.
-@main struct SkipBuild: CommandPlugin {
-    func performCommand(context: PluginContext, arguments: [String]) async throws {
-        try runCommand(tool: context.tool(named: "skipgradle"), arguments: arguments)
-    }
-
-    fileprivate func runCommand(tool runner: PackagePlugin.PluginContext.Tool, arguments: [String]) throws {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: runner.path.string)
-        process.arguments = arguments
-        try process.run()
-        process.waitUntilExit()
+/// Command plugin to invoke `skipgradle`.
+///
+/// Note that this plugin does nothing; it just exists to ensure that skipgradle is built so we can manually execute it with adequate permissions.
+/// If ever it becomes possible to execute a post-build plugin, this might be where it takes place.
+@main struct SkipBuildPlugIn: BuildToolPlugin {
+    func createBuildCommands(context: PluginContext, target: Target) async throws -> [Command] {
+        return []
     }
 }
 
 #if canImport(XcodeProjectPlugin)
 import XcodeProjectPlugin
 
-extension SkipBuild: XcodeCommandPlugin {
-    func performCommand(context: XcodePluginContext, arguments: [String]) throws {
-        try runCommand(tool: context.tool(named: "skipgradle"), arguments: arguments)
+extension SkipBuildPlugIn: XcodeBuildToolPlugin {
+    func createBuildCommands(context: XcodePluginContext, target: XcodeTarget) throws -> [Command] {
+        return []
     }
 }
 #endif
