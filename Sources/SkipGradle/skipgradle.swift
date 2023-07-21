@@ -26,7 +26,7 @@ let packageName = "skipapp"
 
             // the build is run as a script at the end of the Build Phases
             print("Running Gradle build for app…")
-            try await gradle.assemble(appName: appName, packageName: packageName, arguments: Array(CommandLine.arguments.dropFirst(1)))
+            try await gradle.gradleExec(appName: appName, packageName: packageName, arguments: Array(CommandLine.arguments.dropFirst(1)))
         } catch {
             print("Error launching: \(error)")
             //print("\(#file):\(#line):\(#column): error: AppDroid: \(error.localizedDescription)")
