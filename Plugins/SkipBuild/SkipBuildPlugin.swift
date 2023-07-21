@@ -6,14 +6,10 @@
 import Foundation
 import PackagePlugin
 
-/// Command plugin to invoke skip as a custom command.
-///
-///     swift package --disable-sandbox --allow-writing-to-package-directory plugin skip [options] <file>+
-///
-/// - Note: The location of your Command Line Tools must be set in Xcode->Settings->Locations
-@main struct SkipCommand: CommandPlugin {
+/// Command plugin to invoke skipgradle.
+@main struct SkipBuild: CommandPlugin {
     func performCommand(context: PluginContext, arguments: [String]) async throws {
-        try runCommand(tool: context.tool(named: "skiptool"), arguments: arguments)
+        try runCommand(tool: context.tool(named: "skipgradle"), arguments: arguments)
     }
 
     fileprivate func runCommand(tool runner: PackagePlugin.PluginContext.Tool, arguments: [String]) throws {
@@ -28,9 +24,9 @@ import PackagePlugin
 #if canImport(XcodeProjectPlugin)
 import XcodeProjectPlugin
 
-extension SkipCommand: XcodeCommandPlugin {
+extension SkipBuild: XcodeCommandPlugin {
     func performCommand(context: XcodePluginContext, arguments: [String]) throws {
-        try runCommand(tool: context.tool(named: "skiptool"), arguments: arguments)
+        try runCommand(tool: context.tool(named: "skipgradle"), arguments: arguments)
     }
 }
 #endif

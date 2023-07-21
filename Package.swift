@@ -6,11 +6,10 @@ let package = Package(
     defaultLocalization: "en",
     products: [
         .plugin(name: "skip-init", targets: ["Hello Skip"]),
-        .plugin(name: "skip-sync", targets: ["Synchronize Packages/Skip"]),
-        .plugin(name: "skip", targets: ["Skip Custom Command"]),
 
         .plugin(name: "preflight", targets: ["skip-preflight"]),
         .plugin(name: "transpile", targets: ["skip-transpiler"]),
+        .plugin(name: "skipbuild", targets: ["Skip Gradle Build"]),
 
         .library(name: "SkipDrive", targets: ["SkipDrive"]),
     ],
@@ -21,7 +20,7 @@ let package = Package(
 
         .plugin(name: "Hello Skip",
                 capability: .command(
-                    intent: .custom(verb: "skip-init",  description: "Show an introduction to Skip and how it can be added to this project."),
+                    intent: .custom(verb: "skip-init", description: "Show an introduction to Skip and how it can be added to this project."),
                     permissions: [
                         .writeToPackageDirectory(reason: """
                         Skip: Swift Kotlin Interop (Technology Preview)”
@@ -44,29 +43,14 @@ let package = Package(
                 dependencies: ["skiptool"],
                 path: "Plugins/SkipInit"),
 
-        .plugin(name: "Synchronize Packages/Skip",
+        .plugin(name: "Skip Gradle Build",
                 capability: .command(
-                    intent: .custom(verb: "skip-sync",  description: "Synchronize and link the local Skip build output folder(s)"),
-                    permissions: [
-                        .writeToPackageDirectory(reason: """
-                        This command synchronizes and links the build output of the transpiled Gradle project, facilitating the browsing and opening of project files in an external editor.
-
-                        The sync process will create local links under the Packages/Skip/ folder to the DerivedData output of the Skip transpilation process for any Kt library target that is selected.
-
-                        Skip Sync may need to be re-run if the build folder is cleaned or the Xcode DerivedData path changes. You should ensure your project folder is backed up before continuing. By proceeding you agree to abide by the terms and conditions of the Skip license.
-                        """)
-                    ]),
-                dependencies: ["skiptool"],
-                path: "Plugins/SkipSync"),
-
-        .plugin(name: "Skip Custom Command",
-                capability: .command(
-                    intent: .custom(verb: "skip",  description: "Run a custom Skip command by specifying arguments manually"),
+                    intent: .custom(verb: "skip", description: "Run a Skip Gradle build"),
                     permissions: [
                         .writeToPackageDirectory(reason: "Skip needs to create and update the Skip folder in the project."),
                     ]),
-                dependencies: ["skiptool"],
-                path: "Plugins/SkipCommand"),
+                dependencies: ["skipgradle"],
+                path: "Plugins/SkipBuild"),
 
         .plugin(name: "skip-preflight",
                 capability: .buildTool(),
@@ -75,7 +59,7 @@ let package = Package(
 
         .plugin(name: "skip-transpiler",
                 capability: .buildTool(),
-                dependencies: ["skiptool", "skipgradle"],
+                dependencies: ["skiptool"],
                 path: "Plugins/SkipTranspilePlugIn"),
 
         // skipgradle is the CLI interface from Skip to the Gradle tool for building, testing, and packaging Kotlin
