@@ -7,6 +7,7 @@ let package = Package(
     products: [
         .plugin(name: "skip-init", targets: ["Hello Skip"]),
 
+        .plugin(name: "skip", targets: ["skip-command"]),
         .plugin(name: "preflight", targets: ["skip-preflight"]),
         .plugin(name: "transpile", targets: ["skip-transpiler"]),
         .plugin(name: "skipbuild", targets: ["skip-build"]),
@@ -42,6 +43,15 @@ let package = Package(
                     ]),
                 dependencies: ["skiptool"],
                 path: "Plugins/SkipInit"),
+
+        .plugin(name: "skip-command",
+                capability: .command(
+                    intent: .custom(verb: "skip",  description: "Run skiptool by specifying arguments manually"),
+                    permissions: [
+                        .writeToPackageDirectory(reason: "Skip needs to create and update the Skip folder in the project."),
+                    ]),
+                dependencies: ["skiptool"],
+                path: "Plugins/SkipCommand"),
 
         .plugin(name: "skip-build",
                 capability: .buildTool(),
