@@ -20,9 +20,11 @@ final class TransformerTests: XCTestCase {
         import skip.unit.*
 
         internal open class TestCase: XCTestCase {
-            @Test internal open fun testSomeTest() = Unit
+            @Test
+            internal open fun testSomeTest() = Unit
 
-            @Test internal open fun testSomeOtherTest() = Unit
+            @Test
+            internal open fun testSomeOtherTest() = Unit
 
             companion object {
 
@@ -49,7 +51,9 @@ final class TransformerTests: XCTestCase {
 
         internal open class TestCase: XCTestCase {
 
-            @OptIn(ExperimentalCoroutinesApi::class) @Test internal fun runtestAsync() {
+            @OptIn(ExperimentalCoroutinesApi::class)
+            @Test
+            internal fun runtestAsync() {
                 val dispatcher = StandardTestDispatcher()
                 Dispatchers.setMain(dispatcher)
                 try {

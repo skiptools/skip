@@ -439,9 +439,12 @@ struct Attribute: Equatable, Codable {
         case frozen
         case indirect
         case inlinable
-        case mainActor
         case inlineAlways
         case inlineNever
+        case mainActor
+        case observable
+        case observationIgnored
+        case published
         case unavailable
         case unknown
     }
@@ -474,8 +477,6 @@ struct Attribute: Equatable, Codable {
             return .indirect
         case "inlinable":
             return .inlinable
-        case "MainActor":
-            return .mainActor
         case "inline":
             if tokens.contains("__always") {
                 return .inlineAlways
@@ -484,6 +485,14 @@ struct Attribute: Equatable, Codable {
             } else {
                 return .unknown
             }
+        case "MainActor":
+            return .mainActor
+        case "Observable":
+            return .observable
+        case "ObservationIgnored":
+            return .observationIgnored
+        case "Published":
+            return .published
         default:
             return .unknown
         }
@@ -835,6 +844,13 @@ extension Array where Element == String {
     /// Filter single-element import paths.
     var moduleName: String? {
         return count == 1 ? self[0] : nil
+    }
+
+    /// Append as separate lines.
+    func appendLines(to output: OutputGenerator, indentation: Indentation) {
+        for string in self {
+            output.append(indentation).append(string).append("\n")
+        }
     }
 }
 

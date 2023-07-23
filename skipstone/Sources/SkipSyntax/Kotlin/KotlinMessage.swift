@@ -181,7 +181,12 @@ extension Message {
     }
 
     static func kotlinNumericCast(_ sourceDerived: SourceDerived, source: Source, type: String) -> Message {
-        return Message(kind: .error, message: "Cast required, e.g. \(type)(<value>). Kotlin requires specific type matching when dealing with Floats and unsigned types. We generally recommend avoiding them in favor of Double and signed types.", sourceDerived: sourceDerived, source: source)
+        return Message(kind: .error, message: "Cast required, e.g. \(type)(<value>). Kotlin requires specific type matching when dealing with Floats and unsigned types. We generally recommend avoiding them in favor of Double and signed types", sourceDerived: sourceDerived, source: source)
+    }
+
+    // Idea: read/mutate synthetic mutableState values
+    static func kotlinObservationManualTrigger(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Skip does not support calls to the generated access(keyPath:) and withMutation(keyPath:_:) functions. Consider adding a synthetic observed property that you read or increment to trigger access and mutation effects", sourceDerived: sourceDerived, source: source)
     }
 
     // Idea: translate to equivalent Kotlin operator functions
@@ -249,6 +254,10 @@ extension Message {
 
     static func kotlinVariableMirrorInternalParameter(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Declaring a viarable that mirrors an internal parameter label of its enclosing function will cause an error in Kotlin. Consider renaming this variable", sourceDerived: sourceDerived, source: source)
+    }
+
+    static func kotlinVariableNeedsTypeDeclaration(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Skip is unable to determine the type of this variable. Consider declaring its type explicitly", sourceDerived: sourceDerived, source: source)
     }
 
     static func kotlinViewBuilderUnsupportedStatement(_ sourceDerived: SourceDerived, source: Source) -> Message {

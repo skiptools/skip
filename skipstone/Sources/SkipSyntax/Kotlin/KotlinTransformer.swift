@@ -51,10 +51,12 @@ public let builtinKotlinTransformerTypes: [KotlinTransformer.Type] = [
     // May *replace* constructors with factory functions. May add static allCases function. May change optional init call
     // sites to factory calls. Requires knowledge of sealed vs. unsealed enums
     KotlinEnumTransformer.self,
-    // May add constructors and modify existing constructors. May suppress side property setting side effects in functions.
+    // May add constructors and modify existing constructors. May suppress property setting side effects in functions.
     // May change optional init call sites
     KotlinConstructorAndSideEffectSupressionTransformer.self,
     KotlinConcurrencyTransformer.self,
+    // May change the names of stored properties, but adds computed wrapper properties with the previous names
+    KotlinObservationTransformer.self,
     KotlinIfWhenTransformer.self,
     KotlinDeferTransformer.self,
     KotlinDisambiguateFunctionsTransformer.self,

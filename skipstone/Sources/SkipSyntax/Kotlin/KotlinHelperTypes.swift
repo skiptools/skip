@@ -53,6 +53,13 @@ struct KotlinTargetVariable {
     }
 }
 
+/// An extra variable we declare to act as storage for the value of another variable.
+struct KotlinStorageVariable {
+    var name: String
+    var isUnwrappedOptional = false
+    var append: (KotlinVariableDeclaration, OutputGenerator, Indentation) -> Void = { _, _, _ in }
+}
+
 extension ExtensionDeclaration {
     /// Whether this extension's members can be moved into the extended type definition.
     var canMoveIntoExtendedType: Bool {

@@ -874,6 +874,7 @@ class KotlinClassDeclaration: KotlinStatement {
     var inherits: [TypeSignature] = []
     var companionInherits: [TypeSignature] = []
     var superclassCall: String?
+    var annotations: [String] = []
     var attributes = Attributes()
     var modifiers = Modifiers()
     var generics = Generics()
@@ -1596,10 +1597,8 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             output.append(indentation).append(declaration)
         } else {
             attributes.append(to: output, indentation: indentation)
+            annotations.appendLines(to: output, indentation: indentation)
             output.append(indentation)
-            for annotation in annotations {
-                output.append(annotation + " ")
-            }
             if isEqualImplementation {
                 appendEqualsDeclaration(to: output, indentation: indentation)
             } else if isLessThanImplementation {
@@ -1859,6 +1858,8 @@ class KotlinInterfaceDeclaration: KotlinStatement {
     var name: String
     var signature: TypeSignature
     var inherits: [TypeSignature] = []
+    var attributes = Attributes()
+    var annotations: [String] = []
     var modifiers = Modifiers()
     var generics = Generics()
     var members: [KotlinStatement] = []
@@ -1866,6 +1867,7 @@ class KotlinInterfaceDeclaration: KotlinStatement {
 
     static func translate(statement: TypeDeclaration, translator: KotlinTranslator) -> KotlinInterfaceDeclaration {
         let kstatement = KotlinInterfaceDeclaration(statement: statement)
+        kstatement.attributes = kstatement.processAttributes(statement.attributes, translator: translator)
         kstatement.modifiers = statement.modifiers
         kstatement.inherits = statement.inherits
         kstatement.generics = statement.generics
@@ -1962,6 +1964,8 @@ class KotlinInterfaceDeclaration: KotlinStatement {
         if let declaration = extras?.declaration {
             output.append(declaration)
         } else {
+            attributes.append(to: output, indentation: indentation)
+            annotations.appendLines(to: output, indentation: indentation)
             switch modifiers.visibility {
             case .default, .internal:
                 output.append("internal ")
@@ -2063,6 +2067,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         return isLet && apiFlags.contains(.async)
     }
     var isOpen = false
+    var annotations: [String] = []
     var modifiers = Modifiers()
     var attributes = Attributes()
     var apiFlags: APIFlags = []
@@ -2078,6 +2083,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var onUpdate: String?
     var suppressSideEffectsPropertyName: String?
     var mutationFunctionNames: (willMutate: String, didMutate: String)?
+    var storageVariable: KotlinStorageVariable?
     var isGenerated = false
     var isDescriptionImplementation: Bool {
         return role.isProperty && propertyName == "description" && propertyType == .string
@@ -2207,6 +2213,9 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 kstatement.messages.append(.kotlinVariableMirrorInternalParameter(kstatement, source: translator.syntaxTree.source))
             }
         }
+        if kstatement.declaredType == .none && kstatement.propertyType == .none && kstatement.initializeStorageVariable() != nil {
+            kstatement.messages.append(.kotlinVariableNeedsTypeDeclaration(kstatement, source: translator.syntaxTree.source))
+        }
         if owningDeclarationType == .protocolDeclaration {
             if statement.modifiers.isStatic {
                 kstatement.messages.append(.kotlinProtocolStaticMember(statement, source: translator.syntaxTree.source))
@@ -2252,6 +2261,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
+        let storageVariable = initializeStorageVariable()
         if let declaration = extras?.declaration {
             output.append(indentation).append(declaration)
         } else if names.count == 1 && names[0] == nil {
@@ -2260,25 +2270,32 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 output.append(indentation).append(value, indentation: indentation)
             }
         } else {
-            appendDeclaration(to: output, indentation: indentation)
+            appendDeclaration(to: output, indentation: indentation, storageVariable: storageVariable)
         }
 
         if apiFlags.contains(.async), let getterBody = getter?.body {
             appendAsyncGet(getterBody, to: output, indentation: indentation)
         } else {
-            appendPropertyDefinition(to: output, indentation: indentation)
+            appendPropertyDefinition(to: output, indentation: indentation, storageVariable: storageVariable)
+        }
+
+        if let storageVariable {
+            storageVariable.append(self, output, indentation)
+            if modifiers.isLazy {
+                output.append(indentation).append("private var \(lazyInitInitializedName) = false\n")
+            }
         }
     }
 
-    private func appendDeclaration(to output: OutputGenerator, indentation: Indentation) {
-        let usesStorageProperty = self.usesStorageProperty
+    private func appendDeclaration(to output: OutputGenerator, indentation: Indentation, storageVariable: KotlinStorageVariable?) {
         attributes.append(to: output, indentation: indentation)
+        annotations.appendLines(to: output, indentation: indentation)
         output.append(indentation)
         if role.isProperty || role == .global {
             output.append(modifiers.kotlinMemberString(isGlobal: role == .global, isOpen: isOpen, suffix: " "))
             if apiFlags.contains(.async) {
                 output.append("suspend ")
-            } else if !usesStorageProperty && role != .superclassOverrideProperty && declaredType.isUnwrappedOptional {
+            } else if storageVariable == nil && role != .superclassOverrideProperty && declaredType.isUnwrappedOptional {
                 output.append("lateinit ")
             }
         }
@@ -2307,10 +2324,10 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
 
         if declaredType != .none {
             output.append(": ").append(declaredType.kotlin)
-        } else if usesStorageProperty {
+        } else if storageVariable != nil && propertyType != .none {
             output.append(": ").append(propertyType.kotlin)
         }
-        if (!apiFlags.contains(.async) || isAsyncLet) && !usesStorageProperty {
+        if (!apiFlags.contains(.async) || isAsyncLet) && storageVariable == nil {
             appendInitialValue(to: output, indentation: indentation)
         }
         extends?.1.appendWhere(to: output, indentation: indentation)
@@ -2330,25 +2347,24 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         output.append(indentation).append("}\n")
     }
 
-    private func appendPropertyDefinition(to output: OutputGenerator, indentation: Indentation) {
-        let usesStorageProperty = self.usesStorageProperty
+    private func appendPropertyDefinition(to output: OutputGenerator, indentation: Indentation, storageVariable: KotlinStorageVariable?) {
         output.append("\n")
         if let getterBody = getter?.body {
             let getterIndentation = indentation.inc()
-            if usesStorageProperty {
-                output.append(getterIndentation).append("get() = \(storagePropertyName)!!\n")
+            if let storageVariable {
+                output.append(getterIndentation).append("get() = \(storageVariable.name)\(storageVariable.isUnwrappedOptional ? "!!" : "")\n")
             } else {
                 appendGetterBody(getterBody, to: output, indentation: getterIndentation)
             }
         } else if role == .superclassOverrideProperty {
             output.append(indentation.inc()).append("get() = super.\(propertyName)\n")
-        } else if (role.isProperty && role != .protocolProperty) || role == .global, usesStorageProperty || (mayBeSharedMutableStruct && apiFlags.contains(.writeable)) {
+        } else if (role.isProperty && role != .protocolProperty) || role == .global, storageVariable != nil || (mayBeSharedMutableStruct && apiFlags.contains(.writeable)) {
             let getterIndentation = indentation.inc()
-            let isSingleStatement = (!modifiers.isLazy || mutationFunctionNames == nil) && getFieldIsSingleStatementAppendable
+            let isSingleStatement = !modifiers.isLazy || (mutationFunctionNames == nil && value == nil)
             output.append(getterIndentation).append("get()")
             if isSingleStatement {
                 output.append(" = ")
-                appendGetField(to: output, indentation: getterIndentation, usesStorageProperty: usesStorageProperty, isSingleStatement: isSingleStatement)
+                appendGetField(to: output, indentation: getterIndentation, storageVariable: storageVariable, isSingleStatement: true)
             } else {
                 let getterBodyIndentation = getterIndentation.inc()
                 var getIndentation = getterBodyIndentation
@@ -2360,7 +2376,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                     output.append(getterBodyIndentation).append("try {\n")
                     getIndentation = getterBodyIndentation.inc()
                 }
-                appendGetField(to: output, indentation: getIndentation, usesStorageProperty: usesStorageProperty)
+                appendGetField(to: output, indentation: getIndentation, storageVariable: storageVariable)
                 if let mutationFunctionNames, modifiers.isLazy {
                     output.append(getterBodyIndentation).append("} finally {\n")
                     output.append(getIndentation).append("if (!isinitialized) \(mutationFunctionNames.didMutate)()\n")
@@ -2413,7 +2429,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 if didSetUsesOldValue {
                     if isStoredOverride {
                         output.append(setIndentation).append("val oldValue = super.\(propertyName)\n")
-                    } else if usesStorageProperty {
+                    } else if storageVariable != nil {
                         output.append(setIndentation).append("val oldValue = this.\(propertyName)\n")
                     } else {
                         output.append(setIndentation).append("val oldValue = field\n")
@@ -2422,7 +2438,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 if isStoredOverride {
                     output.append(setIndentation).append("super.\(propertyName) = newValue\n")
                 } else {
-                    appendSetField(to: output, indentation: setIndentation, usesStorageProperty: usesStorageProperty, isCopy: true)
+                    appendSetField(to: output, indentation: setIndentation, storageVariable: storageVariable, isCopy: true)
                 }
             }
             
@@ -2448,34 +2464,13 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             }
             output.append(setterIndentation).append("}\n")
         } else if (role.isProperty && role != .protocolProperty) || role == .global, apiFlags.contains(.writeable) || isAssignFromWriteable {
-            if usesStorageProperty || (mayBeSharedMutableStruct && apiFlags.contains(.writeable)) {
+            if storageVariable != nil || (mayBeSharedMutableStruct && apiFlags.contains(.writeable)) {
                 let setterIndentation = indentation.inc()
                 output.append(setterIndentation).append(setVisibilityString).append("set(newValue) {\n")
-                appendSetField(to: output, indentation: setterIndentation.inc(), usesStorageProperty: usesStorageProperty, isCopy: false)
+                appendSetField(to: output, indentation: setterIndentation.inc(), storageVariable: storageVariable, isCopy: false)
                 output.append(setterIndentation).append("}\n")
             } else if !setVisibilityString.isEmpty {
                 output.append(indentation.inc()).append(setVisibilityString).append("set\n")
-            }
-        }
-        if usesStorageProperty {
-            if modifiers.isLazy && propertyType.kotlinIsNative(primitive: true) {
-                let defaultValue: String
-                if propertyType == .bool {
-                    defaultValue = "false"
-                } else if propertyType == .character {
-                    defaultValue = "' '"
-                } else {
-                    defaultValue = "\(propertyType.kotlin)(0)"
-                }
-                output.append(indentation).append("private var \(storagePropertyName) = \(defaultValue)\n")
-            } else if !apiFlags.contains(.writeable), let getterBody = getter?.body {
-                output.append(indentation).append("private val \(storagePropertyName): \(propertyType.asOptional(true).kotlin)\n")
-                appendGetterBody(getterBody, to: output, indentation: indentation.inc())
-            } else {
-                output.append(indentation).append("private lateinit var \(storagePropertyName): \(propertyType.kotlin)\n")
-            }
-            if modifiers.isLazy {
-                output.append(indentation).append("private var \(lazyInitInitializedName) = false\n")
             }
         }
     }
@@ -2498,10 +2493,6 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         }
     }
 
-    private var getFieldIsSingleStatementAppendable: Bool {
-        return !modifiers.isLazy || value == nil
-    }
-
     private func appendGetterBody(_ getterBody: KotlinCodeBlock, to output: OutputGenerator, indentation: Indentation) {
         output.append(indentation).append("get()")
         if getterBody.isSingleStatementAppendable(mode: .function) {
@@ -2515,13 +2506,14 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         }
     }
 
-    private func appendGetField(to output: OutputGenerator, indentation: Indentation, usesStorageProperty: Bool, isSingleStatement: Bool = false) {
-        let fieldName = usesStorageProperty ? storagePropertyName : "field"
-        let storageValue = apiFlags.contains(.writeable) && mayBeSharedMutableStruct ? "\(fieldName).sref(\(onUpdate ?? ""))" : fieldName
+    private func appendGetField(to output: OutputGenerator, indentation: Indentation, storageVariable: KotlinStorageVariable?, isSingleStatement: Bool = false) {
+        let fieldName = storageVariable?.name ?? "field"
+        let unwrapSuffix = storageVariable?.isUnwrappedOptional == true ? "!!" : ""
+        let storageValue = apiFlags.contains(.writeable) && mayBeSharedMutableStruct ? "\(fieldName)\(unwrapSuffix).sref(\(onUpdate ?? ""))" : "\(fieldName)\(unwrapSuffix)"
         if modifiers.isLazy && value != nil {
             output.append(indentation).append("if (!\(lazyInitInitializedName)) {\n")
             let initializeIndentation = indentation.inc()
-            output.append(initializeIndentation).append(storagePropertyName)
+            output.append(initializeIndentation).append(fieldName)
             appendInitialValue(to: output, indentation: initializeIndentation)
             output.append("\n")
             output.append(initializeIndentation).append("\(lazyInitInitializedName) = true\n")
@@ -2534,8 +2526,8 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         }
     }
 
-    private func appendSetField(to output: OutputGenerator, indentation: Indentation, usesStorageProperty: Bool, isCopy: Bool) {
-        let fieldName = usesStorageProperty ? storagePropertyName : "field"
+    private func appendSetField(to output: OutputGenerator, indentation: Indentation, storageVariable: KotlinStorageVariable?, isCopy: Bool) {
+        let fieldName = storageVariable?.name ?? "field"
         if !isCopy && mayBeSharedMutableStruct {
             output.append(indentation).append("\(fieldName) = newValue.sref()\n")
         } else {
@@ -2546,25 +2538,55 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         }
     }
 
-    private var usesStorageProperty: Bool {
+    private func initializeStorageVariable() -> KotlinStorageVariable? {
+        if let storageVariable {
+            return storageVariable
+        }
         guard !apiFlags.contains(.async) else {
-            return false
+            return nil
         }
         guard role == .property || role == .global else {
-            return false
+            return nil
         }
-        if modifiers.isLazy {
-            return true
-        }
-        if declaredType.isUnwrappedOptional {
-            // We only need a separate storage var if we need custom get or set logic
-            return (mayBeSharedMutableStruct && apiFlags.contains(.writeable)) || mutationFunctionNames != nil || getter?.body != nil || setter?.body != nil || willSet?.body != nil || didSet?.body != nil
-        }
-        return false
-    }
 
-    private var storagePropertyName: String {
-        return "\(propertyName)storage"
+        guard !modifiers.isLazy else {
+            let name = "\(propertyName)storage"
+            return KotlinStorageVariable(name: name) { variable, output, indentation in
+                if variable.propertyType.kotlinIsNative(primitive: true) {
+                    let defaultValue: String
+                    if variable.propertyType == .bool {
+                        defaultValue = "false"
+                    } else if variable.propertyType == .character {
+                        defaultValue = "' '"
+                    } else {
+                        defaultValue = "\(variable.propertyType.kotlin)(0)"
+                    }
+                    output.append(indentation).append("private var \(name) = \(defaultValue)\n")
+                } else {
+                    output.append(indentation).append("private lateinit var \(name): \(variable.propertyType.kotlin)\n")
+                }
+            }
+        }
+
+        guard declaredType.isUnwrappedOptional else {
+            return nil
+        }
+        // We only need a separate storage var if we need custom get or set logic
+        guard (mayBeSharedMutableStruct && apiFlags.contains(.writeable)) || mutationFunctionNames != nil || getter?.body != nil || setter?.body != nil || willSet?.body != nil || didSet?.body != nil else {
+            return nil
+        }
+
+        let name = "\(propertyName)storage"
+        if !apiFlags.contains(.writeable), let getterBody = getter?.body {
+            return KotlinStorageVariable(name: name, isUnwrappedOptional: !propertyType.isOptional) { variable, output, indentation in
+                output.append(indentation).append("private val \(name): \(variable.propertyType.asOptional(true).kotlin)\n")
+                variable.appendGetterBody(getterBody, to: output, indentation: indentation.inc())
+            }
+        } else {
+            return KotlinStorageVariable(name: name) { variable, output, indentation in
+                output.append(indentation).append("private lateinit var \(name): \(variable.propertyType.kotlin)\n")
+            }
+        }
     }
 
     private var lazyInitInitializedName: String {
