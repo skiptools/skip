@@ -158,6 +158,8 @@ final class KotlinConstructorAndSideEffectSupressionTransformer: KotlinTransform
                 return .recurse(nil)
             }
         }
+        // The delegating call should not be treated as an optional init call
+        functionCall.isOptionalInit = false
     }
 
     private func superclass(of classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) -> TypeSignature? {

@@ -711,6 +711,29 @@ final class ConstructorDestructorTests: XCTestCase {
         """)
     }
 
+    func testDelegatingOptionalConstructor() async throws {
+        try await check(swift: """
+        class C {
+            var x: Int
+            init?(x: Int) {
+                self.x = x
+            }
+            convenience init?(y: Int) {
+                self.init(x: y + 1)
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal open var x: Int
+            internal constructor(x: Int, @Suppress("UNUSED_PARAMETER") unusedp_0: Nothing? = null) {
+                this.x = x
+            }
+            internal constructor(y: Int): this(x = y + 1) {
+            }
+        }
+        """)
+    }
+
     func testDeinit() async throws {
         try await check(swift: """
         class A {
