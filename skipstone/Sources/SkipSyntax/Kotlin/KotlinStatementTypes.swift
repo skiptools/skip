@@ -507,7 +507,7 @@ class KotlinForLoop: KotlinStatement {
         }
         let kbody = KotlinCodeBlock.translate(statement: statement.body, translator: translator)
         let kstatement = KotlinForLoop(statement: statement, sequence: ksequence, body: kbody)
-        kstatement.declaredType = statement.declaredType
+        kstatement.declaredType = statement.declaredType.resolvingSelf(in: statement)
         kstatement.isNonNilMatch = statement.isNonNilMatch
         if let whereGuard = statement.whereGuard {
             kstatement.whereGuard = translator.translateExpression(whereGuard)
@@ -904,7 +904,7 @@ class KotlinClassDeclaration: KotlinStatement {
         let kstatement = KotlinClassDeclaration(statement: statement)
         kstatement.inherits = statement.inherits
         kstatement.modifiers = statement.modifiers
-        kstatement.generics = statement.generics
+        kstatement.generics = statement.generics.resolvingSelf(in: statement)
         if let owningTypeDeclaration = statement.parent?.owningTypeDeclaration, !owningTypeDeclaration.generics.isEmpty {
             kstatement.messages.append(.kotlinGenericTypeNested(statement, source: translator.syntaxTree.source))
         }
@@ -916,7 +916,7 @@ class KotlinClassDeclaration: KotlinStatement {
                 // Type info contains full resolved generics
                 kstatement.signature = typeInfo.signature
                 kstatement.inherits = typeInfo.inherits
-                kstatement.generics = typeInfo.generics
+                kstatement.generics = typeInfo.generics.resolvingSelf(in: statement)
             }
 
             // Move extensions of this type into the type itself rather than use Kotlin extension functions.
@@ -1145,7 +1145,7 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
         kstatement.associatedValues.forEach { $0.declaredType.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
         kstatement.rawValue = statement.rawValue.map { translator.translateExpression($0) }
         if let owningTypeDeclaration = statement.owningTypeDeclaration {
-            let genericsEntries = owningTypeDeclaration.generics.entries.map { entry in
+            let genericsEntries = owningTypeDeclaration.generics.resolvingSelf(in: statement).entries.map { entry in
                 if kstatement.associatedValues.contains(where: { $0.declaredType.referencesType(entry.namedType) }) {
                     return entry
                 } else {
@@ -1314,11 +1314,11 @@ struct KotlinExtensionDeclaration {
             kstatements.append(KotlinMessageStatement(message: message, statement: statement))
         }
         var extends = statement.extends
-        var generics = statement.generics
+        var generics = statement.generics.resolvingSelf(in: statement)
         if let extendedTypeInfo = translator.codebaseInfo?.primaryTypeInfo(forNamed: statement.extends) {
             // Set the extended type to match its primary type and put the complete set of constraints into the generics object
             extends = extendedTypeInfo.signature
-            generics = extendedTypeInfo.generics.merge(extension: statement.extends, generics: statement.generics)
+            generics = extendedTypeInfo.generics.merge(extension: statement.extends, generics: statement.generics).resolvingSelf(in: statement)
         }
         for member in statement.members {
             if !canMove {
@@ -1448,9 +1448,9 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         let kstatement = KotlinFunctionDeclaration(statement: statement)
         kstatement.isOptionalInit = statement.isOptionalInit
         kstatement.modifiers = statement.modifiers
-        kstatement.generics = statement.generics
-        kstatement.returnType = statement.returnType
-        kstatement.parameters = statement.parameters.map { $0.translate(translator: translator) }
+        kstatement.generics = statement.generics.resolvingSelf(in: statement)
+        kstatement.returnType = statement.returnType.resolvingSelf(in: statement)
+        kstatement.parameters = statement.parameters.map { $0.resolvingSelf(in: statement).translate(translator: translator) }
         kstatement.attributes = kstatement.processAttributes(statement.attributes, translator: translator)
         kstatement.apiFlags = statement.functionType.apiFlags
         var owningDeclarationType: StatementType? = nil
@@ -1870,7 +1870,7 @@ class KotlinInterfaceDeclaration: KotlinStatement {
         kstatement.attributes = kstatement.processAttributes(statement.attributes, translator: translator)
         kstatement.modifiers = statement.modifiers
         kstatement.inherits = statement.inherits
-        kstatement.generics = statement.generics
+        kstatement.generics = statement.generics.resolvingSelf(in: statement)
         kstatement.members = statement.members.flatMap { translator.translateStatement($0) }
         kstatement.inherits.forEach { $0.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
         guard let codebaseInfo = translator.codebaseInfo else {
@@ -1881,7 +1881,7 @@ class KotlinInterfaceDeclaration: KotlinStatement {
             // Type info contains full resolved generics
             kstatement.signature = typeInfo.signature
             kstatement.inherits = typeInfo.inherits
-            kstatement.generics = typeInfo.generics
+            kstatement.generics = typeInfo.generics.resolvingSelf(in: statement)
         }
 
         // Move extensions of this type into the type itself rather than use Kotlin extension functions.
@@ -2007,7 +2007,7 @@ class KotlinTypealiasDeclaration: KotlinStatement {
 
         let kstatement = KotlinTypealiasDeclaration(statement: statement)
         kstatement.modifiers = statement.modifiers
-        kstatement.generics = statement.generics
+        kstatement.generics = statement.generics.resolvingSelf(in: statement)
         kstatement.aliasedType = statement.aliasedType
         kstatement.attributes = kstatement.processAttributes(statement.attributes, translator: translator)
         kstatement.messages += messages
@@ -2117,7 +2117,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         let kstatement = KotlinVariableDeclaration(statement: statement)
         kstatement.isLet = statement.isLet
         kstatement.modifiers = statement.modifiers
-        kstatement.declaredType = statement.declaredType
+        kstatement.declaredType = statement.declaredType.resolvingSelf(in: statement)
         var owningDeclarationType: StatementType? = nil
         if let owningTypeDeclaration = statement.parent as? TypeDeclaration {
             // Use codebaseInfo rather than .type directly so that extension API is also handled correctly
@@ -2232,7 +2232,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
 
     private init(statement: VariableDeclaration) {
         self.names = statement.names
-        self.variableTypes = statement.variableTypes
+        self.variableTypes = statement.variableTypes.map { $0.resolvingSelf(in: statement) }
         super.init(type: .variableDeclaration, statement: statement)
     }
 

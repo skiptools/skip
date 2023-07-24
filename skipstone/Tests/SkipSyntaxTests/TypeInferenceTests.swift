@@ -796,4 +796,26 @@ final class TypeInferenceTests: XCTestCase {
         }
         """)
     }
+
+    func testSelfReturnTypeInference() async throws {
+        try await check(swift: """
+        class C {
+            static let c: Self {
+                .init(name: "c")
+            }
+            init(name: String) {
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal constructor(name: String) {
+            }
+
+            companion object {
+                internal val c: C
+                    get() = C(name = "c")
+            }
+        }
+        """)
+    }
 }

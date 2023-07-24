@@ -171,7 +171,7 @@ class CodeBlock: Statement {
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
         var blockContext = context
-        statements.forEach { blockContext = $0.inferTypes(context: blockContext, expecting: .none) }
+        statements.forEach { blockContext = $0.inferTypes(context: blockContext, expecting: expecting) }
         return context
     }
 
@@ -346,7 +346,7 @@ class ForLoop: Statement {
         }
         let isTry = forInStmnt.tryKeyword != nil
         let isAwait = forInStmnt.awaitKeyword != nil
-        let sequence = ExpressionDecoder.decode(syntax: forInStmnt.sequenceExpr, in: syntaxTree)
+        let sequence = ExpressionDecoder.decode(syntax: forInStmnt.sequence, in: syntaxTree)
         var whereGuard: Expression? = nil
         if let whereSyntax = forInStmnt.whereClause?.guardResult {
             whereGuard = ExpressionDecoder.decode(syntax: whereSyntax, in: syntaxTree)
@@ -747,7 +747,7 @@ class EnumCaseDeclaration: Statement {
         attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: enumCaseDecl.modifiers)
         return enumCaseDecl.elements.enumerated().map { (index, element) in
-            let name = element.identifier.text
+            let name = element.name.text
             let (associatedValues, messages) = element.associatedValue?.parameters(in: syntaxTree) ?? ([], [])
             let rawValue = element.rawValue.map { ExpressionDecoder.decode(syntax: $0.value, in: syntaxTree) }
             let statement = EnumCaseDeclaration(name: name, associatedValues: associatedValues, rawValue: rawValue, attributes: attributes, modifiers: modifiers, syntax: element, sourceFile: syntaxTree.source.file, sourceRange: element.range(in: syntaxTree.source), extras: index == 0 ? extras : nil)
@@ -819,7 +819,7 @@ class ExtensionDeclaration: TypeDeclaration {
         guard extends != .none else {
             return nil
         }
-        let (inherits, inheritsMessages) = extensionDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], [])
+        let (inherits, inheritsMessages) = extensionDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
         var attributes = Attributes.for(syntax: extensionDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: extensionDecl.modifiers)
@@ -875,7 +875,7 @@ class FunctionDeclaration: Statement {
     }
 
     private static func decodeFunctionDeclaration(_ functionDecl: FunctionDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> FunctionDeclaration {
-        let name = functionDecl.identifier.text
+        let name = functionDecl.name.text
         let (returnType, parameters, signatureMessges) = functionDecl.signature.typeSignatures(in: syntaxTree)
         let isAsync = functionDecl.signature.effectSpecifiers?.asyncSpecifier != nil
         let isThrows = functionDecl.signature.effectSpecifiers?.throwsSpecifier != nil
@@ -944,7 +944,7 @@ class FunctionDeclaration: Statement {
         parameters.forEach { $0.defaultValue?.inferTypes(context: context, expecting: $0.declaredType) }
         if let body {
             let bodyContext = context.pushing(self)
-            let _ = body.inferTypes(context: bodyContext, expecting: .none)
+            let _ = body.inferTypes(context: bodyContext, expecting: body.statements.count == 1 && bodyContext.expectedReturn != .void ? bodyContext.expectedReturn : .none)
         }
         if parent?.owningFunctionDeclaration != nil {
             // Add identifier if local function
@@ -1050,14 +1050,14 @@ class SubscriptDeclaration: Statement {
         guard syntax.kind == .subscriptDecl, let subscriptDecl = syntax.as(SubscriptDeclSyntax.self) else {
             return nil
         }
-        let elementType = TypeSignature.for(syntax: subscriptDecl.returnClause.returnType, in: syntaxTree)
+        let elementType = TypeSignature.for(syntax: subscriptDecl.returnClause.type, in: syntaxTree)
         let (parameters, parametersMessages) = subscriptDecl.parameterClause.parameters(in: syntaxTree)
         var attributes = Attributes.for(syntax: subscriptDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: subscriptDecl.modifiers)
         let (generics, genericsMessages) = Generics.for(syntax: subscriptDecl.genericParameterClause, where: subscriptDecl.genericWhereClause, in: syntaxTree)
         var accessors = Accessors()
-        if let accessor = subscriptDecl.accessor {
+        if let accessor = subscriptDecl.accessors {
             switch accessor {
             case .accessors(let syntax):
                 accessors = syntax.accessors(in: syntaxTree)
@@ -1155,7 +1155,7 @@ class TypealiasDeclaration: Statement {
         guard syntax.kind == .typealiasDecl, let typealiasDecl = syntax.as(TypealiasDeclSyntax.self) else {
             return nil
         }
-        let name = typealiasDecl.identifier.text
+        let name = typealiasDecl.name.text
         var attributes = Attributes.for(syntax: typealiasDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: typealiasDecl.modifiers)
@@ -1235,8 +1235,8 @@ class TypeDeclaration: Statement {
     }
 
     private static func decodeClassDeclaration(_ classDecl: ClassDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration {
-        let name = classDecl.identifier.text
-        let (inherits, inheritsMessages) = classDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], [])
+        let name = classDecl.name.text
+        let (inherits, inheritsMessages) = classDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
         var attributes = Attributes.for(syntax: classDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: classDecl.modifiers)
@@ -1248,8 +1248,8 @@ class TypeDeclaration: Statement {
     }
 
     private static func decodeStructDeclaration(_ structDecl: StructDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration {
-        let name = structDecl.identifier.text
-        let (inherits, inheritsMessages) = structDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], [])
+        let name = structDecl.name.text
+        let (inherits, inheritsMessages) = structDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
         var attributes = Attributes.for(syntax: structDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: structDecl.modifiers)
@@ -1261,8 +1261,8 @@ class TypeDeclaration: Statement {
     }
 
     private static func decodeProtocolDeclaration(_ protocolDecl: ProtocolDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration {
-        let name = protocolDecl.identifier.text
-        let (inherits, inheritsMessages) = protocolDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], [])
+        let name = protocolDecl.name.text
+        let (inherits, inheritsMessages) = protocolDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
         var attributes = Attributes.for(syntax: protocolDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: protocolDecl.modifiers)
@@ -1276,8 +1276,8 @@ class TypeDeclaration: Statement {
     }
 
     private static func decodeEnumDeclaration(_ enumDecl: EnumDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration {
-        let name = enumDecl.identifier.text
-        let (inherits, inheritsMessages) = enumDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], [])
+        let name = enumDecl.name.text
+        let (inherits, inheritsMessages) = enumDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
         var attributes = Attributes.for(syntax: enumDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: enumDecl.modifiers)
@@ -1289,8 +1289,8 @@ class TypeDeclaration: Statement {
     }
 
     private static func decodeActorDeclaration(_ actorDecl: ActorDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration {
-        let name = actorDecl.identifier.text
-        let (inherits, inheritsMessages) = actorDecl.inheritanceClause?.inheritedTypeCollection.typeSignatures(in: syntaxTree) ?? ([], [])
+        let name = actorDecl.name.text
+        let (inherits, inheritsMessages) = actorDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
         var attributes = Attributes.for(syntax: actorDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: actorDecl.modifiers)
@@ -1419,7 +1419,7 @@ class VariableDeclaration: Statement {
         }
 
         var accessors: Accessors = Accessors()
-        if let accessor = syntax.accessor {
+        if let accessor = syntax.accessors {
             switch accessor {
             case .accessors(let accessorBlockSyntax):
                 accessors = accessorBlockSyntax.accessors(in: syntaxTree)
@@ -1455,7 +1455,7 @@ class VariableDeclaration: Statement {
         let type = TypeSignature.for(labels: names, types: variableTypes)
         if let body = getter?.body {
             let bodyContext = context.expectingReturn(type)
-            let _ = body.inferTypes(context: bodyContext, expecting: .none)
+            let _ = body.inferTypes(context: bodyContext, expecting: body.statements.count == 1 ? bodyContext.expectedReturn : .none)
         }
         if let body = setter?.body {
             let bodyContext = context.addingIdentifier(setter?.parameterName ?? "newValue", type: type)

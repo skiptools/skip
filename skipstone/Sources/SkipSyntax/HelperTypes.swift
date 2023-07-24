@@ -172,6 +172,12 @@ struct Parameter<V>: Hashable {
         return parameter
     }
 
+    func resolvingSelf(in node: SyntaxNode? = nil) -> Parameter<V> {
+        var parameter = self
+        parameter.declaredType = declaredType.resolvingSelf(in: node)
+        return parameter
+    }
+
     static func ==(lhs: Parameter<V>, rhs: Parameter<V>) -> Bool {
         return lhs.externalLabel == rhs.externalLabel && lhs.declaredType == rhs.declaredType && lhs.isInOut == rhs.isInOut && lhs.isVariadic == rhs.isVariadic && lhs.attributes == rhs.attributes
     }
@@ -406,7 +412,7 @@ struct Attribute: Equatable, Codable {
         guard signature != .none else {
             return nil
         }
-        guard let argument = syntax.argument else {
+        guard let argument = syntax.arguments else {
             return Attribute(signature: signature)
         }
         switch argument {
@@ -587,13 +593,13 @@ struct Generics: Equatable, Codable {
             }
         }
         for associatedType in associatedTypeSyntax {
-            let name = associatedType.identifier.text
+            let name = associatedType.name.text
             var inherits: [TypeSignature] = []
             if let initializer = associatedType.initializer {
                 inherits.append(TypeSignature.for(syntax: initializer.value, in: syntaxTree))
             } else if let inheritance = associatedType.inheritanceClause {
-                inherits += inheritance.inheritedTypeCollection.map {
-                    TypeSignature.for(syntax: $0.typeName, in: syntaxTree)
+                inherits += inheritance.inheritedTypes.map {
+                    TypeSignature.for(syntax: $0.type, in: syntaxTree)
                 }
             }
             entries.append(Generic(name: name, inherits: inherits))
@@ -612,14 +618,14 @@ struct Generics: Equatable, Codable {
         guard let whereSyntax else {
             return
         }
-        for requirementSyntax in whereSyntax.requirementList {
-            switch requirementSyntax.body {
+        for requirementSyntax in whereSyntax.requirements {
+            switch requirementSyntax.requirement {
             case .sameTypeRequirement(let syntax):
-                apply(entryType: syntax.leftTypeIdentifier, constrainedTo: syntax.rightTypeIdentifier, whereEqual: true, in: syntaxTree, messages: &messages)
+                apply(entryType: syntax.leftType, constrainedTo: syntax.rightType, whereEqual: true, in: syntaxTree, messages: &messages)
             case .conformanceRequirement(let syntax):
-                apply(entryType: syntax.leftTypeIdentifier, constrainedTo: syntax.rightTypeIdentifier, whereEqual: false, in: syntaxTree, messages: &messages)
+                apply(entryType: syntax.leftType, constrainedTo: syntax.rightType, whereEqual: false, in: syntaxTree, messages: &messages)
             case .layoutRequirement:
-                messages.append(.unsupportedSyntax(requirementSyntax.body, source: syntaxTree.source))
+                messages.append(.unsupportedSyntax(requirementSyntax.requirement, source: syntaxTree.source))
             }
         }
     }
@@ -710,6 +716,12 @@ struct Generics: Equatable, Codable {
         return generics
     }
 
+    func resolvingSelf(in node: SyntaxNode? = nil) -> Generics {
+        var generics = self
+        generics.entries = generics.entries.map { $0.resolvingSelf(in: node) }
+        return generics
+    }
+
     var isEmpty: Bool {
         return entries.isEmpty
     }
@@ -761,6 +773,13 @@ struct Generic: Equatable, Codable {
         var generic = self
         generic.whereEqual = generic.whereEqual.map { $0.resolved(in: node, context: context) }
         generic.inherits = generic.inherits.map { $0.resolved(in: node, context: context) }
+        return generic
+    }
+
+    func resolvingSelf(in node: SyntaxNode? = nil) -> Generic {
+        var generic = self
+        generic.whereEqual = generic.whereEqual.map { $0.resolvingSelf(in: node) }
+        generic.inherits = generic.inherits.map { $0.resolvingSelf(in: node) }
         return generic
     }
 }

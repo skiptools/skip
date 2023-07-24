@@ -889,6 +889,23 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         }
     }
 
+    /// Replace uses of `Self` as a type with the owning type declaration.
+    func resolvingSelf(in node: SyntaxNode?) -> TypeSignature {
+        guard let node else {
+            return self
+        }
+        var owningType: TypeSignature? = nil
+        return mappingTypes {
+            if $0 == .named("Self", []) {
+                if owningType == nil {
+                    owningType = node.owningTypeDeclaration?.signature
+                }
+                return owningType
+            }
+            return nil
+        }
+    }
+
     /// Attempt to replace `.none` cases in this type signature with information from the given signature.
     func or(_ typeSignature: TypeSignature, replaceAny: Bool = false) -> TypeSignature {
         let typeModule = typeSignature.moduleName
@@ -1277,7 +1294,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             guard let arrayType = syntax.as(ArrayTypeSyntax.self) else {
                 return .none
             }
-            let elementType = self.for(syntax: arrayType.elementType, in: syntaxTree)
+            let elementType = self.for(syntax: arrayType.element, in: syntaxTree)
             return elementType == .none ? .none : .array(elementType)
         case .attributedType:
             guard let attributedType = syntax.as(AttributedTypeSyntax.self) else {
@@ -1300,7 +1317,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             let name = simpleType.name.text
             var genericTypes: [TypeSignature] = []
             if let generics = simpleType.genericArgumentClause?.arguments {
-                genericTypes = generics.map { self.for(syntax: $0.argumentType, in: syntaxTree) }
+                genericTypes = generics.map { self.for(syntax: $0.argument, in: syntaxTree) }
                 guard !genericTypes.contains(.none) else {
                     return .none
                 }
@@ -1319,8 +1336,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             guard let dictionaryType = syntax.as(DictionaryTypeSyntax.self) else {
                 return .none
             }
-            let keyType = self.for(syntax: dictionaryType.keyType, in: syntaxTree)
-            let valueType = self.for(syntax: dictionaryType.valueType, in: syntaxTree)
+            let keyType = self.for(syntax: dictionaryType.key, in: syntaxTree)
+            let valueType = self.for(syntax: dictionaryType.value, in: syntaxTree)
             guard keyType != .none, valueType != .none else {
                 return .none
             }
@@ -1343,7 +1360,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                 let hasDefaultValue = parameterSyntax.initializer != nil
                 parameters.append(Parameter(label: label, type: type, isInOut: isInOut, isVariadic: isVariadic, hasDefaultValue: hasDefaultValue))
             }
-            let returnType = self.for(syntax: functionType.returnClause.returnType, in: syntaxTree)
+            let returnType = self.for(syntax: functionType.returnClause.type, in: syntaxTree)
             guard !parameters.contains(where: { $0.type == .none }) && returnType != .none else {
                 return .none
             }
@@ -1360,7 +1377,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             let name = memberType.name.text
             var genericTypes: [TypeSignature] = []
             if let generics = memberType.genericArgumentClause?.arguments {
-                genericTypes = generics.map { self.for(syntax: $0.argumentType, in: syntaxTree) }
+                genericTypes = generics.map { self.for(syntax: $0.argument, in: syntaxTree) }
                 guard !genericTypes.contains(.none) else {
                     return .none
                 }
@@ -1698,6 +1715,10 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
 }
 
 extension TypeSignature {
+    var isSelf: Bool {
+        return isNamed("Self", generics: [])
+    }
+
     var isComparable: Bool {
         return isNamed("Comparable", moduleName: "Swift", generics: [])
     }

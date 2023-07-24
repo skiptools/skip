@@ -15,14 +15,14 @@ extension SyntaxProtocol {
     /// Xcode-compatible range of this syntax in the given source.
     func range(in source: Source) -> Source.Range {
         let offset = positionAfterSkippingLeadingTrivia.utf8Offset
-        let length = contentLength.utf8Length
+        let length = trimmedLength.utf8Length
         return source.range(offset: offset, length: length)
     }
 
     /// Return the source code of this syntax.
     func sourceCode(in source: Source) -> String {
         let offset = positionAfterSkippingLeadingTrivia.utf8Offset
-        let length = contentLength.utf8Length
+        let length = trimmedLength.utf8Length
         return source.content(offset: offset, length: length)
     }
 }
@@ -32,11 +32,11 @@ extension InheritedTypeListSyntax {
     func typeSignatures(in syntaxTree: SyntaxTree) -> ([TypeSignature], [Message]) {
         var messages: [Message] = []
         let typeSignatures = compactMap { typeSyntax in
-            let typeSignature = TypeSignature.for(syntax: typeSyntax.typeName, in: syntaxTree)
+            let typeSignature = TypeSignature.for(syntax: typeSyntax.type, in: syntaxTree)
             if typeSignature != .none {
                 return typeSignature
             } else {
-                messages.append(.unsupportedTypeSignature(typeSyntax.typeName, source: syntaxTree.source))
+                messages.append(.unsupportedTypeSignature(typeSyntax.type, source: syntaxTree.source))
                 return nil
             }
         }
@@ -56,10 +56,10 @@ extension FunctionSignatureSyntax {
 
 extension ReturnClauseSyntax {
     fileprivate func typeSignature(in syntaxTree: SyntaxTree, messages: inout [Message]) -> TypeSignature {
-        var signature = TypeSignature.for(syntax: returnType, in: syntaxTree)
+        var signature = TypeSignature.for(syntax: type, in: syntaxTree)
         if signature == .none {
             signature = .void
-            messages.append(.unsupportedTypeSignature(returnType, source: syntaxTree.source))
+            messages.append(.unsupportedTypeSignature(type, source: syntaxTree.source))
         }
         return signature
     }
@@ -96,12 +96,12 @@ extension ParameterClauseSyntax {
     }
 
     fileprivate func parameters(in syntaxTree: SyntaxTree, messages: inout [Message]) -> [Parameter<Expression>] {
-        let parameters = parameterList.map { parameterSyntax in
+        let parameters = parameters.map { parameterSyntax in
             Parameter<Expression>(firstName: parameterSyntax.firstName.text, secondName: parameterSyntax.secondName?.text, typeSyntax: parameterSyntax.type, ellipses: parameterSyntax.ellipsis?.text, defaultArgument: parameterSyntax.defaultArgument, in: syntaxTree, messages: &messages)
         }
         for (index, parameter) in parameters.enumerated() {
             if parameter.externalLabel == nil && index > 0 && parameters[index - 1].isVariadic {
-                messages.append(.variadicParameterLabel(parameterList, source: syntaxTree.source))
+                messages.append(.variadicParameterLabel(self.parameters, source: syntaxTree.source))
             }
         }
         return parameters
@@ -175,7 +175,7 @@ extension ClosureSignatureSyntax {
 
 extension ClosureParameterClauseSyntax {
     fileprivate func parameters(in syntaxTree: SyntaxTree, messages: inout [Message]) -> [Parameter<Expression>] {
-        return parameterList.map { parameterSyntax in
+        return parameters.map { parameterSyntax in
             Parameter<Expression>(firstName: parameterSyntax.firstName.text, secondName: parameterSyntax.secondName?.text, typeSyntax: parameterSyntax.type, ellipses: parameterSyntax.ellipsis?.text, in: syntaxTree, messages: &messages)
         }
     }
@@ -189,7 +189,7 @@ extension EnumCaseParameterClauseSyntax {
     }
 
     fileprivate func parameters(in syntaxTree: SyntaxTree, messages: inout [Message]) -> [Parameter<Expression>] {
-        return parameterList.map { parameterSyntax in
+        return parameters.map { parameterSyntax in
             Parameter<Expression>(firstName: parameterSyntax.firstName?.text, secondName: parameterSyntax.secondName?.text, typeSyntax: parameterSyntax.type, defaultArgument: parameterSyntax.defaultArgument, in: syntaxTree, messages: &messages)
         }
     }
@@ -232,7 +232,7 @@ extension PatternSyntax {
             guard let valueBindingSyntax = self.as(ValueBindingPatternSyntax.self) else {
                 return nil
             }
-            guard let identifierPatterns = valueBindingSyntax.valuePattern.identifierPatterns(in: syntaxTree) else {
+            guard let identifierPatterns = valueBindingSyntax.pattern.identifierPatterns(in: syntaxTree) else {
                 return nil
             }
             let isVar = valueBindingSyntax.bindingSpecifier.text == "var"
@@ -256,7 +256,7 @@ extension PatternSyntax {
             }
         case .valueBindingPattern:
             if let valueBindingSyntax = self.as(ValueBindingPatternSyntax.self) {
-                let (expression, _) = valueBindingSyntax.valuePattern.expression(in: syntaxTree)
+                let (expression, _) = valueBindingSyntax.pattern.expression(in: syntaxTree)
                 let isVar = valueBindingSyntax.bindingSpecifier.text == "var"
                 return (expression, isVar)
             }

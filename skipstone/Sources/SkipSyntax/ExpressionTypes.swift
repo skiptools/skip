@@ -533,7 +533,7 @@ class Closure: Expression {
         functionType = .function(parameterSignatures, returnType, apiFlags).or(expecting)
 
         let bodyContext = context.pushing(self)
-        let _ = body.inferTypes(context: bodyContext, expecting: .none)
+        let _ = body.inferTypes(context: bodyContext, expecting: body.statements.count == 1 && bodyContext.expectedReturn != .void ? bodyContext.expectedReturn : .none)
         // Use any type information we can glean from return statements in the body
         functionType = .function(functionType.parameters, functionType.returnType.or(body.returnType, replaceAny: true), functionType.apiFlags)
         return context
@@ -583,8 +583,8 @@ class DictionaryLiteral: Expression {
         var entries: [(Expression, Expression)] = []
         if case .elements(let elements) = dictionaryExpr.content {
             entries = elements.map {
-                let keyExpression = ExpressionDecoder.decode(syntax: $0.keyExpression, in: syntaxTree)
-                let valueExpression = ExpressionDecoder.decode(syntax: $0.valueExpression, in: syntaxTree)
+                let keyExpression = ExpressionDecoder.decode(syntax: $0.key, in: syntaxTree)
+                let valueExpression = ExpressionDecoder.decode(syntax: $0.value, in: syntaxTree)
                 return (keyExpression, valueExpression)
             }
         }
@@ -641,7 +641,7 @@ class FunctionCall: Expression, APICallExpression {
             return nil
         }
         let function = ExpressionDecoder.decode(syntax: functionCallExpr.calledExpression, in: syntaxTree)
-        var labeledExpressions = functionCallExpr.argumentList.map {
+        var labeledExpressions = functionCallExpr.arguments.map {
             let label = $0.label?.text
             let expression = ExpressionDecoder.decode(syntax: $0.expression, in: syntaxTree)
             return LabeledValue(label: label, value: expression)
@@ -828,7 +828,7 @@ class Identifier: Expression, APICallExpression {
             name = "super"
         } else if syntax.kind == .specializeExpr, let specializeExpr = syntax.as(SpecializeExprSyntax.self), specializeExpr.expression.kind == .identifierExpr, let identifierExpr = specializeExpr.expression.as(IdentifierExprSyntax.self) {
             name = identifierExpr.identifier.text
-            generics = specializeExpr.genericArgumentClause.arguments.map { TypeSignature.for(syntax: $0.argumentType, in: syntaxTree) }
+            generics = specializeExpr.genericArgumentClause.arguments.map { TypeSignature.for(syntax: $0.argument, in: syntaxTree) }
         } else {
             return nil
         }
@@ -1047,7 +1047,7 @@ class MemberAccess: Expression, APICallExpression {
         var generics: [TypeSignature]? = nil
         if syntax.kind == .specializeExpr, let specializeExpr = syntax.as(SpecializeExprSyntax.self), specializeExpr.expression.kind == .memberAccessExpr {
             syntax = specializeExpr.expression
-            generics = specializeExpr.genericArgumentClause.arguments.map { TypeSignature.for(syntax: $0.argumentType, in: syntaxTree) }
+            generics = specializeExpr.genericArgumentClause.arguments.map { TypeSignature.for(syntax: $0.argument, in: syntaxTree) }
         }
         guard syntax.kind == .memberAccessExpr, let memberAccessExpr = syntax.as(MemberAccessExprSyntax.self) else {
             return nil
@@ -1374,7 +1374,7 @@ class PrefixOperator: Expression {
 
     override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
         if syntax.kind == .prefixOperatorExpr, let prefixOperatorExpr = syntax.as(PrefixOperatorExprSyntax.self) {
-            let target = ExpressionDecoder.decode(syntax: prefixOperatorExpr.postfixExpression, in: syntaxTree)
+            let target = ExpressionDecoder.decode(syntax: prefixOperatorExpr.base, in: syntaxTree)
             guard let operatorSymbol = prefixOperatorExpr.operator?.text else {
                 return target
             }
@@ -1504,7 +1504,7 @@ class Subscript: Expression, APICallExpression {
             return nil
         }
         let base = ExpressionDecoder.decode(syntax: subscriptExpr.calledExpression, in: syntaxTree)
-        var labeledExpressions = subscriptExpr.argumentList.map {
+        var labeledExpressions = subscriptExpr.arguments.map {
             let label = $0.label?.text
             let expression = ExpressionDecoder.decode(syntax: $0.expression, in: syntaxTree)
             return LabeledValue(label: label, value: expression)

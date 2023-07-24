@@ -40,7 +40,7 @@ class KotlinArrayLiteral: KotlinExpression {
     static func translate(expression: ArrayLiteral, translator: KotlinTranslator) -> KotlinArrayLiteral {
         let kexpression = KotlinArrayLiteral(expression: expression)
         kexpression.elements = expression.elements.map { translator.translateExpression($0) }
-        kexpression.inferredType = expression.inferredType
+        kexpression.inferredType = expression.inferredType.resolvingSelf(in: expression)
         if case .array(let element) = expression.inferredType {
             kexpression.isOptionSet = translator.codebaseInfo?.global.protocolSignatures(forNamed: element).contains(where: \.isOptionSet) == true
         }
@@ -548,15 +548,15 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
             }
         }
         let kexpression = KotlinClosure(expression: expression, body: kbody)
-        kexpression.returnType = expression.returnType
+        kexpression.returnType = expression.returnType.resolvingSelf(in: expression)
         kexpression.returnType.appendKotlinMessages(to: kexpression, source: translator.syntaxTree.source)
-        kexpression.parameters = expression.parameters
+        kexpression.parameters = expression.parameters.map { $0.resolvingSelf(in: expression) }
         kexpression.parameters.forEach { $0.appendKotlinMessages(to: kexpression, source: translator.syntaxTree.source) }
         kexpression.attributes = expression.attributes
         // Combine inferred flags because most closures aren't declared with explicit info
         kexpression.apiFlags = expression.apiFlags.union(expression.inferredType.apiFlags)
         kexpression.isAnonymousFunction = isAnonymousFunction
-        kexpression.inferredReturnType = expression.returnType != .none ? expression.returnType : expression.inferredType.returnType
+        kexpression.inferredReturnType = expression.returnType != .none ? expression.returnType.resolvingSelf(in: expression) : expression.inferredType.returnType.resolvingSelf(in: expression)
         kexpression.implicitParameterLabels = implicitParameterLabels
         kexpression.hasReturnLabel = hasReturnLabel
         return kexpression
@@ -752,7 +752,7 @@ class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting {
             return LabeledValue(label: $0.label, value: kargumentExpression)
         }
         kexpression.isOptionalInit = expression.isInit && expression.inferredType.isOptional
-        kexpression.inferredType = expression.inferredType
+        kexpression.inferredType = expression.inferredType.resolvingSelf(in: expression)
         kexpression.apiMatch = expression.apiMatch
         kexpression.mayBeSharedMutableStructType = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
         // If we resolved our function to a type but this function call is not a type constructor, it must be a free function with a
@@ -904,16 +904,16 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
 
     static func translate(expression: Identifier, translator: KotlinTranslator) -> KotlinIdentifier {
         let kexpression = KotlinIdentifier(expression: expression)
-        kexpression.generics = expression.generics
+        kexpression.generics = expression.generics?.map { $0.resolvingSelf(in: expression) }
         kexpression.apiMatch = expression.apiMatch
         kexpression.isOperatorIdentifier = !Operator.with(symbol: expression.name).isUnknown
         kexpression.mayBeSharedMutableStruct = !kexpression.isOperatorIdentifier && expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
         kexpression.isLocalOrSelfIdentifier = expression.isLocalOrSelfIdentifier
-        kexpression.isModuleNameFor = expression.isModuleNameFor
+        kexpression.isModuleNameFor = expression.isModuleNameFor.resolvingSelf(in: expression)
         if case .function = expression.inferredType {
             kexpression.isFunctionReference = !expression.isLocalOrSelfIdentifier && !expression.isCalledAsFunction && translator.codebaseInfo?.isFunctionName(expression.name, in: expression.owningTypeDeclaration?.signature) == true
         } else if expression.inferredType.isMetaType && expression.apiMatch?.declarationType == .typealiasDeclaration {
-            kexpression.isTypealiasFor = expression.inferredType.asMetaType(false)
+            kexpression.isTypealiasFor = expression.inferredType.resolvingSelf(in: expression).asMetaType(false)
         }
         return kexpression
     }
@@ -1420,9 +1420,9 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinCast
         } else if expression.inferredType.isOptional, expression.member == "none" || expression.member == "some" {
             kexpression.messages.append(.kotlinOptionalNoneSome(expression, source: translator.syntaxTree.source))
         }
-        kexpression.generics = expression.generics
+        kexpression.generics = expression.generics?.map { $0.resolvingSelf(in: expression) }
         kexpression.apiMatch = expression.apiMatch
-        kexpression.baseType = expression.baseType.asMetaType(false)
+        kexpression.baseType = expression.baseType.resolvingSelf(in: expression).asMetaType(false)
         if case .tuple = expression.baseType {
             // Tuples sref() their members on the way out and do not set an onUpdate block, so no need to sref() again
             kexpression.mayBeSharedMutableStruct = false
@@ -1474,7 +1474,7 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinCast
         }
         // Now that we've ruled out a type literal, any other non-Identifier must be represented by a KClass
         guard let identifier = expression as? Identifier else {
-            return type
+            return type.resolvingSelf(in: expression)
         }
         guard identifier.name != "Self" && identifier.name != "self" else {
             return nil
@@ -1495,7 +1495,7 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinCast
         guard let codebaseInfo else {
             return nil
         }
-        return codebaseInfo.declarationType(forNamed: .named(identifier.name, [])) == nil ? type : nil
+        return codebaseInfo.declarationType(forNamed: .named(identifier.name, [])) == nil ? type.resolvingSelf(in: expression) : nil
     }
 
     init(base: KotlinExpression, member: String) {
@@ -2307,7 +2307,7 @@ class KotlinTypeLiteral: KotlinExpression, KotlinCastTarget {
     var literal: TypeSignature
 
     init(expression: TypeLiteral) {
-        self.literal = expression.literal
+        self.literal = expression.literal.resolvingSelf(in: expression)
         super.init(type: .typeLiteral, expression: expression)
     }
 
