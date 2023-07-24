@@ -83,6 +83,8 @@ final class ObservationTests: XCTestCase {
             var a = 1
         }
         """, kotlin: """
+        import androidx.compose.runtime.*
+
         internal class S: MutableStruct {
             internal var a: Int
                 get() = astate
@@ -110,6 +112,8 @@ final class ObservationTests: XCTestCase {
             lazy var a: Int = { 1 }()
         }
         """, kotlin: """
+        import androidx.compose.runtime.*
+
         internal open class C {
             internal open var a: Int
                 get() {
@@ -133,6 +137,8 @@ final class ObservationTests: XCTestCase {
             lazy var a: Int = { 1 }()
         }
         """, kotlin: """
+        import androidx.compose.runtime.*
+
         internal class S: MutableStruct {
             internal var a: Int
                 get() {
@@ -174,6 +180,7 @@ final class ObservationTests: XCTestCase {
             var a: [A] = []
         }
         """, kotlin: """
+        import androidx.compose.runtime.*
         import skip.lib.Array
 
         internal open class C {
@@ -195,6 +202,7 @@ final class ObservationTests: XCTestCase {
             var a: [A] = []
         }
         """, kotlin: """
+        import androidx.compose.runtime.*
         import skip.lib.Array
 
         internal class S: MutableStruct {
@@ -268,6 +276,8 @@ final class ObservationTests: XCTestCase {
             }
         }
         """, kotlin: """
+        import androidx.compose.runtime.*
+        
         internal open class C {
             internal open var a: S
                 get() = astate!!.sref({ this.a = it })

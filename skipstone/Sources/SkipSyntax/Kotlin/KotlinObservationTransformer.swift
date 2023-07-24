@@ -6,9 +6,12 @@ final class KotlinObservationTransformer: KotlinTransformer {
                 mapObservationImport(statement: importDeclaration, in: syntaxTree)
             } else if let classDeclaration = node as? KotlinClassDeclaration {
                 if classDeclaration.attributes.contains(.observable) {
+                    addKotlinObservationDependencies(to: syntaxTree)
                     updateObservableClass(statement: classDeclaration, source: translator.syntaxTree.source)
                 } else if classDeclaration.type == .classDeclaration {
-                    updatePublishedProperties(in: classDeclaration, source: translator.syntaxTree.source)
+                    if (handleObservableObject(statement: classDeclaration, source: translator.syntaxTree.source)) {
+                        addKotlinObservationDependencies(to: syntaxTree)
+                    }
                 }
             }
             return .recurse(nil)
@@ -20,7 +23,7 @@ final class KotlinObservationTransformer: KotlinTransformer {
             return
         }
         (statement.parent as? KotlinStatement)?.remove(statement: statement)
-        syntaxTree.dependencies.imports.insert("androidx.compose.runtime.*")
+        addKotlinObservationDependencies(to: syntaxTree)
     }
 
     private func updateObservableClass(statement: KotlinClassDeclaration, source: Source) {
@@ -72,19 +75,22 @@ final class KotlinObservationTransformer: KotlinTransformer {
         }
     }
 
-    private func updatePublishedProperties(in statement: KotlinClassDeclaration, source: Source) {
+    private func handleObservableObject(statement: KotlinClassDeclaration, source: Source) -> Bool {
+        var isObservableObject = false
         if let observableObjectIndex = statement.inherits.firstIndex(where: { $0.isNamed("ObservableObject", moduleName: "Combine") }) {
             statement.inherits.remove(at: observableObjectIndex)
-            statement.annotations.append("@Stable")
+            isObservableObject = true
         }
         for member in statement.members {
             if let variableDeclaration = member as? KotlinVariableDeclaration, variableDeclaration.attributes.contains(.published) {
                 makeObservable(statement: variableDeclaration, in: statement, isPublished: true, source: source)
-                if !statement.annotations.contains("@Stable") {
-                    statement.annotations.append("@Stable")
-                }
+                isObservableObject = true
             }
         }
+        if isObservableObject {
+            statement.annotations.append("@Stable")
+        }
+        return isObservableObject
     }
 
     private func makeObservable(statement: KotlinVariableDeclaration, in classDeclaration: KotlinClassDeclaration, isPublished: Bool = false, source: Source) {
@@ -112,5 +118,9 @@ final class KotlinObservationTransformer: KotlinTransformer {
             }
             output.append(")\n")
         }
+    }
+
+    private func addKotlinObservationDependencies(to syntaxTree: KotlinSyntaxTree) {
+        syntaxTree.dependencies.imports.insert("androidx.compose.runtime.*")
     }
 }
