@@ -939,21 +939,114 @@ final class MemberDeclarationTests: XCTestCase {
     }
 
     func testSubscript() async throws {
-        //~~~
-//        try await checkProducesMessage(swift: """
-//        class C {
-//            subscript(index: Int) -> Int {
-//                get {
-//                    return 0
-//                }
-//                set {
-//                }
-//            }
-//            subscript(key: String, defaultValue: Int) -> Int {
-//                return defaultValue
-//            }
-//        }
-//        """)
+        try await check(swift: """
+        class C {
+            subscript(index: Int) -> Int {
+                get {
+                    return 0
+                }
+                set {
+                }
+            }
+            subscript(index: Double) -> Double {
+                get { 1.0 }
+                set(double) {
+                }
+            }
+            subscript(key: String, defaultValue: Int) -> Int {
+                return defaultValue
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal open operator fun get(index: Int): Int = 0
+            internal open operator fun set(index: Int, newValue: Int) = Unit
+            internal open operator fun get(index: Double): Double = 1.0
+            internal open operator fun set(index: Double, double: Double) = Unit
+            internal open operator fun get(key: String, defaultValue: Int): Int = defaultValue
+        }
+        """)
+
+        try await check(swift: """
+        struct S1 {
+            subscript(index: Int) -> Int { 0 }
+        }
+        struct S2 {
+            subscript(index: Int) -> Int {
+                get { 0 }
+                set {
+                    print(newValue)
+                }
+            }
+        }
+        """, kotlin: """
+        internal class S1 {
+            internal operator fun get(index: Int): Int = 0
+        }
+        internal class S2: MutableStruct {
+            internal operator fun get(index: Int): Int = 0
+            internal operator fun set(index: Int, newValue: Int) {
+                willmutate()
+                try {
+                    print(newValue)
+                } finally {
+                    didmutate()
+                }
+            }
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct = S2()
+        }
+        """)
+
+        try await checkProducesMessage(swift: """
+        class C {
+            subscript(index: Int) -> Int {
+                get async {
+                    return 0
+                }
+            }
+        }
+        """)
+
+        try await check(supportingSwift: """
+        extension Int {
+            static let zero = 0
+        }
+        extension Double {
+            static let zero = 0.0
+        }
+        class C {
+            subscript(index: Int) -> Int {
+                get { 0 }
+                set {}
+            }
+            subscript(index: Double) -> Double {
+                get { 0.0 }
+                set {}
+            }
+            subscript(index: Int, defaultValue: Int) -> Int {
+                return 0
+            }
+        }
+        """, swift: """
+        func f(c: C) {
+            let b1 = c[0] == .zero
+            let b2 = c[0.0] == .zero
+            c[0] = .zero
+            c[0.0] = .zero
+            let b3 = c[.zero, defaultValue: 0] == .zero
+        }
+        """, kotlin: """
+        internal fun f(c: C) {
+            val b1 = c[0] == Int.zero
+            val b2 = c[0.0] == Double.zero
+            c[0] = Int.zero
+            c[0.0] = Double.zero
+            val b3 = c[Int.zero, 0] == Int.zero
+        }
+        """)
     }
 
     func testFunctionSignatureConflicts() async throws {

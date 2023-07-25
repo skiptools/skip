@@ -11,17 +11,22 @@ extension Message {
         return Message(kind: .error, message: "Kotlin supports async functions, but it does not have actors", sourceDerived: sourceDerived, source: source)
     }
 
-    // Idea: auto-translate to function?
-    static func kotlinAsyncConstructors(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "Kotlin does not support async constructors. Consider using a factory function", sourceDerived: sourceDerived, source: source)
-    }
-
     static func kotlinAsyncAwaitTypeInference(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .warning, message: "Skip is unable to match this API call to determine the correct actor on which to run it. Consider adding additional type information", sourceDerived: sourceDerived, source: source)
     }
 
+    // Idea: auto-translate to function?
+    static func kotlinAsyncConstructor(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Kotlin does not support async constructors. Consider using a factory function", sourceDerived: sourceDerived, source: source)
+    }
+
     static func kotlinAsyncLetAssignment(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .warning, message: "Shadowing an async let variable with a variable of the same name may produce incorrect Kotlin. Consider using a different variable name", sourceDerived: sourceDerived, source: source)
+    }
+
+    // Idea: call as get()?
+    static func kotlinAsyncSubscript(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Kotlin does not support async subscripts. Consider using a standard get function", sourceDerived: sourceDerived, source: source)
     }
 
     static func kotlinAsyncTaskClosureInline(_ sourceDerived: SourceDerived, source: Source) -> Message {

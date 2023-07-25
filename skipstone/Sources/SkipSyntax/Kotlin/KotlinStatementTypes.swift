@@ -1473,6 +1473,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
 
     static func translate(statement: SubscriptDeclaration, translator: KotlinTranslator) -> [KotlinStatement] {
         let getter = KotlinFunctionDeclaration(statement: statement, isSetter: false)
+        getter.role = .operator
         getter.modifiers = statement.modifiers
         getter.generics = statement.generics.resolvingSelf(in: statement)
         getter.returnType = statement.elementType.resolvingSelf(in: statement)
@@ -1481,11 +1482,15 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         getter.apiFlags = statement.getterType.apiFlags
         translateMemberInfo(declaration: getter, from: statement, modifiers: statement.modifiers, translator: translator)
         translateBody(declaration: getter, from: statement, body: statement.getter?.body, returnType: statement.elementType, isAsync: statement.isAsync, translator: translator)
+        if statement.isAsync {
+            getter.messages.append(.kotlinAsyncSubscript(getter, source: translator.syntaxTree.source))
+        }
 
         guard let statementSetter = statement.setter else {
             return [getter]
         }
         let setter = KotlinFunctionDeclaration(statement: statement, isSetter: true)
+        setter.role = .operator
         setter.modifiers = getter.modifiers
         setter.modifiers.isMutating = true
         setter.generics = getter.generics
@@ -1512,7 +1517,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             kstatement.isOpen = false
             kstatement.modifiers.isOverride = false // Kotlin does not override constructors
             if (statement as? FunctionDeclaration)?.isAsync == true {
-                kstatement.messages.append(.kotlinAsyncConstructors(statement, source: translator.syntaxTree.source))
+                kstatement.messages.append(.kotlinAsyncConstructor(statement, source: translator.syntaxTree.source))
             }
         } else if statement.type == .deinitDeclaration {
             kstatement.isOpen = owningTypeDeclaration.type == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
