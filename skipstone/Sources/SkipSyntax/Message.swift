@@ -124,7 +124,7 @@ extension Message {
 
     static func keyPathUnsupported(_ syntax: SyntaxProtocol, source: Source) -> Message {
         let range = syntax.range(in: source)
-        return Message(kind: .error, message: "Skip does not yet support key path expressions", source: source, sourceRange: range)
+        return Message(kind: .error, message: "Skip only supports basic key path expressions consisting of '.'-separated property names", source: source, sourceRange: range)
     }
 
     static func localFunctionsUniqueIdentifiers(_ sourceDerived: SourceDerived, source: Source) -> Message {

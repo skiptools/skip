@@ -199,6 +199,8 @@ public class KotlinTranslator {
                 return KotlinIf.translate(expression: expression as! If, translator: self)
             case .inout:
                 return KotlinInOut.translate(expression: expression as! InOut, translator: self)
+            case .keyPathLiteral:
+                return KotlinClosure.translate(expression: expression as! KeyPathLiteral, translator: self)
             case .matchingCase:
                 break // Should be translated directly by parent expressions
             case .memberAccess:

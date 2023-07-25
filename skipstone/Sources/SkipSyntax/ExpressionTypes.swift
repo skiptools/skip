@@ -15,6 +15,7 @@ enum ExpressionType: CaseIterable {
     case identifier
     case `if`
     case `inout`
+    case keyPathLiteral
     case matchingCase
     case memberAccess
     case nilLiteral
@@ -64,6 +65,8 @@ enum ExpressionType: CaseIterable {
             return If.self
         case .inout:
             return InOut.self
+        case .keyPathLiteral:
+            return KeyPathLiteral.self
         case .matchingCase:
             return MatchingCase.self
         case .memberAccess:
@@ -966,6 +969,126 @@ class InOut: Expression {
 
     override var children: [SyntaxNode] {
         return [target]
+    }
+}
+
+/// `\.x`
+class KeyPathLiteral: Expression {
+    private(set) var root: TypeSignature = .none
+    let components: [Component]
+
+    enum Component {
+        case property(String)
+        case optional
+        case unwrappedOptional
+    }
+
+    init(root: TypeSignature, components: [Component], syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
+        self.root = root
+        self.components = components
+        super.init(type: .keyPathLiteral, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
+        guard syntax.kind == .keyPathExpr, let keyPathExpr = syntax.as(KeyPathExprSyntax.self) else {
+            return nil
+        }
+        var root: TypeSignature = .none
+        if let rootExpr = keyPathExpr.root {
+            root = TypeSignature.for(syntax: rootExpr, in: syntaxTree)
+        }
+        var components: [Component] = []
+        for componentExpr in keyPathExpr.components {
+            switch componentExpr.component {
+            case .property(let syntax):
+                if syntax.declNameArguments != nil || syntax.genericArgumentClause != nil {
+                    throw Message.keyPathUnsupported(syntax, source: syntaxTree.source)
+                }
+                let name = syntax.property.text
+                components.append(.property(name))
+            case .subscript(let syntax):
+                throw Message.keyPathUnsupported(syntax, source: syntaxTree.source)
+            case .optional(let syntax):
+                if syntax.questionOrExclamationMark.text == "?" {
+                    components.append(.optional)
+                } else {
+                    components.append(.unwrappedOptional)
+                }
+            }
+        }
+        return KeyPathLiteral(root: root, components: components, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+    }
+
+    override func resolveAttributes(in syntaxTree: SyntaxTree, context: TypeResolutionContext) {
+        root = root.resolved(in: self, context: context)
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        var root = root
+        var expectingLeaf: TypeSignature = .none
+        var isKeyPathExpected = false
+        if expecting.isKeyPath {
+            isKeyPathExpected = true
+            if expecting.generics.count == 2 {
+                root = root.or(expecting.generics[0])
+                expectingLeaf = expecting.generics[1]
+            }
+        } else if case .function(let parameters, let returnType, _) = expecting {
+            if parameters.count == 1 {
+                root = root.or(parameters[0].type)
+            }
+            expectingLeaf = returnType
+        }
+        var leaf = root
+        for component in components {
+            switch component {
+            case .property(let name):
+                if name != "self" {
+                    if let match = context.member(name, in: leaf, messagesNode: self) {
+                        leaf = match.0
+                    } else {
+                        leaf = .none
+                        break
+                    }
+                }
+            case .optional:
+                leaf = leaf.asOptional(true)
+            case .unwrappedOptional:
+                leaf = leaf.asUnwrappedOptional(true)
+            }
+        }
+        leaf = leaf.or(expectingLeaf)
+        if isKeyPathExpected {
+            keyPathType = .named("KeyPath", [root, leaf])
+        } else {
+            keyPathType = .function([.init(type: root)], leaf, []).or(expecting)
+        }
+        return context
+    }
+
+    private var keyPathType: TypeSignature = .none
+
+    override var inferredType: TypeSignature {
+        return keyPathType
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        var string = "\\"
+        if root != .none {
+            string.append(root.description)
+        }
+        for component in components {
+            string.append(".")
+            switch component {
+            case .property(let name):
+                string.append(name)
+            case .optional:
+                string.append("?")
+            case .unwrappedOptional:
+                string.append("!")
+            }
+        }
+        return [PrettyPrintTree(root: string)]
     }
 }
 

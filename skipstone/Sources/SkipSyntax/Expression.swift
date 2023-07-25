@@ -37,13 +37,6 @@ struct ExpressionDecoder {
                     return expression
                 }
             }
-            // Unsupported expressions with specific error messages
-            switch syntax.kind {
-            case .keyPathExpr:
-                return RawExpression(syntax: syntax, message: .keyPathUnsupported(syntax, source: syntaxTree.source), in: syntaxTree)
-            default:
-                break
-            }
         } catch {
             return RawExpression(syntax: syntax, message: error as? Message, in: syntaxTree)
         }

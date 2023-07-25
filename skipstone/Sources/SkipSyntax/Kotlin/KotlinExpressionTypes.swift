@@ -588,7 +588,33 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
         return (0...highestParameter).map { KotlinIdentifier.translateName("$\($0)") }
     }
 
-    private init(expression: Closure, body: KotlinCodeBlock) {
+    static func translate(expression: KeyPathLiteral, translator: KotlinTranslator) -> KotlinClosure {
+        var code = "it"
+        for component in expression.components {
+            switch component {
+            case .property(let name):
+                if let tupleIndex = Int(name) {
+                    code.append(".")
+                    code.append(KotlinTupleLiteral.member(index: tupleIndex))
+                } else if name != "self" {
+                    code.append(".")
+                    code.append(name)
+                }
+            case .optional:
+                code.append("?")
+            case .unwrappedOptional:
+                code.append("!!")
+            }
+        }
+        let kbody = KotlinCodeBlock(statements: [KotlinRawStatement(sourceCode: code, sourceFile: expression.sourceFile, sourceRange: expression.sourceRange)])
+
+        let kexpression = KotlinClosure(expression: expression, body: kbody)
+        kexpression.apiFlags = expression.inferredType.apiFlags
+        kexpression.inferredReturnType = kexpression.returnType
+        return kexpression
+    }
+
+    private init(expression: Expression, body: KotlinCodeBlock) {
         self.body = body
         super.init(type: .closure, expression: expression)
     }
@@ -2106,6 +2132,10 @@ class KotlinSubscript: KotlinExpression, KotlinMainActorTargeting {
         }
         if case .dictionary = expression.base.inferredType {
             kexpression.isDictionarySubscript = true
+        }
+
+        if expression.arguments.count == 1 && expression.arguments[0].label == "keyPath" && expression.arguments[0].value is KeyPathLiteral {
+            kexpression.messages.append(.kotlinKeyPath(kexpression, source: translator.syntaxTree.source))
         }
         return kexpression
     }

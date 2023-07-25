@@ -144,6 +144,10 @@ extension TypeSignature {
             switch $0 {
             case .composition:
                 messages.append(.kotlinComposedTypes(node, source: source))
+            case .named(let name, let generics):
+                if name == "KeyPath" && generics.count == 2 {
+                    messages.append(.kotlinKeyPath(node, source: source))
+                }
             case .tuple(let labels, _):
                 if labels.count > KotlinTupleLiteral.maximumArity {
                     messages.append(.kotlinTupleArity(node, source: source))

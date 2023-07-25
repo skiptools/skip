@@ -284,17 +284,70 @@ final class ExpressionTests: XCTestCase {
     }
 
     func testKeyPaths() async throws {
+        try await check(supportingSwift: """
+        class A {
+            var b = B()
+            var ob: B?
+        }
+        class B {
+            var x = 1
+        }
+        """, swift: """
+        func f(a: [A]) -> [Int] {
+            return a.map(\\.b.x)
+        }
+        func g(a: [A]) -> [Int?] {
+            return a.map(\\.self.ob?.x)
+        }
+        """, kotlin: """
+        import skip.lib.Array
+
+        internal fun f(a: Array<A>): Array<Int> {
+            return a.map { it.b.x }
+        }
+        internal fun g(a: Array<A>): Array<Int?> {
+            return a.map { it.ob?.x }
+        }
+        """)
+
+        try await check(supportingSwift: """
+        extension Int {
+            static let zero = 0
+        }
+        extension String {
+            var count: Int {
+            }
+            func map<T>(_ operation: (String) -> T) -> T {
+            }
+        }
+        """, swift: """
+        func f(s: String) {
+            let b = s.map(\\.count) == .zero
+        }
+        """, kotlin: """
+        internal fun f(s: String) {
+            val b = s.map { it.count } == Int.zero
+        }
+        """)
+
+        try await checkProducesMessage(swift: """
+        func f(a: [A]) -> [Int] {
+            return a.map(\\.arr[0])
+        }
+        """)
+
         try await checkProducesMessage(swift: """
         struct S {
             let i = 0
         }
         func get(keyPath: KeyPath<S, Int>, from: S) -> Int {
-            return from[keyPath: keyPath]
         }
+        """)
+
+        try await checkProducesMessage(swift: """
         func f() {
             let s = S()
             let i = s[keyPath: \\.i]
-            let j = get(keyPath: \\.i, from: s)
         }
         """)
     }

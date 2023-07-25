@@ -1735,6 +1735,10 @@ extension TypeSignature {
         return isNamed("Hashable", moduleName: "Swift", generics: [])
     }
 
+    var isKeyPath: Bool {
+        return isNamed("KeyPath", moduleName: "Swift")
+    }
+
     var isOptionSet: Bool {
         // May have generics
         if case .named("OptionSet", _) = self {

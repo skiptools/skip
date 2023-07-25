@@ -172,6 +172,10 @@ extension Message {
         return Message(kind: .warning, message: "Shadowing an inout parameter with a variable of the same name may produce incorrect Kotlin. Consider using a different variable name", sourceDerived: sourceDerived, source: source)
     }
 
+    static func kotlinKeyPath(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Kotlin does not support key paths. Skip offers limited support by translating key path literals to closures, but this use case is not supported", sourceDerived: sourceDerived, source: source)
+    }
+
     static func kotlinLateinitPrimitive(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Kotlin does not support late initialization of properties with primitive types", sourceDerived: sourceDerived, source: source)
     }
