@@ -681,8 +681,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         let v = skipVersion
         #endif
         info("Skip \(v): performing transpilation to: \(transpileOptions.outputFolder ?? "nowhere") for: \(sourceFiles.map(\.basename))")
-        //~~~
-        try await self.transpile(fs: localFileSystem, sourceFiles: Set(sourceFiles.filter { $0.extension == "swift" }), with: continuation)
+        try await self.transpile(fs: localFileSystem, sourceFiles: Set(sourceFiles), with: continuation)
     }
 
     private func transpile(fs: FileSystem, sourceFiles: Set<AbsolutePath>, with continuation: AsyncThrowingStream<OutputMessage, Error>.Continuation) async throws {

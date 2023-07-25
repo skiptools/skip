@@ -1430,6 +1430,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         case local
         case global
         case member
+        case `operator`
     }
 
     // KotlinMemberDeclaration
@@ -1453,101 +1454,140 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         kstatement.parameters = statement.parameters.map { $0.resolvingSelf(in: statement).translate(translator: translator) }
         kstatement.attributes = kstatement.processAttributes(statement.attributes, translator: translator)
         kstatement.apiFlags = statement.functionType.apiFlags
-        var owningDeclarationType: StatementType? = nil
-        if statement.parent?.owningFunctionDeclaration != nil {
-            kstatement.role = .local
-        } else if let owningTypeDeclaration = statement.parent as? TypeDeclaration {
-            // Use codebaseInfo rather than .type directly so that extension API is also handled correctly
-            owningDeclarationType = translator.codebaseInfo?.declarationType(forNamed: owningTypeDeclaration.signature) ?? owningTypeDeclaration.type
-            let owningSignature = translator.codebaseInfo?.primaryTypeInfo(forNamed: owningTypeDeclaration.signature)?.signature ?? owningTypeDeclaration.signature
 
-            if statement.type == .initDeclaration {
-                kstatement.isOpen = false
-                kstatement.modifiers.isOverride = false // Kotlin does not override constructors
-                if statement.isAsync {
-                    kstatement.messages.append(.kotlinAsyncConstructors(statement, source: translator.syntaxTree.source))
-                }
-            } else if statement.type == .deinitDeclaration {
-                kstatement.isOpen = owningTypeDeclaration.type == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
-                kstatement.modifiers.visibility = .public
-                // Swift deinit is called automatically for all types in hierarchy, but Kotlin finalizers must explicitly override
-                if let codebaseInfo = translator.codebaseInfo {
-                    let inheritedTypeInfos = codebaseInfo.global.inheritanceChainSignatures(forNamed: owningSignature).dropFirst().flatMap { codebaseInfo.typeInfos(forNamed: $0) }
-                    kstatement.modifiers.isOverride = inheritedTypeInfos.contains { $0.members.contains { $0.declarationType == .deinitDeclaration } }
-                }
-            } else {
-                if owningDeclarationType == .protocolDeclaration {
-                    // Kotlin uses default public visibility on all interface members
-                    kstatement.modifiers.visibility = .public
-                } else {
-                    if !kstatement.modifiers.isOverride && translator.codebaseInfo?.isImplementingKotlinInterfaceMember(declaration: statement, in: owningTypeDeclaration.signature) == true {
-                        kstatement.modifiers.isOverride = true
-                    }
-                    kstatement.isOpen = !kstatement.modifiers.isOverride && !statement.modifiers.isFinal && statement.modifiers.visibility != .private && owningDeclarationType == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
-                }
-                // Kotlin does not all you to decrease visibility when overriding a member, so we simply make all overrides public to prevent errors
-                if kstatement.modifiers.isOverride {
-                    kstatement.modifiers.visibility = .public
-                }
-            }
-            if !owningSignature.generics.isEmpty {
-                // Kotlin companion objects do not have access to their type's generics, but we can create a generic function so long as the generic
-                // is on a parameter rather than in the return type
-                if kstatement.isStatic {
-                    kstatement.convertToGenericFunction(owningTypeDeclaration, generics: owningSignature.generics, translator: translator)
-                }
-                // Kotlin does not allow a generic type to refer to itself without constraints
-                let withoutGenerics: TypeSignature = .named(owningTypeDeclaration.name, [])
-                kstatement.returnType = kstatement.returnType.mappingTypes(from: [withoutGenerics], to: [owningSignature])
-                kstatement.parameters = kstatement.parameters.map {
-                    var parameter = $0
-                    parameter.declaredType = parameter.declaredType.mappingTypes(from: [withoutGenerics], to: [owningSignature])
-                    return parameter
-                }
-            }
-        } else if statement.isGlobal {
-            kstatement.role = .global
-        }
-        if let body = statement.body {
-            kstatement.body = KotlinCodeBlock.translate(statement: body, translator: translator)
-            // Note: we leave optional init handling to our transformers because we handle them differently for different types
-            if statement.type != .initDeclaration {
-                if statement.returnType != .void {
-                    // We sref() all values from functions. While this is not strictly necessary given that function return
-                    // values must be assigned to a var before mutating them, it produces cleaner code than calling sref() at
-                    // function call sites. This is particularly true when calling Kotlin native functions for which we do not
-                    // have symbols. It also makes functions symmetrical with the behavior of arrays and of mutable properties
-                    kstatement.body?.updateWithExpectedReturn(.sref(nil))
-                }
-                if statement.isAsync && kstatement.body?.updateWithExpectedReturn(.labelIfPresent(KotlinClosure.returnLabel)) == true {
-                    kstatement.hasAsyncExplicitReturn = true
-                }
-            }
-            for parameter in kstatement.parameters where parameter.isInOut {
-                kstatement.body?.updateWithInOutParameter(name: parameter.internalLabel, source: translator.syntaxTree.source)
+        if !translateMemberInfo(declaration: kstatement, from: statement, modifiers: statement.modifiers, translator: translator) {
+            if statement.parent?.owningFunctionDeclaration != nil {
+                kstatement.role = .local
+            } else if statement.isGlobal {
+                kstatement.role = .global
             }
         }
-        kstatement.returnType.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source)
-        kstatement.parameters.forEach { $0.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
+        translateBody(declaration: kstatement, from: statement, body: statement.body, returnType: statement.returnType, isAsync: statement.isAsync, translator: translator)
 
         // Warnings and fixups
         if let firstCharacter = kstatement.name.first, firstCharacter != "_" && firstCharacter != "$" && firstCharacter != "`" && !firstCharacter.isLetter && !firstCharacter.isNumber && !kstatement.isEqualImplementation && !kstatement.isLessThanImplementation {
             kstatement.messages.append(.kotlinOperatorFunction(statement, source: translator.syntaxTree.source))
         }
-        if owningDeclarationType == .protocolDeclaration {
-            if statement.type == .initDeclaration {
-                kstatement.messages.append(.kotlinProtocolConstructor(statement, source: translator.syntaxTree.source))
-            } else if statement.modifiers.isStatic {
-                kstatement.messages.append(.kotlinProtocolStaticMember(statement, source: translator.syntaxTree.source))
-            }
-        }
         return kstatement
     }
 
     static func translate(statement: SubscriptDeclaration, translator: KotlinTranslator) -> [KotlinStatement] {
-        // TODO: Translate to get/set functions
-        let kstatement = KotlinMessageStatement(message: .kotlinSubscriptFunction(statement, source: translator.syntaxTree.source), statement: statement)
-        return [kstatement]
+        let getter = KotlinFunctionDeclaration(statement: statement, isSetter: false)
+        getter.modifiers = statement.modifiers
+        getter.generics = statement.generics.resolvingSelf(in: statement)
+        getter.returnType = statement.elementType.resolvingSelf(in: statement)
+        getter.parameters = statement.parameters.map { $0.resolvingSelf(in: statement).translate(translator: translator) }
+        getter.attributes = getter.processAttributes(statement.attributes, translator: translator)
+        getter.apiFlags = statement.getterType.apiFlags
+        translateMemberInfo(declaration: getter, from: statement, modifiers: statement.modifiers, translator: translator)
+        translateBody(declaration: getter, from: statement, body: statement.getter?.body, returnType: statement.elementType, isAsync: statement.isAsync, translator: translator)
+
+        guard let statementSetter = statement.setter else {
+            return [getter]
+        }
+        let setter = KotlinFunctionDeclaration(statement: statement, isSetter: true)
+        setter.modifiers = getter.modifiers
+        setter.modifiers.isMutating = true
+        setter.generics = getter.generics
+        setter.returnType = .void
+        setter.parameters = getter.parameters
+        setter.parameters.append(Parameter<KotlinExpression>(externalLabel: statementSetter.parameterName ?? "newValue", declaredType: getter.returnType))
+        setter.attributes = getter.attributes
+        setter.apiFlags = statement.setterType.apiFlags
+        translateMemberInfo(declaration: setter, from: statement, modifiers: statement.modifiers, translator: translator)
+        translateBody(declaration: setter, from: statement, body: statementSetter.body, returnType: .void, isAsync: false, translator: translator)
+        return [getter, setter]
+    }
+
+    @discardableResult private static func translateMemberInfo(declaration kstatement: KotlinFunctionDeclaration, from statement: Statement, modifiers: Modifiers, translator: KotlinTranslator) -> Bool {
+        guard let owningTypeDeclaration = statement.parent as? TypeDeclaration else {
+            return false
+        }
+
+        // Use codebaseInfo rather than .type directly so that extension API is also handled correctly
+        let owningDeclarationType = translator.codebaseInfo?.declarationType(forNamed: owningTypeDeclaration.signature) ?? owningTypeDeclaration.type
+        let owningSignature = translator.codebaseInfo?.primaryTypeInfo(forNamed: owningTypeDeclaration.signature)?.signature ?? owningTypeDeclaration.signature
+
+        if statement.type == .initDeclaration {
+            kstatement.isOpen = false
+            kstatement.modifiers.isOverride = false // Kotlin does not override constructors
+            if (statement as? FunctionDeclaration)?.isAsync == true {
+                kstatement.messages.append(.kotlinAsyncConstructors(statement, source: translator.syntaxTree.source))
+            }
+        } else if statement.type == .deinitDeclaration {
+            kstatement.isOpen = owningTypeDeclaration.type == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
+            kstatement.modifiers.visibility = .public
+            // Swift deinit is called automatically for all types in hierarchy, but Kotlin finalizers must explicitly override
+            if let codebaseInfo = translator.codebaseInfo {
+                let inheritedTypeInfos = codebaseInfo.global.inheritanceChainSignatures(forNamed: owningSignature).dropFirst().flatMap { codebaseInfo.typeInfos(forNamed: $0) }
+                kstatement.modifiers.isOverride = inheritedTypeInfos.contains { $0.members.contains { $0.declarationType == .deinitDeclaration } }
+            }
+        } else {
+            if owningDeclarationType == .protocolDeclaration {
+                // Kotlin uses default public visibility on all interface members
+                kstatement.modifiers.visibility = .public
+            } else {
+                if !kstatement.modifiers.isOverride && translator.codebaseInfo?.isImplementingKotlinInterfaceMember(declaration: statement, in: owningTypeDeclaration.signature) == true {
+                    kstatement.modifiers.isOverride = true
+                }
+                kstatement.isOpen = !kstatement.modifiers.isOverride && !modifiers.isFinal && modifiers.visibility != .private && owningDeclarationType == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
+            }
+            // Kotlin does not all you to decrease visibility when overriding a member, so we simply make all overrides public to prevent errors
+            if kstatement.modifiers.isOverride {
+                kstatement.modifiers.visibility = .public
+            }
+        }
+
+        if !owningSignature.generics.isEmpty {
+            // Kotlin companion objects do not have access to their type's generics, but we can create a generic function so long as the generic
+            // is on a parameter rather than in the return type
+            if kstatement.isStatic {
+                kstatement.convertToGenericFunction(owningTypeDeclaration, generics: owningSignature.generics, translator: translator)
+            }
+            // Kotlin does not allow a generic type to refer to itself without constraints
+            let withoutGenerics: TypeSignature = .named(owningTypeDeclaration.name, [])
+            kstatement.returnType = kstatement.returnType.mappingTypes(from: [withoutGenerics], to: [owningSignature])
+            kstatement.parameters = kstatement.parameters.map {
+                var parameter = $0
+                parameter.declaredType = parameter.declaredType.mappingTypes(from: [withoutGenerics], to: [owningSignature])
+                return parameter
+            }
+        }
+
+        if owningTypeDeclaration.type == .protocolDeclaration {
+            if statement.type == .initDeclaration {
+                kstatement.messages.append(.kotlinProtocolConstructor(statement, source: translator.syntaxTree.source))
+            } else if modifiers.isStatic {
+                kstatement.messages.append(.kotlinProtocolStaticMember(statement, source: translator.syntaxTree.source))
+            }
+        }
+        return true
+    }
+
+    private static func translateBody(declaration kstatement: KotlinFunctionDeclaration, from statement: Statement, body: CodeBlock?, returnType: TypeSignature, isAsync: Bool, translator: KotlinTranslator) {
+        kstatement.returnType.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source)
+        kstatement.parameters.forEach { $0.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
+        guard let body else {
+            return
+        }
+
+        kstatement.body = KotlinCodeBlock.translate(statement: body, translator: translator)
+        // Note: we leave optional init handling to our transformers because we handle them differently for different types
+        if statement.type != .initDeclaration {
+            if returnType != .void {
+                // We sref() all values from functions. While this is not strictly necessary given that function return
+                // values must be assigned to a var before mutating them, it produces cleaner code than calling sref() at
+                // function call sites. This is particularly true when calling Kotlin native functions for which we do not
+                // have symbols. It also makes functions symmetrical with the behavior of arrays and of mutable properties
+                kstatement.body?.updateWithExpectedReturn(.sref(nil))
+            }
+            if isAsync && kstatement.body?.updateWithExpectedReturn(.labelIfPresent(KotlinClosure.returnLabel)) == true {
+                kstatement.hasAsyncExplicitReturn = true
+            }
+        }
+        for parameter in kstatement.parameters where parameter.isInOut {
+            kstatement.body?.updateWithInOutParameter(name: parameter.internalLabel, source: translator.syntaxTree.source)
+        }
     }
 
     init(name: String, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
@@ -1566,6 +1606,11 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             self.name = statement.name
             super.init(type: .functionDeclaration, statement: statement)
         }
+    }
+
+    private init(statement: SubscriptDeclaration, isSetter: Bool) {
+        self.name = isSetter ? "set" : "get"
+        super.init(type: .functionDeclaration, statement: statement)
     }
 
     override func insertDependencies(into dependencies: inout KotlinDependencies) {
@@ -1638,6 +1683,9 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if type != .constructorDeclaration {
             if inline {
                 output.append("inline ")
+            }
+            if role == .operator {
+                output.append("operator ")
             }
             output.append("fun ")
         }

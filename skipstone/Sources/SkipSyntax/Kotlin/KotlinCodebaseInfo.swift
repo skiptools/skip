@@ -79,16 +79,19 @@ extension CodebaseInfo.Context {
     }
 
     /// Whether this declaration is implementing a protocol property.
-    func isImplementingKotlinInterfaceMember(declaration: VariableDeclaration, in type: TypeSignature) -> Bool {
-        guard !declaration.names.isEmpty, let name = declaration.names[0] else {
+    func isImplementingKotlinInterfaceMember(declaration: Statement, in type: TypeSignature) -> Bool {
+        if let variableDeclaration = declaration as? VariableDeclaration {
+            guard !variableDeclaration.names.isEmpty, let name = variableDeclaration.names[0] else {
+                return false
+            }
+            return isKotlinInterfaceMember(name: name, parameters: nil, isStatic: variableDeclaration.modifiers.isStatic, in: type)
+        } else if let functionDeclaration = declaration as? FunctionDeclaration {
+            return isKotlinInterfaceMember(name: functionDeclaration.name, parameters: functionDeclaration.functionType.parameters, isStatic: functionDeclaration.modifiers.isStatic, in: type)
+        } else if let subscriptDeclaration = declaration as? SubscriptDeclaration {
+            return isKotlinInterfaceMember(name: "subscript", parameters: subscriptDeclaration.getterType.parameters, isStatic: subscriptDeclaration.modifiers.isStatic, in: type)
+        } else {
             return false
         }
-        return isKotlinInterfaceMember(name: name, parameters: nil, isStatic: declaration.modifiers.isStatic, in: type)
-    }
-
-    /// Whether this declaration is implementing a protocol function.
-    func isImplementingKotlinInterfaceMember(declaration: FunctionDeclaration, in type: TypeSignature) -> Bool {
-        return isKotlinInterfaceMember(name: declaration.name, parameters: declaration.functionType.parameters, isStatic: declaration.modifiers.isStatic, in: type)
     }
 
     /// Whether the given member is declared by a protocol of the given type.
@@ -102,8 +105,14 @@ extension CodebaseInfo.Context {
             }
             for protocolInfo in typeInfos(forNamed: protocolSignature) {
                 if let parameters {
-                    if protocolInfo.functions.contains(where: { $0.name == name && $0.signature.parameters.map(\.label) == parameters.map(\.label) }) {
-                        return true
+                    if name == "subscript" {
+                        if protocolInfo.subscripts.contains(where: { $0.signature.parameters.map(\.label) == parameters.map(\.label) }) {
+                            return true
+                        }
+                    } else {
+                        if protocolInfo.functions.contains(where: { $0.name == name && $0.signature.parameters.map(\.label) == parameters.map(\.label) }) {
+                            return true
+                        }
                     }
                 } else if protocolInfo.variables.contains(where: { $0.name == name }) {
                     return true

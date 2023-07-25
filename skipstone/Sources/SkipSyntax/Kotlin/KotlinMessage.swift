@@ -233,11 +233,6 @@ extension Message {
     // Idea: convert string mutation to re-assigning the string value
     static let kotlinStringMutation = "Detected possible string mutation. This may cause errors when converting to Kotlin, which does not have mutable strings"
 
-    // Idea: translate to equivalent Kotlin get/set functions
-    static func kotlinSubscriptFunction(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "Skip does not support custom subscripts. Consider using standard functions", sourceDerived: sourceDerived, source: source)
-    }
-
     // Idea: duplicate body that we're falling through to (and the following if that too does a fallthrough, etc)
     static func kotlinSwitchFallthrough(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Kotlin does not support fallthrough. Consider restructuring your switch statement", sourceDerived: sourceDerived, source: source)

@@ -939,20 +939,21 @@ final class MemberDeclarationTests: XCTestCase {
     }
 
     func testSubscript() async throws {
-        try await checkProducesMessage(swift: """
-        class C {
-            subscript(index: Int) -> Int {
-                get {
-                    return 0
-                }
-                set {
-                }
-            }
-            subscript(key: String, defaultValue: Int) -> Int {
-                return defaultValue
-            }
-        }
-        """)
+        //~~~
+//        try await checkProducesMessage(swift: """
+//        class C {
+//            subscript(index: Int) -> Int {
+//                get {
+//                    return 0
+//                }
+//                set {
+//                }
+//            }
+//            subscript(key: String, defaultValue: Int) -> Int {
+//                return defaultValue
+//            }
+//        }
+//        """)
     }
 
     func testFunctionSignatureConflicts() async throws {
@@ -1324,16 +1325,6 @@ final class MemberDeclarationTests: XCTestCase {
 
         try await checkProducesMessage(swift: """
         func f(v: Int..., _ s: String) {
-        }
-        """)
-    }
-
-    func testCustomSubscript() async throws {
-        try await checkProducesMessage(swift: """
-        class C {
-            subscript(index: Int) -> String {
-                return ""
-            }
         }
         """)
     }
