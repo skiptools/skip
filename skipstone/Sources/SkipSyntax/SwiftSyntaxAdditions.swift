@@ -18,13 +18,6 @@ extension SyntaxProtocol {
         let length = trimmedLength.utf8Length
         return source.range(offset: offset, length: length)
     }
-
-    /// Return the source code of this syntax.
-    func sourceCode(in source: Source) -> String {
-        let offset = positionAfterSkippingLeadingTrivia.utf8Offset
-        let length = trimmedLength.utf8Length
-        return source.content(offset: offset, length: length)
-    }
 }
 
 extension InheritedTypeListSyntax {

@@ -1,4 +1,3 @@
-@testable import SkipSyntax
 import XCTest
 
 final class MemberDeclarationTests: XCTestCase {
