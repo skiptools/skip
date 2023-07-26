@@ -127,10 +127,6 @@ class SyntaxNode: SourceDerived, PrettyPrintable {
             guard let owningType = current?.owningTypeDeclaration else {
                 break
             }
-            //~~~
-//            guard name != "Self" else {
-//                return owningType.signature.withGenerics(generics)
-//            }
             // Look for any direct child of that type with a matching qualified name
             if let referencedType = owningType.members.first(where: { ($0 as? TypeDeclaration)?.signature.name.hasSuffix(suffix) == true }) {
                 return (referencedType as! TypeDeclaration).signature.withGenerics(generics)

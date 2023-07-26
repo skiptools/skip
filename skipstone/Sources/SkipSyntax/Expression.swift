@@ -149,7 +149,7 @@ class RawExpression: Expression {
     }
 
     init(syntax: SyntaxProtocol, message: Message? = nil, in syntaxTree: SyntaxTree) {
-        self.sourceCode = syntax.sourceCode(in: syntaxTree.source)
+        self.sourceCode = syntax.description
         let source = syntaxTree.source
         let range = syntax.range(in: source)
         super.init(type: .raw, syntax: syntax, sourceFile: source.file, sourceRange: range)

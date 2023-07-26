@@ -138,7 +138,7 @@ class RawStatement: Statement {
     }
 
     init(syntax: SyntaxProtocol, message: Message? = nil, extras: StatementExtras? = nil, in syntaxTree: SyntaxTree) {
-        self.sourceCode = syntax.sourceCode(in: syntaxTree.source)
+        self.sourceCode = syntax.description
         let source = syntaxTree.source
         let range = syntax.range(in: source)
         super.init(type: .raw, syntax: syntax, sourceFile: source.file, sourceRange: range, extras: extras)

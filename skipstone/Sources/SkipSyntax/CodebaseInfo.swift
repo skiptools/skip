@@ -211,12 +211,13 @@ public class CodebaseInfo: Codable {
         }
         return signatures
     }
-    
+
     /// A context for accessing visible codebase information.
     struct Context {
         let global: CodebaseInfo
         let importedModuleNames: Set<String>
         let sourceFile: Source.FilePath?
+        private let cache = ContextCache()
 
         fileprivate init(global: CodebaseInfo, importedModuleNames: Set<String>, sourceFile: Source.FilePath?) {
             self.global = global
@@ -248,7 +249,15 @@ public class CodebaseInfo: Codable {
 
         /// Return the type info for the given type's primary declaration, omitting extensions.
         func primaryTypeInfo(forNamed type: TypeSignature) -> TypeInfo? {
-            return typeInfos(forNamed: type).first { $0.declarationType != .extensionDeclaration }
+            // Profiling indicated that ranking typeInfos to get the primary type info can be expensive, so cache
+            if let primaryTypeInfo = cache.primaryTypeInfos[type] {
+                return primaryTypeInfo
+            }
+            let primaryTypeInfo = typeInfos(forNamed: type).first { $0.declarationType != .extensionDeclaration }
+            if let primaryTypeInfo {
+                cache.primaryTypeInfos[type] = primaryTypeInfo
+            }
+            return primaryTypeInfo
         }
 
         /// Whether the given type is a class, struct, etc, optionally limiting results to this module.
@@ -828,6 +837,11 @@ public class CodebaseInfo: Codable {
             }
             return result
         }
+    }
+
+    /// Reference-type cache so that we can mutate it within a `Context` struct.
+    private class ContextCache {
+        var primaryTypeInfos: [TypeSignature: TypeInfo] = [:]
     }
 
     private func candidateTypeNames(for type: TypeSignature) -> [(String, String?)] {

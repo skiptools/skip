@@ -183,9 +183,16 @@ extension XCTestCase {
     }
 
     /// Checks that the given Swift generates a message when transpiled.
-    public func checkProducesMessage(preflight: Bool = false, swift: String, file: StaticString = #file, line: UInt = #line) async throws {
+    public func checkProducesMessage(preflight: Bool = false, swift: String) async throws {
         let tmpFile = try tmpFile(named: "Source.swift", contents: swift)
-        let srcFile = Source.FilePath(path: tmpFile.path)
+        let messages = try await transpile(preflight: preflight, file: tmpFile)
+        XCTAssertTrue(!messages.isEmpty)
+        messages.forEach { print("Received expected message: \($0)") }
+    }
+
+    /// Transpiles the code without performing checks, e.g. for performance profiling.
+    @discardableResult public func transpile(preflight: Bool = false, file: URL) async throws -> [Message] {
+        let srcFile = Source.FilePath(path: file.absoluteURL.path)
         var messages: [Message] = []
         if preflight {
             let source = try Source(file: srcFile)
@@ -204,8 +211,7 @@ extension XCTestCase {
                 messages += transpilation.messages
             }
         }
-        XCTAssertTrue(!messages.isEmpty)
-        messages.forEach { print("Received expected message: \($0)") }
+        return messages
     }
 
     private func trimmedContent(transpilation: Transpilation) -> String {

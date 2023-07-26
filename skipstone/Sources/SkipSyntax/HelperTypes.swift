@@ -417,14 +417,7 @@ struct Attribute: Equatable, Codable {
         }
         switch argument {
         case .availability(let availabilitySyntax):
-            let tokens = availabilitySyntax.map {
-                let str = $0.sourceCode(in: syntaxTree.source)
-                if str.hasSuffix(",") {
-                    return String(str.dropLast())
-                } else {
-                    return str
-                }
-            }
+            let tokens = availabilitySyntax.map { $0.entry.description }
             return Attribute(signature: signature, tokens: tokens)
         case .token(let tokenSyntax):
             return Attribute(signature: signature, tokens: [tokenSyntax.text])
