@@ -829,7 +829,7 @@ class Identifier: Expression, APICallExpression {
             name = identifierExpr.identifier.text
         } else if syntax.kind == .superRefExpr {
             name = "super"
-        } else if syntax.kind == .specializeExpr, let specializeExpr = syntax.as(SpecializeExprSyntax.self), specializeExpr.expression.kind == .identifierExpr, let identifierExpr = specializeExpr.expression.as(IdentifierExprSyntax.self) {
+        } else if syntax.kind == .specializeExpr, let specializeExpr = syntax.as(GenericSpecializationExprSyntax.self), specializeExpr.expression.kind == .identifierExpr, let identifierExpr = specializeExpr.expression.as(IdentifierExprSyntax.self) {
             name = identifierExpr.identifier.text
             generics = specializeExpr.genericArgumentClause.arguments.map { TypeSignature.for(syntax: $0.argument, in: syntaxTree) }
         } else {
@@ -1168,7 +1168,7 @@ class MemberAccess: Expression, APICallExpression {
     override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
         var syntax = syntax
         var generics: [TypeSignature]? = nil
-        if syntax.kind == .specializeExpr, let specializeExpr = syntax.as(SpecializeExprSyntax.self), specializeExpr.expression.kind == .memberAccessExpr {
+        if syntax.kind == .specializeExpr, let specializeExpr = syntax.as(GenericSpecializationExprSyntax.self), specializeExpr.expression.kind == .memberAccessExpr {
             syntax = specializeExpr.expression
             generics = specializeExpr.genericArgumentClause.arguments.map { TypeSignature.for(syntax: $0.argument, in: syntaxTree) }
         }
@@ -1287,10 +1287,10 @@ class NumericLiteral: Expression {
         let literal: String
         let isFloatingPoint: Bool
         if syntax.kind == .floatLiteralExpr, let floatLiteralExpr = syntax.as(FloatLiteralExprSyntax.self) {
-            literal = floatLiteralExpr.digits.text
+            literal = floatLiteralExpr.literal.text
             isFloatingPoint = true
         } else if syntax.kind == .integerLiteralExpr, let integerLiteralExpr = syntax.as(IntegerLiteralExprSyntax.self) {
-            literal = integerLiteralExpr.digits.text
+            literal = integerLiteralExpr.literal.text
             isFloatingPoint = false
         } else {
             return nil
@@ -1442,13 +1442,13 @@ class PostfixOperator: Expression {
     override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
         let operatorSymbol: String
         let target: Expression
-        if syntax.kind == .forcedValueExpr, let forcedValueExpr = syntax.as(ForcedValueExprSyntax.self) {
+        if syntax.kind == .forcedValueExpr, let forceUnwrapExpr = syntax.as(ForceUnwrapExprSyntax.self) {
             operatorSymbol = "!"
-            target = ExpressionDecoder.decode(syntax: forcedValueExpr.expression, in: syntaxTree)
+            target = ExpressionDecoder.decode(syntax: forceUnwrapExpr.expression, in: syntaxTree)
         } else if syntax.kind == .optionalChainingExpr, let optionalChainingExpr = syntax.as(OptionalChainingExprSyntax.self) {
             operatorSymbol = "?"
             target = ExpressionDecoder.decode(syntax: optionalChainingExpr.expression, in: syntaxTree)
-        } else if syntax.kind == .postfixUnaryExpr, let postfixExpr = syntax.as(PostfixUnaryExprSyntax.self) {
+        } else if syntax.kind == .postfixUnaryExpr, let postfixExpr = syntax.as(PostfixOperatorExprSyntax.self) {
             operatorSymbol = postfixExpr.operator.text
             target = ExpressionDecoder.decode(syntax: postfixExpr.expression, in: syntaxTree)
         } else {
@@ -1497,7 +1497,7 @@ class PrefixOperator: Expression {
 
     override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
         if syntax.kind == .prefixOperatorExpr, let prefixOperatorExpr = syntax.as(PrefixOperatorExprSyntax.self) {
-            let target = ExpressionDecoder.decode(syntax: prefixOperatorExpr.base, in: syntaxTree)
+            let target = ExpressionDecoder.decode(syntax: prefixOperatorExpr.expression, in: syntaxTree)
             guard let operatorSymbol = prefixOperatorExpr.operator?.text else {
                 return target
             }
@@ -1549,7 +1549,7 @@ class StringLiteral: Expression {
         guard syntax.kind == .stringLiteralExpr, let stringLiteralExpr = syntax.as(StringLiteralExprSyntax.self) else {
             return nil
         }
-        let isMultiline = stringLiteralExpr.openDelimiter != nil || stringLiteralExpr.openQuote.tokenKind == .multilineStringQuote
+        let isMultiline = stringLiteralExpr.openingPounds != nil || stringLiteralExpr.openingQuote.tokenKind == .multilineStringQuote
         var segments: [StringLiteralSegment<Expression>] = []
         for segmentSyntax in stringLiteralExpr.segments {
             switch segmentSyntax {
@@ -1623,7 +1623,7 @@ class Subscript: Expression, APICallExpression {
     }
 
     override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
-        guard syntax.kind == .subscriptExpr, let subscriptExpr = syntax.as(SubscriptExprSyntax.self) else {
+        guard syntax.kind == .subscriptExpr, let subscriptExpr = syntax.as(SubscriptCallExprSyntax.self) else {
             return nil
         }
         let base = ExpressionDecoder.decode(syntax: subscriptExpr.calledExpression, in: syntaxTree)
@@ -1694,7 +1694,7 @@ class Switch: Expression {
         guard syntax.kind == .switchExpr, let switchExpr = syntax.as(SwitchExprSyntax.self) else {
             return nil
         }
-        let on = ExpressionDecoder.decode(syntax: switchExpr.expression, in: syntaxTree)
+        let on = ExpressionDecoder.decode(syntax: switchExpr.subject, in: syntaxTree)
         let (switchCases, messages) = decodeCaseList(syntax: switchExpr.cases, in: syntaxTree)
         let expression = Switch(on: on, cases: switchCases, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
         expression.messages = messages
@@ -1769,7 +1769,7 @@ class SwitchCase: Expression, BindingExpression {
         case .case(let syntax):
             patterns = syntax.caseItems.map { item in
                 let pattern = CasePattern(syntax: item.pattern, in: syntaxTree)
-                let whereGuard = item.whereClause.map { ExpressionDecoder.decode(syntax: $0.guardResult, in: syntaxTree) }
+                let whereGuard = item.whereClause.map { ExpressionDecoder.decode(syntax: $0.condition, in: syntaxTree) }
                 return (pattern, whereGuard)
             }
         case .default:
@@ -1788,7 +1788,7 @@ class SwitchCase: Expression, BindingExpression {
                     return nil
                 }
                 let pattern = CasePattern(syntax: itemPattern, in: syntaxTree)
-                let whereGuard = item.whereClause.map { ExpressionDecoder.decode(syntax: $0.guardResult, in: syntaxTree) }
+                let whereGuard = item.whereClause.map { ExpressionDecoder.decode(syntax: $0.condition, in: syntaxTree) }
                 return (pattern, whereGuard)
             }
         } else {
@@ -1842,7 +1842,7 @@ class TernaryOperator: Expression {
             return nil
         }
         let condition = try ExpressionDecoder.decodeSequence(sequence, elements: Array(elements[..<index]), in: syntaxTree)
-        let ifTrue = ExpressionDecoder.decode(syntax: ternaryExpr.firstChoice, in: syntaxTree)
+        let ifTrue = ExpressionDecoder.decode(syntax: ternaryExpr.thenExpression, in: syntaxTree)
         let ifFalse = try ExpressionDecoder.decodeSequence(sequence, elements: Array(elements[(index + 1)...]), in: syntaxTree)
         return TernaryOperator(condition: condition, ifTrue: ifTrue, ifFalse: ifFalse, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }

@@ -239,7 +239,7 @@ struct Modifiers: PrettyPrintable, Codable {
     }
 
     /// Decode the modifier information in the given syntax.
-    static func `for`(syntax: ModifierListSyntax?) -> Modifiers {
+    static func `for`(syntax: DeclModifierListSyntax?) -> Modifiers {
         guard let syntax else {
             return Modifiers()
         }
@@ -417,7 +417,7 @@ struct Attribute: Equatable, Codable {
         }
         switch argument {
         case .availability(let availabilitySyntax):
-            let tokens = availabilitySyntax.map { $0.entry.description }
+            let tokens = availabilitySyntax.map { $0.argument.description }
             return Attribute(signature: signature, tokens: tokens)
         case .token(let tokenSyntax):
             return Attribute(signature: signature, tokens: [tokenSyntax.text])
@@ -570,7 +570,7 @@ struct Generics: Equatable, Codable {
     }
 
     /// Decode the generics information in the given syntax.
-    static func `for`(syntax: GenericParameterClauseSyntax?, associatedTypeSyntax: [AssociatedtypeDeclSyntax] = [], where whereSyntax: GenericWhereClauseSyntax? = nil, in syntaxTree: SyntaxTree) -> (Generics, [Message]) {
+    static func `for`(syntax: GenericParameterClauseSyntax?, associatedTypeSyntax: [AssociatedTypeDeclSyntax] = [], where whereSyntax: GenericWhereClauseSyntax? = nil, in syntaxTree: SyntaxTree) -> (Generics, [Message]) {
         if syntax == nil && associatedTypeSyntax.isEmpty && whereSyntax == nil {
             return (Generics(), [])
         }

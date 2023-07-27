@@ -323,35 +323,35 @@ class ForLoop: Statement {
     }
 
     override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
-        guard syntax.kind == .forInStmt, let forInStmnt = syntax.as(ForInStmtSyntax.self) else {
+        guard syntax.kind == .forInStmt, let forStmnt = syntax.as(ForStmtSyntax.self) else {
             return nil
         }
 
         let identifierPatterns: [IdentifierPattern]?
         let isNonNilMatch: Bool
-        if forInStmnt.caseKeyword != nil {
-            let casePattern = CasePattern(syntax: forInStmnt.pattern, in: syntaxTree)
+        if forStmnt.caseKeyword != nil {
+            let casePattern = CasePattern(syntax: forStmnt.pattern, in: syntaxTree)
             identifierPatterns = (casePattern.value as? Binding)?.identifierPatterns
             isNonNilMatch = casePattern.isNonNilMatch
         } else {
-            identifierPatterns = forInStmnt.pattern.identifierPatterns(in: syntaxTree)
+            identifierPatterns = forStmnt.pattern.identifierPatterns(in: syntaxTree)
             isNonNilMatch = false
         }
         guard let identifierPatterns else {
-            throw Message.unsupportedSyntax(forInStmnt.pattern, source: syntaxTree.source)
+            throw Message.unsupportedSyntax(forStmnt.pattern, source: syntaxTree.source)
         }
         var declaredType: TypeSignature = .none
-        if let typeSyntax = forInStmnt.typeAnnotation?.type {
+        if let typeSyntax = forStmnt.typeAnnotation?.type {
             declaredType = TypeSignature.for(syntax: typeSyntax, in: syntaxTree)
         }
-        let isTry = forInStmnt.tryKeyword != nil
-        let isAwait = forInStmnt.awaitKeyword != nil
-        let sequence = ExpressionDecoder.decode(syntax: forInStmnt.sequence, in: syntaxTree)
+        let isTry = forStmnt.tryKeyword != nil
+        let isAwait = forStmnt.awaitKeyword != nil
+        let sequence = ExpressionDecoder.decode(syntax: forStmnt.sequence, in: syntaxTree)
         var whereGuard: Expression? = nil
-        if let whereSyntax = forInStmnt.whereClause?.guardResult {
+        if let whereSyntax = forStmnt.whereClause?.condition {
             whereGuard = ExpressionDecoder.decode(syntax: whereSyntax, in: syntaxTree)
         }
-        let statements = StatementDecoder.decode(syntaxListContainer: forInStmnt.body, in: syntaxTree)
+        let statements = StatementDecoder.decode(syntaxListContainer: forStmnt.body, in: syntaxTree)
         let body = CodeBlock(statements: statements)
         return [ForLoop(identifierPatterns: identifierPatterns, declaredType: declaredType, isTry: isTry, isAwait: isAwait, isNonNilMatch: isNonNilMatch, sequence: sequence, whereGuard: whereGuard, body: body, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
     }
@@ -657,8 +657,8 @@ class WhileLoop: Statement {
     override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
         if syntax.kind == .whileStmt, let whileStmnt = syntax.as(WhileStmtSyntax.self) {
             return try [decodeWhile(statement: whileStmnt, extras: extras, in: syntaxTree)]
-        } else if syntax.kind == .repeatWhileStmt, let repeatWhileStmnt = syntax.as(RepeatWhileStmtSyntax.self) {
-            return [decodeRepeatWhile(statement: repeatWhileStmnt, extras: extras, in: syntaxTree)]
+        } else if syntax.kind == .repeatWhileStmt, let repeatStmnt = syntax.as(RepeatStmtSyntax.self) {
+            return [decodeRepeat(statement: repeatStmnt, extras: extras, in: syntaxTree)]
         } else {
             return nil
         }
@@ -671,7 +671,7 @@ class WhileLoop: Statement {
         return WhileLoop(conditions: conditions, body: body, syntax: statement, sourceFile: syntaxTree.source.file, sourceRange: statement.range(in: syntaxTree.source), extras: extras)
     }
 
-    private static func decodeRepeatWhile(statement: RepeatWhileStmtSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> WhileLoop {
+    private static func decodeRepeat(statement: RepeatStmtSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> WhileLoop {
         let condition = ExpressionDecoder.decode(syntax: statement.condition, in: syntaxTree)
         let statements = StatementDecoder.decode(syntaxListContainer: statement.body, in: syntaxTree)
         let body = CodeBlock(statements: statements)
@@ -748,7 +748,7 @@ class EnumCaseDeclaration: Statement {
         let modifiers = Modifiers.for(syntax: enumCaseDecl.modifiers)
         return enumCaseDecl.elements.enumerated().map { (index, element) in
             let name = element.name.text
-            let (associatedValues, messages) = element.associatedValue?.parameters(in: syntaxTree) ?? ([], [])
+            let (associatedValues, messages) = element.parameterClause?.parameters(in: syntaxTree) ?? ([], [])
             let rawValue = element.rawValue.map { ExpressionDecoder.decode(syntax: $0.value, in: syntaxTree) }
             let statement = EnumCaseDeclaration(name: name, associatedValues: associatedValues, rawValue: rawValue, attributes: attributes, modifiers: modifiers, syntax: element, sourceFile: syntaxTree.source.file, sourceRange: element.range(in: syntaxTree.source), extras: index == 0 ? extras : nil)
             statement.messages = messages
@@ -1152,7 +1152,7 @@ class TypealiasDeclaration: Statement {
     }
 
     override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
-        guard syntax.kind == .typealiasDecl, let typealiasDecl = syntax.as(TypealiasDeclSyntax.self) else {
+        guard syntax.kind == .typealiasDecl, let typealiasDecl = syntax.as(TypeAliasDeclSyntax.self) else {
             return nil
         }
         let name = typealiasDecl.name.text
@@ -1266,7 +1266,7 @@ class TypeDeclaration: Statement {
         var attributes = Attributes.for(syntax: protocolDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: protocolDecl.modifiers)
-        let associatedTypeDecls = protocolDecl.memberBlock.members.compactMap { $0.decl.kind == .associatedtypeDecl ? $0.decl.as(AssociatedtypeDeclSyntax.self) : nil }
+        let associatedTypeDecls = protocolDecl.memberBlock.members.compactMap { $0.decl.kind == .associatedtypeDecl ? $0.decl.as(AssociatedTypeDeclSyntax.self) : nil }
         let memberDecls = protocolDecl.memberBlock.members.compactMap { $0.decl.kind != .associatedtypeDecl ? $0.decl : nil }
         let (generics, genericsMessages) = Generics.for(syntax: nil, associatedTypeSyntax: associatedTypeDecls, where: protocolDecl.genericWhereClause, in: syntaxTree)
         let members = memberDecls.flatMap { StatementDecoder.decode(syntax: $0, in: syntaxTree) }

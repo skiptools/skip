@@ -81,7 +81,7 @@ extension Parameter<Expression> {
     }
 }
 
-extension ParameterClauseSyntax {
+extension FunctionParameterClauseSyntax {
     func parameters(in syntaxTree: SyntaxTree) -> ([Parameter<Expression>], [Message]) {
         var messages: [Message] = []
         let parameters = parameters(in: syntaxTree, messages: &messages)
@@ -90,7 +90,7 @@ extension ParameterClauseSyntax {
 
     fileprivate func parameters(in syntaxTree: SyntaxTree, messages: inout [Message]) -> [Parameter<Expression>] {
         let parameters = parameters.map { parameterSyntax in
-            Parameter<Expression>(firstName: parameterSyntax.firstName.text, secondName: parameterSyntax.secondName?.text, typeSyntax: parameterSyntax.type, ellipses: parameterSyntax.ellipsis?.text, defaultArgument: parameterSyntax.defaultArgument, in: syntaxTree, messages: &messages)
+            Parameter<Expression>(firstName: parameterSyntax.firstName.text, secondName: parameterSyntax.secondName?.text, typeSyntax: parameterSyntax.type, ellipses: parameterSyntax.ellipsis?.text, defaultArgument: parameterSyntax.defaultValue, in: syntaxTree, messages: &messages)
         }
         for (index, parameter) in parameters.enumerated() {
             if parameter.externalLabel == nil && index > 0 && parameters[index - 1].isVariadic {
@@ -121,10 +121,10 @@ extension AccessorBlockSyntax {
             case "get":
                 accessors.getter = Accessor(body: body)
             case "set":
-                let parameterName = accessorSyntax.parameter?.name.text
+                let parameterName = accessorSyntax.parameters?.name.text
                 accessors.setter = Accessor(parameterName: parameterName, body: body)
             case "willSet":
-                let parameterName = accessorSyntax.parameter?.name.text
+                let parameterName = accessorSyntax.parameters?.name.text
                 accessors.willSet = Accessor(parameterName: parameterName, body: body)
             case "didSet":
                 accessors.didSet = Accessor(body: body)
@@ -183,7 +183,7 @@ extension EnumCaseParameterClauseSyntax {
 
     fileprivate func parameters(in syntaxTree: SyntaxTree, messages: inout [Message]) -> [Parameter<Expression>] {
         return parameters.map { parameterSyntax in
-            Parameter<Expression>(firstName: parameterSyntax.firstName?.text, secondName: parameterSyntax.secondName?.text, typeSyntax: parameterSyntax.type, defaultArgument: parameterSyntax.defaultArgument, in: syntaxTree, messages: &messages)
+            Parameter<Expression>(firstName: parameterSyntax.firstName?.text, secondName: parameterSyntax.secondName?.text, typeSyntax: parameterSyntax.type, defaultArgument: parameterSyntax.defaultValue, in: syntaxTree, messages: &messages)
         }
     }
 }
@@ -288,7 +288,7 @@ extension ExprSyntaxProtocol {
             return identifierPatterns
         case .unresolvedPatternExpr:
             // We've seen this pattern in e.g. 'if let (a, b) = optionalTuple'
-            guard let patternExpr = self.as(UnresolvedPatternExprSyntax.self) else {
+            guard let patternExpr = self.as(PatternExprSyntax.self) else {
                 return nil
             }
             return patternExpr.pattern.identifierPatterns(in: syntaxTree)
@@ -374,17 +374,17 @@ extension CodeBlockSyntax: SyntaxListContainer {
     }
 }
 
-extension MemberDeclListItemSyntax: SyntaxListElement {
+extension MemberBlockItemSyntax: SyntaxListElement {
     var content: SyntaxProtocol {
         return self.decl
     }
 }
 
-extension MemberDeclListSyntax: SyntaxList {
+extension MemberBlockItemListSyntax: SyntaxList {
 }
 
-extension MemberDeclBlockSyntax: SyntaxListContainer {
-    var syntaxList: MemberDeclListSyntax {
+extension MemberBlockSyntax: SyntaxListContainer {
+    var syntaxList: MemberBlockItemListSyntax {
         return self.members
     }
 
