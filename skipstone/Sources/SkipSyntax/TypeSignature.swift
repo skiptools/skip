@@ -1311,7 +1311,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                 return signature
             }
         case .simpleTypeIdentifier:
-            guard let simpleType = syntax.as(SimpleTypeIdentifierSyntax.self) else {
+            guard let simpleType = syntax.as(IdentifierTypeSyntax.self) else {
                 return .none
             }
             let name = simpleType.name.text
@@ -1343,22 +1343,21 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             }
             return .dictionary(keyType, valueType)
         case .constrainedSugarType:
-            guard let constrainedSugarType = syntax.as(ConstrainedSugarTypeSyntax.self) else {
+            guard let someOrAnyType = syntax.as(SomeOrAnyTypeSyntax.self) else {
                 return .none
             }
-            return self.for(syntax: constrainedSugarType.baseType, in: syntaxTree)
+            return self.for(syntax: someOrAnyType.constraint, in: syntaxTree)
         case .functionType:
             guard let functionType = syntax.as(FunctionTypeSyntax.self) else {
                 return .none
             }
             var parameters: [Parameter] = []
             for parameterSyntax in functionType.parameters {
-                let label = parameterSyntax.name?.text
+                let label = parameterSyntax.firstName?.text
                 let type = self.for(syntax: parameterSyntax.type, in: syntaxTree)
                 let isInOut = isInOut(syntax: parameterSyntax.type)
                 let isVariadic = parameterSyntax.ellipsis != nil
-                let hasDefaultValue = parameterSyntax.initializer != nil
-                parameters.append(Parameter(label: label, type: type, isInOut: isInOut, isVariadic: isVariadic, hasDefaultValue: hasDefaultValue))
+                parameters.append(Parameter(label: label, type: type, isInOut: isInOut, isVariadic: isVariadic, hasDefaultValue: false))
             }
             let returnType = self.for(syntax: functionType.returnClause.type, in: syntaxTree)
             guard !parameters.contains(where: { $0.type == .none }) && returnType != .none else {
@@ -1367,7 +1366,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             let apiFlags = functionType.effectSpecifiers?.apiFlags ?? []
             return .function(parameters, returnType, apiFlags)
         case .memberTypeIdentifier:
-            guard let memberType = syntax.as(MemberTypeIdentifierSyntax.self) else {
+            guard let memberType = syntax.as(MemberTypeSyntax.self) else {
                 return .none
             }
             let baseType = self.for(syntax: memberType.baseType, in: syntaxTree)
@@ -1408,7 +1407,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             let elementsSyntax = tupleType.elements
             let elements = elementsSyntax.map { (syntax: TupleTypeElementSyntax) -> (String?, TypeSignature) in
                 let type = self.for(syntax: syntax.type, in: syntaxTree)
-                return (syntax.name?.text, type)
+                return (syntax.firstName?.text, type)
             }
             guard !elements.isEmpty else {
                 return .void
