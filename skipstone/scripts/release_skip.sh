@@ -37,7 +37,8 @@ DIR=.build/artifactbundle
 GITDATE="$(git log -1 --format=%ad --date=iso-strict)"
 GITREF="$(git rev-parse HEAD)"
 
-# the relative path to the repo that hosts the plug-in code and referebce to the binary executable
+# the relative path to the repo that hosts the plug-in code
+# and references the binary executable
 SKIPPKG="../skip/Package.swift"
 SKIPPKGDIR=$(dirname ${SKIPPKG})
 SKIPHUBPKG="../skiphub/Package.swift"
