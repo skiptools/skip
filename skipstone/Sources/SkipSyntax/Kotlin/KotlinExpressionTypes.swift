@@ -770,13 +770,18 @@ class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting {
     var mayBeSharedMutableStructType = false
     var useTrailingClosureFormatting = true
 
-    static func translate(expression: FunctionCall, translator: KotlinTranslator) -> KotlinFunctionCall {
-        let kfunction = translator.translateExpression(expression.function)
-        let kexpression = KotlinFunctionCall(expression: expression, function: kfunction)
-        kexpression.arguments = expression.arguments.map {
+    static func translate(expression: FunctionCall, translator: KotlinTranslator) -> KotlinExpression {
+        let karguments = expression.arguments.map {
             let kargumentExpression = translator.translateExpression($0.value)
             return LabeledValue(label: $0.label, value: kargumentExpression)
         }
+        if let numberLiteral = numberConstructorToLiteral(expression: expression, arguments: karguments) {
+            return numberLiteral
+        }
+
+        let kfunction = translator.translateExpression(expression.function)
+        let kexpression = KotlinFunctionCall(expression: expression, function: kfunction)
+        kexpression.arguments = karguments
         kexpression.isOptionalInit = expression.isInit && expression.inferredType.isOptional
         kexpression.inferredType = expression.inferredType.resolvingSelf(in: expression)
         kexpression.apiMatch = expression.apiMatch
@@ -792,6 +797,49 @@ class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting {
             memberAccess.member = "optional" + memberAccess.member
         }
         return kexpression
+    }
+
+    private static func numberConstructorToLiteral(expression: FunctionCall, arguments: [LabeledValue<KotlinExpression>]) -> KotlinExpression? {
+        guard arguments.count == 1, arguments[0].label == nil, let numberLiteral = arguments[0].value as? KotlinNumericLiteral else {
+            return nil
+        }
+        // Kotlin supports suffixes to create literals of certain numeric types, which are more efficient than function calls:
+        // f, L, U, UL
+        if isFunction(expression: expression, named: "Float", moduleName: "Swift") {
+            numberLiteral.suffix = "f"
+            return numberLiteral
+        }
+        guard !numberLiteral.isFloatingPoint else {
+            return nil
+        }
+
+        if isFunction(expression: expression, named: "Long", moduleName: "Swift") {
+            numberLiteral.suffix = "L"
+            return numberLiteral
+        } else if isFunction(expression: expression, named: "UInt", moduleName: "Swift") {
+            numberLiteral.suffix = "U"
+            return numberLiteral
+        } else if isFunction(expression: expression, named: "UInt64", moduleName: "Swift") {
+            numberLiteral.suffix = "UL"
+            return numberLiteral
+        } else {
+            return nil
+        }
+    }
+
+    private static func isFunction(expression: FunctionCall, named: String, moduleName: String) -> Bool {
+        if let identifier = expression.function as? Identifier {
+            return identifier.name == named
+        }
+        if let memberAccess = expression.function as? MemberAccess {
+            guard memberAccess.member == named else {
+                return false
+            }
+            if let baseIdentifier = memberAccess.base as? Identifier {
+                return baseIdentifier.name == moduleName
+            }
+        }
+        return false
     }
 
     init(function: KotlinExpression, arguments: [LabeledValue<KotlinExpression>]) {
@@ -1678,6 +1726,7 @@ class KotlinNullLiteral: KotlinExpression {
 class KotlinNumericLiteral: KotlinExpression {
     var literal: String
     var isFloatingPoint: Bool
+    var suffix: String = ""
 
     init(literal: String, isFloatingPoint: Bool = false, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.literal = literal
@@ -1702,6 +1751,7 @@ class KotlinNumericLiteral: KotlinExpression {
         } else {
             output.append(literal)
         }
+        output.append(suffix)
     }
 }
 

@@ -176,8 +176,12 @@ final class BuiltinTypeTests: XCTestCase {
     func testNumericCastRequired() async throws {
         try await check(swift: """
         let x: Float = Float(1.0)
+        let y: Float = Float(1)
+        let z: Float = Float(1 * 2)
         """, kotlin: """
-        internal val x: Float = Float(1.0)
+        internal val x: Float = 1.0f
+        internal val y: Float = 1f
+        internal val z: Float = Float(1 * 2)
         """)
 
         try await checkProducesMessage(swift: """
@@ -186,12 +190,24 @@ final class BuiltinTypeTests: XCTestCase {
 
         try await check(swift: """
         let x: UInt = UInt(1)
+        let y: UInt64 = UInt64(1)
         """, kotlin: """
-        internal val x: UInt = UInt(1)
+        internal val x: UInt = 1U
+        internal val y: ULong = 1UL
         """)
 
         try await checkProducesMessage(swift: """
         let x: UInt = 1
+        """)
+
+        try await check(swift: """
+        let i: Int = Int(1)
+        let x: Long = Long(1)
+        let y: Long = Long(1.0)
+        """, kotlin: """
+        internal val i: Int = Int(1)
+        internal val x: Long = 1L
+        internal val y: Long = Long(1.0)
         """)
     }
 
