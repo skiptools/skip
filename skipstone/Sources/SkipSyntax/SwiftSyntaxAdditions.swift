@@ -101,10 +101,10 @@ extension FunctionParameterClauseSyntax {
     }
 }
 
-extension AccessorBlockSyntax {
+extension AccessorDeclListSyntax {
     func accessors(in syntaxTree: SyntaxTree) -> Accessors {
         var accessors = Accessors()
-        for accessorSyntax in self.accessors {
+        for accessorSyntax in self {
             if accessorSyntax.effectSpecifiers?.asyncSpecifier != nil {
                 accessors.isAsync = true
             }
@@ -270,10 +270,10 @@ extension ExprSyntaxProtocol {
         case .discardAssignmentExpr:
             return [IdentifierPattern(name: nil)]
         case .identifierExpr:
-            guard let identifierExpr = self.as(IdentifierExprSyntax.self) else {
+            guard let identifierExpr = self.as(DeclReferenceExprSyntax.self) else {
                 return nil
             }
-            return [IdentifierPattern(name: identifierExpr.identifier.text)]
+            return [IdentifierPattern(name: identifierExpr.baseName.text)]
         case .tupleExpr:
             guard let tupleExpr = self.as(TupleExprSyntax.self) else {
                 return nil

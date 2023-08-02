@@ -1057,12 +1057,12 @@ class SubscriptDeclaration: Statement {
         let modifiers = Modifiers.for(syntax: subscriptDecl.modifiers)
         let (generics, genericsMessages) = Generics.for(syntax: subscriptDecl.genericParameterClause, where: subscriptDecl.genericWhereClause, in: syntaxTree)
         var accessors = Accessors()
-        if let accessor = subscriptDecl.accessors {
+        if let accessor = subscriptDecl.accessorBlock?.accessors {
             switch accessor {
             case .accessors(let syntax):
                 accessors = syntax.accessors(in: syntaxTree)
             case .getter(let syntax):
-                let statements = StatementDecoder.decode(syntaxListContainer: syntax, in: syntaxTree)
+                let statements = StatementDecoder.decode(syntaxList: syntax, in: syntaxTree)
                 accessors.getter = Accessor(body: CodeBlock(statements: statements))
             }
         }
@@ -1419,12 +1419,12 @@ class VariableDeclaration: Statement {
         }
 
         var accessors: Accessors = Accessors()
-        if let accessor = syntax.accessors {
+        if let accessor = syntax.accessorBlock?.accessors {
             switch accessor {
-            case .accessors(let accessorBlockSyntax):
-                accessors = accessorBlockSyntax.accessors(in: syntaxTree)
-            case .getter(let codeBlockSyntax):
-                let statements = StatementDecoder.decode(syntaxListContainer: codeBlockSyntax, in: syntaxTree)
+            case .accessors(let syntax):
+                accessors = syntax.accessors(in: syntaxTree)
+            case .getter(let syntax):
+                let statements = StatementDecoder.decode(syntaxList: syntax, in: syntaxTree)
                 accessors.getter = Accessor(body: CodeBlock(statements: statements))
             }
         }

@@ -825,12 +825,12 @@ class Identifier: Expression, APICallExpression {
     override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
         let name: String
         var generics: [TypeSignature]? = nil
-        if syntax.kind == .identifierExpr, let identifierExpr = syntax.as(IdentifierExprSyntax.self) {
-            name = identifierExpr.identifier.text
+        if syntax.kind == .identifierExpr, let identifierExpr = syntax.as(DeclReferenceExprSyntax.self) {
+            name = identifierExpr.baseName.text
         } else if syntax.kind == .superRefExpr {
             name = "super"
-        } else if syntax.kind == .specializeExpr, let specializeExpr = syntax.as(GenericSpecializationExprSyntax.self), specializeExpr.expression.kind == .identifierExpr, let identifierExpr = specializeExpr.expression.as(IdentifierExprSyntax.self) {
-            name = identifierExpr.identifier.text
+        } else if syntax.kind == .specializeExpr, let specializeExpr = syntax.as(GenericSpecializationExprSyntax.self), specializeExpr.expression.kind == .identifierExpr, let identifierExpr = specializeExpr.expression.as(DeclReferenceExprSyntax.self) {
+            name = identifierExpr.baseName.text
             generics = specializeExpr.genericArgumentClause.arguments.map { TypeSignature.for(syntax: $0.argument, in: syntaxTree) }
         } else {
             return nil
@@ -1001,10 +1001,10 @@ class KeyPathLiteral: Expression {
         for componentExpr in keyPathExpr.components {
             switch componentExpr.component {
             case .property(let syntax):
-                if syntax.declNameArguments != nil || syntax.genericArgumentClause != nil {
+                if syntax.genericArgumentClause != nil {
                     throw Message.keyPathUnsupported(syntax, source: syntaxTree.source)
                 }
-                let name = syntax.property.text
+                let name = syntax.declName.baseName.text
                 components.append(.property(name))
             case .subscript(let syntax):
                 throw Message.keyPathUnsupported(syntax, source: syntaxTree.source)
@@ -1179,7 +1179,7 @@ class MemberAccess: Expression, APICallExpression {
         if let baseSyntax = memberAccessExpr.base {
             base = ExpressionDecoder.decode(syntax: baseSyntax, in: syntaxTree)
         }
-        let member = memberAccessExpr.name.text
+        let member = memberAccessExpr.declName.baseName.text
         let useMultlineFormatting = base != nil && memberAccessExpr.period.leadingTrivia.contains {
             switch $0 {
             case .newlines:
