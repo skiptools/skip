@@ -430,8 +430,13 @@ class IfDefined: Statement {
             return nil
         }
 
-        let clause = extractClause(from: ifConfigDecl, in: syntaxTree)
-        var statements = try extractStatements(from: clause, in: syntaxTree)
+        let match = extractClause(from: ifConfigDecl, in: syntaxTree)
+        var statements = try extractStatements(from: match?.clause, in: syntaxTree)
+        if let endSyntax = match?.endSyntax, let extras = StatementExtras.decode(syntax: endSyntax) {
+            let (extraStatements, _) = extras.statements(syntax: endSyntax, in: syntaxTree)
+            statements += extraStatements
+            statements.append(Empty(syntax: endSyntax, extras: extras, in: syntaxTree))
+        }
         guard let extras else {
             return statements
         }
@@ -450,7 +455,7 @@ class IfDefined: Statement {
 
     /// Decode an `#if` surrounding a set of switch cases.
     static func decodeCaseList(syntax: IfConfigDeclSyntax, in syntaxTree: SyntaxTree) -> ([SwitchCase], [Message]) {
-        guard let elements = extractClause(from: syntax, in: syntaxTree)?.elements else {
+        guard let elements = extractClause(from: syntax, in: syntaxTree)?.clause.elements else {
             return ([], [])
         }
         guard case .switchCases(let caseList) = elements else {
@@ -459,12 +464,18 @@ class IfDefined: Statement {
         return Switch.decodeCaseList(syntax: caseList, in: syntaxTree)
     }
 
-    private static func extractClause(from syntax: IfConfigDeclSyntax, in syntaxTree: SyntaxTree) -> IfConfigClauseSyntax? {
-        // Look for a clause that matches a defined symbol, or an 'else'
+    private static func extractClause(from syntax: IfConfigDeclSyntax, in syntaxTree: SyntaxTree) -> (clause: IfConfigClauseSyntax, endSyntax: SyntaxProtocol)? {
+        // Look for a clause that matches a defined symbol, or an 'else'. Return it along with the pound keyword *after* it,
+        // which we use to look for ending statement extras
+        var trueClause: IfConfigClauseSyntax? = nil
         for ifConfigClause in syntax.clauses {
+            if let trueClause {
+                return (trueClause, ifConfigClause.poundKeyword)
+            }
             if ifConfigClause.poundKeyword.text == "#else" {
                 // If we reach an else, all previous clauses must have been false
-                return ifConfigClause
+                trueClause = ifConfigClause
+                continue
             }
 
             let clauseSymbol = ifConfigClause.condition?.description ?? ""
@@ -474,10 +485,14 @@ class IfDefined: Statement {
                 break
             }
             if isTrue {
-                return ifConfigClause
+                trueClause = ifConfigClause
             }
         }
-        return nil
+        if let trueClause {
+            return (trueClause, syntax.poundEndif)
+        } else {
+            return nil
+        }
     }
 
     private static func processConditions(symbol: String, preprocessorSymbols: Set<String>) -> (isSupported: Bool, isTrue: Bool) {

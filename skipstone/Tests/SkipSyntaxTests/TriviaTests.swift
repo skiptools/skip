@@ -199,23 +199,48 @@ final class TriviaTests: XCTestCase {
         try await check(swift: """
         func f() {
         }
-
+        
         // SKIP INSERT:
         // fun insert() {
         //     print("inserted")
         // }
-
+        
         func g() {
             print("original")
         }
         """, kotlin: """
         internal fun f() = Unit
-
+        
         fun insert() {
             print("inserted")
         }
-
+        
         internal fun g() = print("original")
+        """)
+    }
+
+    func testIfDefinedInsertDirective() async throws {
+        try await check(swift: """
+        #if SKIP
+        func doSomething() {}
+        // SKIP INSERT:
+        // fun doSomethingElse() = Unit
+        #endif
+        """, kotlin: """
+        internal fun doSomething() = Unit
+        fun doSomethingElse() = Unit
+        """)
+
+        try await check(swift: """
+        #if SKIP
+        func doSomething() {}
+        // SKIP INSERT:
+        // fun doSomethingElse() = Unit
+        #else
+        #endif
+        """, kotlin: """
+        internal fun doSomething() = Unit
+        fun doSomethingElse() = Unit
         """)
     }
 
