@@ -1125,6 +1125,12 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                 }
                 return (2.0 + elementScore) / 2.0
             }
+            if case .named(_, let generics) = strippedTarget, generics.count == 1, let inheritanceScore = inheritanceCompatibilityScore(target: target, codebaseInfo: codebaseInfo) {
+                guard let elementScore = element.compatibilityScore(target: generics[0], codebaseInfo: codebaseInfo) else {
+                    return nil
+                }
+                return (inheritanceScore + elementScore) / 2.0
+            }
         case .character:
             if strippedTarget.isStringy {
                 return 1.0
@@ -1135,6 +1141,10 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                     return nil
                 }
                 return (2.0 + keyScore + 2.0 + valueScore) / 4.0
+            }
+            // TODO: Match K, V, to superclass collections Entry<K, V> element type
+            if let inheritanceScore = inheritanceCompatibilityScore(target: target, codebaseInfo: codebaseInfo) {
+                return inheritanceScore / 4.0
             }
         case .double, .float:
             if strippedTarget.isFloatingPoint {
@@ -1189,6 +1199,12 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                     return nil
                 }
                 return (2.0 + elementScore) / 2.0
+            }
+            if case .named(_, let generics) = strippedTarget, generics.count == 1, let inheritanceScore = inheritanceCompatibilityScore(target: target, codebaseInfo: codebaseInfo) {
+                guard let elementScore = element.compatibilityScore(target: generics[0], codebaseInfo: codebaseInfo) else {
+                    return nil
+                }
+                return (inheritanceScore + elementScore) / 2.0
             }
         case .string:
             if strippedTarget.isStringy {

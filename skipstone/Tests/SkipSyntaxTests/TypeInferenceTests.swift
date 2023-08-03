@@ -817,4 +817,42 @@ final class TypeInferenceTests: XCTestCase {
         }
         """)
     }
+
+    func testElementSpecialization() async throws {
+        let supportingSwift = """
+        protocol Sequence {
+            associatedtype Element
+        }
+        extension Sequence {
+            func joined<RE>() -> [RE] where Element: Sequence<RE> {
+                fatalError()
+            }
+        }
+        struct Array<Element>: Sequence {
+            init(_ sequence: any Sequence<Element>) {
+            }
+        }
+        enum E {
+            case a
+            case b
+            case c
+        }
+        """
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        func f() {
+            let a: [[E]] = [[.a], [.b, .c]]
+            let j = a.joined()
+            let b = Array(j) == [.a, .b, .c]
+        }
+        """, kotlin: """
+        import skip.lib.Array
+
+        internal fun f() {
+            val a: Array<Array<E>> = arrayOf(arrayOf(E.a), arrayOf(E.b, E.c))
+            val j = a.joined()
+            val b = Array(j) == arrayOf(E.a, E.b, E.c)
+        }
+        """)
+    }
 }

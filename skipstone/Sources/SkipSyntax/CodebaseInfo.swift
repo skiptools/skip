@@ -724,7 +724,8 @@ public class CodebaseInfo: Codable {
                 constrainedParameters = parameters.map {
                     $0.mappingTypes(from: typeInfo.signature.generics, to: constrainedGenerics)
                 }
-                generics = typeInfo.generics.merge(overrides: generics, addNew: true).merge(overrides: Generics(typeInfo.signature.generics, whereEqual: constrainedGenerics), addNew: true)
+                generics = typeInfo.generics.merge(overrides: generics, addNew: true)
+                generics = generics.merge(overrides: Generics(typeInfo.signature.generics, whereEqual: constrainedGenerics), addNew: true)
                 availability = availability.least(typeInfo.availability)
             }
             constrainedParameters = constrainedParameters.map { $0.constrainedTypeWithGenerics(generics) }

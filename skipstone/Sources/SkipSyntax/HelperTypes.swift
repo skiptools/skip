@@ -675,6 +675,16 @@ struct Generics: Equatable, Codable {
         var result = self
         for i in 0..<generics.entries.count {
             if let ri = result.entries.firstIndex(where: { $0.name == generics.entries[i].name }) {
+                // If we found a concrete mapping, use it to populate any other generics that may be used in the entry, e.g.
+                // in fun joined<RE>() -> [RE] where Element: Sequence<RE>, if we know Element we can populate RE
+                if let type = generics.entries[i].whereEqual {
+                    for signature in result.entries[ri].inherits {
+                        result = signature.mergeGenericMappings(in: type, with: result)
+                    }
+                    if let signature = result.entries[ri].whereEqual {
+                        result = signature.mergeGenericMappings(in: type, with: result)
+                    }
+                }
                 result.entries[ri] = generics.entries[i]
             } else if case .named(let name, []) = generics.entries[i].whereEqual, let ri = result.entries.firstIndex(where: { $0.name == name }) {
                 // If there is a constraint setting some new generic name equal to an existing name, replace the existing
