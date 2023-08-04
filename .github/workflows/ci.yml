@@ -26,8 +26,8 @@ jobs:
           cd SomeLibraryDebug
           swift package init
 
-          echo 'package.dependencies += [.package(url: "https://github.com/skiptools/skip", branch: "main")]' >> Package.swift
-          echo 'package.dependencies += [.package(url: "https://github.com/skiptools/skiphub", branch: "main")]' >> Package.swift
+          echo 'package.dependencies += [.package(url: "https://skip.tools/skiptools/skip.git", branch: "main")]' >> Package.swift
+          echo 'package.dependencies += [.package(url: "https://skip.tools/skiptools/skiphub.git", branch: "main")]' >> Package.swift
 
           swift package plugin --allow-writing-to-package-directory skip-init
           cat Package.swift Package.resolved
@@ -61,8 +61,8 @@ jobs:
           cd SomeLibraryRelease
           swift package init
 
-          echo 'package.dependencies += [.package(url: "https://github.com/skiptools/skip", from: "0.0.0")]' >> Package.swift
-          echo 'package.dependencies += [.package(url: "https://github.com/skiptools/skiphub", from: "0.0.0")]' >> Package.swift
+          echo 'package.dependencies += [.package(url: "https://skip.tools/skiptools/skip.git", from: "0.0.0")]' >> Package.swift
+          echo 'package.dependencies += [.package(url: "https://skip.tools/skiptools/skiphub.git", from: "0.0.0")]' >> Package.swift
 
           swift package plugin --allow-writing-to-package-directory skip-init
           cat Package.swift Package.resolved
