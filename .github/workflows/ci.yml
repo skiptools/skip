@@ -26,6 +26,7 @@ jobs:
           cd SomeLibraryDebug
           swift package init
 
+          echo 'package.platforms = package.platforms ?? [.macOS("13"), .iOS("16")]' >> Package.swift
           echo 'package.dependencies += [.package(url: "https://skip.tools/skiptools/skip.git", branch: "main")]' >> Package.swift
           echo 'package.dependencies += [.package(url: "https://skip.tools/skiptools/skiphub.git", branch: "main")]' >> Package.swift
 
