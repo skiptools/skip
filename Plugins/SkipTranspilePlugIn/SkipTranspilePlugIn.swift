@@ -12,7 +12,7 @@ import PackagePlugin
     let pluginFolderName = "skip-transpiler"
 
     func createBuildCommands(context: PluginContext, target: Target) async throws -> [Command] {
-        let skiptool = try context.tool(named: "skiptool")
+        let skipstone = try context.tool(named: "skipstone")
         let outputFolder = context.pluginWorkDirectory
 
         // In SPM the per-module outputs has no suffix, but in Xcode it is "ModuleName.output" below DerivedData/
@@ -177,7 +177,7 @@ import PackagePlugin
 
         // note that commands are executed in reverse order
         return [
-            .buildCommand(displayName: "Skip Transpile \(target.name)", executable: skiptool.path, arguments: [
+            .buildCommand(displayName: "Skip Transpile \(target.name)", executable: skipstone.path, arguments: [
                 "transpile",
                 "--marker-file", markerFile.path,
                 "--output-folder", sourceBase.path,
@@ -190,7 +190,7 @@ import PackagePlugin
                 + buildModuleArgs
                 + sourceFilePaths, inputFiles: inputFiles, outputFiles: outputFiles)
 
-//            .buildCommand(displayName: "Skip Info", executable: skiptool.path, arguments: [
+//            .buildCommand(displayName: "Skip Info", executable: skipstone.path, arguments: [
 //                "info",
 //                "-v",
 //                "-E",

@@ -41,16 +41,16 @@ let package = Package(
                         “Happy Skipping!
                         """)
                     ]),
-                dependencies: ["skiptool"],
+                dependencies: ["skipstone"],
                 path: "Plugins/SkipInit"),
 
         .plugin(name: "skip-command",
                 capability: .command(
-                    intent: .custom(verb: "skip",  description: "Run skiptool by specifying arguments manually"),
+                    intent: .custom(verb: "skip",  description: "Run skipstone by specifying arguments manually"),
                     permissions: [
                         .writeToPackageDirectory(reason: "Skip needs to create and update the Skip folder in the project."),
                     ]),
-                dependencies: ["skiptool"],
+                dependencies: ["skipstone"],
                 path: "Plugins/SkipCommand"),
 
         .plugin(name: "skip-build",
@@ -60,12 +60,12 @@ let package = Package(
 
         .plugin(name: "skip-preflight",
                 capability: .buildTool(),
-                dependencies: ["skiptool"],
+                dependencies: ["skipstone"],
                 path: "Plugins/SkipPreflightPlugIn"),
 
         .plugin(name: "skip-transpiler",
                 capability: .buildTool(),
-                dependencies: ["skiptool"],
+                dependencies: ["skipstone"],
                 path: "Plugins/SkipTranspilePlugIn"),
 
         // skipgradle is the CLI interface from Skip to the Gradle tool for building, testing, and packaging Kotlin
@@ -78,9 +78,9 @@ if let localPath = ProcessInfo.processInfo.environment["SKIPLOCAL"] {
     // locally linking SwiftSyntax requires min platform targets
     package.platforms = [.iOS(.v16), .macOS(.v13), .tvOS(.v16), .watchOS(.v9), .macCatalyst(.v16)]
     // build against the local relative packages in the peer folders by running: SKIPLOCAL=.. xed Skip.xcworkspace
-    package.dependencies += [.package(path: localPath + "/skiptool")]
-    package.targets += [.executableTarget(name: "skiptool", dependencies: [.product(name: "SkipBuild", package: "skiptool")], path: "Sources/SkipTool", sources: ["skiptool.swift"])]
+    package.dependencies += [.package(path: localPath + "/skipstone")]
+    package.targets += [.executableTarget(name: "skipstone", dependencies: [.product(name: "SkipBuild", package: "skipstone")])]
 } else {
-    // default to using the latest binary skiptool release
+    // default to using the latest binary skipstone release
     package.targets += [.binaryTarget(name: "skipstone", url: "https://skip.tools/skiptools/skip/releases/download/0.5.30/skipstone.plugin.zip", checksum: "950884a4b534da7cfe9f53a34e7f384190c78fce0ef808c347b6673f8768917a")]
 }
