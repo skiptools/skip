@@ -900,7 +900,7 @@ class KotlinClassDeclaration: KotlinStatement {
     var alwaysCreateNewSealedClassInstances = false
     var isGenerated = false
 
-    static func translate(statement: TypeDeclaration, translator: KotlinTranslator) -> KotlinClassDeclaration {
+    static func translate(statement: TypeDeclaration, translator: KotlinTranslator) -> [KotlinStatement] {
         let kstatement = KotlinClassDeclaration(statement: statement)
         kstatement.inherits = statement.inherits
         kstatement.modifiers = statement.modifiers
@@ -910,7 +910,9 @@ class KotlinClassDeclaration: KotlinStatement {
         }
         kstatement.attributes = kstatement.processAttributes(statement.attributes, translator: translator)
 
-        var members = statement.members.flatMap { translator.translateStatement($0) }
+        let partitioned = partition(members: statement.members, of: kstatement.signature)
+        var extensionMembers = partitioned.extensionMembers
+        var kmembers = partitioned.members.flatMap { translator.translateStatement($0) }
         if let codebaseInfo = translator.codebaseInfo {
             if let typeInfo = codebaseInfo.primaryTypeInfo(forNamed: statement.signature) {
                 // Type info contains full resolved generics
@@ -923,17 +925,43 @@ class KotlinClassDeclaration: KotlinStatement {
             // Kotlin extension functions act like static functions, which can lead to different behavior
             for (extInfo, extDeclaration, extImportModulePaths) in codebaseInfo.moveableExtensions(of: statement.signature, in: translator.syntaxTree) {
                 kstatement.inherits += extInfo.inherits
-                members += extDeclaration.members.flatMap { translator.translateStatement($0) }
+                let partitioned = partition(members: extDeclaration.members, of: kstatement.signature)
+                extensionMembers += partitioned.extensionMembers
+                kmembers += partitioned.members.flatMap { translator.translateStatement($0) }
                 kstatement.movedExtensionImportModulePaths += extImportModulePaths
             }
         }
-        kstatement.members = members
+        kstatement.members = kmembers
         if statement.type == .enumDeclaration {
             kstatement.processEnumCaseDeclarations()
         }
 
         kstatement.inherits.forEach { $0.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
-        return kstatement
+
+        return [kstatement] + KotlinExtensionDeclaration.translateExtensionMembers(extensionMembers, of: kstatement.signature, generics: kstatement.generics, translator: translator)
+    }
+
+    private static func partition(members: [Statement], of signature: TypeSignature) -> (members: [Statement], extensionMembers: [Statement]) {
+        var extensionMembers: [Statement] = []
+        var otherMembers: [Statement] = []
+        for member in members {
+            var extensionFunction: FunctionDeclaration? = nil
+            if let functionDeclaration = member as? FunctionDeclaration {
+                // We have to use extension functions when there are any constraints on the owning type's generics
+                for entry in functionDeclaration.generics.entries {
+                    if entry.whereEqual != nil || !entry.inherits.isEmpty, signature.generics.contains(where: { $0.isNamed(entry.name) }) {
+                        extensionFunction = functionDeclaration
+                        break
+                    }
+                }
+            }
+            if let extensionFunction {
+                extensionMembers.append(extensionFunction)
+            } else {
+                otherMembers.append(member)
+            }
+        }
+        return (otherMembers, extensionMembers)
     }
 
     init(name: String, signature: TypeSignature, declarationType: StatementType, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
@@ -1296,11 +1324,12 @@ struct KotlinExtensionDeclaration {
     static func translate(statement: ExtensionDeclaration, translator: KotlinTranslator) -> [KotlinStatement] {
         // If the extension can't move into its extended type or is on a type outside this module, use Kotlin extension
         // functions. Otherwise do not translate the extension - instead we'll move its members into the extended type
-        let canMove = statement.canMoveIntoExtendedType
         let isInSameFile = statement.isInSameFileAsExtendedType
-        let visibilityAllowsMove = isInSameFile || statement.visibilityAllowsMoveIntoExtendedType
-        let isInModule = translator.codebaseInfo == nil ? nil : translator.codebaseInfo?.declarationType(forNamed: statement.extends, mustBeInModule: true) != nil
-        guard !canMove || !visibilityAllowsMove || isInModule != true else {
+        var placement = KotlinExtensionPlacement()
+        placement.canMove = statement.canMoveIntoExtendedType
+        placement.visibilityAllowsMove = isInSameFile || statement.visibilityAllowsMoveIntoExtendedType
+        placement.isInModule = translator.codebaseInfo == nil ? nil : translator.codebaseInfo?.declarationType(forNamed: statement.extends, mustBeInModule: true) != nil
+        guard !placement.canMove || !placement.visibilityAllowsMove || placement.isInModule != true else {
             if !isInSameFile && mayUseFilePrivateAPI(statement: statement, in: translator.syntaxTree) {
                 let message: Message = .kotlinExtensionUsingFileprivateAPI(statement, source: translator.syntaxTree.source)
                 return [KotlinMessageStatement(message: message, statement: statement)]
@@ -1310,7 +1339,7 @@ struct KotlinExtensionDeclaration {
         }
 
         var kstatements: [KotlinStatement] = []
-        if !statement.inherits.isEmpty, let message = Message.kotlinExtensionAddProtocols(statement, canMove: canMove, visibilityAllowsMove: visibilityAllowsMove, isInModule: isInModule, source: translator.syntaxTree.source) {
+        if !statement.inherits.isEmpty, let message = Message.kotlinExtensionAddProtocols(statement, extensionPlacement: placement, source: translator.syntaxTree.source) {
             kstatements.append(KotlinMessageStatement(message: message, statement: statement))
         }
         var extends = statement.extends
@@ -1320,30 +1349,40 @@ struct KotlinExtensionDeclaration {
             extends = extendedTypeInfo.signature
             generics = extendedTypeInfo.generics.merge(extension: statement.extends, generics: statement.generics).resolvingSelf(in: statement)
         }
-        for member in statement.members {
-            if !canMove {
+        return kstatements + translateExtensionMembers(statement.members, of: extends, generics: generics, translator: translator, extensionPlacement: placement)
+    }
+
+    static func translateExtensionMembers(_ members: [Statement], of extends: TypeSignature, generics: Generics, translator: KotlinTranslator, extensionPlacement: KotlinExtensionPlacement? = nil) -> [KotlinStatement] {
+        var kstatements: [KotlinStatement] = []
+        for member in members {
+            if let extensionPlacement, !extensionPlacement.canMove {
                 // Check that an extension that will be implemented as extension functions because it has generic constraints, etc is not
                 // attempting to override member functions. Kotlin extension functions can never override members
-                if let variableDeclaration = member as? VariableDeclaration, translator.codebaseInfo?.isImplementingKotlinMember(declaration: variableDeclaration, inExtension: extends, withConstrainingGenerics: generics) == true, let message = Message.kotlinExtensionImplementMember(member, canMove: canMove, visibilityAllowsMove: visibilityAllowsMove, isInModule: isInModule, source: translator.syntaxTree.source) {
+                if let variableDeclaration = member as? VariableDeclaration, translator.codebaseInfo?.isImplementingKotlinMember(declaration: variableDeclaration, inExtension: extends, withConstrainingGenerics: generics) == true, let message = Message.kotlinExtensionImplementMember(member, extensionPlacement: extensionPlacement, source: translator.syntaxTree.source) {
                     kstatements.append(KotlinMessageStatement(message: message, statement: member))
-                } else if let functionDeclaration = member as? FunctionDeclaration, translator.codebaseInfo?.isImplementingKotlinMember(declaration: functionDeclaration, inExtension: extends, withConstrainingGenerics: generics) == true, let message = Message.kotlinExtensionImplementMember(member, canMove: canMove, visibilityAllowsMove: visibilityAllowsMove, isInModule: isInModule, source: translator.syntaxTree.source) {
+                } else if let functionDeclaration = member as? FunctionDeclaration, translator.codebaseInfo?.isImplementingKotlinMember(declaration: functionDeclaration, inExtension: extends, withConstrainingGenerics: generics) == true, let message = Message.kotlinExtensionImplementMember(member, extensionPlacement: extensionPlacement, source: translator.syntaxTree.source) {
                     kstatements.append(KotlinMessageStatement(message: message, statement: member))
                 }
             }
+            
             for kmember in translator.translateStatement(member) {
                 guard let memberDeclaration = kmember as? KotlinMemberDeclaration else {
-                    if let message = Message.kotlinExtensionUnsupportedMember(member, canMove: canMove, visibilityAllowsMove: visibilityAllowsMove, isInModule: isInModule, source: translator.syntaxTree.source) {
+                    if let message = Message.kotlinExtensionUnsupportedMember(member, extensionPlacement: extensionPlacement, source: translator.syntaxTree.source) {
                         kstatements.append(KotlinMessageStatement(message: message, statement: member))
                     }
                     continue
                 }
                 guard kmember.type != .constructorDeclaration else {
-                    if let message = Message.kotlinExtensionAddConstructors(member, canMove: canMove, visibilityAllowsMove: visibilityAllowsMove, isInModule: isInModule, source: translator.syntaxTree.source) {
+                    if let message = Message.kotlinExtensionAddConstructors(member, extensionPlacement: extensionPlacement, source: translator.syntaxTree.source) {
                         kstatements.append(KotlinMessageStatement(message: message, statement: member))
                     }
                     continue
                 }
-                memberDeclaration.extends = (extends, generics)
+                var extendsGenerics = generics
+                if let kfunctionDeclaration = kmember as? KotlinFunctionDeclaration {
+                    extendsGenerics = extendsGenerics.merge(overrides: kfunctionDeclaration.generics, addNew: false)
+                }
+                memberDeclaration.extends = (extends, extendsGenerics)
                 kstatements.append(kmember)
             }
         }

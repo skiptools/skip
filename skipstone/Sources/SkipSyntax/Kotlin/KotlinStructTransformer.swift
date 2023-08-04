@@ -211,7 +211,11 @@ final class KotlinStructTransformer: KotlinTransformer {
     }
 
     private func handleSelfAssignments(in functionDeclaration: KotlinFunctionDeclaration, translator: KotlinTranslator) {
-        guard let body = functionDeclaration.body, let classDeclaration = functionDeclaration.parent as? KotlinClassDeclaration else {
+        guard let body = functionDeclaration.body else {
+            return
+        }
+        let classDeclaration = functionDeclaration.parent as? KotlinClassDeclaration
+        guard classDeclaration != nil || functionDeclaration.extends != nil else {
             return
         }
         var hasSelfAssignments = false
@@ -235,7 +239,7 @@ final class KotlinStructTransformer: KotlinTransformer {
             }
             return .skip
         }
-        if hasSelfAssignments {
+        if hasSelfAssignments, let classDeclaration {
             addAssignFrom(to: classDeclaration)
         }
     }

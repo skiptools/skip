@@ -127,13 +127,13 @@ public class KotlinTranslator {
             case .actorDeclaration:
                 return [KotlinMessageStatement(message: .kotlinActors(statement, source: syntaxTree.source), statement: statement)]
             case .classDeclaration:
-                return [KotlinClassDeclaration.translate(statement: statement as! TypeDeclaration, translator: self)]
+                return KotlinClassDeclaration.translate(statement: statement as! TypeDeclaration, translator: self)
             case .deinitDeclaration:
                 return [KotlinFunctionDeclaration.translate(statement: statement as! FunctionDeclaration, translator: self)]
             case .enumCaseDeclaration:
                 return [KotlinEnumCaseDeclaration.translate(statement: statement as! EnumCaseDeclaration, translator: self)]
             case .enumDeclaration:
-                return [KotlinClassDeclaration.translate(statement: statement as! TypeDeclaration, translator: self)]
+                return KotlinClassDeclaration.translate(statement: statement as! TypeDeclaration, translator: self)
             case .extensionDeclaration:
                 return KotlinExtensionDeclaration.translate(statement: statement as! ExtensionDeclaration, translator: self)
             case .functionDeclaration:
@@ -145,7 +145,7 @@ public class KotlinTranslator {
             case .protocolDeclaration:
                 return [KotlinInterfaceDeclaration.translate(statement: statement as! TypeDeclaration, translator: self)]
             case .structDeclaration:
-                return [KotlinClassDeclaration.translate(statement: statement as! TypeDeclaration, translator: self)]
+                return KotlinClassDeclaration.translate(statement: statement as! TypeDeclaration, translator: self)
             case .subscriptDeclaration:
                 return KotlinFunctionDeclaration.translate(statement: statement as! SubscriptDeclaration, translator: self)
             case .typealiasDeclaration:

@@ -86,6 +86,13 @@ extension ExtensionDeclaration {
     }
 }
 
+/// Metadata about the placement of a Kotlin extension.
+struct KotlinExtensionPlacement {
+    var canMove = true
+    var visibilityAllowsMove = true
+    var isInModule: Bool?
+}
+
 extension Accessor where B: CodeBlock {
     /// Translate to an equivalent Kotlin accessor.
     func translate(translator: KotlinTranslator, expectedReturn: KotlinExpectedReturn) -> Accessor<KotlinCodeBlock> {

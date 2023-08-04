@@ -93,15 +93,18 @@ extension Message {
     }
 
     // Idea: factory function with class name?
-    static func kotlinExtensionAddConstructors(_ sourceDerived: SourceDerived, canMove: Bool, visibilityAllowsMove: Bool, isInModule: Bool?, source: Source) -> Message? {
-        guard let unmovableExplanation = extensionUnmovableExplanation(canMove: canMove, visibilityAllowsMove: visibilityAllowsMove, isInModule: isInModule) else {
+    static func kotlinExtensionAddConstructors(_ sourceDerived: SourceDerived, extensionPlacement: KotlinExtensionPlacement?, source: Source) -> Message? {
+        guard let extensionPlacement else {
+            return Message(kind: .error, message: "Kotlin does not support constructors with additional type constraints", sourceDerived: sourceDerived, source: source)
+        }
+        guard let unmovableExplanation = extensionUnmovableExplanation(placement: extensionPlacement) else {
             return nil
         }
         return Message(kind: .error, message: "\(unmovableExplanation) Therefore it cannot add additional constructors", sourceDerived: sourceDerived, source: source)
     }
 
-    static func kotlinExtensionAddProtocols(_ sourceDerived: SourceDerived, canMove: Bool, visibilityAllowsMove: Bool, isInModule: Bool?, source: Source) -> Message? {
-        guard let unmovableExplanation = extensionUnmovableExplanation(canMove: canMove, visibilityAllowsMove: visibilityAllowsMove, isInModule: isInModule) else {
+    static func kotlinExtensionAddProtocols(_ sourceDerived: SourceDerived, extensionPlacement: KotlinExtensionPlacement, source: Source) -> Message? {
+        guard let unmovableExplanation = extensionUnmovableExplanation(placement: extensionPlacement) else {
             return nil
         }
         return Message(kind: .error, message: "\(unmovableExplanation) Therefore it cannot add additional protocols", sourceDerived: sourceDerived, source: source)
@@ -111,30 +114,34 @@ extension Message {
         return Message(kind: .warning, message: "This extension will be moved into its extended type definition when translated to Kotlin. It will not be able to access this file's private types or fileprivate members", sourceDerived: sourceDerived, source: source)
     }
 
-    static func kotlinExtensionImplementMember(_ sourceDerived: SourceDerived, canMove: Bool, visibilityAllowsMove: Bool, isInModule: Bool?, source: Source) -> Message? {
-        guard let unmovableExplanation = extensionUnmovableExplanation(canMove: canMove, visibilityAllowsMove: visibilityAllowsMove, isInModule: isInModule) else {
+    static func kotlinExtensionImplementMember(_ sourceDerived: SourceDerived, extensionPlacement: KotlinExtensionPlacement, source: Source) -> Message? {
+        guard let unmovableExplanation = extensionUnmovableExplanation(placement: extensionPlacement) else {
             return nil
         }
         return Message(kind: .error, message: "\(unmovableExplanation) Therefore it can add new properties and functions, but it cannot be used to override members or implement protocol requirements", sourceDerived: sourceDerived, source: source)
     }
 
     static func kotlinExtensionSelfAssignment(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "This extension cannot be merged into its extended Kotlin type. Therefore you cannot assign a new value to self", sourceDerived: sourceDerived, source: source)
+        return Message(kind: .error, message: "This function must be translated to a Kotlin extension function, which lives outside the Kotlin class definition. Therefore you cannot assign a new value to self", sourceDerived: sourceDerived, source: source)
     }
 
-    static func kotlinExtensionUnsupportedMember(_ sourceDerived: SourceDerived, canMove: Bool, visibilityAllowsMove: Bool, isInModule: Bool?, source: Source) -> Message? {
-        guard let unmovableExplanation = extensionUnmovableExplanation(canMove: canMove, visibilityAllowsMove: visibilityAllowsMove, isInModule: isInModule) else {
+    static func kotlinExtensionUnsupportedMember(_ sourceDerived: SourceDerived, extensionPlacement: KotlinExtensionPlacement?, source: Source) -> Message? {
+        guard let extensionPlacement else {
+            // This shouldn't be possible
+            return Message.internalError(sourceDerived, source: source)
+        }
+        guard let unmovableExplanation = extensionUnmovableExplanation(placement: extensionPlacement) else {
             return nil
         }
         return Message(kind: .error, message: "\(unmovableExplanation) Therefore the extension can only include properties and functions", sourceDerived: sourceDerived, source: source)
     }
 
-    private static func extensionUnmovableExplanation(canMove: Bool, visibilityAllowsMove: Bool, isInModule: Bool?) -> String? {
-        if isInModule == false {
+    private static func extensionUnmovableExplanation(placement: KotlinExtensionPlacement) -> String? {
+        if placement.isInModule == false {
             return "This extension cannot be merged into its extended Kotlin type, because its type is defined outside of this module."
-        } else if !canMove {
+        } else if !placement.canMove {
             return "This extension cannot be merged into its extended Kotlin type definition because it has generic constraints."
-        } else if !visibilityAllowsMove {
+        } else if !placement.visibilityAllowsMove {
             return "This extension will not be merged into its extended Kotlin type definition because it is declared as private or fileprivate."
         } else {
             return nil

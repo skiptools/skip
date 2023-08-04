@@ -1344,6 +1344,83 @@ final class MemberDeclarationTests: XCTestCase {
         """)
     }
 
+    func testGenericMemberFunction() async throws {
+        try await check(swift: """
+        protocol I {}
+        class C<T> {
+            func a(t: T) {}
+            func b<U>(t: T, u: U) -> U  {
+                return u
+            }
+            func c<U>(t: T, u: U) where U: I {}
+        }
+        """, kotlin: """
+        internal interface I {
+        }
+        internal open class C<T> {
+            internal open fun a(t: T) = Unit
+            internal open fun <U> b(t: T, u: U): U = u.sref()
+            internal open fun <U> c(t: T, u: U) where U: I = Unit
+        }
+        """)
+
+        try await check(swift: """
+        protocol I {}
+        class C<T, Z> {
+            func a(z: Z) {}
+            func b<U>(t: T, u: U) where T: I {}
+            func c<U>(t: String, u: U) where T == String {}
+        }
+        """, kotlin: """
+        internal interface I {
+        }
+        internal open class C<T, Z> {
+            internal open fun a(z: Z) = Unit
+        }
+        internal fun <T, Z, U> C<T, Z>.b(t: T, u: U) where T: I = Unit
+        internal fun <Z, U> C<String, Z>.c(t: String, u: U) = Unit
+        """)
+
+        try await check(swift: """
+        protocol I {}
+        class C<T, Z> {
+            func a(z: Z) {}
+            func b<U>(t: T, u: U) where T: I {}
+        }
+        extension C where T == String {
+            func c<U>(t: String, u: U)
+            func d() where Z: I {
+            }
+        }
+        """, kotlin: """
+        internal interface I {
+        }
+        internal open class C<T, Z> {
+            internal open fun a(z: Z) = Unit
+        }
+        internal fun <T, Z, U> C<T, Z>.b(t: T, u: U) where T: I = Unit
+        internal fun <Z, U> C<String, Z>.c(t: String, u: U)
+        internal fun <Z> C<String, Z>.d() where Z: I = Unit
+        """)
+
+        try await checkProducesMessage(swift: """
+        protocol I {}
+        class C<T> {
+            init() where T: I {
+            }
+        }
+        """)
+
+        try await checkProducesMessage(swift: """
+        protocol I {}
+        struct S<T> {
+            mutating func f() where T: I {
+                self = S()
+            }
+        }
+        """)
+    }
+
     func testMissingGenericsAddedToMembers() async throws {
         try await check(swift: """
         class C<T> {

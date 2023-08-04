@@ -105,6 +105,7 @@ extension CodebaseInfo.Context {
             }
             for protocolInfo in typeInfos(forNamed: protocolSignature) {
                 if let parameters {
+                    //~~~ Check compatibility of parameter types
                     if name == "subscript" {
                         if protocolInfo.subscripts.contains(where: { $0.signature.parameters.map(\.label) == parameters.map(\.label) }) {
                             return true
