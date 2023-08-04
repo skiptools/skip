@@ -18,7 +18,7 @@ public protocol SkipCommandExecutor : AsyncParsableCommand {
 
 }
 
-/// The command that is run by "SkipRunner" (aka "skiptool")
+/// The command that is run by "SkipRunner" (aka "skipstone")
 public struct SkipRunnerExecutor: SkipCommandExecutor {
     public static var configuration = CommandConfiguration(commandName: "skip",
                                                            abstract: "Skip Transpiler \(skipVersion)",

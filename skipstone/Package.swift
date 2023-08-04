@@ -2,7 +2,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "skiptool",
+    name: "skipstone",
     defaultLocalization: "en",
     platforms: [
         .iOS(.v16),

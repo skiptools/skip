@@ -52,7 +52,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         run: |
           mkdir -p .build/dist/skiptool/x86_64-unknown-linux-gnu/
-          cp -a .build/x86_64-unknown-linux-gnu/release/SkipRunner .build/dist/skiptool/x86_64-unknown-linux-gnu/skiptool
+          cp -a .build/x86_64-unknown-linux-gnu/release/SkipRunner .build/dist/skiptool/x86_64-unknown-linux-gnu/skipstone
 
       - name: "Upload Build Artifacts"
         if: startsWith(github.ref, 'refs/tags/')

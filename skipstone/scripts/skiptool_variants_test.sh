@@ -1,5 +1,5 @@
 #!/bin/sh -ev
-# Runs the tests in the peer ../skip/ repo against skiptool
+# Runs the tests in the peer ../skip/ repo against skipstone
 # in the various build configurations
 cd ../skip
 
