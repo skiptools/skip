@@ -1498,9 +1498,7 @@ class PrefixOperator: Expression {
     override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
         if syntax.kind == .prefixOperatorExpr, let prefixOperatorExpr = syntax.as(PrefixOperatorExprSyntax.self) {
             let target = ExpressionDecoder.decode(syntax: prefixOperatorExpr.expression, in: syntaxTree)
-            guard let operatorSymbol = prefixOperatorExpr.operator?.text else {
-                return target
-            }
+            let operatorSymbol = prefixOperatorExpr.operator.text
             return PrefixOperator(operatorSymbol: operatorSymbol, target: target, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
         } else if syntax.kind == .isTypePattern, let isTypeExpr = syntax.as(IsTypePatternSyntax.self) {
             let typeSignature = TypeSignature.for(syntax: isTypeExpr.type, in: syntaxTree)
