@@ -1571,7 +1571,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 // Kotlin uses default public visibility on all interface members
                 kstatement.modifiers.visibility = .public
             } else {
-                if !kstatement.modifiers.isOverride && translator.codebaseInfo?.isImplementingKotlinInterfaceMember(declaration: statement, in: owningTypeDeclaration.signature) == true {
+                if !kstatement.modifiers.isOverride && translator.codebaseInfo?.isImplementingKotlinInterfaceMember(declaration: statement, in: owningSignature) == true {
                     kstatement.modifiers.isOverride = true
                 }
                 kstatement.isOpen = !kstatement.modifiers.isOverride && !modifiers.isFinal && modifiers.visibility != .private && owningDeclarationType == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
@@ -2225,7 +2225,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             } else {
                 if kstatement.modifiers.isOverride {
                     kstatement.role = .superclassOverrideProperty
-                } else if translator.codebaseInfo?.isImplementingKotlinInterfaceMember(declaration: statement, in: owningTypeDeclaration.signature) == true {
+                } else if translator.codebaseInfo?.isImplementingKotlinInterfaceMember(declaration: statement, in: owningSignature) == true {
                     kstatement.modifiers.isOverride = true
                 }
                 kstatement.isOpen = !kstatement.isLet && !kstatement.modifiers.isOverride && !statement.modifiers.isFinal && statement.modifiers.visibility != .private && owningDeclarationType == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal

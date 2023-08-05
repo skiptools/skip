@@ -935,6 +935,40 @@ final class MemberDeclarationTests: XCTestCase {
             override fun f() = Unit
         }
         """)
+
+        try await check(supportingSwift: """
+        protocol P {
+            func f(i: Int, s: String)
+        }
+        """, swift: """
+        class PImpl: P {
+            func f(i: Double, s: String) {
+            }
+            func f(i: Int, s: String) {
+            }
+        }
+        """, kotlin: """
+        internal open class PImpl: P {
+            internal open fun f(i: Double, s: String) = Unit
+            override fun f(i: Int, s: String) = Unit
+        }
+        """)
+
+        try await check(supportingSwift: """
+        protocol P {
+            associatedtype T
+            func f(t: T)
+        }
+        """, swift: """
+        class PImpl: P {
+            func f(t: Int) {
+            }
+        }
+        """, kotlin: """
+        internal open class PImpl: P<Int> {
+            override fun f(t: Int) = Unit
+        }
+        """)
     }
 
     func testSubscript() async throws {

@@ -98,20 +98,21 @@ extension CodebaseInfo.Context {
     func isKotlinInterfaceMember(name: String, parameters: [TypeSignature.Parameter]?, isStatic: Bool, in owningType: TypeSignature) -> Bool {
         assert(global.kotlin != nil)
         let protocolSignatures = global.protocolSignatures(forNamed: owningType)
+        let parameterLabels = parameters?.map(\.label) ?? []
+        let parameterTypes = parameters?.map(\.type) ?? []
         for protocolSignature in protocolSignatures {
             // Exclude protocols that do not translate into Kotlin interfaces
             guard !protocolSignature.isCustomStringConvertible && !protocolSignature.isEquatable && !protocolSignature.isHashable else {
                 continue
             }
             for protocolInfo in typeInfos(forNamed: protocolSignature) {
-                if let parameters {
-                    //~~~ Check compatibility of parameter types
+                if parameters != nil {
                     if name == "subscript" {
-                        if protocolInfo.subscripts.contains(where: { $0.signature.parameters.map(\.label) == parameters.map(\.label) }) {
+                        if protocolInfo.subscripts.contains(where: { $0.signature.parameters.map(\.label) == parameterLabels && isCompatibleParameterTypes(candidates: parameterTypes, in: owningType, targets: $0.signature.parameters.map(\.type), in: protocolInfo.signature) }) {
                             return true
                         }
                     } else {
-                        if protocolInfo.functions.contains(where: { $0.name == name && $0.signature.parameters.map(\.label) == parameters.map(\.label) }) {
+                        if protocolInfo.functions.contains(where: { $0.name == name && $0.signature.parameters.map(\.label) == parameterLabels && isCompatibleParameterTypes(candidates: parameterTypes, in: owningType, targets: $0.signature.parameters.map(\.type), in: protocolInfo.signature) }) {
                             return true
                         }
                     }
@@ -121,6 +122,14 @@ extension CodebaseInfo.Context {
             }
         }
         return false
+    }
+
+    private func isCompatibleParameterTypes(candidates: [TypeSignature], in candidateType: TypeSignature, targets: [TypeSignature], in targetType: TypeSignature) -> Bool {
+        // If there are generics involved, it is difficult to calculate final types, so we bail
+        guard candidateType.generics.isEmpty && targetType.generics.isEmpty else {
+            return true
+        }
+        return candidates == targets
     }
 
     /// Whether the given type may be a mutable struct.
