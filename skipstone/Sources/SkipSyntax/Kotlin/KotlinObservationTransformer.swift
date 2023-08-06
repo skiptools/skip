@@ -28,6 +28,7 @@ final class KotlinObservationTransformer: KotlinTransformer {
 
     private func updateObservableClass(statement: KotlinClassDeclaration, source: Source) {
         statement.annotations.append("@Stable")
+        statement.inherits.append(.named("Observable", []))
         for member in statement.members {
             guard let variableDeclaration = member as? KotlinVariableDeclaration else {
                 continue
@@ -77,8 +78,9 @@ final class KotlinObservationTransformer: KotlinTransformer {
 
     private func handleObservableObject(statement: KotlinClassDeclaration, source: Source) -> Bool {
         var isObservableObject = false
-        if let observableObjectIndex = statement.inherits.firstIndex(where: { $0.isNamed("ObservableObject", moduleName: "Combine") }) {
-            statement.inherits.remove(at: observableObjectIndex)
+        if let observableObjectIndex = statement.inherits.firstIndex(where: { $0.isNamed("ObservableObject", moduleName: "Combine") || $0.isNamed("ObservableObject", moduleName: "SwiftUI") }) {
+            // Remove any package specification
+            statement.inherits[observableObjectIndex] = .named("ObservableObject", [])
             isObservableObject = true
         }
         for member in statement.members {

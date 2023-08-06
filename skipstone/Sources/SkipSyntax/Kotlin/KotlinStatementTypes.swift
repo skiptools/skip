@@ -1975,6 +1975,8 @@ class KotlinInterfaceDeclaration: KotlinStatement {
             kstatement.inherits = typeInfo.inherits
             kstatement.generics = typeInfo.generics.resolvingSelf(in: statement)
         }
+        // Kotlin interfaces cannot extend Any
+        kstatement.inherits = kstatement.inherits.filter { $0 != .any && $0 != .anyObject }
 
         // Move extensions of this type into the type itself rather than use Kotlin extension functions.
         // This allows us to replace API declarations with implementations. Also Kotlin extension functions

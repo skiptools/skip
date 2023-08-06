@@ -363,6 +363,14 @@ final class BuiltinTypeTests: XCTestCase {
         }
         """)
     }
+
+    func testAnyObjectProtocols() async throws {
+        try await check(swift: """
+        protocol P: AnyObject {
+        }
+        """, kotlin: """
+        internal interface P {
+        }
+        """)
+    }
 }
-
-

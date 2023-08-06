@@ -32,7 +32,7 @@ final class ObservationTests: XCTestCase {
         import androidx.compose.runtime.*
 
 
-        internal open class C {
+        internal open class C: Observable {
             internal val a = 1
             internal open val b: Int
                 get() = 1
@@ -85,7 +85,7 @@ final class ObservationTests: XCTestCase {
         """, kotlin: """
         import androidx.compose.runtime.*
 
-        internal class S: MutableStruct {
+        internal class S: MutableStruct, Observable {
             internal var a: Int
                 get() = astate
                 set(newValue) {
@@ -114,7 +114,7 @@ final class ObservationTests: XCTestCase {
         """, kotlin: """
         import androidx.compose.runtime.*
 
-        internal open class C {
+        internal open class C: Observable {
             internal open var a: Int
                 get() {
                     if (!ainitialized) {
@@ -139,7 +139,7 @@ final class ObservationTests: XCTestCase {
         """, kotlin: """
         import androidx.compose.runtime.*
 
-        internal class S: MutableStruct {
+        internal class S: MutableStruct, Observable {
             internal var a: Int
                 get() {
                     val isinitialized = ainitialized
@@ -183,7 +183,7 @@ final class ObservationTests: XCTestCase {
         import androidx.compose.runtime.*
         import skip.lib.Array
 
-        internal open class C {
+        internal open class C: Observable {
             internal open var a: Array<A>
                 get() = astate.sref({ this.a = it })
                 set(newValue) {
@@ -205,7 +205,7 @@ final class ObservationTests: XCTestCase {
         import androidx.compose.runtime.*
         import skip.lib.Array
 
-        internal class S: MutableStruct {
+        internal class S: MutableStruct, Observable {
             internal var a: Array<A>
                 get() = astate.sref({ this.a = it })
                 set(newValue) {
@@ -242,7 +242,7 @@ final class ObservationTests: XCTestCase {
         import androidx.compose.runtime.*
 
 
-        internal open class C1 {
+        internal open class C1: ObservableObject {
             internal open var a = 1
             internal open var b: Int
                 get() = bstate
@@ -278,7 +278,7 @@ final class ObservationTests: XCTestCase {
         """, kotlin: """
         import androidx.compose.runtime.*
         
-        internal open class C {
+        internal open class C: ObservableObject {
             internal open var a: S
                 get() = astate!!.sref({ this.a = it })
                 set(newValue) {
