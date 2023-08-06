@@ -504,6 +504,7 @@ struct KotlinCasePattern {
 class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
     static let returnLabel = "l"
 
+    var labeledCaptureList: [LabeledValue<KotlinExpression>] = []
     var returnType: TypeSignature = .none
     var parameters: [Parameter<Void>] = []
     var attributes = Attributes()
@@ -516,6 +517,12 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
     var isTaskClosure = false
 
     static func translate(expression: Closure, translator: KotlinTranslator) -> KotlinClosure {
+        let labeledCaptureList = expression.captureList.compactMap { (capture: (CaptureType, LabeledValue<Expression>)) -> LabeledValue<KotlinExpression>? in
+            guard let label = capture.1.label else {
+                return nil
+            }
+            return LabeledValue(label: label, value: translator.translateExpression(capture.1.value))
+        }
         // If there is an explicit return type we'll use an anonymous function rather than a closure, as Kotlin
         // closures cannot declare a return type. Kotlin does not support anonymous suspend functions, though
         let kbody = KotlinCodeBlock.translate(statement: expression.body, translator: translator)
@@ -547,7 +554,10 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
                 kbody.updateWithInOutParameter(name: name, source: translator.syntaxTree.source)
             }
         }
+        handleSelfAssignments(in: kbody, source: translator.syntaxTree.source)
+
         let kexpression = KotlinClosure(expression: expression, body: kbody)
+        kexpression.labeledCaptureList = labeledCaptureList
         kexpression.returnType = expression.returnType.resolvingSelf(in: expression)
         kexpression.returnType.appendKotlinMessages(to: kexpression, source: translator.syntaxTree.source)
         kexpression.parameters = expression.parameters.map { $0.resolvingSelf(in: expression) }
@@ -586,6 +596,21 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
             return []
         }
         return (0...highestParameter).map { KotlinIdentifier.translateName("$\($0)") }
+    }
+
+    private static func handleSelfAssignments(in codeBlock: KotlinCodeBlock, source: Source) {
+        codeBlock.visit { node in
+            if let binaryOperator = node as? KotlinBinaryOperator, binaryOperator.op.symbol == "=", let lhs = binaryOperator.lhs as? KotlinIdentifier, lhs.name == "self" {
+                node.messages.append(.kotlinClosureSelfAssignment(node, source: source))
+                return .skip
+            } else if let kif = node as? KotlinIf, kif.conditionSets.contains(where: { $0.optionalBindingVariable?.names == ["self"] }) {
+                node.messages.append(.kotlinClosureSelfAssignment(node, source: source))
+                return .skip
+            } else {
+                // Let nested closures handle themselves
+                return node is KotlinClosure ? .skip : .recurse(nil)
+            }
+        }
     }
 
     static func translate(expression: KeyPathLiteral, translator: KotlinTranslator) -> KotlinClosure {
@@ -627,7 +652,7 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
     }
 
     override var children: [KotlinSyntaxNode] {
-        return [body]
+        return labeledCaptureList.map(\.value) + [body]
     }
 
     override func insertDependencies(into dependencies: inout KotlinDependencies) {
@@ -652,12 +677,14 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
             }
         }
         output.append("): ").append(returnType)
-        if body.isSingleStatementAppendable(mode: .function) {
+        if labeledCaptureList.isEmpty && body.isSingleStatementAppendable(mode: .function) {
             output.append(" = ")
             body.appendAsSingleStatement(to: output, indentation: indentation, mode: .function)
         } else {
             output.append(" {\n")
-            output.append(body, indentation: indentation.inc())
+            let bodyIndentation = indentation.inc()
+            appendCaptureList(to: output, indentation: bodyIndentation)
+            output.append(body, indentation: bodyIndentation)
             output.append(indentation).append("}")
         }
     }
@@ -672,7 +699,7 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
             output.append(returnLabel)
         }
         output.append("{")
-        let isSingleStatement = body.isSingleStatementAppendable(mode: .closure)
+        let isSingleStatement = labeledCaptureList.isEmpty && body.isSingleStatementAppendable(mode: .closure)
         if parameters.isEmpty && implicitParameterLabels.isEmpty {
             if isMainActor {
                 output.append(" MainActor.run \(returnLabel){")
@@ -705,6 +732,7 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
             }
             output.append(isSingleStatement ? " " : "\n")
         }
+        appendCaptureList(to: output, indentation: indentation.inc())
         if isSingleStatement {
             body.appendAsSingleStatement(to: output, indentation: indentation, mode: .closure)
             output.append(" }")
@@ -714,6 +742,16 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
         }
         if isAsync {
             output.append(" }")
+        }
+    }
+
+    private func appendCaptureList(to output: OutputGenerator, indentation: Indentation) {
+        for capture in labeledCaptureList {
+            guard let label = capture.label else {
+                continue
+            }
+            output.append(indentation).append("val \(label) = ")
+            output.append(capture.value, indentation: indentation).append("\n")
         }
     }
 }

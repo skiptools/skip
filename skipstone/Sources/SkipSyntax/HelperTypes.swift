@@ -6,6 +6,13 @@ struct Accessor<B> {
     var body: B? // Nil if the accessor has no body, as in a protocol { get set }
 }
 
+/// Type of closure capture.
+enum CaptureType {
+    case none
+    case unowned
+    case weak
+}
+
 /// A labeled value, as used in function call parameters.
 struct LabeledValue<V> {
     var label: String?

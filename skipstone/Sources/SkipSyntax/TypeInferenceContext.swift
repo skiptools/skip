@@ -55,7 +55,19 @@ struct TypeInferenceContext {
     /// Return a context for evaluating the code of the given closure.
     func pushing(_ closure: Closure) -> TypeInferenceContext {
         var parameterDictionary: [String: TypeSignature] = [:]
-        // Use the inferred type because we'll already have done our best if the parameter types are not declared
+        // Add captured values to context
+        for (captureType, value) in closure.captureList {
+            var type = value.value.inferredType
+            if captureType == .weak {
+                type = type.asOptional(true)
+            }
+            if let label = value.label {
+                parameterDictionary[label] = type
+            } else if let identifier = value.value as? Identifier {
+                parameterDictionary[identifier.name] = type
+            }
+        }
+        // Add parameters. Use inferred type because we'll already have done our best if the parameter types are not declared
         if !closure.inferredType.parameters.isEmpty {
             let declaredParameters = closure.parameters
             parameterDictionary = closure.inferredType.parameters.enumerated().reduce(into: parameterDictionary) { result, indexedParameter in

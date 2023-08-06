@@ -492,7 +492,7 @@ class CasePattern: Expression, BindingExpression {
 
 /// `{ ... }`
 class Closure: Expression {
-    // TODO: Capture list
+    private(set) var captureList: [(CaptureType, LabeledValue<Expression>)]
     private(set) var returnType: TypeSignature
     private(set) var parameters: [Parameter<Void>]
     let attributes: Attributes
@@ -503,7 +503,8 @@ class Closure: Expression {
         return APIFlags(isAsync: isAsync, isThrows: isThrows, isMainActor: attributes.contains(.mainActor))
     }
 
-    init(returnType: TypeSignature = .none, parameters: [Parameter<Void>], attributes: Attributes = Attributes(), isAsync: Bool = false, isThrows: Bool = false, body: CodeBlock, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
+    init(captureList: [(CaptureType, LabeledValue<Expression>)] = [], returnType: TypeSignature = .none, parameters: [Parameter<Void>], attributes: Attributes = Attributes(), isAsync: Bool = false, isThrows: Bool = false, body: CodeBlock, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
+        self.captureList = captureList
         self.returnType = returnType
         self.parameters = parameters
         self.attributes = attributes
@@ -517,18 +518,32 @@ class Closure: Expression {
         guard syntax.kind == .closureExpr, let closureExpr = syntax.as(ClosureExprSyntax.self) else {
             return nil
         }
+        let captureList = closureExpr.signature?.capture?.items?.compactMap { (item: ClosureCaptureSyntax) -> (CaptureType, LabeledValue<Expression>)? in
+            var type: CaptureType = .none
+            if let specifier = item.specifier?.specifier.text {
+                if specifier == "unowned" {
+                    type = .unowned
+                } else if specifier == "weak" {
+                    type = .weak
+                }
+            }
+            let expression = ExpressionDecoder.decode(syntax: item.expression, in: syntaxTree)
+            let label = item.name?.text
+            return (type, LabeledValue(label: label, value: expression))
+        } ?? []
         let (returnType, parameters, messages) = closureExpr.signature?.typeSignatures(in: syntaxTree) ?? (.none, [], [])
         let attributes = Attributes.for(syntax: closureExpr.signature?.attributes, in: syntaxTree)
         let isAsync = closureExpr.signature?.effectSpecifiers?.asyncSpecifier != nil
         let isThrows = closureExpr.signature?.effectSpecifiers?.throwsSpecifier != nil
         let statements = StatementDecoder.decode(syntaxList: closureExpr.statements, in: syntaxTree)
         let body = CodeBlock(statements: statements)
-        let expression = Closure(returnType: returnType, parameters: parameters, attributes: attributes, isAsync: isAsync, isThrows: isThrows, body: body, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+        let expression = Closure(captureList: captureList, returnType: returnType, parameters: parameters, attributes: attributes, isAsync: isAsync, isThrows: isThrows, body: body, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
         expression.messages = messages
         return expression
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        captureList.forEach { $0.1.value.inferTypes(context: context, expecting: .none) }
         let parameterSignatures = parameters.map { parameter in
             TypeSignature.Parameter(label: parameter.externalLabel, type: parameter.declaredType, isInOut: parameter.isInOut, isVariadic: parameter.isVariadic, hasDefaultValue: parameter.defaultValue != nil )
         }
@@ -549,7 +564,7 @@ class Closure: Expression {
     }
 
     override var children: [SyntaxNode] {
-        return [body]
+        return captureList.map(\.1.value) + [body]
     }
 
     override var prettyPrintAttributes: [PrettyPrintTree] {

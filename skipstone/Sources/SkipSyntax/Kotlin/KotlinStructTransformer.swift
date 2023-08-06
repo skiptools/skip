@@ -221,7 +221,8 @@ final class KotlinStructTransformer: KotlinTransformer {
         var hasSelfAssignments = false
         body.visit { node in
             guard let binaryOperator = node as? KotlinBinaryOperator, binaryOperator.op.symbol == "=", let lhs = binaryOperator.lhs as? KotlinIdentifier, lhs.name == "self", let statement = binaryOperator.parent as? KotlinExpressionStatement else {
-                return .recurse(nil)
+                // Closure self assignments are reassigning captured self, not mutating the struct
+                return node is KotlinClosure ? .skip : .recurse(nil)
             }
             if functionDeclaration.extends != nil {
                 binaryOperator.messages.append(.kotlinExtensionSelfAssignment(binaryOperator, source: translator.syntaxTree.source))

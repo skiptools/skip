@@ -194,4 +194,133 @@ final class ClosureTests: XCTestCase {
         }
         """)
     }
+
+    func testCaptureList() async throws {
+        try await check(swift: """
+        class C {
+            func f() {
+                let c = { [weak self] in
+                    if let strongSelf = self {
+                        strongSelf.g()
+                    }
+                }
+            }
+            func g() {}
+        }
+        """, kotlin: """
+        internal open class C {
+            internal open fun f() {
+                val c = {
+                    this?.let { strongSelf ->
+                        strongSelf.g()
+                    }
+                }
+            }
+            internal open fun g() = Unit
+        }
+        """)
+        
+        try await check(swift: """
+        class C {
+            func f() {
+                let o = C()
+                let c = { [weak weakSelf = self, unowned weakO = o] in
+                    if let strongSelf = weakSelf, let o = weakO {
+                        strongSelf.g(c: o)
+                    }
+                }
+            }
+            func g(c: C) {}
+        }
+        """, kotlin: """
+        internal open class C {
+            internal open fun f() {
+                val o = C()
+                val c = {
+                    val weakSelf = this
+                    val weakO = o
+                    weakSelf?.let { strongSelf ->
+                        weakO?.let { o ->
+                            strongSelf.g(c = o)
+                        }
+                    }
+                }
+            }
+            internal open fun g(c: C) = Unit
+        }
+        """)
+
+        try await checkProducesMessage(swift: """
+        class C {
+            func f() {
+                let c = { [weak weakSelf = self] in
+                    if let self = weakSelf {
+                    }
+                }
+            }
+        }
+        """)
+
+        try await checkProducesMessage(swift: """
+        class C {
+            func f() {
+                let c = { [weak weakSelf = self] in
+                    guard let self = weakSelf else {
+                        return
+                    }
+                }
+            }
+        }
+        """)
+
+        try await check(swift: """
+        class C {
+            func f() {
+                let c = { [weak self] in
+                    guard let self else {
+                        return
+                    }
+                    self.g()
+                }
+            }
+            func g() {}
+        }
+        """, kotlin: """
+        internal open class C {
+            internal open fun f() {
+                val c = l@{
+                    if (this == null) {
+                        return@l
+                    }
+                    this.g()
+                }
+            }
+            internal open fun g() = Unit
+        }
+        """)
+
+        try await check(swift: """
+        class C {
+            func f() {
+                let c = { [weak self] in
+                    if let self {
+                        self.g()
+                    }
+                }
+            }
+            func g() {}
+        }
+        """, kotlin: """
+        internal open class C {
+            internal open fun f() {
+                val c = {
+                    if (this != null) {
+                        this.g()
+                    }
+                }
+            }
+            internal open fun g() = Unit
+        }
+        """)
+    }
 }

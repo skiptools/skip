@@ -50,6 +50,10 @@ extension Message {
         return Message(kind: .error, message: "Kotlin only supports catch clauses that use enum cases, 'is <type>', or 'let <e> as <type>' conditions", sourceDerived: sourceDerived, source: source)
     }
 
+    static func kotlinClosureSelfAssignment(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Kotlin does not allow you to re-bind 'self'. Consider using a different identifier", sourceDerived: sourceDerived, source: source)
+    }
+
     static func kotlinCodablePropertyForKey(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Unable to locate the property for this coding key", sourceDerived: sourceDerived, source: source)
     }

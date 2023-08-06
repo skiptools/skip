@@ -961,6 +961,26 @@ final class ConcurrencyTests: XCTestCase {
         """)
     }
 
+    func testLocalFunction() async throws {
+        try await check(swift: """
+        func f() -> Int {
+            @MainActor func b(i: Int) -> Int { i }
+            func c() async -> Int {
+                return await b(i: 100)
+            }
+            return await c()
+        }
+        """, kotlin: """
+        internal fun f(): Int {
+            fun b(i: Int): Int = i
+            suspend fun c(): Int = Async.run l@{
+                return@l MainActor.run { b(i = 100) }
+            }
+            return c()
+        }
+        """)
+    }
+
     // Running this and observing the output verifies that Swift hops to the main thread when required by @MainActor, but does
     // not stay there for chained calls. Commented out to avoid warnings about using Thread.isMainThread within async code.
 //    func testMainActorBehavior() async throws {
