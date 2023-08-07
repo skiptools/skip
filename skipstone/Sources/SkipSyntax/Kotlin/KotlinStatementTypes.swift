@@ -225,6 +225,10 @@ class KotlinCodeBlock: KotlinStatement, KotlinSingleStatementAppendable {
         guard returnRequired, statements.count == 1, statements[0].type == .expression, let expressionStatement = statements[0] as? KotlinExpressionStatement, var expression = expressionStatement.expression else {
             return false
         }
+        // No need to return if throwing a fatal error
+        if let functionCall = expression as? KotlinFunctionCall, functionCall.arguments.isEmpty, let functionIdentifier = functionCall.function as? KotlinIdentifier, functionIdentifier.name == "fatalError" {
+            return false
+        }
         if sref {
             expression = expression.sref(onUpdate: onUpdate)
         }
