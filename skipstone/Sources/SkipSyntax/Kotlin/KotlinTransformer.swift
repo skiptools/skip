@@ -61,7 +61,7 @@ public let builtinKotlinTransformerTypes: [KotlinTransformer.Type] = [
     KotlinDeferTransformer.self,
     KotlinDisambiguateFunctionsTransformer.self,
     KotlinTupleLabelTransformer.self,
-    KotlinSwiftUITransformer.self,
+    // Disable until we resurrect for SwiftUI support: KotlinSwiftUITransformer.self,
     KotlinImportsTransformer.self,
     KotlinUnitTestTransformer.self,
 ]
