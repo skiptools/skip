@@ -220,6 +220,10 @@ private class UnreachableVisitor {
             if let body = functionDeclaration.body, functionDeclaration.returnType != .none && functionDeclaration.returnType != .void {
                 addUnreachableErrorIfNeeded(to: body)
             }
+        } else if let variableDeclaration = node as? KotlinVariableDeclaration {
+            if let body = variableDeclaration.getter?.body {
+                addUnreachableErrorIfNeeded(to: body)
+            }
         } else if let closure = node as? KotlinClosure {
             // For closures a .none return type is unknown, so only skip void
             if closure.returnType != .void {
