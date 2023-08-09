@@ -450,7 +450,10 @@ struct Attribute: Hashable, Codable {
         case mainActor
         case observable
         case observationIgnored
+        case observedObject
         case published
+        case state
+        case stateObject
         case unavailable
         case unknown
         case viewBuilder
@@ -498,8 +501,14 @@ struct Attribute: Hashable, Codable {
             return .observable
         case "ObservationIgnored":
             return .observationIgnored
+        case "ObservedObject":
+            return .observedObject
         case "Published":
             return .published
+        case "State":
+            return .state
+        case "StateObject":
+            return .stateObject
         case "ViewBuilder":
             return .viewBuilder
         default:

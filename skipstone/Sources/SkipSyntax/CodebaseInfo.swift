@@ -1408,11 +1408,19 @@ public class CodebaseInfo: Codable {
                 // Is extension's extended type @MainActor?
                 return codebaseInfo.primaryTypeInfo(forNamed: signature)?.isMainActorType(codebaseInfo: codebaseInfo) == true
             } else {
-                // NOTE: If we supported property wrappers, we'd make this a @MainActor type if it had any @MainActor property wrappers
-
                 // Do we extend a class or conform to a protocol that is @MainActor?
-                return inherits.contains { codebaseInfo.primaryTypeInfo(forNamed: $0)?.isMainActorType(codebaseInfo: codebaseInfo) == true }
+                if inherits.contains(where: { codebaseInfo.primaryTypeInfo(forNamed: $0)?.isMainActorType(codebaseInfo: codebaseInfo) == true }) {
+                    return true
+                }
+                return variables.contains(where: { forcesMainActorType(member: $0, codebaseInfo: codebaseInfo) })
             }
+        }
+
+        private func forcesMainActorType(member: VariableInfo, codebaseInfo: CodebaseInfo) -> Bool {
+            if member.attributes.contains(.observedObject) || member.attributes.contains(.stateObject) {
+                return true
+            }
+            return codebaseInfo.primaryTypeInfo(forNamed: member.signature)?.attributes.contains(.observable) == true
         }
 
         private static func isMainActorInferred(_ item: CodebaseInfoItem, in typeInfos: [TypeInfo]) -> Bool {
