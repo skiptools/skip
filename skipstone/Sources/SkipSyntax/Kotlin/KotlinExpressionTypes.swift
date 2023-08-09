@@ -799,7 +799,7 @@ class KotlinDictionaryLiteral: KotlinExpression {
     }
 }
 
-class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting {
+class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting, APICallExpression {
     var function: KotlinExpression
     var arguments: [LabeledValue<KotlinExpression>] = []
     var isOptionalInit = false
@@ -1003,7 +1003,7 @@ class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting {
     }
 }
 
-class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTarget {
+class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTarget, APICallExpression {
     var name: String
     var apiMatch: APIMatch?
     var mayBeSharedMutableStruct = false
@@ -1499,7 +1499,7 @@ struct KotlinMatchingCase {
     }
 }
 
-class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinCastTarget {
+class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinCastTarget, APICallExpression {
     var base: KotlinExpression?
     var baseKClass: TypeSignature?
     var member: String
@@ -2197,7 +2197,7 @@ class KotlinStringLiteral: KotlinExpression {
     }
 }
 
-class KotlinSubscript: KotlinExpression, KotlinMainActorTargeting {
+class KotlinSubscript: KotlinExpression, KotlinMainActorTargeting, APICallExpression {
     var base: KotlinExpression
     var arguments: [LabeledValue<KotlinExpression>] = []
     var apiMatch: APIMatch?

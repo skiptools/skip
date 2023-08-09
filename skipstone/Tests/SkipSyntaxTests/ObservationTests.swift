@@ -241,7 +241,8 @@ final class ObservationTests: XCTestCase {
         """, kotlin: """
         import androidx.compose.runtime.*
 
-
+        import skip.ui.*
+        
         internal open class C1: ObservableObject {
             internal open var a = 1
             internal open var b: Int

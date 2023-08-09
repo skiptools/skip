@@ -196,9 +196,7 @@ extension Parameter {
     /// Add messages about unsupported aspects of this parameter.
     func appendKotlinMessages(to node: KotlinSyntaxNode, source: Source) {
         declaredType.appendKotlinMessages(to: node, source: source)
-        if attributes.contains(.autoclosure) {
-            node.messages.append(.kotlinAutoclosure(node, source: source))
-        } else if attributes.contains(.unknown) {
+        if attributes.contains(.unknown) {
             node.messages.append(.kotlinAttributeOnParameterUnsupported(node, source: source))
         }
     }

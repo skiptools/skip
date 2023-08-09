@@ -55,8 +55,9 @@ extension TypeSignature {
         case .float:
             return "Float"
         case .function(let parameters, let returnType, let apiFlags):
+            let composableString = apiFlags.contains(.viewBuilder) ? "@Composable " : ""
             let suspendString = apiFlags.contains(.async) ? "suspend " : ""
-            return "\(suspendString)(\(parameters.map { $0.kotlin }.joined(separator: ", "))) -> \(returnType.kotlin)"
+            return "\(composableString)\(suspendString)(\(parameters.map { $0.kotlin }.joined(separator: ", "))) -> \(returnType.kotlin)"
         case .int:
             return "Int"
         case .int8:
@@ -147,6 +148,10 @@ extension TypeSignature {
             case .named(let name, let generics):
                 if name == "KeyPath" && generics.count == 2 {
                     messages.append(.kotlinKeyPath(node, source: source))
+                }
+            case .function(_, _, let apiFlags):
+                if apiFlags.contains(.autoclosure) {
+                    messages.append(.kotlinAutoclosure(node, source: source))
                 }
             case .tuple(let labels, _):
                 if labels.count > KotlinTupleLiteral.maximumArity {

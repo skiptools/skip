@@ -59,10 +59,9 @@ extension ReturnClauseSyntax {
 }
 
 extension Parameter<Expression> {
-    fileprivate init(firstName: String?, secondName: String?, typeSyntax: TypeSyntax?, ellipses: String? = nil, defaultArgument: InitializerClauseSyntax? = nil, in syntaxTree: SyntaxTree, messages: inout [Message]) {
+    fileprivate init(firstName: String?, secondName: String?, typeSyntax: TypeSyntax?, ellipses: String? = nil, attributes: Attributes? = nil, defaultArgument: InitializerClauseSyntax? = nil, in syntaxTree: SyntaxTree, messages: inout [Message]) {
         var type: TypeSignature = .none
         var isInOut = false
-        var attributes: Attributes? = nil
         if let typeSyntax {
             type = TypeSignature.for(syntax: typeSyntax, in: syntaxTree)
             if type == .none {
@@ -70,7 +69,6 @@ extension Parameter<Expression> {
                 messages.append(.unsupportedTypeSignature(typeSyntax, source: syntaxTree.source))
             }
             isInOut = TypeSignature.isInOut(syntax: typeSyntax)
-            attributes = TypeSignature.attributes(syntax: typeSyntax, in: syntaxTree)
         }
         let isVariadic = ellipses == "..."
         var defaultValue: Expression? = nil
@@ -90,7 +88,7 @@ extension FunctionParameterClauseSyntax {
 
     fileprivate func parameters(in syntaxTree: SyntaxTree, messages: inout [Message]) -> [Parameter<Expression>] {
         let parameters = parameters.map { parameterSyntax in
-            Parameter<Expression>(firstName: parameterSyntax.firstName.text, secondName: parameterSyntax.secondName?.text, typeSyntax: parameterSyntax.type, ellipses: parameterSyntax.ellipsis?.text, defaultArgument: parameterSyntax.defaultValue, in: syntaxTree, messages: &messages)
+            Parameter<Expression>(firstName: parameterSyntax.firstName.text, secondName: parameterSyntax.secondName?.text, typeSyntax: parameterSyntax.type, ellipses: parameterSyntax.ellipsis?.text, attributes: .for(syntax: parameterSyntax.attributes, in: syntaxTree), defaultArgument: parameterSyntax.defaultValue, in: syntaxTree, messages: &messages)
         }
         for (index, parameter) in parameters.enumerated() {
             if parameter.externalLabel == nil && index > 0 && parameters[index - 1].isVariadic {

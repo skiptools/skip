@@ -404,10 +404,11 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     }
 
     /// Set the API flags for this function.
-    func withAPIFlags(_ apiFlags: APIFlags) -> TypeSignature {
+    func withAPIFlags(_ apiFlags: APIFlags, replace: Bool = true) -> TypeSignature {
         switch self {
-        case .function(let parameters, let returnType, _):
-            return .function(parameters, returnType, apiFlags)
+        case .function(let parameters, let returnType, let existingFlags):
+            let finalFlags = replace ? apiFlags : existingFlags.union(apiFlags)
+            return .function(parameters, returnType, finalFlags)
         case .member(let base, let type):
             return .member(base, type.withAPIFlags(apiFlags))
         case .module(let moduleName, let type):
@@ -421,6 +422,21 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         default:
             return self
         }
+    }
+
+    /// Apply the given attributes to this type.
+    func applying(attributes: Attributes) -> TypeSignature {
+        var apiFlags: APIFlags = []
+        if attributes.contains(.autoclosure) {
+            apiFlags.insert(.autoclosure)
+        }
+        if attributes.contains(.mainActor) {
+            apiFlags.insert(.mainActor)
+        }
+        if attributes.contains(.viewBuilder) {
+            apiFlags.insert(.viewBuilder)
+        }
+        return withAPIFlags(apiFlags, replace: false)
     }
 
     /// If this is a tuple with matching element count, the decomposed tuple types.
@@ -1290,19 +1306,6 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         }
     }
 
-    /// Attributes on the given syntax.
-    static func attributes(syntax: TypeSyntax, in syntaxTree: SyntaxTree) -> Attributes? {
-        switch syntax.kind {
-        case .attributedType:
-            guard let attributedType = syntax.as(AttributedTypeSyntax.self), let attributes = attributedType.attributes else {
-                return nil
-            }
-            return Attributes.for(syntax: attributes, in: syntaxTree)
-        default:
-            return nil
-        }
-    }
-
     /// Create a type signature for the given syntax.
     static func `for`(syntax: TypeSyntax, in syntaxTree: SyntaxTree) -> TypeSignature {
         switch syntax.kind {
@@ -1317,15 +1320,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                 return .none
             }
             let signature = self.for(syntax: attributedType.baseType, in: syntaxTree)
-            if case .function(let parameters, let returnType, var apiFlags) = signature {
-                let attributes = Attributes.for(syntax: attributedType.attributes, in: syntaxTree)
-                if attributes.contains(.mainActor) {
-                    apiFlags.insert(.mainActor)
-                }
-                return .function(parameters, returnType, apiFlags)
-            } else {
-                return signature
-            }
+            let attributes = Attributes.for(syntax: attributedType.attributes, in: syntaxTree)
+            return signature.applying(attributes: attributes)
         case .simpleTypeIdentifier:
             guard let simpleType = syntax.as(IdentifierTypeSyntax.self) else {
                 return .none

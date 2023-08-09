@@ -24,13 +24,16 @@ public class CodebaseInfo: Codable {
 
     /// Map between Swift modules and the equivalent Skip modules.
     static let moduleNameMap: [String: String] = [
+        "Combine": "SkipLib",
         "CoreFoundation": "SkipFoundation",
         "CryptoKit": "SkipFoundation",
         "Dispatch": "SkipFoundation",
         "Foundation": "SkipFoundation",
         "JavaScriptCore": "SkipKit",
+        "Observation": "SkipLib",
         "OSLog": "SkipFoundation",
         "Swift": "SkipLib",
+        "SwiftUI": "SkipUI",
         "XCTest": "SkipUnit",
     ]
 

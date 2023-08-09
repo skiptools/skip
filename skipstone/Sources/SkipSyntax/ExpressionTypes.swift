@@ -500,7 +500,7 @@ class Closure: Expression {
     let isThrows: Bool
     let body: CodeBlock
     var apiFlags: APIFlags {
-        return APIFlags(isAsync: isAsync, isThrows: isThrows, isMainActor: attributes.contains(.mainActor))
+        return APIFlags(isAsync: isAsync, isThrows: isThrows, isMainActor: attributes.contains(.mainActor), isViewBuilder: attributes.contains(.viewBuilder))
     }
 
     init(captureList: [(CaptureType, LabeledValue<Expression>)] = [], returnType: TypeSignature = .none, parameters: [Parameter<Void>], attributes: Attributes = Attributes(), isAsync: Bool = false, isThrows: Bool = false, body: CodeBlock, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
@@ -547,7 +547,6 @@ class Closure: Expression {
         let parameterSignatures = parameters.map { parameter in
             TypeSignature.Parameter(label: parameter.externalLabel, type: parameter.declaredType, isInOut: parameter.isInOut, isVariadic: parameter.isVariadic, hasDefaultValue: parameter.defaultValue != nil )
         }
-        let apiFlags = APIFlags(isAsync: isAsync, isThrows: isThrows, isMainActor: attributes.contains(.mainActor))
         functionType = .function(parameterSignatures, returnType, apiFlags).or(expecting)
 
         let bodyContext = context.pushing(self)

@@ -3,7 +3,7 @@ final class KotlinObservationTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
         syntaxTree.root.visit { node in
             if let importDeclaration = node as? KotlinImportDeclaration {
-                mapObservationImport(statement: importDeclaration, in: syntaxTree)
+                addObservationImportDependencies(statement: importDeclaration, in: syntaxTree)
             } else if let classDeclaration = node as? KotlinClassDeclaration {
                 if classDeclaration.attributes.contains(.observable) {
                     addKotlinObservationDependencies(to: syntaxTree)
@@ -18,11 +18,10 @@ final class KotlinObservationTransformer: KotlinTransformer {
         }
     }
 
-    private func mapObservationImport(statement: KotlinImportDeclaration, in syntaxTree: KotlinSyntaxTree) {
+    private func addObservationImportDependencies(statement: KotlinImportDeclaration, in syntaxTree: KotlinSyntaxTree) {
         guard statement.modulePath.first == "Combine" || statement.modulePath.first == "Observation" || statement.modulePath.first == "SwiftUI" else {
             return
         }
-        (statement.parent as? KotlinStatement)?.remove(statement: statement)
         addKotlinObservationDependencies(to: syntaxTree)
     }
 

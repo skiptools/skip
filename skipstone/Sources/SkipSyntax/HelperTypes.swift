@@ -148,7 +148,7 @@ struct Parameter<V>: Hashable {
     init(externalLabel: String?, internalLabel: String? = nil, declaredType: TypeSignature = .none, isInOut: Bool = false, isVariadic: Bool = false, attributes: Attributes = Attributes(), defaultValue: V? = nil) {
         self.externalLabel = externalLabel == "" || externalLabel == "_" ? nil : externalLabel
         _internalLabel = internalLabel
-        self.declaredType = declaredType
+        self.declaredType = declaredType.applying(attributes: attributes)
         self.isInOut = isInOut
         self.isVariadic = isVariadic
         self.attributes = attributes
@@ -348,7 +348,7 @@ struct Modifiers: PrettyPrintable, Codable {
 /// @Attributes on a declaration.
 ///
 /// - Note: `Codable` for use in `CodebaseInfo`.
-struct Attributes: Equatable, PrettyPrintable, Codable {
+struct Attributes: Hashable, PrettyPrintable, Codable {
     var attributes: [Attribute]
 
     init(attributes: [Attribute] = []) {
@@ -409,7 +409,7 @@ struct Attributes: Equatable, PrettyPrintable, Codable {
 /// @Attribute on a declaration.
 ///
 /// - Note: `Codable` for use in `CodebaseInfo`.
-struct Attribute: Equatable, Codable {
+struct Attribute: Hashable, Codable {
     let signature: TypeSignature
     var tokens: [String] = []
 
@@ -453,6 +453,7 @@ struct Attribute: Equatable, Codable {
         case published
         case unavailable
         case unknown
+        case viewBuilder
     }
 
     /// The attribute kind, if it is recognized.
@@ -499,6 +500,8 @@ struct Attribute: Equatable, Codable {
             return .observationIgnored
         case "Published":
             return .published
+        case "ViewBuilder":
+            return .viewBuilder
         default:
             return .unknown
         }
@@ -810,15 +813,17 @@ struct APIFlags: OptionSet, Hashable, Codable {
     let rawValue: Int
 
     static let async = APIFlags(rawValue: 1 << 0)
-    static let mainActor = APIFlags(rawValue: 1 << 1)
+    static let autoclosure = APIFlags(rawValue: 1 << 1)
+    static let mainActor = APIFlags(rawValue: 1 << 2)
     static let `throws` = APIFlags(rawValue: 1 << 3)
-    static let writeable = APIFlags(rawValue: 1 << 4)
+    static let viewBuilder = APIFlags(rawValue: 1 << 4)
+    static let writeable = APIFlags(rawValue: 1 << 5)
 
     init(rawValue: Int) {
         self.rawValue = rawValue
     }
 
-    init(isAsync: Bool = false, isThrows: Bool = false, isMainActor: Bool = false, isWriteable: Bool = false) {
+    init(isAsync: Bool = false, isThrows: Bool = false, isMainActor: Bool = false, isViewBuilder: Bool = false, isWriteable: Bool = false) {
         var apiFlags: APIFlags = []
         if isAsync {
             apiFlags.insert(.async)
@@ -828,6 +833,9 @@ struct APIFlags: OptionSet, Hashable, Codable {
         }
         if isMainActor {
             apiFlags.insert(.mainActor)
+        }
+        if isViewBuilder {
+            apiFlags.insert(.viewBuilder)
         }
         if isWriteable {
             apiFlags.insert(.writeable)

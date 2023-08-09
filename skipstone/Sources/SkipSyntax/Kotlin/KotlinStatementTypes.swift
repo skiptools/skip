@@ -1691,6 +1691,9 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         } else {
             attributes.append(to: output, indentation: indentation)
             annotations.appendLines(to: output, indentation: indentation)
+            if apiFlags.contains(.viewBuilder) {
+                output.append(indentation).append("@Composable\n")
+            }
             output.append(indentation)
             if isEqualImplementation {
                 appendEqualsDeclaration(to: output, indentation: indentation)
@@ -2371,8 +2374,8 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             appendDeclaration(to: output, indentation: indentation, storageVariable: storageVariable)
         }
 
-        if apiFlags.contains(.async), let getterBody = getter?.body {
-            appendAsyncGet(getterBody, to: output, indentation: indentation)
+        if apiFlags.contains(.viewBuilder) || apiFlags.contains(.async), let getterBody = getter?.body {
+            appendAsFunctionDefinition(getterBody, to: output, indentation: indentation)
         } else {
             appendPropertyDefinition(to: output, indentation: indentation, storageVariable: storageVariable)
         }
@@ -2388,6 +2391,9 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     private func appendDeclaration(to output: OutputGenerator, indentation: Indentation, storageVariable: KotlinStorageVariable?) {
         attributes.append(to: output, indentation: indentation)
         annotations.appendLines(to: output, indentation: indentation)
+        if apiFlags.contains(.viewBuilder) {
+            output.append(indentation).append("@Composable\n")
+        }
         output.append(indentation)
         if role.isProperty || role == .global {
             output.append(modifiers.kotlinMemberString(isGlobal: role == .global, isOpen: isOpen, suffix: " "))
@@ -2397,7 +2403,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 output.append("lateinit ")
             }
         }
-        if apiFlags.contains(.async) && !isAsyncLet {
+        if apiFlags.contains(.viewBuilder) || (apiFlags.contains(.async) && !isAsyncLet) {
             output.append("fun ")
         } else if !apiFlags.contains(.writeable) && !isAssignFromWriteable {
             output.append("val ")
@@ -2416,7 +2422,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if names.count > 1 {
             output.append(")")
         }
-        if apiFlags.contains(.async) && !isAsyncLet {
+        if apiFlags.contains(.viewBuilder) || (apiFlags.contains(.async) && !isAsyncLet) {
             output.append("()")
         }
 
@@ -2431,11 +2437,13 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         extends?.1.appendWhere(to: output, indentation: indentation)
     }
 
-    private func appendAsyncGet(_ body: KotlinCodeBlock, to output: OutputGenerator, indentation: Indentation) {
+    private func appendAsFunctionDefinition(_ body: KotlinCodeBlock, to output: OutputGenerator, indentation: Indentation) {
         if apiFlags.contains(.mainActor) {
             output.append(" = MainActor.run ")
-        } else {
+        } else if apiFlags.contains(.async) {
             output.append(" = Async.run ")
+        } else {
+            output.append(" ")
         }
         if hasAsyncExplicitReturn {
             output.append("\(KotlinClosure.returnLabel)@")

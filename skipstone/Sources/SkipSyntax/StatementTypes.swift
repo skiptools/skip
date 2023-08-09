@@ -859,7 +859,7 @@ class FunctionDeclaration: Statement {
     private(set) var generics: Generics
     let body: CodeBlock?
     var functionType: TypeSignature {
-        let apiFlags = APIFlags(isAsync: isAsync, isThrows: isThrows, isMainActor: attributes.contains(.mainActor))
+        let apiFlags = APIFlags(isAsync: isAsync, isThrows: isThrows, isMainActor: attributes.contains(.mainActor), isViewBuilder: attributes.contains(.viewBuilder))
         return .function(parameters.map(\.signature), returnType, apiFlags)
     }
 
@@ -1041,7 +1041,7 @@ class SubscriptDeclaration: Statement {
     let getter: Accessor<CodeBlock>?
     let setter: Accessor<CodeBlock>?
     var getterType: TypeSignature {
-        let apiFlags = APIFlags(isAsync: isAsync, isThrows: isThrows, isMainActor: attributes.contains(.mainActor))
+        let apiFlags = APIFlags(isAsync: isAsync, isThrows: isThrows, isMainActor: attributes.contains(.mainActor), isViewBuilder: attributes.contains(.viewBuilder))
         return .function(parameters.map(\.signature), elementType, apiFlags)
     }
     var setterType: TypeSignature {
@@ -1383,7 +1383,7 @@ class VariableDeclaration: Statement {
         return declaredType.or(value?.inferredType ?? .none).tupleTypes(count: names.count)
     }
     var apiFlags: APIFlags {
-        return APIFlags(isAsync: isAsync, isThrows: isThrows, isMainActor: attributes.contains(.mainActor), isWriteable: !isLet && (getter == nil || setter != nil))
+        return APIFlags(isAsync: isAsync, isThrows: isThrows, isMainActor: attributes.contains(.mainActor), isViewBuilder: attributes.contains(.viewBuilder), isWriteable: !isLet && (getter == nil || setter != nil))
     }
 
     init(names: [String?], declaredType: TypeSignature = .none, isLet: Bool = false, isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), value: Expression?, getter: Accessor<CodeBlock>? = nil, setter: Accessor<CodeBlock>? = nil, willSet: Accessor<CodeBlock>? = nil, didSet: Accessor<CodeBlock>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {

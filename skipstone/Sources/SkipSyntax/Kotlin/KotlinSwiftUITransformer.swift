@@ -1,131 +1,139 @@
 /// Translate SwiftUI to syntactically correct Kotlin.
 ///
-/// We rely on our Kotlin UI libraries to provide the implementation of the SwiftUI-like API that this translation will result in.
+/// We rely on our UI libraries to provide the implementation of the SwiftUI-like API that this translation will result in.
 final class KotlinSwiftUITransformer: KotlinTransformer {
-    private var sourceFile: Source.FilePath? = nil
-    private var messages: [Message] = []
-
-    func messages(for sourceFile: Source.FilePath) -> [Message] {
-        return sourceFile == self.sourceFile ? messages : []
-    }
-
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
-        sourceFile = syntaxTree.sourceFile
+        // We need codebase info to issue any warnings, so no point in processing the code without it
+        guard translator.codebaseInfo != nil else {
+            return
+        }
 
         // Does this file need translation?
         var needsTranslation = false
         for importDeclaration in syntaxTree.root.statements.compactMap({ $0 as? KotlinImportDeclaration }) {
             // Update SwiftUI imports to SkipUI
-            if importDeclaration.modulePath.first == "SwiftUI" {
+            if importDeclaration.modulePath.first == "SwiftUI" || importDeclaration.modulePath.first == "SkipUI" {
                 needsTranslation = true
-                importDeclaration.modulePath[0] = "SkipUI"
-            } else if importDeclaration.modulePath.first == "SkipUI" {
-                needsTranslation = true
+                break
             }
         }
         if needsTranslation {
-            syntaxTree.root.visit { visit($0, source: translator.syntaxTree.source) }
+            syntaxTree.root.visit { visit($0, translator: translator) }
         }
     }
 
-    private func visit(_ node: KotlinSyntaxNode, source: Source) -> VisitResult<KotlinSyntaxNode> {
-        if let variableDeclaration = node as? KotlinVariableDeclaration {
-            translateVariableDeclaration(variableDeclaration)
+    private func visit(_ node: KotlinSyntaxNode, translator: KotlinTranslator) -> VisitResult<KotlinSyntaxNode> {
+        if let functionDeclaration = node as? KotlinFunctionDeclaration {
+            translateFunctionDeclaration(functionDeclaration, translator: translator)
+        } else if let variableDeclaration = node as? KotlinVariableDeclaration {
+            translateVariableDeclaration(variableDeclaration, translator: translator)
+        } else if let closure = node as? KotlinClosure {
+            translateClosure(closure, translator: translator)
         } else if let functionCall = node as? KotlinFunctionCall {
-            translateFunctionCall(functionCall, source: source)
-            return .skip
+            translateFunctionCallParameters(functionCall, translator: translator)
         }
         return .recurse(nil)
     }
 
-    private func translateVariableDeclaration(_ statement: KotlinVariableDeclaration) {
-        guard let view = viewForBody(statement), let memberIndex = view.members.firstIndex(where: { $0 === statement }) else {
+    private func translateFunctionDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, translator: KotlinTranslator) {
+        guard functionDeclaration.apiFlags.contains(.viewBuilder) else {
             return
         }
-
-        // Replace 'var body' with an override of our Kotlin SkipUI body function
-        let bodyMethod = KotlinFunctionDeclaration(name: "body", sourceFile: statement.sourceFile, sourceRange: statement.sourceRange)
-        bodyMethod.modifiers = statement.modifiers
-        bodyMethod.modifiers.isOverride = true
-        bodyMethod.isGenerated = true
-        bodyMethod.returnType = statement.declaredType
-        bodyMethod.body = statement.getter?.body
-        view.members[memberIndex] = bodyMethod
-
-        bodyMethod.parent = view
-        bodyMethod.assignParentReferences()
-    }
-
-    private func translateFunctionCall(_ functionCall: KotlinFunctionCall, source: Source) {
-        guard let viewBuilderParams = viewBuilderParameters(in: functionCall, source: source) else {
-            // not a result builder
-            return
-        }
-        for viewBuilder in viewBuilderParams {
-            translateViewBuilder(viewBuilder.body, source: source)
-            viewBuilder.body.assignParentReferences()
+        if let body = functionDeclaration.body {
+            processViewBuilder(codeBlock: body, translator: translator)
         }
     }
 
-    private func translateViewBuilder(_ codeBlock: KotlinCodeBlock, source: Source) {
-        codeBlock.statements = codeBlock.statements.map { translateViewBuilderStatement($0) }
-        guard codeBlock.statements.count > 1, !hasExplicitReturn(codeBlock) else {
+    private func translateClosure(_ closure: KotlinClosure, translator: KotlinTranslator) {
+        guard closure.apiFlags?.contains(.viewBuilder) == true else {
             return
         }
-        // Wrap multi-statement view builders in an array
-        var elements: [KotlinExpression] = []
-        for statement in codeBlock.statements {
-            if statement.type != .expression {
-                // TODO: We should be appending the raw code here
-                statement.messages.append(.kotlinViewBuilderUnsupportedStatement(statement, source: source))
-            } else if let expression = (statement as! KotlinExpressionStatement).expression {
-                elements.append(expression)
+        processViewBuilder(codeBlock: closure.body, translator: translator)
+    }
+
+    private func translateFunctionCallParameters(_ functionCall: KotlinFunctionCall, translator: KotlinTranslator) {
+        // Look for closures passed as ViewBuilder arguments to function calls
+        guard case .function(let parameterTypes, _, _) = functionCall.apiMatch?.signature, parameterTypes.count == functionCall.arguments.count else {
+            return
+        }
+        for i in 0..<parameterTypes.count {
+            guard case .function(_, _, let apiFlags) = parameterTypes[i].type, apiFlags.contains(.viewBuilder), let closure = functionCall.arguments[i].value as? KotlinClosure else {
+                continue
+            }
+            // If the closure is marked as a ViewBuilder, we'll already process it
+            guard closure.apiFlags?.contains(.viewBuilder) != true else {
+                continue
+            }
+            processViewBuilder(codeBlock: closure.body, translator: translator)
+        }
+    }
+
+    private func translateVariableDeclaration(_ statement: KotlinVariableDeclaration, translator: KotlinTranslator) {
+        var viewBuilder: KotlinCodeBlock? = nil
+        if let viewDeclaration = viewForBody(statement, codebaseInfo: translator.codebaseInfo) {
+            transform(view: viewDeclaration, body: statement, translator: translator)
+            viewBuilder = statement.getter?.body
+        } else if statement.apiFlags.contains(.viewBuilder) {
+            viewBuilder = statement.getter?.body
+        }
+        if let viewBuilder {
+            processViewBuilder(codeBlock: viewBuilder, translator: translator)
+        }
+    }
+
+    private func viewForBody(_ variableDeclaration: KotlinVariableDeclaration, codebaseInfo: CodebaseInfo.Context?) -> KotlinClassDeclaration? {
+        guard variableDeclaration.role == .property, variableDeclaration.propertyName == "body", !variableDeclaration.isStatic, let classDeclaration = variableDeclaration.parent as? KotlinClassDeclaration else {
+            return nil
+        }
+        guard classDeclaration.inherits.contains(where: { $0.isNamed("View", moduleName: "SwiftUI") }) || isView(type: classDeclaration.signature, codebaseInfo: codebaseInfo) else {
+            return nil
+        }
+        return classDeclaration
+    }
+
+    private func transform(view: KotlinClassDeclaration, body: KotlinVariableDeclaration, translator: KotlinTranslator) {
+        // TODO: Transformations for state handling, etc
+        body.apiFlags.insert(.viewBuilder)
+    }
+
+    private func processViewBuilder(codeBlock: KotlinCodeBlock, translator: KotlinTranslator) {
+        codeBlock.visit { node in
+            if node is KotlinFunctionDeclaration || node is KotlinClosure {
+                // These do not inherit our view builder context and will get processed by the top-level visitation code
+                return .skip
+            } else if let apiCall = node as? APICallExpression, let expressionStatement = node.parent as? KotlinExpressionStatement {
+                // Add our processing tail call to expressions that evaluate to Views and are used as statements
+                if let apiMatch = apiCall.apiMatch {
+                    if isView(type: apiMatch.signature, codebaseInfo: translator.codebaseInfo) || isView(type: apiMatch.signature.returnType, codebaseInfo: translator.codebaseInfo) {
+                        addComposeTailCall(to: node as! KotlinExpression, statement: expressionStatement)
+                    }
+                } else {
+                    // TODO: Add warnings for unrecognized API use like for async
+                }
+                return .skip
+            } else {
+                return .recurse(nil)
             }
         }
-        let arrayLiteral = KotlinArrayLiteral()
-        arrayLiteral.elements = elements
-        arrayLiteral.useMultilineFormatting = true
-        let arrayStatement = KotlinExpressionStatement()
-        arrayStatement.expression = arrayLiteral
-        codeBlock.statements = [arrayStatement]
     }
 
-    private func translateViewBuilderStatement(_ statement: KotlinStatement) -> KotlinStatement {
-        // TODO: Handle 'if', 'switch'
-        return statement
+    private func addComposeTailCall(to expression: KotlinExpression, statement: KotlinExpressionStatement) {
+        let composeMemberAccess = KotlinMemberAccess(base: expression, member: "eval")
+        let composeCall = KotlinFunctionCall(function: composeMemberAccess, arguments: [])
+        statement.expression = composeCall
+
+        composeCall.parent = statement
+        composeCall.assignParentReferences()
     }
 
-    private func isView(_ classDeclaration: KotlinClassDeclaration) -> Bool {
-        // TODO: Ask codebase info
-        return classDeclaration.inherits.contains(where: { $0.isNamed("View", moduleName: "SwiftUI", generics: []) })
-    }
-
-    private func viewForBody(_ variableDeclaration: KotlinVariableDeclaration) -> KotlinClassDeclaration? {
-        guard variableDeclaration.names.count == 1 && variableDeclaration.names[0] == "body" && !variableDeclaration.modifiers.isStatic && variableDeclaration.getter?.body != nil else {
-            return nil
+    private func isView(type: TypeSignature, codebaseInfo: CodebaseInfo.Context?) -> Bool {
+        guard let codebaseInfo else {
+            return false
         }
-        guard let owningClass = variableDeclaration.parent as? KotlinClassDeclaration, isView(owningClass) else {
-            return nil
+        guard case .named = type else {
+            return false
         }
-        return owningClass
-    }
-
-    private func viewBuilderParameters(in functionCall: KotlinFunctionCall, source: Source) -> [KotlinClosure]? {
-        // TODO: Match up this function call to available API calls and see which params are view builders
-        // for now, we just translate anything that looks like a View initializer; i.e., a capitalized function name
-
-        guard let functionName = (functionCall.function as? KotlinIdentifier)?.name else {
-            // function name was not an identifier
-            return nil
-        }
-        if functionName.first?.isUppercase != true {
-            // we only consider uppercase names, like view initialiers, for special result builder treatment
-            return nil
-        }
-        return functionCall.arguments.compactMap { $0.value as? KotlinClosure }
-    }
-
-    private func hasExplicitReturn(_ codeBlock: KotlinCodeBlock) -> Bool {
-        return codeBlock.updateWithExpectedReturn(.no)
+        return codebaseInfo.global.protocolSignatures(forNamed: type)
+            .contains { $0.isNamed("View", moduleName: "SwiftUI") }
     }
 }
