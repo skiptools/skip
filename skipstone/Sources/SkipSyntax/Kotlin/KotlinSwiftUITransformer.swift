@@ -10,11 +10,15 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
 
         // Does this file need translation?
         var needsTranslation = false
-        for importDeclaration in syntaxTree.root.statements.compactMap({ $0 as? KotlinImportDeclaration }) {
-            // Update SwiftUI imports to SkipUI
-            if importDeclaration.modulePath.first == "SwiftUI" || importDeclaration.modulePath.first == "SkipUI" {
-                needsTranslation = true
-                break
+        if translator.packageName == "skip.ui" {
+            // We need to be able to transpile the views within our own SkipUI package
+            needsTranslation = true
+        } else {
+            for importDeclaration in syntaxTree.root.statements.compactMap({ $0 as? KotlinImportDeclaration }) {
+                if importDeclaration.modulePath.first == "SwiftUI" || importDeclaration.modulePath.first == "SkipUI" {
+                    needsTranslation = true
+                    break
+                }
             }
         }
         if needsTranslation {
@@ -40,7 +44,8 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             return
         }
         if let body = functionDeclaration.body {
-            processViewBuilder(codeBlock: body, translator: translator)
+            functionDeclaration.body = translateViewBuilder(codeBlock: body, translator: translator)
+            functionDeclaration.body?.parent = functionDeclaration
         }
     }
 
@@ -48,7 +53,8 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         guard closure.apiFlags?.contains(.viewBuilder) == true else {
             return
         }
-        processViewBuilder(codeBlock: closure.body, translator: translator)
+        closure.body = translateViewBuilder(codeBlock: closure.body, fromClosure: closure, translator: translator)
+        closure.body.parent = closure
     }
 
     private func translateFunctionCallParameters(_ functionCall: KotlinFunctionCall, translator: KotlinTranslator) {
@@ -64,7 +70,8 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             guard closure.apiFlags?.contains(.viewBuilder) != true else {
                 continue
             }
-            processViewBuilder(codeBlock: closure.body, translator: translator)
+            closure.body = translateViewBuilder(codeBlock: closure.body, fromClosure: closure, translator: translator)
+            closure.body.parent = closure
         }
     }
 
@@ -77,7 +84,8 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             viewBuilder = statement.getter?.body
         }
         if let viewBuilder {
-            processViewBuilder(codeBlock: viewBuilder, translator: translator)
+            statement.getter?.body = translateViewBuilder(codeBlock: viewBuilder, translator: translator)
+            statement.getter?.body?.parent = statement
         }
     }
 
@@ -96,13 +104,19 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         body.apiFlags.insert(.viewBuilder)
     }
 
-    private func processViewBuilder(codeBlock: KotlinCodeBlock, translator: KotlinTranslator) {
+    private func translateViewBuilder(codeBlock: KotlinCodeBlock, fromClosure closure: KotlinClosure? = nil, translator: KotlinTranslator) -> KotlinCodeBlock {
+        // If the view builder returns a view explicitly, leave it as-is to support typed return values
+        guard !codeBlock.updateWithExpectedReturn(.no) else {
+            return codeBlock
+        }
+
+        // Add tail calls to compose the views that SwiftUI would build into a TupleView
         codeBlock.visit { node in
             if node is KotlinFunctionDeclaration || node is KotlinClosure {
                 // These do not inherit our view builder context and will get processed by the top-level visitation code
                 return .skip
             } else if let apiCall = node as? APICallExpression, let expressionStatement = node.parent as? KotlinExpressionStatement {
-                // Add our processing tail call to expressions that evaluate to Views and are used as statements
+                // Add our compose tail call to expressions that evaluate to Views and are used as statements
                 if let apiMatch = apiCall.apiMatch {
                     if isView(type: apiMatch.signature, codebaseInfo: translator.codebaseInfo) || isView(type: apiMatch.signature.returnType, codebaseInfo: translator.codebaseInfo) {
                         addComposeTailCall(to: node as! KotlinExpression, statement: expressionStatement)
@@ -115,10 +129,23 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
                 return .recurse(nil)
             }
         }
+
+        // Wrap the code block in 'return ComposingView { ... }' to return a single view that will compose
+        // when the parent adds its tail call
+        let composingClosure = KotlinClosure(body: codeBlock)
+        let composingArgument = LabeledValue<KotlinExpression>(value: composingClosure)
+        let composingFunction = KotlinIdentifier(name: "ComposingView")
+        let composingFunctionCall = KotlinFunctionCall(function: composingFunction, arguments: [composingArgument])
+
+        let returnStatement: KotlinStatement = closure == nil ? KotlinReturn(expression: composingFunctionCall) : KotlinExpressionStatement(expression: composingFunctionCall)
+        let composingCodeBlock = KotlinCodeBlock(statements: [returnStatement])
+
+        composingCodeBlock.assignParentReferences()
+        return composingCodeBlock
     }
 
     private func addComposeTailCall(to expression: KotlinExpression, statement: KotlinExpressionStatement) {
-        let composeMemberAccess = KotlinMemberAccess(base: expression, member: "eval")
+        let composeMemberAccess = KotlinMemberAccess(base: expression, member: "Compose")
         let composeCall = KotlinFunctionCall(function: composeMemberAccess, arguments: [])
         statement.expression = composeCall
 

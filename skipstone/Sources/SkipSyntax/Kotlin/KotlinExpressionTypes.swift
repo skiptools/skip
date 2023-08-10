@@ -639,6 +639,11 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
         return kexpression
     }
 
+    init(body: KotlinCodeBlock) {
+        self.body = body
+        super.init(type: .closure)
+    }
+
     private init(expression: Expression, body: KotlinCodeBlock) {
         self.body = body
         super.init(type: .closure, expression: expression)
@@ -1164,10 +1169,7 @@ class KotlinIf: KotlinExpression {
         let kbody = KotlinCodeBlock.translate(statement: statement.body, translator: translator)
         let kexpression = KotlinIf(conditionSets: kconditionSets, body: kbody, sourceFile: statement.sourceFile, sourceRange: statement.sourceRange)
         kexpression.isGuard = true
-
-        let kstatement = KotlinExpressionStatement(type: .expression)
-        kstatement.expression = kexpression
-        return kstatement
+        return KotlinExpressionStatement(expression: kexpression)
     }
 
     static func translateAsLoopGuard(statement: WhileLoop, translator: KotlinTranslator) -> KotlinStatement {
@@ -1175,10 +1177,7 @@ class KotlinIf: KotlinExpression {
         let kbody = KotlinCodeBlock(statements: [KotlinBreak()])
         let kexpression = KotlinIf(conditionSets: kconditionSets, body: kbody)
         kexpression.isGuard = true
-
-        let kstatement = KotlinExpressionStatement(type: .expression)
-        kstatement.expression = kexpression
-        return kstatement
+        return KotlinExpressionStatement(expression: kexpression)
     }
 
     private static func translate(conditions: [Expression], isGuard: Bool = false, translator: KotlinTranslator) -> [ConditionSet] {

@@ -81,8 +81,7 @@ final class KotlinOptionSetTransformer: KotlinTransformer {
 
         // Use structured statements so that subsequent transformers can detect and translate the self assignment
         let selfAssignment = KotlinBinaryOperator(op: .with(symbol: "="), lhs: KotlinIdentifier(name: "self"), rhs: KotlinIdentifier(name: "target"))
-        let assignStatement = KotlinExpressionStatement(type: .expression)
-        assignStatement.expression = selfAssignment
+        let assignStatement = KotlinExpressionStatement(expression: selfAssignment)
         assign.body = KotlinCodeBlock(statements: [assignStatement])
 
         classDeclaration.members.append(assign)

@@ -108,6 +108,11 @@ class KotlinExpressionStatement: KotlinStatement, KotlinSingleStatementAppendabl
         super.init(type: type, statement: statement)
     }
 
+    init(expression: KotlinExpression?) {
+        self.expression = expression
+        super.init(type: .expression)
+    }
+
     override var children: [KotlinSyntaxNode] {
         return expression == nil ? [] : [expression!]
     }
