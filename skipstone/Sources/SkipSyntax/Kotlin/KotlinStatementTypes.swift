@@ -2203,6 +2203,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var suppressSideEffectsPropertyName: String?
     var mutationFunctionNames: (willMutate: String, didMutate: String)?
     var storageVariable: KotlinStorageVariable?
+    var setterSideEffects: [KotlinStatement] = []
     var isGenerated = false
     var isDescriptionImplementation: Bool {
         return role.isProperty && propertyName == "description" && propertyType == .string
@@ -2376,6 +2377,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if let body = didSet?.body {
             children.append(body)
         }
+        children += setterSideEffects
         return children
     }
 
@@ -2512,7 +2514,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
 
         let setVisibilityString = modifiers.kotlinSetVisibilityString(isGlobal: role == .global, suffix: " ")
         let hasCustomSet = setter?.body != nil || willSet?.body != nil || didSet?.body != nil
-        if hasCustomSet || mutationFunctionNames != nil {
+        if hasCustomSet || !setterSideEffects.isEmpty || mutationFunctionNames != nil {
             let isStoredOverride = getter?.body == nil && role == .superclassOverrideProperty
             let setterIndentation = indentation.inc()
             let setterBodyIndentation = setterIndentation.inc()
@@ -2565,7 +2567,9 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                     appendSetField(to: output, indentation: setIndentation, storageVariable: storageVariable, isCopy: true)
                 }
             }
-            
+
+            output.append(setterSideEffects, indentation: setIndentation)
+
             if let didSetBody = didSet?.body {
                 var didSetIndentation = setIndentation
                 if let suppressSideEffectsPropertyName, !isStoredOverride {
@@ -2577,6 +2581,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                     output.append(setIndentation).append("}\n")
                 }
             }
+
             if let mutationFunctionNames, !isStoredOverride {
                 if hasCustomSet {
                     output.append(setterBodyIndentation).append("} finally {\n")

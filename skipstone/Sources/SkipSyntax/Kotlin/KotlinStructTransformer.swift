@@ -14,7 +14,7 @@ final class KotlinStructTransformer: KotlinTransformer {
                 updateStructDeclaration(classDeclaration, translator: translator)
             }
         } else if let variableDeclaration = node as? KotlinVariableDeclaration {
-            if !variableDeclaration.isStatic, variableDeclaration.apiFlags.contains(.writeable), let extends = variableDeclaration.extends, translator.codebaseInfo?.mayBeMutableStruct(type: extends.0) == true {
+            if !variableDeclaration.isStatic, variableDeclaration.apiFlags.contains(.writeable) && !variableDeclaration.attributes.isNonMutating, let extends = variableDeclaration.extends, translator.codebaseInfo?.mayBeMutableStruct(type: extends.0) == true {
                 variableDeclaration.mutationFunctionNames = mutationFunctionNames
             }
             return .skip
@@ -39,13 +39,13 @@ final class KotlinStructTransformer: KotlinTransformer {
         var initializableVariableDeclarations: [KotlinVariableDeclaration] = []
         for member in classDeclaration.members {
             if let variableDeclaration = member as? KotlinVariableDeclaration {
-                if !isNoCopy && !variableDeclaration.isStatic && (variableDeclaration.apiFlags.contains(.writeable) || variableDeclaration.modifiers.isLazy) && !variableDeclaration.isGenerated {
+                if !isNoCopy && !variableDeclaration.isStatic && ((variableDeclaration.apiFlags.contains(.writeable) && !variableDeclaration.attributes.isNonMutating) || variableDeclaration.modifiers.isLazy) && !variableDeclaration.isGenerated {
                     variableDeclaration.mutationFunctionNames = mutationFunctionNames
                     isMutable = true
                 }
                 if variableDeclaration.declaredType.isUnwrappedOptional {
                     // Not initialized
-                } else if !variableDeclaration.modifiers.isStatic && variableDeclaration.getter == nil && (!variableDeclaration.isLet || variableDeclaration.value == nil) && !variableDeclaration.modifiers.isLazy && !variableDeclaration.isGenerated {
+                } else if !variableDeclaration.modifiers.isStatic && variableDeclaration.getter == nil && (!variableDeclaration.isLet || variableDeclaration.value == nil) && !variableDeclaration.attributes.isNonMutating && !variableDeclaration.modifiers.isLazy && !variableDeclaration.isGenerated {
                     initializableVariableDeclarations.append(variableDeclaration)
                 }
             } else if let functionDeclaration = member as? KotlinFunctionDeclaration, !functionDeclaration.isGenerated {

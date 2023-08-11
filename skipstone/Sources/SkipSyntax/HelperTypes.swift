@@ -398,6 +398,11 @@ struct Attributes: Hashable, PrettyPrintable, Codable {
         return attributes.isEmpty
     }
 
+    /// Some property wrappers are non-mutating.
+    var isNonMutating: Bool {
+        return contains(.state) || contains(.stateObject) || contains(.environment) || contains(.environmentObject) || contains(.bindable) || contains(.binding)
+    }
+
     var prettyPrintTree: PrettyPrintTree {
         let children = attributes.map {
             return PrettyPrintTree(root: "@\($0.signature)\($0.tokens)")
@@ -437,10 +442,14 @@ struct Attribute: Hashable, Codable {
     enum Kind: Equatable {
         case autoclosure
         case available
+        case bindable
+        case binding
         case deprecated
         case discardableResult
         /// Recorded from `StatementExtras.attributes`
         case directive
+        case environment
+        case environmentObject
         case escaping
         case frozen
         case indirect
@@ -475,10 +484,18 @@ struct Attribute: Hashable, Codable {
             } else {
                 return .available
             }
+        case "Bindable":
+            return .bindable
+        case "Binding":
+            return .binding
         case "discardableResult":
             return .discardableResult
         case "directive":
             return .directive
+        case "Environment":
+            return .environment
+        case "EnvironmentObject":
+            return .environmentObject
         case "escaping":
             return .escaping
         case "frozen":

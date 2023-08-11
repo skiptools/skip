@@ -1385,6 +1385,9 @@ class VariableDeclaration: Statement {
     var apiFlags: APIFlags {
         return APIFlags(isAsync: isAsync, isThrows: isThrows, isMainActor: attributes.contains(.mainActor), isViewBuilder: attributes.contains(.viewBuilder), isWriteable: !isLet && (getter == nil || setter != nil))
     }
+    var isMutating: Bool {
+        return !isLet && (getter == nil || setter != nil) && !attributes.contains(.state) && !attributes.contains(.stateObject) && !attributes.contains(.environment) && !attributes.contains(.environmentObject) && !attributes.contains(.bindable) && !attributes.contains(.binding)
+    }
 
     init(names: [String?], declaredType: TypeSignature = .none, isLet: Bool = false, isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), value: Expression?, getter: Accessor<CodeBlock>? = nil, setter: Accessor<CodeBlock>? = nil, willSet: Accessor<CodeBlock>? = nil, didSet: Accessor<CodeBlock>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.names = names

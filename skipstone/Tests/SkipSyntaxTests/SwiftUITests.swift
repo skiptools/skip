@@ -4,7 +4,9 @@ final class SwiftUITests: XCTestCase {
     let baseSupportingSwift = """
     import SwiftUI
     
-    protocol View {}
+    protocol View {
+        @ViewBuilder var body: some View { get }
+    }
 
     extension View {
         func mod() -> some View {
@@ -13,6 +15,16 @@ final class SwiftUITests: XCTestCase {
 
     struct VStack: View {
         init(@ViewBuilder content: () -> any View) {
+        }
+    }
+
+    struct Text: View {
+        init(_ text: String) {
+        }
+    }
+
+    struct Button: View {
+        init(_ text: String, action: () -> Void) {
         }
     }
     """
@@ -30,8 +42,8 @@ final class SwiftUITests: XCTestCase {
         import skip.ui.*
         internal class V: View {
             @Composable
-            internal fun body(): View {
-                return SkipComposingView { skipcontext: SkipContext ->  }
+            override fun body(): View {
+                return ComposingView { composectx: ComposeContext ->  }
             }
         }
         """)
@@ -51,8 +63,8 @@ final class SwiftUITests: XCTestCase {
         import skip.ui.*
         internal class V: MyView {
             @Composable
-            internal fun body(): View {
-                return SkipComposingView { skipcontext: SkipContext ->  }
+            override fun body(): View {
+                return ComposingView { composectx: ComposeContext ->  }
             }
         }
         """)
@@ -98,29 +110,29 @@ final class SwiftUITests: XCTestCase {
         internal open class C: P {
             @Composable
             override fun v(): View {
-                return SkipComposingView { skipcontext: SkipContext ->
+                return ComposingView { composectx: ComposeContext ->
                     VStack {
-                        SkipComposingView { skipcontext: SkipContext ->  }
-                    }.Compose(skipcontext)
+                        ComposingView { composectx: ComposeContext ->  }
+                    }.Compose(composectx)
                 }
             }
             internal open val v2: View
                 get() {
                     return VStack {
-                        SkipComposingView { skipcontext: SkipContext ->  }
+                        ComposingView { composectx: ComposeContext ->  }
                     }
                 }
             @Composable
             override fun f(): View {
-                return SkipComposingView { skipcontext: SkipContext ->
+                return ComposingView { composectx: ComposeContext ->
                     VStack {
-                        SkipComposingView { skipcontext: SkipContext ->  }
-                    }.Compose(skipcontext)
+                        ComposingView { composectx: ComposeContext ->  }
+                    }.Compose(composectx)
                 }
             }
             internal open fun f2(): View {
                 return VStack {
-                    SkipComposingView { skipcontext: SkipContext ->  }
+                    ComposingView { composectx: ComposeContext ->  }
                 }
             }
             internal open fun f3(b: Boolean): View = (if (b) v() else v2).sref()
@@ -151,7 +163,7 @@ final class SwiftUITests: XCTestCase {
         import skip.ui.*
         internal fun f() {
             VStack {
-                SkipComposingView { skipcontext: SkipContext -> V().Compose(skipcontext) }
+                ComposingView { composectx: ComposeContext -> V().Compose(composectx) }
             }
         }
         """)
@@ -171,11 +183,11 @@ final class SwiftUITests: XCTestCase {
         import skip.ui.*
         internal class MyV: View {
             @Composable
-            internal fun body(): View {
-                return SkipComposingView { skipcontext: SkipContext ->
+            override fun body(): View {
+                return ComposingView { composectx: ComposeContext ->
                     VStack {
-                        SkipComposingView { skipcontext: SkipContext -> V().mod().Compose(skipcontext) }
-                    }.mod().Compose(skipcontext)
+                        ComposingView { composectx: ComposeContext -> V().mod().Compose(composectx) }
+                    }.mod().Compose(composectx)
                 }
             }
         }
@@ -198,15 +210,15 @@ final class SwiftUITests: XCTestCase {
         import skip.ui.*
         internal class MyV: View {
             @Composable
-            internal fun body(): View {
-                return SkipComposingView { skipcontext: SkipContext ->
+            override fun body(): View {
+                return ComposingView { composectx: ComposeContext ->
                     VStack {
-                        SkipComposingView { skipcontext: SkipContext ->
+                        ComposingView { composectx: ComposeContext ->
                             val v = V().mod()
-                            v.Compose(skipcontext)
-                            v.Compose(skipcontext)
+                            v.Compose(composectx)
+                            v.Compose(composectx)
                         }
-                    }.Compose(skipcontext)
+                    }.Compose(composectx)
                 }
             }
         }
@@ -252,26 +264,170 @@ final class SwiftUITests: XCTestCase {
         import skip.ui.*
         internal class MyV: View {
             @Composable
-            internal fun body(): View {
-                return SkipComposingView l@{ skipcontext: SkipContext ->
+            override fun body(): View {
+                return ComposingView l@{ composectx: ComposeContext ->
                     if (b(v = V())) {
                         return@l VStack {
-                            SkipComposingView { skipcontext: SkipContext -> V().mod().Compose(skipcontext) }
-                        }.Compose(skipcontext)
+                            ComposingView { composectx: ComposeContext -> V().mod().Compose(composectx) }
+                        }.Compose(composectx)
                     } else {
                         val test = b(v = V())
                         return@l v(b = test) {
-                            SkipComposingView { skipcontext: SkipContext ->
+                            ComposingView { composectx: ComposeContext ->
                                 VStack {
-                                    SkipComposingView { skipcontext: SkipContext -> V().mod().Compose(skipcontext) }
-                                }.Compose(skipcontext)
+                                    ComposingView { composectx: ComposeContext -> V().mod().Compose(composectx) }
+                                }.Compose(composectx)
                             }
-                        }.Compose(skipcontext)
+                        }.Compose(composectx)
                     }
                 }
             }
             internal fun b(v: View): Boolean = true
             internal fun v(b: Boolean, c: @Composable () -> View): View = V()
+        }
+        """)
+    }
+
+    func testStateVariable() async throws {
+        try await check(supportingSwift: baseSupportingSwift, swift: """
+        import SwiftUI
+        @Observable
+        class O {
+        }
+        struct V: View {
+            @State var s = 0
+            @State var o = O() {
+                didSet {
+                    print("set o")
+                }
+            }
+            var body: some View {
+                VStack {
+                    Text("O: \\(o)")
+                    Button("Tap") {
+                        s += 1
+                    }
+                }
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.*
+
+        import skip.ui.*
+        internal open class O: Observable {
+        }
+        internal class V: View {
+            internal var s = 0
+                set(newValue) {
+                    field = newValue
+                    sdidchange?.invoke()
+                }
+            private var sdidchange: (() -> Unit)? = null
+            internal var o = O()
+                set(newValue) {
+                    field = newValue
+                    odidchange?.invoke()
+                    print("set o")
+                }
+            private var odidchange: (() -> Unit)? = null
+            @Composable
+            override fun body(): View {
+                return ComposingView { composectx: ComposeContext ->
+                    VStack {
+                        ComposingView { composectx: ComposeContext ->
+                            Text("O: ${o}").Compose(composectx)
+                            Button("Tap") { s += 1 }.Compose(composectx)
+                        }
+                    }.Compose(composectx)
+                }
+            }
+
+            @Composable
+            override fun Compose(composectx: ComposeContext) {
+                sdidchange = null
+                val initials = s
+                var composes by remember { mutableStateOf(initials) }
+                s = initials
+                sdidchange = { composes = s }
+
+                odidchange = null
+                val initialo = o
+                var composeo by remember { mutableStateOf(initialo) }
+                o = initialo
+                odidchange = { composeo = o }
+
+                body().Compose(composectx)
+            }
+        }
+        """)
+    }
+
+    func testMutableStructStateVariable() async throws {
+        try await check(supportingSwift: baseSupportingSwift, swift: """
+        import SwiftUI
+        struct S {
+            var x = 0
+        }
+        struct V: View {
+            @State var s = S()
+            var body: some View {
+                VStack {
+                    Button("Tap") {
+                        s = S(x: 100)
+                    }
+                }
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.*
+
+        import skip.ui.*
+        internal class S: MutableStruct {
+            internal var x = 0
+                set(newValue) {
+                    willmutate()
+                    field = newValue
+                    didmutate()
+                }
+
+            constructor(x: Int = 0) {
+                this.x = x
+            }
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct = S(x)
+        }
+        internal class V: View {
+            internal var s = S()
+                get() = field.sref({ this.s = it })
+                set(newValue) {
+                    @Suppress("NAME_SHADOWING") val newValue = newValue.sref()
+                    field = newValue
+                    sdidchange?.invoke()
+                }
+            private var sdidchange: (() -> Unit)? = null
+            @Composable
+            override fun body(): View {
+                return ComposingView { composectx: ComposeContext ->
+                    VStack {
+                        ComposingView { composectx: ComposeContext ->
+                            Button("Tap") { s = S(x = 100) }.Compose(composectx)
+                        }
+                    }.Compose(composectx)
+                }
+            }
+
+            @Composable
+            override fun Compose(composectx: ComposeContext) {
+                sdidchange = null
+                val initials = s
+                var composes by remember { mutableStateOf(initials) }
+                s = initials
+                sdidchange = { composes = s }
+
+                body().Compose(composectx)
+            }
         }
         """)
     }
