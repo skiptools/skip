@@ -105,11 +105,6 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
     }
 
     private func translateViewBuilder(codeBlock: KotlinCodeBlock, fromClosure closure: KotlinClosure? = nil, translator: KotlinTranslator) -> KotlinCodeBlock {
-        // If the view builder returns a view explicitly, leave it as-is to support typed return values
-        guard !codeBlock.updateWithExpectedReturn(.no) else {
-            return codeBlock
-        }
-
         // Add tail calls to compose the views that SwiftUI would build into a TupleView
         codeBlock.visit { node in
             if node is KotlinFunctionDeclaration || node is KotlinClosure {
@@ -117,12 +112,13 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
                 return .skip
             } else if let apiCall = node as? APICallExpression, let expressionStatement = node.parent as? KotlinExpressionStatement {
                 // Add our compose tail call to expressions that evaluate to Views and are used as statements
+                //~~~ Handle let view = if condition { View1() } else { View2() } (and same with switch)
                 if let apiMatch = apiCall.apiMatch {
                     if isView(type: apiMatch.signature, codebaseInfo: translator.codebaseInfo) || isView(type: apiMatch.signature.returnType, codebaseInfo: translator.codebaseInfo) {
                         addComposeTailCall(to: node as! KotlinExpression, statement: expressionStatement)
                     }
                 } else {
-                    // TODO: Add warnings for unrecognized API use like for async
+                    //~~~ Add warnings for unrecognized API use like for async
                 }
                 return .skip
             } else {
@@ -130,11 +126,23 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             }
         }
 
+        // We may need to use a return label when moving the code block to a closure
+        var needsReturnLabel = false
+        if !codeBlock.updateRemovingSingleStatementReturn() {
+            if let closure {
+                needsReturnLabel = closure.hasReturnLabel
+            } else {
+                needsReturnLabel = codeBlock.updateWithExpectedReturn(.labelIfPresent(KotlinClosure.returnLabel))
+            }
+        }
+
         // Wrap the code block in 'return ComposingView { ... }' to return a single view that will compose
         // when the parent adds its tail call
         let composingClosure = KotlinClosure(body: codeBlock)
+        composingClosure.parameters = [Parameter(externalLabel: "skipcontext", declaredType: .named("SkipContext", []))]
+        composingClosure.hasReturnLabel = needsReturnLabel
         let composingArgument = LabeledValue<KotlinExpression>(value: composingClosure)
-        let composingFunction = KotlinIdentifier(name: "ComposingView")
+        let composingFunction = KotlinIdentifier(name: "SkipComposingView")
         let composingFunctionCall = KotlinFunctionCall(function: composingFunction, arguments: [composingArgument])
 
         let returnStatement: KotlinStatement = closure == nil ? KotlinReturn(expression: composingFunctionCall) : KotlinExpressionStatement(expression: composingFunctionCall)
@@ -146,7 +154,8 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
 
     private func addComposeTailCall(to expression: KotlinExpression, statement: KotlinExpressionStatement) {
         let composeMemberAccess = KotlinMemberAccess(base: expression, member: "Compose")
-        let composeCall = KotlinFunctionCall(function: composeMemberAccess, arguments: [])
+        let contextArgument = LabeledValue<KotlinExpression>(value: KotlinIdentifier(name: "skipcontext"))
+        let composeCall = KotlinFunctionCall(function: composeMemberAccess, arguments: [contextArgument])
         statement.expression = composeCall
 
         composeCall.parent = statement

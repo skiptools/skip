@@ -238,6 +238,24 @@ class KotlinCodeBlock: KotlinStatement, KotlinSingleStatementAppendable {
         return true
     }
 
+    /// If this code block is a single return statement, remove the return.
+    func updateRemovingSingleStatementReturn() -> Bool {
+        guard !isTryCatch && statements.count == 1 else {
+            return false
+        }
+        guard let returnStatement = statements[0] as? KotlinReturn else {
+            return false
+        }
+        if let expression = returnStatement.expression {
+            statements = [KotlinExpressionStatement(expression: expression)]
+            statements[0].parent = self
+            expression.parent = statements[0]
+        } else {
+            statements = []
+        }
+        return true
+    }
+
     /// Perform any updates to handle references to the given `inout` parameter.
     func updateWithInOutParameter(name: String, source: Source) {
         visit { node in
