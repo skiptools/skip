@@ -1115,8 +1115,8 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
                     if let generics, !generics.isEmpty {
                         output.append("<\(generics.map(\.kotlin).joined(separator: ", "))>")
                     }
-                    if let apiMatch, apiMatch.declarationType == .variableDeclaration, apiMatch.apiFlags.contains(.async) {
-                        // Async properties are converted to Kotlin functions
+                    if let apiMatch, apiMatch.declarationType == .variableDeclaration, apiMatch.apiFlags.contains(.viewBuilder) || apiMatch.apiFlags.contains(.async) {
+                        // View builder and async properties are converted to Kotlin functions
                         output.append("()")
                     }
                     if let valueSuffix {
@@ -1735,8 +1735,8 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinCast
             }
             output.append("<\(generics.map(\.kotlin).joined(separator: ", "))>")
         }
-        if let apiMatch, apiMatch.declarationType == .variableDeclaration, apiMatch.apiFlags.contains(.async) {
-            // Async properties are converted to Kotlin functions
+        if let apiMatch, apiMatch.declarationType == .variableDeclaration, apiMatch.apiFlags.contains(.viewBuilder) || apiMatch.apiFlags.contains(.async) {
+            // View builder and async properties are converted to Kotlin functions
             output.append("()")
         }
         if mainActorOutputMode == .isolated {
