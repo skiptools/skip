@@ -518,7 +518,7 @@ class Closure: Expression {
         guard syntax.kind == .closureExpr, let closureExpr = syntax.as(ClosureExprSyntax.self) else {
             return nil
         }
-        let captureList = closureExpr.signature?.capture?.items?.compactMap { (item: ClosureCaptureSyntax) -> (CaptureType, LabeledValue<Expression>)? in
+        let captureList = closureExpr.signature?.capture?.items.compactMap { (item: ClosureCaptureSyntax) -> (CaptureType, LabeledValue<Expression>)? in
             var type: CaptureType = .none
             if let specifier = item.specifier?.specifier.text {
                 if specifier == "unowned" {
@@ -667,8 +667,8 @@ class FunctionCall: Expression, APICallExpression {
             let expression = ExpressionDecoder.decode(syntax: trailingClosure, in: syntaxTree)
             labeledExpressions.append(LabeledValue(value: expression))
         }
-        if let multipleTrailingClosures = functionCallExpr.additionalTrailingClosures {
-            labeledExpressions += multipleTrailingClosures.map {
+        if !functionCallExpr.additionalTrailingClosures.isEmpty {
+            labeledExpressions += functionCallExpr.additionalTrailingClosures.map {
                 let label = $0.label.text
                 let expression = ExpressionDecoder.decode(syntax: $0.closure, in: syntaxTree)
                 return LabeledValue(label: label, value: expression)
@@ -1648,8 +1648,8 @@ class Subscript: Expression, APICallExpression {
             let expression = ExpressionDecoder.decode(syntax: trailingClosure, in: syntaxTree)
             labeledExpressions.append(LabeledValue(value: expression))
         }
-        if let multipleTrailingClosures = subscriptExpr.additionalTrailingClosures {
-            labeledExpressions += multipleTrailingClosures.map {
+        if !subscriptExpr.additionalTrailingClosures.isEmpty {
+            labeledExpressions += subscriptExpr.additionalTrailingClosures.map {
                 let label = $0.label.text
                 let expression = ExpressionDecoder.decode(syntax: $0.closure, in: syntaxTree)
                 return LabeledValue(label: label, value: expression)
@@ -1794,8 +1794,8 @@ class SwitchCase: Expression, BindingExpression {
 
     private static func decodeCatchClause(statement: CatchClauseSyntax, in syntaxTree: SyntaxTree) -> SwitchCase {
         let patterns: [(CasePattern, Expression?)]
-        if let catchItems = statement.catchItems {
-            patterns = catchItems.compactMap { item in
+        if !statement.catchItems.isEmpty {
+            patterns = statement.catchItems.compactMap { item in
                 guard let itemPattern = item.pattern else {
                     return nil
                 }

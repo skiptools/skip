@@ -248,12 +248,12 @@ class DoCatch: Statement {
         let body = CodeBlock(statements: statements)
         var catches: [SwitchCase] = []
         var messages: [Message] = []
-        if let catchClauses = doStmnt.catchClauses {
-            for catchClause in catchClauses {
+        if !doStmnt.catchClauses.isEmpty {
+            for catchClause in doStmnt.catchClauses {
                 if let switchCase = ExpressionDecoder.decode(syntax: catchClause, in: syntaxTree) as? SwitchCase {
                     catches.append(switchCase)
                 } else {
-                    messages.append(.unsupportedSyntax(catchClauses, source: syntaxTree.source))
+                    messages.append(.unsupportedSyntax(doStmnt.catchClauses, source: syntaxTree.source))
                 }
             }
         }
@@ -1415,7 +1415,7 @@ class VariableDeclaration: Statement {
         var attributes = Attributes.for(syntax: variableDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: variableDecl.modifiers)
-        let isAsync = variableDecl.modifiers?.contains(where: { $0.name.text == "async" }) == true
+        let isAsync = variableDecl.modifiers.contains(where: { $0.name.text == "async" })
 
         var statements: [Statement] = []
         for (index, syntax) in variableDecl.bindings.enumerated() {
