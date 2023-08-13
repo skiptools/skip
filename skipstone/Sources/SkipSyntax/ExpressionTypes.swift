@@ -667,12 +667,10 @@ class FunctionCall: Expression, APICallExpression {
             let expression = ExpressionDecoder.decode(syntax: trailingClosure, in: syntaxTree)
             labeledExpressions.append(LabeledValue(value: expression))
         }
-        if !functionCallExpr.additionalTrailingClosures.isEmpty {
-            labeledExpressions += functionCallExpr.additionalTrailingClosures.map {
-                let label = $0.label.text
-                let expression = ExpressionDecoder.decode(syntax: $0.closure, in: syntaxTree)
-                return LabeledValue(label: label, value: expression)
-            }
+        labeledExpressions += functionCallExpr.additionalTrailingClosures.map {
+            let label = $0.label.text
+            let expression = ExpressionDecoder.decode(syntax: $0.closure, in: syntaxTree)
+            return LabeledValue(label: label, value: expression)
         }
         return FunctionCall(function: function, arguments: labeledExpressions, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
@@ -1648,12 +1646,10 @@ class Subscript: Expression, APICallExpression {
             let expression = ExpressionDecoder.decode(syntax: trailingClosure, in: syntaxTree)
             labeledExpressions.append(LabeledValue(value: expression))
         }
-        if !subscriptExpr.additionalTrailingClosures.isEmpty {
-            labeledExpressions += subscriptExpr.additionalTrailingClosures.map {
-                let label = $0.label.text
-                let expression = ExpressionDecoder.decode(syntax: $0.closure, in: syntaxTree)
-                return LabeledValue(label: label, value: expression)
-            }
+        labeledExpressions += subscriptExpr.additionalTrailingClosures.map {
+            let label = $0.label.text
+            let expression = ExpressionDecoder.decode(syntax: $0.closure, in: syntaxTree)
+            return LabeledValue(label: label, value: expression)
         }
         return Subscript(base: base, arguments: labeledExpressions)
     }
@@ -1793,18 +1789,13 @@ class SwitchCase: Expression, BindingExpression {
     }
 
     private static func decodeCatchClause(statement: CatchClauseSyntax, in syntaxTree: SyntaxTree) -> SwitchCase {
-        let patterns: [(CasePattern, Expression?)]
-        if !statement.catchItems.isEmpty {
-            patterns = statement.catchItems.compactMap { item in
-                guard let itemPattern = item.pattern else {
-                    return nil
-                }
-                let pattern = CasePattern(syntax: itemPattern, in: syntaxTree)
-                let whereGuard = item.whereClause.map { ExpressionDecoder.decode(syntax: $0.condition, in: syntaxTree) }
-                return (pattern, whereGuard)
+        let patterns: [(CasePattern, Expression?)] = statement.catchItems.compactMap { item in
+            guard let itemPattern = item.pattern else {
+                return nil
             }
-        } else {
-            patterns = []
+            let pattern = CasePattern(syntax: itemPattern, in: syntaxTree)
+            let whereGuard = item.whereClause.map { ExpressionDecoder.decode(syntax: $0.condition, in: syntaxTree) }
+            return (pattern, whereGuard)
         }
         let body = CodeBlock(statements: StatementDecoder.decode(syntaxListContainer: statement.body, in: syntaxTree))
         return SwitchCase(patterns: patterns, body: body, syntax: statement, sourceFile: syntaxTree.source.file, sourceRange: statement.range(in: syntaxTree.source))

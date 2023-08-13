@@ -248,13 +248,11 @@ class DoCatch: Statement {
         let body = CodeBlock(statements: statements)
         var catches: [SwitchCase] = []
         var messages: [Message] = []
-        if !doStmnt.catchClauses.isEmpty {
-            for catchClause in doStmnt.catchClauses {
-                if let switchCase = ExpressionDecoder.decode(syntax: catchClause, in: syntaxTree) as? SwitchCase {
-                    catches.append(switchCase)
-                } else {
-                    messages.append(.unsupportedSyntax(doStmnt.catchClauses, source: syntaxTree.source))
-                }
+        for catchClause in doStmnt.catchClauses {
+            if let switchCase = ExpressionDecoder.decode(syntax: catchClause, in: syntaxTree) as? SwitchCase {
+                catches.append(switchCase)
+            } else {
+                messages.append(.unsupportedSyntax(doStmnt.catchClauses, source: syntaxTree.source))
             }
         }
         let statement = DoCatch(body: body, catches: catches, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
