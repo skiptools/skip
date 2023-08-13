@@ -2682,15 +2682,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             let name = "\(propertyName)storage"
             return KotlinStorageVariable(name: name) { variable, output, indentation in
                 if variable.propertyType.kotlinIsNative(primitive: true) {
-                    let defaultValue: String
-                    if variable.propertyType == .bool {
-                        defaultValue = "false"
-                    } else if variable.propertyType == .character {
-                        defaultValue = "' '"
-                    } else {
-                        defaultValue = "\(variable.propertyType.kotlin)(0)"
-                    }
-                    output.append(indentation).append("private var \(name) = \(defaultValue)\n")
+                    output.append(indentation).append("private var \(name) = \(variable.propertyType.kotlinDefaultValue)\n")
                 } else {
                     output.append(indentation).append("private lateinit var \(name): \(variable.propertyType.kotlin)\n")
                 }

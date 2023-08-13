@@ -428,6 +428,9 @@ struct Attribute: Hashable, Codable {
             return Attribute(signature: signature)
         }
         switch argument {
+        case .argumentList(let argumentListSyntax):
+            let tokens = argumentListSyntax.map { $0.expression.description }
+            return Attribute(signature: signature, tokens: tokens)
         case .availability(let availabilitySyntax):
             let tokens = availabilitySyntax.map { $0.argument.description }
             return Attribute(signature: signature, tokens: tokens)

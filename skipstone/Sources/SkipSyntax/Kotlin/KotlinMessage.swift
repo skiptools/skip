@@ -92,6 +92,14 @@ extension Message {
         return Message(kind: .error, message: "Skip does not support automatic Comparable conformance for enums that translate into Kotlin sealed classes. Consider writing your own < operator function", sourceDerived: sourceDerived, source: source)
     }
 
+    static func kotlinEnvironmentDeclaredType(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Kotlin cannot infer the type of this @Environment variable. Consider adding a type declaration", sourceDerived: sourceDerived, source: source)
+    }
+
+    static func kotlinEnvironmentKeyType(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .warning, message: "Skip does not recognize this environment key type. Supply '\\.keyPath', '\\EnvironmentValues.keyPath' or 'ObservableType.self'", sourceDerived: sourceDerived, source: source)
+    }
+
     static func kotlinErrorCannotExtendClass(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "An Error type cannot extend another class because it will be translated to extend Exception in Kotlin", sourceDerived: sourceDerived, source: source)
     }

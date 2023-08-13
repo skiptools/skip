@@ -27,6 +27,15 @@ final class SwiftUITests: XCTestCase {
         init(_ text: String, action: () -> Void) {
         }
     }
+
+    class EnvironmentValues {
+    }
+
+    extension EnvironmentValues {
+        var envvalue: Int {
+            return 0
+        }
+    }
     """
 
     func testBody() async throws {
@@ -425,6 +434,110 @@ final class SwiftUITests: XCTestCase {
                 var composes by remember { mutableStateOf(initials) }
                 s = initials
                 sdidchange = { composes = s }
+
+                body().Compose(composectx)
+            }
+        }
+        """)
+    }
+
+    func testEnvironmentVariable() async throws {
+        try await check(supportingSwift: baseSupportingSwift, swift: """
+        import SwiftUI
+        struct V: View {
+            @Environment(\\.envvalue) var envvalue
+            var body: some View {
+                Text("Value: \\(envvalue)")
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.*
+
+        import skip.ui.*
+        internal class V: View {
+            internal var envvalue: Int = Int(0)
+                get() = field.sref({ this.envvalue = it })
+                set(newValue) {
+                    field = newValue.sref()
+                }
+            @Composable
+            override fun body(): View {
+                return ComposingView { composectx: ComposeContext -> Text("Value: ${envvalue}").Compose(composectx) }
+            }
+
+            @Composable
+            override fun Compose(composectx: ComposeContext) {
+                envvalue = composectx.environment[EnvironmentValues::envvalue]
+
+                body().Compose(composectx)
+            }
+        }
+        """)
+
+        try await check(supportingSwift: baseSupportingSwift, swift: """
+        import SwiftUI
+        struct V: View {
+            @Environment(EnvValue.self) var envvalue
+            var body: some View {
+                Text("Value: \\(envvalue.x)")
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.*
+
+        import skip.ui.*
+        internal class V: View {
+            internal var envvalue: EnvValue
+                get() = envvaluestorage.sref({ this.envvalue = it })
+                set(newValue) {
+                    envvaluestorage = newValue.sref()
+                    envvalueinitialized = true
+                }
+            private lateinit var envvaluestorage: EnvValue
+            private var envvalueinitialized = false
+            @Composable
+            override fun body(): View {
+                return ComposingView { composectx: ComposeContext -> Text("Value: ${envvalue.x}").Compose(composectx) }
+            }
+
+            @Composable
+            override fun Compose(composectx: ComposeContext) {
+                envvalue = composectx.environment[EnvValue::class]
+
+                body().Compose(composectx)
+            }
+        }
+        """)
+
+        try await check(supportingSwift: baseSupportingSwift, swift: """
+        import SwiftUI
+        struct V: View {
+            @EnvironmentObject(EnvValue.self) var envvalue
+            var body: some View {
+                Text("Value: \\(envvalue.x)")
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.*
+
+        import skip.ui.*
+        internal class V: View {
+            internal var envvalue: EnvValue
+                get() = envvaluestorage.sref({ this.envvalue = it })
+                set(newValue) {
+                    envvaluestorage = newValue.sref()
+                    envvalueinitialized = true
+                }
+            private lateinit var envvaluestorage: EnvValue
+            private var envvalueinitialized = false
+            @Composable
+            override fun body(): View {
+                return ComposingView { composectx: ComposeContext -> Text("Value: ${envvalue.x}").Compose(composectx) }
+            }
+
+            @Composable
+            override fun Compose(composectx: ComposeContext) {
+                envvalue = composectx.environment[EnvValue::class]
 
                 body().Compose(composectx)
             }

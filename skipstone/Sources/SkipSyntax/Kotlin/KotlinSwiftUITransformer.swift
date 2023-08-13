@@ -78,7 +78,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
     private func translateVariableDeclaration(_ statement: KotlinVariableDeclaration, translator: KotlinTranslator) {
         var viewBuilder: KotlinCodeBlock? = nil
         if let viewDeclaration = viewForBody(statement, codebaseInfo: translator.codebaseInfo) {
-            transform(view: viewDeclaration, body: statement)
+            transform(view: viewDeclaration, body: statement, translator: translator)
             viewBuilder = statement.getter?.body
         } else if statement.apiFlags.contains(.viewBuilder) {
             viewBuilder = statement.getter?.body
@@ -99,14 +99,14 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         return classDeclaration
     }
     
-    private func transform(view: KotlinClassDeclaration, body: KotlinVariableDeclaration) {
+    private func transform(view: KotlinClassDeclaration, body: KotlinVariableDeclaration, translator: KotlinTranslator) {
         body.apiFlags.insert(.viewBuilder)
         
         let variableDeclarations = view.members.compactMap { $0 as? KotlinVariableDeclaration }
         let stateVariables = variableDeclarations.filter { $0.attributes.contains(.state) || $0.attributes.contains(.stateObject) }
         let environmentVariables = variableDeclarations.filter { $0.attributes.contains(.environment) || $0.attributes.contains(.environmentObject) }
         if !stateVariables.isEmpty || !environmentVariables.isEmpty {
-            let composeFunction = synthesizeComposeFunction(view: view, stateVariables: stateVariables, environmentVariables: environmentVariables)
+            let composeFunction = synthesizeComposeFunction(view: view, stateVariables: stateVariables, environmentVariables: environmentVariables, translator: translator)
             view.insert(statements: [composeFunction], after: body)
             
             for stateVariable in stateVariables {
@@ -115,7 +115,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         }
     }
     
-    private func synthesizeComposeFunction(view: KotlinClassDeclaration, stateVariables: [KotlinVariableDeclaration], environmentVariables: [KotlinVariableDeclaration]) -> KotlinStatement {
+    private func synthesizeComposeFunction(view: KotlinClassDeclaration, stateVariables: [KotlinVariableDeclaration], environmentVariables: [KotlinVariableDeclaration], translator: KotlinTranslator) -> KotlinStatement {
         let composeFunction = KotlinFunctionDeclaration(name: "Compose")
         composeFunction.modifiers.visibility = .public
         composeFunction.modifiers.isOverride = true
@@ -131,12 +131,14 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             }
             composeBodyStatements += statements
         }
-        for environmentVariable in environmentVariables {
-            let statements = synthesizeEnvironmentSync(variable: environmentVariable)
-            if !composeBodyStatements.isEmpty {
-                statements[0].extras = .singleNewline
+        for i in 0..<environmentVariables.count {
+            guard let statement = synthesizeEnvironmentSync(variable: environmentVariables[i], translator: translator) else {
+                continue
             }
-            composeBodyStatements += statements
+            if i == 0 && !composeBodyStatements.isEmpty {
+                statement.extras = .singleNewline
+            }
+            composeBodyStatements.append(statement)
         }
 
         let statement = KotlinRawStatement(sourceCode: "body().Compose(composectx)")
@@ -158,9 +160,53 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         let setDidChange = KotlinRawStatement(sourceCode: "\(variable.stateDidChangePropertyName) = { compose\(variable.propertyName) = \(variable.propertyName) }")
         return [nullDidChange, initialValue, composeValue, syncValue, setDidChange]
     }
-    
-    private func synthesizeEnvironmentSync(variable: KotlinVariableDeclaration) -> [KotlinStatement] {
-        return [] //~~~
+
+    private func synthesizeEnvironmentSync(variable: KotlinVariableDeclaration, translator: KotlinTranslator) -> KotlinStatement? {
+        let entry: (key: String, type: TypeSignature?)
+        if let environment = (variable.attributes.of(kind: .environment) + variable.attributes.of(kind: .environmentObject)).first {
+            let rawKey = environment.tokens.joined(separator: "")
+            if let environmentEntry = environmentEntry(for: rawKey, codebaseInfo: translator.codebaseInfo) {
+                entry = environmentEntry
+            } else {
+                entry = (rawKey, nil)
+                variable.messages.append(.kotlinEnvironmentKeyType(variable, source: translator.syntaxTree.source))
+            }
+        } else {
+            return nil
+        }
+
+        if variable.declaredType == .none && variable.value == nil {
+            if let environmentType = entry.type {
+                variable.declaredType = environmentType
+                variable.variableTypes = [environmentType]
+                if environmentType.isOptional || environmentType.kotlinIsNative(primitive: true) {
+                    variable.value = KotlinRawExpression(sourceCode: environmentType.kotlinDefaultValue)
+                } else {
+                    variable.modifiers.isLazy = true
+                }
+            } else {
+                variable.messages.append(.kotlinEnvironmentDeclaredType(variable, source: translator.syntaxTree.source))
+            }
+        }
+        return KotlinRawStatement(sourceCode: "\(variable.propertyName) = composectx.environment[\(entry.key)]")
+    }
+
+    private func environmentEntry(for key: String, codebaseInfo: CodebaseInfo.Context?) -> (String, TypeSignature?)? {
+        if key.hasSuffix(".self") {
+            let typeName = String(key.dropLast(".self".count))
+            return (typeName + "::class", .named(typeName, []))
+        } else {
+            let propertyName: String
+            if key.hasPrefix("\\EnvironmentValues.") {
+                propertyName = String(key.dropFirst("\\EnvironmentValues.".count))
+            } else if key.hasPrefix("\\.") {
+                propertyName = String(key.dropFirst(2))
+            } else {
+                return nil
+            }
+            let type = codebaseInfo?.matchIdentifier(name: propertyName, inConstrained: .named("EnvironmentValues", []))?.signature
+            return ("EnvironmentValues::" + propertyName, type)
+        }
     }
 
     private func synthesizeStateObservation(variable: KotlinVariableDeclaration, in view: KotlinClassDeclaration) {
