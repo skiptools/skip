@@ -53,11 +53,66 @@ struct KotlinTargetVariable {
     }
 }
 
-/// An extra variable we declare to act as storage for the value of another variable.
-struct KotlinStorageVariable {
-    var name: String
-    var isUnwrappedOptional = false
-    var append: (KotlinVariableDeclaration, OutputGenerator, Indentation) -> Void = { _, _, _ in }
+/// Customize the way a variable gets and sets its value, including delegating to a storage variable.
+struct KotlinVariableStorage {
+    /// Append the code to retrieve this value.
+    ///
+    /// Use the given block to  append any needed `sref` on the value, and use the given `Bool` to determine single-statement formatting.
+    var appendGet: (KotlinVariableDeclaration, () -> Void, Bool, OutputGenerator, Indentation) -> Void = { _, _, _, _, _ in }
+
+    /// Append the code to set this value equal to the code appended by the given block.
+    var appendSet: (KotlinVariableDeclaration, () -> Void, OutputGenerator, Indentation) -> Void = { _, _, _, _ in }
+
+    /// Append the code to declare any required storage members.
+    var appendStorage: (KotlinVariableDeclaration, OutputGenerator, Indentation) -> Void = { _, _, _ in }
+
+    /// Whether this storage getter can be appended as a single statement.
+    var isSingleStatementAppendable: (KotlinVariableDeclaration) -> Bool = { _ in false }
+
+    init() {
+    }
+
+    /// Create storage with default behavior.
+    ///
+    /// - Parameter access: Code to access the value from storage.
+    init(access: String, isUnwrappedOptional: Bool = false, appendStorage: @escaping (KotlinVariableDeclaration, OutputGenerator, Indentation) -> Void) {
+        self.isSingleStatementAppendable = { !$0.modifiers.isLazy || $0.value == nil }
+        self.appendGet = { variable, sref, isSingleStatement, output, indentation in
+            if variable.modifiers.isLazy && variable.value != nil {
+                output.append(indentation).append("if (!\(Self.lazyInitializedName(variable))) {\n")
+                let initializeIndentation = indentation.inc()
+                output.append(initializeIndentation).append(access)
+                variable.appendInitialValue(to: output, indentation: initializeIndentation)
+                output.append("\n")
+                output.append(initializeIndentation).append("\(Self.lazyInitializedName(variable)) = true\n")
+                output.append(indentation).append("}\n")
+            }
+            if isSingleStatement {
+                output.append(access)
+            } else {
+                output.append(indentation).append("return ").append(access)
+            }
+            if isUnwrappedOptional {
+                output.append("!!")
+            }
+            sref()
+            output.append("\n")
+        }
+        self.appendSet = { variable, value, output, indentation in
+            output.append(indentation).append(access).append(" = ")
+            value()
+            output.append("\n")
+            if variable.modifiers.isLazy {
+                output.append(indentation).append("\(Self.lazyInitializedName(variable)) = true\n")
+            }
+        }
+        self.appendStorage = appendStorage
+    }
+
+    /// Lazy variables must set this property to `true` when initalized.
+    static func lazyInitializedName(_ variable: KotlinVariableDeclaration) -> String {
+        return variable.propertyName + "initialized"
+    }
 }
 
 extension ExtensionDeclaration {

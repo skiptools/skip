@@ -113,6 +113,9 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
                 synthesizeStateObservation(variable: stateVariable, in: view)
             }
         }
+        for bindingVariable in variableDeclarations.filter({ $0.attributes.contains(.binding) }) {
+            synthesizeBindingBacking(variable: bindingVariable, in: view, source: translator.syntaxTree.source)
+        }
     }
     
     private func synthesizeComposeFunction(view: KotlinClassDeclaration, stateVariables: [KotlinVariableDeclaration], environmentVariables: [KotlinVariableDeclaration], translator: KotlinTranslator) -> KotlinStatement {
@@ -177,12 +180,17 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
 
         if variable.declaredType == .none && variable.value == nil {
             if let environmentType = entry.type {
-                variable.declaredType = environmentType
-                variable.variableTypes = [environmentType]
                 if environmentType.isOptional || environmentType.kotlinIsNative(primitive: true) {
+                    variable.declaredType = environmentType
+                    variable.propertyType = environmentType
                     variable.value = KotlinRawExpression(sourceCode: environmentType.kotlinDefaultValue)
                 } else {
-                    variable.modifiers.isLazy = true
+                    variable.declaredType = environmentType.asUnwrappedOptional(true)
+                    variable.propertyType = environmentType.asUnwrappedOptional(true)
+                }
+                if let codebaseInfo = translator.codebaseInfo, variable.mayBeSharedMutableStruct && !environmentType.kotlinMayBeSharedMutableStruct(codebaseInfo: codebaseInfo) {
+                    variable.mayBeSharedMutableStruct = false
+                    variable.onUpdate = nil
                 }
             } else {
                 variable.messages.append(.kotlinEnvironmentDeclaredType(variable, source: translator.syntaxTree.source))
@@ -220,6 +228,32 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         view.insert(statements: [didChangeProperty], after: variable)
 
         variable.setterSideEffects.append(KotlinRawStatement(sourceCode: "\(variable.stateDidChangePropertyName)?.invoke()"))
+    }
+
+    private func synthesizeBindingBacking(variable: KotlinVariableDeclaration, in view: KotlinClassDeclaration, source: Source) {
+        let propertyType = variable.declaredType == .none ? variable.propertyType : variable.declaredType
+        if propertyType == .none {
+            variable.messages.append(.kotlinVariableNeedsTypeDeclaration(variable, source: source))
+        }
+
+        //~~~ change setter side effects to setField, add getField statements, use to get and set binding value
+
+        // Tell the @Binding variable to get and set its value using _variable of type Binding
+//        let storageName = "_\(variable.propertyName)"
+//        variable.storageVariable = KotlinStorageVariable(name: storageName) { variable, output, indentation in
+//            output.append(indentation).append(variable.modifiers.kotlinMemberString(isGlobal: false, isOpen: false, suffix: " "))
+//            output.append("var \(storageName)")
+//            if propertyType != .none {
+//                output.append(": \(propertyType.kotlin)")
+//            }
+//            output.append(" by mutableStateOf(")
+//            if let value = variable.value, !variable.modifiers.isLazy {
+//                output.append(value, indentation: indentation)
+//            } else {
+//                output.append("null")
+//            }
+//            output.append(")\n")
+//        }
     }
 
     private func translateViewBuilder(codeBlock: KotlinCodeBlock, fromClosure closure: KotlinClosure? = nil, translator: KotlinTranslator) -> KotlinCodeBlock {

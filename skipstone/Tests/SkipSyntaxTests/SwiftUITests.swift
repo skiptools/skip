@@ -456,10 +456,6 @@ final class SwiftUITests: XCTestCase {
         import skip.ui.*
         internal class V: View {
             internal var envvalue: Int = Int(0)
-                get() = field.sref({ this.envvalue = it })
-                set(newValue) {
-                    field = newValue.sref()
-                }
             @Composable
             override fun body(): View {
                 return ComposingView { composectx: ComposeContext -> Text("Value: ${envvalue}").Compose(composectx) }
@@ -491,10 +487,8 @@ final class SwiftUITests: XCTestCase {
                 get() = envvaluestorage.sref({ this.envvalue = it })
                 set(newValue) {
                     envvaluestorage = newValue.sref()
-                    envvalueinitialized = true
                 }
             private lateinit var envvaluestorage: EnvValue
-            private var envvalueinitialized = false
             @Composable
             override fun body(): View {
                 return ComposingView { composectx: ComposeContext -> Text("Value: ${envvalue.x}").Compose(composectx) }
@@ -526,10 +520,8 @@ final class SwiftUITests: XCTestCase {
                 get() = envvaluestorage.sref({ this.envvalue = it })
                 set(newValue) {
                     envvaluestorage = newValue.sref()
-                    envvalueinitialized = true
                 }
             private lateinit var envvaluestorage: EnvValue
-            private var envvalueinitialized = false
             @Composable
             override fun body(): View {
                 return ComposingView { composectx: ComposeContext -> Text("Value: ${envvalue.x}").Compose(composectx) }

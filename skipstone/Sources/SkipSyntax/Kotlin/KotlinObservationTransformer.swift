@@ -105,7 +105,7 @@ final class KotlinObservationTransformer: KotlinTransformer {
         let storageName = "\(statement.propertyName)state"
         let isUnwrappedOptional = (statement.value == nil || statement.modifiers.isLazy) && !statement.propertyType.isOptional
         let storageType = isUnwrappedOptional ? propertyType.asOptional(true) : propertyType
-        statement.storageVariable = KotlinStorageVariable(name: storageName, isUnwrappedOptional: isUnwrappedOptional) { variable, output, indentation in
+        statement.storage = KotlinVariableStorage(access: storageName, isUnwrappedOptional: isUnwrappedOptional) { variable, output, indentation in
             output.append(indentation).append(variable.modifiers.kotlinMemberString(isGlobal: false, isOpen: false, suffix: " "))
             output.append("var \(storageName)")
             if storageType != .none {
