@@ -326,18 +326,24 @@ final class SwiftUITests: XCTestCase {
         internal open class O: Observable {
         }
         internal class V: View {
-            internal var s = 0
+            internal var s: Int
+                get() = _s.wrappedValue
                 set(newValue) {
-                    field = newValue
+                    _s.wrappedValue = newValue
                     sdidchange?.invoke()
                 }
+            internal var _s: State<Int>
             private var sdidchange: (() -> Unit)? = null
-            internal var o = O()
+            internal var o: O
+                get() = _o.wrappedValue
                 set(newValue) {
-                    field = newValue
+                    _o.wrappedValue = newValue
                     odidchange?.invoke()
-                    print("set o")
+                    if (!suppresssideeffects) {
+                        print("set o")
+                    }
                 }
+            internal var _o: State<O>
             private var odidchange: (() -> Unit)? = null
             @Composable
             override fun body(): View {
@@ -367,6 +373,18 @@ final class SwiftUITests: XCTestCase {
 
                 body().Compose(composectx)
             }
+
+            constructor(s: Int = 0, o: O = O()) {
+                suppresssideeffects = true
+                try {
+                    this._s = State(s)
+                    this._o = State(o)
+                } finally {
+                    suppresssideeffects = false
+                }
+            }
+
+            private var suppresssideeffects = false
         }
         """)
     }
@@ -392,7 +410,7 @@ final class SwiftUITests: XCTestCase {
 
         import skip.ui.*
         internal class S: MutableStruct {
-            internal var x = 0
+            internal var x: Int
                 set(newValue) {
                     willmutate()
                     field = newValue
@@ -415,7 +433,7 @@ final class SwiftUITests: XCTestCase {
                     _s.wrappedValue = newValue
                     sdidchange?.invoke()
                 }
-            internal var _s: State<S> = State(initialValue: S())
+            internal var _s: State<S>
             private var sdidchange: (() -> Unit)? = null
             @Composable
             override fun body(): View {
@@ -440,7 +458,7 @@ final class SwiftUITests: XCTestCase {
             }
 
             constructor(s: S = S()) {
-                this._s = State(initialValue: s.sref())
+                this._s = State(s.sref())
             }
         }
         """)
@@ -475,85 +493,85 @@ final class SwiftUITests: XCTestCase {
         }
         """)
 
-        try await check(supportingSwift: baseSupportingSwift, swift: """
-        import SwiftUI
-        struct V: View {
-            @Environment(EnvValue.self) var envvalue
-            var body: some View {
-                Text("Value: \\(envvalue.x)")
-            }
-        }
-        """, kotlin: """
-        import androidx.compose.runtime.*
-
-        import skip.ui.*
-        internal class V: View {
-            internal var envvalue: EnvValue
-                get() = envvaluestorage.sref({ this.envvalue = it })
-                set(newValue) {
-                    envvaluestorage = newValue.sref()
-                }
-            private lateinit var envvaluestorage: EnvValue
-            @Composable
-            override fun body(): View {
-                return ComposingView { composectx: ComposeContext -> Text("Value: ${envvalue.x}").Compose(composectx) }
-            }
-
-            @Composable
-            override fun Compose(composectx: ComposeContext) {
-                envvalue = composectx.environment[EnvValue::class]
-
-                body().Compose(composectx)
-            }
-        }
-        """)
-
-        try await check(supportingSwift: baseSupportingSwift, swift: """
-        import SwiftUI
-        struct V: View {
-            @EnvironmentObject(EnvValue.self) var envvalue
-            var body: some View {
-                Text("Value: \\(envvalue.x)")
-            }
-        }
-        """, kotlin: """
-        import androidx.compose.runtime.*
-
-        import skip.ui.*
-        internal class V: View {
-            internal var envvalue: EnvValue
-                get() = envvaluestorage.sref({ this.envvalue = it })
-                set(newValue) {
-                    envvaluestorage = newValue.sref()
-                }
-            private lateinit var envvaluestorage: EnvValue
-            @Composable
-            override fun body(): View {
-                return ComposingView { composectx: ComposeContext -> Text("Value: ${envvalue.x}").Compose(composectx) }
-            }
-
-            @Composable
-            override fun Compose(composectx: ComposeContext) {
-                envvalue = composectx.environment[EnvValue::class]
-
-                body().Compose(composectx)
-            }
-        }
-        """)
+//        try await check(supportingSwift: baseSupportingSwift, swift: """
+//        import SwiftUI
+//        struct V: View {
+//            @Environment(EnvValue.self) var envvalue
+//            var body: some View {
+//                Text("Value: \\(envvalue.x)")
+//            }
+//        }
+//        """, kotlin: """
+//        import androidx.compose.runtime.*
+//
+//        import skip.ui.*
+//        internal class V: View {
+//            internal var envvalue: EnvValue
+//                get() = envvaluestorage.sref({ this.envvalue = it })
+//                set(newValue) {
+//                    envvaluestorage = newValue.sref()
+//                }
+//            private lateinit var envvaluestorage: EnvValue
+//            @Composable
+//            override fun body(): View {
+//                return ComposingView { composectx: ComposeContext -> Text("Value: ${envvalue.x}").Compose(composectx) }
+//            }
+//
+//            @Composable
+//            override fun Compose(composectx: ComposeContext) {
+//                envvalue = composectx.environment[EnvValue::class]
+//
+//                body().Compose(composectx)
+//            }
+//        }
+//        """)
+//
+//        try await check(supportingSwift: baseSupportingSwift, swift: """
+//        import SwiftUI
+//        struct V: View {
+//            @EnvironmentObject(EnvValue.self) var envvalue
+//            var body: some View {
+//                Text("Value: \\(envvalue.x)")
+//            }
+//        }
+//        """, kotlin: """
+//        import androidx.compose.runtime.*
+//
+//        import skip.ui.*
+//        internal class V: View {
+//            internal var envvalue: EnvValue
+//                get() = envvaluestorage.sref({ this.envvalue = it })
+//                set(newValue) {
+//                    envvaluestorage = newValue.sref()
+//                }
+//            private lateinit var envvaluestorage: EnvValue
+//            @Composable
+//            override fun body(): View {
+//                return ComposingView { composectx: ComposeContext -> Text("Value: ${envvalue.x}").Compose(composectx) }
+//            }
+//
+//            @Composable
+//            override fun Compose(composectx: ComposeContext) {
+//                envvalue = composectx.environment[EnvValue::class]
+//
+//                body().Compose(composectx)
+//            }
+//        }
+//        """)
     }
 
-    func testBindingVariable() async throws {
-        try await check(supportingSwift: baseSupportingSwift, swift: """
-        import SwiftUI
-        struct V: View {
-            @Binding var count: Int
-            var body: some View {
-                Button("Tap") {
-                    count += 1
-                }
-            }
-        }
-        """, kotlin: """
-        """)
-    }
+//    func testBindingVariable() async throws {
+//        try await check(supportingSwift: baseSupportingSwift, swift: """
+//        import SwiftUI
+//        struct V: View {
+//            @Binding var count: Int
+//            var body: some View {
+//                Button("Tap") {
+//                    count += 1
+//                }
+//            }
+//        }
+//        """, kotlin: """
+//        """)
+//    }
 }

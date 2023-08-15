@@ -223,10 +223,10 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
 
         if variable.declaredType == .none && variable.value == nil {
             if let environmentType = entry.type {
-                if environmentType.isOptional || environmentType.kotlinIsNative(primitive: true) {
+                if let defaultValue = environmentType.kotlinDefaultValue {
                     variable.declaredType = environmentType
                     variable.propertyType = environmentType
-                    variable.value = KotlinRawExpression(sourceCode: environmentType.kotlinDefaultValue)
+                    variable.value = KotlinRawExpression(sourceCode: defaultValue)
                 } else {
                     variable.declaredType = environmentType.asUnwrappedOptional(true)
                     variable.propertyType = environmentType.asUnwrappedOptional(true)

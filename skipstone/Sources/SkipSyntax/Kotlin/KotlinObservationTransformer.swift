@@ -101,9 +101,10 @@ final class KotlinObservationTransformer: KotlinTransformer {
         }
 
         // Tell the observable variable to get and set its value using a state var. If we don't have an initial value,
-        // we'll make the state var optional and force unwrap on get
+        // we'll use a default or make the state var optional and force unwrap on get
         let storageName = "\(statement.propertyName)state"
-        let isUnwrappedOptional = (statement.value == nil || statement.modifiers.isLazy) && !statement.propertyType.isOptional
+        let storageDefaultValue = statement.propertyType.kotlinDefaultValue
+        let isUnwrappedOptional = (statement.value == nil || statement.modifiers.isLazy) && storageDefaultValue == nil
         let storageType = isUnwrappedOptional ? propertyType.asOptional(true) : propertyType
         statement.storage = KotlinVariableStorage(access: storageName, isUnwrappedOptional: isUnwrappedOptional) { variable, output, indentation in
             output.append(indentation).append(variable.modifiers.kotlinMemberString(isGlobal: false, isOpen: false, suffix: " "))
@@ -114,6 +115,8 @@ final class KotlinObservationTransformer: KotlinTransformer {
             output.append(" by mutableStateOf(")
             if let value = variable.value, !variable.modifiers.isLazy {
                 output.append(value, indentation: indentation)
+            } else if let storageDefaultValue {
+                output.append(storageDefaultValue)
             } else {
                 output.append("null")
             }

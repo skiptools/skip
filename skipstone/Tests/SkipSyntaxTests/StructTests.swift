@@ -481,14 +481,14 @@ final class StructTests: XCTestCase {
         }
         """, kotlin: """
         internal class S {
-            internal var x = 1
+            internal var x: Int
 
             constructor(x: Int = 1) {
                 this.x = x
             }
         }
         internal class A: MutableStruct {
-            internal var s = S()
+            internal var s: S
                 set(newValue) {
                     willmutate()
                     field = newValue
@@ -505,6 +505,7 @@ final class StructTests: XCTestCase {
         }
         """)
 
+        //~~~
         try await check(swift: """
         // SKIP ATTRIBUTES: nocopy
         struct S {

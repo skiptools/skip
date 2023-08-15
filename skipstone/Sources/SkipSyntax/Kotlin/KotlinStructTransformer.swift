@@ -45,6 +45,9 @@ final class KotlinStructTransformer: KotlinTransformer {
                 }
                 if variableDeclaration.declaredType.isUnwrappedOptional {
                     // Not initialized
+                } else if variableDeclaration.declaredType == .none && variableDeclaration.propertyType == .none && (variableDeclaration.attributes.contains(.environment) || variableDeclaration.attributes.contains(.environmentObject)) {
+                    // It's so rare to want to pass environment values to the constructor that we ignore them when they'd cause an error.
+                    // To fix this we'd need help from the SwiftUI transformer (which runs after us) to figure out the variable type
                 } else if !variableDeclaration.modifiers.isStatic && variableDeclaration.getter == nil && (!variableDeclaration.isLet || variableDeclaration.value == nil) && !variableDeclaration.modifiers.isLazy && !variableDeclaration.isGenerated {
                     initializableVariableDeclarations.append(variableDeclaration)
                 }
@@ -136,7 +139,18 @@ final class KotlinStructTransformer: KotlinTransformer {
             }
             var defaultValue: KotlinExpression? = nil
             if let value = variableDeclaration.value {
-                defaultValue = KotlinSharedExpressionPointer(shared: value)
+                defaultValue = value
+                // Clear the default value if it will be assigned from the constructor to prevent creating the value twice
+                if variableDeclaration.declaredType == .none && variableDeclaration.propertyType == .none {
+                    // We can't clear it, however, if we don't know what type to declare the variable
+                    defaultValue = KotlinSharedExpressionPointer(shared: value)
+                } else {
+                    defaultValue = value
+                    variableDeclaration.value = nil
+                    if variableDeclaration.declaredType == .none {
+                        variableDeclaration.declaredType = variableDeclaration.propertyType
+                    }
+                }
             } else if type.isOptional {
                 defaultValue = KotlinNullLiteral()
             }
@@ -151,7 +165,7 @@ final class KotlinStructTransformer: KotlinTransformer {
                 if variableDeclaration.mayBeSharedMutableStruct {
                     value += ".sref()"
                 }
-                assignment = "this._\(variableDeclaration.propertyName) = State(initialValue: \(value))"
+                assignment = "this._\(variableDeclaration.propertyName) = State(\(value))"
             } else if variableDeclaration.attributes.contains(.binding) {
                 assignment = "this._\(variableDeclaration.propertyName) = \(variableDeclaration.propertyName)"
             } else {

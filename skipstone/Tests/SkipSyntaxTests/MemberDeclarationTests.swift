@@ -336,7 +336,7 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal class A: MutableStruct {
-            internal var i = 1
+            internal var i: Int
                 set(newValue) {
                     willmutate()
                     try {
@@ -348,7 +348,7 @@ final class MemberDeclarationTests: XCTestCase {
                         didmutate()
                     }
                 }
-            internal var j = 2
+            internal var j: Int
                 set(newValue) {
                     willmutate()
                     try {

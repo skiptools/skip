@@ -314,9 +314,7 @@ extension TypeSignature {
     }
 
     /// Kotlin code representing a default value for this type.
-    ///
-    /// Assumes a default constructor for non-primitive, non-optional types.
-    var kotlinDefaultValue: String {
+    var kotlinDefaultValue: String? {
         if isOptional {
             return "null"
         } else if kotlinIsNative(primitive: true) {
@@ -327,8 +325,10 @@ extension TypeSignature {
             } else {
                 return "\(self.kotlin)(0)"
             }
+        } else if self == .string {
+            return "\"\""
         } else {
-            return "\(self.kotlin)()"
+            return nil
         }
     }
 

@@ -320,7 +320,7 @@ final class ErrorHandlingTests: XCTestCase {
         }
         """, kotlin: """
         internal class S: MutableStruct {
-            internal var i = 0
+            internal var i: Int
                 set(newValue) {
                     willmutate()
                     field = newValue

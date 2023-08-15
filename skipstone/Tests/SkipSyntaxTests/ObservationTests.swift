@@ -60,13 +60,13 @@ final class ObservationTests: XCTestCase {
                         gstate = 1
                         ginitialized = true
                     }
-                    return gstate!!
+                    return gstate
                 }
                 set(newValue) {
                     gstate = newValue
                     ginitialized = true
                 }
-            internal var gstate: Int? by mutableStateOf(null)
+            internal var gstate: Int by mutableStateOf(Int(0))
             private var ginitialized = false
 
             companion object {
@@ -93,7 +93,7 @@ final class ObservationTests: XCTestCase {
                     astate = newValue
                     didmutate()
                 }
-            internal var astate: Int by mutableStateOf(1)
+            internal var astate: Int by mutableStateOf(Int(0))
 
             constructor(a: Int = 1) {
                 this.a = a
@@ -121,13 +121,13 @@ final class ObservationTests: XCTestCase {
                         astate = { 1 }()
                         ainitialized = true
                     }
-                    return astate!!
+                    return astate
                 }
                 set(newValue) {
                     astate = newValue
                     ainitialized = true
                 }
-            internal var astate: Int? by mutableStateOf(null)
+            internal var astate: Int by mutableStateOf(Int(0))
             private var ainitialized = false
         }
         """)
@@ -149,7 +149,7 @@ final class ObservationTests: XCTestCase {
                             astate = { 1 }()
                             ainitialized = true
                         }
-                        return astate!!
+                        return astate
                     } finally {
                         if (!isinitialized) didmutate()
                     }
@@ -160,7 +160,7 @@ final class ObservationTests: XCTestCase {
                     ainitialized = true
                     didmutate()
                 }
-            internal var astate: Int? by mutableStateOf(null)
+            internal var astate: Int by mutableStateOf(Int(0))
             private var ainitialized = false
 
             override var supdate: ((Any) -> Unit)? = null
@@ -207,14 +207,14 @@ final class ObservationTests: XCTestCase {
 
         internal class S: MutableStruct, Observable {
             internal var a: Array<A>
-                get() = astate.sref({ this.a = it })
+                get() = astate!!.sref({ this.a = it })
                 set(newValue) {
                     @Suppress("NAME_SHADOWING") val newValue = newValue.sref()
                     willmutate()
                     astate = newValue
                     didmutate()
                 }
-            internal var astate: Array<A> by mutableStateOf(arrayOf())
+            internal var astate: Array<A>? by mutableStateOf(null)
 
             constructor(a: Array<A> = arrayOf()) {
                 this.a = a

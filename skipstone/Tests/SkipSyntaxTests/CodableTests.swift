@@ -57,13 +57,13 @@ final class CodableTests: XCTestCase {
         }
         """, kotlin: """
         internal class S: Codable, MutableStruct {
-            internal var i = 0
+            internal var i: Int
                 set(newValue) {
                     willmutate()
                     field = newValue
                     didmutate()
                 }
-            internal var s = ""
+            internal var s: String
                 set(newValue) {
                     willmutate()
                     field = newValue

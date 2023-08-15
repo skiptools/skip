@@ -185,7 +185,7 @@ final class ConstructorDestructorTests: XCTestCase {
         """, kotlin: """
         internal class A {
         }
-        
+
         internal class B: MutableStruct {
             internal var i: Int
                 set(newValue) {
@@ -193,32 +193,32 @@ final class ConstructorDestructorTests: XCTestCase {
                     field = newValue
                     didmutate()
                 }
-        
+
             internal constructor(i: Int) {
                 this.i = i
             }
-        
+
             private constructor(copy: MutableStruct) {
                 @Suppress("NAME_SHADOWING") val copy = copy as B
                 this.i = copy.i
             }
-        
+
             override var supdate: ((Any) -> Unit)? = null
             override var smutatingcount = 0
             override fun scopy(): MutableStruct = B(this as MutableStruct)
         }
-        
+
         internal class C {
             internal val i = 100
             internal val s: String
                 get() = "100"
         }
-        
+
         internal class D: MutableStruct {
             internal val letVar = 100
             internal val computedVar: Int
                 get() = 100
-            internal var i = 100
+            internal var i: Int
                 set(newValue) {
                     willmutate()
                     field = newValue
@@ -230,19 +230,19 @@ final class ConstructorDestructorTests: XCTestCase {
                     field = newValue
                     didmutate()
                 }
-        
+
             constructor(i: Int = 100, s: String) {
                 this.i = i
                 this.s = s
             }
-        
+
             override var supdate: ((Any) -> Unit)? = null
             override var smutatingcount = 0
             override fun scopy(): MutableStruct = D(i, s)
         }
-        
+
         internal class E: MutableStruct {
-            internal var i = 100
+            internal var i: Int
                 set(newValue) {
                     willmutate()
                     field = newValue
@@ -254,15 +254,60 @@ final class ConstructorDestructorTests: XCTestCase {
                     field = newValue
                     didmutate()
                 }
-        
+
             constructor(i: Int = 100, s: String) {
                 this.i = i
                 this.s = s
             }
-        
+
             override var supdate: ((Any) -> Unit)? = null
             override var smutatingcount = 0
             override fun scopy(): MutableStruct = E(i, s)
+        }
+        """)
+    }
+
+    func testStructMemberwiseConstructorDoesNotDuplicateDefaultValue() async throws {
+        try await check(swift: """
+        struct A {
+        }
+        struct B {
+            var a1 = A()
+            var a2: A? = A()
+            var a3: A? = nil
+        }
+        """, kotlin: """
+        internal class A {
+        }
+        internal class B: MutableStruct {
+            internal var a1: A
+                set(newValue) {
+                    willmutate()
+                    field = newValue
+                    didmutate()
+                }
+            internal var a2: A? = null
+                set(newValue) {
+                    willmutate()
+                    field = newValue
+                    didmutate()
+                }
+            internal var a3: A? = null
+                set(newValue) {
+                    willmutate()
+                    field = newValue
+                    didmutate()
+                }
+
+            constructor(a1: A = A(), a2: A? = A(), a3: A? = null) {
+                this.a1 = a1
+                this.a2 = a2
+                this.a3 = a3
+            }
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct = B(a1, a2, a3)
         }
         """)
     }
@@ -478,7 +523,7 @@ final class ConstructorDestructorTests: XCTestCase {
         }
 
         internal class S: MutableStruct {
-            internal var i = 100
+            internal var i: Int
                 set(newValue) {
                     willmutate()
                     try {
@@ -592,6 +637,7 @@ final class ConstructorDestructorTests: XCTestCase {
         """)
     }
 
+    //~~~
     func testSelfAssignConstructor() async throws {
         try await check(swift: """
         struct S {
