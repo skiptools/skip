@@ -140,6 +140,11 @@ import PackagePlugin
 
         // the input files consist of all the swift, kotlin, and .yml files in all of the sources
         // having no inputs or outputs in Xcode seems to result in the command running *every* time, but in SPM is appears to have the opposite effect: it never seems to run when there are no inputs or outputs
+        //#warning("build sourceFiles from directory rather than from SPM")
+        let sourceDir = sourceTarget.directory
+        // TODO: find .swift files in tree
+        let _ = sourceDir
+
         let inputFiles: [Path] = sourceTarget.sourceFiles.map(\.path) + swiftSourceTarget.sourceFiles.map(\.path)
 
         for (product, depTarget) in target.recursiveTargetProductDependencies {
@@ -242,7 +247,7 @@ import XcodeProjectPlugin
 
 extension SkipTranspilePlugIn: XcodeBuildToolPlugin {
     func createBuildCommands(context: XcodePluginContext, target: XcodeTarget) throws -> [Command] {
-        Diagnostics.warning("SkipTranspilePlugIn Xcode")
+        Diagnostics.error("SkipTranspilePlugIn does not support Xcode projects, only SPM")
         return []
     }
 }

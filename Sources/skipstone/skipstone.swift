@@ -5,9 +5,7 @@
 // as published by the Free Software Foundation https://fsf.org
 import SkipBuild
 
-/// Command-line runner for the transpiler.
-///
-/// This is only built for local `skiptool` imported through `SKIPLOCAL` (see `Package.swift`).
+/// Command-line `skip` tool.
 @main public struct SkipToolMain {
     static func main() async throws {
         await SkipRunnerExecutor.main()

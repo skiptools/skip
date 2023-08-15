@@ -5,9 +5,11 @@ let package = Package(
     name: "skip",
     defaultLocalization: "en",
     products: [
+        .executable(name: "skip", targets: ["skip"]),
+
         .plugin(name: "skip-init", targets: ["Hello Skip"]),
 
-        .plugin(name: "skip", targets: ["skip-command"]),
+        .plugin(name: "skipstone", targets: ["skip-command"]),
         .plugin(name: "preflight", targets: ["skip-preflight"]),
         .plugin(name: "transpile", targets: ["skip-transpiler"]),
         .plugin(name: "skipbuild", targets: ["skip-build"]),
@@ -46,7 +48,7 @@ let package = Package(
 
         .plugin(name: "skip-command",
                 capability: .command(
-                    intent: .custom(verb: "skip",  description: "Run skipstone by specifying arguments manually"),
+                    intent: .custom(verb: "skip",  description: "Run Skip by specifying arguments manually"),
                     permissions: [
                         .writeToPackageDirectory(reason: "Skip needs to create and update the Skip folder in the project."),
                     ]),
@@ -67,6 +69,8 @@ let package = Package(
                 capability: .buildTool(),
                 dependencies: ["skipstone"],
                 path: "Plugins/SkipTranspilePlugIn"),
+
+        .executableTarget(name: "skip", dependencies: ["SkipDrive"]),
 
         // skipgradle is the CLI interface from Skip to the Gradle tool for building, testing, and packaging Kotlin
         .executableTarget(name: "skipgradle", dependencies: ["SkipDrive"], path: "Sources/SkipGradle"),
