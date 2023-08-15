@@ -819,7 +819,7 @@ class FunctionCall: Expression, APICallExpression {
     }
 }
 
-/// `x`, also `this` or `super`
+/// `x`, also `self` or `super`
 class Identifier: Expression, APICallExpression {
     let name: String
     private(set) var generics: [TypeSignature]?

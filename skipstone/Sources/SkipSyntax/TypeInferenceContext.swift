@@ -134,9 +134,23 @@ struct TypeInferenceContext {
 
     /// Return the type of the given identifier.
     func identifier(_ name: String, messagesNode: SyntaxNode?) -> (TypeSignature, APIMatch)? {
+        var name = name
+        var isBinding = false
+        if name.hasPrefix("$") {
+            let suffix = String(name.dropFirst())
+            // Filter implicit closure arguments: $0, $1, etc
+            if Int(suffix) == nil {
+                name = suffix
+                isBinding = true
+            }
+        }
+
         // Check local identifiers and bindings
         if let identifierType = localIdentifierTypes[name] {
-            let signature = identifierType.constrainedTypeWithGenerics(generics)
+            var signature = identifierType.constrainedTypeWithGenerics(generics)
+            if isBinding {
+                signature = signature.asBinding()
+            }
             return (signature, APIMatch(signature: signature))
         }
         if name == "self" || name == "Self" || name == "super" {
@@ -166,11 +180,11 @@ struct TypeInferenceContext {
             if let codebaseInfo {
                 if let match = codebaseInfo.matchIdentifier(name: name, inConstrained: signature.constrainedTypeWithGenerics(generics)) {
                     addMessages(to: messagesNode, for: [match.availability])
-                    return (resolveSignature(match: match), match)
+                    return update((resolveSignature(match: match), match), isBinding: isBinding)
                 }
             } else if let match = unavailableAPI?.knownUnavailableMember(name, in: signature) {
                 addMessages(to: messagesNode, for: [match.availability])
-                return (resolveSignature(match: match), match)
+                return update((resolveSignature(match: match), match), isBinding: isBinding)
             }
         }
         let genericType = generics.constrainedType(of: name)
@@ -180,16 +194,18 @@ struct TypeInferenceContext {
         if let codebaseInfo {
             if let match = codebaseInfo.matchIdentifier(name: name) {
                 addMessages(to: messagesNode, for: [match.availability])
-                return (resolveSignature(match: match), match)
+                return update((resolveSignature(match: match), match), isBinding: isBinding)
             } else {
                 return nil
             }
         } else if let match = unavailableAPI?.knownUnavailableIdentifier(name) {
             addMessages(to: messagesNode, for: [match.availability])
-            return (resolveSignature(match: match), match)
-        } else {
+            return update((resolveSignature(match: match), match), isBinding: isBinding)
+        } else if !isBinding {
             let signature = TypeSignature.for(name: name, genericTypes: [], allowNamed: false).asMetaType(true)
             return signature == .none ? nil : (signature, APIMatch(signature: signature))
+        } else {
+            return nil
         }
     }
 
@@ -208,15 +224,26 @@ struct TypeInferenceContext {
     ///
     /// The returned signature may be different than the returned `APIMatch.signature` due to optional chaining and type aliasing.
     func member(_ name: String, in type: TypeSignature, messagesNode: SyntaxNode?) -> (TypeSignature, APIMatch)? {
+        var type = type
+        var name = name
+        var isBinding = false
+        if case .named("Binding", let generics) = type, generics.count == 1 {
+            isBinding = true
+            type = generics[0]
+        } else if name.hasPrefix("$") {
+            isBinding = true
+            name = String(name.dropFirst())
+        }
+
         if type.isOptional {
             if let match = member(name, inNonOptional: type.asOptional(false), messagesNode: messagesNode) {
-                return (resolveSignature(match: match).asOptional(true), match)
+                return update((resolveSignature(match: match).asOptional(true), match), isBinding: isBinding)
             } else {
                 return nil
             }
         } else {
             if let match = member(name, inNonOptional: type, messagesNode: messagesNode) {
-                return (resolveSignature(match: match), match)
+                return update((resolveSignature(match: match), match), isBinding: isBinding)
             } else {
                 return nil
             }
@@ -436,6 +463,15 @@ struct TypeInferenceContext {
 
     private func resolveSignature(match: APIMatch) -> TypeSignature {
         return codebaseInfo?.resolveTypealias(for: match.signature) ?? match.signature
+    }
+
+    private func update(_ match: (TypeSignature, APIMatch), isBinding: Bool) -> (TypeSignature, APIMatch) {
+        guard isBinding else {
+            return match
+        }
+        var bindingAPIMatch = match.1
+        bindingAPIMatch.signature = bindingAPIMatch.signature.asBinding()
+        return (match.0.asBinding(), bindingAPIMatch)
     }
 
     private func addMessages(to messagesNode: SyntaxNode?, for availability: [Availability]) {
