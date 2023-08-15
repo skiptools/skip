@@ -8,9 +8,12 @@ import SkipDrive
 /// Command-line runner for the transpiler.
 ///
 /// This is only built for local `skiptool` imported through `SKIPLOCAL` (see `Package.swift`).
+#if os(macOS)
+@available(macOS 13, macCatalyst 16, *)
 @main public struct SkipMain {
     static func main() async throws {
         //await SkipRunnerExecutor.main()
         print("Running Skip Command")
     }
 }
+#endif
