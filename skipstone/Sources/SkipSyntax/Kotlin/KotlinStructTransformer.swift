@@ -45,7 +45,7 @@ final class KotlinStructTransformer: KotlinTransformer {
                 }
                 if variableDeclaration.declaredType.isUnwrappedOptional {
                     // Not initialized
-                } else if !variableDeclaration.modifiers.isStatic && variableDeclaration.getter == nil && (!variableDeclaration.isLet || variableDeclaration.value == nil) && !variableDeclaration.attributes.isNonMutating && !variableDeclaration.modifiers.isLazy && !variableDeclaration.isGenerated {
+                } else if !variableDeclaration.modifiers.isStatic && variableDeclaration.getter == nil && (!variableDeclaration.isLet || variableDeclaration.value == nil) && !variableDeclaration.modifiers.isLazy && !variableDeclaration.isGenerated {
                     initializableVariableDeclarations.append(variableDeclaration)
                 }
             } else if let functionDeclaration = member as? KotlinFunctionDeclaration, !functionDeclaration.isGenerated {
@@ -126,9 +126,13 @@ final class KotlinStructTransformer: KotlinTransformer {
 
         constructor.parameters = variableDeclarations.map { variableDeclaration in
             let label = variableDeclaration.propertyName
-            let type = variableDeclaration.propertyType
-            if type == .none && translator.codebaseInfo != nil {
-                variableDeclaration.messages.append(.kotlinConstructorCannotInferPropertyType(variableDeclaration, source: translator.syntaxTree.source))
+            var type = variableDeclaration.propertyType
+            if type == .none {
+                if translator.codebaseInfo != nil {
+                    variableDeclaration.messages.append(.kotlinConstructorCannotInferPropertyType(variableDeclaration, source: translator.syntaxTree.source))
+                }
+            } else if variableDeclaration.attributes.contains(.binding) {
+                type = type.asBinding()
             }
             var defaultValue: KotlinExpression? = nil
             if let value = variableDeclaration.value {
@@ -141,9 +145,20 @@ final class KotlinStructTransformer: KotlinTransformer {
 
         var bodyStatements: [KotlinStatement] = []
         bodyStatements += variableDeclarations.map { variableDeclaration in
-            var assignment = "this.\(variableDeclaration.names[0] ?? "") = \(variableDeclaration.names[0] ?? "")"
-            if !variableDeclaration.apiFlags.contains(.writeable) && variableDeclaration.mayBeSharedMutableStruct {
-                assignment += ".sref()"
+            var assignment: String
+            if variableDeclaration.attributes.contains(.state) {
+                var value = variableDeclaration.propertyName
+                if variableDeclaration.mayBeSharedMutableStruct {
+                    value += ".sref()"
+                }
+                assignment = "this._\(variableDeclaration.propertyName) = State(initialValue: \(value))"
+            } else if variableDeclaration.attributes.contains(.binding) {
+                assignment = "this._\(variableDeclaration.propertyName) = \(variableDeclaration.propertyName)"
+            } else {
+                assignment = "this.\(variableDeclaration.propertyName) = \(variableDeclaration.propertyName)"
+                if !variableDeclaration.apiFlags.contains(.writeable) && variableDeclaration.mayBeSharedMutableStruct {
+                    assignment += ".sref()"
+                }
             }
             return KotlinRawStatement(sourceCode: assignment)
         }

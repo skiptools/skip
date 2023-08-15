@@ -1170,7 +1170,11 @@ public class CodebaseInfo: Codable {
             guard variable.isInitializable else {
                 return nil
             }
-            return TypeSignature.Parameter(label: variable.name, type: variable.signature, hasDefaultValue: variable.hasValue)
+            var parameterType = variable.signature
+            if variable.attributes.contains(.binding) {
+                parameterType = parameterType.asBinding()
+            }
+            return TypeSignature.Parameter(label: variable.name, type: parameterType, hasDefaultValue: variable.hasValue)
         }
         let initSignature: TypeSignature = .function(parameters, typeInfo.signature, typeInfo.apiFlags ?? [])
         var initInfo = FunctionInfo(name: "init", declarationType: .initDeclaration, signature: initSignature, moduleName: typeInfo.moduleName, sourceFile: typeInfo.sourceFile, declaringType: typeInfo.signature, modifiers: typeInfo.modifiers, attributes: Attributes(), availability: .available)

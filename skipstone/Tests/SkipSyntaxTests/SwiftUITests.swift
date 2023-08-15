@@ -408,13 +408,14 @@ final class SwiftUITests: XCTestCase {
             override fun scopy(): MutableStruct = S(x)
         }
         internal class V: View {
-            internal var s = S()
-                get() = field.sref({ this.s = it })
+            internal var s: S
+                get() = _s.wrappedValue.sref({ this.s = it })
                 set(newValue) {
                     @Suppress("NAME_SHADOWING") val newValue = newValue.sref()
-                    field = newValue
+                    _s.wrappedValue = newValue
                     sdidchange?.invoke()
                 }
+            internal var _s: State<S> = State(initialValue: S())
             private var sdidchange: (() -> Unit)? = null
             @Composable
             override fun body(): View {
@@ -436,6 +437,10 @@ final class SwiftUITests: XCTestCase {
                 sdidchange = { composes = s }
 
                 body().Compose(composectx)
+            }
+
+            constructor(s: S = S()) {
+                this._s = State(initialValue: s.sref())
             }
         }
         """)
@@ -534,6 +539,21 @@ final class SwiftUITests: XCTestCase {
                 body().Compose(composectx)
             }
         }
+        """)
+    }
+
+    func testBindingVariable() async throws {
+        try await check(supportingSwift: baseSupportingSwift, swift: """
+        import SwiftUI
+        struct V: View {
+            @Binding var count: Int
+            var body: some View {
+                Button("Tap") {
+                    count += 1
+                }
+            }
+        }
+        """, kotlin: """
         """)
     }
 }

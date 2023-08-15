@@ -28,7 +28,11 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
     
     private func visit(_ node: KotlinSyntaxNode, translator: KotlinTranslator) -> VisitResult<KotlinSyntaxNode> {
         if let functionDeclaration = node as? KotlinFunctionDeclaration {
-            translateFunctionDeclaration(functionDeclaration, translator: translator)
+            if functionDeclaration.type == .constructorDeclaration {
+                translateConstructorDeclaration(functionDeclaration, translator: translator)
+            } else {
+                translateFunctionDeclaration(functionDeclaration, translator: translator)
+            }
         } else if let variableDeclaration = node as? KotlinVariableDeclaration {
             translateVariableDeclaration(variableDeclaration, translator: translator)
         } else if let closure = node as? KotlinClosure {
@@ -38,7 +42,46 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         }
         return .recurse(nil)
     }
-    
+
+    private func translateConstructorDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, translator: KotlinTranslator) {
+        // Translate any assignment to a state var into an assignment to its property wrapper
+        functionDeclaration.body?.visit { node in
+            if node is KotlinClosure {
+                return .skip
+            } else if node is KotlinFunctionDeclaration {
+                return .skip
+            } else if let binaryOperator = node as? KotlinBinaryOperator, binaryOperator.op.symbol == "=", let statePropertyName = statePropertyName(for: binaryOperator.lhs, in: functionDeclaration.parent as? KotlinClassDeclaration) {
+                binaryOperator.lhs = KotlinMemberAccess(base: KotlinIdentifier(name: "self"), member: "_" + statePropertyName)
+                binaryOperator.rhs = KotlinFunctionCall(function: KotlinIdentifier(name: "State"), arguments: [LabeledValue(label: "initialValue", value: binaryOperator.rhs)])
+                binaryOperator.assignParentReferences()
+                return .skip
+            } else {
+                return .recurse(nil)
+            }
+        }
+    }
+
+    private func statePropertyName(for expression: KotlinExpression, in view: KotlinClassDeclaration?) -> String? {
+        guard let view else {
+            return nil
+        }
+        var variableName: String? = nil
+        if let identifier = expression as? KotlinIdentifier {
+            variableName = identifier.name
+        } else if let memberAccess = expression as? KotlinMemberAccess, (memberAccess.base as? KotlinIdentifier)?.name == "self" {
+            variableName = memberAccess.member
+        }
+        guard let variableName else {
+            return nil
+        }
+        for member in view.members {
+            if let variable = member as? KotlinVariableDeclaration, variable.propertyName == variableName {
+                return variable.attributes.contains(.state) ? variableName : nil
+            }
+        }
+        return nil
+    }
+
     private func translateFunctionDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, translator: KotlinTranslator) {
         guard functionDeclaration.apiFlags.contains(.viewBuilder) else {
             return
@@ -110,7 +153,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             view.insert(statements: [composeFunction], after: body)
             
             for stateVariable in stateVariables {
-                synthesizeStateObservation(variable: stateVariable, in: view)
+                synthesizeStateBacking(variable: stateVariable, in: view)
             }
         }
         for bindingVariable in variableDeclarations.filter({ $0.attributes.contains(.binding) }) {
@@ -217,7 +260,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         }
     }
 
-    private func synthesizeStateObservation(variable: KotlinVariableDeclaration, in view: KotlinClassDeclaration) {
+    private func synthesizeStateBacking(variable: KotlinVariableDeclaration, in view: KotlinClassDeclaration) {
         let didChangeType: TypeSignature = .function([], .void, []).asOptional(true)
         let didChangeProperty = KotlinVariableDeclaration(names: [variable.stateDidChangePropertyName], variableTypes: [didChangeType])
         didChangeProperty.declaredType = didChangeType
@@ -228,6 +271,37 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         view.insert(statements: [didChangeProperty], after: variable)
 
         variable.setterSideEffects.append(KotlinRawStatement(sourceCode: "\(variable.stateDidChangePropertyName)?.invoke()"))
+
+        // Tell the @State variable to get and set its value using _variable of type State
+        let storageName = "_\(variable.propertyName)"
+        var storage = KotlinVariableStorage()
+        storage.isSingleStatementAppendable = { _ in true }
+        storage.appendGet = { variable, sref, isSingleStatement, output, indentation in
+            if !isSingleStatement {
+                output.append(indentation).append("return ")
+            }
+            output.append(storageName).append(".wrappedValue")
+            sref()
+            output.append("\n")
+        }
+        storage.appendSet = { variable, value, output, indentation in
+            output.append(indentation).append(storageName).append(".wrappedValue = ")
+            value()
+            output.append("\n")
+        }
+        storage.appendStorage = { variable, output, indentation in
+            let stateType = variable.propertyType.asState().kotlin
+            output.append(indentation).append(variable.modifiers.kotlinMemberString(isGlobal: false, isOpen: false, suffix: " ")).append("var ").append(storageName).append(": ").append(stateType)
+            if let value = variable.value {
+                output.append(" = State(")
+                value.append(to: output, indentation: indentation)
+                output.append(")")
+            } else if variable.propertyType.isOptional {
+                output.append(" = State(null)")
+            }
+            output.append("\n")
+        }
+        variable.storage = storage
     }
 
     private func synthesizeBindingBacking(variable: KotlinVariableDeclaration, in view: KotlinClassDeclaration, source: Source) {
@@ -236,24 +310,27 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             variable.messages.append(.kotlinVariableNeedsTypeDeclaration(variable, source: source))
         }
 
-        //~~~ change setter side effects to setField, add getField statements, use to get and set binding value
-
         // Tell the @Binding variable to get and set its value using _variable of type Binding
-//        let storageName = "_\(variable.propertyName)"
-//        variable.storageVariable = KotlinStorageVariable(name: storageName) { variable, output, indentation in
-//            output.append(indentation).append(variable.modifiers.kotlinMemberString(isGlobal: false, isOpen: false, suffix: " "))
-//            output.append("var \(storageName)")
-//            if propertyType != .none {
-//                output.append(": \(propertyType.kotlin)")
-//            }
-//            output.append(" by mutableStateOf(")
-//            if let value = variable.value, !variable.modifiers.isLazy {
-//                output.append(value, indentation: indentation)
-//            } else {
-//                output.append("null")
-//            }
-//            output.append(")\n")
-//        }
+        let storageName = "_\(variable.propertyName)"
+        var storage = KotlinVariableStorage()
+        storage.isSingleStatementAppendable = { _ in true }
+        storage.appendGet = { variable, sref, isSingleStatement, output, indentation in
+            if !isSingleStatement {
+                output.append(indentation).append("return ")
+            }
+            output.append(storageName).append(".get()")
+            sref()
+            output.append("\n")
+        }
+        storage.appendSet = { variable, value, output, indentation in
+            output.append(indentation).append(storageName).append(".set(")
+            value()
+            output.append(")\n")
+        }
+        storage.appendStorage = { variable, output, indentation in
+            output.append(indentation).append(variable.modifiers.kotlinMemberString(isGlobal: false, isOpen: false, suffix: " ")).append("var ").append(storageName).append(": ").append(variable.propertyType.asBinding().kotlin).append("\n")
+        }
+        variable.storage = storage
     }
 
     private func translateViewBuilder(codeBlock: KotlinCodeBlock, fromClosure closure: KotlinClosure? = nil, translator: KotlinTranslator) -> KotlinCodeBlock {

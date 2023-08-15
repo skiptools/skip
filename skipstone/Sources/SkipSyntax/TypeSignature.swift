@@ -1765,6 +1765,16 @@ extension TypeSignature {
         }
         return false
     }
+
+    /// Return a SwiftUI Binding of this type.
+    func asBinding() -> TypeSignature {
+        return .named("Binding", [self])
+    }
+
+    /// Return a SwiftUI State of this type.
+    func asState() -> TypeSignature {
+        return .named("State", [self])
+    }
 }
 
 extension Array where Element == TypeSignature {
