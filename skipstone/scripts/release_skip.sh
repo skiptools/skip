@@ -33,7 +33,7 @@ ARTIFACTTOOL=skipstone
 # name the artifact the same as the tool
 ARTIFACT=${ARTIFACTTOOL}
 ARTIFACTBUNDLE="${ARTIFACT}.artifactbundle"
-ZIPNAME="${ARTIFACT}.plugin"
+PLUGIN_BASENAME="${ARTIFACT}.plugin"
 
 DIR=.build/artifactbundle
 GITDATE="$(git log -1 --format=%ad --date=iso-strict)"
@@ -97,17 +97,17 @@ du -skh "${ARTIFACTBUNDLE}"
 
 # sync file times to git date for build reproducability
 find ${ARTIFACTBUNDLE} -exec touch -d "${GITDATE:0:19}" {} \;
-zip -9 -q --symlinks -r ${ZIPNAME}.zip ${ARTIFACTBUNDLE}
+zip -9 -q --symlinks -r ${PLUGIN_BASENAME}.zip ${ARTIFACTBUNDLE}
 
-CHECKSUM=$(shasum -a 256 ${ZIPNAME}.zip | cut -f 1 -d ' ')
-du -skh "${ZIPNAME}.zip"
+CHECKSUM=$(shasum -a 256 ${PLUGIN_BASENAME}.zip | cut -f 1 -d ' ')
+du -skh "${PLUGIN_BASENAME}.zip"
 
 # the location of the download once we have uploaded it
 #ARTIFACT_URL="https://github.com/skiptools/skip/releases/download/${SEMVER_NEXT}/${ARTIFACTBUNDLE}.zip"
 
-ARTIFACT_URL="https://skip.tools/skiptools/skip/releases/download/${SEMVER_NEXT}/${ZIPNAME}.zip"
+ARTIFACT_URL="https://skip.tools/skiptools/skip/releases/download/${SEMVER_NEXT}/${PLUGIN_BASENAME}.zip"
 
-#ARTIFACT_URL="https://source.skip.tools/skip/releases/download/${SEMVER_NEXT}/${ZIPNAME}.zip"
+#ARTIFACT_URL="https://source.skip.tools/skip/releases/download/${SEMVER_NEXT}/${PLUGIN_BASENAME}.zip"
 
 #gh release -R github.com/skiptools/skip delete "main-${RELNAME}" --yes || true
 
@@ -137,10 +137,28 @@ git tag --sign "${SEMVER_NEXT}" -m "Release ${SEMVER_NEXT}"
 git push --follow-tags
 
 cd '-'
+# back in SKIPPKGDIR
+
+SKIPDRIVE_VERSION_PATH="Sources/SkipDrive/Version.swift"
+
+sed -I '' 's;public let skipVersion = .*;public let skipVersion = "'${SEMVER_NEXT}'";g' "${SKIPDRIVE_VERSION_PATH}"
+
+swift build --arch arm64 --arch x86_64 --configuration ${SKIPCONFIG} --product skip
+
+cd .build/apple/Products/${SKIPCONFIG}/
+# ensure we can run it
+./skip version
+zip ../../../../skip.zip skip
+cd -
+
+git add "${SKIPDRIVE_VERSION_PATH}"
+git commit -m "Release ${SEMVER_NEXT}"
+git tag --sign "${SEMVER_NEXT}" -m "Release ${SEMVER_NEXT}"
+git push --follow-tags
 
 # Now when we upload, it will be to the tag that corresponds to this download
 #echo "Creating release artifact: ${ARTIFACT_URL}"
-gh release -R github.com/skiptools/skip create --notes "" "${SEMVER_NEXT}" ${DIR}/${ZIPNAME}.zip
+gh release -R github.com/skiptools/skip create --notes "" "${SEMVER_NEXT}" ${DIR}/${PLUGIN_BASENAME}.zip skip.zip
 
 echo "Waiting to download to become available…"
 sleep 15

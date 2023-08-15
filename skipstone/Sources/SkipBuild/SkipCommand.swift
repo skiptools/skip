@@ -676,7 +676,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
     func performCommand(with continuation: AsyncThrowingStream<OutputMessage, Error>.Continuation) async throws {
         let sourceFiles = try checkOptions.files.map(AbsolutePath.init(validating:))
         #if DEBUG
-        let v = skipVersion + "*" // * indicated debug version
+        let v = skipVersion + "*" // * indicates debug version
         #else
         let v = skipVersion
         #endif
