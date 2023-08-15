@@ -227,7 +227,7 @@ final class KotlinCommonProtocolsTransformer: KotlinTransformer {
         return classDeclaration.members
             .compactMap { $0 as? KotlinVariableDeclaration }
             .filter { !$0.isStatic && !$0.isGenerated && $0.getter == nil }
-            .map { $0.names[0] ?? "" }
+            .map { $0.propertyName }
     }
 }
 

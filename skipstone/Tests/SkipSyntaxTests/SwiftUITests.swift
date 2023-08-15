@@ -574,4 +574,155 @@ final class SwiftUITests: XCTestCase {
 //        """, kotlin: """
 //        """)
 //    }
+
+    func testMutableViewMemberwiseConstructor() async throws {
+        try await check(supportingSwift: baseSupportingSwift, swift: """
+        import SwiftUI
+        struct V: View {
+            @Environment(\\.envvalue) var envvalue
+            @State var count = 0
+            @Binding var text: String
+            var i = 0
+
+            var body: some View {
+                Text("Hello")
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.*
+
+        import skip.ui.*
+        internal class V: View, MutableStruct {
+            internal var envvalue: Int = Int(0)
+            internal var count: Int
+                get() = _count.wrappedValue
+                set(newValue) {
+                    _count.wrappedValue = newValue
+                    countdidchange?.invoke()
+                }
+            internal var _count: State<Int>
+            private var countdidchange: (() -> Unit)? = null
+            internal var text: String
+                get() = _text.get()
+                set(newValue) {
+                    _text.set(newValue)
+                }
+            internal var _text: Binding<String>
+            internal var i: Int
+                set(newValue) {
+                    willmutate()
+                    field = newValue
+                    didmutate()
+                }
+
+            @Composable
+            override fun body(): View {
+                return ComposingView { composectx: ComposeContext -> Text("Hello").Compose(composectx) }
+            }
+
+            @Composable
+            override fun Compose(composectx: ComposeContext) {
+                countdidchange = null
+                val initialcount = count
+                var composecount by remember { mutableStateOf(initialcount) }
+                count = initialcount
+                countdidchange = { composecount = count }
+
+                envvalue = composectx.environment[EnvironmentValues::envvalue]
+
+                body().Compose(composectx)
+            }
+
+            constructor(count: Int = 0, text: Binding<String>, i: Int = 0) {
+                this._count = State(count)
+                this._text = text
+                this.i = i
+            }
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct = V(count, _text, i)
+        }
+        """)
+    }
+
+    func testMutableViewCopyConstructor() async throws {
+        try await check(supportingSwift: baseSupportingSwift, swift: """
+        import SwiftUI
+        struct V: View {
+            @Environment(\\.envvalue) var envvalue
+            @State var count = 0
+            @Binding var text: String
+            var i = 0
+        
+            init(text: Binding<String>) {
+                self._text = text
+            }
+        
+            var body: some View {
+                Text("Hello")
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.*
+
+        import skip.ui.*
+        internal class V: View, MutableStruct {
+            internal var envvalue: Int = Int(0)
+            internal var count: Int
+                get() = _count.wrappedValue
+                set(newValue) {
+                    _count.wrappedValue = newValue
+                    countdidchange?.invoke()
+                }
+            internal var _count: State<Int> = State(0)
+            private var countdidchange: (() -> Unit)? = null
+            internal var text: String
+                get() = _text.get()
+                set(newValue) {
+                    _text.set(newValue)
+                }
+            internal var _text: Binding<String>
+            internal var i = 0
+                set(newValue) {
+                    willmutate()
+                    field = newValue
+                    didmutate()
+                }
+
+            internal constructor(text: Binding<String>) {
+                this._text = text.sref()
+            }
+
+            @Composable
+            override fun body(): View {
+                return ComposingView { composectx: ComposeContext -> Text("Hello").Compose(composectx) }
+            }
+
+            @Composable
+            override fun Compose(composectx: ComposeContext) {
+                countdidchange = null
+                val initialcount = count
+                var composecount by remember { mutableStateOf(initialcount) }
+                count = initialcount
+                countdidchange = { composecount = count }
+
+                envvalue = composectx.environment[EnvironmentValues::envvalue]
+
+                body().Compose(composectx)
+            }
+
+            private constructor(copy: MutableStruct) {
+                @Suppress("NAME_SHADOWING") val copy = copy as V
+                this._count = State(copy.count)
+                this._text = copy._text
+                this.i = copy.i
+            }
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct = V(this as MutableStruct)
+        }
+        """)
+    }
 }

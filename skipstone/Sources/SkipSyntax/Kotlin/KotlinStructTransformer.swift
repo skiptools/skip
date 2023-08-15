@@ -46,8 +46,9 @@ final class KotlinStructTransformer: KotlinTransformer {
                 if variableDeclaration.declaredType.isUnwrappedOptional {
                     // Not initialized
                 } else if variableDeclaration.declaredType == .none && variableDeclaration.propertyType == .none && (variableDeclaration.attributes.contains(.environment) || variableDeclaration.attributes.contains(.environmentObject)) {
-                    // It's so rare to want to pass environment values to the constructor that we ignore them when they'd cause an error.
-                    // To fix this we'd need help from the SwiftUI transformer (which runs after us) to figure out the variable type
+                    // It's so rare to want to pass environment values to the constructor that we omit them when they'd cause an error due to
+                    // lack of type information. To fix this we'd need help from the SwiftUI transformer (which runs after us) to figure out the
+                    // variable type
                 } else if !variableDeclaration.modifiers.isStatic && variableDeclaration.getter == nil && (!variableDeclaration.isLet || variableDeclaration.value == nil) && !variableDeclaration.modifiers.isLazy && !variableDeclaration.isGenerated {
                     initializableVariableDeclarations.append(variableDeclaration)
                 }
@@ -106,7 +107,8 @@ final class KotlinStructTransformer: KotlinTransformer {
         if useMemberwiseConstructor {
             let initFunction = KotlinMemberAccess(base: KotlinIdentifier(name: classDeclaration.signature.kotlin), member: "init")
             let arguments = variableDeclarations.map {
-                let argumentValue = KotlinIdentifier(name: $0.names[0] ?? "")
+                let propertyName = $0.attributes.contains(.binding) ? "_" + $0.propertyName : $0.propertyName
+                let argumentValue = KotlinIdentifier(name: propertyName)
                 argumentValue.mayBeSharedMutableStruct = $0.mayBeSharedMutableStruct
                 return LabeledValue<KotlinExpression>(value: argumentValue)
             }
@@ -193,7 +195,13 @@ final class KotlinStructTransformer: KotlinTransformer {
         var bodyStatements: [KotlinStatement] = []
         bodyStatements.append(KotlinRawStatement(sourceCode: "@Suppress(\"NAME_SHADOWING\") val copy = copy as \(classDeclaration.signature.kotlin)"))
         bodyStatements += variableDeclarations.map { variableDeclaration in
-            return KotlinRawStatement(sourceCode: "this.\(variableDeclaration.names[0] ?? "") = copy.\(variableDeclaration.names[0] ?? "")")
+            if variableDeclaration.attributes.contains(.state) {
+                return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = State(copy.\(variableDeclaration.propertyName))")
+            } else if variableDeclaration.attributes.contains(.binding) {
+                return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = copy._\(variableDeclaration.propertyName)")
+            } else {
+                return KotlinRawStatement(sourceCode: "this.\(variableDeclaration.propertyName) = copy.\(variableDeclaration.propertyName)")
+            }
         }
         constructor.body = KotlinCodeBlock(statements: bodyStatements)
         constructor.parent = classDeclaration
@@ -201,12 +209,7 @@ final class KotlinStructTransformer: KotlinTransformer {
         classDeclaration.members.append(constructor)
     }
 
-    private func addAssignFrom(to classDeclaration: KotlinClassDeclaration) {
-        // Already added?
-        guard !classDeclaration.members.contains(where: { ($0 as? KotlinFunctionDeclaration)?.name == "assignfrom" }) else {
-            return
-        }
-
+    private func makeSelfAssignable(_ classDeclaration: KotlinClassDeclaration) -> [KotlinVariableDeclaration] {
         // Assign all stored variables
         var storedVariableDeclarations: [KotlinVariableDeclaration] = []
         for member in classDeclaration.members {
@@ -216,27 +219,12 @@ final class KotlinStructTransformer: KotlinTransformer {
             guard variableDeclaration.getter == nil else {
                 continue
             }
-
+            
             // Make let vars writeable, in case they can have different initial values
             variableDeclaration.isAssignFromWriteable = true
             storedVariableDeclarations.append(variableDeclaration)
         }
-
-        let assignfrom = KotlinFunctionDeclaration(name: "assignfrom")
-        assignfrom.parameters = [Parameter(externalLabel: "target", declaredType: classDeclaration.signature)]
-        assignfrom.modifiers = Modifiers(visibility: .private)
-        assignfrom.extras = .singleNewline
-        assignfrom.isGenerated = true
-        assignfrom.suppressSideEffects = true
-
-        let bodyStatements: [KotlinStatement] = storedVariableDeclarations.map { variableDeclaration in
-            return KotlinRawStatement(sourceCode: "this.\(variableDeclaration.names[0] ?? "") = target.\(variableDeclaration.names[0] ?? "")")
-        }
-        assignfrom.body = KotlinCodeBlock(statements: bodyStatements)
-        assignfrom.body?.disallowSingleStatementAppend = true // Single statement assignment disallowed
-        assignfrom.parent = classDeclaration
-        assignfrom.assignParentReferences()
-        classDeclaration.members.append(assignfrom)
+        return storedVariableDeclarations
     }
 
     private func handleSelfAssignments(in functionDeclaration: KotlinFunctionDeclaration, translator: KotlinTranslator) {
@@ -247,30 +235,86 @@ final class KotlinStructTransformer: KotlinTransformer {
         guard classDeclaration != nil || functionDeclaration.extends != nil else {
             return
         }
-        var hasSelfAssignments = false
+
         body.visit { node in
             guard let binaryOperator = node as? KotlinBinaryOperator, binaryOperator.op.symbol == "=", let lhs = binaryOperator.lhs as? KotlinIdentifier, lhs.name == "self", let statement = binaryOperator.parent as? KotlinExpressionStatement else {
                 // Closure self assignments are reassigning captured self, not mutating the struct
                 return node is KotlinClosure ? .skip : .recurse(nil)
             }
-            if functionDeclaration.extends != nil {
+            guard functionDeclaration.extends == nil else {
                 binaryOperator.messages.append(.kotlinExtensionSelfAssignment(binaryOperator, source: translator.syntaxTree.source))
+                return .skip
+            }
+            guard let classDeclaration else {
+                return .skip
+            }
+
+            let storedVariables = makeSelfAssignable(classDeclaration)
+            var copyStatements: [KotlinStatement] = []
+            if functionDeclaration.type == .constructorDeclaration {
+                // In constructors we manually copy each property inline to satisfy the compiler that all properties are initialized
+                let copyName: String
+                if let copyIdentifier = binaryOperator.rhs as? KotlinIdentifier {
+                    copyName = copyIdentifier.name
+                } else {
+                    // Create a local to copy from so that we don't re-evaluate the expression and cause unwanted side effects
+                    copyName = "assignfrom"
+                    let copyVariable = KotlinVariableDeclaration(names: [copyName], variableTypes: [classDeclaration.signature], sourceFile: binaryOperator.sourceFile, sourceRange: binaryOperator.sourceRange)
+                    copyVariable.value = binaryOperator.rhs
+                    copyVariable.isLet = true
+                    copyStatements.append(copyVariable)
+                }
+                copyStatements += selfAssignStatements(from: copyName, storedVariableDeclarations: storedVariables)
             } else {
-                hasSelfAssignments = true
+                // Outside of constructors we call a method to copy all properties rather than expand inline.
+                // This makes it easier to surround the code with calls to suppress side effects
                 let assignCall = KotlinFunctionCall(function: KotlinIdentifier(name: "assignfrom"), arguments: [LabeledValue(value: binaryOperator.rhs)])
                 let assignStatement = KotlinExpressionStatement(type: .expression, sourceFile: statement.sourceFile, sourceRange: statement.sourceRange)
                 assignStatement.expression = assignCall
-                if let parent = statement.parent as? KotlinStatement {
-                    parent.insert(statements: [assignStatement], after: statement)
-                    parent.remove(statement: statement)
-                } else {
-                    binaryOperator.messages.append(.internalError(binaryOperator, source: translator.syntaxTree.source))
-                }
+                copyStatements.append(assignStatement)
+
+                addAssignFromFunction(to: classDeclaration, storedVariableDeclarations: storedVariables)
+            }
+            if let parent = statement.parent as? KotlinStatement {
+                parent.insert(statements: copyStatements, after: statement)
+                parent.remove(statement: statement)
+            } else {
+                binaryOperator.messages.append(.internalError(binaryOperator, source: translator.syntaxTree.source))
             }
             return .skip
         }
-        if hasSelfAssignments, let classDeclaration {
-            addAssignFrom(to: classDeclaration)
+    }
+
+    private func addAssignFromFunction(to classDeclaration: KotlinClassDeclaration, storedVariableDeclarations: [KotlinVariableDeclaration]) {
+        // Already added?
+        guard !classDeclaration.members.contains(where: { ($0 as? KotlinFunctionDeclaration)?.name == "assignfrom" }) else {
+            return
+        }
+
+        let assignfrom = KotlinFunctionDeclaration(name: "assignfrom")
+        assignfrom.parameters = [Parameter(externalLabel: "target", declaredType: classDeclaration.signature)]
+        assignfrom.modifiers = Modifiers(visibility: .private)
+        assignfrom.extras = .singleNewline
+        assignfrom.isGenerated = true
+        assignfrom.suppressSideEffects = true
+
+        let bodyStatements = selfAssignStatements(from: "target", storedVariableDeclarations: storedVariableDeclarations)
+        assignfrom.body = KotlinCodeBlock(statements: bodyStatements)
+        assignfrom.body?.disallowSingleStatementAppend = true // Single statement assignment disallowed
+        assignfrom.parent = classDeclaration
+        assignfrom.assignParentReferences()
+        classDeclaration.members.append(assignfrom)
+    }
+
+    private func selfAssignStatements(from copy: String, storedVariableDeclarations: [KotlinVariableDeclaration]) -> [KotlinStatement] {
+        return storedVariableDeclarations.map { variableDeclaration in
+            if variableDeclaration.attributes.contains(.state) {
+                return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = State(\(copy).\(variableDeclaration.propertyName))")
+            } else if variableDeclaration.attributes.contains(.binding) {
+                return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = \(copy)._\(variableDeclaration.propertyName)")
+            } else {
+                return KotlinRawStatement(sourceCode: "this.\(variableDeclaration.propertyName) = \(copy).\(variableDeclaration.propertyName)")
+            }
         }
     }
 }

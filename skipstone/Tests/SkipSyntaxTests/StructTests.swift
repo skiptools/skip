@@ -505,7 +505,6 @@ final class StructTests: XCTestCase {
         }
         """)
 
-        //~~~
         try await check(swift: """
         // SKIP ATTRIBUTES: nocopy
         struct S {
@@ -524,11 +523,7 @@ final class StructTests: XCTestCase {
             internal constructor(p: Int) {
                 var s = S()
                 s.x = p
-                assignfrom(s)
-            }
-
-            private fun assignfrom(target: S) {
-                this.x = target.x
+                this.x = s.x
             }
         }
         """)

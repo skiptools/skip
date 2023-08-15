@@ -653,7 +653,7 @@ final class ConstructorDestructorTests: XCTestCase {
         }
         """, kotlin: """
         import skip.lib.Array
-        
+
         internal class S {
             internal var a: Array<Int>
 
@@ -662,11 +662,7 @@ final class ConstructorDestructorTests: XCTestCase {
             }
 
             internal constructor(copy: S) {
-                assignfrom(copy)
-            }
-
-            private fun assignfrom(target: S) {
-                this.a = target.a
+                this.a = copy.a
             }
         }
         """)
@@ -720,7 +716,8 @@ final class ConstructorDestructorTests: XCTestCase {
             internal constructor(copy: S) {
                 suppresssideeffects = true
                 try {
-                    assignfrom(copy)
+                    this.i = copy.i
+                    this.a = copy.a
                 } finally {
                     suppresssideeffects = false
                 }
@@ -740,16 +737,6 @@ final class ConstructorDestructorTests: XCTestCase {
             override var supdate: ((Any) -> Unit)? = null
             override var smutatingcount = 0
             override fun scopy(): MutableStruct = S(this as MutableStruct)
-
-            private fun assignfrom(target: S) {
-                suppresssideeffects = true
-                try {
-                    this.i = target.i
-                    this.a = target.a
-                } finally {
-                    suppresssideeffects = false
-                }
-            }
 
             private var suppresssideeffects = false
         }
