@@ -335,21 +335,17 @@ final class SwiftUITests: XCTestCase {
                 get() = _s.wrappedValue
                 set(newValue) {
                     _s.wrappedValue = newValue
-                    sdidchange?.invoke()
                 }
             internal var _s: State<Int>
-            private var sdidchange: (() -> Unit)? = null
             internal var o: O
                 get() = _o.wrappedValue
                 set(newValue) {
                     _o.wrappedValue = newValue
-                    odidchange?.invoke()
                     if (!suppresssideeffects) {
                         print("set o")
                     }
                 }
             internal var _o: State<O>
-            private var odidchange: (() -> Unit)? = null
             @Composable
             override fun body(): View {
                 return ComposingView { composectx: ComposeContext ->
@@ -364,17 +360,13 @@ final class SwiftUITests: XCTestCase {
 
             @Composable
             override fun Compose(composectx: ComposeContext) {
-                sdidchange = null
-                val initials = s
+                val initials = _s.wrappedValue
                 var composes by remember { mutableStateOf(initials) }
-                s = composes
-                sdidchange = { composes = s }
+                _s.sync(composes, { composes = it })
 
-                odidchange = null
-                val initialo = o
+                val initialo = _o.wrappedValue
                 var composeo by remember { mutableStateOf(initialo) }
-                o = composeo
-                odidchange = { composeo = o }
+                _o.sync(composeo, { composeo = it })
 
                 body().Compose(composectx)
             }
@@ -434,12 +426,9 @@ final class SwiftUITests: XCTestCase {
             internal var s: S
                 get() = _s.wrappedValue.sref({ this.s = it })
                 set(newValue) {
-                    @Suppress("NAME_SHADOWING") val newValue = newValue.sref()
-                    _s.wrappedValue = newValue
-                    sdidchange?.invoke()
+                    _s.wrappedValue = newValue.sref()
                 }
             internal var _s: State<S>
-            private var sdidchange: (() -> Unit)? = null
             @Composable
             override fun body(): View {
                 return ComposingView { composectx: ComposeContext ->
@@ -453,11 +442,9 @@ final class SwiftUITests: XCTestCase {
 
             @Composable
             override fun Compose(composectx: ComposeContext) {
-                sdidchange = null
-                val initials = s
+                val initials = _s.wrappedValue
                 var composes by remember { mutableStateOf(initials) }
-                s = composes
-                sdidchange = { composes = s }
+                _s.sync(composes, { composes = it })
 
                 body().Compose(composectx)
             }
@@ -621,10 +608,8 @@ final class SwiftUITests: XCTestCase {
                 get() = _text.wrappedValue
                 set(newValue) {
                     _text.wrappedValue = newValue
-                    textdidchange?.invoke()
                 }
             internal var _text: State<String>
-            private var textdidchange: (() -> Unit)? = null
             @Composable
             override fun body(): View {
                 return ComposingView { composectx: ComposeContext -> TextField(Binding({ text }, { text = it })).Compose(composectx) }
@@ -632,11 +617,9 @@ final class SwiftUITests: XCTestCase {
 
             @Composable
             override fun Compose(composectx: ComposeContext) {
-                textdidchange = null
-                val initialtext = text
+                val initialtext = _text.wrappedValue
                 var composetext by remember { mutableStateOf(initialtext) }
-                text = composetext
-                textdidchange = { composetext = text }
+                _text.sync(composetext, { composetext = it })
 
                 body().Compose(composectx)
             }
@@ -666,10 +649,8 @@ final class SwiftUITests: XCTestCase {
                 get() = _text.wrappedValue
                 set(newValue) {
                     _text.wrappedValue = newValue
-                    textdidchange?.invoke()
                 }
             internal var _text: State<String>
-            private var textdidchange: (() -> Unit)? = null
             @Composable
             override fun body(): View {
                 return ComposingView { composectx: ComposeContext -> TextField(InstanceBinding(this, { it.text }, { it, newvalue -> it.text = newvalue })).Compose(composectx) }
@@ -677,11 +658,9 @@ final class SwiftUITests: XCTestCase {
 
             @Composable
             override fun Compose(composectx: ComposeContext) {
-                textdidchange = null
-                val initialtext = text
+                val initialtext = _text.wrappedValue
                 var composetext by remember { mutableStateOf(initialtext) }
-                text = composetext
-                textdidchange = { composetext = text }
+                _text.sync(composetext, { composetext = it })
 
                 body().Compose(composectx)
             }
@@ -779,10 +758,8 @@ final class SwiftUITests: XCTestCase {
                 get() = _count.wrappedValue
                 set(newValue) {
                     _count.wrappedValue = newValue
-                    countdidchange?.invoke()
                 }
             internal var _count: State<Int>
-            private var countdidchange: (() -> Unit)? = null
             internal var text: String
                 get() = _text.get()
                 set(newValue) {
@@ -803,11 +780,9 @@ final class SwiftUITests: XCTestCase {
 
             @Composable
             override fun Compose(composectx: ComposeContext) {
-                countdidchange = null
-                val initialcount = count
+                val initialcount = _count.wrappedValue
                 var composecount by remember { mutableStateOf(initialcount) }
-                count = composecount
-                countdidchange = { composecount = count }
+                _count.sync(composecount, { composecount = it })
 
                 envvalue = composectx.environment[EnvironmentValues::envvalue]
 
@@ -854,10 +829,8 @@ final class SwiftUITests: XCTestCase {
                 get() = _count.wrappedValue
                 set(newValue) {
                     _count.wrappedValue = newValue
-                    countdidchange?.invoke()
                 }
             internal var _count: State<Int> = State(0)
-            private var countdidchange: (() -> Unit)? = null
             internal var text: String
                 get() = _text.get()
                 set(newValue) {
@@ -882,11 +855,9 @@ final class SwiftUITests: XCTestCase {
 
             @Composable
             override fun Compose(composectx: ComposeContext) {
-                countdidchange = null
-                val initialcount = count
+                val initialcount = _count.wrappedValue
                 var composecount by remember { mutableStateOf(initialcount) }
-                count = composecount
-                countdidchange = { composecount = count }
+                _count.sync(composecount, { composecount = it })
 
                 envvalue = composectx.environment[EnvironmentValues::envvalue]
 

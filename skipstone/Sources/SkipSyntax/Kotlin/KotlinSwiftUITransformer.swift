@@ -199,12 +199,10 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
     }
     
     private func synthesizeStateSync(variable: KotlinVariableDeclaration) -> [KotlinStatement] {
-        let nullDidChange = KotlinRawStatement(sourceCode: "\(variable.stateDidChangePropertyName) = null")
-        let initialValue = KotlinRawStatement(sourceCode: "val initial\(variable.propertyName) = \(variable.propertyName)")
+        let initialValue = KotlinRawStatement(sourceCode: "val initial\(variable.propertyName) = _\(variable.propertyName).wrappedValue")
         let composeValue = KotlinRawStatement(sourceCode: "var compose\(variable.propertyName) by remember { mutableStateOf(initial\(variable.propertyName)) }")
-        let syncValue = KotlinRawStatement(sourceCode: "\(variable.propertyName) = compose\(variable.propertyName)")
-        let setDidChange = KotlinRawStatement(sourceCode: "\(variable.stateDidChangePropertyName) = { compose\(variable.propertyName) = \(variable.propertyName) }")
-        return [nullDidChange, initialValue, composeValue, syncValue, setDidChange]
+        let syncValue = KotlinRawStatement(sourceCode: "_\(variable.propertyName).sync(compose\(variable.propertyName), { compose\(variable.propertyName) = it })")
+        return [initialValue, composeValue, syncValue]
     }
 
     private func synthesizeEnvironmentSync(variable: KotlinVariableDeclaration, translator: KotlinTranslator) -> KotlinStatement? {
@@ -261,17 +259,6 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
     }
 
     private func synthesizeStateBacking(variable: KotlinVariableDeclaration, in view: KotlinClassDeclaration) {
-        let didChangeType: TypeSignature = .function([], .void, []).asOptional(true)
-        let didChangeProperty = KotlinVariableDeclaration(names: [variable.stateDidChangePropertyName], variableTypes: [didChangeType])
-        didChangeProperty.declaredType = didChangeType
-        didChangeProperty.role = .property
-        didChangeProperty.modifiers.visibility = .private
-        didChangeProperty.apiFlags = [.writeable]
-        didChangeProperty.isGenerated = true
-        view.insert(statements: [didChangeProperty], after: variable)
-
-        variable.setterSideEffects.append(KotlinRawStatement(sourceCode: "\(variable.stateDidChangePropertyName)?.invoke()"))
-
         // Tell the @State variable to get and set its value using _variable of type State
         let storageName = "_\(variable.propertyName)"
         var storage = KotlinVariableStorage()
