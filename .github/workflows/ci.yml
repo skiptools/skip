@@ -64,7 +64,7 @@ jobs:
           mint run skiptools/skip version
 
       - name: Show Skip Package (Debug)
-        # disabled for concurrency
+        # disables for concurrency
         if: false
         working-directory: SomeLibraryDebug
         run: |

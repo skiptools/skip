@@ -139,6 +139,7 @@ extension CommandPlugin {
                     """
                     addTargetDependencies()
                     packageAddition += """
+                        .product(name: "SkipUnit", package: "skiphub"),
                         ],
                         resources: [.copy("Skip")],
                         plugins: [.plugin(name: "transpile", package: "skip")])
