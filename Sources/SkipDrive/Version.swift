@@ -5,4 +5,4 @@
 // as published by the Free Software Foundation https://fsf.org
 
 /// The current version of SkipDrive.
-public let skipVersion = "0.5.77"
+public let skipVersion = "0.5.78"
