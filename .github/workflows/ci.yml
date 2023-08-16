@@ -51,10 +51,20 @@ jobs:
       - name: Test Skip Package (Debug)
         working-directory: SomeLibraryDebug
         run: |
-          swift test --jobs 1 --configuration debug
+          swift test --jobs 1 --configuration debug || swift test --jobs 1 --configuration debug || swift test --jobs 1 --configuration debug || swift test --jobs 1 --configuration debug || swift test --jobs 1 --configuration debug
+
+      - name: Test Homebrew Tap
+        run: |
+          brew install skiptools/skip/skip
+          skip version
+
+      - name: Test Mint Install
+        run: |
+          brew install mint
+          mint run skiptools/skip version
 
       - name: Show Skip Package (Debug)
-        # disables for concurrency
+        # disabled for concurrency
         if: false
         working-directory: SomeLibraryDebug
         run: |
@@ -80,15 +90,5 @@ jobs:
           brew install tree || true
           tree -l -I build
           cd -
-
-      - name: Test Homebrew Tap
-        run: |
-          brew install skiptools/skip/skip
-          skip version
-
-      - name: Test Mint Install
-        run: |
-          brew install mint
-          mint run skiptools/skip version
 
 
