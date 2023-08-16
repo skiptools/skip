@@ -5,7 +5,7 @@
 // as published by the Free Software Foundation https://fsf.org
 import struct Foundation.URL
 
-@available(macOS 12, iOS 15, tvOS 15, watchOS 8, *)
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 public protocol SkipParsableCommand : AsyncParsableCommand {
     var outputOptions: OutputOptions { get set }
 
