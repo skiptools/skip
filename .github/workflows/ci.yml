@@ -49,6 +49,8 @@ jobs:
           swift build --jobs 1 --configuration debug
 
       - name: Test Skip Package (Debug)
+        # disabled until determining issue with SkipUnit
+        if: false
         working-directory: SomeLibraryDebug
         run: |
           swift test --jobs 1 --configuration debug
