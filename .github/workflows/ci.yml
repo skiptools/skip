@@ -14,7 +14,14 @@ jobs:
   skip-init:
     runs-on: macos-13
     steps:
+      - name: Checkout skip
+        uses: actions/checkout@v3
+        with:
+          path: skip
+          repository: skiptools/skip
+
       - name: Test Skip
+        working-directory: skip
         run: swift test
 
       - name: Setup Java
