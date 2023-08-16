@@ -55,7 +55,6 @@ final class SwiftUITests: XCTestCase {
 
         import skip.ui.*
         internal class V: View {
-            @Composable
             override fun body(): View {
                 return ComposingView { composectx: ComposeContext ->  }
             }
@@ -76,7 +75,6 @@ final class SwiftUITests: XCTestCase {
 
         import skip.ui.*
         internal class V: MyView {
-            @Composable
             override fun body(): View {
                 return ComposingView { composectx: ComposeContext ->  }
             }
@@ -116,13 +114,10 @@ final class SwiftUITests: XCTestCase {
 
         import skip.ui.*
         internal interface P {
-            @Composable
             fun v(): View
-            @Composable
             fun f(): View
         }
         internal open class C: P {
-            @Composable
             override fun v(): View {
                 return ComposingView { composectx: ComposeContext ->
                     VStack {
@@ -136,7 +131,6 @@ final class SwiftUITests: XCTestCase {
                         ComposingView { composectx: ComposeContext ->  }
                     }
                 }
-            @Composable
             override fun f(): View {
                 return ComposingView { composectx: ComposeContext ->
                     VStack {
@@ -196,7 +190,6 @@ final class SwiftUITests: XCTestCase {
 
         import skip.ui.*
         internal class MyV: View {
-            @Composable
             override fun body(): View {
                 return ComposingView { composectx: ComposeContext ->
                     VStack {
@@ -223,7 +216,6 @@ final class SwiftUITests: XCTestCase {
 
         import skip.ui.*
         internal class MyV: View {
-            @Composable
             override fun body(): View {
                 return ComposingView { composectx: ComposeContext ->
                     VStack {
@@ -277,7 +269,6 @@ final class SwiftUITests: XCTestCase {
 
         import skip.ui.*
         internal class MyV: View {
-            @Composable
             override fun body(): View {
                 return ComposingView l@{ composectx: ComposeContext ->
                     if (b(v = V())) {
@@ -297,7 +288,7 @@ final class SwiftUITests: XCTestCase {
                 }
             }
             internal fun b(v: View): Boolean = true
-            internal fun v(b: Boolean, c: @Composable () -> View): View = V()
+            internal fun v(b: Boolean, c: () -> View): View = V()
         }
         """)
     }
@@ -412,7 +403,6 @@ final class SwiftUITests: XCTestCase {
                     }
                 }
             internal var _o: State<O>
-            @Composable
             override fun body(): View {
                 return ComposingView { composectx: ComposeContext ->
                     VStack {
@@ -495,7 +485,6 @@ final class SwiftUITests: XCTestCase {
                     _s.wrappedValue = newValue.sref()
                 }
             internal var _s: State<S>
-            @Composable
             override fun body(): View {
                 return ComposingView { composectx: ComposeContext ->
                     VStack {
@@ -537,7 +526,6 @@ final class SwiftUITests: XCTestCase {
         import skip.ui.*
         internal class V: View {
             internal var envvalue: Int = Int(0)
-            @Composable
             override fun body(): View {
                 return ComposingView { composectx: ComposeContext -> Text("Value: ${envvalue}").Compose(composectx) }
             }
@@ -572,7 +560,6 @@ final class SwiftUITests: XCTestCase {
                     envvaluestorage = newValue.sref()
                 }
             private lateinit var envvaluestorage: EnvValue
-            @Composable
             override fun body(): View {
                 return ComposingView { composectx: ComposeContext -> Text("Value: ${envvalue.x}").Compose(composectx) }
             }
@@ -605,7 +592,6 @@ final class SwiftUITests: XCTestCase {
                     envvaluestorage = newValue.sref()
                 }
             private lateinit var envvaluestorage: EnvValue
-            @Composable
             override fun body(): View {
                 return ComposingView { composectx: ComposeContext -> Text("Value: ${envvalue.x}").Compose(composectx) }
             }
@@ -642,7 +628,6 @@ final class SwiftUITests: XCTestCase {
                     _count.set(newValue)
                 }
             internal var _count: Binding<Int>
-            @Composable
             override fun body(): View {
                 return ComposingView { composectx: ComposeContext ->
                     Button("Tap") { count += 1 }.Compose(composectx)
@@ -676,7 +661,6 @@ final class SwiftUITests: XCTestCase {
                     _text.wrappedValue = newValue
                 }
             internal var _text: State<String>
-            @Composable
             override fun body(): View {
                 return ComposingView { composectx: ComposeContext -> TextField(Binding({ text }, { text = it })).Compose(composectx) }
             }
@@ -717,7 +701,6 @@ final class SwiftUITests: XCTestCase {
                     _text.wrappedValue = newValue
                 }
             internal var _text: State<String>
-            @Composable
             override fun body(): View {
                 return ComposingView { composectx: ComposeContext -> TextField(InstanceBinding(this, { it.text }, { it, newvalue -> it.text = newvalue })).Compose(composectx) }
             }
@@ -757,7 +740,6 @@ final class SwiftUITests: XCTestCase {
         import skip.ui.*
         internal class V: View {
             internal var o: O
-            @Composable
             override fun body(): View {
                 return ComposingView { composectx: ComposeContext -> TextField(InstanceBinding(o, { it.string }, { it, newvalue -> it.string = newvalue })).Compose(composectx) }
             }
@@ -789,7 +771,6 @@ final class SwiftUITests: XCTestCase {
         import skip.ui.*
         internal class V: View {
             internal var o: O
-            @Composable
             override fun body(): View {
                 return ComposingView { composectx: ComposeContext -> TextField(InstanceBinding(this.o, { it.s.string }, { it, newvalue -> it.s.string = newvalue })).Compose(composectx) }
             }
@@ -820,7 +801,6 @@ final class SwiftUITests: XCTestCase {
         import skip.ui.*
         internal class V: View {
             internal var o: O
-            @Composable
             override fun body(): View {
                 return ComposingView { composectx: ComposeContext -> TextField(InstanceBinding(o, { it.strings[0] }, { it, newvalue -> it.strings[0] = newvalue })).Compose(composectx) }
             }
@@ -855,7 +835,6 @@ final class SwiftUITests: XCTestCase {
         import skip.ui.*
         internal class V: View {
             internal val os: Array<O>
-            @Composable
             override fun body(): View {
                 return ComposingView { composectx: ComposeContext ->
                     for (o in os.sref()) {
@@ -910,7 +889,6 @@ final class SwiftUITests: XCTestCase {
                     didmutate()
                 }
 
-            @Composable
             override fun body(): View {
                 return ComposingView { composectx: ComposeContext -> Text("Hello").Compose(composectx) }
             }
@@ -985,7 +963,6 @@ final class SwiftUITests: XCTestCase {
                 this._text = text.sref()
             }
 
-            @Composable
             override fun body(): View {
                 return ComposingView { composectx: ComposeContext -> Text("Hello").Compose(composectx) }
             }
@@ -1011,6 +988,38 @@ final class SwiftUITests: XCTestCase {
             override var supdate: ((Any) -> Unit)? = null
             override var smutatingcount = 0
             override fun scopy(): MutableStruct = V(this as MutableStruct)
+        }
+        """)
+    }
+
+    func testContainerView() async throws {
+        try await check(supportingSwift: baseSupportingSwift, swift: """
+        import SwiftUI
+        struct HStack<Content> : View where Content : View {
+            let content: Content
+
+            init(@ViewBuilder content: () -> Content) {
+                self.content = content()
+            }
+
+            var body: some View {
+                content
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.*
+
+        import skip.ui.*
+        internal class HStack<Content>: View where Content: View {
+            internal val content: Content
+
+            internal constructor(content: () -> Content) {
+                this.content = content()
+            }
+
+            override fun body(): View {
+                return ComposingView { composectx: ComposeContext -> content.Compose(composectx) }
+            }
         }
         """)
     }

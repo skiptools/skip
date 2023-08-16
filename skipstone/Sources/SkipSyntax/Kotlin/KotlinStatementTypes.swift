@@ -1709,9 +1709,6 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         } else {
             attributes.append(to: output, indentation: indentation)
             annotations.appendLines(to: output, indentation: indentation)
-            if apiFlags.contains(.viewBuilder) {
-                output.append(indentation).append("@Composable\n")
-            }
             output.append(indentation)
             if isEqualImplementation {
                 appendEqualsDeclaration(to: output, indentation: indentation)
@@ -2406,9 +2403,6 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     private func appendDeclaration(to output: OutputGenerator, indentation: Indentation, storage: KotlinVariableStorage?) {
         attributes.append(to: output, indentation: indentation)
         annotations.appendLines(to: output, indentation: indentation)
-        if apiFlags.contains(.viewBuilder) {
-            output.append(indentation).append("@Composable\n")
-        }
         output.append(indentation)
         if role.isProperty || role == .global {
             output.append(modifiers.kotlinMemberString(isGlobal: role == .global, isOpen: isOpen, suffix: " "))
