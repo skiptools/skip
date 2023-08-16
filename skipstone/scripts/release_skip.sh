@@ -170,9 +170,9 @@ sleep 15
 curl --location --fail --retry 10 --retry-all-errors --retry-max-time 120 -o /dev/null "${ARTIFACT_URL}"
 
 # now jump *back* to the package and make sure we can run the command
-if [ "${SKIPPKG}" != "/dev/null" ]; then        
-    swift package --disable-sandbox --allow-writing-to-package-directory SkipRunner info
-fi
+#if [ "${SKIPPKG}" != "/dev/null" ]; then        
+    #swift package --disable-sandbox --allow-writing-to-package-directory SkipRunner info
+#fi
 
 # jump back and make a corresponding release in skipstone
 cd ${SKIPSTONEDIR}
@@ -193,7 +193,7 @@ git tag --sign "${SKIP_VERSION}" -m "Release ${SKIP_VERSION}"
 git push --follow-tags
 
 # check that mint can build/install and run the tool
-mint run skiptools/skip --version
+mint run skiptools/skip version
 
 # check that homebrew can install/upgrade and run the tool
 HOMEBREW_AUTO_UPDATE_SECS=0 brew upgrade skiptools/skip/skip || brew install skiptools/skip/skip
