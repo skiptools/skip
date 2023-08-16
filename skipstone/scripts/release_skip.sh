@@ -171,7 +171,7 @@ curl --location --fail --retry 10 --retry-all-errors --retry-max-time 120 -o /de
 
 # now jump *back* to the package and make sure we can run the command
 if [ "${SKIPPKG}" != "/dev/null" ]; then        
-    swift package --disable-sandbox --allow-writing-to-package-directory skip info
+    swift package --disable-sandbox --allow-writing-to-package-directory SkipRunner info
 fi
 
 # jump back and make a corresponding release in skipstone
