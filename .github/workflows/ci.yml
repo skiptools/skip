@@ -14,6 +14,9 @@ jobs:
   skip-init:
     runs-on: macos-13
     steps:
+      - name: Test Skip
+        run: swift test
+
       - name: Setup Java
         uses: actions/setup-java@v3
         with:
