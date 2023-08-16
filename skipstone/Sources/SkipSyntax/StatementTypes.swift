@@ -262,8 +262,7 @@ class DoCatch: Statement {
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
         let _ = body.inferTypes(context: context, expecting: .none)
-        let errorType: TypeSignature = .named("Error", [])
-        catches.forEach { let _ = $0.inferTypes(context: context, expecting: errorType) }
+        catches.forEach { let _ = $0.inferTypes(context: context, expecting: .none) }
         return context
     }
 

@@ -302,6 +302,72 @@ final class SwiftUITests: XCTestCase {
         """)
     }
 
+    func testConditionalExpressionTailCall() async throws {
+        let supportingSwift = baseSupportingSwift + """
+        struct V: View {
+            var body: some View {
+                V()
+            }
+        }
+        """
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        import SwiftUI
+        func f() {
+            VStack {
+                let v = if true { V() } else { V() }
+                v
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.*
+
+        import skip.ui.*
+        internal fun f() {
+            VStack {
+                ComposingView { composectx: ComposeContext ->
+                    val v = if (true) {
+                        V()
+                    } else {
+                        V()
+                    }
+                    v.Compose(composectx)
+                }
+            }
+        }
+        """)
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        import SwiftUI
+        func f() {
+            VStack {
+                let i = 1
+                let v = switch i {
+                    case 0: V()
+                    default: V()
+                }
+                v
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.*
+
+        import skip.ui.*
+        internal fun f() {
+            VStack {
+                ComposingView { composectx: ComposeContext ->
+                    val i = 1
+                    val v = when (i) {
+                        0 -> V()
+                        else -> V()
+                    }
+                    v.Compose(composectx)
+                }
+            }
+        }
+        """)
+    }
+
     func testStateVariable() async throws {
         try await check(supportingSwift: baseSupportingSwift, swift: """
         import SwiftUI

@@ -44,6 +44,11 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
     }
 
     private func translateConstructorDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, translator: KotlinTranslator) {
+        // Only need to consider Views
+        guard let classDeclaration = functionDeclaration.parent as? KotlinClassDeclaration, isView(classDeclaration, type: classDeclaration.signature, codebaseInfo: translator.codebaseInfo) else {
+            return
+        }
+
         // Translate any assignment to a state var into an assignment to its property wrapper
         functionDeclaration.body?.visit { node in
             if node is KotlinClosure {
@@ -61,6 +66,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         }
     }
 
+    /// If the given expression is a reference to a @State property, return the underlying State property name.
     private func statePropertyName(for expression: KotlinExpression, in view: KotlinClassDeclaration?) -> String? {
         guard let view else {
             return nil
@@ -121,6 +127,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
     private func translateVariableDeclaration(_ statement: KotlinVariableDeclaration, translator: KotlinTranslator) {
         var viewBuilder: KotlinCodeBlock? = nil
         if let viewDeclaration = viewForBody(statement, codebaseInfo: translator.codebaseInfo) {
+            // We perform our View transformations when we find the body
             transform(view: viewDeclaration, body: statement, translator: translator)
             viewBuilder = statement.getter?.body
         } else if statement.apiFlags.contains(.viewBuilder) {
@@ -131,17 +138,19 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             statement.getter?.body?.parent = statement
         }
     }
-    
+
+    /// If the given variable is the `body` of a `View`, return the parent view.
     private func viewForBody(_ variableDeclaration: KotlinVariableDeclaration, codebaseInfo: CodebaseInfo.Context?) -> KotlinClassDeclaration? {
         guard variableDeclaration.role == .property, variableDeclaration.propertyName == "body", !variableDeclaration.isStatic, let classDeclaration = variableDeclaration.parent as? KotlinClassDeclaration else {
             return nil
         }
-        guard classDeclaration.inherits.contains(where: { $0.isNamed("View", moduleName: "SwiftUI") }) || isView(type: classDeclaration.signature, codebaseInfo: codebaseInfo) else {
+        guard isView(classDeclaration, type: classDeclaration.signature, codebaseInfo: codebaseInfo) else {
             return nil
         }
         return classDeclaration
     }
-    
+
+    /// Perform `View` transformations.
     private func transform(view: KotlinClassDeclaration, body: KotlinVariableDeclaration, translator: KotlinTranslator) {
         body.apiFlags.insert(.viewBuilder)
         
@@ -160,7 +169,8 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             synthesizeBindingBacking(variable: bindingVariable, in: view, source: translator.syntaxTree.source)
         }
     }
-    
+
+    /// Create an override of the SkipUI `Compose` function on views to handle state synchronization, etc.
     private func synthesizeComposeFunction(view: KotlinClassDeclaration, stateVariables: [KotlinVariableDeclaration], environmentVariables: [KotlinVariableDeclaration], translator: KotlinTranslator) -> KotlinStatement {
         let composeFunction = KotlinFunctionDeclaration(name: "Compose")
         composeFunction.modifiers.visibility = .public
@@ -197,7 +207,8 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         composeFunction.assignParentReferences()
         return composeFunction
     }
-    
+
+    /// Create code to remember and sync a state variable.
     private func synthesizeStateSync(variable: KotlinVariableDeclaration) -> [KotlinStatement] {
         let initialValue = KotlinRawStatement(sourceCode: "val initial\(variable.propertyName) = _\(variable.propertyName).wrappedValue")
         let composeValue = KotlinRawStatement(sourceCode: "var compose\(variable.propertyName) by remember { mutableStateOf(initial\(variable.propertyName)) }")
@@ -205,6 +216,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         return [initialValue, composeValue, syncValue]
     }
 
+    /// Create code to initialize an environment variable.
     private func synthesizeEnvironmentSync(variable: KotlinVariableDeclaration, translator: KotlinTranslator) -> KotlinStatement? {
         let entry: (key: String, type: TypeSignature?)
         if let environment = (variable.attributes.of(kind: .environment) + variable.attributes.of(kind: .environmentObject)).first {
@@ -240,6 +252,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         return KotlinRawStatement(sourceCode: "\(variable.propertyName) = composectx.environment[\(entry.key)]")
     }
 
+    /// Given a Swift `@Environment` property wrapper key, return the Kotlin key and the expected value type.
     private func environmentEntry(for key: String, codebaseInfo: CodebaseInfo.Context?) -> (String, TypeSignature?)? {
         if key.hasSuffix(".self") {
             let typeName = String(key.dropLast(".self".count))
@@ -258,6 +271,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         }
     }
 
+    /// Create the additional property synthesized for `@State` variables.
     private func synthesizeStateBacking(variable: KotlinVariableDeclaration, in view: KotlinClassDeclaration) {
         // Tell the @State variable to get and set its value using _variable of type State
         let storageName = "_\(variable.propertyName)"
@@ -291,6 +305,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         variable.storage = storage
     }
 
+    /// Create the extra property synthesized for `@Binding` variables.
     private func synthesizeBindingBacking(variable: KotlinVariableDeclaration, in view: KotlinClassDeclaration, source: Source) {
         let propertyType = variable.declaredType == .none ? variable.propertyType : variable.declaredType
         if propertyType == .none {
@@ -326,9 +341,8 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             if node is KotlinFunctionDeclaration || node is KotlinClosure {
                 // These do not inherit our view builder context and will get processed by the top-level visitation code
                 return .skip
-            } else if let apiCall = node as? APICallExpression, let expressionStatement = node.parent as? KotlinExpressionStatement {
+            } else if let apiCall = node as? APICallExpression, let expressionStatement = node.parent as? KotlinExpressionStatement, !isInAssignmentExpression(expressionStatement, in: codeBlock) {
                 // Add our compose tail call to expressions that evaluate to Views and are used as statements
-                //~~~ Handle let view = if condition { View1() } else { View2() } (and same with switch)
                 if let apiMatch = apiCall.apiMatch {
                     if isView(type: apiMatch.signature, codebaseInfo: translator.codebaseInfo) || isView(type: apiMatch.signature.returnType, codebaseInfo: translator.codebaseInfo) {
                         addComposeTailCall(to: node as! KotlinExpression, statement: expressionStatement)
@@ -378,7 +392,10 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         composeCall.assignParentReferences()
     }
 
-    private func isView(type: TypeSignature, codebaseInfo: CodebaseInfo.Context?) -> Bool {
+    private func isView(_ declaration: KotlinClassDeclaration? = nil, type: TypeSignature, codebaseInfo: CodebaseInfo.Context?) -> Bool {
+        if let declaration, declaration.inherits.contains(where: { $0.isNamed("View", moduleName: "SwiftUI", generics: []) }) {
+            return true
+        }
         guard let codebaseInfo else {
             return false
         }
@@ -388,10 +405,21 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         return codebaseInfo.global.protocolSignatures(forNamed: type)
             .contains { $0.isNamed("View", moduleName: "SwiftUI") }
     }
-}
 
-private extension KotlinVariableDeclaration {
-    var stateDidChangePropertyName: String {
-        return propertyName + "didchange"
+    private func isInAssignmentExpression(_ statement: KotlinStatement, in codeBlock: KotlinCodeBlock) -> Bool {
+        var node: KotlinSyntaxNode = statement
+        while node !== codeBlock {
+            if let binaryOperator = node as? KotlinBinaryOperator, binaryOperator.op.precedence == .assignment {
+                return true
+            } else if node is KotlinVariableDeclaration {
+                return true
+            }
+            if let parent = node.parent {
+                node = parent
+            } else {
+                break
+            }
+        }
+        return false
     }
 }

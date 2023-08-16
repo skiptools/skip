@@ -936,11 +936,18 @@ class If: Expression {
             }
         }
         let bodyContext = context.pushingBlock(identifiers: bindings)
-        let _ = body.inferTypes(context: bodyContext, expecting: .none)
+        let _ = body.inferTypes(context: bodyContext, expecting: expecting)
         if let elseBody {
-            let _ = elseBody.inferTypes(context: context, expecting: .none)
+            let _ = elseBody.inferTypes(context: context, expecting: expecting)
         }
+        bodyType = bodyType.or(body.returnType)
         return context
+    }
+
+    private var bodyType: TypeSignature = .none
+
+    override var inferredType: TypeSignature {
+        return bodyType
     }
 
     override var children: [SyntaxNode] {
@@ -1731,8 +1738,17 @@ class Switch: Expression {
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
         on.inferTypes(context: context, expecting: .none)
-        cases.forEach { _ = $0.inferTypes(context: context, expecting: on.inferredType) }
+        cases.forEach { _ = $0.inferTypes(context: context, expecting: expecting) }
+        if let firstCase = cases.first {
+            bodyType = bodyType.or(firstCase.inferredType)
+        }
         return context
+    }
+
+    private var bodyType: TypeSignature = .none
+
+    override var inferredType: TypeSignature {
+        return bodyType
     }
 
     override var children: [SyntaxNode] {
@@ -1802,18 +1818,33 @@ class SwitchCase: Expression, BindingExpression {
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        let patternsExpecting: TypeSignature
+        if let switchStatement = parent as? Switch {
+            patternsExpecting = switchStatement.on.inferredType
+        } else if parent is DoCatch {
+            patternsExpecting = .named("Error", [])
+        } else {
+            patternsExpecting = .none
+        }
         var patternsContext = context
         var bindings: [String: TypeSignature] = [:]
         for pattern in patterns {
-            patternsContext = pattern.pattern.inferTypes(context: patternsContext, expecting: expecting)
+            patternsContext = pattern.pattern.inferTypes(context: patternsContext, expecting: patternsExpecting)
             pattern.whereGuard?.inferTypes(context: patternsContext, expecting: .bool)
             let patternBindings = pattern.pattern.bindings
             patternsContext = patternsContext.addingIdentifiers(patternBindings)
             bindings.merge(patternBindings) { _, new in new }
         }
         let bodyContext = context.pushingBlock(identifiers: bindings)
-        let _ = body.inferTypes(context: bodyContext, expecting: .none)
+        let _ = body.inferTypes(context: bodyContext, expecting: expecting)
+        bodyType = bodyType.or(body.returnType)
         return context
+    }
+
+    private var bodyType: TypeSignature = .none
+
+    override var inferredType: TypeSignature {
+        return bodyType
     }
 
     override var children: [SyntaxNode] {
