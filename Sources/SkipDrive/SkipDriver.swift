@@ -11,7 +11,7 @@ public protocol SkipParsableCommand : AsyncParsableCommand {
 
 }
 
-@available(macOS 12, iOS 15, tvOS 15, watchOS 8, *)
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 extension SkipParsableCommand {
     /// Run the transpiler on the given arguments.
     public static func run(_ arguments: [String], out: WritableByteStream? = nil, err: WritableByteStream? = nil) async throws {
@@ -36,6 +36,7 @@ extension SkipParsableCommand {
 }
 
 /// The command that is run by "SkipRunner" (aka "skipstone")
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 public struct SkipDriver: SkipParsableCommand {
     public static var configuration = CommandConfiguration(
         commandName: "skip",
@@ -55,6 +56,7 @@ public struct SkipDriver: SkipParsableCommand {
 
 // MARK: VersionCommand
 
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 struct VersionCommand: SkipParsableCommand {
     static var configuration = CommandConfiguration(
         commandName: "version",
@@ -69,6 +71,7 @@ struct VersionCommand: SkipParsableCommand {
     }
 }
 
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 public struct OutputOptions: ParsableArguments {
     @Option(name: [.customShort("o"), .long], help: ArgumentHelp("Send output to the given file (stdout: -)", valueName: "path"))
     var output: String?
