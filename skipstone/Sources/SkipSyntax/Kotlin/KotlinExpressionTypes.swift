@@ -2350,8 +2350,15 @@ class KotlinSubscript: KotlinExpression, KotlinMainActorTargeting, KotlinBindabl
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
-        output.append(base, indentation: indentation)
-        appendSubscript(to: output, indentation: indentation)
+        if let bindable = base as? KotlinBindable, bindable.isBinding {
+            bindable.appendBindingPath(to: output, indentation: indentation) { output, indentation, appendBase in
+                appendBase(output, indentation)
+                self.appendSubscript(to: output, indentation: indentation)
+            }
+        } else {
+            output.append(base, indentation: indentation)
+            appendSubscript(to: output, indentation: indentation)
+        }
     }
 
     private func appendSubscript(to output: OutputGenerator, indentation: Indentation) {

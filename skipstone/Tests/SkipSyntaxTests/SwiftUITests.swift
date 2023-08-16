@@ -656,7 +656,7 @@ final class SwiftUITests: XCTestCase {
         """)
     }
 
-    func testPassBinding() async throws {
+    func testBinding() async throws {
         try await check(supportingSwift: baseSupportingSwift, swift: """
         import SwiftUI
         struct V: View {
@@ -796,6 +796,77 @@ final class SwiftUITests: XCTestCase {
 
             constructor(o: O) {
                 this.o = o
+            }
+        }
+        """)
+    }
+
+    func testBindableSubscript() async throws {
+        try await check(supportingSwift: baseSupportingSwift + """
+        @Observable class O {
+            var strings: [String] = []
+        }
+        """, swift: """
+        import SwiftUI
+        struct V: View {
+            @Bindable var o: O
+            var body: some View {
+                TextField($o.strings[0])
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.*
+
+        import skip.ui.*
+        internal class V: View {
+            internal var o: O
+            @Composable
+            override fun body(): View {
+                return ComposingView { composectx: ComposeContext -> TextField(InstanceBinding(o, { it.strings[0] }, { it, newvalue -> it.strings[0] = newvalue })).Compose(composectx) }
+            }
+
+            constructor(o: O) {
+                this.o = o
+            }
+        }
+        """)
+    }
+
+    func testInlineBindable() async throws {
+        try await check(supportingSwift: baseSupportingSwift + """
+        @Observable class O {
+            var string = ""
+        }
+        """, swift: """
+        import SwiftUI
+        struct V: View {
+            let os: [O]
+            var body: some View {
+                for o in os {
+                    @Bindable var o = o
+                    TextField($o.string)
+                }
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.*
+        import skip.lib.Array
+
+        import skip.ui.*
+        internal class V: View {
+            internal val os: Array<O>
+            @Composable
+            override fun body(): View {
+                return ComposingView { composectx: ComposeContext ->
+                    for (o in os.sref()) {
+                        var o = o
+                        TextField(InstanceBinding(o, { it.string }, { it, newvalue -> it.string = newvalue })).Compose(composectx)
+                    }
+                }
+            }
+
+            constructor(os: Array<O>) {
+                this.os = os.sref()
             }
         }
         """)
