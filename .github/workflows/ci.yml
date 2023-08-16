@@ -51,7 +51,7 @@ jobs:
       - name: Test Skip Package (Debug)
         working-directory: SomeLibraryDebug
         run: |
-          swift test --jobs 1 --configuration debug || swift test --jobs 1 --configuration debug || swift test --jobs 1 --configuration debug || swift test --jobs 1 --configuration debug || swift test --jobs 1 --configuration debug
+          swift test --jobs 1 --configuration debug
 
       - name: Test Homebrew Tap
         run: |
