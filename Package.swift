@@ -86,5 +86,5 @@ if let localPath = ProcessInfo.processInfo.environment["SKIPLOCAL"] {
     package.targets += [.executableTarget(name: "skipstone", dependencies: [.product(name: "SkipBuild", package: "skipstone")])]
 } else {
     // default to using the latest binary skipstone release
-    package.targets += [.binaryTarget(name: "skipstone", url: "https://skip.tools/skiptools/skip/releases/download/0.5.54/skipstone.plugin.zip", checksum: "4e1d77a6c555119314f3c6697b5788aa5fb6027467eb12d3db2a9824961e9a1b")]
+    package.targets += [.binaryTarget(name: "skipstone", url: "https://skip.tools/skiptools/skip/releases/download/0.5.55/skipstone.plugin.zip", checksum: "73d8ac4acf9f87c4c9d63a69a32b8d5b7e78d97c62c7356b4af7ccbdda76405e")]
 }
