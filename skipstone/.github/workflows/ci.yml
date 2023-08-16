@@ -26,11 +26,13 @@ jobs:
 
     steps:
       - name: Dispatch skip ci.yml
+        if: false
         run: gh workflow run -R skiptools/skip 'ci.yml'
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Dispatch skiphub ci.yml
+        if: false
         run: gh workflow run -R skiptools/skiphub 'ci.yml'
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
