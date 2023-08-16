@@ -367,13 +367,13 @@ final class SwiftUITests: XCTestCase {
                 sdidchange = null
                 val initials = s
                 var composes by remember { mutableStateOf(initials) }
-                s = initials
+                s = composes
                 sdidchange = { composes = s }
 
                 odidchange = null
                 val initialo = o
                 var composeo by remember { mutableStateOf(initialo) }
-                o = initialo
+                o = composeo
                 odidchange = { composeo = o }
 
                 body().Compose(composectx)
@@ -456,7 +456,7 @@ final class SwiftUITests: XCTestCase {
                 sdidchange = null
                 val initials = s
                 var composes by remember { mutableStateOf(initials) }
-                s = initials
+                s = composes
                 sdidchange = { composes = s }
 
                 body().Compose(composectx)
@@ -603,18 +603,158 @@ final class SwiftUITests: XCTestCase {
         """)
     }
 
-//    func testPassBindingToView() async throws {
-//        try await check(supportingSwift: baseSupportingSwift, swift: """
-//        import SwiftUI
-//        struct V: View {
-//            @State var text = ""
-//            var body: some View {
-//                TextField($text)
-//            }
-//        }
-//        """, kotlin: """
-//        """)
-//    }
+    func testPassBinding() async throws {
+        try await check(supportingSwift: baseSupportingSwift, swift: """
+        import SwiftUI
+        struct V: View {
+            @State var text = ""
+            var body: some View {
+                TextField($text)
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.*
+
+        import skip.ui.*
+        internal class V: View {
+            internal var text: String
+                get() = _text.wrappedValue
+                set(newValue) {
+                    _text.wrappedValue = newValue
+                    textdidchange?.invoke()
+                }
+            internal var _text: State<String>
+            private var textdidchange: (() -> Unit)? = null
+            @Composable
+            override fun body(): View {
+                return ComposingView { composectx: ComposeContext -> TextField(Binding({ text }, { text = it })).Compose(composectx) }
+            }
+
+            @Composable
+            override fun Compose(composectx: ComposeContext) {
+                textdidchange = null
+                val initialtext = text
+                var composetext by remember { mutableStateOf(initialtext) }
+                text = composetext
+                textdidchange = { composetext = text }
+
+                body().Compose(composectx)
+            }
+
+            constructor(text: String = "") {
+                this._text = State(text)
+            }
+        }
+        """)
+    }
+
+    func testSelfBinding() async throws {
+        try await check(supportingSwift: baseSupportingSwift, swift: """
+        import SwiftUI
+        struct V: View {
+            @State var text = ""
+            var body: some View {
+                TextField(self.$text)
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.*
+
+        import skip.ui.*
+        internal class V: View {
+            internal var text: String
+                get() = _text.wrappedValue
+                set(newValue) {
+                    _text.wrappedValue = newValue
+                    textdidchange?.invoke()
+                }
+            internal var _text: State<String>
+            private var textdidchange: (() -> Unit)? = null
+            @Composable
+            override fun body(): View {
+                return ComposingView { composectx: ComposeContext -> TextField(InstanceBinding(this, { it.text }, { it, newvalue -> it.text = newvalue })).Compose(composectx) }
+            }
+
+            @Composable
+            override fun Compose(composectx: ComposeContext) {
+                textdidchange = null
+                val initialtext = text
+                var composetext by remember { mutableStateOf(initialtext) }
+                text = composetext
+                textdidchange = { composetext = text }
+
+                body().Compose(composectx)
+            }
+
+            constructor(text: String = "") {
+                this._text = State(text)
+            }
+        }
+        """)
+    }
+
+    func testBindable() async throws {
+        try await check(supportingSwift: baseSupportingSwift + """
+        @Observable class O {
+            var string = ""
+        }
+        """, swift: """
+        import SwiftUI
+        struct V: View {
+            @Bindable var o: O
+            var body: some View {
+                TextField($o.string)
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.*
+
+        import skip.ui.*
+        internal class V: View {
+            internal var o: O
+            @Composable
+            override fun body(): View {
+                return ComposingView { composectx: ComposeContext -> TextField(InstanceBinding(o, { it.string }, { it, newvalue -> it.string = newvalue })).Compose(composectx) }
+            }
+
+            constructor(o: O) {
+                this.o = o
+            }
+        }
+        """)
+
+        try await check(supportingSwift: baseSupportingSwift + """
+        @Observable class O {
+            var s = S()
+        }
+        struct S {
+            var string = ""
+        }
+        """, swift: """
+        import SwiftUI
+        struct V: View {
+            @Bindable var o: O
+            var body: some View {
+                TextField(self.$o.s.string)
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.*
+
+        import skip.ui.*
+        internal class V: View {
+            internal var o: O
+            @Composable
+            override fun body(): View {
+                return ComposingView { composectx: ComposeContext -> TextField(InstanceBinding(this.o, { it.s.string }, { it, newvalue -> it.s.string = newvalue })).Compose(composectx) }
+            }
+
+            constructor(o: O) {
+                this.o = o
+            }
+        }
+        """)
+    }
 
     func testMutableViewMemberwiseConstructor() async throws {
         try await check(supportingSwift: baseSupportingSwift, swift: """
@@ -666,7 +806,7 @@ final class SwiftUITests: XCTestCase {
                 countdidchange = null
                 val initialcount = count
                 var composecount by remember { mutableStateOf(initialcount) }
-                count = initialcount
+                count = composecount
                 countdidchange = { composecount = count }
 
                 envvalue = composectx.environment[EnvironmentValues::envvalue]
@@ -745,7 +885,7 @@ final class SwiftUITests: XCTestCase {
                 countdidchange = null
                 val initialcount = count
                 var composecount by remember { mutableStateOf(initialcount) }
-                count = initialcount
+                count = composecount
                 countdidchange = { composecount = count }
 
                 envvalue = composectx.environment[EnvironmentValues::envvalue]

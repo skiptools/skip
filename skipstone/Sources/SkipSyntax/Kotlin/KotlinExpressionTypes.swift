@@ -1008,7 +1008,7 @@ class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting, APICallExp
     }
 }
 
-class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTarget, APICallExpression {
+class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTarget, KotlinBindable, APICallExpression {
     var name: String
     var apiMatch: APIMatch?
     var mayBeSharedMutableStruct = false
@@ -1062,6 +1062,16 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
         return .isolated
     }
 
+    var isBinding: Bool {
+        return name.hasPrefix("$") && Int(name.dropFirst()) == nil
+    }
+
+    func appendBindingPath(to output: OutputGenerator, indentation: Indentation, appendPath: @escaping (OutputGenerator, Indentation, KotlinBindableBase) -> Void) {
+        appendInstanceBinding(to: output, indentation: indentation, appendPath: appendPath) {
+            appendIdentifier(to: output, indentation: indentation)
+        }
+    }
+
     var generics: [TypeSignature]?
     var isGenericsTypeErased = false
 
@@ -1077,6 +1087,19 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
+        if isBinding {
+            appendBinding(to: output, indentation: indentation)
+        } else {
+            appendIdentifier(to: output, indentation: indentation)
+        }
+    }
+
+    private func appendIdentifier(to output: OutputGenerator, indentation: Indentation) {
+        var name = name
+        if isBinding {
+            name = String(name.dropFirst())
+        }
+
         let mainActorOutputMode = mainActorMode.output
         if mainActorOutputMode != .none {
             output.append("MainActor.run { ")
@@ -1128,6 +1151,14 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
         if mainActorOutputMode == .isolated {
             output.append(" }")
         }
+    }
+
+    private func appendBinding(to output: OutputGenerator, indentation: Indentation) {
+        output.append("Binding({ ")
+        appendIdentifier(to: output, indentation: indentation)
+        output.append(" }, { ")
+        appendIdentifier(to: output, indentation: indentation)
+        output.append(" = it })")
     }
 }
 
@@ -1498,7 +1529,7 @@ struct KotlinMatchingCase {
     }
 }
 
-class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinCastTarget, APICallExpression {
+class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinBindable, KotlinCastTarget, APICallExpression {
     var base: KotlinExpression?
     var baseKClass: TypeSignature?
     var member: String
@@ -1641,6 +1672,30 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinCast
         return isBaseIncludedInMainActor ? .isolated : .none
     }
 
+    var isBinding: Bool {
+        return member.hasPrefix("$") || (base as? KotlinBindable)?.isBinding == true
+    }
+
+    func appendBindingPath(to output: OutputGenerator, indentation: Indentation, appendPath: @escaping (OutputGenerator, Indentation, KotlinBindableBase) -> Void) {
+        if member.hasPrefix("$") {
+            // Capture this member access as the base of an InstanceBinding
+            appendInstanceBinding(to: output, indentation: indentation, appendPath: appendPath) {
+                appendMemberAccess(to: output, indentation: indentation) { output, indentation in
+                    if let base {
+                        output.append(base, indentation: indentation)
+                    }
+                }
+            }
+        } else {
+            // Tack this member access onto our base's existing InstanceBinding
+            (base as? KotlinBindable)?.appendBindingPath(to: output, indentation: indentation) { output, indentation, appendTo in
+                appendPath(output, indentation) { output, indentation in
+                    self.appendMemberAccess(to: output, indentation: indentation, appendBase: appendTo)
+                }
+            }
+        }
+    }
+
     var generics: [TypeSignature]?
     var isGenericsTypeErased = false
 
@@ -1669,6 +1724,31 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinCast
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
+        if member.hasPrefix("$") {
+            // Append an InstanceBinding where the base is our base and the path is our member
+            appendInstanceBinding(to: output, indentation: indentation, appendPath: appendMemberAccess) {
+                if let base {
+                    output.append(base, indentation: indentation)
+                }
+            }
+        } else if let bindable = base as? KotlinBindable, bindable.isBinding {
+            // Add our member to the base binding path
+            bindable.appendBindingPath(to: output, indentation: indentation, appendPath: appendMemberAccess)
+        } else {
+            appendMemberAccess(to: output, indentation: indentation) { output, indentation in
+                if let base {
+                    output.append(base, indentation: indentation)
+                }
+            }
+        }
+    }
+
+    private func appendMemberAccess(to output: OutputGenerator, indentation: Indentation, appendBase: (OutputGenerator, Indentation) -> Void) {
+        var member = member
+        if member.hasPrefix("$") {
+            member = String(member.dropFirst())
+        }
+
         let mainActorOutputMode = mainActorMode.output
         if mainActorOutputMode != .none && isBaseIncludedInMainActor {
             // MainActor.run { self... or Type.... }
@@ -1680,7 +1760,7 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinCast
             if baseKClass != nil {
                 output.append("(")
             }
-            output.append(base, indentation: indentation)
+            appendBase(output, indentation)
             if base.optionalChain == .implicit {
                 output.append("?")
             }
@@ -2196,7 +2276,7 @@ class KotlinStringLiteral: KotlinExpression {
     }
 }
 
-class KotlinSubscript: KotlinExpression, KotlinMainActorTargeting, APICallExpression {
+class KotlinSubscript: KotlinExpression, KotlinMainActorTargeting, KotlinBindable, APICallExpression {
     var base: KotlinExpression
     var arguments: [LabeledValue<KotlinExpression>] = []
     var apiMatch: APIMatch?
@@ -2242,6 +2322,19 @@ class KotlinSubscript: KotlinExpression, KotlinMainActorTargeting, APICallExpres
         return child === base ? .isolatedFunctionReference : .isolated
     }
 
+    var isBinding: Bool {
+        return (base as? KotlinBindable)?.isBinding == true
+    }
+
+    func appendBindingPath(to output: OutputGenerator, indentation: Indentation, appendPath: @escaping (OutputGenerator, Indentation, KotlinBindableBase) -> Void) {
+        (base as? KotlinBindable)?.appendBindingPath(to: output, indentation: indentation) { output, indentation, appendBase in
+            appendPath(output, indentation) { output, indentation in
+                appendBase(output, indentation)
+                self.appendSubscript(to: output, indentation: indentation)
+            }
+        }
+    }
+
     override func mayBeSharedMutableStructExpression(orType: Bool) -> Bool {
         // Subscripts sref() on the way out, but they do so with an onUpdate to support e.g. 'a[0].i += 1'. So unlike a
         // function, we do have to sref() subscript values again on assignment to erase the onUpdate action
@@ -2258,6 +2351,10 @@ class KotlinSubscript: KotlinExpression, KotlinMainActorTargeting, APICallExpres
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
         output.append(base, indentation: indentation)
+        appendSubscript(to: output, indentation: indentation)
+    }
+
+    private func appendSubscript(to output: OutputGenerator, indentation: Indentation) {
         // Kotlin can't optional chain a subscript, i.e. a?[0]
         switch base.optionalChain {
         case .none:

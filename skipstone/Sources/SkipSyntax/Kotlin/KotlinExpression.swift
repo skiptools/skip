@@ -129,6 +129,32 @@ extension KotlinMainActorTargeting where Self: KotlinSyntaxNode {
     }
 }
 
+/// An expression that can take part in a binding.
+protocol KotlinBindable {
+    /// Whether this is a binding expression.
+    var isBinding: Bool { get }
+    
+    /// Append this expression as part of a binding path, using the given block to append the remaining path.
+    ///
+    /// This is called by a parent expression in place of `append` when the child's `isBinding` is `true`.
+    func appendBindingPath(to output: OutputGenerator, indentation: Indentation, appendPath: @escaping (OutputGenerator, Indentation, KotlinBindableBase) -> Void)
+}
+
+typealias KotlinBindableBase = (OutputGenerator, Indentation) -> Void
+
+extension KotlinBindable {
+    /// Helper function for bindables to create an instance binding.
+    func appendInstanceBinding(to output: OutputGenerator, indentation: Indentation, appendPath: (OutputGenerator, Indentation, KotlinBindableBase) -> Void, appendInstance: () -> Void) {
+        output.append("InstanceBinding(")
+        appendInstance()
+        output.append(", { ")
+        appendPath(output, indentation) { output, _ in output.append("it") }
+        output.append(" }, { it, newvalue -> ")
+        appendPath(output, indentation) { output, _ in output.append("it") }
+        output.append(" = newvalue })")
+    }
+}
+
 /// An expression that can act as the target of a cast operation.
 protocol KotlinCastTarget {
     var generics: [TypeSignature]? { get }

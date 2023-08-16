@@ -202,7 +202,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         let nullDidChange = KotlinRawStatement(sourceCode: "\(variable.stateDidChangePropertyName) = null")
         let initialValue = KotlinRawStatement(sourceCode: "val initial\(variable.propertyName) = \(variable.propertyName)")
         let composeValue = KotlinRawStatement(sourceCode: "var compose\(variable.propertyName) by remember { mutableStateOf(initial\(variable.propertyName)) }")
-        let syncValue = KotlinRawStatement(sourceCode: "\(variable.propertyName) = initial\(variable.propertyName)")
+        let syncValue = KotlinRawStatement(sourceCode: "\(variable.propertyName) = compose\(variable.propertyName)")
         let setDidChange = KotlinRawStatement(sourceCode: "\(variable.stateDidChangePropertyName) = { compose\(variable.propertyName) = \(variable.propertyName) }")
         return [nullDidChange, initialValue, composeValue, syncValue, setDidChange]
     }
