@@ -20,8 +20,8 @@ public protocol SkipCommandExecutor : AsyncParsableCommand {
 
 /// The command that is run by "SkipRunner" (aka "skipstone")
 public struct SkipRunnerExecutor: SkipCommandExecutor {
-    public static var configuration = CommandConfiguration(commandName: "skip",
-                                                           abstract: "Skip Transpiler \(skipVersion)",
+    public static var configuration = CommandConfiguration(commandName: "skipstone",
+                                                           abstract: "skipstone transpiler \(skipVersion)",
                                                            shouldDisplay: true,
                                                            subcommands: [
                                                             VersionCommand.self,
@@ -255,15 +255,15 @@ struct VersionCommand: SingleStreamingCommand {
         var version: String = skipVersion
         #if DEBUG
         let debug: Bool = true
-        var description: String { "skip version \(skipVersion) (debug)" }
+        var description: String { "skipstone version \(skipVersion) (debug)" }
         #else
         let debug: Bool? = nil
-        var description: String { "skip version \(skipVersion)" }
+        var description: String { "skipstone version \(skipVersion)" }
         #endif
     }
 
     static var configuration = CommandConfiguration(commandName: "version",
-                                                           abstract: "Print the Skip version",
+                                                           abstract: "Print the skipstone version",
                                                            shouldDisplay: !experimental)
 
     @OptionGroup(title: "Output Options")
