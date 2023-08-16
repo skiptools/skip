@@ -81,3 +81,14 @@ jobs:
           tree -l -I build
           cd -
 
+      - name: Test Homebrew Tap
+        run: |
+          brew install skiptools/skip/skip
+          skip version
+
+      - name: Test Mint Install
+        run: |
+          brew install mint
+          mint run skiptools/skip version
+
+

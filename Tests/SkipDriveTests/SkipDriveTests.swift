@@ -1,6 +1,7 @@
 import XCTest
 import SkipDrive
 
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 public class SkipCommandTests : XCTestCase {
     public func testSkipCommands() async throws {
         try await XCTAssertEqualX("Skip version \(skipVersion)", skip("version").out)
@@ -16,6 +17,7 @@ public class SkipCommandTests : XCTestCase {
 }
 
 /// Cover for `XCTAssertEqual` that permit async autoclosures.
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 public func XCTAssertEqualX<T>(_ expression1: T, _ expression2: T, _ message: @autoclosure () -> String = "", file: StaticString = #filePath, line: UInt = #line) where T : Equatable {
     XCTAssertEqual(expression1, expression2, message(), file: file, line: line)
 }
