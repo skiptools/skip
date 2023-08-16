@@ -1023,4 +1023,29 @@ final class SwiftUITests: XCTestCase {
         }
         """)
     }
+
+    func testOmitPreviews() async throws {
+        try await check(supportingSwift: baseSupportingSwift, swift: """
+        import SwiftUI
+        struct MyV: View {
+            var body: some View {
+                return Text("Hello")
+            }
+        }
+        struct MyV_Previews: PreviewProvider {
+            static var previews: some View {
+                MyV()
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.*
+
+        import skip.ui.*
+        internal class MyV: View {
+            override fun body(): View {
+                return ComposingView { composectx: ComposeContext -> Text("Hello").Compose(composectx) }
+            }
+        }
+        """)
+    }
 }
