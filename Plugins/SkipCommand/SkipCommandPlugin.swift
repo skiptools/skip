@@ -1,7 +1,7 @@
 // Copyright 2023 Skip
 //
 // This is free software: you can redistribute and/or modify it
-// under the terms of the GNU Affero General Public License 3.0
+// under the terms of the GNU Lesser General Public License 3.0
 // as published by the Free Software Foundation https://fsf.org
 import Foundation
 import PackagePlugin
@@ -13,7 +13,7 @@ import PackagePlugin
 /// - Note: The location of your Command Line Tools must be set in Xcode->Settings->Locations
 @main struct SkipCommand: CommandPlugin {
     func performCommand(context: PluginContext, arguments: [String]) async throws {
-        try runCommand(tool: context.tool(named: "skipstone"), arguments: arguments)
+        try runCommand(tool: context.tool(named: "skip"), arguments: arguments)
     }
 
     fileprivate func runCommand(tool runner: PackagePlugin.PluginContext.Tool, arguments: [String]) throws {
@@ -30,7 +30,7 @@ import XcodeProjectPlugin
 
 extension SkipCommand: XcodeCommandPlugin {
     func performCommand(context: XcodePluginContext, arguments: [String]) throws {
-        try runCommand(tool: context.tool(named: "skipstone"), arguments: arguments)
+        try runCommand(tool: context.tool(named: "skip"), arguments: arguments)
     }
 }
 #endif

@@ -39,8 +39,6 @@ jobs:
           swift build --jobs 1 --configuration debug
 
       - name: Test Skip Package (Debug)
-        # disables for concurrency
-        if: false
         working-directory: SomeLibraryDebug
         run: |
           swift test --jobs 1 --configuration debug
