@@ -114,6 +114,10 @@ cd -
 # make a release of the skip command
 cd ${SKIPPKGDIR}
 
+SKIPDRIVE_VERSION_PATH="Sources/SkipDrive/Version.swift"
+
+sed -I '' 's;public let skipVersion = .*;public let skipVersion = "'${SKIP_VERSION}'";g' "${SKIPDRIVE_VERSION_PATH}"
+
 SKIP_ARTIFACT_ZIP="skip.zip"
 echo "Building ${SKIP_ARTIFACT_ZIP}"
 SKIPLOCAL=.. swift build --arch arm64 --arch x86_64 --configuration ${SKIPCONFIG} --product skip
@@ -127,10 +131,6 @@ cd -
 
 # package.targets += [.binaryTarget(name: "${PRODUCT}", url: "${ARTIFACT_URL}", checksum: "${PLUGIN_CHECKSUM}")]
 sed -I '' 's;package.targets += \[.binaryTarget.*;package.targets += [.binaryTarget(name: "'${ARTIFACT}'", url: "'${ARTIFACT_URL}'", checksum: "'${PLUGIN_CHECKSUM}'")];g' ${SKIPPKG}
-
-SKIPDRIVE_VERSION_PATH="Sources/SkipDrive/Version.swift"
-
-sed -I '' 's;public let skipVersion = .*;public let skipVersion = "'${SKIP_VERSION}'";g' "${SKIPDRIVE_VERSION_PATH}"
 
 git add Package.swift ${README_PATH} ${SKIPDRIVE_VERSION_PATH}
 git add .
