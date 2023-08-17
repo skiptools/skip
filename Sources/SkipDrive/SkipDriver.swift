@@ -122,16 +122,19 @@ struct CreateCommand: SkipParsableCommand {
             throw AppLaunchError(errorDescription: "Specified project path already exists: \(projectFolder)")
         }
 
-        let downloadURL = try createOptions.projectTemplateURL
-        let (url, response) = try await URLSession.shared.download(from: downloadURL)
-        let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-        if !(200..<300).contains(code) {
-            throw AppLaunchError(errorDescription: "Download for template URL \(downloadURL.absoluteString) returned error: \(code)")
+        let downloadURL: URL = try await outputOptions.monitor("Downloading template \(createOptions.template)") {
+            let downloadURL = try createOptions.projectTemplateURL
+            let (url, response) = try await URLSession.shared.download(from: downloadURL)
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            if !(200..<300).contains(code) {
+                throw AppLaunchError(errorDescription: "Download for template URL \(downloadURL.absoluteString) returned error: \(code)")
+            }
+            return url
         }
 
         let projectFolderURL = URL(fileURLWithPath: projectFolder, isDirectory: true)
 
-        try await outputOptions.run("Unpacking template \(createOptions.template)", ["unzip", url.path, "-d", projectFolderURL.path])
+        try await outputOptions.run("Unpacking template \(createOptions.template) for project \(projectName)", ["unzip", downloadURL.path, "-d", projectFolderURL.path])
 
         let packageJSONString = try await outputOptions.run("Checking project \(projectName)", [toolOptions.swift, "package", "dump-package", "--package-path", projectFolderURL.path])
 
