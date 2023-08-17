@@ -1460,7 +1460,10 @@ class Parenthesized: Expression {
 /// - Note: We never instantiate this class. It is only used ot extract the statements from an `#if`.
 class PostfixIfDefined: Expression {
     override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
-        guard syntax.kind == .postfixIfConfigExpr, let postfixIfConfigExpr = syntax.as(PostfixIfConfigExprSyntax.self), let baseSyntax = postfixIfConfigExpr.base else {
+        guard syntax.kind == .postfixIfConfigExpr, let postfixIfConfigExpr = syntax.as(PostfixIfConfigExprSyntax.self) else {
+            return nil
+        }
+        guard let baseSyntax = postfixIfConfigExpr.base else {
             throw Message.ifDeclPlacement(syntax, source: syntaxTree.source)
         }
         let base = ExpressionDecoder.decode(syntax: baseSyntax, in: syntaxTree)

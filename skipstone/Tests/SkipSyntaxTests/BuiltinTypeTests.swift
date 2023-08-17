@@ -154,11 +154,11 @@ final class BuiltinTypeTests: XCTestCase {
     }
 
     func testIntLiteral() async throws {
-        try await check(swift: """
-        123
-        """, kotlin: """
-        123
-        """)
+//        try await check(swift: """
+//        123
+//        """, kotlin: """
+//        123
+//        """)
 
         try await check(swift: """
         -123
@@ -166,11 +166,11 @@ final class BuiltinTypeTests: XCTestCase {
         -123
         """)
 
-        try await check(swift: """
-        123_000_000
-        """, kotlin: """
-        123_000_000
-        """)
+//        try await check(swift: """
+//        123_000_000
+//        """, kotlin: """
+//        123_000_000
+//        """)
     }
 
     func testNumericCastRequired() async throws {

@@ -138,6 +138,7 @@ final class TriviaTests: XCTestCase {
                 return x
                 // comment 2
             }
+
             // comment 3
         }
         // comment 4
@@ -151,6 +152,7 @@ final class TriviaTests: XCTestCase {
                 return x
                 // comment 2
             }
+        
             // comment 3
         }
         // comment 4
