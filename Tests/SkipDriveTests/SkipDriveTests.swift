@@ -7,6 +7,17 @@ public class SkipCommandTests : XCTestCase {
         try await XCTAssertEqualX("Skip version \(skipVersion)", skip("version").out)
     }
 
+    public func testSkipCreate() async throws {
+        let tempDir = NSTemporaryDirectory() + "skip_app/\(UUID().uuidString)/"
+        try FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
+
+        let (stdout, strerr) = try await skip("create", "--test", "-d", tempDir, "cool_app")
+        XCTAssertEqual("", strerr, "command stderr was not empty")
+
+        let out = stdout.split(separator: "\n")
+        XCTAssertEqual("Creating project cool_app from template skipapp", out.first)
+    }
+
     /// Runs the tool with the given arguments, returning the entire output string as well as a function to parse it to `JSON`
     func skip(_ args: String...) async throws -> (out: String, err: String) {
         let out = BufferedOutputByteStream()
