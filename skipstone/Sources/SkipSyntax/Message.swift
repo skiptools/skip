@@ -106,7 +106,7 @@ extension Message {
 
     static func ifDeclPlacement(_ syntax: SyntaxProtocol, source: Source) -> Message {
         let range = syntax.range(in: source)
-        return Message(kind: .error, message: "Skip only supports #if between code block statements or member declarations", source: source, sourceRange: range)
+        return Message(kind: .error, message: "Skip does not support this use of #if. Only placement around statement blocks, switch cases, or member chains is supported", source: source, sourceRange: range)
     }
 
     static func importKindSpecifier(_ sourceDerived: SourceDerived, source: Source? = nil) -> Message {

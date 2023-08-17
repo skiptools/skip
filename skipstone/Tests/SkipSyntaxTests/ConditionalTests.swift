@@ -1887,4 +1887,51 @@ final class ConditionalTests: XCTestCase {
         }
         """)
     }
+
+    func testIfDefinedTrailingCalls() async throws {
+        try await check(swift: """
+        V().x()
+        #if SKIP
+            .y()
+        #else
+            .z()
+        #endif
+        """, kotlin: """
+        V().x().y()
+        """)
+
+        try await check(swift: """
+        V()
+        #if !SKIP
+            .x()
+        #endif
+        """, kotlin: """
+        V()
+        """)
+
+        try await check(swift: """
+        V().x()
+        #if SKIP
+            .a.b(a: 100).c
+        #endif
+            .d()
+        """, kotlin: """
+        V().x().a.b(a = 100).c
+            .d()
+        """)
+
+        try await check(swift: """
+        f(v: V()
+            .opacity(1.0)
+          #if DEBUG
+            .border(Color.red)
+          #else
+            .border(Color.blue)
+          #endif
+        )
+        """, kotlin: """
+        f(v = V()
+            .opacity(1.0).border(Color.blue))
+        """)
+    }
 }

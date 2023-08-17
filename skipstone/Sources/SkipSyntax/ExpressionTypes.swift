@@ -22,6 +22,7 @@ enum ExpressionType: CaseIterable {
     case numericLiteral
     case optionalBinding
     case parenthesized
+    case postfixIfDefined
     case postfixOperator
     case prefixOperator
     case stringLiteral
@@ -79,6 +80,8 @@ enum ExpressionType: CaseIterable {
             return OptionalBinding.self
         case .parenthesized:
             return Parenthesized.self
+        case .postfixIfDefined:
+            return PostfixIfDefined.self
         case .postfixOperator:
             return PostfixOperator.self
         case .prefixOperator:
@@ -1169,7 +1172,7 @@ class MatchingCase: Expression, BindingExpression {
 
 /// `person.name`
 class MemberAccess: Expression, APICallExpression {
-    let base: Expression?
+    var base: Expression?
     private(set) var baseType: TypeSignature // Will be .module(name, .none) for module qualifier
     let member: String
     private(set) var generics: [TypeSignature]?
@@ -1444,6 +1447,27 @@ class Parenthesized: Expression {
 
     override var children: [SyntaxNode] {
         return [content]
+    }
+}
+
+/// `View().x()`
+///     `#if SYMBOL
+///     `.y()`
+///     `#else`
+///     `.z()`
+///     `#endif`
+///
+/// - Note: We never instantiate this class. It is only used ot extract the statements from an `#if`.
+class PostfixIfDefined: Expression {
+    override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
+        guard syntax.kind == .postfixIfConfigExpr, let postfixIfConfigExpr = syntax.as(PostfixIfConfigExprSyntax.self), let baseSyntax = postfixIfConfigExpr.base else {
+            throw Message.ifDeclPlacement(syntax, source: syntaxTree.source)
+        }
+        let base = ExpressionDecoder.decode(syntax: baseSyntax, in: syntaxTree)
+        guard let expression = IfDefined.decodePostfix(syntax: postfixIfConfigExpr.config, baseExpression: base, in: syntaxTree) else {
+            throw Message.ifDeclPlacement(syntax, source: syntaxTree.source)
+        }
+        return expression
     }
 }
 

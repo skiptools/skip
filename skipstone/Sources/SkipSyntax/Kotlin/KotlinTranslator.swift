@@ -213,6 +213,9 @@ public class KotlinTranslator {
                 break // Should be translated directly by parent expressions
             case .parenthesized:
                 return KotlinParenthesized.translate(expression: expression as! Parenthesized, translator: self)
+            case .postfixIfDefined:
+                // This should never happen, as we never make the PostfixIfDefined expression part of the syntax tree
+                break
             case .prefixOperator:
                 return KotlinPrefixOperator.translate(expression: expression as! PrefixOperator, translator: self)
             case .postfixOperator:

@@ -461,6 +461,42 @@ class IfDefined: Statement {
         return Switch.decodeCaseList(syntax: caseList, in: syntaxTree)
     }
 
+    /// Decode a postfix `#if`.
+    ///
+    /// `View().x()`
+    ///     `#if SYMBOL
+    ///     `.y()`
+    ///     `#else`
+    ///     `.z()`
+    ///     `#endif`
+    static func decodePostfix(syntax: IfConfigDeclSyntax, baseExpression: Expression, in syntaxTree: SyntaxTree) -> Expression? {
+        guard let elements = extractClause(from: syntax, in: syntaxTree)?.clause.elements else {
+            return baseExpression
+        }
+        guard case .postfixExpression(let exprSyntax) = elements else {
+            return nil
+        }
+        let expression = ExpressionDecoder.decode(syntax: exprSyntax, in: syntaxTree)
+        var memberExpression = expression
+        while true {
+            // We only support a chain of member accesses and member function calls. Find the member that is missing a
+            // base expression and install the postfix base
+            if let functionCall = memberExpression as? FunctionCall {
+                memberExpression = functionCall.function
+            } else if let memberAccess = memberExpression as? MemberAccess {
+                if let memberBase = memberAccess.base {
+                    memberExpression = memberBase
+                } else {
+                    memberAccess.base = baseExpression
+                    break
+                }
+            } else {
+                return nil
+            }
+        }
+        return expression
+    }
+
     private static func extractClause(from syntax: IfConfigDeclSyntax, in syntaxTree: SyntaxTree) -> (clause: IfConfigClauseSyntax, endSyntax: SyntaxProtocol)? {
         // Look for a clause that matches a defined symbol, or an 'else'. Return it along with the pound keyword *after* it,
         // which we use to look for ending statement extras

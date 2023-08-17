@@ -637,7 +637,6 @@ final class ConstructorDestructorTests: XCTestCase {
         """)
     }
 
-    //~~~
     func testSelfAssignConstructor() async throws {
         try await check(swift: """
         struct S {
