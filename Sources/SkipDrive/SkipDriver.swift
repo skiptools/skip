@@ -96,11 +96,11 @@ struct CreateCommand: SkipParsableCommand {
     @OptionGroup(title: "Tool Options")
     var toolOptions: ToolOptions
 
-    @Flag(help: ArgumentHelp("Run tests"))
-    var test: Bool = false
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Run the project build"))
+    var build: Bool = true
 
-    @Flag(help: ArgumentHelp("Suppress running the build"))
-    var noBuild: Bool = false
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Run the project tests"))
+    var test: Bool = false
 
     @Argument(help: ArgumentHelp("Project folder name"))
     var projectName: String
@@ -140,11 +140,11 @@ struct CreateCommand: SkipParsableCommand {
 
         let packageJSON = try JSONDecoder().decode(SwiftPackage.self, from: Data(packageJSONString.utf8))
 
-        if !noBuild {
+        if build == true {
             try await outputOptions.run("Building project \(projectName) for package \(packageJSON.name)", [toolOptions.swift, "build", "-c", createOptions.configuration, "--package-path", projectFolderURL.path])
         }
 
-        if test {
+        if test == true {
             try await outputOptions.run("Testing project \(projectName)", [toolOptions.swift, "test", "-c", createOptions.configuration, "--package-path", projectFolderURL.path])
         }
 
@@ -153,18 +153,18 @@ struct CreateCommand: SkipParsableCommand {
 }
 
 struct ToolOptions: ParsableArguments {
-    @Option(help: ArgumentHelp("Swift command path"))
+    @Option(help: ArgumentHelp("Xcode command path", valueName: "path"))
+    var xcode: String = "/usr/bin/xcodebuild"
+
+    @Option(help: ArgumentHelp("Swift command path", valueName: "path"))
     var swift: String = "/usr/bin/swift"
 
     // TODO: check processor for intel vs. arm for homebrew location rather than querying file system
-    @Option(help: ArgumentHelp("Gradle command path"))
+    @Option(help: ArgumentHelp("Gradle command path", valueName: "path"))
     var gradle: String = FileManager.default.fileExists(atPath: "/usr/local/bin/gradle") ? "/usr/local/bin/gradle" : "/opt/homebrew/bin/gradle"
 
-    @Option(help: ArgumentHelp("JAVA_HOME path"))
-    var javaHome: String = ProcessInfo.processInfo.environment["JAVA_HOME"] ?? ""
-
-    @Option(help: ArgumentHelp("ANDROID_HOME path"))
-    var androidHome: String = ProcessInfo.processInfo.environment["ANDROID_HOME"] ?? ""
+    @Option(help: ArgumentHelp("Path to the Android SDK (ANDROID_HOME)", valueName: "path"))
+    var androidHome: String?
 }
 
 struct CreateOptions: ParsableArguments {
