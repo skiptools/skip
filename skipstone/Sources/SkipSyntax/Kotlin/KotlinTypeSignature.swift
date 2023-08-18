@@ -371,6 +371,10 @@ extension TypeSignature {
 extension TypeSignature.Parameter {
     /// Kotlin description of this parameter.
     var kotlin: String {
-        return type.kotlin
+        if isInOut {
+            return "InOut<\(type.kotlin)>"
+        } else {
+            return type.kotlin
+        }
     }
 }

@@ -19,6 +19,33 @@ final class StructTests: XCTestCase {
             }
         }
         """)
+
+        try await check(swift: """
+        struct A {
+            let i: Int
+            var x: Int {
+                get { 100 }
+                set { print(newValue) }
+            }
+
+            init(i: Int) {
+                self.i = i
+            }
+        }
+        """, kotlin: """
+        internal class A {
+            internal val i: Int
+            internal var x: Int
+                get() = 100
+                set(newValue) {
+                    print(newValue)
+                }
+
+            internal constructor(i: Int) {
+                this.i = i
+            }
+        }
+        """)
     }
 
     func testMutableStruct() async throws {

@@ -552,6 +552,8 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
             let name = index < implicitParameterLabels.count ? implicitParameterLabels[index] : parameter.label
             if let name {
                 kbody.updateWithInOutParameter(name: name, source: translator.syntaxTree.source)
+            } else {
+                kbody.updateWithInOutParameter(name: "$\(index)", source: translator.syntaxTree.source)
             }
         }
         handleSelfAssignments(in: kbody, source: translator.syntaxTree.source)

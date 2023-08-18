@@ -17,6 +17,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             for importDeclaration in syntaxTree.root.statements.compactMap({ $0 as? KotlinImportDeclaration }) {
                 if importDeclaration.modulePath.first == "SwiftUI" || importDeclaration.modulePath.first == "SkipUI" {
                     needsTranslation = true
+                    syntaxTree.dependencies.imports.insert("androidx.compose.runtime.*")
                     break
                 }
             }
@@ -76,7 +77,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
                 return .skip
             } else if let binaryOperator = node as? KotlinBinaryOperator, binaryOperator.op.symbol == "=", let statePropertyName = statePropertyName(for: binaryOperator.lhs, in: functionDeclaration.parent as? KotlinClassDeclaration) {
                 binaryOperator.lhs = KotlinMemberAccess(base: KotlinIdentifier(name: "self"), member: "_" + statePropertyName)
-                binaryOperator.rhs = KotlinFunctionCall(function: KotlinIdentifier(name: "State"), arguments: [LabeledValue(label: "initialValue", value: binaryOperator.rhs)])
+                binaryOperator.rhs = KotlinFunctionCall(function: KotlinIdentifier(name: "skip.ui.State"), arguments: [LabeledValue(label: "initialValue", value: binaryOperator.rhs)])
                 binaryOperator.assignParentReferences()
                 return .skip
             } else {
@@ -313,11 +314,11 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             let stateType = variable.propertyType.asState().kotlin
             output.append(indentation).append(variable.modifiers.kotlinMemberString(isGlobal: false, isOpen: false, suffix: " ")).append("var ").append(storageName).append(": ").append(stateType)
             if let value = variable.value {
-                output.append(" = State(")
+                output.append(" = skip.ui.State(")
                 value.append(to: output, indentation: indentation)
                 output.append(")")
             } else if variable.propertyType.isOptional {
-                output.append(" = State(null)")
+                output.append(" = skip.ui.State(null)")
             }
             output.append("\n")
         }

@@ -19,7 +19,7 @@ final class KotlinObservationTransformer: KotlinTransformer {
     }
 
     private func addObservationImportDependencies(statement: KotlinImportDeclaration, in syntaxTree: KotlinSyntaxTree) {
-        guard statement.modulePath.first == "Combine" || statement.modulePath.first == "Observation" || statement.modulePath.first == "SwiftUI" else {
+        guard statement.modulePath.first == "Combine" || statement.modulePath.first == "Observation" else {
             return
         }
         addKotlinObservationDependencies(to: syntaxTree)

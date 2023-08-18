@@ -39,7 +39,7 @@ final class KotlinStructTransformer: KotlinTransformer {
         var initializableVariableDeclarations: [KotlinVariableDeclaration] = []
         for member in classDeclaration.members {
             if let variableDeclaration = member as? KotlinVariableDeclaration {
-                if !isNoCopy && !variableDeclaration.isStatic && ((variableDeclaration.apiFlags.contains(.writeable) && !variableDeclaration.attributes.isNonMutating) || variableDeclaration.modifiers.isLazy) && !variableDeclaration.isGenerated {
+                if !isNoCopy && !variableDeclaration.isStatic && ((variableDeclaration.apiFlags.contains(.writeable) && !variableDeclaration.attributes.isNonMutating && variableDeclaration.getter == nil) || variableDeclaration.modifiers.isLazy) && !variableDeclaration.isGenerated {
                     variableDeclaration.mutationFunctionNames = mutationFunctionNames
                     isMutable = true
                 }
@@ -167,7 +167,7 @@ final class KotlinStructTransformer: KotlinTransformer {
                 if variableDeclaration.mayBeSharedMutableStruct {
                     value += ".sref()"
                 }
-                assignment = "this._\(variableDeclaration.propertyName) = State(\(value))"
+                assignment = "this._\(variableDeclaration.propertyName) = skip.ui.State(\(value))"
             } else if variableDeclaration.attributes.contains(.binding) {
                 assignment = "this._\(variableDeclaration.propertyName) = \(variableDeclaration.propertyName)"
             } else {
@@ -196,7 +196,7 @@ final class KotlinStructTransformer: KotlinTransformer {
         bodyStatements.append(KotlinRawStatement(sourceCode: "@Suppress(\"NAME_SHADOWING\") val copy = copy as \(classDeclaration.signature.kotlin)"))
         bodyStatements += variableDeclarations.map { variableDeclaration in
             if variableDeclaration.attributes.contains(.state) {
-                return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = State(copy.\(variableDeclaration.propertyName))")
+                return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = skip.ui.State(copy.\(variableDeclaration.propertyName))")
             } else if variableDeclaration.attributes.contains(.binding) {
                 return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = copy._\(variableDeclaration.propertyName)")
             } else {
@@ -309,7 +309,7 @@ final class KotlinStructTransformer: KotlinTransformer {
     private func selfAssignStatements(from copy: String, storedVariableDeclarations: [KotlinVariableDeclaration]) -> [KotlinStatement] {
         return storedVariableDeclarations.map { variableDeclaration in
             if variableDeclaration.attributes.contains(.state) {
-                return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = State(\(copy).\(variableDeclaration.propertyName))")
+                return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = skip.ui.State(\(copy).\(variableDeclaration.propertyName))")
             } else if variableDeclaration.attributes.contains(.binding) {
                 return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = \(copy)._\(variableDeclaration.propertyName)")
             } else {

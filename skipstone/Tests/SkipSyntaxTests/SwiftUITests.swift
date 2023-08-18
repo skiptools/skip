@@ -393,7 +393,7 @@ final class SwiftUITests: XCTestCase {
                 set(newValue) {
                     _s.wrappedValue = newValue
                 }
-            internal var _s: State<Int>
+            internal var _s: skip.ui.State<Int>
             internal var o: O
                 get() = _o.wrappedValue
                 set(newValue) {
@@ -402,7 +402,7 @@ final class SwiftUITests: XCTestCase {
                         print("set o")
                     }
                 }
-            internal var _o: State<O>
+            internal var _o: skip.ui.State<O>
             override fun body(): View {
                 return ComposingView { composectx: ComposeContext ->
                     VStack {
@@ -430,8 +430,8 @@ final class SwiftUITests: XCTestCase {
             constructor(s: Int = 0, o: O = O()) {
                 suppresssideeffects = true
                 try {
-                    this._s = State(s)
-                    this._o = State(o)
+                    this._s = skip.ui.State(s)
+                    this._o = skip.ui.State(o)
                 } finally {
                     suppresssideeffects = false
                 }
@@ -484,7 +484,7 @@ final class SwiftUITests: XCTestCase {
                 set(newValue) {
                     _s.wrappedValue = newValue.sref()
                 }
-            internal var _s: State<S>
+            internal var _s: skip.ui.State<S>
             override fun body(): View {
                 return ComposingView { composectx: ComposeContext ->
                     VStack {
@@ -505,7 +505,7 @@ final class SwiftUITests: XCTestCase {
             }
 
             constructor(s: S = S()) {
-                this._s = State(s.sref())
+                this._s = skip.ui.State(s.sref())
             }
         }
         """)
@@ -660,7 +660,7 @@ final class SwiftUITests: XCTestCase {
                 set(newValue) {
                     _text.wrappedValue = newValue
                 }
-            internal var _text: State<String>
+            internal var _text: skip.ui.State<String>
             override fun body(): View {
                 return ComposingView { composectx: ComposeContext -> TextField(Binding({ text }, { text = it })).Compose(composectx) }
             }
@@ -675,7 +675,7 @@ final class SwiftUITests: XCTestCase {
             }
 
             constructor(text: String = "") {
-                this._text = State(text)
+                this._text = skip.ui.State(text)
             }
         }
         """)
@@ -700,7 +700,7 @@ final class SwiftUITests: XCTestCase {
                 set(newValue) {
                     _text.wrappedValue = newValue
                 }
-            internal var _text: State<String>
+            internal var _text: skip.ui.State<String>
             override fun body(): View {
                 return ComposingView { composectx: ComposeContext -> TextField(InstanceBinding(this, { it.text }, { it, newvalue -> it.text = newvalue })).Compose(composectx) }
             }
@@ -715,7 +715,7 @@ final class SwiftUITests: XCTestCase {
             }
 
             constructor(text: String = "") {
-                this._text = State(text)
+                this._text = skip.ui.State(text)
             }
         }
         """)
@@ -875,7 +875,7 @@ final class SwiftUITests: XCTestCase {
                 set(newValue) {
                     _count.wrappedValue = newValue
                 }
-            internal var _count: State<Int>
+            internal var _count: skip.ui.State<Int>
             internal var text: String
                 get() = _text.get()
                 set(newValue) {
@@ -905,7 +905,7 @@ final class SwiftUITests: XCTestCase {
             }
 
             constructor(count: Int = 0, text: Binding<String>, i: Int = 0) {
-                this._count = State(count)
+                this._count = skip.ui.State(count)
                 this._text = text
                 this.i = i
             }
@@ -945,7 +945,7 @@ final class SwiftUITests: XCTestCase {
                 set(newValue) {
                     _count.wrappedValue = newValue
                 }
-            internal var _count: State<Int> = State(0)
+            internal var _count: skip.ui.State<Int> = skip.ui.State(0)
             internal var text: String
                 get() = _text.get()
                 set(newValue) {
@@ -980,7 +980,7 @@ final class SwiftUITests: XCTestCase {
 
             private constructor(copy: MutableStruct) {
                 @Suppress("NAME_SHADOWING") val copy = copy as V
-                this._count = State(copy.count)
+                this._count = skip.ui.State(copy.count)
                 this._text = copy._text
                 this.i = copy.i
             }

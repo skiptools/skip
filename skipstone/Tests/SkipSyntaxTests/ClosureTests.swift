@@ -323,4 +323,35 @@ final class ClosureTests: XCTestCase {
         }
         """)
     }
+
+    func testInOut() async throws {
+        try await check(swift: """
+        let c: (inout Int) -> Void = { $0 += 1 }
+        """, kotlin: """
+        internal val c: (InOut<Int>) -> Unit = { it.value += 1 }
+        """)
+
+        try await check(swift: """
+        struct S {
+            let i: Int
+            let c: (inout Int) -> Void
+        }
+        func f(s: S) -> S {
+            return S(i: 1) { $0 += 1 }
+        }
+        """, kotlin: """
+        internal class S {
+            internal val i: Int
+            internal val c: (InOut<Int>) -> Unit
+
+            constructor(i: Int, c: (InOut<Int>) -> Unit) {
+                this.i = i
+                this.c = c
+            }
+        }
+        internal fun f(s: S): S {
+            return S(i = 1) { it.value += 1 }
+        }
+        """)
+    }
 }

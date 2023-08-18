@@ -1773,7 +1773,7 @@ extension TypeSignature {
 
     /// Return a SwiftUI State of this type.
     func asState() -> TypeSignature {
-        return .named("State", [self])
+        return .named("skip.ui.State", [self])
     }
 }
 
