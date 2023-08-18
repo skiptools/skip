@@ -105,9 +105,8 @@ du -skh "${PLUGIN_ZIP}"
 
 # the location of the download once we have uploaded it
 #ARTIFACT_URL="https://github.com/skiptools/skip/releases/download/${SKIP_VERSION}/${ARTIFACTBUNDLE}.zip"
-ARTIFACT_URL="https://skip.tools/skiptools/skip/releases/download/${SKIP_VERSION}/${PLUGIN_ZIP}"
-
-#ARTIFACT_URL="https://source.skip.tools/skip/releases/download/${SKIP_VERSION}/${PLUGIN_ZIP}"
+#ARTIFACT_URL="https://skip.tools/skiptools/skip/releases/download/${SKIP_VERSION}/${PLUGIN_ZIP}"
+ARTIFACT_URL="https://source.skip.tools/skip/releases/download/${SKIP_VERSION}/${PLUGIN_ZIP}"
 
 cd -
 
@@ -138,8 +137,8 @@ git commit -m "Release ${SKIP_VERSION}"
 git tag --sign "${SKIP_VERSION}" -m "Release ${SKIP_VERSION}"
 git push --follow-tags
 
-sed -I '' 's;.package(url: "https://.*/skiptools/skip.git", from: ".*");.package(url: "https://skip.tools/skiptools/skip.git", from: "'${SKIP_VERSION}'");g' "README.md"
-sed -I '' 's;.package(url: "https://.*/skiptools/skip.git", from: ".*");.package(url: "https://skip.tools/skiptools/skip.git", from: "'${SKIP_VERSION}'");g' "${SKIPHUBPKG}"
+sed -I '' 's;.package(url: "https://.*/skip.git", from: ".*");.package(url: "https://source.skip.tools/skip.git", from: "'${SKIP_VERSION}'");g' "README.md"
+sed -I '' 's;.package(url: "https://.*/skip.git", from: ".*");.package(url: "https://source.skip.tools/skip.git", from: "'${SKIP_VERSION}'");g' "${SKIPHUBPKG}"
 
 # also grab the latest skiphub version and update it in the README
 SKIPHUB_VERSION=`git ls-remote --tags https://github.com/skiptools/skiphub | awk -F/ '$NF ~ /^v?[0-9]+\.[0-9]+\.[0-9]+$/ {print $NF}' | sort -V | tail -n1`
