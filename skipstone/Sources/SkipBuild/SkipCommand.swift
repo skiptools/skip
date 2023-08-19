@@ -680,7 +680,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         #else
         let v = skipVersion
         #endif
-        info("Skip \(v): performing transpilation to: \(transpileOptions.outputFolder ?? "nowhere") for: \(sourceFiles.map(\.basename))")
+        info("Skip \(v): transpiling to: \(transpileOptions.outputFolder ?? "nowhere") for: \(sourceFiles.map(\.basename))")
         try await self.transpile(fs: localFileSystem, sourceFiles: Set(sourceFiles), with: continuation)
     }
 

@@ -192,7 +192,8 @@ git tag --sign "${SKIP_VERSION}" -m "Release ${SKIP_VERSION}"
 git push --follow-tags
 
 # check that mint can build/install and run the tool
-mint run skiptools/skip version
+# works, but is slow and we don't document it
+# mint run skiptools/skip version
 
 # check that homebrew can install/upgrade and run the tool
 HOMEBREW_AUTO_UPDATE_SECS=0 brew upgrade skiptools/skip/skip || brew install skiptools/skip/skip
