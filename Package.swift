@@ -59,17 +59,7 @@ let package = Package(
         .executableTarget(name: "skipgradle", dependencies: ["SkipDrive"], path: "Sources/SkipGradle"),
 
         .testTarget(name: "SkipDriveTests", dependencies: ["skip"]),
+
+        .binaryTarget(name: "skipstone", url: "https://source.skip.tools/skip/releases/download/0.5.83/skipstone.plugin.zip", checksum: "6842851b18d4c790edbbdb37427b290c6f6f543935b50784fef6745eb3e83f8e")
     ]
 )
-
-import class Foundation.ProcessInfo
-if let localPath = ProcessInfo.processInfo.environment["SKIPLOCAL"] {
-    // locally linking SwiftSyntax requires min platform targets
-    package.platforms = [.iOS(.v16), .macOS(.v13), .tvOS(.v16), .watchOS(.v9), .macCatalyst(.v16)]
-    // build against the local relative packages in the peer folders by running: SKIPLOCAL=.. xed Skip.xcworkspace
-    package.dependencies += [.package(path: localPath + "/skipstone")]
-    package.targets += [.executableTarget(name: "skipstone", dependencies: [.product(name: "SkipBuild", package: "skipstone")])]
-} else {
-    // default to using the latest binary skipstone release
-    package.targets += [.binaryTarget(name: "skipstone", url: "https://source.skip.tools/skip/releases/download/0.5.83/skipstone.plugin.zip", checksum: "6842851b18d4c790edbbdb37427b290c6f6f543935b50784fef6745eb3e83f8e")]
-}

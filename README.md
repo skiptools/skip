@@ -4,7 +4,7 @@ The `skip` tool is used to create, manage, build, test, and package dual-platfor
 
 ## Installing
 
-On macOS 13.5+ with [homebrew](https://brew.sh) and [Xcode](https://developer.apple.com/xcode/) installed, install Skip with the command: 
+On macOS 13.5+ with [homebrew](https://brew.sh) and [Xcode](https://developer.apple.com/xcode/) installed, Skip can be installed with this command: 
 
 ```shell
 brew install skiptools/skip/skip
