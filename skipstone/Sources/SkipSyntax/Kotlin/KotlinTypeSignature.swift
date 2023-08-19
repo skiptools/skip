@@ -55,8 +55,9 @@ extension TypeSignature {
         case .float:
             return "Float"
         case .function(let parameters, let returnType, let apiFlags):
+            let composableString = apiFlags.contains(.composable) ? "@Composable " : ""
             let suspendString = apiFlags.contains(.async) ? "suspend " : ""
-            return "\(suspendString)(\(parameters.map { $0.kotlin }.joined(separator: ", "))) -> \(returnType.kotlin)"
+            return "\(composableString)\(suspendString)(\(parameters.map { $0.kotlin }.joined(separator: ", "))) -> \(returnType.kotlin)"
         case .int:
             return "Int"
         case .int8:

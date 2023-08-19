@@ -275,6 +275,8 @@ extension Attributes {
 extension Attribute {
     func append(to output: OutputGenerator, indentation: Indentation) {
         switch kind {
+        case .composable:
+            output.append(indentation).append("@Composable\n")
         case .deprecated:
             let message = self.message ?? Message.deprecatedLabel
             output.append(indentation).append("@Deprecated(\"\(message)\")\n")

@@ -469,6 +469,9 @@ struct Attribute: Hashable, Codable {
         case unavailable
         case unknown
         case viewBuilder
+
+        // Language-specific
+        case composable
     }
 
     /// The attribute kind, if it is recognized.
@@ -531,6 +534,10 @@ struct Attribute: Hashable, Codable {
             return .stateObject
         case "ViewBuilder":
             return .viewBuilder
+
+        // Language-specific
+        case "Composable":
+            return .composable
         default:
             return .unknown
         }
@@ -847,6 +854,9 @@ struct APIFlags: OptionSet, Hashable, Codable {
     static let `throws` = APIFlags(rawValue: 1 << 3)
     static let viewBuilder = APIFlags(rawValue: 1 << 4)
     static let writeable = APIFlags(rawValue: 1 << 5)
+
+    // Language-specific
+    static let composable = APIFlags(rawValue: 1 << 16)
 
     init(rawValue: Int) {
         self.rawValue = rawValue

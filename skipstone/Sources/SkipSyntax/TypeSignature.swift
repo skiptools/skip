@@ -436,6 +436,11 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         if attributes.contains(.viewBuilder) {
             apiFlags.insert(.viewBuilder)
         }
+
+        // Language-specific
+        if attributes.contains(.composable) {
+            apiFlags.insert(.composable)
+        }
         return withAPIFlags(apiFlags, replace: false)
     }
 
