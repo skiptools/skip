@@ -1934,4 +1934,53 @@ final class ConditionalTests: XCTestCase {
             .opacity(1.0).border(Color.blue))
         """)
     }
+
+    func testUnknownAttributeRetention() async throws {
+        try await checkProducesMessage(swift: """
+        @Composable func f() {
+        }
+        """)
+
+        try await check(swift: """
+        #if SKIP
+        @Composable func f() {
+        }
+        #endif
+        """, kotlin: """
+        @Composable
+        internal fun f() = Unit
+        """)
+
+        try await checkProducesMessage(swift: """
+        #if DEBUG
+        #else
+        @Composable func f() {
+        }
+        #endif
+        """)
+
+        try await check(swift: """
+        #if !SKIP
+        @Composable func g() {
+        }
+        #else
+        @Composable func f() {
+        }
+        #endif
+        """, kotlin: """
+        @Composable
+        internal fun f() = Unit
+        """)
+
+        try await check(swift: """
+        #if SKIP
+        @Composable("x", i = 100)
+        func f() {
+        }
+        #endif
+        """, kotlin: """
+        @Composable("x", i = 100)
+        internal fun f() = Unit
+        """)
+    }
 }

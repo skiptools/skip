@@ -2,13 +2,13 @@ import SwiftSyntax
 
 /// Extra directives and trivia derived from the trivia surrounding a statement.
 struct StatementExtras {
-    enum Directive {
+    enum Directive: Hashable {
         /// A language-specific attribute.
         case attributes([String])
         /// Insert directly into the output.
-        case insert(String, StatementExtras?)
+        case insert(String, [String])
         /// Replace the syntax with the given output.
-        case replace(String, StatementExtras?)
+        case replace(String, [String])
         /// Replace the declaration line with the given output.
         case declaration(String)
         /// Mute warnings and errors for this syntax.
@@ -17,6 +17,8 @@ struct StatementExtras {
         case invalid(String)
         /// Marker for a file whose purpose is to provide Swift symbols for separate Kotlin code. Symbols files are not transpiled, and warnings are suppressed.
         case symbolFile
+        /// Marker for a statement in a `#if SKIP` block.
+        case skipBlock
     }
 
     var directives: [Directive]
@@ -51,12 +53,10 @@ struct StatementExtras {
                 let attributes = directiveString.components(separatedBy: .whitespaces)
                 directives.append(.attributes(attributes))
             case .insert:
-                let extras = StatementExtras(directives: [], leadingTrivia: triviaLines, trailingTrivia: [])
-                directives.append(.insert(directiveString, extras))
+                directives.append(.insert(directiveString, triviaLines))
                 triviaLines.removeAll()
             case .replace:
-                let extras = StatementExtras(directives: [], leadingTrivia: triviaLines, trailingTrivia: [])
-                directives.append(.replace(directiveString, extras))
+                directives.append(.replace(directiveString, triviaLines))
                 triviaLines.removeAll()
             case .declaration:
                 directives.append(.declaration(directiveString))
@@ -135,10 +135,10 @@ struct StatementExtras {
             if isDirective {
                 endDirective()
                 if trimmedLine.hasPrefix(insertPrefix) {
-                    directive = .insert("", nil)
+                    directive = .insert("", [])
                     directiveLines.append(String(trimmedLine.dropFirst(insertPrefix.count)).trimmingCharacters(in: .whitespaces) + "\n")
                 } else if trimmedLine.hasPrefix(replacePrefix) {
-                    directive = .replace("", nil)
+                    directive = .replace("", [])
                     directiveLines.append(String(trimmedLine.dropFirst(replacePrefix.count)).trimmingCharacters(in: .whitespaces) + "\n")
                 } else if trimmedLine.hasPrefix(declarationPrefix) {
                     directive = .declaration("")
@@ -188,10 +188,12 @@ struct StatementExtras {
         var replace = false
         for directive in directives {
             switch directive {
-            case .insert(let string, let extras):
+            case .insert(let string, let leadingTrivia):
+                let extras = leadingTrivia.isEmpty ? nil : StatementExtras(directives: [], leadingTrivia: leadingTrivia, trailingTrivia: [])
                 statements.append(RawStatement(sourceCode: string, syntax: syntax, extras: extras, in: syntaxTree))
-            case .replace(let string, let extras):
+            case .replace(let string, let leadingTrivia):
                 replace = true
+                let extras = leadingTrivia.isEmpty ? nil : StatementExtras(directives: [], leadingTrivia: leadingTrivia, trailingTrivia: [])
                 statements.append(RawStatement(sourceCode: string, syntax: syntax, extras: extras, in: syntaxTree))
             case .invalid(let string):
                 let message = Message(kind: .warning, message: "Unrecognized SKIP comment: \(string)", source: syntaxTree.source, sourceRange: syntax.range(in: syntaxTree.source))

@@ -267,7 +267,7 @@ extension Attributes {
         return of(kind: .directive).contains { $0.tokens.contains(directive.rawValue) }
     }
 
-    func append(to output: OutputGenerator, indentation: Indentation) {
+    func append(for node: KotlinSyntaxNode, to output: OutputGenerator, indentation: Indentation) {
         attributes.forEach { $0.append(to: output, indentation: indentation) }
     }
 }
@@ -275,14 +275,27 @@ extension Attributes {
 extension Attribute {
     func append(to output: OutputGenerator, indentation: Indentation) {
         switch kind {
-        case .composable:
-            output.append(indentation).append("@Composable\n")
         case .deprecated:
             let message = self.message ?? Message.deprecatedLabel
             output.append(indentation).append("@Deprecated(\"\(message)\")\n")
         case .unavailable:
             let message = self.message ?? Message.unavailableLabel
             output.append(indentation).append("@Deprecated(\"\(message)\", level = DeprecationLevel.ERROR)\n")
+        case .unknown:
+            if case .named(let name, let generics) = signature {
+                output.append(indentation).append("@").append(name)
+                if !generics.isEmpty {
+                    output.append("<")
+                    output.append(generics.map(\.kotlin).joined(separator: ", "))
+                    output.append(">")
+                }
+                if !tokens.isEmpty {
+                    output.append("(")
+                    output.append(tokens.joined(separator: ", "))
+                    output.append(")")
+                }
+                output.append("\n")
+            }
         default:
             break
         }
@@ -291,7 +304,11 @@ extension Attribute {
 
 extension KotlinStatement {
     /// Return supported attributes and add warnings for unsupported attributes.
-    func processAttributes(_ attributes: Attributes, translator: KotlinTranslator) -> Attributes {
+    func processAttributes(_ attributes: Attributes, from statement: Statement, translator: KotlinTranslator) -> Attributes {
+        // Keep Kotlin attributes that devs may use within SKIP blocks
+        guard !statement.isInSkipBlock else {
+            return attributes
+        }
         let supported: [Attribute] = attributes.attributes.filter { $0.kind != .unknown }
         if supported.count == attributes.attributes.count {
             return attributes

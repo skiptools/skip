@@ -148,7 +148,7 @@ struct Parameter<V>: Hashable {
     init(externalLabel: String?, internalLabel: String? = nil, declaredType: TypeSignature = .none, isInOut: Bool = false, isVariadic: Bool = false, attributes: Attributes = Attributes(), defaultValue: V? = nil) {
         self.externalLabel = externalLabel == "" || externalLabel == "_" ? nil : externalLabel
         _internalLabel = internalLabel
-        self.declaredType = declaredType.applying(attributes: attributes)
+        self.declaredType = attributes.apply(toFunction: declaredType)
         self.isInOut = isInOut
         self.isVariadic = isVariadic
         self.attributes = attributes
@@ -386,6 +386,37 @@ struct Attributes: Hashable, PrettyPrintable, Codable {
         attributes += attrs
     }
 
+    /// Apply these attributes to the `APIFlags` and attributes of the given function type signature.
+    func apply(toFunction signature: TypeSignature) -> TypeSignature {
+        guard case .function(let parameters, let returnType, let initialAPIFlags, let initialAttributes) = signature else {
+            return signature
+        }
+        var apiFlags: APIFlags = []
+        var attributes: [Attribute] = []
+        for attribute in self.attributes {
+            switch attribute.kind {
+            case .autoclosure:
+                apiFlags.insert(.autoclosure)
+            case .mainActor:
+                apiFlags.insert(.mainActor)
+            case .viewBuilder:
+                apiFlags.insert(.viewBuilder)
+            case .unknown:
+                attributes.append(attribute)
+            default:
+                break
+            }
+        }
+        let allAPIFlags = initialAPIFlags.union(apiFlags)
+        var allAttributes = initialAttributes?.attributes ?? []
+        for attribute in attributes {
+            if !allAttributes.contains(attribute) {
+                allAttributes.append(attribute)
+            }
+        }
+        return .function(parameters, returnType, allAPIFlags, allAttributes.isEmpty ? nil : Attributes(attributes: allAttributes))
+    }
+
     func contains(_ kind: Attribute.Kind) -> Bool {
         return attributes.contains { $0.kind == kind }
     }
@@ -469,9 +500,6 @@ struct Attribute: Hashable, Codable {
         case unavailable
         case unknown
         case viewBuilder
-
-        // Language-specific
-        case composable
     }
 
     /// The attribute kind, if it is recognized.
@@ -534,10 +562,6 @@ struct Attribute: Hashable, Codable {
             return .stateObject
         case "ViewBuilder":
             return .viewBuilder
-
-        // Language-specific
-        case "Composable":
-            return .composable
         default:
             return .unknown
         }
@@ -854,9 +878,6 @@ struct APIFlags: OptionSet, Hashable, Codable {
     static let `throws` = APIFlags(rawValue: 1 << 3)
     static let viewBuilder = APIFlags(rawValue: 1 << 4)
     static let writeable = APIFlags(rawValue: 1 << 5)
-
-    // Language-specific
-    static let composable = APIFlags(rawValue: 1 << 16)
 
     init(rawValue: Int) {
         self.rawValue = rawValue

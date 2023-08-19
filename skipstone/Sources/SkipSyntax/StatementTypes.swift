@@ -434,18 +434,25 @@ class IfDefined: Statement {
             statements += extraStatements
             statements.append(Empty(syntax: endSyntax, extras: extras, in: syntaxTree))
         }
-        guard let extras else {
-            return statements
+        if let extras {
+            // Preserve #if leading and trailng trivia
+            if !extras.leadingTrivia.isEmpty {
+                let leadingExtras = StatementExtras(directives: extras.directives, leadingTrivia: extras.leadingTrivia, trailingTrivia: [])
+                statements.insert(Empty(extras: leadingExtras), at: 0)
+            }
+            if !extras.trailingTrivia.isEmpty {
+                let trailingExtras = StatementExtras(directives: [], leadingTrivia: [], trailingTrivia: extras.trailingTrivia)
+                statements.append(Empty(extras: trailingExtras))
+            }
         }
-
-        // Preserve #if leading and trailng trivia
-        if !extras.leadingTrivia.isEmpty {
-            let leadingExtras = StatementExtras(directives: extras.directives, leadingTrivia: extras.leadingTrivia, trailingTrivia: [])
-            statements.insert(Empty(extras: leadingExtras), at: 0)
-        }
-        if !extras.trailingTrivia.isEmpty {
-            let trailingExtras = StatementExtras(directives: [], leadingTrivia: [], trailingTrivia: extras.trailingTrivia)
-            statements.append(Empty(extras: trailingExtras))
+        if match?.isSkipBlock == true {
+            for statement in statements {
+                if statement.extras != nil {
+                    statement.extras?.directives.append(.skipBlock)
+                } else {
+                    statement.extras = StatementExtras(directives: [.skipBlock], leadingTrivia: [], trailingTrivia: [])
+                }
+            }
         }
         return statements
     }
@@ -497,22 +504,28 @@ class IfDefined: Statement {
         return expression
     }
 
-    private static func extractClause(from syntax: IfConfigDeclSyntax, in syntaxTree: SyntaxTree) -> (clause: IfConfigClauseSyntax, endSyntax: SyntaxProtocol)? {
+    private static func extractClause(from syntax: IfConfigDeclSyntax, in syntaxTree: SyntaxTree) -> (clause: IfConfigClauseSyntax, isSkipBlock: Bool, endSyntax: SyntaxProtocol)? {
         // Look for a clause that matches a defined symbol, or an 'else'. Return it along with the pound keyword *after* it,
         // which we use to look for ending statement extras
         var trueClause: IfConfigClauseSyntax? = nil
+        var hasNotSkipClause = false
+        var isSkipClause = false
         for ifConfigClause in syntax.clauses {
             if let trueClause {
-                return (trueClause, ifConfigClause.poundKeyword)
+                return (trueClause, isSkipClause, ifConfigClause.poundKeyword)
             }
             if ifConfigClause.poundKeyword.text == "#else" {
                 // If we reach an else, all previous clauses must have been false
                 trueClause = ifConfigClause
+                isSkipClause = hasNotSkipClause
                 continue
             }
 
             let clauseSymbol = ifConfigClause.condition?.description ?? ""
-            let (isSupported, isTrue) = processConditions(symbol: clauseSymbol, preprocessorSymbols: syntaxTree.preprocessorSymbols)
+            let (isSupported, isTrue, isSkip) = processConditions(symbol: clauseSymbol, preprocessorSymbols: syntaxTree.preprocessorSymbols)
+            isSkipClause = isSkip == true
+            hasNotSkipClause = hasNotSkipClause || isSkip == false
+
             if !isSupported {
                 syntaxTree.root.messages.append(.preprocessorTooComplex(ifConfigClause, source: syntaxTree.source))
                 break
@@ -522,13 +535,13 @@ class IfDefined: Statement {
             }
         }
         if let trueClause {
-            return (trueClause, syntax.poundEndif)
+            return (trueClause, isSkipClause, syntax.poundEndif)
         } else {
             return nil
         }
     }
 
-    private static func processConditions(symbol: String, preprocessorSymbols: Set<String>) -> (isSupported: Bool, isTrue: Bool) {
+    private static func processConditions(symbol: String, preprocessorSymbols: Set<String>) -> (isSupported: Bool, isTrue: Bool, isSkip: Bool?) {
         let symbols = symbol.split(separator: " ", omittingEmptySubsequences: true)
         var hasTrue: Bool? = nil
         var hasFalse: Bool? = nil
@@ -561,16 +574,17 @@ class IfDefined: Statement {
         }
         if !hasSymbol {
             // Don't process Skip-less preprocessor directives at all
-            return (true, false)
+            return (true, false, nil)
         } else if hasParens || (hasAnd && hasOr) {
             // Unsupported
-            return (false, false)
+            return (false, false, nil)
         } else if hasAnd {
-            return (true, hasFalse != true)
+            return (true, hasFalse != true, nil)
         } else if hasOr {
-            return (true, hasTrue == true)
+            return (true, hasTrue == true, nil)
         } else {
-            return (true, hasTrue == true)
+            let isSkip: Bool? = symbols == ["SKIP"] ? true : symbols == ["!SKIP"] ? false : nil
+            return (true, hasTrue == true, isSkip)
         }
     }
 
@@ -775,7 +789,7 @@ class EnumCaseDeclaration: Statement {
         let parameters = associatedValues.map {
             TypeSignature.Parameter(label: $0.externalLabel, type: $0.declaredType, isInOut: $0.isInOut, isVariadic: $0.isVariadic, hasDefaultValue: $0.defaultValue != nil)
         }
-        return .function(parameters, owningTypeDeclaration.signature, [])
+        return .function(parameters, owningTypeDeclaration.signature, [], nil)
     }
 
     init(name: String, associatedValues: [Parameter<Expression>], rawValue: Expression? = nil, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
@@ -892,8 +906,9 @@ class FunctionDeclaration: Statement {
     private(set) var generics: Generics
     let body: CodeBlock?
     var functionType: TypeSignature {
-        let apiFlags = APIFlags(isAsync: isAsync, isThrows: isThrows, isMainActor: attributes.contains(.mainActor), isViewBuilder: attributes.contains(.viewBuilder))
-        return .function(parameters.map(\.signature), returnType, apiFlags)
+        let apiFlags = APIFlags(isAsync: isAsync, isThrows: isThrows)
+        let function: TypeSignature = .function(parameters.map(\.signature), returnType, apiFlags, nil)
+        return attributes.apply(toFunction: function)
     }
 
     init(type: StatementType, name: String, isOptionalInit: Bool = false, returnType: TypeSignature = .void, parameters: [Parameter<Expression>] = [], isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), body: CodeBlock? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
@@ -1074,11 +1089,12 @@ class SubscriptDeclaration: Statement {
     let getter: Accessor<CodeBlock>?
     let setter: Accessor<CodeBlock>?
     var getterType: TypeSignature {
-        let apiFlags = APIFlags(isAsync: isAsync, isThrows: isThrows, isMainActor: attributes.contains(.mainActor), isViewBuilder: attributes.contains(.viewBuilder))
-        return .function(parameters.map(\.signature), elementType, apiFlags)
+        let apiFlags = APIFlags(isAsync: isAsync, isThrows: isThrows)
+        let function: TypeSignature = .function(parameters.map(\.signature), elementType, apiFlags, nil)
+        return attributes.apply(toFunction: function)
     }
     var setterType: TypeSignature {
-        return .function(parameters.map(\.signature), .void, APIFlags(isMainActor: attributes.contains(.mainActor)))
+        return .function(parameters.map(\.signature), .void, APIFlags(isMainActor: attributes.contains(.mainActor)), nil)
     }
 
     init(elementType: TypeSignature, parameters: [Parameter<Expression>], isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), getter: Accessor<CodeBlock>? = nil, setter: Accessor<CodeBlock>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {

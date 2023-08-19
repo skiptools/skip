@@ -3,7 +3,7 @@ import SwiftSyntax
 /// A statement in the Swift syntax tree.
 class Statement: SyntaxNode {
     let type: StatementType
-    let extras: StatementExtras?
+    var extras: StatementExtras?
 
     init(type: StatementType, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.type = type

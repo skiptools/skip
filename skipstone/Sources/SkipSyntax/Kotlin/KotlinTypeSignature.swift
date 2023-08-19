@@ -54,8 +54,8 @@ extension TypeSignature {
             return "Double"
         case .float:
             return "Float"
-        case .function(let parameters, let returnType, let apiFlags):
-            let composableString = apiFlags.contains(.composable) ? "@Composable " : ""
+        case .function(let parameters, let returnType, let apiFlags, let attributes):
+            let composableString = attributes?.attributes.contains(where: { $0.signature == .named("Composable", []) }) == true ? "@Composable " : ""
             let suspendString = apiFlags.contains(.async) ? "suspend " : ""
             return "\(composableString)\(suspendString)(\(parameters.map { $0.kotlin }.joined(separator: ", "))) -> \(returnType.kotlin)"
         case .int:
@@ -149,7 +149,7 @@ extension TypeSignature {
                 if name == "KeyPath" && generics.count == 2 {
                     messages.append(.kotlinKeyPath(node, source: source))
                 }
-            case .function(_, _, let apiFlags):
+            case .function(_, _, let apiFlags, _):
                 if apiFlags.contains(.autoclosure) {
                     messages.append(.kotlinAutoclosure(node, source: source))
                 }

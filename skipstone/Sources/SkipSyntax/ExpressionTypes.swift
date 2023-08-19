@@ -550,16 +550,16 @@ class Closure: Expression {
         let parameterSignatures = parameters.map { parameter in
             TypeSignature.Parameter(label: parameter.externalLabel, type: parameter.declaredType, isInOut: parameter.isInOut, isVariadic: parameter.isVariadic, hasDefaultValue: parameter.defaultValue != nil )
         }
-        functionType = .function(parameterSignatures, returnType, apiFlags).or(expecting)
+        functionType = attributes.apply(toFunction: .function(parameterSignatures, returnType, apiFlags, nil)).or(expecting)
 
         let bodyContext = context.pushing(self)
         let _ = body.inferTypes(context: bodyContext, expecting: body.statements.count == 1 && bodyContext.expectedReturn != .void ? bodyContext.expectedReturn : .none)
         // Use any type information we can glean from return statements in the body
-        functionType = .function(functionType.parameters, functionType.returnType.or(body.returnType, replaceAny: true), functionType.apiFlags)
+        functionType = .function(functionType.parameters, functionType.returnType.or(body.returnType, replaceAny: true), functionType.apiFlags, functionType.additionalAttributes)
         return context
     }
 
-    var functionType: TypeSignature = .function([], .none, [])
+    var functionType: TypeSignature = .function([], .none, [], nil)
 
     override var inferredType: TypeSignature {
         return functionType
@@ -734,7 +734,7 @@ class FunctionCall: Expression, APICallExpression {
         default:
             function.inferTypes(context: context, expecting: .none)
             let functionType = function.inferredType.asTypealiased(nil).asOptional(false).withoutOptionality()
-            if case .function(_, var returnType, let apiFlags) = functionType {
+            if case .function(_, var returnType, let apiFlags, _) = functionType {
                 if function.inferredType.isOptional {
                     returnType = returnType.asOptional(true)
                 }
@@ -1055,7 +1055,7 @@ class KeyPathLiteral: Expression {
                 root = root.or(expecting.generics[0])
                 expectingLeaf = expecting.generics[1]
             }
-        } else if case .function(let parameters, let returnType, _) = expecting {
+        } else if case .function(let parameters, let returnType, _, _) = expecting {
             if parameters.count == 1 {
                 root = root.or(parameters[0].type)
             }
@@ -1083,7 +1083,7 @@ class KeyPathLiteral: Expression {
         if isKeyPathExpected {
             keyPathType = .named("KeyPath", [root, leaf])
         } else {
-            keyPathType = .function([.init(type: root)], leaf, []).or(expecting)
+            keyPathType = .function([.init(type: root)], leaf, [], nil).or(expecting)
         }
         return context
     }

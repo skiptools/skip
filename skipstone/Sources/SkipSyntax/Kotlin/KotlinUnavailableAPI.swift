@@ -17,7 +17,7 @@ public class KotlinUnavailableAPI: UnavailableAPI {
             if name == "append" || name == "insert" || name == "remove" || name == "removeAll" || name == "removeFirst" || name == "removeLast" || name == "removeSubrange" || name == "replaceSubrange" {
                 let message = Message.kotlinStringMutation
                 let arguments = parameters.map { TypeSignature.Parameter(label: $0.label, type: $0.value) }
-                return APIMatch(signature: .function(arguments, .void, []), declarationType: .functionDeclaration, availability: .unavailable(message))
+                return APIMatch(signature: .function(arguments, .void, [], nil), declarationType: .functionDeclaration, availability: .unavailable(message))
             }
         }
         return nil

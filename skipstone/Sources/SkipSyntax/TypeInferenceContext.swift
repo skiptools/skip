@@ -283,7 +283,7 @@ struct TypeInferenceContext {
         if let type, type.isOptional {
             return function(name, inNonOptional: type.asOptional(false), parameters: parameters, messagesNode: messagesNode).map { match in
                 let signature = resolveSignature(match: match)
-                return (.function(signature.parameters, signature.returnType.asOptional(true), signature.apiFlags), match)
+                return (.function(signature.parameters, signature.returnType.asOptional(true), signature.apiFlags, signature.additionalAttributes), match)
             }
         } else {
             return function(name, inNonOptional: type, parameters: parameters, messagesNode: messagesNode).map { (resolveSignature(match: $0), $0) }
@@ -356,7 +356,7 @@ struct TypeInferenceContext {
         if type.isOptional {
             return self.subscript(inNonOptional: type.asOptional(false), parameters: parameters, messagesNode: messagesNode).map { match in
                 let signature = resolveSignature(match: match)
-                return (.function(signature.parameters, signature.returnType.asOptional(true), signature.apiFlags), match)
+                return (.function(signature.parameters, signature.returnType.asOptional(true), signature.apiFlags, signature.additionalAttributes), match)
             }
         } else {
             return self.subscript(inNonOptional: type, parameters: parameters, messagesNode: messagesNode).map { (resolveSignature(match: $0), $0) }

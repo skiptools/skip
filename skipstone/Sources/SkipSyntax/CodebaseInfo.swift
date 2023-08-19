@@ -455,11 +455,11 @@ public class CodebaseInfo: Codable {
                 if case .range = arguments[0].value {
                     // Slice - fall through to symbols
                 } else {
-                    let signature: TypeSignature = .function([TypeSignature.Parameter(type: .int)], elementType.mappingSelf(to: type), [])
+                    let signature: TypeSignature = .function([TypeSignature.Parameter(type: .int)], elementType.mappingSelf(to: type), [], nil)
                     return [APIMatch(signature: signature)]
                 }
             } else if case .dictionary(let keyType, let valueType) = type, arguments.count == 1 {
-                let signature: TypeSignature = .function([TypeSignature.Parameter(type: keyType)], valueType.mappingSelf(to: type).asOptional(true), [])
+                let signature: TypeSignature = .function([TypeSignature.Parameter(type: keyType)], valueType.mappingSelf(to: type).asOptional(true), [], nil)
                 return [APIMatch(signature: signature)]
             }
             let isStatic = type.isMetaType
@@ -662,7 +662,7 @@ public class CodebaseInfo: Codable {
 
         private func syntheticInitCandidate(for type: TypeSignature, arguments: [LabeledValue<TypeSignature>], apiFlags: APIFlags = [], availability: Availability = .available) -> FunctionCandidate {
             let initParameters = arguments.map { TypeSignature.Parameter(label: $0.label, type: $0.value) }
-            let match = APIMatch(signature: .function(initParameters, type, apiFlags), apiFlags: apiFlags, declarationType: .initDeclaration, availability: availability)
+            let match = APIMatch(signature: .function(initParameters, type, apiFlags, nil), apiFlags: apiFlags, declarationType: .initDeclaration, availability: availability)
             return FunctionCandidate(match: match, score: 0.0, level: 0)
         }
 
@@ -678,7 +678,7 @@ public class CodebaseInfo: Codable {
             default:
                 // Is this a cast?
                 if type.isNumeric && arguments.count == 1 && arguments[0].label == nil && arguments[0].value.isNumeric {
-                    return [FunctionCandidate(match: APIMatch(signature: .function([.init(type: arguments[0].value)], type, []), apiFlags: [], declarationType: .initDeclaration, availability: .available), score: 1.0, level: 0)]
+                    return [FunctionCandidate(match: APIMatch(signature: .function([.init(type: arguments[0].value)], type, [], nil), apiFlags: [], declarationType: .initDeclaration, availability: .available), score: 1.0, level: 0)]
                 }
                 return functionCandidates(name: type.name, moduleName: moduleName, constrainedGenerics: constrainedGenerics, arguments: arguments, includeTypes: false)
             }
@@ -691,14 +691,14 @@ public class CodebaseInfo: Codable {
             guard let memberInfo = typeInfo.visibleMembers(context: self).first(where: { $0.name == member && $0.declarationType == .enumCaseDeclaration }) else {
                 return nil
             }
-            guard case .function(let parameters, _, _) = memberInfo.signature else {
+            guard case .function(let parameters, _, _, _) = memberInfo.signature else {
                 return nil
             }
             return parameters.map { $0.mappingTypes(from: typeInfo.signature.generics, to: constrainedGenerics) }
         }
 
         private func matchTuple(_ signature: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> TypeSignature {
-            guard case .function(let parameterTypes, _, _) = signature, parameterTypes.count == arguments.count else {
+            guard case .function(let parameterTypes, _, _, _) = signature, parameterTypes.count == arguments.count else {
                 return .none
             }
             return signature
@@ -710,7 +710,7 @@ public class CodebaseInfo: Codable {
         }
 
         private func matchFunction(signature: TypeSignature, generics: Generics? = nil, declarationType: StatementType, availability: Availability, in typeInfo: TypeInfo? = nil, constrainedGenerics: [TypeSignature] = [], arguments: [LabeledValue<TypeSignature>], level: Int) -> FunctionCandidate? {
-            guard case .function(let parameters, let returnType, let apiFlags) = signature else {
+            guard case .function(let parameters, let returnType, let apiFlags, let attributes) = signature else {
                 return nil
             }
             if !parameters.contains(where: { $0.isVariadic }) {
@@ -787,15 +787,15 @@ public class CodebaseInfo: Codable {
 
             // Apply the generic types we determined from parameter matching and the given constraint information to the original function,
             // using the result to fill in generic types in the return type and matching parameters
-            let matchingOriginalSignature: TypeSignature = .function(matchingOriginalParameters, signature.returnType, apiFlags)
-            let matchingParameterSignature: TypeSignature = .function(matchingParameters, returnType, apiFlags)
+            let matchingOriginalSignature: TypeSignature = .function(matchingOriginalParameters, signature.returnType, apiFlags, attributes)
+            let matchingParameterSignature: TypeSignature = .function(matchingParameters, returnType, apiFlags, attributes)
             let matchingGenerics = matchingOriginalSignature.mergeGenericMappings(in: matchingParameterSignature, with: generics)
             let mappedSignature = matchingOriginalSignature.constrainedTypeWithGenerics(matchingGenerics)
             let mappedParameters = mappedSignature.parameters
             for i in 0..<matchingParameters.count {
                 matchingParameters[i] = matchingParameters[i].or(mappedParameters[i], replaceAny: true)
             }
-            let match = APIMatch(signature: .function(matchingParameters, mappedSignature.returnType, apiFlags), apiFlags: apiFlags, declarationType: declarationType, availability: availability)
+            let match = APIMatch(signature: .function(matchingParameters, mappedSignature.returnType, apiFlags, attributes), apiFlags: apiFlags, declarationType: declarationType, availability: availability)
             return FunctionCandidate(match: match, score: totalScore, level: level)
         }
 
@@ -1176,7 +1176,7 @@ public class CodebaseInfo: Codable {
             }
             return TypeSignature.Parameter(label: variable.name, type: parameterType, hasDefaultValue: variable.hasValue)
         }
-        let initSignature: TypeSignature = .function(parameters, typeInfo.signature, typeInfo.apiFlags ?? [])
+        let initSignature: TypeSignature = .function(parameters, typeInfo.signature, typeInfo.apiFlags ?? [], nil)
         var initInfo = FunctionInfo(name: "init", declarationType: .initDeclaration, signature: initSignature, moduleName: typeInfo.moduleName, sourceFile: typeInfo.sourceFile, declaringType: typeInfo.signature, modifiers: typeInfo.modifiers, attributes: Attributes(), availability: .available)
         initInfo.isGenerated = true
         typeInfo.functions.append(initInfo)

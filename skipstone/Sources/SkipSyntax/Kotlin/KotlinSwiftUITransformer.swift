@@ -128,11 +128,11 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
     
     private func translateFunctionCallParameters(_ functionCall: KotlinFunctionCall, translator: KotlinTranslator) {
         // Look for closures passed as ViewBuilder arguments to function calls
-        guard case .function(let parameterTypes, _, _) = functionCall.apiMatch?.signature, parameterTypes.count == functionCall.arguments.count else {
+        guard case .function(let parameterTypes, _, _, _) = functionCall.apiMatch?.signature, parameterTypes.count == functionCall.arguments.count else {
             return
         }
         for i in 0..<parameterTypes.count {
-            guard case .function(_, _, let apiFlags) = parameterTypes[i].type, apiFlags.contains(.viewBuilder), let closure = functionCall.arguments[i].value as? KotlinClosure else {
+            guard case .function(_, _, let apiFlags, _) = parameterTypes[i].type, apiFlags.contains(.viewBuilder), let closure = functionCall.arguments[i].value as? KotlinClosure else {
                 continue
             }
             // If the closure is marked as a ViewBuilder, we'll already process it

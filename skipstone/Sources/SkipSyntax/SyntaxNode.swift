@@ -115,6 +115,18 @@ class SyntaxNode: SourceDerived, PrettyPrintable {
         return self === (parent as? FunctionCall)?.function
     }
 
+    /// Whether this node is within an `#if SKIP` block in the source.
+    final var isInSkipBlock: Bool {
+        var node: SyntaxNode? = self
+        while node != nil {
+            if (node as? Statement)?.extras?.directives.contains(.skipBlock) == true {
+                return true
+            }
+            node = node?.parent
+        }
+        return false
+    }
+
     /// Traverse up the syntax tree to fully qualify a type.
     ///
     /// - Returns: A qualified type or a typealiased type signature whose type must then be resolved.

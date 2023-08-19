@@ -76,7 +76,7 @@ final class KotlinStructTransformer: KotlinTransformer {
     }
 
     private func addMutableStructAPI(to classDeclaration: KotlinClassDeclaration, variableDeclarations: [KotlinVariableDeclaration], useMemberwiseConstructor: Bool) {
-        let supdateType: TypeSignature = .function([TypeSignature.Parameter(type: .any)], .void, []).asOptional(true)
+        let supdateType: TypeSignature = .function([TypeSignature.Parameter(type: .any)], .void, [], nil).asOptional(true)
         let supdate = KotlinVariableDeclaration(names: ["supdate"], variableTypes: [supdateType])
         supdate.declaredType = supdateType
         supdate.role = .property

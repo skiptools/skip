@@ -930,7 +930,7 @@ class KotlinClassDeclaration: KotlinStatement {
         if let owningTypeDeclaration = statement.parent?.owningTypeDeclaration, !owningTypeDeclaration.generics.isEmpty {
             kstatement.messages.append(.kotlinGenericTypeNested(statement, source: translator.syntaxTree.source))
         }
-        kstatement.attributes = kstatement.processAttributes(statement.attributes, translator: translator)
+        kstatement.attributes = kstatement.processAttributes(statement.attributes, from: statement, translator: translator)
 
         let partitioned = partition(members: statement.members, of: kstatement.signature)
         var extensionMembers = partitioned.extensionMembers
@@ -1063,7 +1063,7 @@ class KotlinClassDeclaration: KotlinStatement {
         if let declaration = extras?.declaration {
             output.append(indentation).append(declaration)
         } else {
-            attributes.append(to: output, indentation: indentation)
+            attributes.append(for: self, to: output, indentation: indentation)
             output.append(indentation)
             switch modifiers.visibility {
             case .default, .internal:
@@ -1205,7 +1205,7 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
             kstatement.enumGenerics = Generics(entries: genericsEntries)
             kstatement.generics = kstatement.enumGenerics.filterWhereEqual()
         }
-        let _ = kstatement.processAttributes(statement.attributes, translator: translator)
+        let _ = kstatement.processAttributes(statement.attributes, from: statement, translator: translator)
         return kstatement
     }
 
@@ -1461,7 +1461,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var suppressSideEffects = false
     var isGenerated = false
     var functionType: TypeSignature {
-        return .function(parameters.map(\.signature), returnType, apiFlags)
+        return attributes.apply(toFunction: .function(parameters.map(\.signature), returnType, apiFlags, nil))
     }
     var functionGenerics: Generics {
         get {
@@ -1513,7 +1513,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         kstatement.generics = statement.generics.resolvingSelf(in: statement)
         kstatement.returnType = statement.returnType.resolvingSelf(in: statement)
         kstatement.parameters = statement.parameters.map { $0.resolvingSelf(in: statement).translate(translator: translator) }
-        kstatement.attributes = kstatement.processAttributes(statement.attributes, translator: translator)
+        kstatement.attributes = kstatement.processAttributes(statement.attributes, from: statement, translator: translator)
         kstatement.apiFlags = statement.functionType.apiFlags
 
         if !translateMemberInfo(declaration: kstatement, from: statement, modifiers: statement.modifiers, translator: translator) {
@@ -1539,7 +1539,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         getter.generics = statement.generics.resolvingSelf(in: statement)
         getter.returnType = statement.elementType.resolvingSelf(in: statement)
         getter.parameters = statement.parameters.map { $0.resolvingSelf(in: statement).translate(translator: translator) }
-        getter.attributes = getter.processAttributes(statement.attributes, translator: translator)
+        getter.attributes = getter.processAttributes(statement.attributes, from: statement, translator: translator)
         getter.apiFlags = statement.getterType.apiFlags
         translateMemberInfo(declaration: getter, from: statement, modifiers: statement.modifiers, translator: translator)
         translateBody(declaration: getter, from: statement, body: statement.getter?.body, returnType: statement.elementType, isAsync: statement.isAsync, translator: translator)
@@ -1707,7 +1707,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if let declaration = extras?.declaration {
             output.append(indentation).append(declaration)
         } else {
-            attributes.append(to: output, indentation: indentation)
+            attributes.append(for: self, to: output, indentation: indentation)
             annotations.appendLines(to: output, indentation: indentation)
             output.append(indentation)
             if isEqualImplementation {
@@ -1981,7 +1981,7 @@ class KotlinInterfaceDeclaration: KotlinStatement {
 
     static func translate(statement: TypeDeclaration, translator: KotlinTranslator) -> KotlinInterfaceDeclaration {
         let kstatement = KotlinInterfaceDeclaration(statement: statement)
-        kstatement.attributes = kstatement.processAttributes(statement.attributes, translator: translator)
+        kstatement.attributes = kstatement.processAttributes(statement.attributes, from: statement, translator: translator)
         kstatement.modifiers = statement.modifiers
         kstatement.inherits = statement.inherits
         kstatement.generics = statement.generics.resolvingSelf(in: statement)
@@ -2080,7 +2080,7 @@ class KotlinInterfaceDeclaration: KotlinStatement {
         if let declaration = extras?.declaration {
             output.append(declaration)
         } else {
-            attributes.append(to: output, indentation: indentation)
+            attributes.append(for: self, to: output, indentation: indentation)
             annotations.appendLines(to: output, indentation: indentation)
             switch modifiers.visibility {
             case .default, .internal:
@@ -2125,7 +2125,7 @@ class KotlinTypealiasDeclaration: KotlinStatement {
         kstatement.modifiers = statement.modifiers
         kstatement.generics = statement.generics.resolvingSelf(in: statement)
         kstatement.aliasedType = statement.aliasedType
-        kstatement.attributes = kstatement.processAttributes(statement.attributes, translator: translator)
+        kstatement.attributes = kstatement.processAttributes(statement.attributes, from: statement, translator: translator)
         kstatement.messages += messages
         return [kstatement]
     }
@@ -2150,7 +2150,7 @@ class KotlinTypealiasDeclaration: KotlinStatement {
         if let declaration = extras?.declaration {
             output.append(indentation).append(declaration).append("\n")
         } else {
-            attributes.append(to: output, indentation: indentation)
+            attributes.append(for: self, to: output, indentation: indentation)
             output.append(indentation).append(modifiers.kotlinMemberString(isGlobal: true, isOpen: false, suffix: " "))
             output.append("typealias ").append(name)
             generics.append(to: output, indentation: indentation)
@@ -2286,7 +2286,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             kstatement.value = translator.translateExpression(value).sref()
         }
 
-        kstatement.attributes = kstatement.processAttributes(statement.attributes, translator: translator)
+        kstatement.attributes = kstatement.processAttributes(statement.attributes, from: statement, translator: translator)
         kstatement.apiFlags = statement.apiFlags
         if kstatement.declaredType != .none {
             kstatement.mayBeSharedMutableStruct = statement.constrainedDeclaredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
@@ -2401,7 +2401,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
 
     private func appendDeclaration(to output: OutputGenerator, indentation: Indentation, storage: KotlinVariableStorage?) {
-        attributes.append(to: output, indentation: indentation)
+        attributes.append(for: self, to: output, indentation: indentation)
         annotations.appendLines(to: output, indentation: indentation)
         output.append(indentation)
         if role.isProperty || role == .global {
