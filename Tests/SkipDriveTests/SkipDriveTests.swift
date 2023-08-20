@@ -23,7 +23,7 @@ public class SkipCommandTests : XCTestCase {
 
         // TODO
         //let config = try await loadProjectConfig(dir + "/App.xcodeproj", scheme: "App")
-        //XCTAssertEqual("XXX", config.first?.buildSettings["XXX"])
+        //XCTAssertEqual("App", config.first?.buildSettings["PROJECT_NAME"])
 
         //try await skip("check", "-d", tempDir)
     }
