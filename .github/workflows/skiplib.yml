@@ -26,6 +26,7 @@ jobs:
           # extract package and initial module name from Package.swift
           PACKAGE=$(swift package dump-package | jq -r '.name')
           MODULE=$(swift package dump-package | jq -r '.targets[0].name')
+          COMMIT_DATE=$(git log -1 --format=%ad --date=iso-strict ${GITHUB_REF#refs/tags/})
 
           # the tag is the most recent GitHub ref
           TAG="${GITHUB_REF#refs/tags/}"
@@ -38,6 +39,7 @@ jobs:
           # create the release .aar and source .zip distribution
           cd ./.build/plugins/outputs/${PACKAGE}/${MODULE}KtTests/skip-transpiler
           cp -a ${MODULE}/.build/${MODULE}/outputs/aar/${MODULE}-release.aar ${PKGDIR}/${PACKAGE}-${TAG}.aar
+          find . -exec touch -d "${COMMIT_DATE:0:19}" {} \;
           zip -r ${PKGDIR}/${PACKAGE}-${TAG}-sources.zip . -x '.*' -x '.*/*' -x '*/.*/*'
 
           # create a release with the assets and a checksums.txt file
