@@ -18,6 +18,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
                 if importDeclaration.modulePath.first == "SwiftUI" || importDeclaration.modulePath.first == "SkipUI" {
                     needsTranslation = true
                     syntaxTree.dependencies.imports.insert("androidx.compose.runtime.*")
+                    syntaxTree.dependencies.imports.insert("androidx.compose.runtime.saveable.*")
                     break
                 }
             }
@@ -196,6 +197,9 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         composeFunction.modifiers.visibility = .public
         composeFunction.modifiers.isOverride = true
         composeFunction.annotations.append("@Composable")
+        if !stateVariables.isEmpty {
+            composeFunction.annotations.append("@Suppress(\"UNCHECKED_CAST\")")
+        }
         composeFunction.parameters.append(Parameter(externalLabel: "composectx", declaredType: .named("ComposeContext", [])))
         composeFunction.extras = .singleNewline
 
@@ -231,7 +235,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
     /// Create code to remember and sync a state variable.
     private func synthesizeStateSync(variable: KotlinVariableDeclaration) -> [KotlinStatement] {
         let initialValue = KotlinRawStatement(sourceCode: "val initial\(variable.propertyName) = _\(variable.propertyName).wrappedValue")
-        let composeValue = KotlinRawStatement(sourceCode: "var compose\(variable.propertyName) by remember { mutableStateOf(initial\(variable.propertyName)) }")
+        let composeValue = KotlinRawStatement(sourceCode: "var compose\(variable.propertyName) by rememberSaveable(stateSaver = composectx.stateSaver as Saver<\(variable.propertyType.kotlin), Any>) { mutableStateOf(initial\(variable.propertyName)) }")
         let syncValue = KotlinRawStatement(sourceCode: "_\(variable.propertyName).sync(compose\(variable.propertyName), { compose\(variable.propertyName) = it })")
         return [initialValue, composeValue, syncValue]
     }

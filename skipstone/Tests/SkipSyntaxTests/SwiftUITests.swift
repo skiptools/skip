@@ -52,6 +52,7 @@ final class SwiftUITests: XCTestCase {
         }
         """, kotlin: """
         import androidx.compose.runtime.*
+        import androidx.compose.runtime.saveable.*
 
         import skip.ui.*
         internal class V: View {
@@ -72,6 +73,7 @@ final class SwiftUITests: XCTestCase {
         }
         """, kotlin: """
         import androidx.compose.runtime.*
+        import androidx.compose.runtime.saveable.*
 
         import skip.ui.*
         internal class V: MyView {
@@ -111,6 +113,7 @@ final class SwiftUITests: XCTestCase {
         }
         """, kotlin: """
         import androidx.compose.runtime.*
+        import androidx.compose.runtime.saveable.*
 
         import skip.ui.*
         internal interface P {
@@ -167,6 +170,7 @@ final class SwiftUITests: XCTestCase {
         }
         """, kotlin: """
         import androidx.compose.runtime.*
+        import androidx.compose.runtime.saveable.*
 
         import skip.ui.*
         internal fun f() {
@@ -187,6 +191,7 @@ final class SwiftUITests: XCTestCase {
         }
         """, kotlin: """
         import androidx.compose.runtime.*
+        import androidx.compose.runtime.saveable.*
 
         import skip.ui.*
         internal class MyV: View {
@@ -213,6 +218,7 @@ final class SwiftUITests: XCTestCase {
         }
         """, kotlin: """
         import androidx.compose.runtime.*
+        import androidx.compose.runtime.saveable.*
 
         import skip.ui.*
         internal class MyV: View {
@@ -266,6 +272,7 @@ final class SwiftUITests: XCTestCase {
         }
         """, kotlin: """
         import androidx.compose.runtime.*
+        import androidx.compose.runtime.saveable.*
 
         import skip.ui.*
         internal class MyV: View {
@@ -312,6 +319,7 @@ final class SwiftUITests: XCTestCase {
         }
         """, kotlin: """
         import androidx.compose.runtime.*
+        import androidx.compose.runtime.saveable.*
 
         import skip.ui.*
         internal fun f() {
@@ -342,6 +350,7 @@ final class SwiftUITests: XCTestCase {
         }
         """, kotlin: """
         import androidx.compose.runtime.*
+        import androidx.compose.runtime.saveable.*
 
         import skip.ui.*
         internal fun f() {
@@ -392,6 +401,7 @@ final class SwiftUITests: XCTestCase {
         }
         """, kotlin: """
         import androidx.compose.runtime.*
+        import androidx.compose.runtime.saveable.*
 
         import skip.ui.*
         internal open class O: Observable {
@@ -424,13 +434,14 @@ final class SwiftUITests: XCTestCase {
             }
 
             @Composable
+            @Suppress(\"UNCHECKED_CAST\")
             override fun Compose(composectx: ComposeContext) {
                 val initials = _s.wrappedValue
-                var composes by remember { mutableStateOf(initials) }
+                var composes by rememberSaveable(stateSaver = composectx.stateSaver as Saver<Int, Any>) { mutableStateOf(initials) }
                 _s.sync(composes, { composes = it })
 
                 val initialo = _o.wrappedValue
-                var composeo by remember { mutableStateOf(initialo) }
+                var composeo by rememberSaveable(stateSaver = composectx.stateSaver as Saver<O, Any>) { mutableStateOf(initialo) }
                 _o.sync(composeo, { composeo = it })
 
                 body().Compose(composectx)
@@ -469,6 +480,7 @@ final class SwiftUITests: XCTestCase {
         }
         """, kotlin: """
         import androidx.compose.runtime.*
+        import androidx.compose.runtime.saveable.*
 
         import skip.ui.*
         internal class S: MutableStruct {
@@ -505,9 +517,10 @@ final class SwiftUITests: XCTestCase {
             }
 
             @Composable
+            @Suppress(\"UNCHECKED_CAST\")
             override fun Compose(composectx: ComposeContext) {
                 val initials = _s.wrappedValue
-                var composes by remember { mutableStateOf(initials) }
+                var composes by rememberSaveable(stateSaver = composectx.stateSaver as Saver<S, Any>) { mutableStateOf(initials) }
                 _s.sync(composes, { composes = it })
 
                 body().Compose(composectx)
@@ -531,7 +544,8 @@ final class SwiftUITests: XCTestCase {
         }
         """, kotlin: """
         import androidx.compose.runtime.*
-        
+        import androidx.compose.runtime.saveable.*
+
         import skip.ui.*
         internal class V: View {
             internal var envvalue: Int = Int(0)
@@ -560,6 +574,7 @@ final class SwiftUITests: XCTestCase {
         }
         """, kotlin: """
         import androidx.compose.runtime.*
+        import androidx.compose.runtime.saveable.*
 
         import skip.ui.*
         internal class V: View {
@@ -592,6 +607,7 @@ final class SwiftUITests: XCTestCase {
         }
         """, kotlin: """
         import androidx.compose.runtime.*
+        import androidx.compose.runtime.saveable.*
 
         import skip.ui.*
         internal class V: View {
@@ -628,6 +644,7 @@ final class SwiftUITests: XCTestCase {
         }
         """, kotlin: """
         import androidx.compose.runtime.*
+        import androidx.compose.runtime.saveable.*
 
         import skip.ui.*
         internal class V: View {
@@ -661,6 +678,7 @@ final class SwiftUITests: XCTestCase {
         }
         """, kotlin: """
         import androidx.compose.runtime.*
+        import androidx.compose.runtime.saveable.*
 
         import skip.ui.*
         internal class V: View {
@@ -675,9 +693,10 @@ final class SwiftUITests: XCTestCase {
             }
 
             @Composable
+            @Suppress(\"UNCHECKED_CAST\")
             override fun Compose(composectx: ComposeContext) {
                 val initialtext = _text.wrappedValue
-                var composetext by remember { mutableStateOf(initialtext) }
+                var composetext by rememberSaveable(stateSaver = composectx.stateSaver as Saver<String, Any>) { mutableStateOf(initialtext) }
                 _text.sync(composetext, { composetext = it })
 
                 body().Compose(composectx)
@@ -701,6 +720,7 @@ final class SwiftUITests: XCTestCase {
         }
         """, kotlin: """
         import androidx.compose.runtime.*
+        import androidx.compose.runtime.saveable.*
 
         import skip.ui.*
         internal class V: View {
@@ -715,9 +735,10 @@ final class SwiftUITests: XCTestCase {
             }
 
             @Composable
+            @Suppress(\"UNCHECKED_CAST\")
             override fun Compose(composectx: ComposeContext) {
                 val initialtext = _text.wrappedValue
-                var composetext by remember { mutableStateOf(initialtext) }
+                var composetext by rememberSaveable(stateSaver = composectx.stateSaver as Saver<String, Any>) { mutableStateOf(initialtext) }
                 _text.sync(composetext, { composetext = it })
 
                 body().Compose(composectx)
@@ -745,6 +766,7 @@ final class SwiftUITests: XCTestCase {
         }
         """, kotlin: """
         import androidx.compose.runtime.*
+        import androidx.compose.runtime.saveable.*
 
         import skip.ui.*
         internal class V: View {
@@ -776,6 +798,7 @@ final class SwiftUITests: XCTestCase {
         }
         """, kotlin: """
         import androidx.compose.runtime.*
+        import androidx.compose.runtime.saveable.*
 
         import skip.ui.*
         internal class V: View {
@@ -806,6 +829,7 @@ final class SwiftUITests: XCTestCase {
         }
         """, kotlin: """
         import androidx.compose.runtime.*
+        import androidx.compose.runtime.saveable.*
 
         import skip.ui.*
         internal class V: View {
@@ -839,6 +863,7 @@ final class SwiftUITests: XCTestCase {
         }
         """, kotlin: """
         import androidx.compose.runtime.*
+        import androidx.compose.runtime.saveable.*
         import skip.lib.Array
 
         import skip.ui.*
@@ -875,6 +900,7 @@ final class SwiftUITests: XCTestCase {
         }
         """, kotlin: """
         import androidx.compose.runtime.*
+        import androidx.compose.runtime.saveable.*
 
         import skip.ui.*
         internal class V: View, MutableStruct {
@@ -903,9 +929,10 @@ final class SwiftUITests: XCTestCase {
             }
 
             @Composable
+            @Suppress(\"UNCHECKED_CAST\")
             override fun Compose(composectx: ComposeContext) {
                 val initialcount = _count.wrappedValue
-                var composecount by remember { mutableStateOf(initialcount) }
+                var composecount by rememberSaveable(stateSaver = composectx.stateSaver as Saver<Int, Any>) { mutableStateOf(initialcount) }
                 _count.sync(composecount, { composecount = it })
 
                 envvalue = composectx.environment[EnvironmentValues::envvalue]
@@ -945,6 +972,7 @@ final class SwiftUITests: XCTestCase {
         }
         """, kotlin: """
         import androidx.compose.runtime.*
+        import androidx.compose.runtime.saveable.*
 
         import skip.ui.*
         internal class V: View, MutableStruct {
@@ -977,9 +1005,10 @@ final class SwiftUITests: XCTestCase {
             }
 
             @Composable
+            @Suppress(\"UNCHECKED_CAST\")
             override fun Compose(composectx: ComposeContext) {
                 val initialcount = _count.wrappedValue
-                var composecount by remember { mutableStateOf(initialcount) }
+                var composecount by rememberSaveable(stateSaver = composectx.stateSaver as Saver<Int, Any>) { mutableStateOf(initialcount) }
                 _count.sync(composecount, { composecount = it })
 
                 envvalue = composectx.environment[EnvironmentValues::envvalue]
@@ -1017,6 +1046,7 @@ final class SwiftUITests: XCTestCase {
         }
         """, kotlin: """
         import androidx.compose.runtime.*
+        import androidx.compose.runtime.saveable.*
 
         import skip.ui.*
         internal class HStack<Content>: View where Content: View {
@@ -1048,6 +1078,7 @@ final class SwiftUITests: XCTestCase {
         }
         """, kotlin: """
         import androidx.compose.runtime.*
+        import androidx.compose.runtime.saveable.*
 
         import skip.ui.*
         internal class MyV: View {
@@ -1085,6 +1116,7 @@ final class SwiftUITests: XCTestCase {
         }
         """, kotlin: """
         import androidx.compose.runtime.*
+        import androidx.compose.runtime.saveable.*
 
         import skip.ui.*
         internal class MyV: View {
