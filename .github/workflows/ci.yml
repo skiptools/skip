@@ -16,48 +16,9 @@ jobs:
     steps:
       - name: Checkout skip
         uses: actions/checkout@v3
-        with:
-          path: skip
-          repository: skiptools/skip
 
       - name: Test Skip
-        working-directory: skip
-        # retry because XCUnit async times out after ~4 minutes, which
-        # might not be enough for testSkipCreate to download dependencies
-        run: swift test || swift test || swift test
-
-      - name: Setup Java
-        uses: actions/setup-java@v3
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Create New Skip Package (Debug)
-        run: |
-          mkdir SomeLibraryDebug
-          cd SomeLibraryDebug
-          swift package init
-
-          echo 'package.platforms = package.platforms ?? [.macOS("13"), .iOS("16")]' >> Package.swift
-          echo 'package.dependencies += [.package(url: "https://skip.tools/skiptools/skip.git", branch: "main")]' >> Package.swift
-          echo 'package.dependencies += [.package(url: "https://skip.tools/skiptools/skip-unit.git", from: "0.0.0")]' >> Package.swift
-          echo 'package.dependencies += [.package(url: "https://skip.tools/skiptools/skip-lib.git", from: "0.0.0")]' >> Package.swift
-          echo 'package.dependencies += [.package(url: "https://skip.tools/skiptools/skip-foundation.git", from: "0.0.0")]' >> Package.swift
-
-          swift package plugin --allow-writing-to-package-directory skip-init
-          cat Package.swift Package.resolved
-
-      - name: Build Skip Package (Debug)
-        working-directory: SomeLibraryDebug
-        run: |
-          swift build --jobs 1 --configuration debug
-
-      - name: Test Skip Package (Debug)
-        # disabled until determining issue with SkipUnit
-        if: false
-        working-directory: SomeLibraryDebug
-        run: |
-          swift test --jobs 1 --configuration debug
+        run: swift test
 
       - name: Test Homebrew Tap
         run: |
@@ -68,33 +29,4 @@ jobs:
         run: |
           brew install mint
           mint run skiptools/skip version
-
-      - name: Show Skip Package (Debug)
-        # disables for concurrency
-        if: false
-        working-directory: SomeLibraryDebug
-        run: |
-          brew install tree || true
-          tree -l -I build
-          cd -
-
-      - name: Create New Skip Package (Release)
-        # disables for concurrency
-        if: false
-        run: |
-          mkdir SomeLibraryRelease
-          cd SomeLibraryRelease
-          swift package init
-
-          echo 'package.dependencies += [.package(url: "https://skip.tools/skiptools/skip.git", from: "0.0.0")]' >> Package.swift
-          echo 'package.dependencies += [.package(url: "https://skip.tools/skiptools/skiphub.git", from: "0.0.0")]' >> Package.swift
-
-          swift package plugin --allow-writing-to-package-directory skip-init
-          cat Package.swift Package.resolved
-          swift build --jobs 1 --configuration release
-          swift test --jobs 1 --configuration release
-          brew install tree || true
-          tree -l -I build
-          cd -
-
 

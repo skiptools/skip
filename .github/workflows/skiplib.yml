@@ -40,7 +40,7 @@ jobs:
           cd ./.build/plugins/outputs/${PACKAGE}/${MODULE}KtTests/skip-transpiler
           cp -a ${MODULE}/.build/${MODULE}/outputs/aar/${MODULE}-release.aar ${PKGDIR}/${PACKAGE}-${TAG}.aar
           # copy the license for the source jar
-          cp ${MODULE}/LICENSE* .
+          cp ../../../../../../LICENSE* .
 
           # create a source .jar distribution with consistent timestamps
           find . -exec touch -d "${COMMIT_DATE:0:19}" {} \;
