@@ -29,7 +29,10 @@ final class ObservationTests: XCTestCase {
             static var s = 1
         }
         """, kotlin: """
-        import androidx.compose.runtime.*
+        import androidx.compose.runtime.Stable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.setValue
 
 
         internal open class C: Observable {
@@ -83,7 +86,10 @@ final class ObservationTests: XCTestCase {
             var a = 1
         }
         """, kotlin: """
-        import androidx.compose.runtime.*
+        import androidx.compose.runtime.Stable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.setValue
 
         internal class S: MutableStruct, Observable {
             internal var a: Int
@@ -112,7 +118,10 @@ final class ObservationTests: XCTestCase {
             lazy var a: Int = { 1 }()
         }
         """, kotlin: """
-        import androidx.compose.runtime.*
+        import androidx.compose.runtime.Stable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.setValue
 
         internal open class C: Observable {
             internal open var a: Int
@@ -137,7 +146,10 @@ final class ObservationTests: XCTestCase {
             lazy var a: Int = { 1 }()
         }
         """, kotlin: """
-        import androidx.compose.runtime.*
+        import androidx.compose.runtime.Stable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.setValue
 
         internal class S: MutableStruct, Observable {
             internal var a: Int
@@ -180,7 +192,10 @@ final class ObservationTests: XCTestCase {
             var a: [A] = []
         }
         """, kotlin: """
-        import androidx.compose.runtime.*
+        import androidx.compose.runtime.Stable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.setValue
         import skip.lib.Array
 
         internal open class C: Observable {
@@ -202,7 +217,10 @@ final class ObservationTests: XCTestCase {
             var a: [A] = []
         }
         """, kotlin: """
-        import androidx.compose.runtime.*
+        import androidx.compose.runtime.Stable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.setValue
         import skip.lib.Array
 
         internal class S: MutableStruct, Observable {
@@ -239,7 +257,10 @@ final class ObservationTests: XCTestCase {
             @Published var c = 1
         }
         """, kotlin: """
-        import androidx.compose.runtime.*
+        import androidx.compose.runtime.Stable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.setValue
 
         
         internal open class C1: ObservableObject {
@@ -276,8 +297,11 @@ final class ObservationTests: XCTestCase {
             }
         }
         """, kotlin: """
-        import androidx.compose.runtime.*
-        
+        import androidx.compose.runtime.Stable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.setValue
+
         internal open class C: ObservableObject {
             internal open var a: S
                 get() = astate!!.sref({ this.a = it })

@@ -15,11 +15,11 @@ extension KotlinDependencies {
 
     /// Add a dependency on `kotlin.reflect`.
     mutating func insertReflect() {
-        imports.insert("kotlin.reflect.*")
+        imports.insert("kotlin.reflect.KClass")
     }
 
     /// Add a dependency on `kotlin.reflect.full`.
     mutating func insertReflectFull() {
-        imports.insert("kotlin.reflect.full.*")
+        imports.insert("kotlin.reflect.full.companionObjectInstance")
     }
 }

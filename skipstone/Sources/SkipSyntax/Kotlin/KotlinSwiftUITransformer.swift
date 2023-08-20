@@ -17,8 +17,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             for importDeclaration in syntaxTree.root.statements.compactMap({ $0 as? KotlinImportDeclaration }) {
                 if importDeclaration.modulePath.first == "SwiftUI" || importDeclaration.modulePath.first == "SkipUI" {
                     needsTranslation = true
-                    syntaxTree.dependencies.imports.insert("androidx.compose.runtime.*")
-                    syntaxTree.dependencies.imports.insert("androidx.compose.runtime.saveable.*")
+                    addKotlinComposeDependencies(to: syntaxTree)
                     break
                 }
             }
@@ -445,5 +444,14 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             }
         }
         return false
+    }
+
+    private func addKotlinComposeDependencies(to syntaxTree: KotlinSyntaxTree) {
+        syntaxTree.dependencies.imports.insert("androidx.compose.runtime.Composable")
+        syntaxTree.dependencies.imports.insert("androidx.compose.runtime.getValue")
+        syntaxTree.dependencies.imports.insert("androidx.compose.runtime.mutableStateOf")
+        syntaxTree.dependencies.imports.insert("androidx.compose.runtime.setValue")
+        syntaxTree.dependencies.imports.insert("androidx.compose.runtime.saveable.rememberSaveable")
+        syntaxTree.dependencies.imports.insert("androidx.compose.runtime.saveable.Saver")
     }
 }

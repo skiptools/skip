@@ -92,8 +92,8 @@ final class ExpressionTests: XCTestCase {
         func g(c: C.Type) {
         }
         """, kotlin: """
-        import kotlin.reflect.*
-        import kotlin.reflect.full.*
+        import kotlin.reflect.KClass
+        import kotlin.reflect.full.companionObjectInstance
 
         internal open class C {
 

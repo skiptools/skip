@@ -51,8 +51,12 @@ final class SwiftUITests: XCTestCase {
             }
         }
         """, kotlin: """
-        import androidx.compose.runtime.*
-        import androidx.compose.runtime.saveable.*
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
 
         import skip.ui.*
         internal class V: View {
@@ -72,8 +76,12 @@ final class SwiftUITests: XCTestCase {
             }
         }
         """, kotlin: """
-        import androidx.compose.runtime.*
-        import androidx.compose.runtime.saveable.*
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
 
         import skip.ui.*
         internal class V: MyView {
@@ -112,8 +120,12 @@ final class SwiftUITests: XCTestCase {
             }
         }
         """, kotlin: """
-        import androidx.compose.runtime.*
-        import androidx.compose.runtime.saveable.*
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
 
         import skip.ui.*
         internal interface P {
@@ -169,8 +181,12 @@ final class SwiftUITests: XCTestCase {
             }
         }
         """, kotlin: """
-        import androidx.compose.runtime.*
-        import androidx.compose.runtime.saveable.*
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
 
         import skip.ui.*
         internal fun f() {
@@ -190,8 +206,12 @@ final class SwiftUITests: XCTestCase {
             }
         }
         """, kotlin: """
-        import androidx.compose.runtime.*
-        import androidx.compose.runtime.saveable.*
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
 
         import skip.ui.*
         internal class MyV: View {
@@ -217,8 +237,12 @@ final class SwiftUITests: XCTestCase {
             }
         }
         """, kotlin: """
-        import androidx.compose.runtime.*
-        import androidx.compose.runtime.saveable.*
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
 
         import skip.ui.*
         internal class MyV: View {
@@ -271,8 +295,12 @@ final class SwiftUITests: XCTestCase {
             }
         }
         """, kotlin: """
-        import androidx.compose.runtime.*
-        import androidx.compose.runtime.saveable.*
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
 
         import skip.ui.*
         internal class MyV: View {
@@ -318,8 +346,12 @@ final class SwiftUITests: XCTestCase {
             }
         }
         """, kotlin: """
-        import androidx.compose.runtime.*
-        import androidx.compose.runtime.saveable.*
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
 
         import skip.ui.*
         internal fun f() {
@@ -349,8 +381,12 @@ final class SwiftUITests: XCTestCase {
             }
         }
         """, kotlin: """
-        import androidx.compose.runtime.*
-        import androidx.compose.runtime.saveable.*
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
 
         import skip.ui.*
         internal fun f() {
@@ -400,8 +436,13 @@ final class SwiftUITests: XCTestCase {
             }
         }
         """, kotlin: """
-        import androidx.compose.runtime.*
-        import androidx.compose.runtime.saveable.*
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.Stable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
 
         import skip.ui.*
         internal open class O: Observable {
@@ -479,8 +520,12 @@ final class SwiftUITests: XCTestCase {
             }
         }
         """, kotlin: """
-        import androidx.compose.runtime.*
-        import androidx.compose.runtime.saveable.*
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
 
         import skip.ui.*
         internal class S: MutableStruct {
@@ -543,8 +588,12 @@ final class SwiftUITests: XCTestCase {
             }
         }
         """, kotlin: """
-        import androidx.compose.runtime.*
-        import androidx.compose.runtime.saveable.*
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
 
         import skip.ui.*
         internal class V: View {
@@ -573,8 +622,12 @@ final class SwiftUITests: XCTestCase {
             }
         }
         """, kotlin: """
-        import androidx.compose.runtime.*
-        import androidx.compose.runtime.saveable.*
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
 
         import skip.ui.*
         internal class V: View {
@@ -606,8 +659,12 @@ final class SwiftUITests: XCTestCase {
             }
         }
         """, kotlin: """
-        import androidx.compose.runtime.*
-        import androidx.compose.runtime.saveable.*
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
 
         import skip.ui.*
         internal class V: View {
@@ -643,8 +700,12 @@ final class SwiftUITests: XCTestCase {
             }
         }
         """, kotlin: """
-        import androidx.compose.runtime.*
-        import androidx.compose.runtime.saveable.*
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
 
         import skip.ui.*
         internal class V: View {
@@ -677,8 +738,12 @@ final class SwiftUITests: XCTestCase {
             }
         }
         """, kotlin: """
-        import androidx.compose.runtime.*
-        import androidx.compose.runtime.saveable.*
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
 
         import skip.ui.*
         internal class V: View {
@@ -719,8 +784,12 @@ final class SwiftUITests: XCTestCase {
             }
         }
         """, kotlin: """
-        import androidx.compose.runtime.*
-        import androidx.compose.runtime.saveable.*
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
 
         import skip.ui.*
         internal class V: View {
@@ -765,8 +834,12 @@ final class SwiftUITests: XCTestCase {
             }
         }
         """, kotlin: """
-        import androidx.compose.runtime.*
-        import androidx.compose.runtime.saveable.*
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
 
         import skip.ui.*
         internal class V: View {
@@ -797,8 +870,12 @@ final class SwiftUITests: XCTestCase {
             }
         }
         """, kotlin: """
-        import androidx.compose.runtime.*
-        import androidx.compose.runtime.saveable.*
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
 
         import skip.ui.*
         internal class V: View {
@@ -828,8 +905,12 @@ final class SwiftUITests: XCTestCase {
             }
         }
         """, kotlin: """
-        import androidx.compose.runtime.*
-        import androidx.compose.runtime.saveable.*
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
 
         import skip.ui.*
         internal class V: View {
@@ -862,8 +943,12 @@ final class SwiftUITests: XCTestCase {
             }
         }
         """, kotlin: """
-        import androidx.compose.runtime.*
-        import androidx.compose.runtime.saveable.*
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
         import skip.lib.Array
 
         import skip.ui.*
@@ -899,8 +984,12 @@ final class SwiftUITests: XCTestCase {
             }
         }
         """, kotlin: """
-        import androidx.compose.runtime.*
-        import androidx.compose.runtime.saveable.*
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
 
         import skip.ui.*
         internal class V: View, MutableStruct {
@@ -971,8 +1060,12 @@ final class SwiftUITests: XCTestCase {
             }
         }
         """, kotlin: """
-        import androidx.compose.runtime.*
-        import androidx.compose.runtime.saveable.*
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
 
         import skip.ui.*
         internal class V: View, MutableStruct {
@@ -1045,8 +1138,12 @@ final class SwiftUITests: XCTestCase {
             }
         }
         """, kotlin: """
-        import androidx.compose.runtime.*
-        import androidx.compose.runtime.saveable.*
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
 
         import skip.ui.*
         internal class HStack<Content>: View where Content: View {
@@ -1077,8 +1174,12 @@ final class SwiftUITests: XCTestCase {
             }
         }
         """, kotlin: """
-        import androidx.compose.runtime.*
-        import androidx.compose.runtime.saveable.*
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
 
         import skip.ui.*
         internal class MyV: View {
@@ -1115,8 +1216,12 @@ final class SwiftUITests: XCTestCase {
             }
         }
         """, kotlin: """
-        import androidx.compose.runtime.*
-        import androidx.compose.runtime.saveable.*
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
 
         import skip.ui.*
         internal class MyV: View {
