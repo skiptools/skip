@@ -22,7 +22,9 @@ jobs:
 
       - name: Test Skip
         working-directory: skip
-        run: swift test
+        # retry because XCUnit async times out after ~4 minutes, which
+        # might not be enough for testSkipCreate to download dependencies
+        run: swift test || swift test || swift test
 
       - name: Setup Java
         uses: actions/setup-java@v3
