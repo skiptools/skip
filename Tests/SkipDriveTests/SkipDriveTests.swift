@@ -9,9 +9,14 @@ public class SkipCommandTests : XCTestCase {
 
     public func testSkipCreate() async throws {
         let tempDir = try mktmp()
-        let (stdout, _) = try await skip("create", "--test", "-d", tempDir, "cool_app")
+        let name = "cool_app"
+        let (stdout, _) = try await skip("create", "--no-build", "--no-test", "-d", tempDir, name)
         let out = stdout.split(separator: "\n")
         XCTAssertEqual("Creating project cool_app from template skipapp", out.first)
+        let dir = tempDir + "/" + name + "/"
+        for path in ["Package.swift", "App.xcodeproj", "App.xcconfig", "Sources", "Tests"] {
+            XCTAssertTrue(FileManager.default.fileExists(atPath: dir + path), "missing file at: \(path)")
+        }
     }
 
     /// Runs the tool with the given arguments, returning the entire output string as well as a function to parse it to `JSON`
