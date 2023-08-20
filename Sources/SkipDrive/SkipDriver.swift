@@ -46,6 +46,8 @@ public struct SkipDriver: SkipParsableCommand {
         subcommands: [
             VersionCommand.self,
             CreateCommand.self,
+            //InitCommand.self,
+            //CheckCommand.self,
             //DoctorCommand.self,
             //RunCommand.self,
             //TestCommand.self,
@@ -138,7 +140,7 @@ struct CreateCommand: SkipParsableCommand {
 
         let packageJSONString = try await outputOptions.run("Checking project \(projectName)", [toolOptions.swift, "package", "dump-package", "--package-path", projectFolderURL.path])
 
-        let packageJSON = try JSONDecoder().decode(SwiftPackage.self, from: Data(packageJSONString.utf8))
+        let packageJSON = try JSONDecoder().decode(PackageManifest.self, from: Data(packageJSONString.utf8))
 
         if build == true {
             try await outputOptions.run("Building project \(projectName) for package \(packageJSON.name)", [toolOptions.swift, "build", "-c", createOptions.configuration, "--package-path", projectFolderURL.path])
@@ -210,9 +212,68 @@ struct ProjectTemplate : Codable {
 }
 
 /// An incomplete representation of package JSON, to be filled in as needed for the purposes of the tool
-struct SwiftPackage : Decodable {
-    let name: String
+/// The output from `swift package dump-package`.
+public struct PackageManifest : Hashable, Decodable {
+    public var name: String
+    //public var toolsVersion: String // can be string or dict
+    public var products: [Product]
+    public var dependencies: [Dependency]
+    //public var targets: [Either<Target>.Or<String>]
+    public var platforms: [SupportedPlatform]
+    public var cModuleName: String?
+    public var cLanguageStandard: String?
+    public var cxxLanguageStandard: String?
+
+    public struct Target: Hashable, Decodable {
+        public enum TargetType: String, Hashable, Decodable {
+            case regular
+            case test
+            case system
+        }
+
+        public var `type`: TargetType
+        public var name: String
+        public var path: String?
+        public var excludedPaths: [String]?
+        //public var dependencies: [String]? // dict
+        //public var resources: [String]? // dict
+        public var settings: [String]?
+        public var cModuleName: String?
+        // public var providers: [] // apt, brew, etc.
+    }
+
+
+    public struct Product : Hashable, Decodable {
+        //public var `type`: ProductType // can be string or dict
+        public var name: String
+        public var targets: [String]
+
+        public enum ProductType: String, Hashable, Decodable, CaseIterable {
+            case library
+            case executable
+        }
+    }
+
+    public struct Dependency : Hashable, Decodable {
+        public var name: String?
+        public var url: String?
+        //public var requirement: Requirement // revision/range/branch/exact
+    }
+
+    public struct SupportedPlatform : Hashable, Decodable {
+        var platformName: String
+        var version: String
+    }
 }
+
+
+/// The output from `xcodebuild -showBuildSettings -json -project Project.xcodeproj -scheme SchemeName`
+public struct ProjectBuildSettings : Decodable {
+    public let target: String
+    public let action: String
+    public let buildSettings: [String: String]
+}
+
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 public struct OutputOptions: ParsableArguments {

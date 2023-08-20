@@ -17,7 +17,7 @@ enum SkipBuildCommand : Equatable {
 struct SkipCommandOptions : OptionSet {
     let rawValue: Int
 
-    public static let `default`: Self = [project, scaffold, preflight, transpile, targets, inplace, link, skiplocal]
+    public static let `default`: Self = [project, scaffold, preflight, transpile, targets, inplace, link]
 
     /// Generate the project output structure
     public static let project = Self(rawValue: 1 << 0)
@@ -39,9 +39,6 @@ struct SkipCommandOptions : OptionSet {
 
     /// Link the Gradle outputs intpo the Packages/Skip folder
     public static let link = Self(rawValue: 1 << 6)
-
-    /// Add skiplocal directives to the Package.skip
-    public static let skiplocal = Self(rawValue: 1 << 7)
 }
 
 
@@ -162,16 +159,16 @@ extension CommandPlugin {
                     """
                     addTargetDependencies()
                     packageAddition += """
-                            .product(name: "SkipFoundationKt", package: "skiphub"),
+                            .product(name: "SkipFoundationKt", package: "skip-foundation"),
+                            .product(name: "SkipLibKt", package: "skip-lib"),
+                            .product(name: "SkipUnitKt", package: "skip-unit"),
                         ],
                         resources: [.copy("Skip")],
                         plugins: [.plugin(name: "transpile", package: "skip")])
                     ]
 
-
                     """
                 }
-
 
                 // add advice on how to create the targets manually
                 let dirname = target.directory.removingLastComponent().lastComponent + "/" + target.directory.lastComponent
@@ -272,21 +269,6 @@ extension CommandPlugin {
                     }
                 }
 
-            }
-
-            if options.contains(.skiplocal) {
-                packageAddition += """
-
-                // MARK: Internal Skip Development Support
-
-                import class Foundation.ProcessInfo
-                // For Skip library development in peer directories, run: SKIPLOCAL=.. xed Package.swift
-                if let localPath = ProcessInfo.processInfo.environment["SKIPLOCAL"] {
-                    package.platforms = package.platforms ?? [.iOS(.v16), .macOS(.v13), .tvOS(.v16), .watchOS(.v9), .macCatalyst(.v16)]
-                    package.dependencies[package.dependencies.count - 2] = .package(path: localPath + "/skip")
-                    package.dependencies[package.dependencies.count - 1] = .package(path: localPath + "/skiphub")
-                }
-                """
             }
 
             // if we do not create the scaffold directly, insert advice on how to create it manually

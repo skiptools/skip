@@ -40,7 +40,9 @@ jobs:
 
           echo 'package.platforms = package.platforms ?? [.macOS("13"), .iOS("16")]' >> Package.swift
           echo 'package.dependencies += [.package(url: "https://skip.tools/skiptools/skip.git", branch: "main")]' >> Package.swift
-          echo 'package.dependencies += [.package(url: "https://skip.tools/skiptools/skiphub.git", branch: "main")]' >> Package.swift
+          echo 'package.dependencies += [.package(url: "https://skip.tools/skiptools/skip-unit.git", from: "0.0.0")]' >> Package.swift
+          echo 'package.dependencies += [.package(url: "https://skip.tools/skiptools/skip-lib.git", from: "0.0.0")]' >> Package.swift
+          echo 'package.dependencies += [.package(url: "https://skip.tools/skiptools/skip-foundation.git", from: "0.0.0")]' >> Package.swift
 
           swift package plugin --allow-writing-to-package-directory skip-init
           cat Package.swift Package.resolved
