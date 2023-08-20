@@ -368,7 +368,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
                         addComposeTailCall(to: node as! KotlinExpression, statement: expressionStatement)
                     }
                 } else {
-                    //~~~ Add warnings for unrecognized API use like for async
+                    node.messages.append(.kotlinSwiftUITypeInference(node, source: translator.syntaxTree.source))
                 }
                 return .skip
             } else {
@@ -386,13 +386,13 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             }
         }
 
-        // Wrap the code block in 'return ComposingView { ... }' to return a single view that will compose
+        // Wrap the code block in 'return ComposeView { ... }' to return a single view that will compose
         // when the parent adds its tail call
         let composingClosure = KotlinClosure(body: codeBlock)
         composingClosure.parameters = [Parameter(externalLabel: "composectx", declaredType: .named("ComposeContext", []))]
         composingClosure.hasReturnLabel = needsReturnLabel
         let composingArgument = LabeledValue<KotlinExpression>(value: composingClosure)
-        let composingFunction = KotlinIdentifier(name: "ComposingView")
+        let composingFunction = KotlinIdentifier(name: "ComposeView")
         let composingFunctionCall = KotlinFunctionCall(function: composingFunction, arguments: [composingArgument])
 
         let returnStatement: KotlinStatement = closure == nil ? KotlinReturn(expression: composingFunctionCall) : KotlinExpressionStatement(expression: composingFunctionCall)

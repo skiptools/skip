@@ -229,7 +229,7 @@ final class ObservationTests: XCTestCase {
 
     func testObservableObject() async throws {
         try await check(swift: """
-        import SwiftUI
+        import Combine
 
         class C1: ObservableObject {
             var a = 1
@@ -241,7 +241,6 @@ final class ObservationTests: XCTestCase {
         """, kotlin: """
         import androidx.compose.runtime.*
 
-        import skip.ui.*
         
         internal open class C1: ObservableObject {
             internal open var a = 1

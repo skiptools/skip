@@ -1063,7 +1063,7 @@ class KotlinClassDeclaration: KotlinStatement {
         if let declaration = extras?.declaration {
             output.append(indentation).append(declaration)
         } else {
-            attributes.append(for: self, to: output, indentation: indentation)
+            attributes.append(to: output, indentation: indentation)
             output.append(indentation)
             switch modifiers.visibility {
             case .default, .internal:
@@ -1707,7 +1707,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if let declaration = extras?.declaration {
             output.append(indentation).append(declaration)
         } else {
-            attributes.append(for: self, to: output, indentation: indentation)
+            attributes.append(to: output, indentation: indentation)
             annotations.appendLines(to: output, indentation: indentation)
             output.append(indentation)
             if isEqualImplementation {
@@ -2080,7 +2080,7 @@ class KotlinInterfaceDeclaration: KotlinStatement {
         if let declaration = extras?.declaration {
             output.append(declaration)
         } else {
-            attributes.append(for: self, to: output, indentation: indentation)
+            attributes.append(to: output, indentation: indentation)
             annotations.appendLines(to: output, indentation: indentation)
             switch modifiers.visibility {
             case .default, .internal:
@@ -2150,7 +2150,7 @@ class KotlinTypealiasDeclaration: KotlinStatement {
         if let declaration = extras?.declaration {
             output.append(indentation).append(declaration).append("\n")
         } else {
-            attributes.append(for: self, to: output, indentation: indentation)
+            attributes.append(to: output, indentation: indentation)
             output.append(indentation).append(modifiers.kotlinMemberString(isGlobal: true, isOpen: false, suffix: " "))
             output.append("typealias ").append(name)
             generics.append(to: output, indentation: indentation)
@@ -2401,7 +2401,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
 
     private func appendDeclaration(to output: OutputGenerator, indentation: Indentation, storage: KotlinVariableStorage?) {
-        attributes.append(for: self, to: output, indentation: indentation)
+        attributes.append(to: output, indentation: indentation)
         annotations.appendLines(to: output, indentation: indentation)
         output.append(indentation)
         if role.isProperty || role == .global {

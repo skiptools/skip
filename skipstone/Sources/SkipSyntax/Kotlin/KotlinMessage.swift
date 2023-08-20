@@ -257,6 +257,10 @@ extension Message {
     // Idea: convert string mutation to re-assigning the string value
     static let kotlinStringMutation = "Detected possible string mutation. This may cause errors when converting to Kotlin, which does not have mutable strings"
 
+    static func kotlinSwiftUITypeInference(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .warning, message: "Skip is unable to match this API call to determine whether it results in a View. Consider adding additional type information", sourceDerived: sourceDerived, source: source)
+    }
+
     // Idea: duplicate body that we're falling through to (and the following if that too does a fallthrough, etc)
     static func kotlinSwitchFallthrough(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Kotlin does not support fallthrough. Consider restructuring your switch statement", sourceDerived: sourceDerived, source: source)

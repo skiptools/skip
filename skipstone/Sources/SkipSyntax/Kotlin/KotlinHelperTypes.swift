@@ -267,7 +267,7 @@ extension Attributes {
         return of(kind: .directive).contains { $0.tokens.contains(directive.rawValue) }
     }
 
-    func append(for node: KotlinSyntaxNode, to output: OutputGenerator, indentation: Indentation) {
+    func append(to output: OutputGenerator, indentation: Indentation) {
         attributes.forEach { $0.append(to: output, indentation: indentation) }
     }
 }
