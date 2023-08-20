@@ -20,6 +20,12 @@
       location = "group:../skip-foundation">
    </FileRef>
    <FileRef
+      location = "group:../skip-sql">
+   </FileRef>
+   <FileRef
+      location = "group:../skip-script">
+   </FileRef>
+   <FileRef
       location = "group:../skipapp">
    </FileRef>
    <FileRef

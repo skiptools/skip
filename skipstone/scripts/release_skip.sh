@@ -129,7 +129,7 @@ SKIPCMD_CHECKSUM=$(shasum -a 256 ${RELSTAGING}/${SKIP_ARTIFACT_ZIP} | cut -f 1 -
 cd -
 
 # package.targets += [.binaryTarget(name: "${PRODUCT}", url: "${ARTIFACT_URL}", checksum: "${PLUGIN_CHECKSUM}")]
-sed -I '' 's;package.targets += \[.binaryTarget.*;package.targets += [.binaryTarget(name: "'${ARTIFACT}'", url: "'${ARTIFACT_URL}'", checksum: "'${PLUGIN_CHECKSUM}'")];g' ${SKIPPKG}
+sed -I '' 's;.binaryTarget(name: "'${ARTIFACT}'", url:.*);.binaryTarget(name: "'${ARTIFACT}'", url: "'${ARTIFACT_URL}'", checksum: "'${PLUGIN_CHECKSUM}'");g' ${SKIPPKG}
 
 git add Package.swift ${README_PATH} ${SKIPDRIVE_VERSION_PATH}
 git add .

@@ -29,7 +29,7 @@ public class CodebaseInfo: Codable {
         "CryptoKit": "SkipFoundation",
         "Dispatch": "SkipFoundation",
         "Foundation": "SkipFoundation",
-        "JavaScriptCore": "SkipKit",
+        "JavaScriptCore": "SkipScript",
         "Observation": "SkipLib",
         "OSLog": "SkipFoundation",
         "Swift": "SkipLib",
