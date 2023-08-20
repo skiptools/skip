@@ -12,6 +12,7 @@ jobs:
 
       - name: Environment
         run: |
+          echo "APP_VERSION=${${GITHUB_REF#refs/tags/}:-0.0.0}" > $GITHUB_ENV
           echo "COMMIT_DATE=$(git log -1 --format=%ad --date=iso-strict ${GITHUB_REF#refs/tags/})" > $GITHUB_ENV
           sed -i '' "s;MARKETING_VERSION = .*;MARKETING_VERSION = $(git describe --tags --abbrev=0 --match '[0-9]*\.[0-9]*\.[0-9]*' --first-parent);g" App.xcconfig
           sed -i '' "s;PRODUCT_VERSION = .*;PRODUCT_VERSION = $(git rev-list --count HEAD);g" App.xcconfig
@@ -40,10 +41,12 @@ jobs:
             ditto -c -k --sequesterRsrc --keepParent "Payload" "${APPARTIFACT}-${CONFIGURATION}.ipa"
 
             cd -
-            mkdir -p Packages/Skip/artifacts
-            cp -av "${ARCHIVE_PATH}"/Products/"${APPARTIFACT}-${CONFIGURATION}.ipa" Packages/Skip/artifacts
-            ls -la Packages/Skip/artifacts/
           done
+
+          mkdir -p Packages/Skip/artifacts
+          cp -av "${ARCHIVE_PATH}"/Products/App-Release.ipa" Packages/Skip/artifacts/App-${APP_VERSION}.ipa
+          cp -av "${ARCHIVE_PATH}"/Products/App-Debug.ipa" Packages/Skip/artifacts/App-${APP_VERSION}-debug.ipa
+          ls -la Packages/Skip/artifacts/
 
       - name: Build apk
         run: |
@@ -53,9 +56,9 @@ jobs:
             done
           done
           mkdir -p Packages/Skip/artifacts/
-          cp -a ./.build/DerivedData/SourcePackages/plugins/skipapp.output/AppUIKt/skip-transpiler/AppUI/.build/AppUI/outputs/apk/*/AppUI-debug.apk Packages/Skip/artifacts/App-debug.app
-          cp -a ./.build/DerivedData/SourcePackages/plugins/skipapp.output/AppUIKt/skip-transpiler/AppUI/.build/AppUI/outputs/apk/*/AppUI-release.apk Packages/Skip/artifacts/App-release.app
-
+          cp -av ./.build/DerivedData/SourcePackages/plugins/skipapp.output/AppUIKt/skip-transpiler/AppUI/.build/AppUI/outputs/apk/*/AppUI-debug.apk Packages/Skip/artifacts/App-${APP_VERSION}-debug.apk
+          cp -av ./.build/DerivedData/SourcePackages/plugins/skipapp.output/AppUIKt/skip-transpiler/AppUI/.build/AppUI/outputs/apk/*/AppUI-release.apk Packages/Skip/artifacts/App-${APP_VERSION}.apk
+          ls -la Packages/Skip/artifacts/
 
       - name: Assemble Kotlin Source Release
         run: |
@@ -65,7 +68,7 @@ jobs:
           rm -rf .gradle .build */.build
           # create the zip file with predictable timestamps for reproducibility
           find . -exec touch -d "${COMMIT_DATE:0:19}" {} \;
-          zip -r ${OLDPWD}/Packages/Skip/artifacts/App-sources.jar . -x ".build/*" -x "*/.gradle/*" -x "*/.build/*" -x "*/build/*"
+          zip -r ${OLDPWD}/Packages/Skip/artifacts/App-${APP_VERSION}-sources.jar . -x ".build/*" -x "*/.gradle/*" -x "*/.build/*" -x "*/build/*"
 
       - name: "Calculate Checksums"
         run: |
@@ -80,7 +83,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION=${${GITHUB_REF#refs/tags/}:-"0.0.0"}
           echo "Creating release: ${TAG}"
           cd Packages/Skip/artifacts/
 
