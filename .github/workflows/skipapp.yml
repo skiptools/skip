@@ -12,7 +12,8 @@ jobs:
 
       - name: Environment
         run: |
-          echo "APP_VERSION=${${GITHUB_REF#refs/tags/}:-0.0.0}" > $GITHUB_ENV
+          TAG=${GITHUB_REF#refs/tags/}
+          echo "APP_VERSION=${TAG:-'0.0.0'}" > $GITHUB_ENV
           echo "COMMIT_DATE=$(git log -1 --format=%ad --date=iso-strict ${GITHUB_REF#refs/tags/})" > $GITHUB_ENV
           sed -i '' "s;MARKETING_VERSION = .*;MARKETING_VERSION = $(git describe --tags --abbrev=0 --match '[0-9]*\.[0-9]*\.[0-9]*' --first-parent);g" App.xcconfig
           sed -i '' "s;PRODUCT_VERSION = .*;PRODUCT_VERSION = $(git rev-list --count HEAD);g" App.xcconfig
