@@ -41,7 +41,7 @@ jobs:
 
             cd -
             mkdir -p Packages/Skip/artifacts
-            cp -av "${ARCHIVE_PATH}"/Products/"${APPARTIFACT}-{CONFIGURATION}.ipa" Packages/Skip/artifacts
+            cp -av "${ARCHIVE_PATH}"/Products/"${APPARTIFACT}-${CONFIGURATION}.ipa" Packages/Skip/artifacts
             ls -la Packages/Skip/artifacts/
           done
 
