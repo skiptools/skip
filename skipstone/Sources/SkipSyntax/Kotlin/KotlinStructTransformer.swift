@@ -124,8 +124,25 @@ final class KotlinStructTransformer: KotlinTransformer {
     }
 
     private func addMemberwiseConstructor(to classDeclaration: KotlinClassDeclaration, variableDeclarations: [KotlinVariableDeclaration], translator: KotlinTranslator) {
+        var minimumVisibility: Modifiers.Visibility = .public
+        for variableDeclaration in variableDeclarations {
+            if variableDeclaration.modifiers.visibility == .private {
+                minimumVisibility = .private
+                break
+            } else if variableDeclaration.modifiers.visibility == .internal && minimumVisibility == .public {
+                minimumVisibility = .internal
+            }
+        }
+
+        // The visibility of the generated constructor matches the minimum property visibility
         let constructor = KotlinFunctionDeclaration(name: "constructor")
-        constructor.modifiers = Modifiers(visibility: .public)
+        if (minimumVisibility == .private && classDeclaration.modifiers.visibility != .private)
+            || (minimumVisibility == .internal && classDeclaration.modifiers.visibility == .public) {
+            constructor.modifiers = Modifiers(visibility: minimumVisibility)
+        } else {
+            // Use public to omit any modifier on the generated code
+            constructor.modifiers = Modifiers(visibility: .public)
+        }
         constructor.extras = .singleNewline
         constructor.isGenerated = true
 

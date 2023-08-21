@@ -255,7 +255,7 @@ final class ConstructorDestructorTests: XCTestCase {
                     didmutate()
                 }
 
-            constructor(i: Int = 100, s: String) {
+            private constructor(i: Int = 100, s: String) {
                 this.i = i
                 this.s = s
             }

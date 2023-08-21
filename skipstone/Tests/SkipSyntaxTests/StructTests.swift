@@ -555,4 +555,73 @@ final class StructTests: XCTestCase {
         }
         """)
     }
+
+    func testPrivatePropertyConstructor() async throws {
+        try await check(swift: """
+        struct S {
+            private var i = 1
+            var s = ""
+        }
+        """, kotlin: """
+        internal class S: MutableStruct {
+            private var i: Int
+                set(newValue) {
+                    willmutate()
+                    field = newValue
+                    didmutate()
+                }
+            internal var s: String
+                set(newValue) {
+                    willmutate()
+                    field = newValue
+                    didmutate()
+                }
+
+            private constructor(i: Int = 1, s: String = "") {
+                this.i = i
+                this.s = s
+            }
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct = S(i, s)
+        }
+        """)
+    }
+
+    func testInternalPropertyConstructor() async throws {
+        try await check(swift: """
+        public struct S {
+            public var i = 1
+            var s = ""
+        }
+        """, kotlin: """
+        class S: MutableStruct {
+            var i: Int
+                set(newValue) {
+                    willmutate()
+                    field = newValue
+                    didmutate()
+                }
+            internal var s: String
+                set(newValue) {
+                    willmutate()
+                    field = newValue
+                    didmutate()
+                }
+
+            internal constructor(i: Int = 1, s: String = "") {
+                this.i = i
+                this.s = s
+            }
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct = S(i, s)
+
+            companion object {
+            }
+        }
+        """)
+    }
 }
