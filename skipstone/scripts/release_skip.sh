@@ -153,13 +153,14 @@ EOF
 
 cd ${RELSTAGING}
 
+shasum -a 256 *.zip >> checksums.txt
 echo '```' >> ${RELNOTES}
-shasum -a 256 *.zip >> ${RELNOTES}
+cat checksums.txt >> ${RELNOTES}
 echo '```' >> ${RELNOTES}
 
 cat ${RELNOTES}
 
-gh release -R github.com/skiptools/skip create -F releasenotes.md "${SKIP_VERSION}" *.zip
+gh release -R github.com/skiptools/skip create -F releasenotes.md "${SKIP_VERSION}" *.zip checksums.txt
 cd '-'
 
 echo "Waiting to download to become available…"
