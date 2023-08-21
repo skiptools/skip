@@ -52,18 +52,10 @@ jobs:
 
       - name: Build apk
         run: |
-          for CONFIGURATION in "Debug" "Release"; do
-            for TARGET in "AppModelKt" "AppUIKt" "AppDroid"; do
-              BUILT_PRODUCTS_DIR=".build" xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -configuration "${CONFIGURATION}" -destination "platform=macosx" -scheme "${TARGET}" -jobs 1 build CODE_SIGNING_ALLOWED=NO
-            done
+          for CONFIGURATION in "Release" "Debug"; do
+            BUILT_PRODUCTS_DIR=".build" xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -configuration "${CONFIGURATION}" -destination "platform=macosx" -scheme "${TARGET}" -jobs 1 build CODE_SIGNING_ALLOWED=NO
           done
-          mkdir -p Packages/Skip/artifacts/
 
-          ls -la ./.build/DerivedData/SourcePackages/plugins/skipapp.output/AppUIKt/skip-transpiler/AppUI/.build/AppUI/outputs/apk/debug/ || true
-          ls -la ./.build/DerivedData/SourcePackages/plugins/skipapp.output/AppUIKt/skip-transpiler/AppUI/.build/AppUI/outputs/apk/ || true
-
-          cp -av ./.build/DerivedData/SourcePackages/plugins/skipapp.output/AppUIKt/skip-transpiler/AppUI/.build/AppUI/outputs/apk/debug/AppUI-debug.apk Packages/Skip/artifacts/App-debug.apk
-          cp -av ./.build/DerivedData/SourcePackages/plugins/skipapp.output/AppUIKt/skip-transpiler/AppUI/.build/AppUI/outputs/apk/release/AppUI-release.apk Packages/Skip/artifacts/App.apk
           ls -la Packages/Skip/artifacts/
 
       - name: Assemble Kotlin Source Release

@@ -11,6 +11,7 @@ public class SkipCommandTests : XCTestCase {
         let tempDir = try mktmp()
         let name = "cool_app"
         let (stdout, _) = try await skip("create", "--no-build", "--no-test", "-d", tempDir, name)
+        //print("skip create stdout: \(stdout)")
         let out = stdout.split(separator: "\n")
         XCTAssertEqual("Creating project \(name) from template skipapp", out.first)
         let dir = tempDir + "/" + name + "/"
@@ -21,9 +22,8 @@ public class SkipCommandTests : XCTestCase {
         let project = try await loadProjectPackage(dir)
         XCTAssertEqual("App", project.name)
 
-        // TODO
-        //let config = try await loadProjectConfig(dir + "/App.xcodeproj", scheme: "App")
-        //XCTAssertEqual("App", config.first?.buildSettings["PROJECT_NAME"])
+        let config = try await loadProjectConfig(dir + "/App.xcodeproj", scheme: "App")
+        XCTAssertEqual("App", config.first?.buildSettings["PROJECT_NAME"])
 
         //try await skip("check", "-d", tempDir)
     }
