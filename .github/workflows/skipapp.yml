@@ -45,8 +45,8 @@ jobs:
           done
 
           mkdir -p Packages/Skip/artifacts
-          cp -av "${ARCHIVE_PATH}"/Products/App-Release.ipa" Packages/Skip/artifacts/App-${APP_VERSION}.ipa
-          cp -av "${ARCHIVE_PATH}"/Products/App-Debug.ipa" Packages/Skip/artifacts/App-${APP_VERSION}-debug.ipa
+          cp -av "${ARCHIVE_PATH}"/Products/App-Release.ipa" Packages/Skip/artifacts/App.ipa
+          cp -av "${ARCHIVE_PATH}"/Products/App-Debug.ipa" Packages/Skip/artifacts/App-debug.ipa
           ls -la Packages/Skip/artifacts/
 
       - name: Build apk
@@ -57,8 +57,8 @@ jobs:
             done
           done
           mkdir -p Packages/Skip/artifacts/
-          cp -av ./.build/DerivedData/SourcePackages/plugins/skipapp.output/AppUIKt/skip-transpiler/AppUI/.build/AppUI/outputs/apk/*/AppUI-debug.apk Packages/Skip/artifacts/App-${APP_VERSION}-debug.apk
-          cp -av ./.build/DerivedData/SourcePackages/plugins/skipapp.output/AppUIKt/skip-transpiler/AppUI/.build/AppUI/outputs/apk/*/AppUI-release.apk Packages/Skip/artifacts/App-${APP_VERSION}.apk
+          cp -av ./.build/DerivedData/SourcePackages/plugins/skipapp.output/AppUIKt/skip-transpiler/AppUI/.build/AppUI/outputs/apk/*/AppUI-debug.apk Packages/Skip/artifacts/App-debug.apk
+          cp -av ./.build/DerivedData/SourcePackages/plugins/skipapp.output/AppUIKt/skip-transpiler/AppUI/.build/AppUI/outputs/apk/*/AppUI-release.apk Packages/Skip/artifacts/App.apk
           ls -la Packages/Skip/artifacts/
 
       - name: Assemble Kotlin Source Release
@@ -69,7 +69,7 @@ jobs:
           rm -rf .gradle .build */.build
           # create the zip file with predictable timestamps for reproducibility
           find . -exec touch -d "${COMMIT_DATE:0:19}" {} \;
-          zip -r ${OLDPWD}/Packages/Skip/artifacts/App-${APP_VERSION}-sources.jar . -x ".build/*" -x "*/.gradle/*" -x "*/.build/*" -x "*/build/*"
+          zip -r ${OLDPWD}/Packages/Skip/artifacts/App-sources.jar . -x ".build/*" -x "*/.gradle/*" -x "*/.build/*" -x "*/build/*"
 
       - name: "Calculate Checksums"
         run: |
