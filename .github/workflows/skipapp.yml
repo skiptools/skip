@@ -18,7 +18,7 @@ jobs:
           sed -i '' "s;MARKETING_VERSION = .*;MARKETING_VERSION = $(git describe --tags --abbrev=0 --match '[0-9]*\.[0-9]*\.[0-9]*' --first-parent);g" App.xcconfig
           sed -i '' "s;PRODUCT_VERSION = .*;PRODUCT_VERSION = $(git rev-list --count HEAD);g" App.xcconfig
 
-      - name: Assemble Source Release
+      - name: Assemble Swift Source Release
         run: |
           # create the source zip file with predictable timestamps for reproducibility
           find . -exec touch -d "${COMMIT_DATE:0:19}" {} \;
@@ -59,6 +59,11 @@ jobs:
           done
 
           ls -la Packages/Skip/artifacts/
+          cd Packages/Skip/artifacts/
+
+          # fix artifact names to align with .ipa
+          mv AppUI-debug.apk App-debug.apk
+          mv AppUI-release.apk AppUI.apk
 
       - name: Assemble Kotlin Source Release
         run: |
@@ -70,15 +75,7 @@ jobs:
           find . -exec touch -d "${COMMIT_DATE:0:19}" {} \;
           zip -r ${OLDPWD}/Packages/Skip/artifacts/App-sources.jar . -x ".build/*" -x "*/.gradle/*" -x "*/.build/*" -x "*/build/*"
 
-      - name: "Calculate Checksums"
-        run: |
-          cd Packages/Skip/artifacts/
-          # clear vestigial AppUI-debug.apk
-          rm -f *UI-*.*
-          shasum -a 256 *.* > checksums.txt
-          cat checksums.txt
-
-      - name: "Create Release"
+      - name: "Release"
         if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ github.token }}
@@ -86,6 +83,8 @@ jobs:
           TAG=${GITHUB_REF#refs/tags/}
           echo "Creating release: ${TAG}"
           cd Packages/Skip/artifacts/
+
+          shasum -a 256 *.* > checksums.txt
 
           cat > relnotes.md << EOF
           These are the checksums for the release artifacts:
