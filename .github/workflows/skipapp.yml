@@ -76,7 +76,9 @@ jobs:
           ls -la 
 
           APPNAME="App"
-          # fix artifact names for release
+          # fix artifact names for release (retain App-Source.zip for template)
+          cp -v App-Source.zip skip-template-source.zip
+          cp -v App-Source.zip ${APPNAME}-ios-${TAG}-source.zip
           mv -v AppUI-release.apk ${APPNAME}-android-${TAG}.apk
           mv -v AppUI-debug.apk ${APPNAME}-android-${TAG}-debug.apk
           mv -v App-Release.ipa ${APPNAME}-ios-${TAG}.ipa
@@ -85,14 +87,14 @@ jobs:
 
           shasum -a 256 *.* > checksums.txt
 
-          cat > relnotes.md << EOF
+          cat > .relnotes << EOF
           These are the checksums for the release artifacts:
           EOF
-          echo '```' >> .relnotes.md
-          cat checksums.txt >> .relnotes.md
-          echo '```' >> .relnotes.md
+          echo '```' >> .relnotes
+          cat checksums.txt >> .relnotes
+          echo '```' >> .relnotes
 
-          gh release create "${TAG}" -t "Release ${TAG}" -F .relnotes.md *.*
+          gh release create "${TAG}" -t "Release ${TAG}" -F .relnotes *.*
 
       - name: "Upload Build Artifacts"
         # upload the artifacts generated from each build
