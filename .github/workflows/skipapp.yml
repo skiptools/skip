@@ -23,7 +23,7 @@ jobs:
           # create the source zip file with predictable timestamps for reproducibility
           find . -exec touch -d "${COMMIT_DATE:0:19}" {} \;
           mkdir -p Packages/Skip/artifacts/
-          zip -r Packages/Skip/artifacts/App-Source.zip . -x "Packages/*" -x ".git/*" -x ".build/*"
+          zip -9 -r "Packages/Skip/artifacts/App-Source.zip" . -x "Packages/*" -x ".git/*" -x ".build/*"
 
       - name: Run Tests
         run: swift test || swift test || swift test
@@ -40,7 +40,7 @@ jobs:
             mv "Applications" "Payload"
             # create zip file with reproducible timestamps
             find "Payload" -exec touch -t 197001010000 {} \;
-            ditto -c -k --sequesterRsrc --keepParent "Payload" "${APPARTIFACT}-${CONFIGURATION}.ipa"
+            zip -9 -r "${APPARTIFACT}-${CONFIGURATION}.ipa" "Payload"
 
             cd -
             cp -av "${ARCHIVE_PATH}/Products/${APPARTIFACT}-${CONFIGURATION}.ipa" Packages/Skip/artifacts/
@@ -62,7 +62,7 @@ jobs:
           rm -rf .gradle .build */.build
           # create the zip file with predictable timestamps for reproducibility
           find . -exec touch -d "${COMMIT_DATE:0:19}" {} \;
-          zip -r ${OLDPWD}/Packages/Skip/artifacts/App-android-source.zip . -x ".build/*" -x "*/.gradle/*" -x "*/.build/*" -x "*/build/*"
+          zip -9 -r "${OLDPWD}/Packages/Skip/artifacts/App-android-source.zip" . -x ".build/*" -x "*/.gradle/*" -x "*/.build/*" -x "*/build/*"
 
       - name: "Release"
         if: startsWith(github.ref, 'refs/tags/')
