@@ -43,7 +43,7 @@ jobs:
             ditto -c -k --sequesterRsrc --keepParent "Payload" "${APPARTIFACT}-${CONFIGURATION}.ipa"
 
             cd -
-            cp -av "${ARCHIVE_PATH}"/Products/${APPARTIFACT}-${CONFIGURATION}.ipa" Packages/Skip/artifacts/
+            cp -av "${ARCHIVE_PATH}/Products/${APPARTIFACT}-${CONFIGURATION}.ipa" Packages/Skip/artifacts/
           done
 
           # remove "-Release" since that is the default build
