@@ -46,10 +46,6 @@ jobs:
             cp -av "${ARCHIVE_PATH}/Products/${APPARTIFACT}-${CONFIGURATION}.ipa" Packages/Skip/artifacts/
           done
 
-          # remove "-Release" since that is the default build
-          ls -la Packages/Skip/artifacts/
-          mv Packages/Skip/artifacts/${APPARTIFACT}-Release.ipa Packages/Skip/artifacts/${APPARTIFACT}.ipa
-
       - name: Build apk
         run: |
           for CONFIGURATION in "Release" "Debug"; do
@@ -57,13 +53,6 @@ jobs:
               BUILT_PRODUCTS_DIR=".build" xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -configuration "${CONFIGURATION}" -destination "platform=macosx" -scheme "${APPTARGET}" -jobs 1 build CODE_SIGNING_ALLOWED=NO
             done
           done
-
-          ls -la Packages/Skip/artifacts/
-          cd Packages/Skip/artifacts/
-
-          # fix artifact names to align with .ipa
-          mv AppUI-debug.apk App-debug.apk
-          mv AppUI-release.apk AppUI.apk
 
       - name: Assemble Kotlin Source Release
         run: |
@@ -73,7 +62,7 @@ jobs:
           rm -rf .gradle .build */.build
           # create the zip file with predictable timestamps for reproducibility
           find . -exec touch -d "${COMMIT_DATE:0:19}" {} \;
-          zip -r ${OLDPWD}/Packages/Skip/artifacts/App-sources.jar . -x ".build/*" -x "*/.gradle/*" -x "*/.build/*" -x "*/build/*"
+          zip -r ${OLDPWD}/Packages/Skip/artifacts/App-android-source.zip . -x ".build/*" -x "*/.gradle/*" -x "*/.build/*" -x "*/build/*"
 
       - name: "Release"
         if: startsWith(github.ref, 'refs/tags/')
@@ -84,19 +73,26 @@ jobs:
           echo "Creating release: ${TAG}"
           cd Packages/Skip/artifacts/
 
+          ls -la 
+
+          APPNAME="App"
+          # fix artifact names for release
+          mv -v AppUI-release.apk ${APPNAME}-android-${TAG}.apk
+          mv -v AppUI-debug.apk ${APPNAME}-android-${TAG}-debug.apk
+          mv -v App-Release.ipa ${APPNAME}-ios-${TAG}.ipa
+          mv -v App-Debug.ipa ${APPNAME}-ios-${TAG}-debug.ipa
+          mv -v App-android-source.zip ${APPNAME}-android-${TAG}-source.zip
+
           shasum -a 256 *.* > checksums.txt
 
           cat > relnotes.md << EOF
           These are the checksums for the release artifacts:
           EOF
+          echo '```' >> .relnotes.md
+          cat checksums.txt >> .relnotes.md
+          echo '```' >> .relnotes.md
 
-          echo '```' >> relnotes.md
-          cat checksums.txt >> relnotes.md
-          echo '```' >> relnotes.md
-
-          gh release create "${TAG}" --title "Release ${TAG}" -F relnotes.md
-          rm relnotes.md
-          gh release upload "${TAG}" -- *.*
+          gh release create "${TAG}" -t "Release ${TAG}" -F .relnotes.md *.*
 
       - name: "Upload Build Artifacts"
         # upload the artifacts generated from each build
