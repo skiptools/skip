@@ -83,7 +83,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          VERSION=${${GITHUB_REF#refs/tags/}:-"0.0.0"}
+          TAG=${GITHUB_REF#refs/tags/}
           echo "Creating release: ${TAG}"
           cd Packages/Skip/artifacts/
 
