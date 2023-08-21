@@ -13,7 +13,7 @@ public protocol SkipParsableCommand : AsyncParsableCommand {
 }
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-extension SkipParsableCommand {
+extension AsyncParsableCommand {
     /// Run the transpiler on the given arguments.
     public static func run(_ arguments: [String], out: WritableByteStream? = nil, err: WritableByteStream? = nil) async throws {
         var cmd: ParsableCommand = try parseAsRoot(arguments)
@@ -38,7 +38,7 @@ extension SkipParsableCommand {
 
 /// The command that is run by "SkipRunner" (aka "skipstone")
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-public struct SkipDriver: SkipParsableCommand {
+public struct SkipDriver: AsyncParsableCommand {
     public static var configuration = CommandConfiguration(
         commandName: "skip",
         abstract: "Skip \(skipVersion)",
@@ -47,17 +47,15 @@ public struct SkipDriver: SkipParsableCommand {
             VersionCommand.self,
             CreateCommand.self,
             InitCommand.self,
+            DoctorCommand.self,
+            UpdateCommand.self,
             //CheckCommand.self,
-            //DoctorCommand.self,
             //RunCommand.self,
             //TestCommand.self,
             //AssembleCommand.self,
             //UploadCommand.self,
         ]
     )
-
-    @OptionGroup(title: "Output Options")
-    public var outputOptions: OutputOptions
 
     public init() {
     }
@@ -80,13 +78,94 @@ struct VersionCommand: SkipParsableCommand {
     }
 }
 
+// MARK: UpdateCommand
+
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
+struct UpdateCommand: SkipParsableCommand {
+    static var configuration = CommandConfiguration(
+        commandName: "update",
+        abstract: "Update to the latest Skip version using Homebrew",
+        shouldDisplay: true)
+
+    @OptionGroup(title: "Output Options")
+    var outputOptions: OutputOptions
+
+    func run() async throws {
+        outputOptions.write("Checking for skip updates")
+        try await outputOptions.run("Updating Homebew", ["brew", "update"])
+        let upgradeOutput = try await outputOptions.run("Updating Skip", ["brew", "upgrade", "skip"])
+        outputOptions.write(upgradeOutput.out)
+        outputOptions.write(upgradeOutput.err)
+    }
+}
+
+
+// MARK: DoctorCommand
+
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
+struct DoctorCommand: SkipParsableCommand {
+    static var configuration = CommandConfiguration(
+        commandName: "doctor",
+        abstract: "Evaluate and diagnose Skip development environmental",
+        shouldDisplay: true)
+
+    @OptionGroup(title: "Output Options")
+    var outputOptions: OutputOptions
+
+    func run() async throws {
+        outputOptions.write("Skip Doctor")
+
+//        let latestVersion: URL = try await outputOptions.monitor("Checking for latest Skip version") {
+//            let latestReleaseURL = URL(string: "https://source.skip.tools/skip/release/latest/download/checksums.txt")!
+//            let (data, response) = try await URLSession.shared.data(from: latestReleaseURL)
+//            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+//            if !(200..<300).contains(code) {
+//                throw AppLaunchError(errorDescription: "Update check from \(latestReleaseURL.absoluteString) returned error: \(code)")
+//            }
+//            return url
+//        }
+
+        let v = outputOptions.verbose
+        let swift = try await outputOptions.run("Checking Swift", showOutput: v, flush: false, ["swift", "-version"])
+        outputOptions.write(": " + ((try? swift.out.extract(pattern: "Swift version ([0-9.]+)")) ?? "unknown"))
+
+        let xcode = try await outputOptions.run("Checking Xcode", showOutput: v, flush: false, ["xcodebuild", "-version"])
+        outputOptions.write(": " + ((try? xcode.out.extract(pattern: "Xcode ([0-9.]+)")) ?? "unknown"))
+
+        let gradle = try await outputOptions.run("Checking Gradle", showOutput: v, flush: false, ["gradle", "-version"])
+        outputOptions.write(": " + ((try? gradle.out.extract(pattern: "Gradle ([0-9.]+)")) ?? "unknown"))
+
+        let java = try await outputOptions.run("Checking Java", showOutput: v, flush: false, ["java", "-version"])
+        outputOptions.write(": " + ((try? (java.out + java.err).extract(pattern: "version \"([0-9.]+)\"")) ?? "unknown"))
+
+        let studio = try await outputOptions.run("Checking Android Studio", showOutput: v, flush: false, ["/usr/libexec/PlistBuddy", "-c", "Print CFBundleShortVersionString", "/Applications/Android Studio.app/Contents/Info.plist"])
+        outputOptions.write(": " + ((try? studio.out.extract(pattern: "([0-9.]+)")) ?? "unknown"))
+
+        outputOptions.write("Skip Doctor Success")
+    }
+}
+
+extension String {
+    func extract(pattern: String) throws -> String? {
+        let regex = try NSRegularExpression(pattern: pattern)
+        let range = NSRange(location: 0, length: self.utf16.count)
+        if let match = regex.firstMatch(in: self, options: [], range: range) {
+            let matchRange = match.range(at: 1)
+            if let range = Range(matchRange, in: self) {
+                return String(self[range])
+            }
+        }
+        return nil
+    }
+
+}
 // MARK: CreateCommand
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 struct CreateCommand: SkipParsableCommand {
     static var configuration = CommandConfiguration(
         commandName: "create",
-        abstract: "Create a new Skip project from a template",
+        abstract: "Create a new Skip app project from a template",
         shouldDisplay: true)
 
     @OptionGroup(title: "Output Options")
@@ -138,7 +217,7 @@ struct CreateCommand: SkipParsableCommand {
 
         try await outputOptions.run("Unpacking template \(createOptions.template) for project \(projectName)", ["unzip", downloadURL.path, "-d", projectFolderURL.path])
 
-        let packageJSONString = try await outputOptions.run("Checking project \(projectName)", [toolOptions.swift, "package", "dump-package", "--package-path", projectFolderURL.path])
+        let packageJSONString = try await outputOptions.run("Checking project \(projectName)", [toolOptions.swift, "package", "dump-package", "--package-path", projectFolderURL.path]).out
 
         let packageJSON = try JSONDecoder().decode(PackageManifest.self, from: Data(packageJSONString.utf8))
 
@@ -160,7 +239,7 @@ struct CreateCommand: SkipParsableCommand {
 struct InitCommand: SkipParsableCommand {
     static var configuration = CommandConfiguration(
         commandName: "init",
-        abstract: "Initialize a new Skip library",
+        abstract: "Initialize a new Skip library project",
         shouldDisplay: true)
 
     @OptionGroup(title: "Output Options")
@@ -386,7 +465,7 @@ struct InitCommand: SkipParsableCommand {
 
         """.write(to: readmeURL, atomically: true, encoding: .utf8)
 
-        let packageJSONString = try await outputOptions.run("Checking project \(projectName)", [toolOptions.swift, "package", "dump-package", "--package-path", projectFolderURL.path])
+        let packageJSONString = try await outputOptions.run("Checking project \(projectName)", [toolOptions.swift, "package", "dump-package", "--package-path", projectFolderURL.path]).out
 
         let packageJSON = try JSONDecoder().decode(PackageManifest.self, from: Data(packageJSONString.utf8))
 
@@ -614,10 +693,29 @@ public struct OutputOptions: ParsableArguments {
     }
 
     @discardableResult
-    func run(_ message: String, progress: Bool = true, _ args: [String], environment: [String: String] = ProcessInfo.processInfo.environment) async throws -> String {
-        try await monitor(message, progress: progress) {
-            try await Process.checkNonZeroExit(arguments: args, environment: environment, loggingHandler: nil)
+    func run(_ message: String, showOutput: Bool = false, flush: Bool = true, progress: Bool = true, _ args: [String], environment: [String: String] = ProcessInfo.processInfo.environment) async throws -> (out: String, err: String) {
+        let (out, err) = try await monitor(message, progress: progress) {
+            //try await Process.checkNonZeroExit(arguments: args, environment: environment, loggingHandler: nil)
+
+            let result = try await Process.popen(arguments: args, environment: environment, loggingHandler: nil)
+            // Throw if there was a non zero termination.
+            guard result.exitStatus == .terminated(code: 0) else {
+                throw ProcessResult.Error.nonZeroExit(result)
+            }
+            let (out, err) = try (result.utf8Output(), result.utf8stderrOutput())
+            return (out: out, err: err)
         }
+
+        if showOutput {
+            print(out.trimmingCharacters(in: .newlines))
+            print(err.trimmingCharacters(in: .newlines))
+        }
+
+        if flush { // write a final newline (since monitor does not
+            write("", flush: true)
+        }
+
+        return (out, err)
     }
 
     static var isTerminal: Bool { isatty(fileno(stdout)) != 0 }
@@ -649,9 +747,15 @@ public struct OutputOptions: ParsableArguments {
                 while true {
                     for char in progressSeq {
                         printMessage(char)
+//                        do {
+//                            try await Task.sleep(for: .milliseconds(150))
+//                        } catch {
+//                            break // cancelled
+//                        }
                         try Task.checkCancellation()
                         try await Task.sleep(for: .milliseconds(150))
                         try Task.checkCancellation()
+
                     }
                 }
             }
@@ -661,7 +765,7 @@ public struct OutputOptions: ParsableArguments {
             let result = try await block()
             progressMonitor?.cancel() // cancel the progress task
             clear(message.count + 4)
-            write("[✓] " + message, flush: true)
+            write("[✓] " + message, terminator: "", flush: true)
             return result
         } catch {
             progressMonitor?.cancel() // cancel the progress task

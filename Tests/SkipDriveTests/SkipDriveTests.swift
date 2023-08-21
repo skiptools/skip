@@ -46,7 +46,6 @@ public class SkipCommandTests : XCTestCase {
     }
 
     public func testSkipDoctor() async throws {
-        throw XCTSkip("TODO")
         try await skip("doctor")
     }
 

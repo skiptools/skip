@@ -16,7 +16,7 @@ jobs:
       - name: Assemble
         run: |
           brew install skiptools/skip/skip
-          skip version
+          skip doctor
           #skip assemble -o Packages/Skip/artifacts/skip-unit-0.0.0.aar SkipUnit
       - name: Release
         if: startsWith(github.ref, 'refs/tags/')

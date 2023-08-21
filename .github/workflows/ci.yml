@@ -20,6 +20,9 @@ jobs:
       - name: Test Skip
         run: swift test
 
+      - name: Run skip doctor
+        run: swift run skip doctor
+
       - name: Test Homebrew Tap
         run: |
           brew install skiptools/skip/skip
