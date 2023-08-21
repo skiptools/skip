@@ -29,17 +29,18 @@ public class SkipCommandTests : XCTestCase {
     }
 
     public func testSkipInit() async throws {
-        throw XCTSkip("TODO")
-
         let tempDir = try mktmp()
         let name = "cool-lib"
-        let (stdout, _) = try await skip("init", "--build", "--test", "-d", tempDir, name, "CoolA", "CoolB", "CoolC", "CoolD", "CoolE")
+        let (stdout, _) = try await skip("init", "--no-build", "--no-test", "-d", tempDir, name, "CoolA") // , "CoolB", "CoolC", "CoolD", "CoolE")
         let out = stdout.split(separator: "\n")
-        XCTAssertEqual("Creating library project \(name)", out.first)
+        XCTAssertEqual("Initializing Skip library \(name)", out.first)
         let dir = tempDir + "/" + name + "/"
-        for path in ["Package.swift", "Sources/CoolA", "Sources/CoolE", "Sources/CoolEKt", "Tests", "Tests/CoolEKtTests"] {
+        for path in ["Package.swift", "Sources/CoolA", "Sources/CoolA", "Sources/CoolAKt", "Tests", "Tests/CoolAKtTests", "Tests/CoolAKtTests/Skip/skip.yml"] {
             XCTAssertTrue(FileManager.default.fileExists(atPath: dir + path), "missing file at: \(path)")
         }
+
+        let project = try await loadProjectPackage(dir)
+        XCTAssertEqual(name, project.name)
 
         //try await skip("check", "-d", tempDir)
     }
