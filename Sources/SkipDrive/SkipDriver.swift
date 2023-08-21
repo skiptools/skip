@@ -115,34 +115,50 @@ struct DoctorCommand: SkipParsableCommand {
     func run() async throws {
         outputOptions.write("Skip Doctor")
 
-//        let latestVersion: URL = try await outputOptions.monitor("Checking for latest Skip version") {
-//            let latestReleaseURL = URL(string: "https://source.skip.tools/skip/release/latest/download/checksums.txt")!
-//            let (data, response) = try await URLSession.shared.data(from: latestReleaseURL)
-//            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-//            if !(200..<300).contains(code) {
-//                throw AppLaunchError(errorDescription: "Update check from \(latestReleaseURL.absoluteString) returned error: \(code)")
-//            }
-//            return url
-//        }
-
         let v = outputOptions.verbose
-        let swift = try await outputOptions.run("Checking Swift", showOutput: v, flush: false, ["swift", "-version"])
-        outputOptions.write(": " + ((try? swift.out.extract(pattern: "Swift version ([0-9.]+)")) ?? "unknown"))
 
-        let xcode = try await outputOptions.run("Checking Xcode", showOutput: v, flush: false, ["xcodebuild", "-version"])
-        outputOptions.write(": " + ((try? xcode.out.extract(pattern: "Xcode ([0-9.]+)")) ?? "unknown"))
+        let skip = try? await outputOptions.run("Checking Skip", showOutput: v, flush: false, ["skip", "version"])
+        outputOptions.write(": " + ((try? skip?.out.extract(pattern: "Skip version ([0-9.]+)")) ?? "unknown"))
 
-        let gradle = try await outputOptions.run("Checking Gradle", showOutput: v, flush: false, ["gradle", "-version"])
-        outputOptions.write(": " + ((try? gradle.out.extract(pattern: "Gradle ([0-9.]+)")) ?? "unknown"))
+        let swift = try? await outputOptions.run("Checking Swift", showOutput: v, flush: false, ["swift", "-version"])
+        outputOptions.write(": " + ((try? swift?.out.extract(pattern: "Swift version ([0-9.]+)")) ?? "unknown"))
 
-        let java = try await outputOptions.run("Checking Java", showOutput: v, flush: false, ["java", "-version"])
-        outputOptions.write(": " + ((try? (java.out + java.err).extract(pattern: "version \"([0-9.]+)\"")) ?? "unknown"))
+        let xcode = try? await outputOptions.run("Checking Xcode", showOutput: v, flush: false, ["xcodebuild", "-version"])
+        outputOptions.write(": " + ((try? xcode?.out.extract(pattern: "Xcode ([0-9.]+)")) ?? "unknown"))
 
-        let studio = try await outputOptions.run("Checking Android Studio", showOutput: v, flush: false, ["/usr/libexec/PlistBuddy", "-c", "Print CFBundleShortVersionString", "/Applications/Android Studio.app/Contents/Info.plist"])
-        outputOptions.write(": " + ((try? studio.out.extract(pattern: "([0-9.]+)")) ?? "unknown"))
+        let gradle = try? await outputOptions.run("Checking Gradle", showOutput: v, flush: false, ["gradle", "-version"])
+        outputOptions.write(": " + ((try? gradle?.out.extract(pattern: "Gradle ([0-9.]+)")) ?? "unknown"))
 
-        outputOptions.write("Skip Doctor Success")
+        let java = try? await outputOptions.run("Checking Java", showOutput: v, flush: false, ["java", "-version"])
+        outputOptions.write(": " + ((try? ((java?.out ?? "") + (java?.err ?? "")).extract(pattern: "version \"([0-9.]+)\"")) ?? "unknown"))
+
+        let studio = try? await outputOptions.run("Checking Android Studio", showOutput: v, flush: false, ["/usr/libexec/PlistBuddy", "-c", "Print CFBundleShortVersionString", "/Applications/Android Studio.app/Contents/Info.plist"])
+        outputOptions.write(": " + ((try? studio?.out.extract(pattern: "([0-9.]+)")) ?? "unknown"))
+
+        let latestVersion: String? = try await outputOptions.monitor("Skip Updates") {
+            try await fetchLatestRelease(from: URL(string: "https://source.skip.tools/skip/releases.atom")!)
+        }
+        outputOptions.write(": " + ((try? latestVersion?.extract(pattern: "([0-9.]+)")) ?? "unknown"))
+
+        if let latestVersion = latestVersion, latestVersion != skipVersion {
+            outputOptions.write("A new version is Skip (\(latestVersion)) is available to update with: skip update")
+        } else {
+            outputOptions.write("Skip (\(skipVersion)) checks complete")
+        }
     }
+}
+
+/// Grabs an Atom XML feed of releases and returns the first title.
+private func fetchLatestRelease(from atomURL: URL) async throws -> String? {
+    let (data, response) = try await URLSession.shared.data(from: atomURL)
+    let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+    if !(200..<300).contains(code) {
+        throw AppLaunchError(errorDescription: "Update check from \(atomURL.absoluteString) returned error: \(code)")
+    }
+
+    // parse the Atom XML and get the latest version, which is the title of the first entry
+    let document = try XMLDocument(data: data)
+    return document.rootElement()?.elements(forName: "entry").first?.elements(forName: "title").first?.stringValue
 }
 
 extension String {
