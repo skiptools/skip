@@ -30,8 +30,9 @@ jobs:
 
       - name: Build ipa
         run: |
+          mkdir -p Packages/Skip/artifacts
+          APPARTIFACT="App"
           for CONFIGURATION in "Debug" "Release"; do
-            APPARTIFACT="App"
             ARCHIVE_PATH=".build/Skip/artifacts/${CONFIGURATION}/${APPARTIFACT}.xcarchive"
             BUILT_PRODUCTS_DIR=".build" xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -archivePath "${ARCHIVE_PATH}" -configuration "${CONFIGURATION}" -scheme "App" -sdk "iphoneos" -destination "generic/platform=iOS" -jobs 1 archive CODE_SIGNING_ALLOWED=NO
             cd "${ARCHIVE_PATH}"/Products/
@@ -42,12 +43,12 @@ jobs:
             ditto -c -k --sequesterRsrc --keepParent "Payload" "${APPARTIFACT}-${CONFIGURATION}.ipa"
 
             cd -
+            cp -av "${ARCHIVE_PATH}"/Products/${APPARTIFACT}-${CONFIGURATION}.ipa" Packages/Skip/artifacts/
           done
 
-          mkdir -p Packages/Skip/artifacts
-          cp -av "${ARCHIVE_PATH}"/Products/App-Release.ipa" Packages/Skip/artifacts/App.ipa
-          cp -av "${ARCHIVE_PATH}"/Products/App-Debug.ipa" Packages/Skip/artifacts/App-debug.ipa
+          # remove "-Release" since that is the default build
           ls -la Packages/Skip/artifacts/
+          mv Packages/Skip/artifacts/${APPARTIFACT}-Release.ipa Packages/Skip/artifacts/${APPARTIFACT}.ipa
 
       - name: Build apk
         run: |
