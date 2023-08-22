@@ -440,24 +440,24 @@ struct InitCommand: SkipParsableCommand {
             """.write(to: testSkipYamlFile, atomically: true, encoding: .utf8)
 
             products += """
-                .library(name: "\(moduleName)", targets: ["\(moduleName)"]),
-                .library(name: "\(moduleKtName)", targets: ["\(moduleKtName)"]),
+                    .library(name: "\(moduleName)", targets: ["\(moduleName)"]),
+                    .library(name: "\(moduleKtName)", targets: ["\(moduleKtName)"]),
 
             """
             targets += """
-                .target(name: "\(moduleName)", plugins: [.plugin(name: "preflight", package: "skip")]),
-                .testTarget(name: "\(moduleName)Tests", dependencies: ["\(moduleName)"], plugins: [.plugin(name: "preflight", package: "skip")]),
+                    .target(name: "\(moduleName)", plugins: [.plugin(name: "preflight", package: "skip")]),
+                    .testTarget(name: "\(moduleName)Tests", dependencies: ["\(moduleName)"], plugins: [.plugin(name: "preflight", package: "skip")]),
 
-                .target(name: "\(moduleKtName)", dependencies: [
-                    "\(moduleName)",
-                    .product(name: "SkipUnitKt", package: "skip-unit"),
-                    .product(name: "SkipLibKt", package: "skip-lib"),
-                    .product(name: "SkipFoundationKt", package: "skip-foundation"),
-                ], resources: [.process("Skip")], plugins: [.plugin(name: "transpile", package: "skip")]),
-                .testTarget(name: "\(moduleKtName)Tests", dependencies: [
-                    "\(moduleKtName)",
-                    .product(name: "SkipUnit", package: "skip-unit"),
-                ], resources: [.process("Skip")], plugins: [.plugin(name: "transpile", package: "skip")]),
+                    .target(name: "\(moduleKtName)", dependencies: [
+                        "\(moduleName)",
+                        .product(name: "SkipUnitKt", package: "skip-unit"),
+                        .product(name: "SkipLibKt", package: "skip-lib"),
+                        .product(name: "SkipFoundationKt", package: "skip-foundation"),
+                    ], resources: [.process("Skip")], plugins: [.plugin(name: "transpile", package: "skip")]),
+                    .testTarget(name: "\(moduleKtName)Tests", dependencies: [
+                        "\(moduleKtName)",
+                        .product(name: "SkipUnit", package: "skip-unit"),
+                    ], resources: [.process("Skip")], plugins: [.plugin(name: "transpile", package: "skip")]),
 
             """
         }
