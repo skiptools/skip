@@ -747,9 +747,9 @@ final class ConcurrencyTests: XCTestCase {
             val c1: suspend () -> Unit = { MainActor.run { m(p = 1) } }
             f1(c = c1)
             f1(c = { MainActor.run { m(p = 1) } })
-            val c2: suspend (Int) -> Unit = { MainActor.run { m(p = it) } }
+            val c2: suspend (Int) -> Unit = { it -> MainActor.run { m(p = it) } }
             f2(c = c2)
-            f2(c = { MainActor.run { m(p = it) } })
+            f2(c = { it -> MainActor.run { m(p = it) } })
         }
         """)
     }

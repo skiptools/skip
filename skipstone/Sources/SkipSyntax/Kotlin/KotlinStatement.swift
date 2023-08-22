@@ -123,6 +123,17 @@ class KotlinExpressionStatement: KotlinStatement, KotlinSingleStatementAppendabl
         }
     }
 
+    func isSingleStatementAppendable(mode: KotlinSingleStatementAppendMode) -> Bool {
+        guard let expression else {
+            return true
+        }
+        // Don't use single statement for calls that return Never
+        if let functionCall = expression as? KotlinFunctionCall, let functionIdentifier = functionCall.function as? KotlinIdentifier, functionIdentifier.name == "fatalError" {
+            return false
+        }
+        return true
+    }
+
     func appendAsSingleStatement(to output: OutputGenerator, indentation: Indentation, mode: KotlinSingleStatementAppendMode) {
         if let expression {
             expression.append(to: output, indentation: indentation)

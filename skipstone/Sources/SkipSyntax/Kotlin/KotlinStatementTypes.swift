@@ -1794,7 +1794,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         }
         output.append(")")
         if type != .constructorDeclaration {
-            // Kotlin requires an explicit return type when the body is a lambda (as it is for async) and just throws, e.g.:
+            // Kotlin requires an explicit return type for single statement bodies (as we use for async) that return Never, as in:
             //   suspending fun f(): Unit = MainActor.run { throw Error() }
             if returnType != .void || apiFlags.contains(.async) {
                 output.append(": ").append(returnType.kotlin)

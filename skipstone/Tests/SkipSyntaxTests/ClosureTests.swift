@@ -124,7 +124,7 @@ final class ClosureTests: XCTestCase {
         }
         """, kotlin: """
         {
-            val x = linvoke(1) l@{
+            val x = linvoke(1) l@{ it ->
                 if (it % 2 == 0) {
                     return@l "YES"
                 } else {
@@ -139,7 +139,7 @@ final class ClosureTests: XCTestCase {
         try await check(swift: """
         call { $0 + 1 }
         """, kotlin: """
-        call { it + 1 }
+        call { it -> it + 1 }
         """)
     }
 
@@ -328,7 +328,7 @@ final class ClosureTests: XCTestCase {
         try await check(swift: """
         let c: (inout Int) -> Void = { $0 += 1 }
         """, kotlin: """
-        internal val c: (InOut<Int>) -> Unit = { it.value += 1 }
+        internal val c: (InOut<Int>) -> Unit = { it -> it.value += 1 }
         """)
 
         try await check(swift: """
@@ -350,7 +350,7 @@ final class ClosureTests: XCTestCase {
             }
         }
         internal fun f(s: S): S {
-            return S(i = 1) { it.value += 1 }
+            return S(i = 1) { it -> it.value += 1 }
         }
         """)
     }

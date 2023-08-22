@@ -449,4 +449,17 @@ final class ExpressionTests: XCTestCase {
         import func Foundation.x
         """)
     }
+
+    func testFatalError() async throws {
+        // Should not be implemented in single-statement format because returns Never
+        try await check(swift: """
+        func f() {
+            fatalError()
+        }
+        """, kotlin: """
+        internal fun f() {
+            fatalError()
+        }
+        """)
+    }
 }

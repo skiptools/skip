@@ -549,12 +549,8 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
             guard parameter.isInOut else {
                 continue
             }
-            let name = index < implicitParameterLabels.count ? implicitParameterLabels[index] : parameter.label
-            if let name {
-                kbody.updateWithInOutParameter(name: name, source: translator.syntaxTree.source)
-            } else {
-                kbody.updateWithInOutParameter(name: "$\(index)", source: translator.syntaxTree.source)
-            }
+            let name = index < implicitParameterLabels.count ? "$\(index)" : parameter.label ?? "$\(index)"
+            kbody.updateWithInOutParameter(name: name, source: translator.syntaxTree.source)
         }
         handleSelfAssignments(in: kbody, source: translator.syntaxTree.source)
 
@@ -594,7 +590,7 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
         highestParameter = max(highestParameter, inferredType.parameters.count - 1)
 
         // $0 can use the special 'it' built-in, so no need to return it
-        guard highestParameter > 0 else {
+        guard highestParameter >= 0 else {
             return []
         }
         return (0...highestParameter).map { KotlinIdentifier.translateName("$\($0)") }
@@ -678,12 +674,12 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
     private func appendAnonymousFunction(to output: OutputGenerator, indentation: Indentation) {
         output.append("fun(")
         for (index, parameter) in parameters.enumerated() {
-            output.append(parameter.internalLabel).append(": ").append(parameter.declaredType)
+            output.append(parameter.internalLabel).append(": ").append(parameter.declaredType.kotlin)
             if index < parameters.count - 1 {
                 output.append(", ")
             }
         }
-        output.append("): ").append(returnType)
+        output.append("): ").append(returnType.kotlin)
         if labeledCaptureList.isEmpty && body.isSingleStatementAppendable(mode: .function) {
             output.append(" = ")
             body.appendAsSingleStatement(to: output, indentation: indentation, mode: .function)
@@ -1158,7 +1154,7 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
     private func appendBinding(to output: OutputGenerator, indentation: Indentation) {
         output.append("Binding({ ")
         appendIdentifier(to: output, indentation: indentation)
-        output.append(" }, { ")
+        output.append(" }, { it -> ")
         appendIdentifier(to: output, indentation: indentation)
         output.append(" = it })")
     }

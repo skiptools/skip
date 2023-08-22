@@ -598,7 +598,7 @@ final class TypeInferenceTests: XCTestCase {
         """, kotlin: """
         {
             val c = Container<String>()
-            val a = c.map { it.length }
+            val a = c.map { it -> it.length }
             val b = a[0] == Int.myValue
         }
         """)
@@ -626,7 +626,7 @@ final class TypeInferenceTests: XCTestCase {
         }
         """, kotlin: """
         {
-            val enums = Container<String>().map { ElementEnum(rawValue = it) }
+            val enums = Container<String>().map { it -> ElementEnum(rawValue = it) }
             val b = enums[1] == ElementEnum.two
         }
         """)

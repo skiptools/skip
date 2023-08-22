@@ -754,11 +754,11 @@ final class SwiftUITests: XCTestCase {
                 }
             internal var _text: skip.ui.State<String>
             override fun body(): View {
-                return ComposeView { composectx: ComposeContext -> TextField(Binding({ text }, { text = it })).Compose(composectx) }
+                return ComposeView { composectx: ComposeContext -> TextField(Binding({ text }, { it -> text = it })).Compose(composectx) }
             }
 
             @Composable
-            @Suppress(\"UNCHECKED_CAST\")
+            @Suppress("UNCHECKED_CAST")
             override fun Compose(composectx: ComposeContext) {
                 val initialtext = _text.wrappedValue
                 var composetext by rememberSaveable(stateSaver = composectx.stateSaver as Saver<String, Any>) { mutableStateOf(initialtext) }
@@ -1228,7 +1228,7 @@ final class SwiftUITests: XCTestCase {
             override fun body(): View {
                 return ComposeView { composectx: ComposeContext ->
                     Text("x").Compose(composectx)
-                    ComposeView {
+                    ComposeView { it ->
                         androidx.compose.Column(modifier = it.modifier) { androidx.compose.Text("y") }
                     }.Compose(composectx)
                 }
