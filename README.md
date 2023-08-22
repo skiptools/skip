@@ -61,4 +61,4 @@ This project contains an iOS "App" target, along with an "AppDroid" target that 
 
 
 
-[^1] The initial build may take a long time due to Gradle downloading the necessary Android and Jetpack Compose dependencies (approx. 1G) to the `~/.gradle` folder.
+[^1]: The initial build may take a long time due to Gradle downloading the necessary Android and Jetpack Compose dependencies (approx. 1G) to the `~/.gradle` folder.
