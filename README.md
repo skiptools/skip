@@ -61,12 +61,12 @@ lib-name
 │       └── Skip
 │           └── skip.yml
 └── Tests
-	├── ModuleNameKtTests
-	│   ├── ModuleNameKtTests.swift
-	│   └── Skip
-	│       └── skip.yml
-	└── ModuleNameTests
-		└── ModuleNameTests.swift
+    ├── ModuleNameKtTests
+    │   ├── ModuleNameKtTests.swift
+    │   └── Skip
+    │       └── skip.yml
+    └── ModuleNameTests
+        └── ModuleNameTests.swift
 
 ```
 
@@ -77,45 +77,44 @@ lib-name
 import PackageDescription
 
 let package = Package(
-	name: "lib-name",
-	defaultLocalization: "en",
-	platforms: [.iOS(.v16), .macOS(.v13), .tvOS(.v16), .watchOS(.v9), .macCatalyst(.v16)],
-	products: [
-		.library(name: "ModuleName", targets: ["ModuleName"]),
-		.library(name: "ModuleNameKt", targets: ["ModuleNameKt"]),
-	],
-	dependencies: [
-		.package(url: "https://source.skip.tools/skip.git", from: "0.6.0"),
-		.package(url: "https://source.skip.tools/skip-unit.git", from: "0.0.0"),
-		.package(url: "https://source.skip.tools/skip-lib.git", from: "0.0.0"),
-		.package(url: "https://source.skip.tools/skip-foundation.git", from: "0.0.0"),
-	],
-	// Each pure Swift target "ModuleName"
-	// must have a peer target "ModuleNameKt"
-	// that contains the Skip/skip.yml configuration
-	// and any custom Kotlin.
-	targets: [
-		.target(name: "ModuleName", plugins: [.plugin(name: "preflight", package: "skip")]),
-		.testTarget(name: "ModuleNameTests", dependencies: ["ModuleName"], plugins: [.plugin(name: "preflight", package: "skip")]),
+    name: "lib-name",
+    defaultLocalization: "en",
+    platforms: [.iOS(.v16), .macOS(.v13), .tvOS(.v16), .watchOS(.v9), .macCatalyst(.v16)],
+    products: [
+        .library(name: "ModuleName", targets: ["ModuleName"]),
+        .library(name: "ModuleNameKt", targets: ["ModuleNameKt"]),
+    ],
+    dependencies: [
+        .package(url: "https://source.skip.tools/skip.git", from: "0.0.0"),
+        .package(url: "https://source.skip.tools/skip-unit.git", from: "0.0.0"),
+        .package(url: "https://source.skip.tools/skip-lib.git", from: "0.0.0"),
+        .package(url: "https://source.skip.tools/skip-foundation.git", from: "0.0.0"),
+    ],
+    // Each pure Swift target "ModuleName"
+    // must have a peer target "ModuleNameKt"
+    // that contains the Skip/skip.yml configuration
+    // and any custom Kotlin.
+    targets: [
+        .target(name: "ModuleName", plugins: [.plugin(name: "preflight", package: "skip")]),
+        .testTarget(name: "ModuleNameTests", dependencies: ["ModuleName"], plugins: [.plugin(name: "preflight", package: "skip")]),
 
-		.target(name: "ModuleNameKt", dependencies: [
-			"ModuleName",
-			.product(name: "SkipUnitKt", package: "skip-unit"),
-			.product(name: "SkipLibKt", package: "skip-lib"),
-			.product(name: "SkipFoundationKt", package: "skip-foundation"),
-		], resources: [.process("Skip")], plugins: [.plugin(name: "transpile", package: "skip")]),
-		.testTarget(name: "ModuleNameKtTests", dependencies: [
-			"ModuleNameKt",
-			.product(name: "SkipUnit", package: "skip-unit"),
-		], resources: [.process("Skip")], plugins: [.plugin(name: "transpile", package: "skip")]),
-	]
+        .target(name: "ModuleNameKt", dependencies: [
+            "ModuleName",
+            .product(name: "SkipUnitKt", package: "skip-unit"),
+            .product(name: "SkipLibKt", package: "skip-lib"),
+            .product(name: "SkipFoundationKt", package: "skip-foundation"),
+        ], resources: [.process("Skip")], plugins: [.plugin(name: "transpile", package: "skip")]),
+        .testTarget(name: "ModuleNameKtTests", dependencies: [
+            "ModuleNameKt",
+            .product(name: "SkipUnit", package: "skip-unit"),
+        ], resources: [.process("Skip")], plugins: [.plugin(name: "transpile", package: "skip")]),
+    ]
 )
 ```
 
 ## Getting Help
 
 For solutions to common issues, please search the [discussion forums](https://github.com/skiptools/skip/discussions) and check the [Skip documentation](https://skip.tools). For bug reports, use the [issue tracker](https://github.com/skiptools/skip/issues). You can also contact us directly at [skip@skip.tools](mailto:skip@skip.tools) or on Matrix at [#skip:gitter.im](https://app.gitter.im/#/room/#skip:gitter.im). Please include the output of the `skip doctor` command in any communication related to technical issues.
-
 
 
 [^1]: Android Studio is not needed for building and testing Skip projects. It is only needed for launching a transpiled project in the Android Emulator. It can be installed with `brew install --cask android-studio` or downloaded directly from [https://developer.android.com/studio](https://developer.android.com/studio).
