@@ -117,23 +117,35 @@ struct DoctorCommand: SkipParsableCommand {
 
         let v = outputOptions.verbose
 
-        let skip = try? await outputOptions.run("Checking Skip", showOutput: v, flush: false, ["skip", "version"])
-        outputOptions.write(": " + ((try? skip?.out.extract(pattern: "Skip version ([0-9.]+)")) ?? "unknown"))
+        func run(_ title: String, _ args: [String]) async throws -> String {
+            let (out, err) = try await outputOptions.run(title, flush: false, args)
 
-        let swift = try? await outputOptions.run("Checking Swift", showOutput: v, flush: false, ["swift", "-version"])
-        outputOptions.write(": " + ((try? swift?.out.extract(pattern: "Swift version ([0-9.]+)")) ?? "unknown"))
+            return out.trimmingCharacters(in: .newlines) + err.trimmingCharacters(in: .newlines)
+        }
 
-        let xcode = try? await outputOptions.run("Checking Xcode", showOutput: v, flush: false, ["xcodebuild", "-version"])
-        outputOptions.write(": " + ((try? xcode?.out.extract(pattern: "Xcode ([0-9.]+)")) ?? "unknown"))
+        let skip = try? await run("Checking Skip", ["skip", "version"])
+        outputOptions.write(": " + ((try? skip?.extract(pattern: "Skip version ([0-9.]+)")) ?? "unknown"))
+        if let output = skip, v { outputOptions.write(output) }
 
-        let gradle = try? await outputOptions.run("Checking Gradle", showOutput: v, flush: false, ["gradle", "-version"])
-        outputOptions.write(": " + ((try? gradle?.out.extract(pattern: "Gradle ([0-9.]+)")) ?? "unknown"))
+        let swift = try? await run("Checking Swift", ["swift", "-version"])
+        outputOptions.write(": " + ((try? swift?.extract(pattern: "Swift version ([0-9.]+)")) ?? "unknown"))
+        if let output = swift, v { outputOptions.write(output) }
 
-        let java = try? await outputOptions.run("Checking Java", showOutput: v, flush: false, ["java", "-version"])
-        outputOptions.write(": " + ((try? ((java?.out ?? "") + (java?.err ?? "")).extract(pattern: "version \"([0-9.]+)\"")) ?? "unknown"))
+        let xcode = try? await run("Checking Xcode", ["xcodebuild", "-version"])
+        outputOptions.write(": " + ((try? xcode?.extract(pattern: "Xcode ([0-9.]+)")) ?? "unknown"))
+        if let output = xcode, v { outputOptions.write(output) }
 
-        let studio = try? await outputOptions.run("Checking Android Studio", showOutput: v, flush: false, ["/usr/libexec/PlistBuddy", "-c", "Print CFBundleShortVersionString", "/Applications/Android Studio.app/Contents/Info.plist"])
-        outputOptions.write(": " + ((try? studio?.out.extract(pattern: "([0-9.]+)")) ?? "unknown"))
+        let gradle = try? await run("Checking Gradle", ["gradle", "-version"])
+        outputOptions.write(": " + ((try? gradle?.extract(pattern: "Gradle ([0-9.]+)")) ?? "unknown"))
+        if let output = gradle, v { outputOptions.write(output) }
+
+        let java = try? await run("Checking Java", ["java", "-version"])
+        outputOptions.write(": " + ((try? java?.extract(pattern: "version \"([0-9.]+)\"")) ?? "unknown"))
+        if let output = java, v { outputOptions.write(output) }
+
+        let studio = try? await run("Checking Android Studio", ["/usr/libexec/PlistBuddy", "-c", "Print CFBundleShortVersionString", "/Applications/Android Studio.app/Contents/Info.plist"])
+        outputOptions.write(": " + ((try? studio?.extract(pattern: "([0-9.]+)")) ?? "unknown"))
+        if let output = studio, v { outputOptions.write(output) }
 
         let latestVersion: String? = try await outputOptions.monitor("Skip Updates") {
             try await fetchLatestRelease(from: URL(string: "https://source.skip.tools/skip/releases.atom")!)
@@ -391,6 +403,7 @@ struct InitCommand: SkipParsableCommand {
             @available(macOS 13, macCatalyst 16, iOS 16, tvOS 16, watchOS 8, *)
             final class \(moduleName)Tests: XCTestCase {
                 func test\(moduleName)() throws {
+                    logger.log("running test\(moduleName)")
                     XCTAssertEqual(1 + 2, 3, "basic test")
                 }
             }
@@ -709,7 +722,7 @@ public struct OutputOptions: ParsableArguments {
     }
 
     @discardableResult
-    func run(_ message: String, showOutput: Bool = false, flush: Bool = true, progress: Bool = true, _ args: [String], environment: [String: String] = ProcessInfo.processInfo.environment) async throws -> (out: String, err: String) {
+    func run(_ message: String, flush: Bool = true, progress: Bool = true, _ args: [String], environment: [String: String] = ProcessInfo.processInfo.environment) async throws -> (out: String, err: String) {
         let (out, err) = try await monitor(message, progress: progress) {
             //try await Process.checkNonZeroExit(arguments: args, environment: environment, loggingHandler: nil)
 
@@ -720,11 +733,6 @@ public struct OutputOptions: ParsableArguments {
             }
             let (out, err) = try (result.utf8Output(), result.utf8stderrOutput())
             return (out: out, err: err)
-        }
-
-        if showOutput {
-            print(out.trimmingCharacters(in: .newlines))
-            print(err.trimmingCharacters(in: .newlines))
         }
 
         if flush { // write a final newline (since monitor does not
