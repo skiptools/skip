@@ -49,6 +49,7 @@ public struct SkipDriver: AsyncParsableCommand {
             InitCommand.self,
             DoctorCommand.self,
             UpdateCommand.self,
+            GradleCommand.self,
             //CheckCommand.self,
             //RunCommand.self,
             //TestCommand.self,
@@ -308,16 +309,6 @@ struct InitCommand: SkipParsableCommand {
             throw AppLaunchError(errorDescription: "Specified project path already exists: \(projectFolder)")
         }
 
-//        let downloadURL: URL = try await outputOptions.monitor("Downloading template \(createOptions.template)") {
-//            let downloadURL = try createOptions.projectTemplateURL
-//            let (url, response) = try await URLSession.shared.download(from: downloadURL)
-//            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-//            if !(200..<300).contains(code) {
-//                throw AppLaunchError(errorDescription: "Download for template URL \(downloadURL.absoluteString) returned error: \(code)")
-//            }
-//            return url
-//        }
-//
         let projectFolderURL = URL(fileURLWithPath: projectFolder, isDirectory: true)
         try FileManager.default.createDirectory(at: projectFolderURL, withIntermediateDirectories: true)
 
@@ -330,7 +321,7 @@ struct InitCommand: SkipParsableCommand {
         try FileManager.default.createDirectory(at: testsURL, withIntermediateDirectories: false)
 
         let dependencies = """
-        dependencies: [
+            dependencies: [
                 .package(url: "https://source.skip.tools/skip.git", from: "0.0.0"),
                 .package(url: "https://source.skip.tools/skip-unit.git", from: "0.0.0"),
                 .package(url: "https://source.skip.tools/skip-lib.git", from: "0.0.0"),
@@ -339,12 +330,16 @@ struct InitCommand: SkipParsableCommand {
         """
 
         var products = """
-        products: [
+            products: [
 
         """
 
         var targets = """
-        targets: [
+            // Each pure Swift target "ModuleName"
+            // must have a peer target "ModuleNameKt"
+            // that contains the Skip/skip.yml configuration
+            // and any custom Kotlin.
+            targets: [
 
         """
 
@@ -392,7 +387,7 @@ struct InitCommand: SkipParsableCommand {
             try FileManager.default.createDirectory(at: testSkipDir, withIntermediateDirectories: false)
 
             let testSwiftFile = testDir.appending(path: "\(moduleName)Tests.swift")
-            
+
             try """
             import XCTest
             import OSLog
@@ -439,20 +434,16 @@ struct InitCommand: SkipParsableCommand {
             """
             targets += """
                 .target(name: "\(moduleName)", plugins: [.plugin(name: "preflight", package: "skip")]),
+                .testTarget(name: "\(moduleName)Tests", dependencies: ["\(moduleName)"], plugins: [.plugin(name: "preflight", package: "skip")]),
+
                 .target(name: "\(moduleKtName)", dependencies: [
                     "\(moduleName)",
                     .product(name: "SkipUnitKt", package: "skip-unit"),
                     .product(name: "SkipLibKt", package: "skip-lib"),
                     .product(name: "SkipFoundationKt", package: "skip-foundation"),
                 ], resources: [.process("Skip")], plugins: [.plugin(name: "transpile", package: "skip")]),
-                .testTarget(name: "\(moduleName)Tests", dependencies: [
-                    "\(moduleName)"
-                ], plugins: [.plugin(name: "preflight", package: "skip")]),
                 .testTarget(name: "\(moduleKtName)Tests", dependencies: [
                     "\(moduleKtName)",
-                    .product(name: "SkipUnitKt", package: "skip-unit"),
-                    .product(name: "SkipLibKt", package: "skip-lib"),
-                    .product(name: "SkipFoundationKt", package: "skip-foundation"),
                     .product(name: "SkipUnit", package: "skip-unit"),
                 ], resources: [.process("Skip")], plugins: [.plugin(name: "transpile", package: "skip")]),
 
@@ -468,15 +459,21 @@ struct InitCommand: SkipParsableCommand {
 
         let packageSource = """
         // swift-tools-version: 5.8
+        // This is a [Skip](https://skip.tools) package,
+        // containing Swift "ModuleName" library targets
+        // alongside peer "ModuleNameKt" targets that
+        // will use the Skip plugin to transpile the
+        // Swift Package, Sources, and Tests into an
+        // Android Gradle Project with Kotlin sources and JUnit tests.
         import PackageDescription
 
         let package = Package(
             name: "\(projectName)",
             defaultLocalization: "en",
             platforms: [.iOS(.v16), .macOS(.v13), .tvOS(.v16), .watchOS(.v9), .macCatalyst(.v16)],
-            \(products),
-            \(dependencies),
-            \(targets)
+        \(products),
+        \(dependencies),
+        \(targets)
         )
         """
 
@@ -507,6 +504,32 @@ struct InitCommand: SkipParsableCommand {
         }
 
         outputOptions.write("Created library \(projectName) in \(projectFolder)")
+    }
+}
+
+// MARK: GradleCommand
+
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
+struct GradleCommand: SkipParsableCommand, GradleHarness {
+    static var configuration = CommandConfiguration(
+        commandName: "gradle",
+        abstract: "Launch the gradle build tool",
+        shouldDisplay: true)
+
+    @OptionGroup(title: "Output Options")
+    var outputOptions: OutputOptions
+
+    @Option(help: ArgumentHelp("App package name", valueName: "package-name"))
+    var package: String
+
+    @Option(help: ArgumentHelp("App module name", valueName: "ModuleName"))
+    var module: String
+
+    @Argument(help: ArgumentHelp("The arguments to pass to the gradle command"))
+    var gradleArguments: [String]
+
+    func run() async throws {
+        try await self.gradleExec(appName: module, packageName: package, arguments: gradleArguments)
     }
 }
 

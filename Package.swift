@@ -14,8 +14,6 @@ let package = Package(
     products: [
         .executable(name: "skip", targets: ["skip"]),
 
-        .plugin(name: "skip-init", targets: ["Hello Skip"]),
-
         .plugin(name: "skipcommand", targets: ["skip-command"]),
         .plugin(name: "preflight", targets: ["skip-preflight"]),
         .plugin(name: "transpile", targets: ["skip-transpiler"]),
@@ -26,15 +24,6 @@ let package = Package(
     dependencies: [
     ],
     targets: [
-        .plugin(name: "Hello Skip",
-                capability: .command(
-                    intent: .custom(verb: "skip-init", description: "Show an introduction to Skip and how it can be added to this project."),
-                    permissions: [
-                        .writeToPackageDirectory(reason: "Skip needs to create and update the Skip folder in the project.")
-                    ]),
-                dependencies: ["skipstone"],
-                path: "Plugins/SkipInit"),
-
         .plugin(name: "skip-command",
                 capability: .command(
                     intent: .custom(verb: "skip",  description: "Run Skip by specifying arguments manually"),
@@ -46,7 +35,7 @@ let package = Package(
 
         .plugin(name: "skip-build",
                 capability: .buildTool(),
-                dependencies: ["skipgradle"],
+                dependencies: ["skip"],
                 path: "Plugins/SkipBuild"),
 
         .plugin(name: "skip-preflight",
@@ -63,7 +52,6 @@ let package = Package(
         .target(name: "SkipDrive", dependencies: []),
 
         .executableTarget(name: "skip", dependencies: ["SkipDrive"]),
-        .executableTarget(name: "skipgradle", dependencies: ["SkipDrive"], path: "Sources/SkipGradle"),
 
         .testTarget(name: "SkipDriveTests", dependencies: ["skip"]),
 
