@@ -418,6 +418,24 @@ final class ExpressionTests: XCTestCase {
         """)
     }
 
+    func testOptionalChainingClosure() async throws {
+        try await check(supportingSwift: """
+        class C {
+            let c: () -> Int = { }
+        }
+        """, swift: """
+        func f() {
+            let o: C? = C()
+            let i = o?.c()
+        }
+        """, kotlin: """
+        internal fun f() {
+            val o: C? = C()
+            val i = o?.c?.invoke()
+        }
+        """)
+    }
+
     func testTrailingClosureCalls() async throws {
         try await check(supportingSwift: """
         func f(s: String, a: (Int) -> Int, b: () -> Int) {

@@ -130,19 +130,19 @@ extension KotlinMainActorTargeting where Self: KotlinSyntaxNode {
 }
 
 /// An expression that can take part in a binding.
-protocol KotlinBindable {
+protocol KotlinSwiftUIBindable {
     /// Whether this is a binding expression.
-    var isBinding: Bool { get }
+    var isSwiftUIBinding: Bool { get }
     
     /// Append this expression as part of a binding path, using the given block to append the remaining path.
     ///
     /// This is called by a parent expression in place of `append` when the child's `isBinding` is `true`.
-    func appendBindingPath(to output: OutputGenerator, indentation: Indentation, appendPath: @escaping (OutputGenerator, Indentation, KotlinBindableBase) -> Void)
+    func appendSwiftUIBindingPath(to output: OutputGenerator, indentation: Indentation, appendPath: @escaping (OutputGenerator, Indentation, KotlinBindableBase) -> Void)
 }
 
 typealias KotlinBindableBase = (OutputGenerator, Indentation) -> Void
 
-extension KotlinBindable {
+extension KotlinSwiftUIBindable {
     /// Helper function for bindables to create an instance binding.
     func appendInstanceBinding(to output: OutputGenerator, indentation: Indentation, appendPath: (OutputGenerator, Indentation, KotlinBindableBase) -> Void, appendInstance: () -> Void) {
         output.append("InstanceBinding(")
