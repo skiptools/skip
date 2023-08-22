@@ -55,7 +55,7 @@ let package = Package(
 
         .testTarget(name: "SkipDriveTests", dependencies: ["skip"]),
 
-        .binaryTarget(name: "skipstone", url: "https://source.skip.tools/skip/releases/download/0.5.96/skipstone.plugin.zip", checksum: "a996095bcc00baa0f4bf8e9bfae63506bbf906ba306e5c8855e9c5fa871ac203")
+        .binaryTarget(name: "skipstone", url: "https://source.skip.tools/skip/releases/download/0.6.0/skipstone.plugin.zip", checksum: "3f86ae534cb31527367b8bdfaeb2c175b403802404b40536f101dc32f36a449d")
     ]
 )
 
