@@ -23,6 +23,12 @@ jobs:
       - name: Run skip doctor
         run: swift run skip doctor
 
+      - name: Run skip init
+        run: swift run skip init --build --test -d `mktemp -d` skppkg Mod1 Mod2
+
+      - name: Run skip create
+        run: swift run skip create --build --test -d `mktemp -d` skpapp
+
       - name: Test Homebrew Tap
         run: |
           brew install skiptools/skip/skip

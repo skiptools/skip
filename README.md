@@ -1,7 +1,6 @@
 # Skip
 
-Skip brings iPhone apps to Android by transpiling Swift source code into Kotlin and converting Swift packages into Gradle projects. SwiftUI on iOS translates into Jetpack Compose on Android for a genuinely native app experience.
-
+Skip brings iPhone apps to Android by transpiling Swift source code into Kotlin and converting Swift packages into Gradle projects. Skip translates SwiftUI into Jetpack Compose, which provides a modern declarative toolkit for developers and results in a genuinely native end-user experience.
 ## Intro
 
 A Skip project is a SwiftPM package that uses the Skip plugin to transpile the Swift target modules into a Kotlin Gradle project. Skip compatibility frameworks provide Kotlin-side APIs for parity with the Swift standard library ([skip-lib](https://source.skip.tools/skip-lib)), the XCTest testing framework ([skip-unit](https://source.skip.tools/skip-unit)), the Foundation libraries ([skip-foundation](https://source.skip.tools/skip-foundation)), and the SwiftUI ([skip-ui](https://source.skip.tools/skip-ui)) user-interface toolkit.
@@ -10,9 +9,9 @@ Skip is distributed both as a standard SwiftPM build tool plugin, as well as a c
 
 ### Installing Skip
 
-The `skip` command-line tool is used to create, manage, build, test, and package dual-platform Skip apps. The following instructions assume familiarity with using Terminal.app on macOS and basic UNIX commands.
+The `skip` command-line tool is used to create, manage, build, test, and package dual-platform Skip apps. The following instructions assume familiarity with using Terminal.app on macOS.
 
-On macOS 13.5+ with [Homebrew](https://brew.sh) and [Xcode](https://developer.apple.com/xcode/) installed, Skip can be installed with this command: 
+On macOS 13.5+ with [Homebrew](https://brew.sh) and [Xcode](https://developer.apple.com/xcode/) installed, Skip can be installed with the command: 
 
 ```shell
 brew install skiptools/skip/skip
@@ -112,6 +111,11 @@ let package = Package(
 	]
 )
 ```
+
+## Getting Help
+
+For solutions to common issues, please search the [discussion forums](https://github.com/skiptools/skip/discussions) and check the [Skip documentation](https://skip.tools). For bug reports, use the [issue tracker](https://github.com/skiptools/skip/issues). You can also contact us directly at [skip@skip.tools](mailto:skip@skip.tools) or on Matrix at [#skip:gitter.im](https://app.gitter.im/#/room/#skip:gitter.im). Please include the output of the `skip doctor` command in any communication related to technical issues.
+
 
 
 [^1]: Android Studio is not needed for building and testing Skip projects. It is only needed for launching a transpiled project in the Android Emulator. It can be installed with `brew install --cask android-studio` or downloaded directly from [https://developer.android.com/studio](https://developer.android.com/studio).
