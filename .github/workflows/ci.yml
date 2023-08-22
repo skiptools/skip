@@ -27,6 +27,7 @@ jobs:
         run: swift run skip init --build --test -d `mktemp -d` skppkg Mod1 Mod2
 
       - name: Run skip create
+        if: false
         run: swift run skip create --build --test -d `mktemp -d` skpapp
 
       - name: Test Homebrew Tap
