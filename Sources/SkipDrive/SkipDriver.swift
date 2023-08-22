@@ -212,6 +212,9 @@ struct CreateCommand: SkipParsableCommand {
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Run the project tests"))
     var test: Bool = false
 
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Open the new project in Xcode"))
+    var open: Bool = false
+
     @Argument(help: ArgumentHelp("Project folder name"))
     var projectName: String
 
@@ -258,7 +261,16 @@ struct CreateCommand: SkipParsableCommand {
             try await outputOptions.run("Testing project \(projectName)", [toolOptions.swift, "test", "-j", "1", "-c", createOptions.configuration, "--package-path", projectFolderURL.path])
         }
 
-        outputOptions.write("Created project \(projectName) from template \(createOptions.template) in \(projectFolder)")
+        let projectPath = projectFolderURL.path + "/" + "App.xcodeproj"
+        if !FileManager.default.isReadableFile(atPath: projectPath) {
+            outputOptions.write("Warning: path did not exist at: \(projectPath)", error: true, flush: true)
+        }
+
+        if open == true {
+            try await outputOptions.run("Launching project \(projectPath)", ["open", projectPath])
+        }
+
+        outputOptions.write("Created project: \(projectPath)")
     }
 }
 
