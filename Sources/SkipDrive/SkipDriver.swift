@@ -687,14 +687,56 @@ struct TestCommand: SkipCommand {
             // now output all of the test cases
             var outputColumns: [[String]] = [[], [], [], []]
 
-            (0..<outputColumns.count).forEach({ outputColumns[$0].append("-") }) // add header dashes
-            ["Test", "Case", "Swift", "Kotlin"].enumerated().forEach({ outputColumns[$0.offset].append($0.element) })
-            (0..<outputColumns.count).forEach({ outputColumns[$0].append("-") }) // add header dashes
+            func addSeparator() {
+                (0..<outputColumns.count).forEach({ outputColumns[$0].append("-") }) // add header dashes
+            }
+
+            /// Add a row with the given columns
+            func addRow(_ values: [String]) {
+                values.enumerated().forEach({ outputColumns[$0.offset].append($0.element) })
+            }
+
+            addSeparator()
+            addRow(["Test", "Case", "Swift", "Kotlin"])
+            addSeparator()
+
+            struct Stats {
+                var passed: Int = 0
+                var failed: Int = 0
+                var skipped: Int = 0
+                var missing: Int = 0
+
+                var total: Int {
+                    passed + failed + skipped + missing
+                }
+
+                mutating func update(_ test: GradleDriver.TestCase?) {
+                    if test?.skipped == true {
+                        skipped += 1
+                    } else if test?.failures.isEmpty == false {
+                        failed += 1
+                    } else if test == nil {
+                        missing += 1
+                    } else {
+                        passed += 1
+                    }
+                }
+
+                var passRate: String {
+                    NumberFormatter.localizedString(from: (Double(passed) / Double(total)) as NSNumber, number: .percent)
+                }
+            }
+
+            var (xunitStats, junitStats) = (Stats(), Stats())
 
             for (xunit, junit) in matchedCases.sorted(by: { testNameComparison($0.xunit, $1.xunit) }) {
                 let testName = xunit.name
                 outputColumns[0].append(xunit.classname.split(separator: ".").last?.description ?? "")
                 outputColumns[1].append(testName)
+                
+                xunitStats.update(xunit)
+                junitStats.update(junit)
+
                 func desc(_ test: GradleDriver.TestCase?) -> String {
                     guard let test = test else {
                         return "????" // unmatched
@@ -708,7 +750,11 @@ struct TestCommand: SkipCommand {
                 outputColumns[2].append(desc(xunit))
                 outputColumns[3].append(desc(junit))
             }
-            (0..<outputColumns.count).forEach({ outputColumns[$0].append("-") }) // add footer dashes
+
+            // add summary
+            addSeparator()  // add footer dashes
+            addRow(["", "", xunitStats.passRate, junitStats.passRate])
+            addSeparator()  // add footer dashes
 
             // pad all the columns for nice output
             let lengths = outputColumns.map({ $0.reduce(0, { max($0, $1.count) })})
