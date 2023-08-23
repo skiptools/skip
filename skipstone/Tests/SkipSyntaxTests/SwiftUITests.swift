@@ -1236,4 +1236,41 @@ final class SwiftUITests: XCTestCase {
         }
         """)
     }
+
+    func testViewTypeInference() async throws {
+        try await check(supportingSwift: baseSupportingSwift + """
+        struct Color: View {
+            init(value: Int) {
+            }
+
+            var body: some View {
+                VStack {}
+            }
+        }
+        extension Color {
+            static let red = Color(value: 1)
+        }
+        """, swift: """
+        import SwiftUI
+        struct MyV: View {
+            var body: some View {
+                Color.red
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
+
+        import skip.ui.*
+        internal class MyV: View {
+            override fun body(): View {
+                return ComposeView { composectx: ComposeContext -> Color.red.Compose(composectx) }
+            }
+        }
+        """)
+    }
 }

@@ -5,7 +5,8 @@ struct TypeInferenceContext {
     private var path: [PathEntry] = []
     private var localIdentifierTypes: [String: TypeSignature] = [:]
     private struct PathEntry {
-        var typeDeclaration: TypeDeclaration? = nil
+        var typeSignature: TypeSignature?
+        var superSignature: TypeSignature?
         var isStatic = false
     }
 
@@ -33,8 +34,16 @@ struct TypeInferenceContext {
     /// Return a context for evaluating members of the given type.
     func pushing(_ typeDeclaration: TypeDeclaration) -> TypeInferenceContext {
         var context = self
-        context.path.append(PathEntry(typeDeclaration: typeDeclaration))
+        context.path.append(PathEntry(typeSignature: typeDeclaration.signature, superSignature: typeDeclaration.type == .classDeclaration ? typeDeclaration.inherits.first : nil))
         context.generics = context.generics.merge(overrides: typeDeclaration.generics, addNew: true)
+        return context
+    }
+
+    /// Return a context for evaluating members of the given type.
+    func pushing(_ typeInfo: CodebaseInfo.TypeInfo) -> TypeInferenceContext {
+        var context = self
+        context.path.append(PathEntry(typeSignature: typeInfo.signature, superSignature: typeInfo.declarationType == .classDeclaration ? typeInfo.inherits.first : nil))
+        context.generics = context.generics.merge(overrides: typeInfo.generics, addNew: true)
         return context
     }
 
@@ -45,7 +54,7 @@ struct TypeInferenceContext {
         }
         var context = addingIdentifiers(parameterDictionary)
         context.expectedReturn = functionDeclaration.returnType
-        if functionDeclaration.modifiers.isStatic, let lastTypePathIndex = context.path.lastIndex(where: { $0.typeDeclaration != nil }) {
+        if functionDeclaration.modifiers.isStatic, let lastTypePathIndex = context.path.lastIndex(where: { $0.typeSignature != nil }) {
             context.path[lastTypePathIndex].isStatic = true
         }
         context.generics = context.generics.merge(overrides: functionDeclaration.generics, addNew: true)
@@ -154,29 +163,31 @@ struct TypeInferenceContext {
             return (signature, APIMatch(signature: signature))
         }
         if name == "self" || name == "Self" || name == "super" {
-            guard let pathEntry = path.last(where: { $0.typeDeclaration != nil }), let typeDeclaration = pathEntry.typeDeclaration else {
+            guard let pathEntry = path.last(where: { $0.typeSignature != nil }), let typeSignature = pathEntry.typeSignature else {
                 return nil
             }
             if name == "super" {
-                if let superType = typeDeclaration.inherits.first?.constrainedTypeWithGenerics(generics) {
-                    return (superType, APIMatch(signature: superType))
+                var superSignature: TypeSignature? = pathEntry.superSignature
+                if superSignature == nil {
+                    superSignature = codebaseInfo?.primaryTypeInfo(forNamed: typeSignature)?.inherits.first
+                }
+                if let superSignature {
+                    let constrainedSuperSignature = superSignature.constrainedTypeWithGenerics(generics)
+                    return (constrainedSuperSignature, APIMatch(signature: constrainedSuperSignature))
                 } else {
                     return nil
                 }
-            } else if name == "Self" || pathEntry.isStatic {
-                let signature = typeDeclaration.signature.constrainedTypeWithGenerics(generics).asMetaType(true)
-                return (signature, APIMatch(signature: signature))
             } else {
-                let signature = typeDeclaration.signature.constrainedTypeWithGenerics(generics)
+                let signature = typeSignature.constrainedTypeWithGenerics(generics).asMetaType(name == "Self" || pathEntry.isStatic)
                 return (signature, APIMatch(signature: signature))
             }
         }
 
         for pathEntry in path.reversed() {
-            guard let typeDeclaration = pathEntry.typeDeclaration else {
+            guard let typeSignature = pathEntry.typeSignature else {
                 continue
             }
-            let signature = typeDeclaration.signature.asMetaType(pathEntry.isStatic)
+            let signature = typeSignature.asMetaType(pathEntry.isStatic)
             if let codebaseInfo {
                 if let match = codebaseInfo.matchIdentifier(name: name, inConstrained: signature.constrainedTypeWithGenerics(generics)) {
                     addMessages(to: messagesNode, for: [match.availability])
@@ -319,10 +330,10 @@ struct TypeInferenceContext {
             }
         }
         for pathEntry in path.reversed() {
-            guard let typeDeclaration = pathEntry.typeDeclaration else {
+            guard let typeSignature = pathEntry.typeSignature else {
                 continue
             }
-            let signature = typeDeclaration.signature.asMetaType(pathEntry.isStatic)
+            let signature = typeSignature.asMetaType(pathEntry.isStatic)
             if let codebaseInfo {
                 let matches = codebaseInfo.matchFunction(name: name, inConstrained: signature.constrainedTypeWithGenerics(generics), arguments: constrainedArguments)
                 if !matches.isEmpty {

@@ -58,6 +58,7 @@ public class CodebaseInfo: Codable {
                 let typeInfo = TypeInfo(statement: statement as! ExtensionDeclaration, codebaseInfo: self, syntaxTree: syntaxTree)
                 typeInfo.importedModuleNames = importedModuleNames
                 rootExtensions.append(typeInfo)
+                needsVariableTypeInference = needsVariableTypeInference || typeInfo.needsVariableTypeInference
             case .functionDeclaration, .initDeclaration, .deinitDeclaration:
                 var functionInfo = FunctionInfo(statement: statement as! FunctionDeclaration, codebaseInfo: self, syntaxTree: syntaxTree)
                 functionInfo.importedModuleNames = importedModuleNames
@@ -1089,12 +1090,12 @@ public class CodebaseInfo: Codable {
                         }
                     }
                 }
-                for rootType in rootTypes {
+                for rootType in rootTypes + rootExtensions {
                     if rootType.sourceFile == sourceFile && rootType.needsVariableTypeInference {
                         if isCleanupPass {
                             rootType.cleanupTypeInference(source: syntaxTree.source, messages: &messages)
-                        } else if let declaration = syntaxTree.root.statements.first(where: { ($0 as? TypeDeclaration)?.name == rootType.name }) as? TypeDeclaration {
-                            needsInferenceCount += rootType.inferVariableTypes(with: context, declaration: declaration)
+                        } else {
+                            needsInferenceCount += rootType.inferVariableTypes(with: context)
                         }
                     }
                 }
@@ -1317,8 +1318,8 @@ public class CodebaseInfo: Codable {
             return variables.contains { $0.needsTypeInference } || types.contains { $0.needsVariableTypeInference }
         }
 
-        fileprivate func inferVariableTypes(with context: TypeInferenceContext, declaration: TypeDeclaration) -> Int {
-            let memberContext = context.pushing(declaration)
+        fileprivate func inferVariableTypes(with context: TypeInferenceContext) -> Int {
+            let memberContext = context.pushing(self)
             var needsInferenceCount = 0
             for i in 0..<variables.count {
                 guard variables[i].needsTypeInference else {
@@ -1333,9 +1334,7 @@ public class CodebaseInfo: Codable {
                 guard type.needsVariableTypeInference else {
                     continue
                 }
-                if let declaration = declaration.members.first(where: { ($0 as? TypeDeclaration)?.name == type.name }) as? TypeDeclaration {
-                    needsInferenceCount += type.inferVariableTypes(with: memberContext, declaration: declaration)
-                }
+                needsInferenceCount += type.inferVariableTypes(with: memberContext)
             }
             return needsInferenceCount
         }
