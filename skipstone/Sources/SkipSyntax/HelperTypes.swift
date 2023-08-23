@@ -6,6 +6,18 @@ struct Accessor<B> {
     var body: B? // Nil if the accessor has no body, as in a protocol { get set }
 }
 
+/// Parsed accessors.
+struct Accessors {
+    var getter: Accessor<CodeBlock>?
+    var setter: Accessor<CodeBlock>?
+    var willSet: Accessor<CodeBlock>?
+    var didSet: Accessor<CodeBlock>?
+    var isAsync = false
+    var isThrows = false
+    var attributes: Attributes?
+    var messages: [Message] = []
+}
+
 /// Type of closure capture.
 enum CaptureType {
     case none
@@ -431,7 +443,7 @@ struct Attributes: Hashable, PrettyPrintable, Codable {
 
     /// Some property wrappers are non-mutating.
     var isNonMutating: Bool {
-        return contains(.state) || contains(.stateObject) || contains(.environment) || contains(.environmentObject) || contains(.bindable) || contains(.binding)
+        return contains(.nonmutating) || contains(.state) || contains(.stateObject) || contains(.environment) || contains(.environmentObject) || contains(.bindable) || contains(.binding)
     }
 
     var prettyPrintTree: PrettyPrintTree {
@@ -472,6 +484,9 @@ struct Attribute: Hashable, Codable {
         }
     }
 
+    /// `nonmutating` is actually a modifier, but we treat it as an attribute.
+    static let nonmutating = Attribute(signature: .named("nonmutating", []))
+
     /// The attribute kind, if it is recognized.
     enum Kind: Equatable {
         case autoclosure
@@ -491,6 +506,7 @@ struct Attribute: Hashable, Codable {
         case inlineAlways
         case inlineNever
         case mainActor
+        case nonmutating
         case observable
         case observationIgnored
         case observedObject
@@ -548,6 +564,8 @@ struct Attribute: Hashable, Codable {
             }
         case "MainActor":
             return .mainActor
+        case "nonmutating":
+            return .nonmutating
         case "Observable":
             return .observable
         case "ObservationIgnored":

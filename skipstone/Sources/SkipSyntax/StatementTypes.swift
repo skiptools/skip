@@ -1435,7 +1435,7 @@ class VariableDeclaration: Statement {
         return APIFlags(isAsync: isAsync, isThrows: isThrows, isMainActor: attributes.contains(.mainActor), isViewBuilder: attributes.contains(.viewBuilder), isWriteable: !isLet && (getter == nil || setter != nil))
     }
     var isMutating: Bool {
-        return !isLet && (getter == nil || setter != nil) && !attributes.contains(.state) && !attributes.contains(.stateObject) && !attributes.contains(.environment) && !attributes.contains(.environmentObject) && !attributes.contains(.bindable) && !attributes.contains(.binding)
+        return !isLet && (getter == nil || setter != nil) && !attributes.isNonMutating
     }
 
     init(names: [String?], declaredType: TypeSignature = .none, isLet: Bool = false, isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), value: Expression?, getter: Accessor<CodeBlock>? = nil, setter: Accessor<CodeBlock>? = nil, willSet: Accessor<CodeBlock>? = nil, didSet: Accessor<CodeBlock>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
@@ -1494,6 +1494,10 @@ class VariableDeclaration: Statement {
                 let statements = StatementDecoder.decode(syntaxList: syntax, in: syntaxTree)
                 accessors.getter = Accessor(body: CodeBlock(statements: statements))
             }
+        }
+        var attributes = attributes
+        if let accessorsAttributes = accessors.attributes {
+            attributes.attributes += accessorsAttributes.attributes
         }
 
         guard let names = syntax.pattern.identifierPatterns(in: syntaxTree)?.map(\.name) else {

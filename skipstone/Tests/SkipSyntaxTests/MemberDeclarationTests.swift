@@ -841,6 +841,39 @@ final class MemberDeclarationTests: XCTestCase {
         """)
     }
 
+    func testNonmutatingProperty() async throws {
+        try await check(swift: """
+        struct S {
+            var x: String {
+                get {
+                    return "x"
+                }
+                nonmutating set {
+                    print(newValue)
+                }
+            }
+        }
+        func f() -> S {
+            let s = S()
+            s.x = "y"
+            return s
+        }
+        """, kotlin: """
+        internal class S {
+            internal var x: String
+                get() = "x"
+                set(newValue) {
+                    print(newValue)
+                }
+        }
+        internal fun f(): S {
+            val s = S()
+            s.x = "y"
+            return s
+        }
+        """)
+    }
+
     func testDiscardableResult() async throws {
         try await check(swift: """
         @discardableResult func f() -> Int {

@@ -121,6 +121,9 @@ extension AccessorDeclListSyntax {
             case "set":
                 let parameterName = accessorSyntax.parameters?.name.text
                 accessors.setter = Accessor(parameterName: parameterName, body: body)
+                if accessorSyntax.modifier?.name.text == "nonmutating" {
+                    accessors.attributes = Attributes(attributes: [.nonmutating])
+                }
             case "willSet":
                 let parameterName = accessorSyntax.parameters?.name.text
                 accessors.willSet = Accessor(parameterName: parameterName, body: body)
@@ -132,16 +135,6 @@ extension AccessorDeclListSyntax {
         }
         return accessors
     }
-}
-
-struct Accessors {
-    var getter: Accessor<CodeBlock>?
-    var setter: Accessor<CodeBlock>?
-    var willSet: Accessor<CodeBlock>?
-    var didSet: Accessor<CodeBlock>?
-    var isAsync = false
-    var isThrows = false
-    var messages: [Message] = []
 }
 
 extension ClosureSignatureSyntax {
