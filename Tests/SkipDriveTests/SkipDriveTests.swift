@@ -59,14 +59,21 @@ public class SkipCommandTests : XCTestCase {
         // .build/plugins/outputs/skip-zip/SkipZipKtTests/skip-transpiler/SkipZip/.build/SkipZip/test-results/testDebugUnitTest/TEST-skip.zip.SkipZipTests.xml
         let report = try await skip("test", "--configuration", "debug", "--no-test", "--max-column-length", "15", "--xunit", xunit, "--junit", junit)
         XCTAssertEqual(report.out, """
-        +--------------+-----------------+-------+--------+
         | Test         | Case            | Swift | Kotlin |
-        +--------------+-----------------+-------+--------+
+        | ------------ | --------------- | ----- | ------ |
         | SkipZipTests | testArchive     | PASS  | SKIP   |
         | SkipZipTests | testDeflateInfl | PASS  | PASS   |
         | SkipZipTests | testMissingTest | PASS  | ????   |
-        +--------------+-----------------+-------+--------+
+        |              |                 | 100%  | 33%    |
         """)
+        
+//        +--------------+-----------------+-------+--------+
+//        | Test         | Case            | Swift | Kotlin |
+//        +--------------+-----------------+-------+--------+
+//        | SkipZipTests | testArchive     | PASS  | SKIP   |
+//        | SkipZipTests | testDeflateInfl | PASS  | PASS   |
+//        | SkipZipTests | testMissingTest | PASS  | ????   |
+//        +--------------+-----------------+-------+--------+
     }
 
     /// Runs the tool with the given arguments, returning the entire output string as well as a function to parse it to `JSON`

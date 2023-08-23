@@ -696,7 +696,7 @@ struct TestCommand: SkipCommand {
                 values.enumerated().forEach({ outputColumns[$0.offset].append($0.element) })
             }
 
-            addSeparator()
+            //addSeparator()
             addRow(["Test", "Case", "Swift", "Kotlin"])
             addSeparator()
 
@@ -752,9 +752,9 @@ struct TestCommand: SkipCommand {
             }
 
             // add summary
-            addSeparator()  // add footer dashes
+            //addSeparator()  // add footer dashes
             addRow(["", "", xunitStats.passRate, junitStats.passRate])
-            addSeparator()  // add footer dashes
+            //addSeparator()  // add footer dashes
 
             // pad all the columns for nice output
             let lengths = outputColumns.map({ $0.reduce(0, { max($0, $1.count) })})
@@ -766,10 +766,14 @@ struct TestCommand: SkipCommand {
             for row in 0..<rowCount {
                 let row = outputColumns.map({ $0[row] })
 
+                // these look nice in the terminal, but they don't generate valid markdown tables
                 // header columns are all "-"
-                let sep = Set(row.flatMap({ Array($0) })) == ["-"] ? "-" : " "
+                //let sep = Set(row.flatMap({ Array($0) })) == ["-"] ? "-" : " "
                 // corners of headers are "+"
-                let term = sep == "-" ? "+" : "|"
+                //let term = sep == "-" ? "+" : "|"
+
+                let sep = " "
+                let term = "|"
 
                 outputOptions.write("", terminator: term)
                 for cell in row {
