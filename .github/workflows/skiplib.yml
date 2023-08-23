@@ -9,15 +9,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - name: Build
-        run: swift build
-      - name: Test
-        run: swift test
-      - name: Assemble
+      - name: Setup
         run: |
           brew install skiptools/skip/skip
           skip doctor
-          #skip assemble -o Packages/Skip/artifacts/skip-unit-0.0.0.aar SkipUnit
+      - name: Build
+        run: swift build
+      - name: Test
+        #run: swift test
+        run: skip test
       - name: Release
         if: startsWith(github.ref, 'refs/tags/')
         env:
@@ -25,11 +25,15 @@ jobs:
         run: |
           # extract package and initial module name from Package.swift
           PACKAGE=$(swift package dump-package | jq -r '.name')
+          test -n "${PACKAGE}"
           MODULE=$(swift package dump-package | jq -r '.targets[0].name')
+          test -n "${MODULE}"
           COMMIT_DATE=$(git log -1 --format=%ad --date=iso-strict ${GITHUB_REF#refs/tags/})
+          test -n "${COMMIT_DATE}"
 
           # the tag is the most recent GitHub ref
           TAG="${GITHUB_REF#refs/tags/}"
+          test -n "${TAG}"
 
           gradle assemble --project-dir Packages/Skip/${PACKAGE}/${MODULE}KtTests/skip-transpiler -PbuildDir=.build/${MODULE}
 

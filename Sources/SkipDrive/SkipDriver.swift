@@ -7,7 +7,7 @@ import Foundation
 import Darwin
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-public protocol SkipParsableCommand : AsyncParsableCommand {
+public protocol SkipCommand : AsyncParsableCommand {
     var outputOptions: OutputOptions { get set }
 
 }
@@ -17,7 +17,7 @@ extension AsyncParsableCommand {
     /// Run the transpiler on the given arguments.
     public static func run(_ arguments: [String], out: WritableByteStream? = nil, err: WritableByteStream? = nil) async throws {
         var cmd: ParsableCommand = try parseAsRoot(arguments)
-        if var cmd = cmd as? any SkipParsableCommand {
+        if var cmd = cmd as? any SkipCommand {
             if let outputFile = cmd.outputOptions.output {
                 let path = URL(fileURLWithPath: outputFile)
                 cmd.outputOptions.streams.out = try LocalFileOutputByteStream(path)
@@ -50,9 +50,9 @@ public struct SkipDriver: AsyncParsableCommand {
             DoctorCommand.self,
             UpdateCommand.self,
             GradleCommand.self,
+            TestCommand.self,
             //CheckCommand.self,
             //RunCommand.self,
-            //TestCommand.self,
             //AssembleCommand.self,
             //UploadCommand.self,
         ]
@@ -65,7 +65,7 @@ public struct SkipDriver: AsyncParsableCommand {
 // MARK: VersionCommand
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-struct VersionCommand: SkipParsableCommand {
+struct VersionCommand: SkipCommand {
     static var configuration = CommandConfiguration(
         commandName: "version",
         abstract: "Print the Skip version",
@@ -82,7 +82,7 @@ struct VersionCommand: SkipParsableCommand {
 // MARK: UpdateCommand
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-struct UpdateCommand: SkipParsableCommand {
+struct UpdateCommand: SkipCommand {
     static var configuration = CommandConfiguration(
         commandName: "update",
         abstract: "Update to the latest Skip version using Homebrew",
@@ -104,7 +104,7 @@ struct UpdateCommand: SkipParsableCommand {
 // MARK: DoctorCommand
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-struct DoctorCommand: SkipParsableCommand {
+struct DoctorCommand: SkipCommand {
     static var configuration = CommandConfiguration(
         commandName: "doctor",
         abstract: "Evaluate and diagnose Skip development environmental",
@@ -191,7 +191,7 @@ extension String {
 // MARK: CreateCommand
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-struct CreateCommand: SkipParsableCommand {
+struct CreateCommand: SkipCommand {
     static var configuration = CommandConfiguration(
         commandName: "create",
         abstract: "Create a new Skip app project from a template",
@@ -206,17 +206,14 @@ struct CreateCommand: SkipParsableCommand {
     @OptionGroup(title: "Tool Options")
     var toolOptions: ToolOptions
 
-    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Run the project build"))
-    var build: Bool = true
-
-    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Run the project tests"))
-    var test: Bool = false
-
-    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Open the new project in Xcode"))
-    var open: Bool = false
+    @OptionGroup(title: "Build Options")
+    var buildOptions: BuildOptions
 
     @Argument(help: ArgumentHelp("Project folder name"))
     var projectName: String
+
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Open the new project in Xcode"))
+    var open: Bool = false
 
     func run() async throws {
         outputOptions.write("Creating project \(projectName) from template \(createOptions.template)")
@@ -253,11 +250,11 @@ struct CreateCommand: SkipParsableCommand {
 
         let packageJSON = try JSONDecoder().decode(PackageManifest.self, from: Data(packageJSONString.utf8))
 
-        if build == true {
+        if buildOptions.build == true {
             try await outputOptions.run("Building project \(projectName) for package \(packageJSON.name)", [toolOptions.swift, "build", "-c", createOptions.configuration, "--package-path", projectFolderURL.path])
         }
 
-        if test == true {
+        if buildOptions.test == true {
             try await outputOptions.run("Testing project \(projectName)", [toolOptions.swift, "test", "-j", "1", "-c", createOptions.configuration, "--package-path", projectFolderURL.path])
         }
 
@@ -277,7 +274,7 @@ struct CreateCommand: SkipParsableCommand {
 // MARK: InitCommand
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-struct InitCommand: SkipParsableCommand {
+struct InitCommand: SkipCommand {
     static var configuration = CommandConfiguration(
         commandName: "init",
         abstract: "Initialize a new Skip library project",
@@ -292,11 +289,8 @@ struct InitCommand: SkipParsableCommand {
     @OptionGroup(title: "Tool Options")
     var toolOptions: ToolOptions
 
-    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Run the project build"))
-    var build: Bool = true
-
-    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Run the project tests"))
-    var test: Bool = false
+    @OptionGroup(title: "Build Options")
+    var buildOptions: BuildOptions
 
     @Argument(help: ArgumentHelp("Project folder name"))
     var projectName: String
@@ -507,11 +501,11 @@ struct InitCommand: SkipParsableCommand {
 
         let packageJSON = try JSONDecoder().decode(PackageManifest.self, from: Data(packageJSONString.utf8))
 
-        if build == true {
+        if buildOptions.build == true {
             try await outputOptions.run("Building project \(projectName) for package \(packageJSON.name)", [toolOptions.swift, "build", "-c", createOptions.configuration, "--package-path", projectFolderURL.path])
         }
 
-        if test == true {
+        if buildOptions.test == true {
             try await outputOptions.run("Testing project \(projectName)", [toolOptions.swift, "test", "-c", createOptions.configuration, "--package-path", projectFolderURL.path])
         }
 
@@ -522,7 +516,7 @@ struct InitCommand: SkipParsableCommand {
 // MARK: GradleCommand
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-struct GradleCommand: SkipParsableCommand, GradleHarness {
+struct GradleCommand: SkipCommand, GradleHarness {
     static var configuration = CommandConfiguration(
         commandName: "gradle",
         abstract: "Launch the gradle build tool",
@@ -545,6 +539,215 @@ struct GradleCommand: SkipParsableCommand, GradleHarness {
     }
 }
 
+
+// MARK: TestCommand
+
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
+struct TestCommand: SkipCommand {
+    static var configuration = CommandConfiguration(
+        commandName: "test",
+        abstract: "Run parity tests and generate reports",
+        shouldDisplay: true)
+
+    @OptionGroup(title: "Output Options")
+    var outputOptions: OutputOptions
+
+    // cannot use shared `BuildOptions` since it defaults `test` to false
+    //@OptionGroup(title: "Build Options")
+    //var buildOptions: BuildOptions
+
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Run the project tests"))
+    var test: Bool = true
+
+    @Option(help: ArgumentHelp("Project folder", valueName: "dir"))
+    var project: String = "."
+
+    @Option(help: ArgumentHelp("Path to xunit test report", valueName: "xunit.xml"))
+    var xunit: String?
+
+    @Option(help: ArgumentHelp("Path to junit test report", valueName: "folder"))
+    var junit: String?
+
+    @Option(help: ArgumentHelp("Maximum table column length", valueName: "n"))
+    var maxColumnLength: Int = 25
+
+    @OptionGroup(title: "Tool Options")
+    var toolOptions: ToolOptions
+
+    @Option(name: [.customShort("c"), .long], help: ArgumentHelp("Configuration debug/release", valueName: "c"))
+    var configuration: String = "debug"
+
+    func run() async throws {
+        let xunit = xunit ?? ".build/xcunit-\(UUID().uuidString).xml"
+
+        func packageName() async throws -> String {
+            let packageJSONString = try await outputOptions.run("Checking project", [toolOptions.swift, "package", "dump-package", "--package-path", project]).out
+            let packageJSON = try JSONDecoder().decode(PackageManifest.self, from: Data(packageJSONString.utf8))
+            let packageName = packageJSON.name
+            return packageName
+        }
+
+        if test == true {
+            try await outputOptions.run("Testing project", [toolOptions.swift, "test", "--parallel", "-c", configuration, "--enable-code-coverage", "--xunit-output", xunit, "--package-path", project])
+        } else if self.xunit == nil {
+            // we can only use the generated xunit if we are running the tests
+            throw SkipDriveError(errorDescription: "Must either specify --xunit path or run tests with --test")
+        }
+
+        // load the xunit results file
+        let xunitResults = try GradleDriver.TestSuite.parse(contentsOf: URL(fileURLWithPath: xunit))
+        if xunitResults.count == 0 {
+            throw SkipDriveError(errorDescription: "No test results found in \(xunit)")
+        }
+
+
+        func testNameComparison(_ t1: GradleDriver.TestCase, _ t2: GradleDriver.TestCase) -> Bool {
+            t1.classname < t2.classname || (t1.classname == t2.classname && t1.name < t2.name)
+        }
+
+        let xunitCases = xunitResults.flatMap(\.testCases).sorted(by: testNameComparison)
+
+        // <testcase classname="SkipZipKtTests.SkipZipKtTests" name="testSkipModule" time="7.729628">
+        let skipModuleTests = xunitCases.filter({ $0.name == "testSkipModule" && $0.classname.split(separator: ".").first?.hasSuffix("KtTests") == true })
+
+        if skipModuleTests.isEmpty {
+            throw SkipDriveError(errorDescription: "Could not find Skip test testSkipModule in: \(xunitCases.map(\.name))")
+        }
+
+        let skipModules = skipModuleTests.compactMap({ ($0.classname.split(separator: ".").first)?.dropLast("KtTests".count) })
+
+        // XUnit: <testcase name="testDeflateInflate" classname="SkipZipTests.SkipZipTests" time="0.047230875">
+        // JUnit: <testcase name="testDeflateInflate$SkipZip_debugUnitTest" classname="skip.zip.SkipZipTests" time="0.024"/>
+
+        // load the junit result folders
+        for skipModule in skipModules {
+            //outputOptions.write("skipModule: \(skipModule)")
+
+            let junitFolder: URL
+            if let junit = junit {
+                // TODO: use the skip modules to form the junit path relative to the project folder
+                // .build/plugins/outputs/skip-zip/SkipZipKtTests/skip-transpiler/SkipZip/.build/SkipZip/test-results/testDebugUnitTest/TEST-skip.zip.SkipZipTests.xml
+                junitFolder = URL(fileURLWithPath: junit, isDirectory: true)
+            } else {
+                let packageName = try await packageName()
+                let testOutput = ".build/plugins/outputs/\(packageName)/\(skipModule)KtTests/skip-transpiler/\(skipModule)/.build/\(skipModule)/test-results/test\(configuration.capitalized)UnitTest/"
+                junitFolder = URL(fileURLWithPath: testOutput, isDirectory: true)
+            }
+
+            var isDir: Foundation.ObjCBool = false
+            if !FileManager.default.fileExists(atPath: junitFolder.path, isDirectory: &isDir) || isDir.boolValue == false {
+                throw SkipDriveError(errorDescription: "JUnit test output folder did not exist at: \(junitFolder.path)")
+            }
+
+            let testResultFiles = try FileManager.default.contentsOfDirectory(at: junitFolder, includingPropertiesForKeys: nil).filter({ $0.pathExtension == "xml" && $0.lastPathComponent.hasPrefix("TEST-") })
+            if testResultFiles.isEmpty {
+                throw SkipDriveError(errorDescription: "JUnit test output folder did not contain any results at: \(junitFolder.path)")
+            }
+
+            var junitCases: [GradleDriver.TestCase] = []
+            for testResultFile in testResultFiles {
+                // load the xunit results file
+                let junitResults = try GradleDriver.TestSuite.parse(contentsOf: testResultFile)
+                if junitResults.count == 0 {
+                    throw SkipDriveError(errorDescription: "No test results found in \(testResultFile)")
+                }
+
+                junitCases.append(contentsOf: junitResults.flatMap(\.testCases))
+            }
+
+            // now we have all the test cases; for each xunit test, check for an equivalent JUnit test
+            // note that xunit: classname="SkipZipTests.SkipZipTests" name="testDeflateInflate"
+            // maps to junit: classname="skip.zip.SkipZipTests" name="testDeflateInflate$SkipZip_debugUnitTest"
+            var matchedCases: [(xunit: GradleDriver.TestCase, junit: GradleDriver.TestCase?)] = []
+
+            func junitModuleCases(for className: String) -> [GradleDriver.TestCase] {
+                junitCases.filter({ $0.classname.hasSuffix("." + className) })
+            }
+
+            for xunitCase in xunitCases.filter({ $0.classname.hasPrefix(skipModule + "Tests.") }) {
+                let testName = xunitCase.name // e.g., testDeflateInflate
+                // match xunit classname "SkipZipTests.SkipZipTests" to junit classname "skip.zip.SkipZipTests"
+                let className = xunitCase.classname.split(separator: ".").last?.description ?? xunitCase.classname
+                let junitModuleCases = junitModuleCases(for: className)
+
+                // in JUnit, test names are sometimes the raw test name, and other times will be something like "testName$ModuleName_debugUnitTest"
+                // async tests are prefixed with "run"
+                let cases = junitModuleCases.filter({ $0.name == testName || $0.name.hasPrefix(testName + "$") || $0.name.hasPrefix("run" + testName + "$") })
+                if cases.count > 1 {
+                    throw SkipDriveError(errorDescription: "Multiple conflicting XUnit and JUnit test cases named “\(testName)” in \(skipModule).")
+                }
+
+                if cases.count == 0 {
+                    // permit missing cases (e.g., ones inside an #if !SKIP block)
+                    // throw SkipDriveError(errorDescription: "Could not match XUnit and JUnit test case named “\(testName)” in \(skipModule).")
+                }
+                matchedCases.append((xunit: xunitCase, junit: cases.first))
+            }
+
+            // now output all of the test cases
+            var outputColumns: [[String]] = [[], [], [], []]
+
+            (0..<outputColumns.count).forEach({ outputColumns[$0].append("-") }) // add header dashes
+            ["Test", "Case", "Swift", "Kotlin"].enumerated().forEach({ outputColumns[$0.offset].append($0.element) })
+            (0..<outputColumns.count).forEach({ outputColumns[$0].append("-") }) // add header dashes
+
+            for (xunit, junit) in matchedCases.sorted(by: { testNameComparison($0.xunit, $1.xunit) }) {
+                let testName = xunit.name
+                outputColumns[0].append(xunit.classname.split(separator: ".").last?.description ?? "")
+                outputColumns[1].append(testName)
+                func desc(_ test: GradleDriver.TestCase?) -> String {
+                    guard let test = test else {
+                        return "????" // unmatched
+                    }
+                    let result = (test.skipped == true ? "SKIP" : test.failures.count > 0 ? "FAIL" : "PASS")
+                    //result += " (" + ((round(test.time * 1000) / 1000).description) + ")"
+                    return result
+
+                }
+
+                outputColumns[2].append(desc(xunit))
+                outputColumns[3].append(desc(junit))
+            }
+            (0..<outputColumns.count).forEach({ outputColumns[$0].append("-") }) // add footer dashes
+
+            // pad all the columns for nice output
+            let lengths = outputColumns.map({ $0.reduce(0, { max($0, $1.count) })})
+            for (index, length) in lengths.enumerated() {
+                outputColumns[index] = outputColumns[index].map { $0.pad(min(length, maxColumnLength), paddingCharacter: $0 == "-" ? "-" : " ") }
+            }
+
+            let rowCount = outputColumns.map({ $0.count }).min() ?? 0
+            for row in 0..<rowCount {
+                let row = outputColumns.map({ $0[row] })
+
+                // header columns are all "-"
+                let sep = Set(row.flatMap({ Array($0) })) == ["-"] ? "-" : " "
+                // corners of headers are "+"
+                let term = sep == "-" ? "+" : "|"
+
+                outputOptions.write("", terminator: term)
+                for cell in row {
+                    outputOptions.write(sep + cell + sep, terminator: term)
+                }
+                outputOptions.write("", terminator: "\n")
+            }
+        }
+    }
+}
+
+extension String {
+    /// Pads the given string to the specified length
+    func pad(_ length: Int, paddingCharacter: Character = " ") -> String {
+        if self.count == length {
+            return self
+        } else if self.count < length {
+            return self + String(repeating: paddingCharacter, count: length - self.count)
+        } else {
+            return String(self[..<self.index(self.startIndex, offsetBy: length)])
+        }
+    }
+}
+
 struct ToolOptions: ParsableArguments {
     @Option(help: ArgumentHelp("Xcode command path", valueName: "path"))
     var xcode: String = "/usr/bin/xcodebuild"
@@ -558,6 +761,14 @@ struct ToolOptions: ParsableArguments {
 
     @Option(help: ArgumentHelp("Path to the Android SDK (ANDROID_HOME)", valueName: "path"))
     var androidHome: String?
+}
+
+struct BuildOptions: ParsableArguments {
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Run the project build"))
+    var build: Bool = true
+
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Run the project tests"))
+    var test: Bool = false
 }
 
 struct CreateOptions: ParsableArguments {

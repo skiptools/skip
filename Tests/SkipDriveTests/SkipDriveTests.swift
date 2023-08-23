@@ -49,6 +49,26 @@ public class SkipCommandTests : XCTestCase {
         try await skip("doctor")
     }
 
+    public func testSkipTestReport() async throws {
+        let xunit = try mktmpFile(contents: Data(xunitResults.utf8))
+        let tempDir = try mktmp()
+        let junit = tempDir + "/" + "testDebugUnitTest"
+        try FileManager.default.createDirectory(atPath: junit, withIntermediateDirectories: true)
+        try Data(junitResults.utf8).write(to: URL(fileURLWithPath: junit + "/TEST-skip.zip.SkipZipTests.xml"))
+
+        // .build/plugins/outputs/skip-zip/SkipZipKtTests/skip-transpiler/SkipZip/.build/SkipZip/test-results/testDebugUnitTest/TEST-skip.zip.SkipZipTests.xml
+        let report = try await skip("test", "--configuration", "debug", "--no-test", "--max-column-length", "15", "--xunit", xunit, "--junit", junit)
+        XCTAssertEqual(report.out, """
+        +--------------+-----------------+-------+--------+
+        | Test         | Case            | Swift | Kotlin |
+        +--------------+-----------------+-------+--------+
+        | SkipZipTests | testArchive     | PASS  | SKIP   |
+        | SkipZipTests | testDeflateInfl | PASS  | PASS   |
+        | SkipZipTests | testMissingTest | PASS  | ????   |
+        +--------------+-----------------+-------+--------+
+        """)
+    }
+
     /// Runs the tool with the given arguments, returning the entire output string as well as a function to parse it to `JSON`
     @discardableResult func skip(checkError: Bool = true, _ args: String...) async throws -> (out: String, err: String) {
         let out = BufferedOutputByteStream()
@@ -70,12 +90,21 @@ public class SkipCommandTests : XCTestCase {
         return (out: outString, err: errString)
     }
 
-    /// Create a temporary directory
-    func mktmp(baseName: String = "SkipDriveTests") throws -> String {
-        let tempDir = [NSTemporaryDirectory(), baseName, UUID().uuidString].joined(separator: "/")
-        try FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
-        return tempDir
-    }
+}
+
+/// Create a temporary directory
+func mktmp(baseName: String = "SkipDriveTests") throws -> String {
+    let tempDir = [NSTemporaryDirectory(), baseName, UUID().uuidString].joined(separator: "/")
+    try FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
+    return tempDir
+}
+
+/// Create a temporary directory
+func mktmpFile(baseName: String = "SkipDriveTests", named: String = "file-\(UUID().uuidString)", contents: Data) throws -> String {
+    let tempDir = try mktmp(baseName: baseName)
+    let tempFile = tempDir + "/" + named
+    try contents.write(to: URL(fileURLWithPath: tempFile), options: .atomic)
+    return tempFile
 }
 
 func loadProjectPackage(_ path: String) async throws -> PackageManifest {
@@ -96,3 +125,40 @@ func execJSON<T: Decodable>(_ arguments: [String]) async throws -> T {
 public func XCTAssertEqualX<T>(_ expression1: T, _ expression2: T, _ message: @autoclosure () -> String = "", file: StaticString = #filePath, line: UInt = #line) where T : Equatable {
     XCTAssertEqual(expression1, expression2, message(), file: file, line: line)
 }
+
+
+// sample test output generated with the following command in the skip-zip package:
+// swift test --enable-code-coverage --parallel --xunit-output=.build/swift-xunit.xml --filter=SkipZipTests
+
+// .build/plugins/outputs/skip-zip/SkipZipKtTests/skip-transpiler/SkipZip/.build/SkipZip/test-results/testDebugUnitTest/TEST-skip.zip.SkipZipTests.xml
+let junitResults = """
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="skip.zip.SkipZipTests" tests="2" skipped="1" failures="0" errors="0" timestamp="2023-08-23T16:53:50" hostname="zap.local" time="0.02">
+  <properties/>
+  <testcase name="testDeflateInflate" classname="skip.zip.SkipZipTests" time="0.019"/>
+  <testcase name="testArchive$SkipZip_debugUnitTest" classname="skip.zip.SkipZipTests" time="0.001">
+    <skipped/>
+  </testcase>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[Aug 23, 2023 12:53:50 PM skip.foundation.SkipLogger log
+INFO: running test
+]]></system-err>
+</testsuite>
+"""
+
+// .build/swift-xunit.xml
+let xunitResults = """
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+<testsuite name="TestResults" errors="0" tests="4" failures="0" time="15.553686000999999">
+<testcase classname="SkipZipTests.SkipZipTests" name="testDeflateInflate" time="0.047230875">
+</testcase>
+<testcase classname="SkipZipTests.SkipZipTests" name="testArchive" time="7.729590584">
+</testcase>
+<testcase classname="SkipZipTests.SkipZipTests" name="testMissingTest" time="0.01">
+</testcase>
+<testcase classname="SkipZipKtTests.SkipZipKtTests" name="testSkipModule" time="7.729628">
+</testcase>
+</testsuite>
+</testsuites>
+"""

@@ -322,74 +322,95 @@ public struct GradleDriver {
         }
 
         /// Loads the test suite information from the JUnit-compatible XML format.
-        public init(contentsOf url: URL) throws {
-            #if os(macOS) || os(Linux) || targetEnvironment(macCatalyst)
+        static func parse(contentsOf url: URL) throws -> [TestSuite] {
             let results = try XMLDocument(contentsOf: url)
             //print("parsed XML results:", results)
 
-            guard let testsuite = results.rootElement(),
-                  testsuite.name == "testsuite" else {
+            guard let root = results.rootElement() else {
+                throw GradleDriverError.missingProperty(url: url, propertyName: "root")
+            }
+
+            let testsuites: [XMLElement]
+
+            if root.name == "testsuites" {
+                // multiple top-level testsuites (single-file XUnit output style)
+                testsuites = root.children?.compactMap({ $0 as? XMLElement }) ?? []
+            } else if root.name == "testsuite" {
+                // single top-level testsuite (multiple-file JUnit output style)
+                testsuites = [root]
+            } else {
                 throw GradleDriverError.missingProperty(url: url, propertyName: "testsuite")
             }
 
-            guard let testSuiteName = testsuite.attribute(forName: "name")?.stringValue else {
-                throw GradleDriverError.missingProperty(url: url, propertyName: "name")
-            }
+            var suites: [TestSuite] = []
 
-            guard let tests = testsuite.attribute(forName: "tests")?.stringValue,
-                let testCount = Int(tests) else {
-                throw GradleDriverError.missingProperty(url: url, propertyName: "tests")
-            }
-
-            guard let skips = testsuite.attribute(forName: "skipped")?.stringValue,
-                let skipCount = Int(skips) else {
-                throw GradleDriverError.missingProperty(url: url, propertyName: "skipped")
-            }
-
-            guard let failures = testsuite.attribute(forName: "failures")?.stringValue,
-                let failureCount = Int(failures) else {
-                throw GradleDriverError.missingProperty(url: url, propertyName: "failures")
-            }
-
-            guard let errors = testsuite.attribute(forName: "errors")?.stringValue,
-                let errorCount = Int(errors) else {
-                throw GradleDriverError.missingProperty(url: url, propertyName: "errors")
-            }
-
-            guard let time = testsuite.attribute(forName: "time")?.stringValue,
-                let duration = TimeInterval(time) else {
-                throw GradleDriverError.missingProperty(url: url, propertyName: "time")
-            }
-
-            var testCases: [TestCase] = []
-
-            func addTestCase(for element: XMLElement) throws {
-                testCases.append(try TestCase(from: element, in: url))
-            }
-
-            var systemOut = ""
-            var systemErr = ""
-
-            for childElement in testsuite.children?.compactMap({ $0 as? XMLElement }) ?? [] {
-                switch childElement.name {
-                case "testcase":
-                    try addTestCase(for: childElement)
-                case "system-out":
-                    systemOut += childElement.stringValue ?? ""
-                case "system-err":
-                    systemErr += childElement.stringValue ?? ""
-                case "properties":
-                    break // TODO: figure out key/value format
-                default:
-                    break // unrecognized key
+            for testsuite in testsuites {
+                guard let testSuiteName = testsuite.attribute(forName: "name")?.stringValue else {
+                    throw GradleDriverError.missingProperty(url: url, propertyName: "name")
                 }
+
+                guard let tests = testsuite.attribute(forName: "tests")?.stringValue,
+                      let testCount = Int(tests) else {
+                    throw GradleDriverError.missingProperty(url: url, propertyName: "tests")
+                }
+
+                let skipCount: Int
+                if let skips = testsuite.attribute(forName: "skipped")?.stringValue, let skipValue = Int(skips) {
+                    // JUnit
+                    skipCount = skipValue
+                //} else if let skips = testsuite.children?.filter({ $0.name == "skipped" }).first {
+                    // Swift test xunit output does not handle skipped tests; it just looks like it passed
+                    // fixing this would invole updating the `func run(_ tests: [UnitTest]) throws -> [TestResult]` to include skip information at:
+                    // https://github.com/apple/swift-package-manager/blob/main/Sources/Commands/SwiftTestTool.swift#L764C5-L764C57
+                    //skipCount = 1
+                } else {
+                    skipCount = 0
+                }
+
+                guard let failures = testsuite.attribute(forName: "failures")?.stringValue,
+                      let failureCount = Int(failures) else {
+                    throw GradleDriverError.missingProperty(url: url, propertyName: "failures")
+                }
+
+                guard let errors = testsuite.attribute(forName: "errors")?.stringValue,
+                      let errorCount = Int(errors) else {
+                    throw GradleDriverError.missingProperty(url: url, propertyName: "errors")
+                }
+
+                guard let time = testsuite.attribute(forName: "time")?.stringValue,
+                      let duration = TimeInterval(time) else {
+                    throw GradleDriverError.missingProperty(url: url, propertyName: "time")
+                }
+
+                var testCases: [TestCase] = []
+
+                func addTestCase(for element: XMLElement) throws {
+                    testCases.append(try TestCase(from: element, in: url))
+                }
+
+                var systemOut = ""
+                var systemErr = ""
+
+                for childElement in testsuite.children?.compactMap({ $0 as? XMLElement }) ?? [] {
+                    switch childElement.name {
+                    case "testcase":
+                        try addTestCase(for: childElement)
+                    case "system-out":
+                        systemOut += childElement.stringValue ?? ""
+                    case "system-err":
+                        systemErr += childElement.stringValue ?? ""
+                    case "properties":
+                        break // TODO: figure out key/value format
+                    default:
+                        break // unrecognized key
+                    }
+                }
+
+                let suite = TestSuite(name: testSuiteName, tests: testCount, skipped: skipCount, failures: failureCount, errors: errorCount, time: duration, testCases: testCases, systemOut: systemOut.isEmpty ? nil : systemOut, systemErr: systemErr.isEmpty ? nil : systemErr)
+                suites.append(suite)
             }
 
-            let suite = TestSuite(name: testSuiteName, tests: testCount, skipped: skipCount, failures: failureCount, errors: errorCount, time: duration, testCases: testCases, systemOut: systemOut.isEmpty ? nil : systemOut, systemErr: systemErr.isEmpty ? nil : systemErr)
-            self = suite
-            #else
-            fatalError("unexpected platform")
-            #endif
+            return suites
         }
     }
 
@@ -499,17 +520,17 @@ public struct GradleDriver {
             throw URLError(.fileDoesNotExist, userInfo: [NSFilePathErrorKey: testFolder.path])
         }
 
-        func parseTestSuite(resultURL: URL) throws -> TestSuite? {
+        func parseTestSuite(resultURL: URL) throws -> [TestSuite] {
             if try resultURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory != false {
-                return Optional<TestSuite>.none
+                return []
             }
 
             if resultURL.pathExtension != "xml" {
                 print("skipping non .xml test file:", resultURL.path)
-                return Optional<TestSuite>.none
+                return []
             }
 
-            return try TestSuite(contentsOf: resultURL)
+            return try TestSuite.parse(contentsOf: resultURL)
         }
 
         let dirs = try fm.contentsOfDirectory(at: testFolder, includingPropertiesForKeys: [.isDirectoryKey])
@@ -517,7 +538,7 @@ public struct GradleDriver {
         // check each subdir (e.g., "build/test-results/test" and "build/test-results/testDebugUnitTest/" and "build/test-results/testReleaseUnitTest/"
         let subdirs = try dirs.flatMap({ try fm.contentsOfDirectory(at: $0, includingPropertiesForKeys: [.isDirectoryKey]) })
 
-        return try subdirs.compactMap(parseTestSuite)
+        return try Array(subdirs.compactMap(parseTestSuite).joined())
     }
 }
 
