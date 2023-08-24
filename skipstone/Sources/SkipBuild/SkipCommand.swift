@@ -608,9 +608,6 @@ struct TranspilePhaseOptions: ParsableArguments {
     @Option(help: ArgumentHelp("Path to the output module root folder", valueName: "path"))
     var moduleRoot: String? = nil // --module-root
 
-    @Option(help: ArgumentHelp("Path to the file that will store the max input file timestamp", valueName: "path"))
-    var markerFile: String? = nil // --marker-file
-
     @Option(name: [.customShort("D", allowingJoined: true)], help: ArgumentHelp("Set preprocessor variable for transpilation", valueName: "value"))
     var preprocessorVariables: [String] = []
 
@@ -647,9 +644,6 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
     @OptionGroup(title: "License Options")
     var licenseOptions: LicenseOptions
-
-    /// The lock file to prevent concurrent builds from reading from an output folder before it has been completed
-    private static var skipLockFile = RelativePath(".skiplock")
 
     struct Output : MessageConvertible {
         let transpilation: Transpilation
@@ -725,29 +719,6 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
 
         let _ = primaryModulePath
 
-        let skiplock = moduleRootPath.appending(Self.skipLockFile)
-        info("Using lock file: \(skiplock)")
-
-        // if the lock file already exists, that means another process is currently building (or that the transpiler crashed last time, in which case the lock needs to be manually deleted)
-        let pid = ProcessInfo.processInfo.processIdentifier
-        if let lockFileContents = try? fs.readFileContents(skiplock),
-           let lockFileProcess = pid_t(lockFileContents.description) {
-            if (try? ProcessInfo.getRunningProcessIDs().contains(lockFileProcess)) == true {
-                throw error("Lock file exists for running process \(lockFileProcess) at \(skiplock)", sourceFile: skiplock.sourceFile)
-            } else {
-                info("Removing stale pid \(lockFileProcess) lock file: \(skiplock)", sourceFile: skiplock.sourceFile)
-                try? fs.removeFileTree(skiplock)
-            }
-        }
-
-        // touch the lock file and then delete it when we are done
-        try fs.writeFileContents(skiplock, bytes: ByteString(stringLiteral: pid.description), atomically: true)
-        // clean up the lock file; note this won't happen when Xcode kills the transpiler due to use user halting a build
-        defer { try? fs.removeFileTree(skiplock) }
-
-        // track the most recent input change, and touch a file with the modified date to signify the most recent input source date that triggered a build; we first seed it with the most recent input source file, and the we also check out inputs (such as skip.yml) for changes
-        var mostRecentInputSourceLoad: Date = try sourceFiles.map({ try fs.getFileInfo($0).modTime }).max() ?? .distantPast
-
         let packageName = KotlinTranslator.packageName(forModule: primaryModuleName)
         // skip over any source file whose name would match a copied Kotlin file
         let sources = sourceFiles.map(\.sourceFile)
@@ -786,28 +757,12 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
         let sourceModules = try linkDependentModuleSources()
         try linkResources()
         try generateGradle(for: sourceModules, with: mergedSkipConfig)
-        try saveSkipBuildSourceTimeMarker()
-
 
         return // everything following is a stage of the transpilation process
 
         /// Load the given source file, tracking its last modified date for the timestamp on the `.skipbuild` marker file
         func inputSource(_ path: AbsolutePath) throws -> ByteString {
-            mostRecentInputSourceLoad = max(mostRecentInputSourceLoad, try fs.getFileInfo(path).modTime)
-            return try fs.readFileContents(path)
-        }
-
-        func saveSkipBuildSourceTimeMarker() throws {
-            guard let markerFile = transpileOptions.markerFile else {
-                return
-            }
-
-            let skipBuildMarkerFile = try AbsolutePath(validating: markerFile, relativeTo: moduleBasePath)
-
-            // touch the output file
-            FileManager.default.createFile(atPath: skipBuildMarkerFile.pathString, contents: Data(), attributes: [.creationDate: mostRecentInputSourceLoad as NSDate, .modificationDate: mostRecentInputSourceLoad as NSDate])
-
-            info("\(skipBuildMarkerFile.basename) marker file date: \(mostRecentInputSourceLoad)")
+            try fs.readFileContents(path)
         }
 
         /// The relative path for cached codebase info JSON
@@ -824,24 +779,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
                     .parentDirectory
                     .appending(RelativePath(relativeLinkPath))
 
-                let lockFile = linkModuleRoot.appending(Self.skipLockFile)
 
-                for backoff in 1... {
-                    // read the process id integer from the .skiplock file
-                    guard let lockFileContents = try? fs.readFileContents(lockFile),
-                          let pid = UInt32(lockFileContents.description) else {
-                        break
-                    }
-
-                    if backoff >= 20 {
-                        // give up after around 20 seconds
-                        throw error("Stale pid \(pid) lock file detected: \(lockFile)")
-                    } else {
-                        info("Waiting on pid \(pid) lock file: \(lockFile)")
-                        // backoff for N milliseconds
-                        try await Task.sleep(nanoseconds: .init(backoff) * 100_000_000)
-                    }
-                }
                 let dependencyCodebaseInfo = linkModuleRoot
                     .parentDirectory
                     .appending(codebaseInfoPath(forModule: linkModuleName))
@@ -855,7 +793,7 @@ struct TranspileAction: TranspilePhase, StreamingCommand {
                     let codebaseLoadEnd = Date().timeIntervalSinceReferenceDate
                     info("\(dependencyCodebaseInfo.basename) codebase (\(byteCount(for: .init(cbdata.count)))) loaded (\(Int64((codebaseLoadEnd - codebaseLoadStart) * 1000)) ms) for \(linkModuleName)", sourceFile: dependencyCodebaseInfo.sourceFile)
                 } catch let e {
-                    error("error loading codebase for linkModuleName: \(linkModuleName) from: \(dependencyCodebaseInfo.pathString) error: \(e.localizedDescription)", sourceFile: dependencyCodebaseInfo.sourceFile)
+                    throw error("error loading codebase for linkModuleName: \(linkModuleName) from: \(dependencyCodebaseInfo.pathString) error: \(e.localizedDescription)", sourceFile: dependencyCodebaseInfo.sourceFile)
                 }
             }
 
