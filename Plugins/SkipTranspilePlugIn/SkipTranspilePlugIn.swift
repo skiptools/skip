@@ -11,6 +11,9 @@ import PackagePlugin
     /// The name of the plug-in's output folder is the same as the target name for the transpiler
     let pluginFolderName = "skip-transpiler"
 
+    /// The file extension for the metadata about skipcode
+    let skipcodeExtension = ".skipcode.json"
+
     func createBuildCommands(context: PluginContext, target: Target) async throws -> [Command] {
         let skipstone = try context.tool(named: "skipstone")
         let outputFolder = context.pluginWorkDirectory
@@ -145,61 +148,48 @@ import PackagePlugin
         // TODO: find .swift files in tree
         let _ = sourceDir
 
-        let inputFiles: [Path] = sourceTarget.sourceFiles.map(\.path) + swiftSourceTarget.sourceFiles.map(\.path)
-
-        for (product, depTarget) in target.recursiveTargetProductDependencies {
-            if depTarget.name.hasSuffix(kotlinSuffix) { // only link in if the module is named "*Kotlin"
-                // lookup the correct package name that contains this product (whose id will be an arbtrary number like "32")
-                if let _ = try addModuleLinkFlag(depTarget, packageID: productIDPackages[product?.id]?.id) {
-                    // doesn't work with SPM due to: error: couldn't build /opt/src/github/skiptools/skiphub/.build/plugins/outputs/skiphub/SkipUnitKt/skip-transpiler/.skipbuild because of missing inputs: /opt/src/github/skiptools/skiphub/.build/plugins/outputs/skiphub/SkipLibKt/skip-transpiler/SkipLib.skipcode.json
-
-                    // adds an input file dependency on all the .skipcode.json files output from the dependent targets
-                    //let dependentSkipcode = outputFolder.appending(subpath: linkTargetFolder + ".skipcode.json")
-                    //Diagnostics.remark("modile dependency from \(target.name) to \(depTarget.name) file: \(dependentSkipcode)")
-                    //inputFiles.append(dependentSkipcode)
-                }
-            }
-        }
-
         // collect the resources for linking
         var resourceArgs: [String] = []
         for resource in swiftSourceTarget.sourceFiles.filter({ $0.type == .resource }) {
             resourceArgs += ["--resource", resource.path.string]
         }
 
+        // the output files contains the .skipcode.json, and the input files contains all the dependent .skipcode.json files
         let outputURL = URL(fileURLWithPath: outputFolder.string, isDirectory: true)
-        let outputBase = URL(fileURLWithPath: kotlinModule, isDirectory: true, relativeTo: outputURL)
+        let skipcodeOutputPath = Path(outputURL.appendingPathComponent(peerTarget.name + skipcodeExtension).path)
+        Diagnostics.remark("add skipcode output for \(target.name): \(skipcodeOutputPath)", file: skipcodeOutputPath.string)
+        let outputFiles: [Path] = [skipcodeOutputPath]
 
+        var inputFiles: [Path] = sourceTarget.sourceFiles.map(\.path) + swiftSourceTarget.sourceFiles.map(\.path)
+        for (product, depTarget) in target.recursiveTargetProductDependencies {
+            if depTarget.name.hasSuffix(kotlinSuffix) { // only link in if the module is named "*Kotlin"
+                // lookup the correct package name that contains this product (whose id will be an arbtrary number like "32")
+                if let moduleLinkTarget = try addModuleLinkFlag(depTarget, packageID: productIDPackages[product?.id]?.id) {
+                    // adds an input file dependency on all the .skipcode.json files output from the dependent targets
+                    let skipcodeInputFile = outputFolder.appending(subpath: moduleLinkTarget + skipcodeExtension)
+                    let skipcodeURL = URL(fileURLWithPath: skipcodeInputFile.string)
+                    let skipcodeStandardizedPath = Path(skipcodeURL.standardized.path)
+                    Diagnostics.remark("add skipcode input to \(depTarget.name): \(skipcodeStandardizedPath)", file: skipcodeStandardizedPath.string)
+                    inputFiles.append(skipcodeStandardizedPath)
+                }
+            }
+        }
+
+        let outputBase = URL(fileURLWithPath: kotlinModule, isDirectory: true, relativeTo: outputURL)
         let sourceBase = URL(fileURLWithPath: isTest ? "src/test" : "src/main", isDirectory: true, relativeTo: outputBase)
 
-        // the marker file with the most recent input source file, either explicitly as the transpilation args, or any configuration files that are loaded as a side-effect
-        let markerFileName = ".skipbuild"
-        let markerFile = outputURL.appendingPathComponent(markerFileName)
-
-        let outputFiles: [Path] = [Path(markerFile.path)]
-
-        let outputFile = outputURL.appendingPathComponent(".skipbuild.out") // save output log
-
-        // note that commands are executed in reverse order
         return [
             .buildCommand(displayName: "Skip Transpile \(target.name)", executable: skipstone.path, arguments: [
                 "transpile",
-                "--marker-file", markerFile.path,
                 "--output-folder", sourceBase.path,
                 "--module-root", outputBase.path,
                 "--skip-folder", skipFolder.string,
-                "--output", outputFile.path,
-                //"-v",
                 ]
                 + resourceArgs
                 + buildModuleArgs
-                + sourceFilePaths, inputFiles: inputFiles, outputFiles: outputFiles)
-
-//            .buildCommand(displayName: "Skip Info", executable: skipstone.path, arguments: [
-//                "info",
-//                "-v",
-//                "-E",
-//            ]),
+                + sourceFilePaths, 
+                inputFiles: inputFiles, 
+                outputFiles: outputFiles)
         ]
     }
 }
