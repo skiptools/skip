@@ -476,7 +476,7 @@ final class SwiftUITests: XCTestCase {
 
             @Composable
             @Suppress(\"UNCHECKED_CAST\")
-            override fun Compose(composectx: ComposeContext) {
+            override fun ComposeContent(composectx: ComposeContext) {
                 val initials = _s.wrappedValue
                 var composes by rememberSaveable(stateSaver = composectx.stateSaver as Saver<Int, Any>) { mutableStateOf(initials) }
                 _s.sync(composes, { composes = it })
@@ -563,7 +563,7 @@ final class SwiftUITests: XCTestCase {
 
             @Composable
             @Suppress(\"UNCHECKED_CAST\")
-            override fun Compose(composectx: ComposeContext) {
+            override fun ComposeContent(composectx: ComposeContext) {
                 val initials = _s.wrappedValue
                 var composes by rememberSaveable(stateSaver = composectx.stateSaver as Saver<S, Any>) { mutableStateOf(initials) }
                 _s.sync(composes, { composes = it })
@@ -603,7 +603,7 @@ final class SwiftUITests: XCTestCase {
             }
         
             @Composable
-            override fun Compose(composectx: ComposeContext) {
+            override fun ComposeContent(composectx: ComposeContext) {
                 envvalue = composectx.environment[EnvironmentValues::envvalue]
         
                 body().Compose(composectx)
@@ -642,7 +642,7 @@ final class SwiftUITests: XCTestCase {
             }
 
             @Composable
-            override fun Compose(composectx: ComposeContext) {
+            override fun ComposeContent(composectx: ComposeContext) {
                 envvalue = composectx.environment[EnvValue::class]
 
                 body().Compose(composectx)
@@ -679,7 +679,7 @@ final class SwiftUITests: XCTestCase {
             }
 
             @Composable
-            override fun Compose(composectx: ComposeContext) {
+            override fun ComposeContent(composectx: ComposeContext) {
                 envvalue = composectx.environment[EnvValue::class]
 
                 body().Compose(composectx)
@@ -759,7 +759,7 @@ final class SwiftUITests: XCTestCase {
 
             @Composable
             @Suppress("UNCHECKED_CAST")
-            override fun Compose(composectx: ComposeContext) {
+            override fun ComposeContent(composectx: ComposeContext) {
                 val initialtext = _text.wrappedValue
                 var composetext by rememberSaveable(stateSaver = composectx.stateSaver as Saver<String, Any>) { mutableStateOf(initialtext) }
                 _text.sync(composetext, { composetext = it })
@@ -805,7 +805,7 @@ final class SwiftUITests: XCTestCase {
 
             @Composable
             @Suppress(\"UNCHECKED_CAST\")
-            override fun Compose(composectx: ComposeContext) {
+            override fun ComposeContent(composectx: ComposeContext) {
                 val initialtext = _text.wrappedValue
                 var composetext by rememberSaveable(stateSaver = composectx.stateSaver as Saver<String, Any>) { mutableStateOf(initialtext) }
                 _text.sync(composetext, { composetext = it })
@@ -1019,7 +1019,7 @@ final class SwiftUITests: XCTestCase {
 
             @Composable
             @Suppress(\"UNCHECKED_CAST\")
-            override fun Compose(composectx: ComposeContext) {
+            override fun ComposeContent(composectx: ComposeContext) {
                 val initialcount = _count.wrappedValue
                 var composecount by rememberSaveable(stateSaver = composectx.stateSaver as Saver<Int, Any>) { mutableStateOf(initialcount) }
                 _count.sync(composecount, { composecount = it })
@@ -1099,7 +1099,7 @@ final class SwiftUITests: XCTestCase {
 
             @Composable
             @Suppress(\"UNCHECKED_CAST\")
-            override fun Compose(composectx: ComposeContext) {
+            override fun ComposeContent(composectx: ComposeContext) {
                 val initialcount = _count.wrappedValue
                 var composecount by rememberSaveable(stateSaver = composectx.stateSaver as Saver<Int, Any>) { mutableStateOf(initialcount) }
                 _count.sync(composecount, { composecount = it })
@@ -1198,8 +1198,8 @@ final class SwiftUITests: XCTestCase {
             init(content: @Composable (ComposeContext) -> Void) {
                 self.content = content
             }
-            @Composable public override func Compose(ctx: ComposeContext) {
-                content(ctx)
+            @Composable public override func ComposeContentcontext: ComposeContext) {
+                content(context)
             }
         }
         #endif

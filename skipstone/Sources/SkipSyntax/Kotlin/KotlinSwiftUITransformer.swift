@@ -192,7 +192,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
 
     /// Create an override of the SkipUI `Compose` function on views to handle state synchronization, etc.
     private func synthesizeComposeFunction(view: KotlinClassDeclaration, stateVariables: [KotlinVariableDeclaration], environmentVariables: [KotlinVariableDeclaration], translator: KotlinTranslator) -> KotlinStatement {
-        let composeFunction = KotlinFunctionDeclaration(name: "Compose")
+        let composeFunction = KotlinFunctionDeclaration(name: "ComposeContent")
         composeFunction.modifiers.visibility = .public
         composeFunction.modifiers.isOverride = true
         composeFunction.annotations.append("@Composable")
