@@ -27,7 +27,7 @@ jobs:
           APPARTIFACT="App"
           for CONFIGURATION in "Debug" "Release"; do
             ARCHIVE_PATH=".build/Skip/artifacts/${CONFIGURATION}/${APPARTIFACT}.xcarchive"
-            BUILT_PRODUCTS_DIR=".build" xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -archivePath "${ARCHIVE_PATH}" -configuration "${CONFIGURATION}" -scheme "App" -sdk "iphoneos" -destination "generic/platform=iOS" -jobs 1 archive CODE_SIGNING_ALLOWED=NO
+            BUILT_PRODUCTS_DIR=".build" xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -archivePath "${ARCHIVE_PATH}" -configuration "${CONFIGURATION}" -scheme "App" -sdk "iphoneos" -destination "generic/platform=iOS" -jobs 1 archive
             cd "${ARCHIVE_PATH}"/Products/
             find . -type f
             mv "Applications" "Payload"
@@ -42,9 +42,7 @@ jobs:
       - name: Build apk
         run: |
           for CONFIGURATION in "Release" "Debug"; do
-            for APPTARGET in "AppModelKt" "AppUIKt" "AppDroid"; do
-              BUILT_PRODUCTS_DIR=".build" xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -configuration "${CONFIGURATION}" -destination "platform=macosx" -scheme "${APPTARGET}" -jobs 1 build CODE_SIGNING_ALLOWED=NO
-            done
+            BUILT_PRODUCTS_DIR=".build" xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -configuration "${CONFIGURATION}" -destination "platform=macosx" -scheme "AppDroid" build
           done
 
       - name: Assemble Swift Source
@@ -94,13 +92,16 @@ jobs:
           ls -la 
 
           APPNAME="App"
-          # fix artifact names for release (retain App-Source.zip for template)
+
+          # TODO: check whether this is a template project
           cp -v ${APPNAME}-Source.zip skip-template-source.zip
-          cp -v ${APPNAME}-Source.zip ${APPNAME}-ios-${TAG}-source.zip
+
+          # fix artifact names for release (retain App-Source.zip for template)
+          mv -v ${APPNAME}-Source.zip ${APPNAME}-ios-${TAG}-source.zip
           mv -v ${APPNAME}UI-release.apk ${APPNAME}-android-${TAG}.apk
-          mv -v ${APPNAME}UI-debug.apk ${APPNAME}-android-${TAG}-debug.apk
+          #mv -v ${APPNAME}UI-debug.apk ${APPNAME}-android-${TAG}-debug.apk
           mv -v ${APPNAME}-Release.ipa ${APPNAME}-ios-${TAG}.ipa
-          mv -v ${APPNAME}-Debug.ipa ${APPNAME}-ios-${TAG}-debug.ipa
+          #mv -v ${APPNAME}-Debug.ipa ${APPNAME}-ios-${TAG}-debug.ipa
           mv -v ${APPNAME}-android-source.zip ${APPNAME}-android-${TAG}-source.zip
           mv -v ${APPNAME}.appz ${APPNAME}-${TAG}.appz
 
@@ -123,7 +124,6 @@ jobs:
             ${APPNAME}-${TAG}.appz \
             skip-template-source.zip \
             checksums.txt
-
 
       - name: "Upload Build Artifacts"
         # upload the artifacts generated from each build
