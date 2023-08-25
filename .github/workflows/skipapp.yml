@@ -42,7 +42,10 @@ jobs:
       - name: Build apk
         run: |
           for CONFIGURATION in "Release" "Debug"; do
-            BUILT_PRODUCTS_DIR=".build" xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -configuration "${CONFIGURATION}" -destination "platform=macosx" -scheme "AppDroid" build
+            # for some reason we need to build twice
+            for X in "A" "B"; do 
+              BUILT_PRODUCTS_DIR=".build" xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -configuration "${CONFIGURATION}" -destination "platform=macosx" -scheme "AppDroid" build
+            done
           done
 
       - name: Assemble Swift Source
@@ -65,6 +68,8 @@ jobs:
         run: |
           # merge the ipa and apk zips into a single archive
           cd Packages/Skip/artifacts/
+          ls -la
+
           APPNAME="App"
           IPA="${APPNAME}-Release.ipa"
           APK="${APPNAME}UI-release.apk"
