@@ -56,13 +56,12 @@ jobs:
 
       - name: Assemble Kotlin Source
         run: |
-          #cd Packages/Skip/skipapp.output/AppUIKt/skip-transpiler/
-          #cd ~/Library/Developer/Xcode/DerivedData/*/SourcePackages/plugins/skipapp.output/AppUIKt/skip-transpiler/
-          cd .build/DerivedData/SourcePackages/plugins/skipapp.output/AppUIKt/skip-transpiler/
+          cd .build/DerivedData/SourcePackages/plugins/*.output/AppUIKt/skip-transpiler/
           rm -rf .gradle .build */.build
           # create the zip file with predictable timestamps for reproducibility
           find . -exec touch -d "${COMMIT_DATE:0:19}" {} \;
           zip -9 -r "${OLDPWD}/Packages/Skip/artifacts/App-android-source.zip" . -x ".build/*" -x "*/.gradle/*" -x "*/.build/*" -x "*/build/*"
+          cd -
 
       - name: Assemble App
         run: |
