@@ -48,7 +48,7 @@ public struct SkipDriver: AsyncParsableCommand {
             CreateCommand.self,
             InitCommand.self,
             DoctorCommand.self,
-            UpdateCommand.self,
+            UpgradeCommand.self,
             GradleCommand.self,
             TestCommand.self,
             //CheckCommand.self,
@@ -79,20 +79,24 @@ struct VersionCommand: SkipCommand {
     }
 }
 
-// MARK: UpdateCommand
+// MARK: UpgradeCommand
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-struct UpdateCommand: SkipCommand {
+struct UpgradeCommand: SkipCommand {
     static var configuration = CommandConfiguration(
-        commandName: "update",
-        abstract: "Update to the latest Skip version using Homebrew",
+        commandName: "upgrade",
+        abstract: "Upgrade to the latest Skip version using Homebrew",
         shouldDisplay: true)
 
     @OptionGroup(title: "Output Options")
     var outputOptions: OutputOptions
 
     func run() async throws {
-        outputOptions.write("Checking for skip updates")
+        if try await checkSkipUpdates() == skipVersion {
+            outputOptions.write("Skip \(skipVersion) is up to date.")
+            return
+        }
+
         try await outputOptions.run("Updating Homebew", ["brew", "update"])
         let upgradeOutput = try await outputOptions.run("Updating Skip", ["brew", "upgrade", "skip"])
         outputOptions.write(upgradeOutput.out)
@@ -148,10 +152,7 @@ struct DoctorCommand: SkipCommand {
         outputOptions.write(": " + ((try? studio?.extract(pattern: "([0-9.]+)")) ?? "unknown"))
         if let output = studio, v { outputOptions.write(output) }
 
-        let latestVersion: String? = try await outputOptions.monitor("Skip Updates") {
-            try await fetchLatestRelease(from: URL(string: "https://source.skip.tools/skip/releases.atom")!)
-        }
-        outputOptions.write(": " + ((try? latestVersion?.extract(pattern: "([0-9.]+)")) ?? "unknown"))
+        let latestVersion = try await checkSkipUpdates()
 
         if let latestVersion = latestVersion, latestVersion != skipVersion {
             outputOptions.write("A new version is Skip (\(latestVersion)) is available to update with: skip update")
@@ -161,17 +162,29 @@ struct DoctorCommand: SkipCommand {
     }
 }
 
-/// Grabs an Atom XML feed of releases and returns the first title.
-private func fetchLatestRelease(from atomURL: URL) async throws -> String? {
-    let (data, response) = try await URLSession.shared.data(from: atomURL)
-    let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-    if !(200..<300).contains(code) {
-        throw AppLaunchError(errorDescription: "Update check from \(atomURL.absoluteString) returned error: \(code)")
+extension SkipCommand {
+    /// Checks the https://source.skip.tools/skip/releases.atom page and returns the semantic version contained in the title of the first entry (i.e., the latest release of Skip)
+    func checkSkipUpdates() async throws -> String? {
+        let latestVersion: String? = try await outputOptions.monitor("Check Skip Updates") {
+            try await fetchLatestRelease(from: URL(string: "https://source.skip.tools/skip/releases.atom")!)
+        }
+        outputOptions.write(": " + ((try? latestVersion?.extract(pattern: "([0-9.]+)")) ?? "unknown"))
+        return latestVersion
     }
 
-    // parse the Atom XML and get the latest version, which is the title of the first entry
-    let document = try XMLDocument(data: data)
-    return document.rootElement()?.elements(forName: "entry").first?.elements(forName: "title").first?.stringValue
+    /// Grabs an Atom XML feed of releases and returns the first title.
+    private func fetchLatestRelease(from atomURL: URL) async throws -> String? {
+        let (data, response) = try await URLSession.shared.data(from: atomURL)
+        let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+        if !(200..<300).contains(code) {
+            throw AppLaunchError(errorDescription: "Update check from \(atomURL.absoluteString) returned error: \(code)")
+        }
+
+        // parse the Atom XML and get the latest version, which is the title of the first entry
+        let document = try XMLDocument(data: data)
+        return document.rootElement()?.elements(forName: "entry").first?.elements(forName: "title").first?.stringValue
+    }
+
 }
 
 extension String {
