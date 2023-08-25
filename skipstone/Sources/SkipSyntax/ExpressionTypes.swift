@@ -751,11 +751,11 @@ class FunctionCall: Expression, APICallExpression {
         let argumentTypes = arguments.map { $0.value.inferredType }
         let match: (TypeSignature, APIMatch)?
         let matchBaseType: TypeSignature?
-        if isUnchainedOptional, let name, let baseType, baseType.withModuleName(nil) != .none, let optionalMatch = matchFunction(name: name, arguments: arguments, in: .named("Optional", [baseType]), context: context, expecting: expecting, message: false) {
+        if isUnchainedOptional, let name, let baseType, baseType.withModuleName(nil) != .none, let optionalMatch = context.function(name, in: .named("Optional", [baseType]), arguments: arguments, expectedReturn: expecting, messagesNode: nil) {
             match = optionalMatch
             matchBaseType = .named("Optional", [baseType])
         } else {
-            match = matchFunction(name: name, arguments: arguments, in: baseType, context: context, expecting: expecting, message: true)
+            match = context.function(name, in: baseType, arguments: arguments, expectedReturn: expecting, messagesNode: self)
             matchBaseType = baseType
         }
         if var match {
@@ -766,7 +766,7 @@ class FunctionCall: Expression, APICallExpression {
             // If any argument types changed, it could affect the return type of a generic function
             let refinedArgumentTypes = arguments.map({ $0.value.inferredType })
             if argumentTypes != refinedArgumentTypes {
-                if let refinedMatch = matchFunction(name: name, arguments: arguments, in: matchBaseType, context: context, expecting: expecting, message: false) {
+                if let refinedMatch = context.function(name, in: matchBaseType, arguments: arguments, expectedReturn: expecting, messagesNode: nil) {
                     match = refinedMatch
                 }
             }
@@ -780,15 +780,6 @@ class FunctionCall: Expression, APICallExpression {
             returnType = expecting
         }
         return context
-    }
-
-    private func matchFunction(name: String?, arguments: [LabeledValue<Expression>], in baseType: TypeSignature?, context: TypeInferenceContext, expecting: TypeSignature, message: Bool) -> (TypeSignature, APIMatch)? {
-        let parameters = arguments.map { LabeledValue<TypeSignature>(label: $0.label, value: $0.value.inferredType) }
-        let matches = context.function(name, in: baseType, parameters: parameters, messagesNode: message ? self : nil)
-        guard !matches.isEmpty else {
-            return nil
-        }
-        return matches.first { $0.0.returnType == expecting } ?? matches[0]
     }
 
     private static func isUnchainedOptional(expression: Expression?) -> Bool {
@@ -1693,10 +1684,7 @@ class Subscript: Expression, APICallExpression {
 
         // First we infer argument types without knowing the function, so we expect .none
         arguments.forEach { $0.value.inferTypes(context: context, expecting: .none) }
-        let parameters = arguments.map { LabeledValue<TypeSignature>(label: $0.label, value: $0.value.inferredType) }
-        let matches = context.subscript(in: base.inferredType, parameters: parameters, messagesNode: self)
-        if !matches.isEmpty {
-            let match = matches.first { $0.0.returnType == expecting } ?? matches[0]
+        if let match = context.subscript(in: base.inferredType, arguments: arguments, expectedReturn: expecting, messagesNode: self) {
             // Re-infer arguments now that we know the parameter types
             for (index, argument) in arguments.enumerated() {
                 argument.value.inferTypes(context: context, expecting: match.0.parameters[index].type)
