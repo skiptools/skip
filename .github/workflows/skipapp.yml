@@ -19,7 +19,7 @@ jobs:
           sed -i '' "s;PRODUCT_VERSION = .*;PRODUCT_VERSION = $(git rev-list --count HEAD);g" App.xcconfig
 
       - name: Run Tests
-        run: swift test || swift test || swift test
+        run: swift test
 
       - name: Build ipa
         run: |
@@ -42,7 +42,7 @@ jobs:
       - name: Build apk
         run: |
           for CONFIGURATION in "Release" "Debug"; do
-            BUILT_PRODUCTS_DIR=".build" xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -configuration "${CONFIGURATION}" -destination "platform=macosx" -scheme "AppDroid" build
+            BUILT_PRODUCTS_DIR=".build" xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -configuration "${CONFIGURATION}" -destination "platform=macosx" -scheme "AppUIKt" build
           done
 
       - name: Assemble Swift Source
@@ -61,9 +61,9 @@ jobs:
           zip -9 -r "${OLDPWD}/Packages/Skip/artifacts/App-android-source.zip" . -x ".build/*" -x "*/.gradle/*" -x "*/.build/*" -x "*/build/*"
           cd -
 
-      - name: Assemble App
+      - name: Merge Artifacts
         run: |
-          # merge the two app zips into a single appz archive
+          # merge the ipa and apk zips into a single archive
           cd Packages/Skip/artifacts/
           APPNAME="App"
           IPA="${APPNAME}-Release.ipa"
