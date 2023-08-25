@@ -158,14 +158,17 @@ import PackagePlugin
         let outputURL = URL(fileURLWithPath: outputFolder.string, isDirectory: true)
         let skipcodeOutputPath = Path(outputURL.appendingPathComponent(peerTarget.name + skipcodeExtension).path)
         Diagnostics.remark("add skipcode output for \(target.name): \(skipcodeOutputPath)", file: skipcodeOutputPath.string)
-        let outputFiles: [Path] = [skipcodeOutputPath]
 
+        let outputFiles: [Path] = [skipcodeOutputPath]
         var inputFiles: [Path] = sourceTarget.sourceFiles.map(\.path) + swiftSourceTarget.sourceFiles.map(\.path)
+
         for (product, depTarget) in target.recursiveTargetProductDependencies {
             if depTarget.name.hasSuffix(kotlinSuffix) { // only link in if the module is named "*Kotlin"
                 // lookup the correct package name that contains this product (whose id will be an arbtrary number like "32")
                 if let moduleLinkTarget = try addModuleLinkFlag(depTarget, packageID: productIDPackages[product?.id]?.id) {
                     // adds an input file dependency on all the .skipcode.json files output from the dependent targets
+                    // this should block the invocation of the transpiler plugin for this module
+                    // until the dependent modules have all been transpiled and their skipcode JSON files emitted
                     let skipcodeInputFile = outputFolder.appending(subpath: moduleLinkTarget + skipcodeExtension)
                     let skipcodeURL = URL(fileURLWithPath: skipcodeInputFile.string)
                     let skipcodeStandardizedPath = Path(skipcodeURL.standardized.path)

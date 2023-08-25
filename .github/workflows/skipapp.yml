@@ -64,6 +64,25 @@ jobs:
           find . -exec touch -d "${COMMIT_DATE:0:19}" {} \;
           zip -9 -r "${OLDPWD}/Packages/Skip/artifacts/App-android-source.zip" . -x ".build/*" -x "*/.gradle/*" -x "*/.build/*" -x "*/build/*"
 
+      - name: Assemble merged appz
+        run: |
+          # merge the two app zips into a single appz archive
+          cd Packages/Skip/artifacts/
+          APPNAME="App"
+          IPA="${APPNAME}-Release.ipa"
+          APK="${APPNAME}UI-release.apk"
+          APPZ="${APPNAME}.appz"
+
+          TMPDIR=$(mktemp -d)
+          unzip -q "$IPA" -d "$TMPDIR"
+          cp "${APK}" "${TMPDIR}/.source.apk"
+          cd "${TMPDIR}"
+          zip -qr9 ".source.apk" ./*
+          cd -
+          mv "${TMPDIR}/.source.apk" "${APPZ}"
+          shasum -a 256 ${APK} ${IPA} ${APPZ}
+          ls -lah ${APK} ${IPA} ${APPZ}
+
       - name: "Release"
         if: startsWith(github.ref, 'refs/tags/')
         env:
@@ -77,13 +96,13 @@ jobs:
 
           APPNAME="App"
           # fix artifact names for release (retain App-Source.zip for template)
-          cp -v App-Source.zip skip-template-source.zip
-          cp -v App-Source.zip ${APPNAME}-ios-${TAG}-source.zip
-          mv -v AppUI-release.apk ${APPNAME}-android-${TAG}.apk
-          mv -v AppUI-debug.apk ${APPNAME}-android-${TAG}-debug.apk
-          mv -v App-Release.ipa ${APPNAME}-ios-${TAG}.ipa
-          mv -v App-Debug.ipa ${APPNAME}-ios-${TAG}-debug.ipa
-          mv -v App-android-source.zip ${APPNAME}-android-${TAG}-source.zip
+          cp -v ${APPNAME}-Source.zip skip-template-source.zip
+          cp -v ${APPNAME}-Source.zip ${APPNAME}-ios-${TAG}-source.zip
+          mv -v ${APPNAME}UI-release.apk ${APPNAME}-android-${TAG}.apk
+          mv -v ${APPNAME}UI-debug.apk ${APPNAME}-android-${TAG}-debug.apk
+          mv -v ${APPNAME}-Release.ipa ${APPNAME}-ios-${TAG}.ipa
+          mv -v ${APPNAME}-Debug.ipa ${APPNAME}-ios-${TAG}-debug.ipa
+          mv -v ${APPNAME}-android-source.zip ${APPNAME}-android-${TAG}-source.zip
 
           shasum -a 256 *.* > checksums.txt
 
