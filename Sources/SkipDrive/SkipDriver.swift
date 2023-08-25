@@ -824,7 +824,7 @@ struct BuildOptions: ParsableArguments {
 struct CreateOptions: ParsableArguments {
     /// TODO: dynamic loading of template data
     static let templates = [
-        ProjectTemplate(id: "skipapp", url: URL(string: "https://github.com/skiptools/skipapp/releases/latest/download/App-Source.zip")!, localizedTitle: [
+        ProjectTemplate(id: "skipapp", url: URL(string: "https://github.com/skiptools/skipapp/releases/latest/download/skip-template-source.zip")!, localizedTitle: [
             "en": "Skip Sample App"
         ], localizedDescription: [
             "en": """
