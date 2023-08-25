@@ -259,6 +259,8 @@ private class ExtensionAdditions {
             }
             if !hasInferredTypes {
                 let context = codebaseInfo.global.context(importedModuleNames: importedModulePaths.compactMap(\.moduleName), sourceFile: source.file)
+                let typeResolutionContext = TypeResolutionContext(codebaseInfo: context)
+                extensionDeclaration.resolveSubtreeAttributes(in: syntaxTree, context: typeResolutionContext)
                 let typeInferenceContext = TypeInferenceContext(codebaseInfo: context, unavailableAPI: nil, source: syntaxTree.source)
                 let _ = extensionDeclaration.inferTypes(context: typeInferenceContext, expecting: .none)
                 hasInferredTypes = true

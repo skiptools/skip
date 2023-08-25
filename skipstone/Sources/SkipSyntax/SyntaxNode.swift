@@ -18,6 +18,17 @@ class SyntaxNode: SourceDerived, PrettyPrintable {
     func resolveAttributes(in syntaxTree: SyntaxTree, context: TypeResolutionContext) {
     }
 
+    /// Resolve this node and all nodes beneath it.
+    final func resolveSubtreeAttributes(in syntaxTree: SyntaxTree, context: TypeResolutionContext) {
+        var resolveQueue: [SyntaxNode] = [self]
+        while !resolveQueue.isEmpty {
+            let node = resolveQueue.removeFirst()
+            node.resolveAttributes(in: syntaxTree, context: context)
+            node.children.forEach { $0.parent = node }
+            resolveQueue += node.children
+        }
+    }
+
     /// Perform type inference.
     ///
     /// This is called after `resolve`.

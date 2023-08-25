@@ -330,4 +330,36 @@ final class TypealiasTests: XCTestCase {
         }
         """)
     }
+
+    func testTypealiasFunctionArgumentMatchingInExtension() async throws {
+        // Checks that we resolve typealiases in extensions as well
+        try await check(swift: """
+        typealias CGFloat = Double
+        struct S {
+            static let all = S()
+        }
+        protocol P {
+        }
+        extension P {
+            public func f(_ s: S, _ c: CGFloat? = nil) -> P {
+                return self
+            }
+            public func g(_ arg: CGFloat) -> P {
+                return f(.all, arg)
+            }
+        }
+        """, kotlin: """
+        internal typealias CGFloat = Double
+        internal class S {
+
+            companion object {
+                internal val all = S()
+            }
+        }
+        internal interface P {
+            fun f(s: S, c: Double? = null): P = this.sref()
+            fun g(arg: Double): P = f(S.all, arg)
+        }
+        """)
+    }
 }

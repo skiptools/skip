@@ -19,13 +19,7 @@ public class SyntaxTree: PrettyPrintable {
         let importedModuleNames = root.statements.importedModulePaths.compactMap(\.moduleName)
         let codebaseContext = codebaseInfo?.context(importedModuleNames: importedModuleNames, sourceFile: source.file)
         let typeResolutionContext = TypeResolutionContext(codebaseInfo: codebaseContext)
-        var resolveQueue: [SyntaxNode] = [root]
-        while !resolveQueue.isEmpty {
-            let node = resolveQueue.removeFirst()
-            node.resolveAttributes(in: self, context: typeResolutionContext)
-            node.children.forEach { $0.parent = node }
-            resolveQueue += node.children
-        }
+        root.resolveSubtreeAttributes(in: self, context: typeResolutionContext)
 
         let typeInferenceContext = TypeInferenceContext(codebaseInfo: codebaseContext, unavailableAPI: unavailableAPI, source: source)
         let _ = root.inferTypes(context: typeInferenceContext, expecting: .none)

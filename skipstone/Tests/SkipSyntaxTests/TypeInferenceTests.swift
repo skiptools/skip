@@ -856,7 +856,7 @@ final class TypeInferenceTests: XCTestCase {
         """)
     }
 
-    func testTypealiasMatch() async throws {
+    func testUnqualifiedMemberMatch() async throws {
         try await check(supportingSwift: """
         struct S1 {
         }
@@ -866,19 +866,19 @@ final class TypeInferenceTests: XCTestCase {
         """, swift: """
         func f(_ s: S1) {
         }
-
-        func f(_ s: S2 = .all, _ i: Int? = nil) {
+        
+        func f(_ s: S2) {
         }
-
-        func f(_ i: Int) {
+        
+        func f() {
             f(.all)
         }
         """, kotlin: """
         internal fun f(s: S1) = Unit
-
-        internal fun f(s: S2 = S2.all, i: Int? = null) = Unit
-
-        internal fun f(i: Int) = f(S2.all)
+        
+        internal fun f(s: S2) = Unit
+        
+        internal fun f() = f(S2.all)
         """)
     }
 }
