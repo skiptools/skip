@@ -104,11 +104,15 @@ jobs:
           # fix artifact names for release (retain App-Source.zip for template)
           mv -v ${APPNAME}-Source.zip ${APPNAME}-ios-${TAG}-source.zip
           mv -v ${APPNAME}UI-release.apk ${APPNAME}-android-${TAG}.apk
-          #mv -v ${APPNAME}UI-debug.apk ${APPNAME}-android-${TAG}-debug.apk
+          mv -v ${APPNAME}UI-debug.apk ${APPNAME}-android-${TAG}-debug.apk
           mv -v ${APPNAME}-Release.ipa ${APPNAME}-ios-${TAG}.ipa
-          #mv -v ${APPNAME}-Debug.ipa ${APPNAME}-ios-${TAG}-debug.ipa
+          mv -v ${APPNAME}-Debug.ipa ${APPNAME}-ios-${TAG}-debug.ipa
           mv -v ${APPNAME}-android-source.zip ${APPNAME}-android-${TAG}-source.zip
           mv -v ${APPNAME}.appz ${APPNAME}-${TAG}.appz
+
+          # move debug build out of release list
+          mkdir debug
+          mv *-debug-*.*/debug
 
           shasum -a 256 *.* > checksums.txt
 
@@ -119,16 +123,7 @@ jobs:
           cat checksums.txt >> .relnotes
           echo '```' >> .relnotes
 
-          #gh release create "${TAG}" -t "Release ${TAG}" -F .relnotes *.*
-          # manually create the release to control the order
-          gh release create "${TAG}" -t "Release ${TAG}" -F .relnotes \
-            ${APPNAME}-ios-${TAG}.ipa \
-            ${APPNAME}-ios-${TAG}-source.zip \
-            ${APPNAME}-android-${TAG}.apk \
-            ${APPNAME}-android-${TAG}-source.zip \
-            ${APPNAME}-${TAG}.appz \
-            skip-template-source.zip \
-            checksums.txt
+          gh release create "${TAG}" -t "Release ${TAG}" -F .relnotes *.*
 
       - name: "Upload Build Artifacts"
         # upload the artifacts generated from each build
