@@ -633,6 +633,7 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
 
         let kexpression = KotlinClosure(expression: expression, body: kbody)
         kexpression.apiFlags = expression.inferredType.apiFlags
+        kexpression.returnType = expression.inferredType
         kexpression.inferredReturnType = kexpression.returnType
         return kexpression
     }
