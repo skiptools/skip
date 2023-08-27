@@ -127,6 +127,15 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
     }
     
     private func translateFunctionCallParameters(_ functionCall: KotlinFunctionCall, translator: KotlinTranslator) {
+        // Translate .environment(\.keyPath, value) calls. The key path will have been transpiled
+        // to a closure that reads the named property, but we want to set it in EnvironmentValues
+        if let memberAccess = functionCall.function as? KotlinMemberAccess, memberAccess.member == "environment", functionCall.arguments.count == 2, let closure = functionCall.arguments[0].value as? KotlinClosure {
+            closure.returnType = .void
+            closure.inferredReturnType = .void
+            closure.body = KotlinCodeBlock(statements: [KotlinRawStatement(sourceCode: "")])
+            //~~~
+        }
+
         // Look for closures passed as ViewBuilder arguments to function calls
         guard case .function(let parameterTypes, _, _, _) = functionCall.apiMatch?.signature, parameterTypes.count == functionCall.arguments.count else {
             return
@@ -152,6 +161,8 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             viewBuilder = statement.getter?.body
         } else if statement.apiFlags.contains(.viewBuilder) {
             viewBuilder = statement.getter?.body
+        } else if let classDeclaration = statement.parent as? KotlinClassDeclaration, classDeclaration.signature.isNamed("EnvironmentValues", moduleName: "SwiftUI", generics: []), statement.getter != nil {
+            translateEnvironmentValue(statement, in: classDeclaration)
         }
         if let viewBuilder {
             statement.getter?.body = translateViewBuilder(codeBlock: viewBuilder, translator: translator)
@@ -444,6 +455,21 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             }
         }
         return false
+    }
+
+    private func translateEnvironmentValue(_ statement: KotlinVariableDeclaration, in classDeclaration: KotlinClassDeclaration) {
+        statement.getterAnnotations.append("@Composable")
+        guard let setter = statement.setter else {
+            return
+        }
+        statement.setter = nil
+        statement.apiFlags.remove(.writeable)
+
+        let setFunction = KotlinFunctionDeclaration(name: "set" + statement.propertyName)
+        setFunction.modifiers = statement.modifiers
+        setFunction.parameters = [Parameter<KotlinExpression>(externalLabel: setter.parameterName ?? "newValue", declaredType: statement.declaredType)]
+        setFunction.body = setter.body
+        classDeclaration.insert(statements: [setFunction], after: statement)
     }
 
     private func addKotlinComposeDependencies(to syntaxTree: KotlinSyntaxTree) {

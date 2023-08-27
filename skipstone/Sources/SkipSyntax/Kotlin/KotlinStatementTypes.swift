@@ -2184,6 +2184,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
     var isOpen = false
     var annotations: [String] = []
+    var getterAnnotations: [String] = []
     var modifiers = Modifiers()
     var attributes = Attributes()
     var apiFlags: APIFlags = []
@@ -2464,6 +2465,9 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
 
     private func appendPropertyDefinition(to output: OutputGenerator, indentation: Indentation, storage: KotlinVariableStorage?) {
         output.append("\n")
+        if !getterAnnotations.isEmpty {
+            getterAnnotations.appendLines(to: output, indentation: indentation.inc())
+        }
         if let getterBody = getter?.body {
             let getterIndentation = indentation.inc()
             if let storage {

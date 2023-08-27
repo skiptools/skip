@@ -1273,4 +1273,39 @@ final class SwiftUITests: XCTestCase {
         }
         """)
     }
+
+    func testCustomEnvironmentValue() async throws {
+        try await check(swift: """
+        import SwiftUI
+        struct EnvironmentValues {
+        }
+        struct MyKey {
+        }
+        extension EnvironmentValues {
+            var myValue: Int {
+                get { return self[MyKey.self] }
+                set { self[MyKey.self] = newValue }
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
+
+        import skip.ui.*
+        internal class EnvironmentValues {
+            internal val myValue: Int
+                @Composable
+                get() = this[MyKey::class]
+            internal fun setmyValue(newValue: Int) {
+                this[MyKey::class] = newValue
+            }
+        }
+        internal class MyKey {
+        }
+        """)
+    }
 }
