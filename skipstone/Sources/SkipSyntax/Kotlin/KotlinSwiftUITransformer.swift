@@ -129,11 +129,9 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
     private func translateFunctionCallParameters(_ functionCall: KotlinFunctionCall, translator: KotlinTranslator) {
         // Translate .environment(\.keyPath, value) calls. The key path will have been transpiled
         // to a closure that reads the named property, but we want to set it in EnvironmentValues
-        if let memberAccess = functionCall.function as? KotlinMemberAccess, memberAccess.member == "environment", functionCall.arguments.count == 2, let closure = functionCall.arguments[0].value as? KotlinClosure {
-            closure.returnType = .void
-            closure.inferredReturnType = .void
-            closure.body = KotlinCodeBlock(statements: [KotlinRawStatement(sourceCode: "")])
-            //~~~
+        if (functionCall.function as? KotlinMemberAccess)?.member == "environment" || (functionCall.function as? KotlinIdentifier)?.name == "environment", functionCall.arguments.count == 2, let keyPath = functionCall.arguments[0].value as? KotlinKeyPathLiteral {
+            updateEnvironmentFunctionCallParameters(for: keyPath, in: functionCall, codebaseInfo: translator.codebaseInfo)
+            return
         }
 
         // Look for closures passed as ViewBuilder arguments to function calls
@@ -470,6 +468,28 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         setFunction.parameters = [Parameter<KotlinExpression>(externalLabel: setter.parameterName ?? "newValue", declaredType: statement.declaredType)]
         setFunction.body = setter.body
         classDeclaration.insert(statements: [setFunction], after: statement)
+    }
+
+    private func updateEnvironmentFunctionCallParameters(for keyPath: KotlinKeyPathLiteral, in functionCall: KotlinFunctionCall, codebaseInfo: CodebaseInfo.Context?) {
+        guard keyPath.components.count == 1, case .property(let property) = keyPath.components[0] else {
+            return
+        }
+
+        let code = "EnvironmentValues.shared.set\(property)(it)"
+        let codeBlock = KotlinCodeBlock(statements: [KotlinRawStatement(sourceCode: code)])
+        let closure = KotlinClosure(body: codeBlock, sourceFile: keyPath.sourceFile, sourceRange: keyPath.sourceRange)
+        closure.returnType = .void
+        closure.inferredReturnType = .void
+        closure.parent = functionCall
+        functionCall.arguments[0] = LabeledValue(label: functionCall.arguments[0].label, value: closure)
+
+        guard let memberAccess = functionCall.arguments[1].value as? KotlinMemberAccess, memberAccess.baseType == .none || memberAccess.baseType == .any, let codebaseInfo else {
+            return
+        }
+        // Attempt to fill in the base type using the EnvironmentValues property being accessed
+        if let match = codebaseInfo.matchIdentifier(name: property, inConstrained: .named("EnvironmentValues", [])) {
+            memberAccess.baseType = match.signature
+        }
     }
 
     private func addKotlinComposeDependencies(to syntaxTree: KotlinSyntaxTree) {

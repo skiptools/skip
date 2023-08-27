@@ -301,12 +301,8 @@ final class ExpressionTests: XCTestCase {
         """, kotlin: """
         import skip.lib.Array
 
-        internal fun f(a: Array<A>): Array<Int> {
-            return a.map { it.b.x }
-        }
-        internal fun g(a: Array<A>): Array<Int?> {
-            return a.map { it.ob?.x }
-        }
+        internal fun f(a: Array<A>): Array<Int> = a.map({ it.b.x })
+        internal fun g(a: Array<A>): Array<Int?> = a.map({ it.ob?.x })
         """)
 
         try await check(supportingSwift: """
@@ -325,7 +321,7 @@ final class ExpressionTests: XCTestCase {
         }
         """, kotlin: """
         internal fun f(s: String) {
-            val b = s.map { it.count } == Int.zero
+            val b = s.map({ it.count }) == Int.zero
         }
         """)
 

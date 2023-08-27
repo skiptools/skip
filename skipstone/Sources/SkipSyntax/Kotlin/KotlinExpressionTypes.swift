@@ -11,6 +11,7 @@ enum KotlinExpressionType {
     case identifier
     case `if`
     case `inout`
+    case keyPathLiteral
     case matchingCase
     case memberAccess
     case nullLiteral
@@ -611,36 +612,9 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
         }
     }
 
-    static func translate(expression: KeyPathLiteral, translator: KotlinTranslator) -> KotlinClosure {
-        var code = "it"
-        for component in expression.components {
-            switch component {
-            case .property(let name):
-                if let tupleIndex = Int(name) {
-                    code.append(".")
-                    code.append(KotlinTupleLiteral.member(index: tupleIndex))
-                } else if name != "self" {
-                    code.append(".")
-                    code.append(name)
-                }
-            case .optional:
-                code.append("?")
-            case .unwrappedOptional:
-                code.append("!!")
-            }
-        }
-        let kbody = KotlinCodeBlock(statements: [KotlinRawStatement(sourceCode: code, sourceFile: expression.sourceFile, sourceRange: expression.sourceRange)])
-
-        let kexpression = KotlinClosure(expression: expression, body: kbody)
-        kexpression.apiFlags = expression.inferredType.apiFlags
-        kexpression.returnType = expression.inferredType
-        kexpression.inferredReturnType = kexpression.returnType
-        return kexpression
-    }
-
-    init(body: KotlinCodeBlock) {
+    init(body: KotlinCodeBlock, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.body = body
-        super.init(type: .closure)
+        super.init(type: .closure, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
     private init(expression: Expression, body: KotlinCodeBlock) {
@@ -1510,6 +1484,61 @@ class KotlinInOut: KotlinExpression {
     override func append(to output: OutputGenerator, indentation: Indentation) {
         output.append("InOut({ ").append(target, indentation: indentation).append(" }, { ")
         output.append(target, indentation: indentation).append(" = it })")
+    }
+}
+
+class KotlinKeyPathLiteral: KotlinExpression {
+    var components: [KeyPathLiteral.Component] = []
+    var isWrite = false
+    var keyPathType: TypeSignature = .none
+
+    static func translate(expression: KeyPathLiteral, translator: KotlinTranslator) -> KotlinKeyPathLiteral {
+        let kexpression = KotlinKeyPathLiteral(expression: expression)
+        kexpression.components = expression.components
+        kexpression.keyPathType = expression.inferredType
+        return kexpression
+    }
+
+    init(sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
+        super.init(type: .keyPathLiteral, sourceFile: sourceFile, sourceRange: sourceRange)
+    }
+
+    private init(expression: KeyPathLiteral) {
+        super.init(type: .keyPathLiteral, expression: expression)
+    }
+
+    /// The key path code, traversing from the given root.
+    func pathString(root: String) -> String {
+        var path = root
+        for component in components {
+            switch component {
+            case .property(let name):
+                if let tupleIndex = Int(name) {
+                    path.append(".")
+                    path.append(KotlinTupleLiteral.member(index: tupleIndex))
+                } else if name != "self" {
+                    path.append(".")
+                    path.append(name)
+                }
+            case .optional:
+                path.append("?")
+            case .unwrappedOptional:
+                path.append("!!")
+            }
+        }
+        return path
+    }
+
+    override func append(to output: OutputGenerator, indentation: Indentation) {
+        output.append("{ ")
+        if isWrite {
+            output.append("it, it_1 -> ")
+        }
+        output.append(pathString(root: "it"))
+        if isWrite {
+            output.append(" = it_1")
+        }
+        output.append(" }")
     }
 }
 

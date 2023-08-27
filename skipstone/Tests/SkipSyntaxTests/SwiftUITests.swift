@@ -1308,4 +1308,42 @@ final class SwiftUITests: XCTestCase {
         }
         """)
     }
+
+    func testEnvironmentModifier() async throws {
+        try await check(supportingSwift: baseSupportingSwift + """
+        struct Font {
+            static let body = Font()
+        }
+        struct EnvironmentValues {
+            var font: Font
+        }
+        extension View {
+            func environment<V>(_ setValue: (V) -> Void, _ value: V) -> some View {
+            }
+        }
+        """, swift: """
+        import SwiftUI
+        struct MyV: View {
+            var body: some View {
+                VStack().environment(\\.font, .body)
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
+
+        import skip.ui.*
+        internal class MyV: View {
+            override fun body(): View {
+                return ComposeView { composectx: ComposeContext ->
+                    VStack().environment({ EnvironmentValues.shared.setfont(it) }, Font.body).Compose(composectx)
+                }
+            }
+        }
+        """)
+    }
 }
