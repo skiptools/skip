@@ -250,14 +250,14 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
 
     /// Create code to initialize an environment variable.
     private func synthesizeEnvironmentSync(variable: KotlinVariableDeclaration, translator: KotlinTranslator) -> KotlinStatement? {
-        let entry: (key: String, type: TypeSignature?)
+        let entry: (key: String, type: TypeSignature?, isObject: Bool)
         if let environment = (variable.attributes.of(kind: .environment) + variable.attributes.of(kind: .environmentObject)).first {
             let rawKey = environment.tokens.joined(separator: "")
             if let environmentEntry = environmentEntry(for: rawKey, codebaseInfo: translator.codebaseInfo) {
                 entry = environmentEntry
             } else {
-                entry = (rawKey, nil)
                 variable.messages.append(.kotlinEnvironmentKeyType(variable, source: translator.syntaxTree.source))
+                return nil
             }
         } else {
             return nil
@@ -281,14 +281,21 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
                 variable.messages.append(.kotlinEnvironmentDeclaredType(variable, source: translator.syntaxTree.source))
             }
         }
-        return KotlinRawStatement(sourceCode: "\(variable.propertyName) = composectx.environment[\(entry.key)]")
+
+        var valueSourceCode: String
+        if entry.isObject {
+            valueSourceCode = "EnvironmentValues.shared.environmentObject(type = \(entry.key))"
+        } else {
+            valueSourceCode = "EnvironmentValues.shared.\(entry.key)"
+        }
+        return KotlinRawStatement(sourceCode: "\(variable.propertyName) = \(valueSourceCode)")
     }
 
     /// Given a Swift `@Environment` property wrapper key, return the Kotlin key and the expected value type.
-    private func environmentEntry(for key: String, codebaseInfo: CodebaseInfo.Context?) -> (String, TypeSignature?)? {
+    private func environmentEntry(for key: String, codebaseInfo: CodebaseInfo.Context?) -> (key: String, type: TypeSignature?, isObject: Bool)? {
         if key.hasSuffix(".self") {
             let typeName = String(key.dropLast(".self".count))
-            return (typeName + "::class", .named(typeName, []))
+            return (typeName + "::class", .named(typeName, []), true)
         } else {
             let propertyName: String
             if key.hasPrefix("\\EnvironmentValues.") {
@@ -299,7 +306,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
                 return nil
             }
             let type = codebaseInfo?.matchIdentifier(name: propertyName, inConstrained: .named("EnvironmentValues", []))?.signature
-            return ("EnvironmentValues::" + propertyName, type)
+            return (propertyName, type, false)
         }
     }
 
@@ -457,6 +464,13 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
 
     private func translateEnvironmentValue(_ statement: KotlinVariableDeclaration, in classDeclaration: KotlinClassDeclaration) {
         statement.getterAnnotations.append("@Composable")
+        statement.onUpdate = nil
+        statement.getter?.body?.visit { node in
+            if let sref = node as? KotlinSRef {
+                sref.onUpdate = nil
+            }
+            return .recurse(nil)
+        }
         guard let setter = statement.setter else {
             return
         }

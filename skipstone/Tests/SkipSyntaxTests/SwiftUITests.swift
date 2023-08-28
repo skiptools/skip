@@ -604,8 +604,8 @@ final class SwiftUITests: XCTestCase {
         
             @Composable
             override fun ComposeContent(composectx: ComposeContext) {
-                envvalue = composectx.environment[EnvironmentValues::envvalue]
-        
+                envvalue = EnvironmentValues.shared.envvalue
+
                 body().Compose(composectx)
             }
         }
@@ -643,7 +643,7 @@ final class SwiftUITests: XCTestCase {
 
             @Composable
             override fun ComposeContent(composectx: ComposeContext) {
-                envvalue = composectx.environment[EnvValue::class]
+                envvalue = EnvironmentValues.shared.environmentObject(type = EnvValue::class)
 
                 body().Compose(composectx)
             }
@@ -680,7 +680,7 @@ final class SwiftUITests: XCTestCase {
 
             @Composable
             override fun ComposeContent(composectx: ComposeContext) {
-                envvalue = composectx.environment[EnvValue::class]
+                envvalue = EnvironmentValues.shared.environmentObject(type = EnvValue::class)
 
                 body().Compose(composectx)
             }
@@ -1024,7 +1024,7 @@ final class SwiftUITests: XCTestCase {
                 var composecount by rememberSaveable(stateSaver = composectx.stateSaver as Saver<Int, Any>) { mutableStateOf(initialcount) }
                 _count.sync(composecount, { composecount = it })
 
-                envvalue = composectx.environment[EnvironmentValues::envvalue]
+                envvalue = EnvironmentValues.shared.envvalue
 
                 body().Compose(composectx)
             }
@@ -1104,7 +1104,7 @@ final class SwiftUITests: XCTestCase {
                 var composecount by rememberSaveable(stateSaver = composectx.stateSaver as Saver<Int, Any>) { mutableStateOf(initialcount) }
                 _count.sync(composecount, { composecount = it })
 
-                envvalue = composectx.environment[EnvironmentValues::envvalue]
+                envvalue = EnvironmentValues.shared.envvalue
 
                 body().Compose(composectx)
             }
@@ -1275,14 +1275,22 @@ final class SwiftUITests: XCTestCase {
     }
 
     func testCustomEnvironmentValue() async throws {
-        try await check(swift: """
+        try await check(supportingSwift: """
+        struct S {
+            var x = 0
+        }
+        """, swift: """
         import SwiftUI
         struct EnvironmentValues {
         }
         struct MyKey {
         }
         extension EnvironmentValues {
-            var myValue: Int {
+            var intValue: Int {
+                get { return self[MyKey.self] }
+                set { self[MyKey.self] = newValue }
+            }
+            var mutableStructValue: S {
                 get { return self[MyKey.self] }
                 set { self[MyKey.self] = newValue }
             }
@@ -1297,11 +1305,17 @@ final class SwiftUITests: XCTestCase {
 
         import skip.ui.*
         internal class EnvironmentValues {
-            internal val myValue: Int
+            internal val intValue: Int
                 @Composable
                 get() = this[MyKey::class]
-            internal fun setmyValue(newValue: Int) {
+            internal fun setintValue(newValue: Int) {
                 this[MyKey::class] = newValue
+            }
+            internal val mutableStructValue: S
+                @Composable
+                get() = this[MyKey::class].sref()
+            internal fun setmutableStructValue(newValue: S) {
+                this[MyKey::class] = newValue.sref()
             }
         }
         internal class MyKey {

@@ -97,7 +97,7 @@ extension Message {
     }
 
     static func kotlinEnvironmentKeyType(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .warning, message: "Skip does not recognize this environment key type. Supply '\\.keyPath', '\\EnvironmentValues.keyPath' or 'ObservableType.self'", sourceDerived: sourceDerived, source: source)
+        return Message(kind: .error, message: "Skip does not recognize this environment key type. Supply '\\.keyPath', '\\EnvironmentValues.keyPath' or 'ObservableType.self'", sourceDerived: sourceDerived, source: source)
     }
 
     static func kotlinErrorCannotExtendClass(_ sourceDerived: SourceDerived, source: Source) -> Message {
