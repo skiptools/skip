@@ -20,15 +20,6 @@
       location = "group:../skip-ui">
    </FileRef>
    <FileRef
-      location = "group:../skip-sql">
-   </FileRef>
-   <FileRef
-      location = "group:../skip-script">
-   </FileRef>
-   <FileRef
-      location = "group:../skipapp">
-   </FileRef>
-   <FileRef
-      location = "group:../skipapp/App.xcodeproj">
+      location = "group:../ScratchPad/App.xcodeproj">
    </FileRef>
 </Workspace>
