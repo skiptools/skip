@@ -643,7 +643,7 @@ final class SwiftUITests: XCTestCase {
 
             @Composable
             override fun ComposeContent(composectx: ComposeContext) {
-                envvalue = EnvironmentValues.shared.environmentObject(type = EnvValue::class)
+                envvalue = EnvironmentValues.shared.environmentObject(type = EnvValue::class)!!
 
                 body().Compose(composectx)
             }
@@ -675,7 +675,7 @@ final class SwiftUITests: XCTestCase {
 
             @Composable
             override fun ComposeContent(composectx: ComposeContext) {
-                envvalue = EnvironmentValues.shared.environmentObject(type = EnvValue::class)
+                envvalue = EnvironmentValues.shared.environmentObject(type = EnvValue::class)!!
 
                 body().Compose(composectx)
             }
@@ -711,11 +711,49 @@ final class SwiftUITests: XCTestCase {
 
             @Composable
             override fun ComposeContent(composectx: ComposeContext) {
-                envvalue = EnvironmentValues.shared.environmentObject(type = V.EnvValue::class)
+                envvalue = EnvironmentValues.shared.environmentObject(type = V.EnvValue::class)!!
 
                 body().Compose(composectx)
             }
             internal open class EnvValue {
+            }
+        }
+        """)
+    }
+
+    func testOptionalTypeEnvironmentVariable() async throws {
+        try await check(supportingSwift: baseSupportingSwift + """
+        class EnvValue {
+            var x = 0
+        }
+        """, swift: """
+        import SwiftUI
+        struct V: View {
+            @Environment(EnvValue.self) var envvalue: EnvValue?
+            var body: some View {
+                Text("Value: \\(envvalue?.x ?? 1)")
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
+
+        import skip.ui.*
+        internal class V: View {
+            internal var envvalue: EnvValue? = null
+            override fun body(): View {
+                return ComposeView { composectx: ComposeContext -> Text("Value: ${envvalue?.x ?: 1}").Compose(composectx) }
+            }
+
+            @Composable
+            override fun ComposeContent(composectx: ComposeContext) {
+                envvalue = EnvironmentValues.shared.environmentObject(type = EnvValue::class)
+
+                body().Compose(composectx)
             }
         }
         """)
@@ -743,9 +781,9 @@ final class SwiftUITests: XCTestCase {
         import skip.ui.*
         internal class V: View {
             internal var count: Int
-                get() = _count.get()
+                get() = _count.wrappedValue
                 set(newValue) {
-                    _count.set(newValue)
+                    _count.wrappedValue = newValue
                 }
             internal var _count: Binding<Int>
             override fun body(): View {
@@ -833,7 +871,7 @@ final class SwiftUITests: XCTestCase {
                 }
             internal var _text: skip.ui.State<String>
             override fun body(): View {
-                return ComposeView { composectx: ComposeContext -> TextField(InstanceBinding(this, { it.text }, { it, newvalue -> it.text = newvalue })).Compose(composectx) }
+                return ComposeView { composectx: ComposeContext -> TextField(Binding.instance(this, { it.text }, { it, newvalue -> it.text = newvalue })).Compose(composectx) }
             }
 
             @Composable
@@ -878,7 +916,7 @@ final class SwiftUITests: XCTestCase {
         internal class V: View {
             internal var o: O
             override fun body(): View {
-                return ComposeView { composectx: ComposeContext -> TextField(InstanceBinding(o, { it.string }, { it, newvalue -> it.string = newvalue })).Compose(composectx) }
+                return ComposeView { composectx: ComposeContext -> TextField(Binding.instance(o, { it.string }, { it, newvalue -> it.string = newvalue })).Compose(composectx) }
             }
 
             constructor(o: O) {
@@ -914,7 +952,7 @@ final class SwiftUITests: XCTestCase {
         internal class V: View {
             internal var o: O
             override fun body(): View {
-                return ComposeView { composectx: ComposeContext -> TextField(InstanceBinding(this.o, { it.s.string }, { it, newvalue -> it.s.string = newvalue })).Compose(composectx) }
+                return ComposeView { composectx: ComposeContext -> TextField(Binding.instance(this.o, { it.s.string }, { it, newvalue -> it.s.string = newvalue })).Compose(composectx) }
             }
 
             constructor(o: O) {
@@ -949,7 +987,7 @@ final class SwiftUITests: XCTestCase {
         internal class V: View {
             internal var o: O
             override fun body(): View {
-                return ComposeView { composectx: ComposeContext -> TextField(InstanceBinding(o, { it.strings[0] }, { it, newvalue -> it.strings[0] = newvalue })).Compose(composectx) }
+                return ComposeView { composectx: ComposeContext -> TextField(Binding.instance(o, { it.strings[0] }, { it, newvalue -> it.strings[0] = newvalue })).Compose(composectx) }
             }
 
             constructor(o: O) {
@@ -991,7 +1029,7 @@ final class SwiftUITests: XCTestCase {
                 return ComposeView { composectx: ComposeContext ->
                     for (o in os.sref()) {
                         var o = o
-                        TextField(InstanceBinding(o, { it.string }, { it, newvalue -> it.string = newvalue })).Compose(composectx)
+                        TextField(Binding.instance(o, { it.string }, { it, newvalue -> it.string = newvalue })).Compose(composectx)
                     }
                 }
             }
@@ -1034,9 +1072,9 @@ final class SwiftUITests: XCTestCase {
                 }
             internal var _count: skip.ui.State<Int>
             internal var text: String
-                get() = _text.get()
+                get() = _text.wrappedValue
                 set(newValue) {
-                    _text.set(newValue)
+                    _text.wrappedValue = newValue
                 }
             internal var _text: Binding<String>
             internal var i: Int
@@ -1110,9 +1148,9 @@ final class SwiftUITests: XCTestCase {
                 }
             internal var _count: skip.ui.State<Int> = skip.ui.State(0)
             internal var text: String
-                get() = _text.get()
+                get() = _text.wrappedValue
                 set(newValue) {
-                    _text.set(newValue)
+                    _text.wrappedValue = newValue
                 }
             internal var _text: Binding<String>
             internal var i = 0

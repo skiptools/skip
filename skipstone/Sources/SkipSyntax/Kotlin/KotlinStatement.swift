@@ -52,6 +52,7 @@ class KotlinStatement: KotlinSyntaxNode {
 protocol KotlinMemberDeclaration: AnyObject {
     var extends: (TypeSignature, Generics)? { get set }
     var isStatic: Bool { get }
+    var visibility: Modifiers.Visibility { get set }
 }
 
 extension KotlinMemberDeclaration {

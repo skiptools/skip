@@ -1755,7 +1755,7 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
         if member.hasPrefix("$") {
-            // Append an InstanceBinding where the base is our base and the path is our member
+            // Append an instance Binding where the base is our base and the path is our member
             appendInstanceBinding(to: output, indentation: indentation, appendPath: appendMemberAccess) {
                 if let base {
                     output.append(base, indentation: indentation)

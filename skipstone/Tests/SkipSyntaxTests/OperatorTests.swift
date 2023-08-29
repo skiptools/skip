@@ -429,7 +429,7 @@ final class OperatorTests: XCTestCase {
         """)
     }
 
-    func testReifiedTypeComparisons() async throws {
+    func testReified() async throws {
         try await check(swift: """
         @inline(__always) func nameOf<T>(_ value: T) -> String {
             if T.self == String.self {

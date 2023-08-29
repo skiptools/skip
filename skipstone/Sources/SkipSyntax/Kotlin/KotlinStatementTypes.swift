@@ -512,6 +512,7 @@ class KotlinEmpty: KotlinStatement, KotlinMemberDeclaration {
 
     var extends: (TypeSignature, Generics)?
     let isStatic = false
+    var visibility: Modifiers.Visibility = .private
 }
 
 class KotlinForLoop: KotlinStatement {
@@ -932,7 +933,8 @@ class KotlinClassDeclaration: KotlinStatement {
         }
         kstatement.attributes = kstatement.processAttributes(statement.attributes, from: statement, translator: translator)
 
-        let partitioned = partition(members: statement.members, of: kstatement.signature)
+        let isFinal = statement.modifiers.isFinal || statement.type == .structDeclaration
+        let partitioned = KotlinExtensionDeclaration.partition(members: statement.members, of: kstatement.signature, isFinal: isFinal)
         var extensionMembers = partitioned.extensionMembers
         var kmembers = partitioned.members.flatMap { translator.translateStatement($0) }
         if let codebaseInfo = translator.codebaseInfo {
@@ -947,7 +949,7 @@ class KotlinClassDeclaration: KotlinStatement {
             // Kotlin extension functions act like static functions, which can lead to different behavior
             for (extInfo, extDeclaration, extImportModulePaths) in codebaseInfo.moveableExtensions(of: statement.signature, in: translator.syntaxTree) {
                 kstatement.inherits += extInfo.inherits
-                let partitioned = partition(members: extDeclaration.members, of: kstatement.signature)
+                let partitioned = KotlinExtensionDeclaration.partition(members: extDeclaration.members, of: kstatement.signature, isFinal: isFinal)
                 extensionMembers += partitioned.extensionMembers
                 kmembers += partitioned.members.flatMap { translator.translateStatement($0) }
                 kstatement.movedExtensionImportModulePaths += extImportModulePaths
@@ -960,30 +962,7 @@ class KotlinClassDeclaration: KotlinStatement {
 
         kstatement.inherits.forEach { $0.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
 
-        return [kstatement] + KotlinExtensionDeclaration.translateExtensionMembers(extensionMembers, of: kstatement.signature, generics: kstatement.generics, translator: translator)
-    }
-
-    private static func partition(members: [Statement], of signature: TypeSignature) -> (members: [Statement], extensionMembers: [Statement]) {
-        var extensionMembers: [Statement] = []
-        var otherMembers: [Statement] = []
-        for member in members {
-            var extensionFunction: FunctionDeclaration? = nil
-            if let functionDeclaration = member as? FunctionDeclaration {
-                // We have to use extension functions when there are any constraints on the owning type's generics
-                for entry in functionDeclaration.generics.entries {
-                    if entry.whereEqual != nil || !entry.inherits.isEmpty, signature.generics.contains(where: { $0.isNamed(entry.name) }) {
-                        extensionFunction = functionDeclaration
-                        break
-                    }
-                }
-            }
-            if let extensionFunction {
-                extensionMembers.append(extensionFunction)
-            } else {
-                otherMembers.append(member)
-            }
-        }
-        return (otherMembers, extensionMembers)
+        return [kstatement] + KotlinExtensionDeclaration.translateExtensionMembers(extensionMembers, of: kstatement.signature, visibility: kstatement.modifiers.visibility, generics: kstatement.generics, translator: translator)
     }
 
     init(name: String, signature: TypeSignature, declarationType: StatementType, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
@@ -1371,10 +1350,10 @@ struct KotlinExtensionDeclaration {
             extends = extendedTypeInfo.signature
             generics = extendedTypeInfo.generics.merge(extension: statement.extends, generics: statement.generics).resolvingSelf(in: statement)
         }
-        return kstatements + translateExtensionMembers(statement.members, of: extends, generics: generics, translator: translator, extensionPlacement: placement)
+        return kstatements + translateExtensionMembers(statement.members, of: extends, visibility: statement.modifiers.visibility, generics: generics, translator: translator, extensionPlacement: placement)
     }
 
-    static func translateExtensionMembers(_ members: [Statement], of extends: TypeSignature, generics: Generics, translator: KotlinTranslator, extensionPlacement: KotlinExtensionPlacement? = nil) -> [KotlinStatement] {
+    static func translateExtensionMembers(_ members: [Statement], of extends: TypeSignature, visibility: Modifiers.Visibility, generics: Generics, translator: KotlinTranslator, extensionPlacement: KotlinExtensionPlacement? = nil) -> [KotlinStatement] {
         var kstatements: [KotlinStatement] = []
         for member in members {
             if let extensionPlacement, !extensionPlacement.canMove {
@@ -1400,6 +1379,12 @@ struct KotlinExtensionDeclaration {
                     }
                     continue
                 }
+
+                // Reduce the visibility of the extended member to that of the extended type
+                if visibility < memberDeclaration.visibility {
+                    memberDeclaration.visibility = visibility
+                }
+
                 var extendsGenerics = generics
                 if let kfunctionDeclaration = kmember as? KotlinFunctionDeclaration {
                     extendsGenerics = extendsGenerics.merge(overrides: kfunctionDeclaration.generics, addNew: false)
@@ -1409,6 +1394,35 @@ struct KotlinExtensionDeclaration {
             }
         }
         return kstatements
+    }
+
+    /// Partition a set of class or interface members into those that can move into the class or interface and those that must be implemented as extension members.
+    static func partition(members: [Statement], of signature: TypeSignature, isFinal: Bool) -> (members: [Statement], extensionMembers: [Statement]) {
+        var extensionMembers: [Statement] = []
+        var otherMembers: [Statement] = []
+        for member in members {
+            var extensionFunction: FunctionDeclaration? = nil
+            if let functionDeclaration = member as? FunctionDeclaration, !functionDeclaration.generics.isEmpty {
+                // We have to use extension functions for reified generics of a virtual type
+                if !isFinal && functionDeclaration.attributes.contains(.inlineAlways) {
+                    extensionFunction = functionDeclaration
+                } else {
+                    // We have to use extension functions when there are any constraints on the owning type's generics
+                    for entry in functionDeclaration.generics.entries {
+                        if entry.whereEqual != nil || !entry.inherits.isEmpty, signature.generics.contains(where: { $0.isNamed(entry.name) }) {
+                            extensionFunction = functionDeclaration
+                            break
+                        }
+                    }
+                }
+            }
+            if let extensionFunction {
+                extensionMembers.append(extensionFunction)
+            } else {
+                otherMembers.append(member)
+            }
+        }
+        return (otherMembers, extensionMembers)
     }
 
     private static func mayUseFilePrivateAPI(statement: ExtensionDeclaration, in syntaxTree: SyntaxTree) -> Bool {
@@ -1504,6 +1518,14 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
     var isStatic: Bool {
         return modifiers.isStatic && !isEqualImplementation && !isLessThanImplementation
+    }
+    var visibility: Modifiers.Visibility {
+        get {
+            return modifiers.visibility
+        }
+        set {
+            modifiers.visibility = newValue
+        }
     }
 
     static func translate(statement: FunctionDeclaration, translator: KotlinTranslator) -> KotlinFunctionDeclaration {
@@ -1740,14 +1762,9 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         }
 
         let generics = functionGenerics.filterWhereEqual()
-        let inline = attributes.contains(.inlineAlways)
-            && !isOpen  // 'inline' modifier is not allowed on virtual members. Only private or final members can be inlined
-            && (modifiers.visibility == .internal || modifiers.visibility == .private)
-        // If we can inline the function, then we can also reify the type parameters
-        let reify = inline && !generics.isEmpty
-
+        let isInline = attributes.contains(.inlineAlways) && !isOpen
         if type != .constructorDeclaration {
-            if inline {
+            if isInline {
                 output.append("inline ")
             }
             if role == .operator {
@@ -1756,7 +1773,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             output.append("fun ")
         }
         if !generics.isEmpty {
-            generics.append(to: output, indentation: indentation, modifier: reify ? "reified" : nil)
+            generics.append(to: output, indentation: indentation, modifier: isInline ? "reified" : nil)
             output.append(" ")
         }
         appendExtends(to: output, indentation: indentation)
@@ -1979,16 +1996,16 @@ class KotlinInterfaceDeclaration: KotlinStatement {
     var members: [KotlinStatement] = []
     var movedExtensionImportModulePaths: [[String]] = []
 
-    static func translate(statement: TypeDeclaration, translator: KotlinTranslator) -> KotlinInterfaceDeclaration {
+    static func translate(statement: TypeDeclaration, translator: KotlinTranslator) -> [KotlinStatement] {
         let kstatement = KotlinInterfaceDeclaration(statement: statement)
         kstatement.attributes = kstatement.processAttributes(statement.attributes, from: statement, translator: translator)
         kstatement.modifiers = statement.modifiers
         kstatement.inherits = statement.inherits
         kstatement.generics = statement.generics.resolvingSelf(in: statement)
         kstatement.members = statement.members.flatMap { translator.translateStatement($0) }
-        kstatement.inherits.forEach { $0.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
         guard let codebaseInfo = translator.codebaseInfo else {
-            return kstatement
+            kstatement.inherits.forEach { $0.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
+            return [kstatement]
         }
 
         if let typeInfo = codebaseInfo.primaryTypeInfo(forNamed: statement.signature) {
@@ -1997,26 +2014,33 @@ class KotlinInterfaceDeclaration: KotlinStatement {
             kstatement.inherits = typeInfo.inherits
             kstatement.generics = typeInfo.generics.resolvingSelf(in: statement)
         }
-        // Kotlin interfaces cannot extend Any
-        kstatement.inherits = kstatement.inherits.filter { $0 != .any && $0 != .anyObject }
 
         // Move extensions of this type into the type itself rather than use Kotlin extension functions.
         // This allows us to replace API declarations with implementations. Also Kotlin extension functions
         // act like static functions, which can lead to different behavior
         var originalMembers = kstatement.members
         var newMembers: [KotlinStatement] = []
+        var extensionMembers: [Statement] = []
         for (extInfo, extDeclaration, extImportModulePaths) in codebaseInfo.moveableExtensions(of: statement.signature, in: translator.syntaxTree) {
             kstatement.inherits += extInfo.inherits
-            for extMember in extDeclaration.members.flatMap({ translator.translateStatement($0) }) {
 
-                if !replaceMember(in: &originalMembers, with: extMember) {
-                    newMembers.append(extMember)
+            let partitioned = KotlinExtensionDeclaration.partition(members: extDeclaration.members, of: kstatement.signature, isFinal: false)
+            extensionMembers += partitioned.extensionMembers
+
+            for kmember in partitioned.members.flatMap({ translator.translateStatement($0) }) {
+                if !replaceMember(in: &originalMembers, with: kmember) {
+                    newMembers.append(kmember)
                 }
             }
             kstatement.movedExtensionImportModulePaths += extImportModulePaths
         }
         kstatement.members = originalMembers + newMembers
-        return kstatement
+
+        // Kotlin interfaces cannot extend Any
+        kstatement.inherits = kstatement.inherits.filter { $0 != .any && $0 != .anyObject }
+        kstatement.inherits.forEach { $0.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
+
+        return [kstatement] + KotlinExtensionDeclaration.translateExtensionMembers(extensionMembers, of: kstatement.signature, visibility: kstatement.modifiers.visibility, generics: kstatement.generics, translator: translator)
     }
 
     private static func replaceMember(in originalMembers: inout [KotlinStatement], with member: KotlinStatement) -> Bool {
@@ -2228,6 +2252,14 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
     var isStatic: Bool {
         return modifiers.isStatic
+    }
+    var visibility: Modifiers.Visibility {
+        get {
+            return modifiers.visibility
+        }
+        set {
+            modifiers.visibility = newValue
+        }
     }
 
     static func translate(statement: VariableDeclaration, translator: KotlinTranslator) -> KotlinVariableDeclaration {

@@ -143,7 +143,7 @@ public class KotlinTranslator {
             case .initDeclaration:
                 return [KotlinFunctionDeclaration.translate(statement: statement as! FunctionDeclaration, translator: self)]
             case .protocolDeclaration:
-                return [KotlinInterfaceDeclaration.translate(statement: statement as! TypeDeclaration, translator: self)]
+                return KotlinInterfaceDeclaration.translate(statement: statement as! TypeDeclaration, translator: self)
             case .structDeclaration:
                 return KotlinClassDeclaration.translate(statement: statement as! TypeDeclaration, translator: self)
             case .subscriptDeclaration:

@@ -296,17 +296,17 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         }
 
         // Handle the fact that environment vars do not have an initial value and may not have a declared type
+        let environmentType = variable.declaredType == .none ? entry.type : variable.declaredType
         if variable.value == nil {
             var updatedType: TypeSignature? = nil
-            if let environmentType = entry.type, let defaultValue = environmentType.kotlinDefaultValue {
+            if let environmentType, let defaultValue = environmentType.kotlinDefaultValue {
                 if variable.declaredType == .none {
                     updatedType = environmentType
                     variable.declaredType = environmentType
                     variable.propertyType = environmentType
                 }
                 variable.value = KotlinRawExpression(sourceCode: defaultValue)
-            } else if entry.type != nil || variable.declaredType != .none {
-                let environmentType = variable.declaredType == .none ? entry.type! : variable.declaredType
+            } else if let environmentType {
                 if variable.declaredType == .none {
                     updatedType = environmentType
                 }
@@ -325,6 +325,9 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         var valueSourceCode: String
         if entry.isObject {
             valueSourceCode = "EnvironmentValues.shared.environmentObject(type = \(entry.key))"
+            if environmentType?.isOptional == false {
+                valueSourceCode += "!!"
+            }
         } else {
             valueSourceCode = "EnvironmentValues.shared.\(entry.key)"
         }
@@ -402,14 +405,14 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             if !isSingleStatement {
                 output.append(indentation).append("return ")
             }
-            output.append(storageName).append(".get()")
+            output.append(storageName).append(".wrappedValue")
             sref()
             output.append("\n")
         }
         storage.appendSet = { variable, value, output, indentation in
-            output.append(indentation).append(storageName).append(".set(")
+            output.append(indentation).append(storageName).append(".wrappedValue = ")
             value()
-            output.append(")\n")
+            output.append("\n")
         }
         storage.appendStorage = { variable, output, indentation in
             output.append(indentation).append(variable.modifiers.kotlinMemberString(isGlobal: false, isOpen: false, suffix: " ")).append("var ").append(storageName).append(": ").append(variable.propertyType.asBinding().kotlin).append("\n")
