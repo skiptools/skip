@@ -31,6 +31,8 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         if let classDeclaration = node as? KotlinClassDeclaration {
             if omitPreviewProvider(classDeclaration, codebaseInfo: translator.codebaseInfo) {
                 return .skip
+            } else {
+                translateClassDeclaration(classDeclaration, translator: translator)
             }
         } else if let functionDeclaration = node as? KotlinFunctionDeclaration {
             if functionDeclaration.type == .constructorDeclaration {
@@ -61,6 +63,34 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         }
         parentStatement.remove(statement: classDeclaration)
         return true
+    }
+
+    private func translateClassDeclaration(_ classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) {
+        var environmentKeyIndex: Int? = nil
+        for i in 0..<classDeclaration.inherits.count {
+            if classDeclaration.inherits[i].isNamed("EnvironmentKey", moduleName: "SwiftUI") {
+                environmentKeyIndex = i
+                break
+            }
+        }
+        guard let environmentKeyIndex else {
+            return
+        }
+        guard let defaultValueDeclaration = classDeclaration.members
+            .compactMap({ $0 as? KotlinVariableDeclaration })
+            .first(where: { $0.propertyName == "defaultValue" && $0.isStatic }),
+            defaultValueDeclaration.propertyType != .none else {
+            classDeclaration.messages.append(.kotlinEnvironmentValuesKeyDefault(classDeclaration, source: translator.syntaxTree.source))
+            return
+        }
+
+        // Kotlin requires that the key type be public in order to reflect on it from the SkipUI package
+        classDeclaration.modifiers.visibility = .public
+
+        defaultValueDeclaration.modifiers.isOverride = true
+        defaultValueDeclaration.modifiers.visibility = .public
+        classDeclaration.inherits[environmentKeyIndex] = .named("EnvironmentKey", [defaultValueDeclaration.propertyType])
+        classDeclaration.companionInherits.append(.named("EnvironmentKeyCompanion", [defaultValueDeclaration.propertyType]))
     }
 
     private func translateConstructorDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, translator: KotlinTranslator) {
@@ -160,7 +190,9 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         } else if statement.apiFlags.contains(.viewBuilder) {
             viewBuilder = statement.getter?.body
         } else if let classDeclaration = statement.parent as? KotlinClassDeclaration, classDeclaration.signature.isNamed("EnvironmentValues", moduleName: "SwiftUI", generics: []), statement.getter != nil {
-            translateEnvironmentValue(statement, in: classDeclaration)
+            translateEnvironmentValue(statement)
+        } else if statement.extends?.0.isNamed("EnvironmentValues", moduleName: "SwiftUI", generics: []) == true, statement.getter != nil {
+            translateEnvironmentValue(statement)
         }
         if let viewBuilder {
             statement.getter?.body = translateViewBuilder(codeBlock: viewBuilder, translator: translator)
@@ -252,8 +284,8 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
     private func synthesizeEnvironmentSync(variable: KotlinVariableDeclaration, translator: KotlinTranslator) -> KotlinStatement? {
         let entry: (key: String, type: TypeSignature?, isObject: Bool)
         if let environment = (variable.attributes.of(kind: .environment) + variable.attributes.of(kind: .environmentObject)).first {
-            let rawKey = environment.tokens.joined(separator: "")
-            if let environmentEntry = environmentEntry(for: rawKey, codebaseInfo: translator.codebaseInfo) {
+            let rawKey = environment.tokens.first ?? ""
+            if let environmentEntry = environmentEntry(for: variable, key: rawKey, codebaseInfo: translator.codebaseInfo) {
                 entry = environmentEntry
             } else {
                 variable.messages.append(.kotlinEnvironmentKeyType(variable, source: translator.syntaxTree.source))
@@ -263,22 +295,30 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             return nil
         }
 
-        if variable.declaredType == .none && variable.value == nil {
-            if let environmentType = entry.type {
-                if let defaultValue = environmentType.kotlinDefaultValue {
+        // Handle the fact that environment vars do not have an initial value and may not have a declared type
+        if variable.value == nil {
+            var updatedType: TypeSignature? = nil
+            if let environmentType = entry.type, let defaultValue = environmentType.kotlinDefaultValue {
+                if variable.declaredType == .none {
+                    updatedType = environmentType
                     variable.declaredType = environmentType
                     variable.propertyType = environmentType
-                    variable.value = KotlinRawExpression(sourceCode: defaultValue)
-                } else {
-                    variable.declaredType = environmentType.asUnwrappedOptional(true)
-                    variable.propertyType = environmentType.asUnwrappedOptional(true)
                 }
-                if let codebaseInfo = translator.codebaseInfo, variable.mayBeSharedMutableStruct && !environmentType.kotlinMayBeSharedMutableStruct(codebaseInfo: codebaseInfo) {
-                    variable.mayBeSharedMutableStruct = false
-                    variable.onUpdate = nil
+                variable.value = KotlinRawExpression(sourceCode: defaultValue)
+            } else if entry.type != nil || variable.declaredType != .none {
+                let environmentType = variable.declaredType == .none ? entry.type! : variable.declaredType
+                if variable.declaredType == .none {
+                    updatedType = environmentType
                 }
+                variable.declaredType = environmentType.asUnwrappedOptional(true)
+                variable.propertyType = environmentType.asUnwrappedOptional(true)
             } else {
                 variable.messages.append(.kotlinEnvironmentDeclaredType(variable, source: translator.syntaxTree.source))
+            }
+            // Erase handling of mutable struct property if the actual type is not a mutable struct
+            if let updatedType, let codebaseInfo = translator.codebaseInfo, variable.mayBeSharedMutableStruct && !updatedType.kotlinMayBeSharedMutableStruct(codebaseInfo: codebaseInfo) {
+                variable.mayBeSharedMutableStruct = false
+                variable.onUpdate = nil
             }
         }
 
@@ -292,8 +332,11 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
     }
 
     /// Given a Swift `@Environment` property wrapper key, return the Kotlin key and the expected value type.
-    private func environmentEntry(for key: String, codebaseInfo: CodebaseInfo.Context?) -> (key: String, type: TypeSignature?, isObject: Bool)? {
-        if key.hasSuffix(".self") {
+    private func environmentEntry(for variableDeclaration: KotlinVariableDeclaration, key: String, codebaseInfo: CodebaseInfo.Context?) -> (key: String, type: TypeSignature?, isObject: Bool)? {
+        if key.isEmpty {
+            let type = variableDeclaration.declaredType
+            return type == .none ? nil : (type.kotlin + "::class", type, true)
+        } else if key.hasSuffix(".self") {
             let typeName = String(key.dropLast(".self".count))
             return (typeName + "::class", .named(typeName, []), true)
         } else {
@@ -462,7 +505,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         return false
     }
 
-    private func translateEnvironmentValue(_ statement: KotlinVariableDeclaration, in classDeclaration: KotlinClassDeclaration) {
+    private func translateEnvironmentValue(_ statement: KotlinVariableDeclaration) {
         statement.getterAnnotations.append("@Composable")
         statement.onUpdate = nil
         statement.getter?.body?.visit { node in
@@ -478,10 +521,12 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         statement.apiFlags.remove(.writeable)
 
         let setFunction = KotlinFunctionDeclaration(name: "set" + statement.propertyName)
+        setFunction.extends = statement.extends
         setFunction.modifiers = statement.modifiers
         setFunction.parameters = [Parameter<KotlinExpression>(externalLabel: setter.parameterName ?? "newValue", declaredType: statement.declaredType)]
         setFunction.body = setter.body
-        classDeclaration.insert(statements: [setFunction], after: statement)
+
+        (statement.parent as? KotlinStatement)?.insert(statements: [setFunction], after: statement)
     }
 
     private func updateEnvironmentFunctionCallParameters(for keyPath: KotlinKeyPathLiteral, in functionCall: KotlinFunctionCall, codebaseInfo: CodebaseInfo.Context?) {

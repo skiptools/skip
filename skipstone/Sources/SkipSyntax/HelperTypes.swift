@@ -446,6 +446,10 @@ struct Attributes: Hashable, PrettyPrintable, Codable {
         return contains(.nonmutating) || contains(.state) || contains(.stateObject) || contains(.environment) || contains(.environmentObject) || contains(.bindable) || contains(.binding)
     }
 
+    func resolved(in node: SyntaxNode? = nil, context: TypeResolutionContext) -> Attributes {
+        return Attributes(attributes: attributes.map { $0.resolved(in: node, context: context) })
+    }
+
     var prettyPrintTree: PrettyPrintTree {
         let children = attributes.map {
             return PrettyPrintTree(root: "@\($0.signature)\($0.tokens)")
@@ -583,6 +587,22 @@ struct Attribute: Hashable, Codable {
         default:
             return .unknown
         }
+    }
+
+    func resolved(in node: SyntaxNode? = nil, context: TypeResolutionContext) -> Attribute {
+        let kind = self.kind
+        guard kind == .environment || kind == .environmentObject else {
+            return self
+        }
+        let tokens = tokens.map { token in
+            if token.hasSuffix(".self") {
+                let tokenType = TypeSignature.for(name: String(token.dropLast(".self".count)), genericTypes: []).resolved(in: node, context: context)
+                return tokenType.description + ".self"
+            } else {
+                return token
+            }
+        }
+        return Attribute(signature: signature, tokens: tokens)
     }
 
     /// The string contained in any `message: "..."` token.

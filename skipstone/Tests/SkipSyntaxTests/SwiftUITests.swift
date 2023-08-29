@@ -613,7 +613,12 @@ final class SwiftUITests: XCTestCase {
     }
 
     func testTypeEnvironmentVariable() async throws {
-        try await check(supportingSwift: baseSupportingSwift, swift: """
+        let supportingSwift = baseSupportingSwift + """
+        class EnvValue {
+        }
+        """
+
+        try await check(supportingSwift: supportingSwift, swift: """
         import SwiftUI
         struct V: View {
             @Environment(EnvValue.self) var envvalue
@@ -631,12 +636,7 @@ final class SwiftUITests: XCTestCase {
 
         import skip.ui.*
         internal class V: View {
-            internal var envvalue: EnvValue
-                get() = envvaluestorage.sref({ this.envvalue = it })
-                set(newValue) {
-                    envvaluestorage = newValue.sref()
-                }
-            private lateinit var envvaluestorage: EnvValue
+            internal lateinit var envvalue: EnvValue
             override fun body(): View {
                 return ComposeView { composectx: ComposeContext -> Text("Value: ${envvalue.x}").Compose(composectx) }
             }
@@ -650,10 +650,10 @@ final class SwiftUITests: XCTestCase {
         }
         """)
 
-        try await check(supportingSwift: baseSupportingSwift, swift: """
+        try await check(supportingSwift: supportingSwift, swift: """
         import SwiftUI
         struct V: View {
-            @EnvironmentObject(EnvValue.self) var envvalue
+            @EnvironmentObject var envvalue: EnvValue
             var body: some View {
                 Text("Value: \\(envvalue.x)")
             }
@@ -668,12 +668,7 @@ final class SwiftUITests: XCTestCase {
 
         import skip.ui.*
         internal class V: View {
-            internal var envvalue: EnvValue
-                get() = envvaluestorage.sref({ this.envvalue = it })
-                set(newValue) {
-                    envvaluestorage = newValue.sref()
-                }
-            private lateinit var envvaluestorage: EnvValue
+            internal lateinit var envvalue: EnvValue
             override fun body(): View {
                 return ComposeView { composectx: ComposeContext -> Text("Value: ${envvalue.x}").Compose(composectx) }
             }
@@ -683,6 +678,44 @@ final class SwiftUITests: XCTestCase {
                 envvalue = EnvironmentValues.shared.environmentObject(type = EnvValue::class)
 
                 body().Compose(composectx)
+            }
+        }
+        """)
+    }
+
+    func testNestedTypeEnvironmentVariable() async throws {
+        try await check(supportingSwift: baseSupportingSwift, swift: """
+        import SwiftUI
+        struct V: View {
+            @Environment(EnvValue.self) var envvalue
+            var body: some View {
+                Text("Value: \\(envvalue.x)")
+            }
+            class EnvValue {
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
+
+        import skip.ui.*
+        internal class V: View {
+            internal lateinit var envvalue: V.EnvValue
+            override fun body(): View {
+                return ComposeView { composectx: ComposeContext -> Text("Value: ${envvalue.x}").Compose(composectx) }
+            }
+
+            @Composable
+            override fun ComposeContent(composectx: ComposeContext) {
+                envvalue = EnvironmentValues.shared.environmentObject(type = V.EnvValue::class)
+
+                body().Compose(composectx)
+            }
+            internal open class EnvValue {
             }
         }
         """)
@@ -1319,6 +1352,32 @@ final class SwiftUITests: XCTestCase {
             }
         }
         internal class MyKey {
+        }
+        """)
+    }
+
+    func testCustomEnvironmentKey() async throws {
+        try await check(supportingSwift: baseSupportingSwift, swift: """
+        import SwiftUI
+        struct MyKey {
+        }
+        extension MyKey: EnvironmentKey {
+            static var defaultValue = ""
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
+
+        import skip.ui.*
+        class MyKey: EnvironmentKey<String> {
+
+            companion object: EnvironmentKeyCompanion<String> {
+                override var defaultValue = ""
+            }
         }
         """)
     }

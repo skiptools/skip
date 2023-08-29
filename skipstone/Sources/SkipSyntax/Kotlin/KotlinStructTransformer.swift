@@ -45,10 +45,10 @@ final class KotlinStructTransformer: KotlinTransformer {
                 }
                 if variableDeclaration.declaredType.isUnwrappedOptional {
                     // Not initialized
-                } else if variableDeclaration.declaredType == .none && variableDeclaration.propertyType == .none && (variableDeclaration.attributes.contains(.environment) || variableDeclaration.attributes.contains(.environmentObject)) {
+                } else if variableDeclaration.value == nil && (variableDeclaration.attributes.contains(.environment) || variableDeclaration.attributes.contains(.environmentObject)) {
                     // It's so rare to want to pass environment values to the constructor that we omit them when they'd cause an error due to
-                    // lack of type information. To fix this we'd need help from the SwiftUI transformer (which runs after us) to figure out the
-                    // variable type
+                    // lack of initial value. To fix this we'd need help from the SwiftUI transformer (which runs after us) to figure out the
+                    // variable type in many cases
                 } else if !variableDeclaration.modifiers.isStatic && variableDeclaration.getter == nil && (!variableDeclaration.isLet || variableDeclaration.value == nil) && !variableDeclaration.modifiers.isLazy && !variableDeclaration.isGenerated {
                     initializableVariableDeclarations.append(variableDeclaration)
                 }

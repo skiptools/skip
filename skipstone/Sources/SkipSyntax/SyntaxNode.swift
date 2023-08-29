@@ -14,19 +14,35 @@ class SyntaxNode: SourceDerived, PrettyPrintable {
         self.sourceRange = sourceRange
     }
 
+    /// If this node declares a new type, fully qualify its signature.
+    ///
+    /// This is done to fully qualify class, struct, etc signatures before we resolve all attributes and their types.
+    func qualifyTypeDeclaration() {
+    }
+
     /// Resolve contextual information about this node's attributes after the parent node is set.
     func resolveAttributes(in syntaxTree: SyntaxTree, context: TypeResolutionContext) {
     }
 
     /// Resolve this node and all nodes beneath it.
     final func resolveSubtreeAttributes(in syntaxTree: SyntaxTree, context: TypeResolutionContext) {
-        var resolveQueue: [SyntaxNode] = [self]
-        while !resolveQueue.isEmpty {
-            let node = resolveQueue.removeFirst()
-            node.resolveAttributes(in: syntaxTree, context: context)
-            node.children.forEach { $0.parent = node }
-            resolveQueue += node.children
+        // First we fully qualify class, struct, etc declaration signatures
+        qualifySubtreeTypeDeclarationsAndAssignParents()
+        // Then we resolve references to those types
+        resolveQualifiedSubtreeAttributes(in: syntaxTree, context: context)
+    }
+
+    private func qualifySubtreeTypeDeclarationsAndAssignParents() {
+        qualifyTypeDeclaration()
+        for child in children {
+            child.parent = self
+            child.qualifySubtreeTypeDeclarationsAndAssignParents()
         }
+    }
+
+    private func resolveQualifiedSubtreeAttributes(in syntaxTree: SyntaxTree, context: TypeResolutionContext) {
+        resolveAttributes(in: syntaxTree, context: context)
+        children.forEach { $0.resolveQualifiedSubtreeAttributes(in: syntaxTree, context: context) }
     }
 
     /// Perform type inference.

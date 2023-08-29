@@ -1230,10 +1230,13 @@ class TypealiasDeclaration: Statement {
         return [statement]
     }
 
-    override func resolveAttributes(in syntaxTree: SyntaxTree, context: TypeResolutionContext) {
+    override func qualifyTypeDeclaration() {
         if _signature == nil {
             _signature = qualifyDeclaredType(signature)
         }
+    }
+
+    override func resolveAttributes(in syntaxTree: SyntaxTree, context: TypeResolutionContext) {
         generics = generics.resolved(in: self, context: context)
         aliasedType = aliasedType.resolved(in: self, context: context)
         // Aliases in protocols or extensions inherit the visibility of the protocol or extension
@@ -1365,12 +1368,15 @@ class TypeDeclaration: Statement {
         return statement
     }
 
+    override func qualifyTypeDeclaration() {
+        if _signature == nil {
+            _signature = qualifyDeclaredType(signature)
+        }
+    }
+
     override func resolveAttributes(in syntaxTree: SyntaxTree, context: TypeResolutionContext) {
         if parent?.owningFunctionDeclaration != nil {
             messages.append(.localTypesNotSupported(self, source: syntaxTree.source))
-        }
-        if _signature == nil {
-            _signature = qualifyDeclaredType(signature)
         }
         inherits = inherits.map { $0.resolved(in: self, context: context) }
         if modifiers.visibility == .default {
@@ -1510,6 +1516,7 @@ class VariableDeclaration: Statement {
 
     override func resolveAttributes(in syntaxTree: SyntaxTree, context: TypeResolutionContext) {
         declaredType = declaredType.resolved(in: self, context: context)
+        attributes = attributes.resolved(in: self, context: context)
         // Variables in protocols or extensions inherit the visibility of the protocol or extension
         if modifiers.visibility == .default {
             if let owningTypeDeclaration = parent as? TypeDeclaration, (owningTypeDeclaration.type == .protocolDeclaration || owningTypeDeclaration.type == .extensionDeclaration) {

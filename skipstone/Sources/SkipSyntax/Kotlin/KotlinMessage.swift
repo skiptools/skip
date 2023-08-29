@@ -97,7 +97,11 @@ extension Message {
     }
 
     static func kotlinEnvironmentKeyType(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "Skip does not recognize this environment key type. Supply '\\.keyPath', '\\EnvironmentValues.keyPath' or 'ObservableType.self'", sourceDerived: sourceDerived, source: source)
+        return Message(kind: .error, message: "Skip does not recognize this environment property specification. For an @Environment property, supply the key as '\\.keyPath', '\\EnvironmentValues.keyPath' or 'ObservableType.self'. For an @EnvironmentObject property, make sure the property has a declared type", sourceDerived: sourceDerived, source: source)
+    }
+
+    static func kotlinEnvironmentValuesKeyDefault(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .warning, message: "Skip is unable to determine the default value of this EnvironmentValues key type. Make sure it declares a static 'defaultValue' property with an explicitly declared type", sourceDerived: sourceDerived, source: source)
     }
 
     static func kotlinErrorCannotExtendClass(_ sourceDerived: SourceDerived, source: Source) -> Message {

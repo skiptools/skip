@@ -14,17 +14,21 @@ final class TypeDeclarationTests: XCTestCase {
     func testNestedClass() async throws {
         try await check(swift: """
         class A {
+            var b1: B
+
             class B {
             }
 
-            var b: B
+            var b2: B
         }
         """, kotlin: """
         internal open class A {
+            internal open var b1: A.B
+
             internal open class B {
             }
 
-            internal open var b: A.B
+            internal open var b2: A.B
         }
         """)
     }
