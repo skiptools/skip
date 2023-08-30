@@ -1884,22 +1884,25 @@ final class MemberDeclarationTests: XCTestCase {
         protocol P {
         }
         """, swift: """
-        class C<T, U> {
+        public class C<T, U> {
         }
         extension C where T == Int, U: P {
             var v: U? {
                 return nil
             }
-            @inline(__always) func f<V: P>(p1: U, p2: V) -> Int {
+            @inline(__always) public func f<V: P>(p1: U, p2: V) -> Int {
                 return 1
             }
         }
         """, kotlin: """
-        internal open class C<T, U> {
+        open class C<T, U> {
+
+            companion object {
+            }
         }
         internal val <U> C<Int, U>.v: U? where U: P
             get() = null
-        internal inline fun <reified U, reified V> C<Int, U>.f(p1: U, p2: V): Int where U: P, V: P = 1
+        inline fun <reified U, reified V> C<Int, U>.f(p1: U, p2: V): Int where U: P, V: P = 1
         """)
     }
 

@@ -1345,12 +1345,14 @@ struct KotlinExtensionDeclaration {
         }
         var extends = statement.extends
         var generics = statement.generics.resolvingSelf(in: statement)
+        var visibility = statement.modifiers.visibility
         if let extendedTypeInfo = translator.codebaseInfo?.primaryTypeInfo(forNamed: statement.extends) {
             // Set the extended type to match its primary type and put the complete set of constraints into the generics object
             extends = extendedTypeInfo.signature
             generics = extendedTypeInfo.generics.merge(extension: statement.extends, generics: statement.generics).resolvingSelf(in: statement)
+            visibility = extendedTypeInfo.modifiers.visibility
         }
-        return kstatements + translateExtensionMembers(statement.members, of: extends, visibility: statement.modifiers.visibility, generics: generics, translator: translator, extensionPlacement: placement)
+        return kstatements + translateExtensionMembers(statement.members, of: extends, visibility: visibility, generics: generics, translator: translator, extensionPlacement: placement)
     }
 
     static func translateExtensionMembers(_ members: [Statement], of extends: TypeSignature, visibility: Modifiers.Visibility, generics: Generics, translator: KotlinTranslator, extensionPlacement: KotlinExtensionPlacement? = nil) -> [KotlinStatement] {

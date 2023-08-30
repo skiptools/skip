@@ -11,6 +11,9 @@ final class SwiftUITests: XCTestCase {
     extension View {
         func mod() -> some View {
         }
+
+        func navigationDestination(for: Any, @ViewBuilder destination: (Any) -> any View) -> some View {
+        }
     }
 
     struct VStack: View {
@@ -30,6 +33,11 @@ final class SwiftUITests: XCTestCase {
 
     struct Button: View {
         init(_ text: String, action: () -> Void) {
+        }
+    }
+
+    struct NavigationStack: View {
+        init(@ViewBuilder content: () -> any View) {
         }
     }
 
@@ -1457,4 +1465,57 @@ final class SwiftUITests: XCTestCase {
         }
         """)
     }
+
+//    func testNavigationStackStringDestinations() async throws {
+//        try await check(supportingSwift: baseSupportingSwift, swift: """
+//        import SwiftUI
+//        struct MyV: View {
+//            var body: some View {
+//                NavigationStack {
+//                    Text("Root")
+//                        .navigationDestination(for: String.self) { value in
+//                            Text(value)
+//                        }
+//                        .navigationDestination(for: Int.self) {
+//                            switch $0 {
+//                            case 1: Text("one")
+//                            default: Text("default")
+//                            }
+//                        }
+//                }
+//            }
+//        }
+//        """, kotlin: """
+//        import androidx.compose.runtime.Composable
+//        import androidx.compose.runtime.getValue
+//        import androidx.compose.runtime.mutableStateOf
+//        import androidx.compose.runtime.saveable.Saver
+//        import androidx.compose.runtime.saveable.rememberSaveable
+//        import androidx.compose.runtime.setValue
+//
+//        import skip.ui.*
+//        internal class MyV: View {
+//            override fun body(): View {
+//                return ComposeView { composectx: ComposeContext ->
+//                    NavigationStack {
+//                        ComposeView { composectx: ComposeContext ->
+//                            Text("Root")
+//                                .navigationDestination(for_ = String::class) { value ->
+//                                ComposeView { composectx: ComposeContext -> Text(value).Compose(composectx) }
+//                            }
+//                                .navigationDestination(for_ = Int::class) { it ->
+//                                ComposeView { composectx: ComposeContext ->
+//                                    when (it) {
+//                                        1 -> Text("one").Compose(composectx)
+//                                        else -> Text("default").Compose(composectx)
+//                                    }
+//                                }
+//                            }.Compose(composectx)
+//                        }
+//                    }.Compose(composectx)
+//                }
+//            }
+//        }
+//        """)
+//    }
 }
