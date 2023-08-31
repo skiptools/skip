@@ -120,39 +120,49 @@ struct DoctorCommand: SkipCommand {
     func run() async throws {
         outputOptions.write("Skip Doctor")
 
-        let v = outputOptions.verbose
-
         func run(_ title: String, _ args: [String]) async throws -> String {
             let (out, err) = try await outputOptions.run(title, flush: false, args)
-
             return out.trimmingCharacters(in: .newlines) + err.trimmingCharacters(in: .newlines)
         }
 
-        let skip = try? await run("Checking Skip", ["skip", "version"])
-        outputOptions.write(": " + ((try? skip?.extract(pattern: "Skip version ([0-9.]+)")) ?? "unknown"))
-        if let output = skip, v { outputOptions.write(output) }
+        func checkVersion(title: String, cmd: [String], min: Version? = nil, pattern: String) async {
+            do {
+                let output = try await run(title, cmd)
+                if let v = try output.extract(pattern: pattern) {
+                    // the ToolSupport `Version` constructor only accepts three-part versions,
+                    // so we need to augment versions like "8.3" and "2022.3" with an extra ".0"
+                    guard let semver = Version(v) ?? Version(v + ".0") ?? Version(v + ".0.0") else {
+                        outputOptions.write(": PARSE ERROR")
+                        return
+                    }
+                    if let min = min, semver < min {
+                        outputOptions.write(": \(semver) (NEEDS \(min))")
+                    } else {
+                        outputOptions.write(": \(semver)")
+                    }
+                } else {
+                    outputOptions.write(": ERROR")
+                }
+            } catch {
+                outputOptions.write(": ERROR: \(error)")
+            }
+        }
 
-        let swift = try? await run("Checking Swift", ["swift", "-version"])
-        outputOptions.write(": " + ((try? swift?.extract(pattern: "Swift version ([0-9.]+)")) ?? "unknown"))
-        if let output = swift, v { outputOptions.write(output) }
-
-        let xcode = try? await run("Checking Xcode", ["xcodebuild", "-version"])
-        outputOptions.write(": " + ((try? xcode?.extract(pattern: "Xcode ([0-9.]+)")) ?? "unknown"))
-        if let output = xcode, v { outputOptions.write(output) }
-
-        let gradle = try? await run("Checking Gradle", ["gradle", "-version"])
-        outputOptions.write(": " + ((try? gradle?.extract(pattern: "Gradle ([0-9.]+)")) ?? "unknown"))
-        if let output = gradle, v { outputOptions.write(output) }
-
-        let java = try? await run("Checking Java", ["java", "-version"])
-        outputOptions.write(": " + ((try? java?.extract(pattern: "version \"([0-9.]+)\"")) ?? "unknown"))
-        if let output = java, v { outputOptions.write(output) }
-
-        let studio = try? await run("Checking Android Studio", ["/usr/libexec/PlistBuddy", "-c", "Print CFBundleShortVersionString", "/Applications/Android Studio.app/Contents/Info.plist"])
-        outputOptions.write(": " + ((try? studio?.extract(pattern: "([0-9.]+)")) ?? "unknown"))
-        if let output = studio, v { outputOptions.write(output) }
+        await checkVersion(title: "Skip version", cmd: ["skip", "version"], min: Version("0.6.4"), pattern: "Skip version ([0-9.]+)")
+        await checkVersion(title: "macOS version", cmd: ["sw_vers", "--productVersion"], min: Version("13.5.1"), pattern: "([0-9.]+)")
+        await checkVersion(title: "Swift version", cmd: ["swift", "-version"], min: Version("5.9.0"), pattern: "Swift version ([0-9.]+)")
+        await checkVersion(title: "Xcode version", cmd: ["xcodebuild", "-version"], min: Version("15.0.0"), pattern: "Xcode ([0-9.]+)")
+        await checkVersion(title: "Gradle version", cmd: ["gradle", "-version"], min: Version("8.3.0"), pattern: "Gradle ([0-9.]+)")
+        await checkVersion(title: "Java version", cmd: ["java", "-version"], min: Version("17.0.0"), pattern: "version \"([0-9.]+)\"")
+        await checkVersion(title: "Homebrew version", cmd: ["brew", "--version"], min: Version("4.1.7"), pattern: "Homebrew ([0-9.]+)")
+        await checkVersion(title: "Android Studio version", cmd: ["/usr/libexec/PlistBuddy", "-c", "Print CFBundleShortVersionString", "/Applications/Android Studio.app/Contents/Info.plist"], min: Version("2022.3.0"), pattern: "([0-9.]+)")
 
         let latestVersion = try await checkSkipUpdates()
+
+        let hostID = try await outputOptions.monitor("Host") {
+            ProcessInfo.processInfo.hostIdentifier
+        }
+        outputOptions.write(": " + (hostID?.uuidString ?? "unknown"))
 
         if let latestVersion = latestVersion, latestVersion != skipVersion {
             outputOptions.write("A new version is Skip (\(latestVersion)) is available to update with: skip update")
@@ -184,7 +194,6 @@ extension SkipCommand {
         let document = try XMLDocument(data: data)
         return document.rootElement()?.elements(forName: "entry").first?.elements(forName: "title").first?.stringValue
     }
-
 }
 
 extension String {
@@ -199,8 +208,8 @@ extension String {
         }
         return nil
     }
-
 }
+
 // MARK: CreateCommand
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)

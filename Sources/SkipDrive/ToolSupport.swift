@@ -97,6 +97,16 @@ extension FileManager {
     }
 }
 
+extension ProcessInfo {
+    /// The unique host identifier as returned from `IOPlatformExpertDevice`
+    public var hostIdentifier: UUID? {
+        let matchingDict = IOServiceMatching("IOPlatformExpertDevice")
+        let service = IOServiceGetMatchingService(kIOMainPortDefault, matchingDict)
+        defer { IOObjectRelease(service) }
+        guard service != .zero else { return nil }
+        return (IORegistryEntryCreateCFProperty(service, kIOPlatformUUIDKey as CFString, kCFAllocatorDefault, .zero).takeRetainedValue() as? String).flatMap(UUID.init(uuidString:))
+    }
+}
 
 // MARK: cherry-picking swift-tools-support-core
 
