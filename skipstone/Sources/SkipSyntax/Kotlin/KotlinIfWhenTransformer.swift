@@ -7,8 +7,6 @@ final class KotlinIfWhenTransformer: KotlinTransformer {
         syntaxTree.root.visit(perform: expressionVisitor.visit)
         let identifiersVisitor = IdentifiersVisitor()
         syntaxTree.root.visit(perform: identifiersVisitor.visit)
-        let unreachableVisitor = UnreachableVisitor()
-        syntaxTree.root.visit(perform: unreachableVisitor.visit)
     }
 }
 
@@ -87,7 +85,7 @@ private class ValueExpressionVisitor {
     }
 
     private func valueExpressionType(forUsedAsExpression node: KotlinSyntaxNode?) -> ValueExpressionType {
-        return (node as? KotlinIf)?.ifCheckVariable != nil || (node as? KotlinWhen)?.caseTargetVariable != nil ? .expression : .none
+        return (node as? KotlinIf)?.conditionSets.first?.targetVariable != nil || (node as? KotlinWhen)?.caseTargetVariable != nil ? .expression : .none
     }
 }
 
@@ -117,14 +115,11 @@ private class IdentifiersVisitor {
                 if let caseTargetVariable = conditionSet.caseTargetVariable {
                     caseTargetVariable.identifier.name = newTargetVariableName()
                 }
-                if let guardTargetVariable = conditionSet.guardTargetVariable {
-                    guardTargetVariable.identifier.name = newTargetVariableName()
+                if let targetVariable = conditionSet.targetVariable {
+                    targetVariable.identifier.name = newTargetVariableName()
                 }
             }
-            if kif.ifCheckVariable != nil {
-                kif.ifCheckVariable = newIfCheckVariableName()
-                return .recurse(nil)
-            } else if kif.isGuard {
+            if kif.isGuard {
                 // Visit the guard body without the new bindings
                 kif.body.visit(perform: self.visit)
                 // Visit conditions and gather bindings. Reference conditionSets[i].xxx to mutate structs without manually resetting them
@@ -208,66 +203,6 @@ private class IdentifiersVisitor {
             }
         }
         return nil
-    }
-}
-
-/// Add an unreachable error to functions and closures that the compiler may no longer be able to guarantee return a value
-/// due to the complexity of some of our `if` translations.
-private class UnreachableVisitor {
-    func visit(_ node: KotlinSyntaxNode) -> VisitResult<KotlinSyntaxNode> {
-        if let functionDeclaration = node as? KotlinFunctionDeclaration {
-            // For functions a .none return type must be void, so skip it too
-            if let body = functionDeclaration.body, functionDeclaration.returnType != .none && functionDeclaration.returnType != .void {
-                addUnreachableErrorIfNeeded(to: body)
-            }
-        } else if let variableDeclaration = node as? KotlinVariableDeclaration {
-            if let body = variableDeclaration.getter?.body {
-                addUnreachableErrorIfNeeded(to: body)
-            }
-        } else if let closure = node as? KotlinClosure {
-            // For closures a .none return type is unknown, so only skip void
-            if closure.returnType != .void {
-                addUnreachableErrorIfNeeded(to: closure.body)
-            }
-        }
-        return .recurse(nil)
-    }
-
-    private func addUnreachableErrorIfNeeded(to codeBlock: KotlinCodeBlock) {
-        // We need to add an error if the block:
-        // - Does not end with a return statement
-        // - Contains an explicit return value
-        // - Has an 'if' that we've restructured to use an if condition var, which may confuse the compiler
-        guard !(codeBlock.statements.last is KotlinReturn) else {
-            return
-        }
-        var hasReturnValue: Bool? = nil
-        var hasIfCheckVariable = false
-        codeBlock.visit { node in
-            if hasReturnValue == false || (hasIfCheckVariable && hasReturnValue != nil) {
-                // We can skip everything once we meet our conditions
-                return .skip
-            }
-            if node is KotlinFunctionDeclaration {
-                return .skip
-            } else if node is KotlinClosure {
-                return .skip
-            } else if hasReturnValue == nil, let kret = node as? KotlinReturn {
-                hasReturnValue = kret.expression != nil
-                return .skip
-            } else if !hasIfCheckVariable, let kif = node as? KotlinIf, !kif.requiresNestingClosure {
-                hasIfCheckVariable = kif.ifCheckVariable != nil
-                return .recurse(nil)
-            } else {
-                return .recurse(nil)
-            }
-        }
-        guard hasReturnValue == true && hasIfCheckVariable else {
-            return
-        }
-        let errorStatement = KotlinRawStatement(sourceCode: "error(\"Unreachable\")")
-        errorStatement.parent = codeBlock
-        codeBlock.statements.append(errorStatement)
     }
 }
 
