@@ -119,7 +119,7 @@ final class ConditionalTests: XCTestCase {
             }
         }
         """)
-
+        
         try await check(swift: """
         {
             var i: Int?
@@ -135,7 +135,27 @@ final class ConditionalTests: XCTestCase {
             }
         }
         """)
+        
+        try await check(swift: """
+        {
+            var i: Int?
+            var j = 0
+            if j != 0, let i {
+                print(i + j)
+            }
+        }
+        """, kotlin: """
+        {
+            var i: Int?
+            var j = 0
+            if ((j != 0) && (i != null)) {
+                print(i + j)
+            }
+        }
+        """)
+    }
 
+    func testRenameOptionalBinding() async throws {
         try await check(swift: """
         {
             var i: Int?
@@ -148,6 +168,44 @@ final class ConditionalTests: XCTestCase {
             var i: Int?
             i?.let { x ->
                 print(x)
+            }
+        }
+        """)
+
+        try await check(swift: """
+        {
+            var i: Int?
+            var j = 0
+            if j != 0, let x = i {
+                print(x + j)
+            }
+        }
+        """, kotlin: """
+        {
+            var i: Int?
+            var j = 0
+            if (j != 0) {
+                i?.let { x ->
+                    print(x + j)
+                }
+            }
+        }
+        """)
+
+        try await check(swift: """
+        {
+            var i: Int?
+            if let x = i, x > 0 {
+                print(x)
+            }
+        }
+        """, kotlin: """
+        {
+            var i: Int?
+            i?.let { x ->
+                if (x > 0) {
+                    print(x)
+                }
             }
         }
         """)
@@ -276,6 +334,26 @@ final class ConditionalTests: XCTestCase {
         """)
     }
 
+    func testExpressionOptionalBinding() async throws {
+        try await check(supportingSwift: """
+        func f() -> Int? {
+            return nil
+        }
+        """, swift: """
+        {
+            if let i = f() {
+                print(i)
+            }
+        }
+        """, kotlin: """
+        {
+            f()?.let { i ->
+                print(i)
+            }
+        }
+        """)
+    }
+
     func testOptionalBindingElse() async throws {
         try await check(swift: """
         {
@@ -309,12 +387,81 @@ final class ConditionalTests: XCTestCase {
         """, kotlin: """
         {
             var i: Int?
-            var letexec_0 = false
-            i?.let { x ->
-                letexec_0 = true
+            if (i != null) {
+                val x = i
                 print(x)
+            } else {
+                print("nil")
             }
-            if (!letexec_0) {
+        }
+        """)
+    }
+
+    func testMutableStructOptionalBindingElse() async throws {
+        // Translate let into a simple null check because the value can't change
+        try await check(swift: """
+        {
+            let i: S?
+            if let i {
+                print(i)
+            } else {
+                print("nil")
+            }
+        }
+        """, kotlin: """
+        {
+            val i: S?
+            if (i != null) {
+                print(i)
+            } else {
+                print("nil")
+            }
+        }
+        """)
+
+        // Translate var into a new reference because we don't want to mutate the original value
+        try await check(swift: """
+        {
+            let i: S?
+            if var i {
+                i.mutate()
+            } else {
+                print("nil")
+            }
+        }
+        """, kotlin: """
+        {
+            val i: S?
+            if (i != null) {
+                var i = i.sref()
+                i.mutate()
+            } else {
+                print("nil")
+            }
+        }
+        """)
+    }
+
+    func testExpressionOptionalBindingElse() async throws {
+        try await check(supportingSwift: """
+        func f() -> Int? {
+            return nil
+        }
+        """, swift: """
+        {
+            if let i = f() {
+                print(i)
+            } else {
+                print("nil")
+            }
+        }
+        """, kotlin: """
+        {
+            val matchtarget_0 = f()
+            if (matchtarget_0 != null) {
+                val i = matchtarget_0
+                print(i)
+            } else {
                 print("nil")
             }
         }
@@ -343,12 +490,10 @@ final class ConditionalTests: XCTestCase {
             } else if (i != null) {
                 print(i)
             } else {
-                var letexec_0 = false
-                i?.let { x ->
-                    letexec_0 = true
+                if (i != null) {
+                    val x = i
                     print(x)
-                }
-                if (!letexec_0) {
+                } else {
                     print("nil")
                 }
             }
@@ -369,19 +514,14 @@ final class ConditionalTests: XCTestCase {
         """, kotlin: """
         {
             var i: Int?
-            var letexec_0 = false
-            i?.let { i ->
+            if (i != null) {
                 var i = i
-                letexec_0 = true
                 print(i)
-            }
-            if (!letexec_0) {
-                if (x > 0) {
-                    print("positive")
-                } else {
-                    i?.let { y ->
-                        print(y)
-                    }
+            } else if (x > 0) {
+                print("positive")
+            } else {
+                i?.let { y ->
+                    print(y)
                 }
             }
         }
@@ -401,20 +541,97 @@ final class ConditionalTests: XCTestCase {
         """, kotlin: """
         {
             var i: Int?
-            var letexec_0 = false
-            i?.let { i ->
+            if (i != null) {
                 var i = i
-                letexec_0 = true
+                print(i)
+            } else {
+                if (i != null) {
+                    val x = i
+                    print(x)
+                } else {
+                    print("nil")
+                }
+            }
+        }
+        """)
+    }
+
+    func testOptionalBindingMultipleConditions() async throws {
+        try await check(swift: """
+        {
+            var i: Int?
+            if var i, i > 5 {
                 print(i)
             }
-            if (!letexec_0) {
-                var letexec_1 = false
-                i?.let { x ->
-                    letexec_1 = true
-                    print(x)
+        }
+        """, kotlin: """
+        {
+            var i: Int?
+            i?.let { i ->
+                var i = i
+                if (i > 5) {
+                    print(i)
                 }
-                if (!letexec_1) {
-                    print("nil")
+            }
+        }
+        """)
+    }
+
+    func testOptionalBindingMultipleConditionsElse() async throws {
+        try await check(swift: """
+        {
+            var i: Int?
+            if var i, i > 5 {
+                print(i)
+            } else {
+                print("error")
+            }
+        }
+        """, kotlin: """
+        {
+            var i: Int?
+            if (i != null) {
+                var i = i
+                if (i > 5) {
+                    print(i)
+                } else {
+                    print("error")
+                }
+            } else {
+                print("error")
+            }
+        }
+        """)
+    }
+
+    func testSecondaryOptionalBindingElseIf() async throws {
+        try await check(swift: """
+        {
+            var i: Int?
+            if let i, i > 5 {
+                print(i)
+            } else if boolValue, let x = f() {
+                print(x)
+            } else {
+                print("else")
+            }
+        }
+        """, kotlin: """
+        {
+            var i: Int?
+            if ((i != null) && (i > 5)) {
+                print(i)
+            } else {
+                if (boolValue) {
+                    val matchtarget_0 = f()
+                    if (matchtarget_0 != null) {
+                        val x = matchtarget_0
+                        print(x)
+                    } else {
+                        print("else")
+                    }
+                } else {
+                    print("else")
                 }
             }
         }
@@ -438,19 +655,35 @@ final class ConditionalTests: XCTestCase {
             var i: Int?
             var j: String?
             var k: Int?
-            var letexec_0 = false
-            i?.let { i ->
+            if (i != null) {
                 var i = i
                 if (i > 5) {
-                    j?.let { x ->
+                    if (j != null) {
+                        val x = j
                         if (x == "x" || x == "y") {
-                            letexec_0 = true
                             print(i)
+                        } else {
+                            if (boolValue) {
+                                k?.let { x ->
+                                    print(x)
+                                }
+                            }
+                        }
+                    } else {
+                        if (boolValue) {
+                            k?.let { x ->
+                                print(x)
+                            }
+                        }
+                    }
+                } else {
+                    if (boolValue) {
+                        k?.let { x ->
+                            print(x)
                         }
                     }
                 }
-            }
-            if (!letexec_0) {
+            } else {
                 if (boolValue) {
                     k?.let { x ->
                         print(x)
@@ -482,6 +715,39 @@ final class ConditionalTests: XCTestCase {
                         print(doublerelated)
                     }
                 }
+            }
+        }
+        """)
+    }
+
+    func testOptionalBindingUsingPreviousOptionalBindingElse() async throws {
+        try await check(supportingSwift: """
+        class C {
+            var related: C?
+        }
+        """, swift: """
+        {
+            var c: C?
+            if let x = c, let related = x.related {
+                print(related)
+            } else {
+                print("nil")
+            }
+        }
+        """, kotlin: """
+        {
+            var c: C?
+            if (c != null) {
+                val x = c
+                val matchtarget_0 = x.related
+                if (matchtarget_0 != null) {
+                    val related = matchtarget_0
+                    print(related)
+                } else {
+                    print("nil")
+                }
+            } else {
+                print("nil")
             }
         }
         """)
@@ -528,137 +794,13 @@ final class ConditionalTests: XCTestCase {
             print("nope")
         }
         """, kotlin: """
-        var letexec_0 = false
-        f()?.let { (x, y) ->
-            letexec_0 = true
+        val matchtarget_0 = f()
+        if (matchtarget_0 != null) {
+            val (x, y) = matchtarget_0
             print(x)
             print(y)
-        }
-        if (!letexec_0) {
+        } else {
             print("nope")
-        }
-        """)
-    }
-
-    func testAddUnreachableErrorIfReturnRequired() async throws {
-        try await check(swift: """
-        func f(i: Int?) -> Int {
-            if let x = i {
-                return x
-            } else {
-                return 0
-            }
-        }
-        """, kotlin: """
-        internal fun f(i: Int?): Int {
-            var letexec_0 = false
-            i?.let { x ->
-                letexec_0 = true
-                return x
-            }
-            if (!letexec_0) {
-                return 0
-            }
-            error("Unreachable")
-        }
-        """)
-
-        // No error added if the block ends in 'return'
-        try await check(swift: """
-        func f(i: Int?) -> Int {
-            if let x = i {
-                return x
-            } else {
-                print("null")
-            }
-            return 0
-        }
-        """, kotlin: """
-        internal fun f(i: Int?): Int {
-            var letexec_0 = false
-            i?.let { x ->
-                letexec_0 = true
-                return x
-            }
-            if (!letexec_0) {
-                print("null")
-            }
-            return 0
-        }
-        """)
-
-        // No error added for 'if' that retains its 'else'
-        try await check(swift: """
-        func f(i: Int?) -> Int {
-            if let i {
-                return i
-            } else {
-                return 0
-            }
-        }
-        """, kotlin: """
-        internal fun f(i: Int?): Int {
-            if (i != null) {
-                return i
-            } else {
-                return 0
-            }
-        }
-        """)
-
-        try await check(swift: """
-        func f(i: Int?) -> Int {
-            let r = {
-                if let x = i {
-                    return x
-                } else {
-                    return 0
-                }
-            }()
-            return r
-        }
-        """, kotlin: """
-        internal fun f(i: Int?): Int {
-            val r = linvoke l@{
-                var letexec_0 = false
-                i?.let { x ->
-                    letexec_0 = true
-                    return@l x
-                }
-                if (!letexec_0) {
-                    return@l 0
-                }
-                error("Unreachable")
-            }
-            return r
-        }
-        """)
-
-        // No error added if no value returned
-        try await check(swift: """
-        func f(i: Int?) -> Int {
-            {
-                if let x = i {
-                    print(x)
-                } else {
-                    print(0)
-                }
-            }()
-            return 100
-        }
-        """, kotlin: """
-        internal fun f(i: Int?): Int {
-            {
-                var letexec_0 = false
-                i?.let { x ->
-                    letexec_0 = true
-                    print(x)
-                }
-                if (!letexec_0) {
-                    print(0)
-                }
-            }()
-            return 100
         }
         """)
     }
@@ -676,15 +818,13 @@ final class ConditionalTests: XCTestCase {
         """, kotlin: """
         internal fun f(): String {
             val dict: Dictionary<String, Any> = dictionaryOf(Tuple2("A", 1))
-            var letexec_0 = false
-            (dict["A"] as? Int)?.let { num ->
-                letexec_0 = true
+            val matchtarget_0 = dict["A"] as? Int
+            if (matchtarget_0 != null) {
+                val num = matchtarget_0
                 return "A"
-            }
-            if (!letexec_0) {
+            } else {
                 return "B"
             }
-            error("Unreachable")
         }
         """)
     }
@@ -833,17 +973,16 @@ final class ConditionalTests: XCTestCase {
             if (i != null) {
                 print(i)
             } else {
-                var letexec_0 = false
                 val matchtarget_0 = enumFactory()
                 if (matchtarget_0 is E.Case2Case) {
                     val i = matchtarget_0.associated0
                     val s = matchtarget_0.associated1
                     if (i > 1) {
-                        letexec_0 = true
                         print(s)
+                    } else {
+                        print("else")
                     }
-                }
-                if (!letexec_0) {
+                } else {
                     print("else")
                 }
             }
@@ -870,16 +1009,16 @@ final class ConditionalTests: XCTestCase {
         """, kotlin: """
         {
             var i: Int?
-            var letexec_0 = false
-            i?.let { x ->
+            if (i != null) {
+                val x = i
                 val matchtarget_0 = enumFactory()
                 if (matchtarget_0 is E.Case2Case) {
                     val i = matchtarget_0.associated0
-                    letexec_0 = true
                     print(x + i)
+                } else {
+                    print("else")
                 }
-            }
-            if (!letexec_0) {
+            } else {
                 print("else")
             }
         }
@@ -951,27 +1090,18 @@ final class ConditionalTests: XCTestCase {
         """, kotlin: """
         internal fun f() {
             var i: Int? = null
-            val j = linvoke l@{
-                var letexec_0 = false
-                i?.let { x ->
-                    letexec_0 = true
-                    return@l x + 1
+            val j = if (i != null) {
+                val x = i
+                x + 1
+            } else {
+                if (i != null) {
+                    val y = i
+                    y * 2
+                } else if (g()) {
+                    -1
+                } else {
+                    0
                 }
-                if (!letexec_0) {
-                    var letexec_1 = false
-                    i?.let { y ->
-                        letexec_1 = true
-                        return@l y * 2
-                    }
-                    if (!letexec_1) {
-                        if (g()) {
-                            return@l -1
-                        } else {
-                            return@l 0
-                        }
-                    }
-                }
-                error("Unreachable")
             }
         }
         """)
@@ -1034,32 +1164,24 @@ final class ConditionalTests: XCTestCase {
         }
         """, kotlin: """
         internal fun f(i: Int?): Int {
-            return linvoke l@{
-                var letexec_0 = false
-                i?.let { x ->
-                    letexec_0 = true
-                    return@l x + 1
+            return if (i != null) {
+                val x = i
+                x + 1
+            } else {
+                val matchtarget_0 = g()
+                if (matchtarget_0 != null) {
+                    val y = matchtarget_0
+                    y
+                } else {
+                    0
                 }
-                if (!letexec_0) {
-                    var letexec_1 = false
-                    g()?.let { y ->
-                        letexec_1 = true
-                        return@l y
-                    }
-                    if (!letexec_1) {
-                        return@l 0
-                    }
-                }
-                error("Unreachable")
             }
         }
         internal fun g(i: Int? = null): Int {
-            var letexec_2 = false
-            i?.let { x ->
-                letexec_2 = true
+            if (i != null) {
+                val x = i
                 print(x)
-            }
-            if (!letexec_2) {
+            } else {
                 print("Nil")
             }
             return 1
@@ -1076,16 +1198,61 @@ final class ConditionalTests: XCTestCase {
         }
         """, kotlin: """
         internal fun f(i: Int?): Int {
+            return if (i != null) {
+                val x = i
+                x + 1
+            } else {
+                0
+            }
+        }
+        """)
+
+        try await check(swift: """
+        func f() -> Int? {
+            return if let x = f() {
+                x + 1
+            } else {
+                0
+            }
+        }
+        """, kotlin: """
+        internal fun f(): Int? {
             return linvoke l@{
-                var letexec_0 = false
-                i?.let { x ->
-                    letexec_0 = true
+                val matchtarget_0 = f()
+                if (matchtarget_0 != null) {
+                    val x = matchtarget_0
                     return@l x + 1
-                }
-                if (!letexec_0) {
+                } else {
                     return@l 0
                 }
-                error("Unreachable")
+            }
+        }
+        """)
+
+        try await check(swift: """
+        func f(i: Int) -> Int {
+            return if i > 0, let x = f(), x < 10 {
+                x + 1
+            } else {
+                0
+            }
+        }
+        """, kotlin: """
+        internal fun f(i: Int): Int {
+            return if (i > 0) {
+                val matchtarget_0 = f()
+                if (matchtarget_0 != null) {
+                    val x = matchtarget_0
+                    if (x < 10) {
+                        x + 1
+                    } else {
+                        0
+                    }
+                } else {
+                    0
+                }
+            } else {
+                0
             }
         }
         """)
@@ -1105,20 +1272,17 @@ final class ConditionalTests: XCTestCase {
         """, kotlin: """
         internal fun f(i: Int) {
             val c = {
-                var letexec_0 = false
-                i?.let { x ->
-                    letexec_0 = true
+                if (i != null) {
+                    val x = i
                     print(x)
-                }
-                if (!letexec_0) {
+                } else {
                     print("Nil")
                 }
             }
         }
         """)
 
-        // We have no reliable way to detect using 'if' as an implicit return value vs. a statement in a closure
-        try await check(expectFailure: true, swift: """
+        try await check(swift: """
         func f(i: Int) {
             let c = {
                 if let x = i {
@@ -1130,14 +1294,12 @@ final class ConditionalTests: XCTestCase {
         }
         """, kotlin: """
         internal fun f(i: Int) {
-            val c = l@{
-                var letexec_0 = false
-                i?.let { x ->
-                    letexec_0 = true
-                    return@l x + 1
-                }
-                if (!letexec_0) {
-                    return@l 0
+            val c = {
+                if (i != null) {
+                    val x = i
+                    x + 1
+                } else {
+                    0
                 }
             }
         }
@@ -1156,16 +1318,11 @@ final class ConditionalTests: XCTestCase {
         """, kotlin: """
         internal fun f(i: Int) {
             val c = fun(): Int {
-                return linvoke l@{
-                    var letexec_0 = false
-                    i?.let { x ->
-                        letexec_0 = true
-                        return@l x + 1
-                    }
-                    if (!letexec_0) {
-                        return@l 0
-                    }
-                    error("Unreachable")
+                return if (i != null) {
+                    val x = i
+                    x + 1
+                } else {
+                    0
                 }
             }
         }
@@ -1184,16 +1341,11 @@ final class ConditionalTests: XCTestCase {
         """, kotlin: """
         internal fun f(i: Int) {
             val c: () -> Int = {
-                linvoke l@{
-                    var letexec_0 = false
-                    i?.let { x ->
-                        letexec_0 = true
-                        return@l x + 1
-                    }
-                    if (!letexec_0) {
-                        return@l 0
-                    }
-                    error("Unreachable")
+                if (i != null) {
+                    val x = i
+                    x + 1
+                } else {
+                    0
                 }
             }
         }
@@ -1212,15 +1364,12 @@ final class ConditionalTests: XCTestCase {
         """, kotlin: """
         internal fun f(i: Int) {
             val c: () -> Int = l@{
-                var letexec_0 = false
-                i?.let { x ->
-                    letexec_0 = true
+                if (i != null) {
+                    val x = i
                     return@l x + 1
-                }
-                if (!letexec_0) {
+                } else {
                     return@l 0
                 }
-                error("Unreachable")
             }
         }
         """)
@@ -1238,16 +1387,11 @@ final class ConditionalTests: XCTestCase {
         """, kotlin: """
         internal fun f(i: Int) {
             val c: () -> Int = l@{
-                return@l linvoke l@{
-                    var letexec_0 = false
-                    i?.let { x ->
-                        letexec_0 = true
-                        return@l x + 1
-                    }
-                    if (!letexec_0) {
-                        return@l 0
-                    }
-                    error("Unreachable")
+                return@l if (i != null) {
+                    val x = i
+                    x + 1
+                } else {
+                    0
                 }
             }
         }
