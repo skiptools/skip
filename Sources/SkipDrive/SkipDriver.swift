@@ -63,6 +63,7 @@ public struct SkipDriver: AsyncParsableCommand {
 }
 
 extension SkipCommand {
+    /// Initialize a Skip command to run with the given fixed streams.
     func setup(out: WritableByteStream? = nil, err: WritableByteStream? = nil) throws -> Self {
         if let outputFile = outputOptions.output {
             let path = URL(fileURLWithPath: outputFile)
@@ -73,17 +74,13 @@ extension SkipCommand {
         if let err = err {
             outputOptions.streams.err = err
         }
-
-        // setup local skip config folder if it doesn't exist
-        try? FileManager.default.createDirectory(atPath: home(".skiptools"), withIntermediateDirectories: true)
-
         return self
     }
 }
 
 /// The path to a file/folder in a user's home directory
 private func home(_ file: String) -> String {
-    ("~/\(file)" as NSString).expandingTildeInPath
+    NSHomeDirectory() + "/" + file
 }
 
 // MARK: VersionCommand
@@ -184,11 +181,14 @@ struct SelftestCommand: SkipCommand {
             return ["skip", "init", "--build", "--test", "-d", tmpdir, "lib-name", "ModuleName"]
         }
 
-        // if we have never run with Gradle before (indicated by the absence of a ~/.gradle folder), then indicate that the first run may take a long time
-        if !FileManager.default.fileExists(atPath: home(".gradle")) {
+        // if we have not initiailized Gradle before (indicated by the absence of a ~/.gradle/caches/ folder), indicate that the first run will take a while
+        var isDir: ObjCBool = false
+        if FileManager.default.fileExists(atPath: home(".gradle/caches"), isDirectory: &isDir) == false || isDir.boolValue == false {
             try await outputOptions.run("Pre-Caching Gradle Dependencies (~1G)", selftest())
         }
+
         let _ = try await outputOptions.run("Running Skip Self-Test", selftest())
+
         //outputOptions.write(output.out)
         //outputOptions.write(output.err)
         outputOptions.write("Skip \(skipVersion) self-test passed!")
@@ -1102,6 +1102,8 @@ public struct OutputOptions: ParsableArguments {
     internal var streams: OutputHandler = OutputHandler()
 
     public init() {
+        // setup local skip config folder if it doesn't exist
+        try? FileManager.default.createDirectory(atPath: home(".skiptools"), withIntermediateDirectories: true)
     }
 
     internal final class OutputHandler : Decodable {
