@@ -70,8 +70,8 @@ public class SkipRunnerTests : XCTestCase {
         internal fun abc() = Unit
         """)
 
-        try await snippet(swift: "func num() : Int64 { Int64(1) }", kotlin: """
-        internal fun num() = Long(1)
+        try await snippet(swift: "func num() -> Int64 { Int64(1) }", kotlin: """
+        internal fun num(): Long = Long(1)
         """)
 
         try await snippet(swift: """

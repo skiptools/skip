@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Workspace
+   version = "1.0">
+   <FileRef
+      location = "group:">
+   </FileRef>
+   <FileRef
+      location = "group:../skip">
+   </FileRef>
+   <FileRef
+      location = "group:../skip-unit">
+   </FileRef>
+   <FileRef
+      location = "group:../skip-lib">
+   </FileRef>
+   <FileRef
+      location = "group:../skip-foundation">
+   </FileRef>
+   <FileRef
+      location = "group:../skip-ui">
+   </FileRef>
+   <FileRef
+      location = "group:../skipapp/App.xcodeproj">
+   </FileRef>
+</Workspace>

@@ -1582,6 +1582,15 @@ private extension AbsolutePath {
 }
 
 extension ProcessInfo {
+        /// The unique host identifier as returned from `IOPlatformExpertDevice`
+    public var hostIdentifier: UUID? {
+        let matchingDict = IOServiceMatching("IOPlatformExpertDevice")
+        let service = IOServiceGetMatchingService(kIOMainPortDefault, matchingDict)
+        defer { IOObjectRelease(service) }
+        guard service != .zero else { return nil }
+        return (IORegistryEntryCreateCFProperty(service, kIOPlatformUUIDKey as CFString, kCFAllocatorDefault, .zero).takeRetainedValue() as? String).flatMap(UUID.init(uuidString:))
+    }
+
     /// Get the list of all running process IDs, which we check against the contents of a `.skiplock` file
     static func getRunningProcessIDs() throws -> [Int32] {
         #if !canImport(Darwin)
@@ -1601,3 +1610,4 @@ extension ProcessInfo {
         #endif
     }
 }
+
