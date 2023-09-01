@@ -45,6 +45,15 @@ public class SkipCommandTests : XCTestCase {
         //try await skip("check", "-d", tempDir)
     }
 
+    public func testSkipWelcome() async throws {
+        try await skip("welcome")
+    }
+
+    public func testSkipSelftest() async throws {
+        throw XCTSkip("build doesn't run from CI")
+        //try await skip("selftest")
+    }
+
     public func testSkipDoctor() async throws {
         try await skip("doctor")
     }

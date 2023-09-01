@@ -17,17 +17,9 @@ extension AsyncParsableCommand {
     /// Run the transpiler on the given arguments.
     public static func run(_ arguments: [String], out: WritableByteStream? = nil, err: WritableByteStream? = nil) async throws {
         var cmd: ParsableCommand = try parseAsRoot(arguments)
-        if var cmd = cmd as? any SkipCommand {
-            if let outputFile = cmd.outputOptions.output {
-                let path = URL(fileURLWithPath: outputFile)
-                cmd.outputOptions.streams.out = try LocalFileOutputByteStream(path)
-            } else if let out = out {
-                cmd.outputOptions.streams.out = out
-            }
-            if let err = err {
-                cmd.outputOptions.streams.err = err
-            }
-            try await cmd.run()
+        if let cmd = cmd as? any SkipCommand {
+            var skipCommand = try cmd.setup(out: out, err: err)
+            try await skipCommand.run()
         } else if var cmd = cmd as? AsyncParsableCommand {
             try await cmd.run()
         } else {
@@ -45,12 +37,20 @@ public struct SkipDriver: AsyncParsableCommand {
         shouldDisplay: true,
         subcommands: [
             VersionCommand.self,
+            DoctorCommand.self,
+            SelftestCommand.self,
+
             CreateCommand.self,
             InitCommand.self,
-            DoctorCommand.self,
+
             UpgradeCommand.self,
             GradleCommand.self,
+
             TestCommand.self,
+
+            WelcomeCommand.self,
+            HostIDCommand.self,
+
             //CheckCommand.self,
             //RunCommand.self,
             //AssembleCommand.self,
@@ -60,6 +60,30 @@ public struct SkipDriver: AsyncParsableCommand {
 
     public init() {
     }
+}
+
+extension SkipCommand {
+    func setup(out: WritableByteStream? = nil, err: WritableByteStream? = nil) throws -> Self {
+        if let outputFile = outputOptions.output {
+            let path = URL(fileURLWithPath: outputFile)
+            outputOptions.streams.out = try LocalFileOutputByteStream(path)
+        } else if let out = out {
+            outputOptions.streams.out = out
+        }
+        if let err = err {
+            outputOptions.streams.err = err
+        }
+
+        // setup local skip config folder if it doesn't exist
+        try? FileManager.default.createDirectory(atPath: home(".skiptools"), withIntermediateDirectories: true)
+
+        return self
+    }
+}
+
+/// The path to a file/folder in a user's home directory
+private func home(_ file: String) -> String {
+    ("~/\(file)" as NSString).expandingTildeInPath
 }
 
 // MARK: VersionCommand
@@ -104,6 +128,94 @@ struct UpgradeCommand: SkipCommand {
     }
 }
 
+// MARK: WelcomeCommand
+
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
+struct WelcomeCommand: SkipCommand {
+    static var configuration = CommandConfiguration(
+        commandName: "welcome",
+        abstract: "Show the skip welcome message",
+        shouldDisplay: false)
+
+    @OptionGroup(title: "Output Options")
+    var outputOptions: OutputOptions
+
+    func run() async throws {
+        outputOptions.write("""
+
+         ▄▄▄▄▄▄▄ ▄▄▄   ▄ ▄▄▄ ▄▄▄▄▄▄▄
+        █       █   █ █ █   █       █
+        █  ▄▄▄▄▄█   █▄█ █   █    ▄  █
+        █ █▄▄▄▄▄█      ▄█   █   █▄█ █
+        █▄▄▄▄▄  █     █▄█   █    ▄▄▄█
+         ▄▄▄▄▄█ █    ▄  █   █   █
+        █▄▄▄▄▄▄▄█▄▄▄█ █▄█▄▄▄█▄▄▄█
+
+        Welcome to Skip \(skipVersion)!
+
+        Run "skip doctor" to check system requirements.
+        Run "skip selftest" to perform a full system evaluation.
+
+        Visit https://skip.tools for documentation, samples, and FAQs.
+
+        Happy Skipping!
+        """)
+    }
+}
+
+// MARK: SelftestCommand
+
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
+struct SelftestCommand: SkipCommand {
+    static var configuration = CommandConfiguration(
+        commandName: "selftest",
+        abstract: "Run a test to ensure Skip is in working order",
+        shouldDisplay: true)
+
+    @OptionGroup(title: "Output Options")
+    var outputOptions: OutputOptions
+
+    func run() async throws {
+        try await runDoctor()
+
+        func selftest() throws -> [String] {
+            let tmpdir = NSTemporaryDirectory() + "/" + UUID().uuidString
+            try FileManager.default.createDirectory(atPath: tmpdir, withIntermediateDirectories: true)
+            return ["skip", "init", "--build", "--test", "-d", tmpdir, "lib-name", "ModuleName"]
+        }
+
+        // if we have never run with Gradle before (indicated by the absence of a ~/.gradle folder), then indicate that the first run may take a long time
+        if !FileManager.default.fileExists(atPath: home(".gradle")) {
+            try await outputOptions.run("Pre-Caching Gradle Dependencies (~1G)", selftest())
+        }
+        let _ = try await outputOptions.run("Running Skip Self-Test", selftest())
+        //outputOptions.write(output.out)
+        //outputOptions.write(output.err)
+        outputOptions.write("Skip \(skipVersion) self-test passed!")
+
+    }
+}
+
+
+// MARK: HostIDCommand
+
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
+struct HostIDCommand: SkipCommand {
+    static var configuration = CommandConfiguration(
+        commandName: "hostid",
+        abstract: "Display the current host ID",
+        shouldDisplay: false)
+
+    @OptionGroup(title: "Output Options")
+    var outputOptions: OutputOptions
+
+    func run() async throws {
+        guard let hostid = ProcessInfo.processInfo.hostIdentifier else {
+            throw AppLaunchError(errorDescription: "Could not access Host ID")
+        }
+        outputOptions.write(hostid)
+    }
+}
 
 // MARK: DoctorCommand
 
@@ -119,7 +231,19 @@ struct DoctorCommand: SkipCommand {
 
     func run() async throws {
         outputOptions.write("Skip Doctor")
+        try await runDoctor()
+        let latestVersion = try await checkSkipUpdates()
+        if let latestVersion = latestVersion, latestVersion != skipVersion {
+            outputOptions.write("A new version is Skip (\(latestVersion)) is available to update with: skip update")
+        } else {
+            outputOptions.write("Skip (\(skipVersion)) checks complete")
+        }
+    }
+}
 
+extension SkipCommand {
+    /// Runs the `skip doctor` command.
+    func runDoctor() async throws {
         func run(_ title: String, _ args: [String]) async throws -> String {
             let (out, err) = try await outputOptions.run(title, flush: false, args)
             return out.trimmingCharacters(in: .newlines) + err.trimmingCharacters(in: .newlines)
@@ -156,19 +280,6 @@ struct DoctorCommand: SkipCommand {
         await checkVersion(title: "Java version", cmd: ["java", "-version"], min: Version("17.0.0"), pattern: "version \"([0-9.]+)\"")
         await checkVersion(title: "Homebrew version", cmd: ["brew", "--version"], min: Version("4.1.7"), pattern: "Homebrew ([0-9.]+)")
         await checkVersion(title: "Android Studio version", cmd: ["/usr/libexec/PlistBuddy", "-c", "Print CFBundleShortVersionString", "/Applications/Android Studio.app/Contents/Info.plist"], min: Version("2022.3.0"), pattern: "([0-9.]+)")
-
-        let latestVersion = try await checkSkipUpdates()
-
-        let hostID = try await outputOptions.monitor("Host") {
-            ProcessInfo.processInfo.hostIdentifier
-        }
-        outputOptions.write(": " + (hostID?.uuidString ?? "unknown"))
-
-        if let latestVersion = latestVersion, latestVersion != skipVersion {
-            outputOptions.write("A new version is Skip (\(latestVersion)) is available to update with: skip update")
-        } else {
-            outputOptions.write("Skip (\(skipVersion)) checks complete")
-        }
     }
 }
 
