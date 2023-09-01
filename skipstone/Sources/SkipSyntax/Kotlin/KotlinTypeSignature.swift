@@ -72,6 +72,9 @@ extension TypeSignature {
             let typeName = "\(baseType.kotlin).\(type.kotlin)"
             return Self.kotlinInnerExtensions[typeName] ?? typeName
         case .metaType(let baseType):
+            if baseType == .any {
+                return "KClass<*>"
+            }
             return "KClass<\(baseType.kotlin)>"
         case .module(let module, let type):
             return "\(KotlinTranslator.packageName(forModule: module)).\(type.kotlin)"

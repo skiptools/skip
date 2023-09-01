@@ -1626,7 +1626,16 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
     /// Return the `KClass` instance the given expression evaluates to, if any.
     private static func kclass(for expression: Expression, accessingMember: String, codebaseInfo: CodebaseInfo.Context?) -> TypeSignature? {
         // Must evaluate to X.Type
-        guard expression.inferredType.isMetaType, accessingMember != "self" else {
+        guard expression.inferredType.isMetaType else {
+            return nil
+        }
+        // We won't be accessing any Companion API on Any
+        let type = expression.inferredType.asMetaType(false)
+        guard type != .any else {
+            return nil
+        }
+        // Type.self is allowed
+        guard accessingMember != "self" else {
             return nil
         }
         // A type literal is not the same as KClass<Type>
@@ -1643,7 +1652,6 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
             }
         }
         // Is this a nested or module-qualified class type name?
-        let type = expression.inferredType.asMetaType(false)
         if let memberAccess = expression as? MemberAccess {
             let typeName = type.memberType.withModuleName(nil).name
             if memberAccess.member == typeName {
