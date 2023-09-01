@@ -1582,13 +1582,19 @@ private extension AbsolutePath {
 }
 
 extension ProcessInfo {
-        /// The unique host identifier as returned from `IOPlatformExpertDevice`
-    public var hostIdentifier: UUID? {
+        /// The unique host identifier as returned from `IOPlatformExpertDevice` on Darwin and the contents of "/etc/machine-id" on Linux
+    public var hostIdentifier: String? {
+        #if canImport(IOKit)
         let matchingDict = IOServiceMatching("IOPlatformExpertDevice")
         let service = IOServiceGetMatchingService(kIOMainPortDefault, matchingDict)
         defer { IOObjectRelease(service) }
         guard service != .zero else { return nil }
-        return (IORegistryEntryCreateCFProperty(service, kIOPlatformUUIDKey as CFString, kCFAllocatorDefault, .zero).takeRetainedValue() as? String).flatMap(UUID.init(uuidString:))
+        return (IORegistryEntryCreateCFProperty(service, kIOPlatformUUIDKey as CFString, kCFAllocatorDefault, .zero).takeRetainedValue() as? String)
+        #elseif os(Linux)
+        return try? String(contentsOfFile: "/etc/machine-id")
+        #else
+        return nil // unsupported platform
+        #endif
     }
 
     /// Get the list of all running process IDs, which we check against the contents of a `.skiplock` file
