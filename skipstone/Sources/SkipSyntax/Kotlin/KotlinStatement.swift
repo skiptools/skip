@@ -128,9 +128,17 @@ class KotlinExpressionStatement: KotlinStatement, KotlinSingleStatementAppendabl
         guard let expression else {
             return true
         }
-        // Don't use single statement for calls that return Never
-        if let functionCall = expression as? KotlinFunctionCall, let functionIdentifier = functionCall.function as? KotlinIdentifier, functionIdentifier.name == "fatalError" {
+        switch expression.type {
+        case .functionCall:
+            // Don't use single statement for calls that return Never
+            if let functionIdentifier = (expression as! KotlinFunctionCall).function as? KotlinIdentifier, functionIdentifier.name == "fatalError" {
+                return false
+            }
+        case .try:
+            // Don't turn try/catch into a single statement. We've seen odd incompatibilities with try? and Unit functions
             return false
+        default:
+            return true
         }
         return true
     }

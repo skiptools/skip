@@ -207,6 +207,7 @@ final class KotlinCodableTransformer: KotlinTransformer {
         factory.modifiers.visibility = .public
         factory.modifiers.isOverride = true
         factory.isGenerated = true
+        factory.returnType = classDeclaration.signature
         factory.parameters = [Parameter<KotlinExpression>(externalLabel: "from", declaredType: .named("Decoder", []))]
 
         let statement = KotlinRawStatement(sourceCode: "return \(classDeclaration.signature.kotlin)(from = from)")

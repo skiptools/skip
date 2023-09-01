@@ -1485,7 +1485,11 @@ class KotlinInOut: KotlinExpression {
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
         output.append("InOut({ ").append(target, indentation: indentation).append(" }, { ")
-        output.append(target, indentation: indentation).append(" = it })")
+        if let identifier = target as? KotlinIdentifier, identifier.name == "self" {
+            output.append("})")
+        } else {
+            output.append(target, indentation: indentation).append(" = it })")
+        }
     }
 }
 
