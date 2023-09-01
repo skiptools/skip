@@ -137,26 +137,31 @@ struct WelcomeCommand: SkipCommand {
     @OptionGroup(title: "Output Options")
     var outputOptions: OutputOptions
 
+    @Flag(help: ArgumentHelp("Show message only on first run"))
+    var firstRun: Bool = false
+
     func run() async throws {
-        outputOptions.write("""
+        if !firstRun || OutputOptions.isFirstRun == true {
+            outputOptions.write("""
 
-         ▄▄▄▄▄▄▄ ▄▄▄   ▄ ▄▄▄ ▄▄▄▄▄▄▄
-        █       █   █ █ █   █       █
-        █  ▄▄▄▄▄█   █▄█ █   █    ▄  █
-        █ █▄▄▄▄▄█      ▄█   █   █▄█ █
-        █▄▄▄▄▄  █     █▄█   █    ▄▄▄█
-         ▄▄▄▄▄█ █    ▄  █   █   █
-        █▄▄▄▄▄▄▄█▄▄▄█ █▄█▄▄▄█▄▄▄█
+              ▄▄▄▄▄▄▄ ▄▄▄   ▄ ▄▄▄ ▄▄▄▄▄▄▄
+             █       █   █ █ █   █       █
+             █  ▄▄▄▄▄█   █▄█ █   █    ▄  █
+             █ █▄▄▄▄▄█      ▄█   █   █▄█ █
+             █▄▄▄▄▄  █     █▄█   █    ▄▄▄█
+              ▄▄▄▄▄█ █    ▄  █   █   █
+             █▄▄▄▄▄▄▄█▄▄▄█ █▄█▄▄▄█▄▄▄█
 
-        Welcome to Skip \(skipVersion)!
+            Welcome to Skip \(skipVersion)!
 
-        Run "skip doctor" to check system requirements.
-        Run "skip selftest" to perform a full system evaluation.
+            Run "skip doctor" to check system requirements.
+            Run "skip selftest" to perform a full system evaluation.
 
-        Visit https://skip.tools for documentation, samples, and FAQs.
+            Visit https://skip.tools for documentation, samples, and FAQs.
 
-        Happy Skipping!
-        """)
+            Happy Skipping!
+            """)
+        }
     }
 }
 
@@ -1101,9 +1106,12 @@ public struct OutputOptions: ParsableArguments {
     /// A transient handler for tool output; this acts as a temporary holder of output streams
     internal var streams: OutputHandler = OutputHandler()
 
+    static func initialize() {
+        checkFirstRun()
+    }
+
     public init() {
-        // setup local skip config folder if it doesn't exist
-        try? FileManager.default.createDirectory(atPath: home(".skiptools"), withIntermediateDirectories: true)
+        let _ = Self.isFirstRun
     }
 
     internal final class OutputHandler : Decodable {
@@ -1230,7 +1238,18 @@ public struct OutputOptions: ParsableArguments {
         }
     }
 
+    static var isFirstRun: Bool = checkFirstRun()
+
+    @discardableResult static func checkFirstRun() -> Bool {
+        let cfg = home(".skiptools")
+        if FileManager.default.fileExists(atPath: cfg) == true {
+            return false
+        }
+        try? FileManager.default.createDirectory(atPath: cfg, withIntermediateDirectories: true)
+        return true
+    }
 }
+
 
 public struct SkipDriveError : LocalizedError {
     public var errorDescription: String?
