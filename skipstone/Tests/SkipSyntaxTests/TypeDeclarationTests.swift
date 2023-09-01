@@ -300,7 +300,7 @@ final class TypeDeclarationTests: XCTestCase {
             fun g()
             val k: Int
                 get() = 2
-            fun h() = print("h")
+            fun h(): Unit = print("h")
             fun helper() = Unit
         }
         """)
@@ -735,7 +735,7 @@ final class TypeDeclarationTests: XCTestCase {
             override val rawvaluelong: ULong
                 get() = ULong(rawValue)
             override fun makeoptionset(rawvaluelong: ULong): S = S(rawValue = Int(rawvaluelong))
-            override fun assignoptionset(target: S) = assignfrom(target)
+            override fun assignoptionset(target: S): Unit = assignfrom(target)
 
             constructor(rawValue: Int) {
                 this.rawValue = rawValue
@@ -776,7 +776,7 @@ final class TypeDeclarationTests: XCTestCase {
             override val rawvaluelong: ULong
                 get() = rawValue
             override fun makeoptionset(rawvaluelong: ULong): S = S(rawValue = rawvaluelong)
-            override fun assignoptionset(target: S) = assignfrom(target)
+            override fun assignoptionset(target: S): Unit = assignfrom(target)
 
             constructor(rawValue: ULong) {
                 this.rawValue = rawValue
@@ -829,7 +829,7 @@ final class TypeDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal fun f(opts: Opts) = Unit
-        internal fun g() = f(opts = Opts.of())
+        internal fun g(): Unit = f(opts = Opts.of())
         """)
     }
 
@@ -864,7 +864,7 @@ final class TypeDeclarationTests: XCTestCase {
                 override val rawvaluelong: ULong
                     get() = ULong(rawValue)
                 override fun makeoptionset(rawvaluelong: ULong): Outer.S = S(rawValue = Int(rawvaluelong))
-                override fun assignoptionset(target: Outer.S) = assignfrom(target)
+                override fun assignoptionset(target: Outer.S): Unit = assignfrom(target)
 
                 constructor(rawValue: Int) {
                     this.rawValue = rawValue

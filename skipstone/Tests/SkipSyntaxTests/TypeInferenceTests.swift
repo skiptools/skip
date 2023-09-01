@@ -878,7 +878,7 @@ final class TypeInferenceTests: XCTestCase {
         
         internal fun f(s: S2) = Unit
         
-        internal fun f() = f(S2.all)
+        internal fun f(): Unit = f(S2.all)
         """)
     }
 }

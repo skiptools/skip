@@ -1728,6 +1728,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if isHashImplementation {
             appendHashCode(to: output, indentation: indentation)
         }
+        var hasExplicitReturnType = true
         if let declaration = extras?.declaration {
             output.append(indentation).append(declaration)
         } else {
@@ -1739,7 +1740,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             } else if isLessThanImplementation {
                 appendLessThanDeclaration(to: output, indentation: indentation)
             } else {
-                appendFunctionDeclaration(to: output, indentation: indentation)
+                hasExplicitReturnType = appendFunctionDeclaration(to: output, indentation: indentation)
             }
         }
         if let body {
@@ -1748,14 +1749,14 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             } else if isLessThanImplementation {
                 appendLessThanBody(body, to: output, indentation: indentation)
             } else {
-                appendFunctionBody(body, to: output, indentation: indentation)
+                appendFunctionBody(body, to: output, indentation: indentation, hasExplicitReturnType: hasExplicitReturnType)
             }
         } else {
             output.append("\n")
         }
     }
 
-    private func appendFunctionDeclaration(to output: OutputGenerator, indentation: Indentation) {
+    private func appendFunctionDeclaration(to output: OutputGenerator, indentation: Indentation) -> Bool {
         if role != .local {
             output.append(modifiers.kotlinMemberString(isGlobal: role == .global, isOpen: isOpen, suffix: " "))
         }
@@ -1812,19 +1813,23 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             }
         }
         output.append(")")
+
+        var hasExplicitReturnType = false
         if type != .constructorDeclaration {
             // Kotlin requires an explicit return type for single statement bodies (as we use for async) that return Never, as in:
             //   suspending fun f(): Unit = MainActor.run { throw Error() }
             if returnType != .void || apiFlags.contains(.async) {
                 output.append(": ").append(returnType.kotlin)
+                hasExplicitReturnType = true
             }
         } else if let delegatingConstructorCall {
             output.append(": ").append(delegatingConstructorCall, indentation: indentation)
         }
         functionGenerics.appendWhere(to: output, indentation: indentation)
+        return hasExplicitReturnType
     }
 
-    private func appendFunctionBody(_ body: KotlinCodeBlock, to output: OutputGenerator, indentation: Indentation) {
+    private func appendFunctionBody(_ body: KotlinCodeBlock, to output: OutputGenerator, indentation: Indentation, hasExplicitReturnType: Bool) {
         let isConstructor = type == .constructorDeclaration
         let callSuperFinalize = type == .finalizerDeclaration && modifiers.isOverride
         guard isConstructor || callSuperFinalize || !body.statements.isEmpty else {
@@ -1850,6 +1855,11 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
 
         // Append Kotlin single statement format if possible
         guard isConstructor || apiFlags.contains(.async) || callSuperFinalize || !parameterVals.isEmpty || suppressSideEffects || mutationFunctionNames != nil || !body.isSingleStatementAppendable(mode: .function) else {
+            // There are scenarios in which single statement functions without an explicit return type result in a compiler error, such as a function
+            // whose body just calls the same function on another object. So be explicit
+            if !hasExplicitReturnType {
+                output.append(": ").append(returnType.kotlin)
+            }
             output.append(" = ")
             body.appendAsSingleStatement(to: output, indentation: indentation, mode: .function)
             output.append("\n")

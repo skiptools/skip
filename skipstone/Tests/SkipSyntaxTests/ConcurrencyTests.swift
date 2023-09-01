@@ -740,7 +740,7 @@ final class ConcurrencyTests: XCTestCase {
             f2(c: { @MainActor in m(p: $0) })
         }
         """, kotlin: """
-        internal fun m(p: Int) = print(p)
+        internal fun m(p: Int): Unit = print(p)
         internal fun f1(c: suspend () -> Unit) = Unit
         internal fun f2(c: suspend (Int) -> Unit) = Unit
         internal fun g() {

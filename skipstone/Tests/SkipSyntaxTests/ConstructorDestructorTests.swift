@@ -778,7 +778,7 @@ final class ConstructorDestructorTests: XCTestCase {
         internal open class A {
         }
         internal open class C: A() {
-            open fun finalize() = doStuff()
+            open fun finalize(): Unit = doStuff()
         }
         """)
 
@@ -795,7 +795,7 @@ final class ConstructorDestructorTests: XCTestCase {
         }
         """, kotlin: """
         internal open class A {
-            open fun finalize() = doThings()
+            open fun finalize(): Unit = doThings()
         }
         internal open class C: A() {
             override fun finalize() {

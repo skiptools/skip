@@ -43,7 +43,7 @@ final class CodableTests: XCTestCase {
             }
 
             companion object: DecodableCompanion<S> {
-                override fun init(from: Decoder) = S(from = from)
+                override fun init(from: Decoder): S = S(from = from)
             }
         }
         """)
@@ -105,7 +105,7 @@ final class CodableTests: XCTestCase {
             }
 
             companion object: DecodableCompanion<S> {
-                override fun init(from: Decoder) = S(from = from)
+                override fun init(from: Decoder): S = S(from = from)
             }
         }
         """)
@@ -160,7 +160,7 @@ final class CodableTests: XCTestCase {
             }
 
             companion object: DecodableCompanion<S> {
-                override fun init(from: Decoder) = S(from = from)
+                override fun init(from: Decoder): S = S(from = from)
             }
         }
         """)
@@ -213,7 +213,7 @@ final class CodableTests: XCTestCase {
             }
 
             companion object: DecodableCompanion<S> {
-                override fun init(from: Decoder) = S(from = from)
+                override fun init(from: Decoder): S = S(from = from)
             }
         }
         """)
@@ -259,7 +259,7 @@ final class CodableTests: XCTestCase {
             }
 
             companion object: DecodableCompanion<S> {
-                override fun init(from: Decoder) = S(from = from)
+                override fun init(from: Decoder): S = S(from = from)
             }
         }
         """)
@@ -302,7 +302,7 @@ final class CodableTests: XCTestCase {
             }
 
             companion object: DecodableCompanion<S> {
-                override fun init(from: Decoder) = S(from = from)
+                override fun init(from: Decoder): S = S(from = from)
             }
         }
         """)
@@ -404,7 +404,7 @@ final class CodableTests: XCTestCase {
             }
 
             companion object: DecodableCompanion<S> {
-                override fun init(from: Decoder) = S(from = from)
+                override fun init(from: Decoder): S = S(from = from)
             }
         }
         """)
@@ -446,7 +446,7 @@ final class CodableTests: XCTestCase {
             }
 
             companion object: DecodableCompanion<S> {
-                override fun init(from: Decoder) = S(from = from)
+                override fun init(from: Decoder): S = S(from = from)
             }
         }
         """)
@@ -493,7 +493,7 @@ final class CodableTests: XCTestCase {
             }
 
             companion object: DecodableCompanion<S> {
-                override fun init(from: Decoder) = S(from = from)
+                override fun init(from: Decoder): S = S(from = from)
             }
         }
         """)
@@ -541,7 +541,7 @@ final class CodableTests: XCTestCase {
             }
 
             companion object: DecodableCompanion<S> {
-                override fun init(from: Decoder) = S(from = from)
+                override fun init(from: Decoder): S = S(from = from)
             }
         }
         """)
@@ -590,7 +590,7 @@ final class CodableTests: XCTestCase {
             }
 
             companion object: DecodableCompanion<S> {
-                override fun init(from: Decoder) = S(from = from)
+                override fun init(from: Decoder): S = S(from = from)
             }
         }
         """)
@@ -631,7 +631,7 @@ final class CodableTests: XCTestCase {
             }
 
             companion object: DecodableCompanion<Sub> {
-                override fun init(from: Decoder) = Sub(from = from)
+                override fun init(from: Decoder): Sub = Sub(from = from)
             }
         }
         """)
@@ -653,7 +653,7 @@ final class CodableTests: XCTestCase {
             }
 
             companion object: DecodableCompanion<E> {
-                override fun init(from: Decoder) = E(from = from)
+                override fun init(from: Decoder): E = E(from = from)
             }
         }
 
@@ -691,7 +691,7 @@ final class CodableTests: XCTestCase {
             override fun encode(to: Encoder) = Unit
 
             companion object: DecodableCompanion<E> {
-                override fun init(from: Decoder) = E(from = from)
+                override fun init(from: Decoder): E = E(from = from)
             }
         }
 
@@ -733,7 +733,7 @@ final class CodableTests: XCTestCase {
             override fun encode(to: Encoder) = Unit
 
             companion object: DecodableCompanion<E> {
-                override fun init(from: Decoder) = E(from = from)
+                override fun init(from: Decoder): E = E(from = from)
             }
         }
 
@@ -774,7 +774,7 @@ final class CodableTests: XCTestCase {
                 fun a(associated0: Int): E = ACase(associated0)
                 val b: E = BCase()
 
-                override fun init(from: Decoder) = E(from = from)
+                override fun init(from: Decoder): E = E(from = from)
             }
         }
 

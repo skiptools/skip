@@ -1520,7 +1520,7 @@ final class MemberDeclarationTests: XCTestCase {
             c()
         }
         """, kotlin: """
-        internal fun f(c: () -> Unit) = c()
+        internal fun f(c: () -> Unit): Unit = c()
         """)
     }
 

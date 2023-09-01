@@ -188,9 +188,9 @@ final class ClosureTests: XCTestCase {
 
             internal open fun visit(with: (Int) -> Unit) = Unit
 
-            internal open fun f() = visit(with = this::visitor)
+            internal open fun f(): Unit = visit(with = this::visitor)
 
-            internal open fun g() = visit(with = ::visitor)
+            internal open fun g(): Unit = visit(with = ::visitor)
         }
         """)
     }

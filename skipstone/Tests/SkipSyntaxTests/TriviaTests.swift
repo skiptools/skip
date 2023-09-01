@@ -217,7 +217,7 @@ final class TriviaTests: XCTestCase {
             print("inserted")
         }
         
-        internal fun g() = print("original")
+        internal fun g(): Unit = print("original")
         """)
     }
 
@@ -287,13 +287,13 @@ final class TriviaTests: XCTestCase {
 
     func testSingleLineStatementTrivia() async throws {
         try await check(swift: """
-        func f(): Int {
+        func f() -> Int {
             return 100
         }
-        func g(): Int {
+        func g() -> Int {
             return 100 // Comment
         }
-        func h(): Int {
+        func h() -> Int {
             // Comment
             return 100
         }
@@ -315,9 +315,9 @@ final class TriviaTests: XCTestCase {
             c({ f() })
         }
         """, kotlin: """
-        internal fun f() = 100
-        internal fun g() = 100 // Comment
-        internal fun h() {
+        internal fun f(): Int = 100
+        internal fun g(): Int = 100 // Comment
+        internal fun h(): Int {
             // Comment
             return 100
         }
