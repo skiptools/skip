@@ -182,14 +182,16 @@ class KotlinBinaryOperator: KotlinExpression {
         default:
             break
         }
-        if expression.op.precedence == .cast && expression.op.symbol != "as!", var castTarget = krhs as? KotlinCastTarget, let castGenerics = castTarget.generics, !castGenerics.isEmpty {
+        if expression.op.precedence == .cast, var castTarget = krhs as? KotlinCastTarget {
             // Kotlin type erases generics at runtime, so we typically can't use them in casts
-            if expression.op.symbol == "is" {
-                castTarget.isGenericsTypeErased = true
-                krhs.messages.append(.kotlinGenericCheck(krhs, source: translator.syntaxTree.source))
-            } else {
-                krhs.messages.append(.kotlinGenericCast(krhs, source: translator.syntaxTree.source))
+            if let castGenerics = castTarget.generics, !castGenerics.isEmpty {
+                if expression.op.symbol == "is" {
+                    krhs.messages.append(.kotlinGenericCheck(krhs, source: translator.syntaxTree.source))
+                } else if expression.op.symbol != "as!" {
+                    krhs.messages.append(.kotlinGenericCast(krhs, source: translator.syntaxTree.source))
+                }
             }
+            castTarget.castTargetType = expression.op.symbol == "is" ? .typeErasedTarget : .target
         }
         return kexpression
     }
@@ -1048,7 +1050,7 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
     }
 
     var generics: [TypeSignature]?
-    var isGenericsTypeErased = false
+    var castTargetType: KotlinCastTargetType = .none
 
     override func mayBeSharedMutableStructExpression(orType: Bool) -> Bool {
         return mayBeSharedMutableStruct
@@ -1095,8 +1097,14 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
                 output.append("::")
             }
             var generics = self.generics
-            if isGenericsTypeErased {
-                generics = generics?.map { _ in TypeSignature.named("*", []) }
+            if castTargetType != .none {
+                if let specifiedGenerics = generics, !specifiedGenerics.isEmpty {
+                    if castTargetType == .typeErasedTarget {
+                        generics = specifiedGenerics.map { _ in TypeSignature.named("*", []) }
+                    }
+                } else if let apiMatch, !apiMatch.signature.generics.isEmpty {
+                    generics = Array(repeating: TypeSignature.named("*", []), count: apiMatch.signature.generics.count)
+                }
             }
             if isTypealiasFor != .none {
                 var type = isTypealiasFor
@@ -1741,7 +1749,7 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
     }
 
     var generics: [TypeSignature]?
-    var isGenericsTypeErased = false
+    var castTargetType: KotlinCastTargetType = .none
 
     override func mayBeSharedMutableStructExpression(orType: Bool) -> Bool {
         // Though we sref() when returning writable property values, any returned mutable struct may have its onUpdate block
@@ -1854,10 +1862,12 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
             output.append(member)
         }
         if var generics, !generics.isEmpty {
-            if isGenericsTypeErased {
+            if castTargetType == .typeErasedTarget {
                 generics = generics.map { _ in TypeSignature.named("*", []) }
             }
             output.append("<\(generics.map(\.kotlin).joined(separator: ", "))>")
+        } else if castTargetType != .none, let apiMatch, !apiMatch.signature.generics.isEmpty {
+            output.append("<\(Array(repeating: "*", count: apiMatch.signature.generics.count).joined(separator: ", "))>")
         }
         if let apiMatch, apiMatch.declarationType == .variableDeclaration, apiMatch.apiFlags.contains(.viewBuilder) || apiMatch.apiFlags.contains(.async) {
             // View builder and async properties are converted to Kotlin functions
@@ -2573,8 +2583,15 @@ class KotlinTupleLiteral: KotlinExpression {
 
 class KotlinTypeLiteral: KotlinExpression, KotlinCastTarget {
     var literal: TypeSignature
+    var signature: TypeSignature?
 
-    init(expression: TypeLiteral) {
+    static func translate(expression: TypeLiteral, translator: KotlinTranslator) -> KotlinTypeLiteral {
+        let kliteral = KotlinTypeLiteral(expression: expression)
+        kliteral.signature = translator.codebaseInfo?.primaryTypeInfo(forNamed: expression.literal)?.signature
+        return kliteral
+    }
+
+    private init(expression: TypeLiteral) {
         self.literal = expression.literal.resolvingSelf(in: expression)
         super.init(type: .typeLiteral, expression: expression)
     }
@@ -2582,19 +2599,22 @@ class KotlinTypeLiteral: KotlinExpression, KotlinCastTarget {
     var generics: [TypeSignature]? {
         return literal.generics
     }
-    var isGenericsTypeErased = false
+    var castTargetType: KotlinCastTargetType = .none
 
     override func insertDependencies(into dependencies: inout KotlinDependencies) {
         literal.insertDependencies(into: &dependencies)
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
-        if isGenericsTypeErased && !literal.generics.isEmpty {
-            let typeErasedLiteral = literal.withGenerics(literal.generics.map { _ in TypeSignature.named("*", []) })
-            output.append(typeErasedLiteral.kotlin)
-        } else {
-            output.append(literal.kotlin)
+        var literal = self.literal
+        if !literal.generics.isEmpty {
+            if castTargetType == .typeErasedTarget {
+                literal = literal.withGenerics(literal.generics.map { _ in TypeSignature.named("*", []) })
+            }
+        } else if castTargetType != .none, let signature = signature, !signature.generics.isEmpty {
+            literal = literal.withGenerics(Array(repeating: TypeSignature.named("*", []), count: signature.generics.count))
         }
+        output.append(literal.kotlin)
     }
 }
 

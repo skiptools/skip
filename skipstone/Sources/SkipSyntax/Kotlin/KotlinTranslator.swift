@@ -235,7 +235,7 @@ public class KotlinTranslator {
             case .tupleLiteral:
                 return try KotlinTupleLiteral.translate(expression: expression as! TupleLiteral, translator: self)
             case .typeLiteral:
-                return KotlinTypeLiteral(expression: expression as! TypeLiteral)
+                return KotlinTypeLiteral.translate(expression: expression as! TypeLiteral, translator: self)
             case .raw:
                 return KotlinRawExpression(expression: expression as! RawExpression)
             }

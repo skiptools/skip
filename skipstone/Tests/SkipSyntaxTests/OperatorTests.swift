@@ -215,6 +215,23 @@ final class OperatorTests: XCTestCase {
         """)
     }
 
+    func testCastAddsMissingGenerics() async throws {
+        try await check(supportingSwift: """
+        protocol P {
+            associatedtype ID
+            var id: ID { get }
+        }
+        """, swift: """
+        func f(p: Any) {
+            let id = (p as? P).id
+        }
+        """, kotlin: """
+        internal fun f(p: Any) {
+            val id = (p as? P<*>).id.sref()
+        }
+        """)
+    }
+
     func testNilCoalescing() async throws {
         try await check(supportingSwift: """
         extension Int {
