@@ -113,6 +113,7 @@ jobs:
           # move debug build out of release list
           mkdir debug
           mv *-debug.* debug/
+          mv *.appz debug/
 
           shasum -a 256 *.* > checksums.txt
 
