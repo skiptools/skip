@@ -699,14 +699,14 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             } else {
                 type.addGenericMappings(to: to, into: &generics)
             }
-        case .named(let name, let genericTypes):
+        case .named(_, let genericTypes):
             var target = to
             if case .module(_, let type) = target {
                 target = type
             } else if case .typealiased(_, let type) = target {
                 target = type
             }
-            if case .named(let name2, let genericTypes2) = target, name == name2, genericTypes.count == genericTypes2.count {
+            if case .named(_, let genericTypes2) = target, genericTypes.count == genericTypes2.count {
                 zip(genericTypes, genericTypes2).forEach { $0.0.addGenericMappings(to: $0.1, into: &generics) }
             } else if genericTypes.count == 1 {
                 if case .array(let element) = target {

@@ -747,7 +747,7 @@ class FunctionCall: Expression, APICallExpression {
         }
 
         // First we infer argument types without knowing the function, so we expect .none
-        arguments.forEach { $0.value.inferTypes(context: context, expecting: .none) }
+        arguments.forEach { $0.value.inferTypes(context: context.withMessagesSuppressed(true), expecting: .none) }
         let argumentTypes = arguments.map { $0.value.inferredType }
         let match: (TypeSignature, APIMatch)?
         let matchBaseType: TypeSignature?

@@ -881,4 +881,37 @@ final class TypeInferenceTests: XCTestCase {
         internal fun f(): Unit = f(S2.all)
         """)
     }
+
+    func testInferUsingCollectionElementType() async throws {
+        try await check(supportingSwift: """
+        func s(_ s: String) {
+        }
+        func s(_ s: Any) {
+        }
+        extension String {
+            static let empty = ""
+        }
+        protocol C {
+            associatedtype E
+        }
+        struct A<E>: C {
+        }
+        func f<T>(a: any C<T>, block: (T) -> Void) {
+        }
+        """, swift: """
+        func g(a: A<String>) {
+            f(a: a) {
+                let b = $0 == .empty
+                s($0)
+            }
+        }
+        """, kotlin: """
+        internal fun g(a: A<String>) {
+            f(a = a) { it ->
+                val b = it == String.empty
+                s(it)
+            }
+        }
+        """)
+    }
 }

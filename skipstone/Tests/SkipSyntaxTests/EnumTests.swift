@@ -606,4 +606,19 @@ final class EnumTests: XCTestCase {
         }
         """)
     }
+
+    func testSynthesizedRawValueType() async throws {
+        try await check(supportingSwift: """
+        extension String {
+            static let empty = ""
+        }
+        enum E: String {
+            case x
+        }
+        """, swift: """
+        let b = E.x.rawValue == .empty
+        """, kotlin: """
+        internal val b = E.x.rawValue == String.empty
+        """)
+    }
 }

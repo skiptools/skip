@@ -93,6 +93,7 @@ public class CodebaseInfo: Codable {
         resolveTypeSignatures()
         fixupGenericsInfo()
         addGeneratedConstructors()
+        addGeneratedRawValues()
         addMainActorFlags()
         buildItemsByName() // Final mappings after updates
         languageAdditions?.prepareForUse(codebaseInfo: self)
@@ -1183,6 +1184,27 @@ public class CodebaseInfo: Codable {
         typeInfo.functions.append(initInfo)
     }
 
+    private func addGeneratedRawValues() {
+        rootTypes.forEach { addGeneratedRawValues(to: $0) }
+    }
+
+    private func addGeneratedRawValues(to typeInfo: TypeInfo) {
+        // Handle nested types
+        typeInfo.types.forEach { addGeneratedRawValues(to: $0) }
+        guard typeInfo.declarationType == .enumDeclaration, let inherits = typeInfo.inherits.first, (inherits.isStringy || inherits.isNumeric) else {
+            return
+        }
+
+        if !typeInfo.inherits.contains(where: { $0.isNamed("RawRepresentable", moduleName: "Swift") }) {
+            typeInfo.inherits.append(.named("RawRepresentable", [inherits]))
+        }
+        if typeInfo.variables.first(where: { $0.name == "rawValue" }) == nil {
+            var rawValueInfo = VariableInfo(name: "rawValue", signature: inherits, moduleName: typeInfo.moduleName, sourceFile: typeInfo.sourceFile, declaringType: typeInfo.signature, modifiers: typeInfo.modifiers, attributes: Attributes(), availability: .available)
+            rawValueInfo.isGenerated = true
+            typeInfo.variables.append(rawValueInfo)
+        }
+    }
+
     private func addMainActorFlags() {
         // First add type-level flags
         for i in 0..<rootTypes.count { rootTypes[i].addMainActorTypeFlags(codebaseInfo: self) }
@@ -1500,10 +1522,11 @@ public class CodebaseInfo: Codable {
         let isInitializable: Bool
         let hasValue: Bool
         var value: Expression?
+        var isGenerated = false
 
         private enum CodingKeys: String, CodingKey {
             // Exclude value expression, language additions, importedModuleNames
-            case name, signature, moduleName, sourceFile, declaringType, modifiers, attributes, availability, apiFlags, isInitializable, hasValue
+            case name, signature, moduleName, sourceFile, declaringType, modifiers, attributes, availability, apiFlags, isInitializable, hasValue, isGenerated
         }
 
         fileprivate init(statement: VariableDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo, syntaxTree: SyntaxTree) {
@@ -1523,6 +1546,20 @@ public class CodebaseInfo: Codable {
                 self.value = statement.value
             }
             (codebaseInfo.languageAdditions as? CodebaseInfoLanguageAdditionsGatherDelegate)?.codebaseInfo(codebaseInfo, didGather: &self, from: statement, syntaxTree: syntaxTree)
+        }
+
+        fileprivate init(name: String, signature: TypeSignature, moduleName: String?, sourceFile: Source.FilePath? = nil, declaringType: TypeSignature? = nil, modifiers: Modifiers, attributes: Attributes, availability: Availability, apiFlags: APIFlags = [], isInitializable: Bool = false, hasValue: Bool = false) {
+            self.name = name
+            self.signature = signature
+            self.moduleName = moduleName
+            self.sourceFile = sourceFile
+            self.declaringType = declaringType
+            self.modifiers = modifiers
+            self.attributes = attributes
+            self.availability = availability
+            self.apiFlags = apiFlags
+            self.isInitializable = isInitializable
+            self.hasValue = hasValue
         }
 
         fileprivate var needsTypeInference: Bool {

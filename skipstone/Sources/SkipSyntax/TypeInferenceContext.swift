@@ -297,7 +297,7 @@ struct TypeInferenceContext {
             if let match = findUnqualifiedArgumentMatch(in: matches, arguments: arguments) {
                 return match
             }
-            if let messagesNode {
+            if let messagesNode, !messagesSuppressed {
                 messagesNode.messages.append(.ambiguousFunctionCall(messagesNode, source: source))
             }
         }
@@ -385,7 +385,7 @@ struct TypeInferenceContext {
             if let match = findUnqualifiedArgumentMatch(in: matches, arguments: arguments) {
                 return match
             }
-            if let messagesNode {
+            if let messagesNode, !messagesSuppressed {
                 messagesNode.messages.append(.ambiguousFunctionCall(messagesNode, source: source))
             }
         }
@@ -502,6 +502,16 @@ struct TypeInferenceContext {
         }
     }
 
+    /// Suppress warnings and errors when checking for matches.
+    private(set) var messagesSuppressed = false
+
+    /// Suppress warnings and errors when checking for matches.
+    func withMessagesSuppressed(_ value: Bool) -> TypeInferenceContext {
+        var context = self
+        context.messagesSuppressed = value
+        return context
+    }
+
     private func findUnqualifiedArgumentMatch(in matches: [(TypeSignature, APIMatch)], arguments: [LabeledValue<Expression>]) -> (TypeSignature, APIMatch)? {
         // Look for arguments that are unqualified member accesses and see if we can match them to members
         for i in 0..<arguments.count {
@@ -532,7 +542,7 @@ struct TypeInferenceContext {
     }
 
     private func addUnavailableMessages(to messagesNode: SyntaxNode?, for availability: [Availability]) {
-        guard let messagesNode, !availability.isEmpty else {
+        guard let messagesNode, !messagesSuppressed, !availability.isEmpty else {
             return
         }
         if availability.allSatisfy({ if case .unavailable = $0 { return true } else { return false } }) {
