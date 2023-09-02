@@ -297,6 +297,46 @@ final class ConditionalTests: XCTestCase {
         """)
     }
 
+    func testOptionalBindingToMemberElse() async throws {
+        try await check(swift: """
+        class C {
+            var i: Int?
+            let j: Int?
+            func f() {
+                if let i {
+                    print(i)
+                } else {
+                    print("nil")
+                }
+                if let j {
+                    print(j)
+                } else {
+                    print("nil")
+                }
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal open var i: Int? = null
+            internal val j: Int?
+            internal open fun f() {
+                val matchtarget_0 = i
+                if (matchtarget_0 != null) {
+                    val i = matchtarget_0
+                    print(i)
+                } else {
+                    print("nil")
+                }
+                if (j != null) {
+                    print(j)
+                } else {
+                    print("nil")
+                }
+            }
+        }
+        """)
+    }
+
     func testMutableStructOptionalBinding() async throws {
         // Translate let into a simple null check because the value can't change
         try await check(swift: """

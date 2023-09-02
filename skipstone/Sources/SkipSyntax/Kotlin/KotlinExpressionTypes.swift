@@ -1939,15 +1939,24 @@ struct KotlinOptionalBinding {
         let condition: KotlinExpression
         var targetVariable: KotlinTargetVariable? = nil
         var isConditionBeforeBinding = false
-        // When we have an 'if' without 'else' we can use x?.let { y -> ... } to bind; otherwise we need to check our conditions first
-        if (!isGuard && hasElse) || (isGuard && expression.names.count > 1), let value = expression.value {
-            let kvalue = translator.translateExpression(value)
-            if let identifier = kvalue as? KotlinIdentifier, identifier.isLocalOrSelfIdentifier {
-                // If the value is a local identifier, we can compare it directly
-                bindingValue = identifier
+        // For an 'if' without 'else' we can use x?.let { y -> ... } to bind if 'x' is stable. Else we need to check our conditions first
+        if (!isGuard && hasElse) || (isGuard && expression.names.count > 1), expression.value != nil || (!isGuard && expression.nameShadowsUnstableValue) {
+            let kvalue: KotlinExpression
+            let canBindValue: Bool
+            if let value = expression.value {
+                kvalue = translator.translateExpression(value)
+                // If the value is a local identifier, we can compare it directly. Otherwise we need to assign the value to a target variable
+                // in order to avoid executing it more than once. This also handles checking a tuple itself against nil before destructuring it
+                canBindValue = (kvalue as? KotlinIdentifier)?.isLocalOrSelfIdentifier == true
+            } else { // nameShadowsUnstableValue
+                kvalue = KotlinIdentifier(name: expression.names[0] ?? "_")
+                // We need to assign the value to target variable to stabilize it
+                canBindValue = false
+            }
+
+            if canBindValue {
+                bindingValue = kvalue
             } else {
-                // We need to assign the value to a target variable in order to avoid executing it more than once. This also handles checking
-                // a tuple itself against nil before structuring it
                 targetVariable = KotlinTargetVariable(value: kvalue)
                 bindingValue = targetVariable!.identifier
             }

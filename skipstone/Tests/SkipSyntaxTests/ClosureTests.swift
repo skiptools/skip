@@ -163,6 +163,44 @@ final class ClosureTests: XCTestCase {
             val i = c?.invoke("s")
         }
         """)
+
+        try await check(swift: """
+        {
+            let c: ((String) -> Int)? = nil
+            if let c {
+                let i = c("s")
+            }
+        }
+        """, kotlin: """
+        {
+            val c: ((String) -> Int)? = null
+            if (c != null) {
+                val i = c("s")
+            }
+        }
+        """)
+
+        try await check(swift: """
+        class C {
+            var c: ((String) -> Int)? = nil
+
+            func f() {
+                if let c {
+                    let i = c("s")
+                }
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal open var c: ((String) -> Int)? = null
+
+            internal open fun f() {
+                c?.let { c ->
+                    val i = c("s")
+                }
+            }
+        }
+        """)
     }
 
     func testPassFunctionForClosure() async throws {
