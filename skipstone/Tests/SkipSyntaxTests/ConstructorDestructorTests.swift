@@ -573,6 +573,15 @@ final class ConstructorDestructorTests: XCTestCase {
         """)
     }
 
+    func testConstructorAdditionalGenerics() async throws {
+        try await checkProducesMessage(swift: """
+        class C<T> {
+            init<A>(a: A) {
+            }
+        }
+        """)
+    }
+
     func testInheritedGenericConstructor() async throws {
         try await check(swift: """
         class Base<T, U> {

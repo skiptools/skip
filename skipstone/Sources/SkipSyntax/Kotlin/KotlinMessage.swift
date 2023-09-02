@@ -79,12 +79,17 @@ extension Message {
         return Message(kind: .error, message: "Cannot infer property type. Declare the property type explicitly to generate a valid Kotlin constructor for this struct", sourceDerived: sourceDerived, source: source)
     }
 
-    static func kotlinConstructorSingleDelegatingStatement(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "A Kotlin constructor can only include a single top-level call to another 'this' or 'super' constructor", sourceDerived: sourceDerived, source: source)
-    }
-
     static func kotlinConstructorDelegatingStatementArguments(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "In Kotlin, delegating calls to 'self' or 'super' constructors can not use local variables other than the parameters passed to this constructor", sourceDerived: sourceDerived, source: source)
+    }
+
+    // Idea: convert to factory function
+    static func kotlinConstructorGenerics(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Kotlin constructors cannot introduce additional generics. Only use generics from the owning type declaration", sourceDerived: sourceDerived, source: source)
+    }
+
+    static func kotlinConstructorSingleDelegatingStatement(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "A Kotlin constructor can only include a single top-level call to another 'this' or 'super' constructor", sourceDerived: sourceDerived, source: source)
     }
 
     // Idea: generate an internal ordinal member var and synthesize code to use it and associated values to conform

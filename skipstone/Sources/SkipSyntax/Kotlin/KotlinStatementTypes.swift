@@ -1553,6 +1553,9 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if let firstCharacter = kstatement.name.first, firstCharacter != "_" && firstCharacter != "$" && firstCharacter != "`" && !firstCharacter.isLetter && !firstCharacter.isNumber && !kstatement.isEqualImplementation && !kstatement.isLessThanImplementation {
             kstatement.messages.append(.kotlinOperatorFunction(statement, source: translator.syntaxTree.source))
         }
+        if kstatement.type == .constructorDeclaration, !kstatement.generics.isEmpty {
+            kstatement.messages.append(.kotlinConstructorGenerics(statement, source: translator.syntaxTree.source))
+        }
         return kstatement
     }
 
