@@ -419,12 +419,12 @@ extension CheckPhase where Self : StreamingCommand {
             return (installDate, nil)
         }
 
-        var (installDate, licenseString) = try parseLicenseConfig()
-        let trialExpiration = installDate.addingTimeInterval(60 * 60 * 24 * 15) // 15-day implicit trial
-
-        licenseString = licenseString ?? licenseOptions.skipKey ?? ProcessInfo.processInfo.environment["SKIPKEY"]
-
         do {
+            var (installDate, licenseString) = try parseLicenseConfig()
+            let trialExpiration = installDate.addingTimeInterval(60 * 60 * 24 * 15) // 15-day implicit trial
+
+            licenseString = licenseString ?? licenseOptions.skipKey ?? ProcessInfo.processInfo.environment["SKIPKEY"]
+
             let license = try licenseString.flatMap { try LicenseKey(licenseString: $0) }
 
             if let license = license {
