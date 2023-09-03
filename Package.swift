@@ -12,32 +12,13 @@ let package = Package(
         .macCatalyst(.v16),
     ],
     products: [
-        .executable(name: "skip", targets: ["skip"]),
-
-        .plugin(name: "skipcommand", targets: ["skip-command"]),
         .plugin(name: "preflight", targets: ["skip-preflight"]),
         .plugin(name: "transpile", targets: ["skip-transpiler"]),
-        .plugin(name: "skipbuild", targets: ["skip-build"]),
-
         .library(name: "SkipDrive", targets: ["SkipDrive"]),
     ],
     dependencies: [
     ],
     targets: [
-        .plugin(name: "skip-command",
-                capability: .command(
-                    intent: .custom(verb: "skip",  description: "Run Skip by specifying arguments manually"),
-                    permissions: [
-                        .writeToPackageDirectory(reason: "Skip needs to create and update the Skip folder in the project."),
-                    ]),
-                dependencies: ["skip"],
-                path: "Plugins/SkipCommand"),
-
-        .plugin(name: "skip-build",
-                capability: .buildTool(),
-                dependencies: ["skip"],
-                path: "Plugins/SkipBuild"),
-
         .plugin(name: "skip-preflight",
                 capability: .buildTool(),
                 dependencies: ["skipstone"],
@@ -48,12 +29,9 @@ let package = Package(
                 dependencies: ["skipstone"],
                 path: "Plugins/SkipTranspilePlugIn"),
 
-
         .target(name: "SkipDrive", dependencies: []),
 
-        .executableTarget(name: "skip", dependencies: ["SkipDrive"]),
-
-        .testTarget(name: "SkipDriveTests", dependencies: ["skip"]),
+        .testTarget(name: "SkipDriveTests", dependencies: ["SkipDrive"]),
 
         .binaryTarget(name: "skipstone", url: "https://source.skip.tools/skip/releases/download/0.6.16/skip.zip", checksum: "50bc34c7302a901cd86538d2bc4e36574c3266bced096cd0df7fcdc7628d47ac")
     ]

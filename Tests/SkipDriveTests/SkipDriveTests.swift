@@ -4,7 +4,7 @@ import SkipDrive
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 public class SkipCommandTests : XCTestCase {
     public func testSkipVersion() async throws {
-        try await XCTAssertEqualX("Skip version \(skipVersion)", skip("version").out)
+        try await XCTAssertEqualX("skip version \(skipVersion)", skip("version").out)
     }
 
     public func testSkipCreate() async throws {
@@ -50,8 +50,7 @@ public class SkipCommandTests : XCTestCase {
     }
 
     public func testSkipSelftest() async throws {
-        throw XCTSkip("build doesn't run from CI")
-        //try await skip("selftest")
+        try await skip("selftest")
     }
 
     public func testSkipDoctor() async throws {
@@ -87,6 +86,7 @@ public class SkipCommandTests : XCTestCase {
 
     /// Runs the tool with the given arguments, returning the entire output string as well as a function to parse it to `JSON`
     @discardableResult func skip(checkError: Bool = true, _ args: String...) async throws -> (out: String, err: String) {
+        #if canImport(SkipDriver)
         let out = BufferedOutputByteStream()
         let err = BufferedOutputByteStream()
 
@@ -104,6 +104,16 @@ public class SkipCommandTests : XCTestCase {
             }
         }
         return (out: outString, err: errString)
+        #else
+        // we are not linking to the skip driver, so fork the process instead with the proper arguments
+        let result = try await Process.popen(arguments: ["skip"] + args, loggingHandler: nil)
+        // Throw if there was a non zero termination.
+        guard result.exitStatus == .terminated(code: 0) else {
+            throw ProcessResult.Error.nonZeroExit(result)
+        }
+        let (out, err) = try (result.utf8Output(), result.utf8stderrOutput())
+        return (out: out.trimmingCharacters(in: .whitespacesAndNewlines), err: err.trimmingCharacters(in: .whitespacesAndNewlines))
+        #endif
     }
 
 }
@@ -141,6 +151,73 @@ func execJSON<T: Decodable>(_ arguments: [String]) async throws -> T {
 public func XCTAssertEqualX<T>(_ expression1: T, _ expression2: T, _ message: @autoclosure () -> String = "", file: StaticString = #filePath, line: UInt = #line) where T : Equatable {
     XCTAssertEqual(expression1, expression2, message(), file: file, line: line)
 }
+
+
+
+/// An incomplete representation of package JSON, to be filled in as needed for the purposes of the tool
+/// The output from `swift package dump-package`.
+public struct PackageManifest : Hashable, Decodable {
+    public var name: String
+    //public var toolsVersion: String // can be string or dict
+    public var products: [Product]
+    public var dependencies: [Dependency]
+    //public var targets: [Either<Target>.Or<String>]
+    public var platforms: [SupportedPlatform]
+    public var cModuleName: String?
+    public var cLanguageStandard: String?
+    public var cxxLanguageStandard: String?
+
+    public struct Target: Hashable, Decodable {
+        public enum TargetType: String, Hashable, Decodable {
+            case regular
+            case test
+            case system
+        }
+
+        public var `type`: TargetType
+        public var name: String
+        public var path: String?
+        public var excludedPaths: [String]?
+        //public var dependencies: [String]? // dict
+        //public var resources: [String]? // dict
+        public var settings: [String]?
+        public var cModuleName: String?
+        // public var providers: [] // apt, brew, etc.
+    }
+
+
+    public struct Product : Hashable, Decodable {
+        //public var `type`: ProductType // can be string or dict
+        public var name: String
+        public var targets: [String]
+
+        public enum ProductType: String, Hashable, Decodable, CaseIterable {
+            case library
+            case executable
+        }
+    }
+
+    public struct Dependency : Hashable, Decodable {
+        public var name: String?
+        public var url: String?
+        //public var requirement: Requirement // revision/range/branch/exact
+    }
+
+    public struct SupportedPlatform : Hashable, Decodable {
+        var platformName: String
+        var version: String
+    }
+}
+
+
+/// The output from `xcodebuild -showBuildSettings -json -project Project.xcodeproj -scheme SchemeName`
+public struct ProjectBuildSettings : Decodable {
+    public let target: String
+    public let action: String
+    public let buildSettings: [String: String]
+}
+
+
 
 
 // sample test output generated with the following command in the skip-zip package:
