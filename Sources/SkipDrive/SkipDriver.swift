@@ -1249,7 +1249,7 @@ public struct OutputOptions: ParsableArguments {
             let env = cfg + "/skipkey.env"
             if !FileManager.default.fileExists(atPath: env) {
                 try? """
-                # Obtain a Skip key from https://skip.tools and set the SKIPKEY field or environment variable
+                # Obtain a Skip key from https://skip.tools for the SKIPKEY property
                 #SKIPKEY: 
                 """.write(toFile: env, atomically: true, encoding: .utf8)
             }
