@@ -199,10 +199,10 @@ struct VersionCommand: SingleStreamingCommand {
         var version: String = skipVersion
         #if DEBUG
         let debug: Bool = true
-        var description: String { "skip version \(skipVersion) (debug)" }
+        var description: String { "Skip version \(skipVersion) (debug)" }
         #else
         let debug: Bool? = nil
-        var description: String { "skip version \(skipVersion)" }
+        var description: String { "Skip version \(skipVersion)" }
         #endif
     }
 

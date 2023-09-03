@@ -4,7 +4,7 @@ import TSCBasic
 import SkipSyntax
 
 struct SkippyCommand: AsyncParsableCommand, CheckPhase {
-    static var configuration = CommandConfiguration(commandName: "preflight", abstract: "Perform transpilation preflights", shouldDisplay: false)
+    static var configuration = CommandConfiguration(commandName: "skippy", abstract: "Perform transpilation preflight checks", shouldDisplay: false)
 
     @OptionGroup(title: "Check Options")
     var checkOptions: CheckPhaseOptions

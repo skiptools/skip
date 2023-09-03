@@ -2,7 +2,7 @@ import Foundation
 import ArgumentParser
 import SkipSyntax
 #if canImport(SkipDriveExternal)
-import SkipDrive
+import SkipDriveExternal
 
 extension GradleCommand : GradleHarness { }
 fileprivate let gradleCommandEnabled = true

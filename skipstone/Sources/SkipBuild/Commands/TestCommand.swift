@@ -2,7 +2,7 @@ import Foundation
 import ArgumentParser
 import SkipSyntax
 #if canImport(SkipDriveExternal)
-import SkipDrive
+import SkipDriveExternal
 fileprivate let testCommandEnabled = true
 #else
 fileprivate let testCommandEnabled = false

@@ -46,7 +46,6 @@ RELSTAGING=`mktemp -d`
 SKIPPKG="../skip/Package.swift"
 SKIPSTONEDIR="../skipstone"
 SKIPPKGDIR=$(dirname ${SKIPPKG})
-SKIPHUBPKG="../skiphub/Package.swift"
 SKIPBREWDIR="../homebrew-skip"
 
 # once we get this repo sync'd, we can rely on both tags being the same
@@ -137,7 +136,6 @@ git tag --sign "${SKIP_VERSION}" -m "Release ${SKIP_VERSION}"
 git push --follow-tags
 
 sed -I '' 's;.package(url: "https://.*/skip.git", from: ".*");.package(url: "https://source.skip.tools/skip.git", from: "'${SKIP_VERSION}'");g' "README.md"
-sed -I '' 's;.package(url: "https://.*/skip.git", from: ".*");.package(url: "https://source.skip.tools/skip.git", from: "'${SKIP_VERSION}'");g' "${SKIPHUBPKG}"
 
 # also grab the latest skiphub version and update it in the README
 SKIPHUB_VERSION=`git ls-remote --tags https://github.com/skiptools/skiphub | awk -F/ '$NF ~ /^v?[0-9]+\.[0-9]+\.[0-9]+$/ {print $NF}' | sort -V | tail -n1`

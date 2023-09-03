@@ -13,7 +13,7 @@ public class SkipRunnerTests : XCTestCase {
 
         #if DEBUG
         let debug = true
-        try await XCTAssertEqualX("skip version \(v) (debug)", tool("version").out)
+        try await XCTAssertEqualX("Skip version \(v) (debug)", tool("version").out)
 
         func endOfFirstLine(_ output: String, count: Int) throws -> String {
             let firstLine = try XCTUnwrap(output.split(separator: "\n").first)
@@ -26,7 +26,7 @@ public class SkipRunnerTests : XCTestCase {
 
         #else
         let debug = false
-        try await XCTAssertEqualX("skip version \(v)", tool("version").out)
+        try await XCTAssertEqualX("Skip version \(v)", tool("version").out)
         #endif
 
         try await XCTAssertEqualX(debug, tool("info", "-JA").json().array?.last?["debug"]?.boolean)

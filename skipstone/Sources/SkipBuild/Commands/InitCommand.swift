@@ -171,8 +171,8 @@ struct InitCommand: SkipCommand {
 
             """
             targets += """
-                    .target(name: "\(moduleName)", plugins: [.plugin(name: "preflight", package: "skip")]),
-                    .testTarget(name: "\(moduleName)Tests", dependencies: ["\(moduleName)"], plugins: [.plugin(name: "preflight", package: "skip")]),
+                    .target(name: "\(moduleName)", plugins: [.plugin(name: "skippy", package: "skip")]),
+                    .testTarget(name: "\(moduleName)Tests", dependencies: ["\(moduleName)"], plugins: [.plugin(name: "skippy", package: "skip")]),
 
                     .target(name: "\(moduleKtName)", dependencies: [
                         "\(moduleName)",
