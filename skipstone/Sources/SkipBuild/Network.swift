@@ -159,7 +159,7 @@ extension URLResponse {
 
 extension URL {
     public func appending(path: String) -> URL {
-        appendPathComponent(path)
+        appendingPathComponent(path)
     }
 }
 
