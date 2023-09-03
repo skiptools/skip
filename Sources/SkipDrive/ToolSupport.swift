@@ -4,6 +4,9 @@
 // under the terms of the GNU Lesser General Public License 3.0
 // as published by the Free Software Foundation https://fsf.org
 import Foundation
+#if canImport(FoundationXML)
+import FoundationXML
+#endif
 
 @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
 extension Process {
@@ -2706,6 +2709,8 @@ public extension FileSystemError {
 }
 
 
+#if canImport(Darwin)
+
 /// Public stdout stream instance.
 public var stdoutStream: ThreadSafeOutputByteStream = try! ThreadSafeOutputByteStream(LocalFileOutputByteStream(
     filePointer: Darwin.stdout,
@@ -2715,3 +2720,5 @@ public var stdoutStream: ThreadSafeOutputByteStream = try! ThreadSafeOutputByteS
 public var stderrStream: ThreadSafeOutputByteStream = try! ThreadSafeOutputByteStream(LocalFileOutputByteStream(
     filePointer: Darwin.stderr,
     closeOnDeinit: false))
+#endif
+
