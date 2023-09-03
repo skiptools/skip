@@ -44,17 +44,11 @@ extension SkipCommand {
 
     /// Grabs an Atom XML feed of releases and returns the first title.
     private func fetchLatestRelease(from atomURL: URL) async throws -> String? {
-        #if !canImport(Darwin)
-        // Linux, etc. do not support async URLSession.shared.data yet, so just load sync
-        // https://github.com/apple/swift-corelibs-foundation/issues/3205
-        let data = try Data(contentsOf: atomURL)
-        #else
         let (data, response) = try await URLSession.shared.data(from: atomURL)
         let code = (response as? HTTPURLResponse)?.statusCode ?? 0
         if !(200..<300).contains(code) {
             throw SkipUpdateError(errorDescription: "Update check from \(atomURL.absoluteString) returned error: \(code)")
         }
-        #endif
 
         // parse the Atom XML and get the latest version, which is the title of the first entry
         let document = try XMLDocument(data: data)
