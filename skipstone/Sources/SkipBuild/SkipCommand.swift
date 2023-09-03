@@ -99,6 +99,9 @@ public struct SkipKeyExecutor: SkipCommandExecutor {
         @Option(name: [.customShort("e"), .long], help: ArgumentHelp("The ISO-8601 key expiration date", valueName: "date"))
         var expiration: String
 
+        @Option(name: [.customShort("h"), .long], help: ArgumentHelp("The hostid for the key", valueName: "hostid"))
+        var hostid: String?
+
         @Option(name: [.long], help: ArgumentHelp("A hex-encoded 12-byte initialization vector", valueName: "nonce"))
         var nonce: String?
 
@@ -111,7 +114,7 @@ public struct SkipKeyExecutor: SkipCommandExecutor {
             guard let exp = ISO8601DateFormatter().date(from: expiration) else {
                 throw LicenseError.licenseExpirationDateInvalid
             }
-            let key = LicenseKey(id: id, expiration: exp)
+            let key = LicenseKey(id: id, expiration: exp, hostid: hostid)
             let iv = nonce.flatMap(Data.init(hexString:))
             if nonce != nil && iv?.count != 12 {
                 throw LicenseError.invalidNonceFormat
@@ -357,7 +360,7 @@ protocol SkipPhase : AsyncParsableCommand {
 extension SkipPhase {
     /// The total size of all input source files, below which we will not enforce either license key or valid header comments
     /// this is meant to be large enough to accomodate simple demos and experiments without requiring any license
-    static var codebaseThresholdSize: Int { 25 * 1024 }
+    static var codebaseThresholdSize: Int? { nil }
 }
 
 /// The condition under which the phase should be run
@@ -398,24 +401,28 @@ extension CheckPhase {
 }
 
 extension CheckPhase where Self : StreamingCommand {
-    /// Validate the license key if it is present in the tool or environment; otherwise scan the sources above the given codebase threshold size for approved headers
+
+    /// Validate the license key if it is present in the tool or environment; otherwise scan the sources for approved license headers
     func validateLicense(sourceURLs: [URL], against now: Date = Date.now) async throws {
 
-        /// Loads the `.skip.yml` or  `Skip.yml` at the root of the project and checks for a "skip-license" key
-        func parseLicenseConfig(inConfigurationPaths paths: [String] = [".skip.yml", "Skip.yml"], relativeTo baseFolder: URL? = nil) -> String? {
-            for path in paths {
-                let url = URL(fileURLWithPath: path, isDirectory: false, relativeTo: baseFolder)
-                // we tolerate missing config files
-                if let yaml = try? YAML.parse(Data(contentsOf: url)) {
-                    if let license = yaml["skip-license"]?.string {
-                        return license
-                    }
+        /// Loads the `skipkey.env` file in ~/.skiptools/ for a license key
+        func parseLicenseConfig() throws -> (Date, String?) {
+            let (folder, installDate) = try skiptoolsFolder()
+            let skipkeyFile = URL(fileURLWithPath: "skipkey.env", isDirectory: false, relativeTo: folder)
+            if FileManager.default.fileExists(atPath: skipkeyFile.path) {
+                let yaml = try YAML.parse(Data(contentsOf: skipkeyFile))
+                if let license = yaml["SKIPKEY"]?.string, !license.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    return (installDate, license)
                 }
             }
-            return nil
+
+            return (installDate, nil)
         }
 
-        let licenseString = licenseOptions.skipLicense ?? ProcessInfo.processInfo.environment["SKIP_LICENSE"] ?? parseLicenseConfig()
+        var (installDate, licenseString) = try parseLicenseConfig()
+        let trialExpiration = installDate.addingTimeInterval(60 * 60 * 24 * 15) // 15-day implicit trial
+
+        licenseString = licenseString ?? licenseOptions.skipKey ?? ProcessInfo.processInfo.environment["SKIPKEY"]
 
         do {
             let license = try licenseString.flatMap { try LicenseKey(licenseString: $0) }
@@ -424,19 +431,30 @@ extension CheckPhase where Self : StreamingCommand {
                 let exp = DateFormatter.localizedString(from: license.expiration, dateStyle: .short, timeStyle: .none)
                 let daysLeft = Int(ceil(license.expiration.timeIntervalSince(now) / (12 * 60 * 60)))
 
+                // if the license key has a hostid encoded into it, then validate it against the current machine
+                if let hostid = license.hostid, hostid != ProcessInfo.processInfo.hostIdentifier {
+                    throw error("Skip license key validation failed – manage your skipkeys at https://skip.tools")
+                }
+
                 // allow padding the license expiration for up to 14 days
                 if daysLeft + min(licenseOptions.skipGracePeriod ?? 0, 14) < 0 {
-                    error("Skip license expired on \(exp)")
-                } else if daysLeft < 10 { // warn when the license is about to expire
-                    warn("Skip license will expire in \(daysLeft) day\(daysLeft == 1 ? "" : "s") on \(exp)")
+                    throw error("Skip license key expired on \(exp) – get a new skipkey from https://skip.tools")
+                } else if daysLeft <= 10 { // warn when the license is about to expire
+                    warn("Skip license key will expire in \(daysLeft) day\(daysLeft == 1 ? "" : "s") on \(exp) – get a new skipkey from https://skip.tools")
                 } else {
-                    info("Skip license valid through \(exp)")
+                    info("Skip license key valid through \(exp)")
                 }
-            } else {
+            } else if now < trialExpiration {
+                let exp = DateFormatter.localizedString(from: trialExpiration, dateStyle: .short, timeStyle: .none)
+                let daysLeft = Int(ceil(trialExpiration.timeIntervalSince(now) / (12 * 60 * 60)))
+                if daysLeft <= 10 {
+                    warn("Skip trial will expire in \(daysLeft) day\(daysLeft == 1 ? "" : "s") on \(exp) – get a skipkey from https://skip.tools")
+                }
+            } else { // no license key – scan sources for valid open-source license headers
                 let scanSourceStart = Date().timeIntervalSinceReferenceDate
-                let (codebaseSize, validated) = try SourceValidator.scanSources(from: sourceURLs, codebaseThreshold: Self.codebaseThresholdSize)
+                let validated = try SourceValidator.scanSources(from: sourceURLs, codebaseThreshold: Self.codebaseThresholdSize)
                 let scanSourceEnd = Date().timeIntervalSinceReferenceDate
-                info("Codebase (\(byteCount(for: .init(codebaseSize)))) \(validated ? " scanned" : " scanned") (\(Int64((scanSourceEnd - scanSourceStart) * 1000)) ms)")
+                info("Codebase \(validated ? " scanned" : " scanned") (\(Int64((scanSourceEnd - scanSourceStart) * 1000)) ms)")
             }
         } catch let e as LicenseError {
             // issue an error with the offending file
@@ -549,7 +567,7 @@ struct SnippetAction: SnippetPhase, StreamingCommand {
         let totalSize = try files.compactMap({ try URL(fileURLWithPath: $0).resourceValues(forKeys: [.fileSizeKey]).fileSize }).reduce(0, +)
 
         // snippets are hardwired to not exceed the default codebase threshold size
-        if totalSize > Self.codebaseThresholdSize {
+        if let codebaseThresholdSize = Self.codebaseThresholdSize, totalSize > codebaseThresholdSize {
             continuation.yield(OutputMessage(Output(kotlin: nil, messages: [Message(kind: .error, message: "Snippet too large \(byteCount(for: .init(totalSize)))")], duration: 0)))
             continuation.finish()
             return
@@ -1264,8 +1282,8 @@ extension Transpilation {
 }
 
 struct LicenseOptions: ParsableArguments {
-    @Option(help: ArgumentHelp("The license key for transpiling non-free sources", valueName: "SKIP_LICENSE"))
-    var skipLicense: String? = nil // --skip-license SKP657AB7680CA6789F76ABB65975678CDCA34PKS
+    @Option(help: ArgumentHelp("The license key for transpiling non-free sources", valueName: "SKIPKEY"))
+    var skipKey: String? = nil // --skip-key SKP657AB7680CA6789F76ABB65975678CDCA34PKS
 
     /// A license flag that lets someone with an expired license add a few more days in order to confinue developing while the license is being renewed.
     @Option(help: ArgumentHelp("Grace period", valueName: "days"))
