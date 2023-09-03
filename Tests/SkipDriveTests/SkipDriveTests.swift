@@ -2,12 +2,24 @@ import XCTest
 import SkipDrive
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-public class SkipCommandTests : XCTestCase {
-    public func testSkipVersion() async throws {
+class SkipCommandTests : XCTestCase {
+    func testSkipVersion() async throws {
         try await XCTAssertEqualX("skip version \(skipVersion)", skip("version").out)
     }
 
-    public func testSkipCreate() async throws {
+    func testSkipWelcome() async throws {
+        try await skip("welcome")
+    }
+
+    func testSkipSelftest() async throws {
+        try await skip("selftest")
+    }
+
+    func testSkipDoctor() async throws {
+        try await skip("doctor")
+    }
+
+    func testSkipCreate() async throws {
         let tempDir = try mktmp()
         let name = "cool_app"
         let (stdout, _) = try await skip("create", "--no-build", "--no-test", "-d", tempDir, name)
@@ -28,7 +40,7 @@ public class SkipCommandTests : XCTestCase {
         //try await skip("check", "-d", tempDir)
     }
 
-    public func testSkipInit() async throws {
+    func testSkipInit() async throws {
         let tempDir = try mktmp()
         let name = "cool-lib"
         let (stdout, _) = try await skip("init", "--no-build", "--no-test", "-d", tempDir, name, "CoolA") // , "CoolB", "CoolC", "CoolD", "CoolE")
@@ -45,19 +57,7 @@ public class SkipCommandTests : XCTestCase {
         //try await skip("check", "-d", tempDir)
     }
 
-    public func testSkipWelcome() async throws {
-        try await skip("welcome")
-    }
-
-    public func testSkipSelftest() async throws {
-        try await skip("selftest")
-    }
-
-    public func testSkipDoctor() async throws {
-        try await skip("doctor")
-    }
-
-    public func testSkipTestReport() async throws {
+    func testSkipTestReport() async throws {
         let xunit = try mktmpFile(contents: Data(xunitResults.utf8))
         let tempDir = try mktmp()
         let junit = tempDir + "/" + "testDebugUnitTest"
@@ -106,6 +106,7 @@ public class SkipCommandTests : XCTestCase {
         return (out: outString, err: errString)
         #else
         // we are not linking to the skip driver, so fork the process instead with the proper arguments
+
         let result = try await Process.popen(arguments: ["skip"] + args, loggingHandler: nil)
         // Throw if there was a non zero termination.
         guard result.exitStatus == .terminated(code: 0) else {
@@ -148,7 +149,7 @@ func execJSON<T: Decodable>(_ arguments: [String]) async throws -> T {
 
 /// Cover for `XCTAssertEqual` that permit async autoclosures.
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-public func XCTAssertEqualX<T>(_ expression1: T, _ expression2: T, _ message: @autoclosure () -> String = "", file: StaticString = #filePath, line: UInt = #line) where T : Equatable {
+func XCTAssertEqualX<T>(_ expression1: T, _ expression2: T, _ message: @autoclosure () -> String = "", file: StaticString = #filePath, line: UInt = #line) where T : Equatable {
     XCTAssertEqual(expression1, expression2, message(), file: file, line: line)
 }
 
@@ -156,54 +157,54 @@ public func XCTAssertEqualX<T>(_ expression1: T, _ expression2: T, _ message: @a
 
 /// An incomplete representation of package JSON, to be filled in as needed for the purposes of the tool
 /// The output from `swift package dump-package`.
-public struct PackageManifest : Hashable, Decodable {
-    public var name: String
-    //public var toolsVersion: String // can be string or dict
-    public var products: [Product]
-    public var dependencies: [Dependency]
-    //public var targets: [Either<Target>.Or<String>]
-    public var platforms: [SupportedPlatform]
-    public var cModuleName: String?
-    public var cLanguageStandard: String?
-    public var cxxLanguageStandard: String?
+struct PackageManifest : Hashable, Decodable {
+    var name: String
+    //var toolsVersion: String // can be string or dict
+    var products: [Product]
+    var dependencies: [Dependency]
+    //var targets: [Either<Target>.Or<String>]
+    var platforms: [SupportedPlatform]
+    var cModuleName: String?
+    var cLanguageStandard: String?
+    var cxxLanguageStandard: String?
 
-    public struct Target: Hashable, Decodable {
-        public enum TargetType: String, Hashable, Decodable {
+    struct Target: Hashable, Decodable {
+        enum TargetType: String, Hashable, Decodable {
             case regular
             case test
             case system
         }
 
-        public var `type`: TargetType
-        public var name: String
-        public var path: String?
-        public var excludedPaths: [String]?
-        //public var dependencies: [String]? // dict
-        //public var resources: [String]? // dict
-        public var settings: [String]?
-        public var cModuleName: String?
-        // public var providers: [] // apt, brew, etc.
+        var `type`: TargetType
+        var name: String
+        var path: String?
+        var excludedPaths: [String]?
+        //var dependencies: [String]? // dict
+        //var resources: [String]? // dict
+        var settings: [String]?
+        var cModuleName: String?
+        // var providers: [] // apt, brew, etc.
     }
 
 
-    public struct Product : Hashable, Decodable {
-        //public var `type`: ProductType // can be string or dict
-        public var name: String
-        public var targets: [String]
+    struct Product : Hashable, Decodable {
+        //var `type`: ProductType // can be string or dict
+        var name: String
+        var targets: [String]
 
-        public enum ProductType: String, Hashable, Decodable, CaseIterable {
+        enum ProductType: String, Hashable, Decodable, CaseIterable {
             case library
             case executable
         }
     }
 
-    public struct Dependency : Hashable, Decodable {
-        public var name: String?
-        public var url: String?
-        //public var requirement: Requirement // revision/range/branch/exact
+    struct Dependency : Hashable, Decodable {
+        var name: String?
+        var url: String?
+        //var requirement: Requirement // revision/range/branch/exact
     }
 
-    public struct SupportedPlatform : Hashable, Decodable {
+    struct SupportedPlatform : Hashable, Decodable {
         var platformName: String
         var version: String
     }
@@ -211,10 +212,10 @@ public struct PackageManifest : Hashable, Decodable {
 
 
 /// The output from `xcodebuild -showBuildSettings -json -project Project.xcodeproj -scheme SchemeName`
-public struct ProjectBuildSettings : Decodable {
-    public let target: String
-    public let action: String
-    public let buildSettings: [String: String]
+struct ProjectBuildSettings : Decodable {
+    let target: String
+    let action: String
+    let buildSettings: [String: String]
 }
 
 

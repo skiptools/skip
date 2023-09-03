@@ -322,7 +322,7 @@ public struct GradleDriver {
         }
 
         /// Loads the test suite information from the JUnit-compatible XML format.
-        static func parse(contentsOf url: URL) throws -> [TestSuite] {
+        public static func parse(contentsOf url: URL) throws -> [TestSuite] {
             let results = try XMLDocument(contentsOf: url)
             //print("parsed XML results:", results)
 
