@@ -23,11 +23,11 @@ jobs:
         run: swift test
 
       - name: Run skip doctor
-        run: skip doctor
+        run: skip doctor --plain
 
       - name: Run skip init
-        run: skip init --build --test -d `mktemp -d` skppkg Mod1 Mod2
+        run: skip init --plain --build --test -d `mktemp -d` skppkg Mod1 Mod2
 
       - name: Run skip create
-        run: skip create --build --test -d `mktemp -d` skpapp
+        run: skip create --plain --build --test -d `mktemp -d` skpapp
 
