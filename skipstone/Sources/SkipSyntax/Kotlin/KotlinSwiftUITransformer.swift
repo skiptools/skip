@@ -459,6 +459,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         let composingArgument = LabeledValue<KotlinExpression>(value: composingClosure)
         let composingFunction = KotlinIdentifier(name: "ComposeView")
         let composingFunctionCall = KotlinFunctionCall(function: composingFunction, arguments: [composingArgument])
+        composingFunctionCall.hasTrailingClosures = true
 
         let returnStatement: KotlinStatement = closure == nil ? KotlinReturn(expression: composingFunctionCall) : KotlinExpressionStatement(expression: composingFunctionCall)
         let composingCodeBlock = KotlinCodeBlock(statements: [returnStatement])

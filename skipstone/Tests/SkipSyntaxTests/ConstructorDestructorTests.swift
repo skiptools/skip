@@ -453,6 +453,29 @@ final class ConstructorDestructorTests: XCTestCase {
         """)
     }
 
+    func testDelegatingTrailingClosureConstructor() async throws {
+        try await check(swift: """
+        class C {
+            init(c: () -> Void) {
+            }
+            convenience init(x: Double) {
+                self.init {
+                    print("delegating")
+                }
+                print("double")
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal constructor(c: () -> Unit) {
+            }
+            internal constructor(x: Double): this(c = { print("delegating") }) {
+                print("double")
+            }
+        }
+        """)
+    }
+
     func testSetterSideEffects() {
         let base = ConstructorTestsSideEffectBase()
         XCTAssertFalse(base.didSet1)

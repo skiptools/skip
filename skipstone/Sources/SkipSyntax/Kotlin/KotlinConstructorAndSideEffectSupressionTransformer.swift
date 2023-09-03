@@ -160,6 +160,8 @@ final class KotlinConstructorAndSideEffectSupressionTransformer: KotlinTransform
         }
         // The delegating call should not be treated as an optional init call
         functionCall.isOptionalInit = false
+        // Cannot use trailing closures in delegating calls
+        functionCall.hasTrailingClosures = false
     }
 
     private func superclass(of classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) -> TypeSignature? {

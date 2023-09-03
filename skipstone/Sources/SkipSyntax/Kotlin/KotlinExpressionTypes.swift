@@ -786,7 +786,17 @@ class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting, APICallExp
     var inferredType: TypeSignature = .none
     var apiMatch: APIMatch?
     var mayBeSharedMutableStructType = false
-    var useTrailingClosureFormatting = true
+    var hasTrailingClosures = false {
+        didSet {
+            if !hasTrailingClosures && oldValue == true, !arguments.isEmpty && arguments.last?.label == nil, let apiMatch {
+                // Attempt to fill in the trailing closure argument label
+                let parameters = apiMatch.signature.parameters
+                if parameters.count == arguments.count {
+                    arguments[arguments.count - 1].label = parameters.last?.label
+                }
+            }
+        }
+    }
 
     static func translate(expression: FunctionCall, translator: KotlinTranslator) -> KotlinExpression {
         let karguments = expression.arguments.map {
@@ -800,6 +810,7 @@ class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting, APICallExp
         let kfunction = translator.translateExpression(expression.function)
         let kexpression = KotlinFunctionCall(expression: expression, function: kfunction)
         kexpression.arguments = karguments
+        kexpression.hasTrailingClosures = expression.hasTrailingClosures
         kexpression.isOptionalInit = expression.isInit && expression.inferredType.isOptional
         kexpression.inferredType = expression.inferredType.resolvingSelf(in: expression)
         kexpression.apiMatch = expression.apiMatch
@@ -928,13 +939,13 @@ class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting, APICallExp
                     isReduceFunction = memberAccess.member == "reduce"
                 }
             }
-            let hasTrailingClosure = useTrailingClosureFormatting && arguments.last?.value.type == .closure && arguments.last?.label == nil && (arguments.last?.value as? KotlinClosure)?.isAnonymousFunction == false
-            if hasTrailingClosure {
+            let useTrailingClosure = hasTrailingClosures && arguments.last?.value.type == .closure && arguments.last?.label == nil && (arguments.last?.value as? KotlinClosure)?.isAnonymousFunction == false
+            if useTrailingClosure {
                 trailingClosure = arguments[arguments.count - 1].value
                 arguments = Array(arguments[0..<(arguments.count - 1)])
             }
             // When immediately executing a closure we must add parentheses { ... }()
-            if arguments.isEmpty && (!hasTrailingClosure || function is KotlinClosure) {
+            if arguments.isEmpty && (!useTrailingClosure || function is KotlinClosure) {
                 forceParentheses = true
             }
         }
@@ -1593,7 +1604,7 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
             kexpression.useMultlineFormatting = expression.useMultlineFormatting
             if let functionCall = kbase as? KotlinFunctionCall, functionCall.optionalChain == .implicit {
                 // f({ ... })?.member is cleaner and simpler for us than (f() { ... })?.member
-                functionCall.useTrailingClosureFormatting = false
+                functionCall.hasTrailingClosures = false
             }
             kexpression.baseKClass = kclass(for: base, accessingMember: expression.member, codebaseInfo: translator.codebaseInfo)
             if case .function = expression.inferredType {

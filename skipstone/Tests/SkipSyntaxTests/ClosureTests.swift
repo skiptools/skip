@@ -21,7 +21,7 @@ final class ClosureTests: XCTestCase {
         try await check(swift: """
         call(100, { print("f") })
         """, kotlin: """
-        call(100) { print("f") }
+        call(100, { print("f") })
         """)
     }
 
