@@ -1,5 +1,5 @@
 #if canImport(FoundationNetworking)
-import Foundation
+import FoundationNetworking
 import FoundationNetworking
 
 // Non-Darwin (e.g., Linux) do not yet support async URLSession functions, so we re-create them here
@@ -156,4 +156,11 @@ extension URLResponse {
     }
 
 }
+
+extension URL {
+    public func appending(path: String) -> URL {
+        appendPathComponent(path)
+    }
+}
+
 #endif
