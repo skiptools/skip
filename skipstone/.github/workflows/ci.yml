@@ -46,7 +46,7 @@ jobs:
       - name: Checkout skip.git
         uses: actions/checkout@v3
         with:
-          repository: skiptools/skip.git
+          repository: skiptools/skip
           path: skip
 
       - name: Check kotlinc
