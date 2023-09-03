@@ -38,13 +38,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
       # checkout both skipstone.git and skip.git for the linked SkipDrive
-      - name: Checkout
+      - name: Checkout skipstone.git
         uses: actions/checkout@v3
         with:
-          repository: skiptools/skipstone.git
           path: skipstone
 
-      - name: Checkout
+      - name: Checkout skip.git
         uses: actions/checkout@v3
         with:
           repository: skiptools/skip.git
