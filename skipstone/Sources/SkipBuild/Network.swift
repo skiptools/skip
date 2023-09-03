@@ -1,6 +1,6 @@
 #if canImport(FoundationNetworking)
 import FoundationNetworking
-import FoundationNetworking
+import Foundation
 
 // Non-Darwin (e.g., Linux) do not yet support async URLSession functions, so we re-create them here
 // https://github.com/apple/swift-corelibs-foundation/issues/3205
