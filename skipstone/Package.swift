@@ -41,7 +41,7 @@ let package = Package(
 
         .target(name: "SkipBuild", dependencies: [
             "SkipSyntax",
-            "SkipDriveExternal",
+            .target(name: "SkipDriveExternal", condition: .when(platforms: [.macOS])),
             .product(name: "SwiftParser", package: "swift-syntax"),
             .product(name: "ArgumentParser", package: "swift-argument-parser"),
             .product(name: "SwiftToolsSupport-auto", package: "swift-tools-support-core"),
