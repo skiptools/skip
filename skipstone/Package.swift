@@ -32,14 +32,14 @@ let package = Package(
         .testTarget(name: "SkipSyntaxTests", dependencies: [
             "SkipSyntax",
             "SkipBuild",
-            .product(name: "SwiftToolsSupport", package: "swift-tools-support-core"),
+            .product(name: "SwiftToolsSupport-auto", package: "swift-tools-support-core"),
         ]),
 
         .target(name: "SkipBuild", dependencies: [
             "SkipSyntax",
             .product(name: "SwiftParser", package: "swift-syntax"),
             .product(name: "ArgumentParser", package: "swift-argument-parser"),
-            .product(name: "SwiftToolsSupport", package: "swift-tools-support-core"),
+            .product(name: "SwiftToolsSupport-auto", package: "swift-tools-support-core"),
             .product(name: "Universal", package: "universal"),
             .product(name: "Crypto", package: "swift-crypto", condition: .when(platforms: [.linux])),
         ]),

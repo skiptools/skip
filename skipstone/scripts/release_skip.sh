@@ -29,13 +29,12 @@ set -o pipefail
 SKIPCONFIG=${SKIPCONFIG:-"release"}
 
 PRODUCT=SkipRunner
-ARTIFACTTOOL=skipstone
+SKIPCMD=skip
 
 # name the artifact the same as the tool
-ARTIFACT=${ARTIFACTTOOL}
+ARTIFACT=${SKIPCMD}
 ARTIFACTBUNDLE="${ARTIFACT}.artifactbundle"
-PLUGIN_BASENAME="${ARTIFACT}.plugin"
-PLUGIN_ZIP="${PLUGIN_BASENAME}.zip"
+PLUGIN_ZIP="${ARTIFACT}.zip"
 
 DIR=.build/artifactbundle
 GITDATE="$(git log -1 --format=%ad --date=iso-strict)"
@@ -54,7 +53,6 @@ SKIPBREWDIR="../homebrew-skip"
 cd ${SKIPPKGDIR}
 SKIP_VERSION_OLD=$(git tag -l --sort=-version:refname | grep '[0-9]*\.[0-9]*\.[0-9]*' | head -n 1)
 SKIP_VERSION=$(semver bump "${SEMVER_BUMP:-patch}" "${SKIP_VERSION_OLD}")
-
 cd '-'
 
 echo "Creating release and tagging new skip version: ${SKIP_VERSION}"
@@ -68,10 +66,10 @@ swift build --arch arm64 --arch x86_64 --configuration ${SKIPCONFIG} --product $
 
 # try to back up any old artifactbundle folder
 mv -f ${DIR}/${ARTIFACTBUNDLE} ${DIR}/${ARTIFACTBUNDLE}.bk.`date +%s` || true
-mkdir -p ${DIR}/${ARTIFACTBUNDLE}
+mkdir -p ${DIR}/${ARTIFACTBUNDLE}/macos
 
 # the secret --arch flag emits to the (undocumented) "apple" build folder
-cp -av .build/apple/Products/${SKIPCONFIG}/${PRODUCT} ${DIR}/${ARTIFACTBUNDLE}/${ARTIFACTTOOL}
+cp -av .build/apple/Products/${SKIPCONFIG}/${PRODUCT} ${DIR}/${ARTIFACTBUNDLE}/macos/${SKIPCMD}
 
 cd ${DIR}
 
@@ -79,12 +77,12 @@ cat > ${ARTIFACTBUNDLE}/info.json << EOF
 {
     "schemaVersion": "1.0",
     "artifacts": {
-        "${ARTIFACTTOOL}": {
+        "${SKIPCMD}": {
             "type": "executable",
             "version": "${SKIP_VERSION}",
             "variants": [
                 {
-                    "path": "${ARTIFACTTOOL}",
+                    "path": "macos/${SKIPCMD}",
                     "supportedTriples": ["x86_64-apple-macosx", "arm64-apple-macosx"]
                 },
             ]
@@ -112,21 +110,22 @@ cd -
 
 # make a release of the skip command
 cd ${SKIPPKGDIR}
+pwd
 
 SKIPDRIVE_VERSION_PATH="Sources/SkipDrive/Version.swift"
 
 sed -I '' 's;public let skipVersion = .*;public let skipVersion = "'${SKIP_VERSION}'";g' "${SKIPDRIVE_VERSION_PATH}"
 
-SKIP_ARTIFACT_ZIP="skip.zip"
-echo "Building ${SKIP_ARTIFACT_ZIP}"
-SKIPLOCAL=.. swift build --arch arm64 --arch x86_64 --configuration ${SKIPCONFIG} --product skip
+#SKIP_ARTIFACT_ZIP="skip.zip"
+#echo "Building ${SKIP_ARTIFACT_ZIP}"
+#SKIPLOCAL=.. swift build --arch arm64 --arch x86_64 --configuration ${SKIPCONFIG} --product skip
 
-cd .build/apple/Products/${SKIPCONFIG}/
-# ensure we can run the skip command
-./skip version
-zip -9 ${RELSTAGING}/${SKIP_ARTIFACT_ZIP} skip
-SKIPCMD_CHECKSUM=$(shasum -a 256 ${RELSTAGING}/${SKIP_ARTIFACT_ZIP} | cut -f 1 -d ' ')
-cd -
+#cd .build/apple/Products/${SKIPCONFIG}/
+## ensure we can run the skip command
+#./skip version
+#zip -9 ${RELSTAGING}/${SKIP_ARTIFACT_ZIP} skip
+#SKIPCMD_CHECKSUM=$(shasum -a 256 ${RELSTAGING}/${SKIP_ARTIFACT_ZIP} | cut -f 1 -d ' ')
+#cd -
 
 # package.targets += [.binaryTarget(name: "${PRODUCT}", url: "${ARTIFACT_URL}", checksum: "${PLUGIN_CHECKSUM}")]
 sed -I '' 's;.binaryTarget(name: "'${ARTIFACT}'", url:.*);.binaryTarget(name: "'${ARTIFACT}'", url: "'${ARTIFACT_URL}'", checksum: "'${PLUGIN_CHECKSUM}'");g' ${SKIPPKG}
@@ -186,7 +185,10 @@ git push --follow-tags
 cd ${SKIPBREWDIR}
 
 sed -I '' "s;version \".*\";version \"${SKIP_VERSION}\";g" Casks/skip.rb
-sed -I '' "s;sha256 \".*\";sha256 \"${SKIPCMD_CHECKSUM}\";g" Casks/skip.rb
+sed -I '' "s;sha256 \".*\";sha256 \"${PLUGIN_CHECKSUM}\";g" Casks/skip.rb
+# from when they were distributed separately
+#sed -I '' "s;sha256 \".*\";sha256 \"${SKIPCMD_CHECKSUM}\";g" Casks/skip.rb
+
 git add Casks/skip.rb
 git commit -m "Release ${SKIP_VERSION}" 
 git tag --sign "${SKIP_VERSION}" -m "Release ${SKIP_VERSION}"
