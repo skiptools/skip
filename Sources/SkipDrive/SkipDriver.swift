@@ -1243,11 +1243,19 @@ public struct OutputOptions: ParsableArguments {
 
     @discardableResult static func checkFirstRun() -> Bool {
         let cfg = home(".skiptools")
-        if FileManager.default.fileExists(atPath: cfg) == true {
-            return false
+
+        defer {
+            try? FileManager.default.createDirectory(atPath: cfg, withIntermediateDirectories: true)
+            let env = cfg + "/skipkey.env"
+            if !FileManager.default.fileExists(atPath: env) {
+                try? """
+                # Obtain a Skip key from https://skip.tools and set the SKIPKEY field or environment variable
+                #SKIPKEY: 
+                """.write(toFile: env, atomically: true, encoding: .utf8)
+            }
         }
-        try? FileManager.default.createDirectory(atPath: cfg, withIntermediateDirectories: true)
-        return true
+
+        return FileManager.default.fileExists(atPath: cfg) == false
     }
 }
 
