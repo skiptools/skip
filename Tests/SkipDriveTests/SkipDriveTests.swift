@@ -4,7 +4,7 @@ import SkipDrive
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 class SkipCommandTests : XCTestCase {
     func testSkipVersion() async throws {
-        try await XCTAssertEqualX("skip version \(skipVersion)", skip("version").out)
+        try await XCTAssertEqualX("Skip version \(skipVersion)", skip("version").out)
     }
 
     func testSkipWelcome() async throws {
