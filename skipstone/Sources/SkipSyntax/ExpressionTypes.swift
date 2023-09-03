@@ -1589,7 +1589,10 @@ class StringLiteral: Expression {
         for segmentSyntax in stringLiteralExpr.segments {
             switch segmentSyntax {
             case .stringSegment(let stringSyntax):
-                segments.append(.string(stringSyntax.content.text))
+                let string = stringSyntax.content.text
+                if !string.isEmpty {
+                    segments.append(.string(string))
+                }
             case .expressionSegment(let expressionSyntax):
                 guard let expressionSyntax = expressionSyntax.expressions.first?.expression else {
                     break
@@ -1607,7 +1610,7 @@ class StringLiteral: Expression {
                 expression.inferTypes(context: context, expecting: .none)
             }
         }
-        if expecting == .character && segments.count == 1, case .string(let string) = segments[0], string.count == 1 {
+        if expecting == .character && segments.count == 1, case .string(let string) = segments[0], string.count == 1 || (string.count == 2 && string.first == "\\")  {
             literalType = .character
         }
         return context

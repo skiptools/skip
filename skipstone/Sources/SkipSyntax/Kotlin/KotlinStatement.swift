@@ -46,6 +46,38 @@ class KotlinStatement: KotlinSyntaxNode {
     final override func trailingTrivia(indentation: Indentation) -> String {
         return extras?.trailingTrivia(indentation: indentation) ?? ""
     }
+
+    /// The number of leading newlines detected in our leading trivia.
+    final var leadingNewlines: Int {
+        guard let extras else {
+            return 0
+        }
+        var count = 0
+        for leadingTrivia in extras.leadingTrivia {
+            if leadingTrivia == "\n" {
+                count += 1
+            } else {
+                break
+            }
+        }
+        return count
+    }
+
+    /// Attempt to ensure that this statement will contains at least the given number of leading newlines.
+    ///
+    /// Used to make output more readable.
+    final func ensureLeadingNewlines(_ count: Int) {
+        let additional = count - leadingNewlines
+        guard additional > 0 else {
+            return
+        }
+        let newlines = Array(repeating: "\n", count: additional)
+        if extras == nil {
+            extras = StatementExtras(directives: [], leadingTrivia: newlines, trailingTrivia: [])
+        } else {
+            extras?.leadingTrivia += newlines
+        }
+    }
 }
 
 /// Additional requirements for type members to handle extensions and companion objects in Kotlin.

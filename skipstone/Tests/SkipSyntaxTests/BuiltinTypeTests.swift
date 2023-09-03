@@ -362,6 +362,25 @@ final class BuiltinTypeTests: XCTestCase {
             setf(set = setOf(1, 2, 3))
         }
         """)
+
+        try await check(supportingSwift: """
+        func setf(set: Set<Character>) {
+        }
+        """, swift: """
+        {
+            let s: Set<Character> = ["1", "2", "3"]
+            setf(set: s)
+            setf(set: ["1", "2", "\\n"])
+        }
+        """, kotlin: """
+        import skip.lib.Set
+
+        {
+            val s: Set<Char> = setOf('1', '2', '3')
+            setf(set = s)
+            setf(set = setOf('1', '2', '\\n'))
+        }
+        """)
     }
 
     func testAnyObjectProtocols() async throws {

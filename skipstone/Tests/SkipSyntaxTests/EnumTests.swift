@@ -363,6 +363,7 @@ final class EnumTests: XCTestCase {
                     return associated0 == other.associated0
                 }
             }
+
             override fun compareTo(other: E): Int {
                 if (this == other) return 0
                 fun islessthan(lhs: E, rhs: E): Boolean {
@@ -541,6 +542,7 @@ final class EnumTests: XCTestCase {
             three;
 
             companion object {
+        
                 internal val allCases: Array<E>
                     get() = arrayOf(E.one, E.two, E.three)
             }

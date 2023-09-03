@@ -1444,6 +1444,7 @@ final class MemberDeclarationTests: XCTestCase {
         internal open class C<T, Z> {
             internal open fun a(z: Z) = Unit
         }
+
         internal fun <T, Z, U> C<T, Z>.b(t: T, u: U) where T: I = Unit
         internal fun <Z, U> C<String, Z>.c(t: String, u: U) = Unit
         """)
@@ -1465,7 +1466,9 @@ final class MemberDeclarationTests: XCTestCase {
         internal open class C<T, Z> {
             internal open fun a(z: Z) = Unit
         }
+
         internal fun <T, Z, U> C<T, Z>.b(t: T, u: U) where T: I = Unit
+
         internal fun <Z, U> C<String, Z>.c(t: String, u: U)
         internal fun <Z> C<String, Z>.d() where Z: I = Unit
         """)
@@ -1726,6 +1729,7 @@ final class MemberDeclarationTests: XCTestCase {
             internal constructor(param: Int) {
                 this.i = param
             }
+
             internal open val description: String
                 get() = "foo"
 
@@ -1836,6 +1840,7 @@ final class MemberDeclarationTests: XCTestCase {
         internal open class C<T> {
             internal open fun f(): T? = null
         }
+
         internal val C<Int>.v: Int
             get() = 1
         internal fun C<Int>.plusOne(): Int = (f() ?: 0) + 1
@@ -1859,6 +1864,7 @@ final class MemberDeclarationTests: XCTestCase {
         internal open class C<T> {
             internal open fun f(): T? = null
         }
+
         internal val C<Int>.v: Int
             get() = 1
         internal fun C<Int>.plusOne(): Int = (f() ?: 0) + 1
@@ -1877,6 +1883,7 @@ final class MemberDeclarationTests: XCTestCase {
         """, kotlin: """
         internal open class C<T, U> {
         }
+
         internal inline fun <reified T, reified U> C<T, U>.f(p: T) where T: P = Unit
         """)
 
@@ -1900,6 +1907,7 @@ final class MemberDeclarationTests: XCTestCase {
             companion object {
             }
         }
+
         internal val <U> C<Int, U>.v: U? where U: P
             get() = null
         inline fun <reified U, reified V> C<Int, U>.f(p1: U, p2: V): Int where U: P, V: P = 1
@@ -1917,6 +1925,7 @@ final class MemberDeclarationTests: XCTestCase {
         """, kotlin: """
         internal interface P {
         }
+
         internal inline fun <reified T> P.f(p: T) = Unit
         """)
     }

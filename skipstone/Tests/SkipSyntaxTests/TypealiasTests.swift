@@ -357,6 +357,7 @@ final class TypealiasTests: XCTestCase {
             }
         }
         internal interface P {
+        
             fun f(s: S, c: Double? = null): P = this.sref()
             fun g(arg: Double): P = f(S.all, arg)
         }

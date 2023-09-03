@@ -694,6 +694,7 @@ final class TypeInferenceTests: XCTestCase {
         """, kotlin: """
         internal open class C {
             internal open fun f(): E = E.a
+
             internal open fun g(): Boolean = C().f() == E.a
         }
         """)
@@ -718,6 +719,7 @@ final class TypeInferenceTests: XCTestCase {
         """, kotlin: """
         internal open class C {
             internal open fun f(): E = E.a
+
             internal open fun g(): Boolean = C().f() == E.a
         }
         """)

@@ -951,7 +951,9 @@ class KotlinClassDeclaration: KotlinStatement {
                 kstatement.inherits += extInfo.inherits
                 let partitioned = KotlinExtensionDeclaration.partition(members: extDeclaration.members, of: kstatement.signature, isFinal: isFinal)
                 extensionMembers += partitioned.extensionMembers
-                kmembers += partitioned.members.flatMap { translator.translateStatement($0) }
+                let kpartitionedMembers = partitioned.members.flatMap { translator.translateStatement($0) }
+                kpartitionedMembers.first?.ensureLeadingNewlines(1)
+                kmembers += kpartitionedMembers
                 kstatement.movedExtensionImportModulePaths += extImportModulePaths
             }
         }
@@ -962,7 +964,9 @@ class KotlinClassDeclaration: KotlinStatement {
 
         kstatement.inherits.forEach { $0.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
 
-        return [kstatement] + KotlinExtensionDeclaration.translateExtensionMembers(extensionMembers, of: kstatement.signature, visibility: kstatement.modifiers.visibility, generics: kstatement.generics, translator: translator)
+        let kextensionMembers = KotlinExtensionDeclaration.translateExtensionMembers(extensionMembers, of: kstatement.signature, visibility: kstatement.modifiers.visibility, generics: kstatement.generics, translator: translator)
+        kextensionMembers.first?.ensureLeadingNewlines(1)
+        return [kstatement] + kextensionMembers
     }
 
     init(name: String, signature: TypeSignature, declarationType: StatementType, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
@@ -1352,7 +1356,9 @@ struct KotlinExtensionDeclaration {
             generics = extendedTypeInfo.generics.merge(extension: statement.extends, generics: statement.generics).resolvingSelf(in: statement)
             visibility = extendedTypeInfo.modifiers.visibility
         }
-        return kstatements + translateExtensionMembers(statement.members, of: extends, visibility: visibility, generics: generics, translator: translator, extensionPlacement: placement)
+        let kextensionMembers = translateExtensionMembers(statement.members, of: extends, visibility: visibility, generics: generics, translator: translator, extensionPlacement: placement)
+        kextensionMembers.first?.ensureLeadingNewlines(1)
+        return kstatements + kextensionMembers
     }
 
     static func translateExtensionMembers(_ members: [Statement], of extends: TypeSignature, visibility: Modifiers.Visibility, generics: Generics, translator: KotlinTranslator, extensionPlacement: KotlinExtensionPlacement? = nil) -> [KotlinStatement] {
@@ -2044,6 +2050,9 @@ class KotlinInterfaceDeclaration: KotlinStatement {
 
             for kmember in partitioned.members.flatMap({ translator.translateStatement($0) }) {
                 if !replaceMember(in: &originalMembers, with: kmember) {
+                    if newMembers.isEmpty {
+                        kmember.ensureLeadingNewlines(1)
+                    }
                     newMembers.append(kmember)
                 }
             }
@@ -2055,7 +2064,9 @@ class KotlinInterfaceDeclaration: KotlinStatement {
         kstatement.inherits = kstatement.inherits.filter { $0 != .any && $0 != .anyObject }
         kstatement.inherits.forEach { $0.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
 
-        return [kstatement] + KotlinExtensionDeclaration.translateExtensionMembers(extensionMembers, of: kstatement.signature, visibility: kstatement.modifiers.visibility, generics: kstatement.generics, translator: translator)
+        let kextensionMembers = KotlinExtensionDeclaration.translateExtensionMembers(extensionMembers, of: kstatement.signature, visibility: kstatement.modifiers.visibility, generics: kstatement.generics, translator: translator)
+        kextensionMembers.first?.ensureLeadingNewlines(1)
+        return [kstatement] + kextensionMembers
     }
 
     private static func replaceMember(in originalMembers: inout [KotlinStatement], with member: KotlinStatement) -> Bool {
@@ -2065,11 +2076,13 @@ class KotlinInterfaceDeclaration: KotlinStatement {
             }
             if let originalVariableDeclaration = originalMembers[i] as? KotlinVariableDeclaration, let variableDeclaration = member as? KotlinVariableDeclaration {
                 if originalVariableDeclaration.names == variableDeclaration.names {
+                    member.ensureLeadingNewlines(originalMembers[i].leadingNewlines)
                     originalMembers[i] = member
                     return true
                 }
             } else if let originalFunctionDeclaration = originalMembers[i] as? KotlinFunctionDeclaration, let functionDeclaration = member as? KotlinFunctionDeclaration {
                 if originalFunctionDeclaration.name == functionDeclaration.name && originalFunctionDeclaration.functionType == functionDeclaration.functionType {
+                    member.ensureLeadingNewlines(originalMembers[i].leadingNewlines)
                     originalMembers[i] = member
                     return true
                 }

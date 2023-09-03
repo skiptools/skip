@@ -51,6 +51,7 @@ final class TypeDeclarationTests: XCTestCase {
         """, kotlin: """
         internal open class TypeDeclarationTestsClass: TypeDeclarationTestsProtocol {
             internal open var i = 0
+
             override fun f() = Unit
             internal open fun g() = Unit
         }
@@ -92,6 +93,7 @@ final class TypeDeclarationTests: XCTestCase {
         """, kotlin: """
         import module1.*
         internal class S: I {
+
             internal fun f() = Unit
         }
         """)
@@ -114,6 +116,7 @@ final class TypeDeclarationTests: XCTestCase {
         import module2.*
 
         internal class S: I {
+
             internal fun f() = Unit
         }
         """)
@@ -130,6 +133,7 @@ final class TypeDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         import module1.*
+
         private fun S.f() = Unit
         """)
 
@@ -145,6 +149,7 @@ final class TypeDeclarationTests: XCTestCase {
         """, kotlin: """
         import module1.*
         internal class S {
+
             private fun f() = Unit
         }
         """)
@@ -163,6 +168,7 @@ final class TypeDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal class S {
+
             internal fun f() = Unit
         }
         """)
@@ -181,6 +187,7 @@ final class TypeDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal class S {
+
             internal fun f() = Unit
         }
         """)
@@ -199,6 +206,7 @@ final class TypeDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal class S {
+
             internal fun f() = Unit
         }
         """)
@@ -217,6 +225,7 @@ final class TypeDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal class S {
+
             internal fun f() = Unit
         }
         """)
@@ -298,6 +307,7 @@ final class TypeDeclarationTests: XCTestCase {
             val j: Int
             fun f(i: Int = 1): String = "f"
             fun g()
+
             val k: Int
                 get() = 2
             fun h(): Unit = print("h")
@@ -535,6 +545,7 @@ final class TypeDeclarationTests: XCTestCase {
         internal open class C<T> {
             internal open fun f(): T? = null
         }
+
         internal val C<Int>.v: Int
             get() = 1
         internal fun C<Int>.plusOne(): Int = (f() ?: 0) + 1
@@ -558,6 +569,7 @@ final class TypeDeclarationTests: XCTestCase {
         internal open class C<T> {
             internal open fun f(): T? = null
         }
+
         internal val C<Int>.v: Int
             get() = 1
         internal fun C<Int>.plusOne(): Int = (f() ?: 0) + 1
@@ -576,6 +588,7 @@ final class TypeDeclarationTests: XCTestCase {
         """, kotlin: """
         internal open class C<T, U> {
         }
+
         internal fun <T, U> C<T, U>.f(p: T) where T: P = Unit
         """)
 
@@ -596,6 +609,7 @@ final class TypeDeclarationTests: XCTestCase {
         """, kotlin: """
         internal open class C<T, U> {
         }
+
         internal val <U> C<Int, U>.v: U? where U: P
             get() = null
         internal fun <U, V> C<Int, U>.f(p1: U, p2: V): Int where U: P, V: P = 1
@@ -645,6 +659,7 @@ final class TypeDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal open class C {
+        
             internal open class Sub {
             }
         }
