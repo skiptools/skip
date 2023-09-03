@@ -1,6 +1,12 @@
 import Foundation
 import ArgumentParser
 import SkipSyntax
+#if canImport(FoundationNetworking)
+import FoundationNetworking // for non-Darwin
+#endif
+#if canImport(FoundationXML)
+import FoundationXML // for non-Darwin
+#endif
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 struct UpgradeCommand: SkipCommand {
