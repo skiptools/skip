@@ -70,7 +70,6 @@ jobs:
           cp -a .build/x86_64-unknown-linux-gnu/release/SkipRunner .build/dist/skiptool/x86_64-unknown-linux-gnu/skipstone
 
       - name: "Upload Build Artifacts"
-        working-directory: skipstone
         # disabled since it uses storage credit
         # TODO: hand off to macBuild, which will public the linux plugin
         # alongside the macOS one (once swift supports plugins on Linux)
@@ -79,4 +78,5 @@ jobs:
         uses: actions/upload-artifact@v3
         with: 
           path: .build/dist
+          working-directory: skipstone
 
