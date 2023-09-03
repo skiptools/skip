@@ -1077,6 +1077,9 @@ public struct OutputOptions: ParsableArguments {
     @Flag(name: [.customShort("q"), .long], help: ArgumentHelp("Quiet mode: suppress output"))
     var quiet: Bool = false
 
+    @Flag(name: [.customShort("p"), .long], help: ArgumentHelp("Show no ANSI colors or progress animations"))
+    var plain: Bool = false
+
     /// progress animation sequences
     static let progressAimations = [
         "⠙⠸⢰⣠⣄⡆⠇⠋", // clockwise line
@@ -1193,7 +1196,7 @@ public struct OutputOptions: ParsableArguments {
             write(String(repeating: "\u{8}", count: count), terminator: "", flush: true)
         }
 
-        if !progress {
+        if progress == false || plain == true {
             write(message)
         } else {
             progressMonitor = Task {
@@ -1250,7 +1253,7 @@ public struct OutputOptions: ParsableArguments {
             if !FileManager.default.fileExists(atPath: env) {
                 try? """
                 # Obtain a Skip key from https://skip.tools for the SKIPKEY property
-                #SKIPKEY: 
+                #SKIPKEY:
                 """.write(toFile: env, atomically: true, encoding: .utf8)
             }
         }
