@@ -1,7 +1,7 @@
 import Foundation
 import ArgumentParser
 import SkipSyntax
-#if canImport(SkipDrive)
+#if canImport(SkipDriveExternal)
 import SkipDrive
 fileprivate let testCommandEnabled = true
 #else
@@ -60,7 +60,7 @@ struct TestCommand: SkipCommand {
             throw SkipDriveError(errorDescription: "Must either specify --xunit path or run tests with --test")
         }
 
-        #if !canImport(SkipDrive)
+        #if !canImport(SkipDriveExternal)
         throw SkipDriveError(errorDescription: "SkipDrive not linked")
         #else
         // load the xunit results file

@@ -25,6 +25,10 @@ let package = Package(
         .package(url: "https://github.com/marcprux/universal.git", from: "5.2.0"),
     ],
     targets: [
+        // SkipDriveExternal is a link to ../../skip/Sources/SkipDrive
+        // it allows skipstone.git to share code with skip.git, which would otherwise cause circular package dependecy errors
+        .target(name: "SkipDriveExternal"),
+
         .target(name: "SkipSyntax", dependencies: [
             .product(name: "SwiftSyntax", package: "swift-syntax"),
             .product(name: "SwiftParser", package: "swift-syntax"),

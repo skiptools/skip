@@ -1,7 +1,7 @@
 import Foundation
 import ArgumentParser
 import SkipSyntax
-#if canImport(SkipDrive)
+#if canImport(SkipDriveExternal)
 import SkipDrive
 
 extension GradleCommand : GradleHarness { }
@@ -30,7 +30,7 @@ struct GradleCommand: SkipCommand {
     var gradleArguments: [String]
 
     func run() async throws {
-        #if !canImport(SkipDrive)
+        #if !canImport(SkipDriveExternal)
         throw SkipDriveError(errorDescription: "SkipDrive not linked")
         #else
         try await self.gradleExec(appName: module, packageName: package, arguments: gradleArguments)
