@@ -95,8 +95,8 @@ let package = Package(
     // that contains the Skip/skip.yml configuration
     // and any custom Kotlin.
     targets: [
-        .target(name: "ModuleName", plugins: [.plugin(name: "preflight", package: "skip")]),
-        .testTarget(name: "ModuleNameTests", dependencies: ["ModuleName"], plugins: [.plugin(name: "preflight", package: "skip")]),
+        .target(name: "ModuleName", plugins: [.plugin(name: "skippy", package: "skip")]),
+        .testTarget(name: "ModuleNameTests", dependencies: ["ModuleName"], plugins: [.plugin(name: "skippy", package: "skip")]),
 
         .target(name: "ModuleNameKt", dependencies: [
             "ModuleName",

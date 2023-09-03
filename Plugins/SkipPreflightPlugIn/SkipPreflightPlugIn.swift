@@ -15,7 +15,7 @@ import PackagePlugin
         let runner = try context.tool(named: "skip").path
         let inputPaths = sourceModuleTarget.sourceFiles(withSuffix: ".swift").map { $0.path }
         let outputDir = context.pluginWorkDirectory
-        return inputPaths.map { Command.buildCommand(displayName: "Skip Preflight \(target.name)", executable: runner, arguments: ["preflight", "-O", "\(outputDir.string)", $0.string], inputFiles: [$0], outputFiles: [$0.outputPath(in: outputDir)]) }
+        return inputPaths.map { Command.buildCommand(displayName: "Skip Preflight \(target.name)", executable: runner, arguments: ["skippy", "-O", "\(outputDir.string)", $0.string], inputFiles: [$0], outputFiles: [$0.outputPath(in: outputDir)]) }
     }
 }
 
@@ -29,7 +29,7 @@ extension SkipPreflightPlugIn: XcodeBuildToolPlugin {
             .filter { $0.type == .source && $0.path.extension == "swift" }
             .map { $0.path }
         let outputDir = context.pluginWorkDirectory
-        return inputPaths.map { Command.buildCommand(displayName: "Skip Preflight \(target.displayName)", executable: runner, arguments: ["preflight", "-O", "\(outputDir.string)", $0.string], inputFiles: [$0], outputFiles: [$0.outputPath(in: outputDir)]) }
+        return inputPaths.map { Command.buildCommand(displayName: "Skip Preflight \(target.displayName)", executable: runner, arguments: ["skippy", "-O", "\(outputDir.string)", $0.string], inputFiles: [$0], outputFiles: [$0.outputPath(in: outputDir)]) }
     }
 }
 #endif
