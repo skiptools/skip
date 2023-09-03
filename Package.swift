@@ -21,12 +21,12 @@ let package = Package(
     targets: [
         .plugin(name: "skip-preflight",
                 capability: .buildTool(),
-                dependencies: ["skipstone"],
+                dependencies: ["skip"],
                 path: "Plugins/SkipPreflightPlugIn"),
 
         .plugin(name: "skip-transpiler",
                 capability: .buildTool(),
-                dependencies: ["skipstone"],
+                dependencies: ["skip"],
                 path: "Plugins/SkipTranspilePlugIn"),
 
         .target(name: "SkipDrive", dependencies: []),
@@ -40,5 +40,5 @@ let package = Package(
 import Foundation
 if ProcessInfo.processInfo.environment["PWD"]?.hasSuffix("skipstone") == true {
     package.dependencies += [.package(path: "../skipstone")]
-    package.targets = package.targets.dropLast() + [.executableTarget(name: "skipstone", dependencies: [.product(name: "SkipBuild", package: "skipstone")])]
+    package.targets = package.targets.dropLast() + [.executableTarget(name: "skip", dependencies: [.product(name: "SkipBuild", package: "skipstone")])]
 }

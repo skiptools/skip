@@ -15,7 +15,7 @@ import PackagePlugin
     let skipcodeExtension = ".skipcode.json"
 
     func createBuildCommands(context: PluginContext, target: Target) async throws -> [Command] {
-        let skipstone = try context.tool(named: "skipstone")
+        let skip = try context.tool(named: "skip")
         let outputFolder = context.pluginWorkDirectory
 
         // In SPM the per-module outputs has no suffix, but in Xcode it is "ModuleName.output" below DerivedData/
@@ -182,7 +182,7 @@ import PackagePlugin
         let sourceBase = URL(fileURLWithPath: isTest ? "src/test" : "src/main", isDirectory: true, relativeTo: outputBase)
 
         return [
-            .buildCommand(displayName: "Skip Transpile \(target.name)", executable: skipstone.path, arguments: [
+            .buildCommand(displayName: "Skip Transpile \(target.name)", executable: skip.path, arguments: [
                 "transpile",
                 "--output-folder", sourceBase.path,
                 "--module-root", outputBase.path,
