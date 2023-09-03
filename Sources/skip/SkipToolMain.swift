@@ -3,6 +3,9 @@
 // This is free software: you can redistribute and/or modify it
 // under the terms of the GNU Lesser General Public License 3.0
 // as published by the Free Software Foundation https://fsf.org
+#if !canImport(SkipBuild)
+#error("Should only import SkipBuild for SKIPLOCAL")
+#else
 import SkipBuild
 
 /// Command-line `skip` tool.
@@ -11,5 +14,4 @@ import SkipBuild
         await SkipRunnerExecutor.main()
     }
 }
-
-
+#endif
