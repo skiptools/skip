@@ -512,12 +512,6 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
     private func translateEnvironmentValue(_ statement: KotlinVariableDeclaration) {
         statement.getterAnnotations.append("@Composable")
         statement.onUpdate = nil
-        statement.getter?.body?.visit { node in
-            if let sref = node as? KotlinSRef {
-                sref.onUpdate = nil
-            }
-            return .recurse(nil)
-        }
         guard let setter = statement.setter else {
             return
         }

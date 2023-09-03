@@ -11,7 +11,7 @@ enum KotlinExpectedReturn {
     /// Convert break statements to returns with the given label.
     case labelIfBreak(String)
     /// Call `sref` on returned values with the given `onUpdate` code.
-    case sref(String?)
+    case sref((() -> String)?)
     /// Convert any null return to our Kotlin `NullReturnException`.
     case throwIfNull
 }

@@ -2206,9 +2206,9 @@ class KotlinPrefixOperator: KotlinExpression {
 
 class KotlinSRef: KotlinExpression {
     var base: KotlinExpression
-    var onUpdate: String?
+    var onUpdate: (() -> String)?
 
-    init(base: KotlinExpression, onUpdate: String? = nil) {
+    init(base: KotlinExpression, onUpdate: (() -> String)? = nil) {
         self.base = base
         self.onUpdate = onUpdate
         super.init(type: .sref)
@@ -2222,7 +2222,7 @@ class KotlinSRef: KotlinExpression {
         return base.optionalChain == .none ? .none : .implicit
     }
 
-    override func sref(onUpdate: String? = nil) -> KotlinExpression {
+    override func sref(onUpdate: (() -> String)? = nil) -> KotlinExpression {
         if let onUpdate {
             self.onUpdate = onUpdate
         }
@@ -2241,7 +2241,7 @@ class KotlinSRef: KotlinExpression {
         }
         output.append(".sref(")
         if let onUpdate {
-            output.append(onUpdate)
+            output.append(onUpdate())
         }
         output.append(")")
     }
@@ -2575,7 +2575,7 @@ class KotlinTupleLiteral: KotlinExpression {
         super.init(type: .tupleLiteral, expression: expression)
     }
 
-    override func sref(onUpdate: String? = nil) -> KotlinExpression {
+    override func sref(onUpdate: (() -> String)? = nil) -> KotlinExpression {
         let srefValues = values.map { $0.sref() }
         return KotlinTupleLiteral(values: srefValues, sourceFile: sourceFile, sourceRange: sourceRange)
     }

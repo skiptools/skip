@@ -128,7 +128,7 @@ class KotlinCodeBlock: KotlinStatement, KotlinSingleStatementAppendable {
         var sref = false
         var throwIfNull = false
         var returnRequired = false
-        var onUpdate: String? = nil
+        var onUpdate: (() -> String)? = nil
         switch expectedReturn {
         case .no:
             // Don't shortcut and return here because we need to return whether any return statements were found
@@ -2249,7 +2249,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var hasAsyncExplicitReturn = false
     var mayBeSharedMutableStruct = false
     var isAssignFromWriteable = false
-    var onUpdate: String?
+    var onUpdate: (() -> String)?
     var suppressSideEffectsPropertyName: String?
     var mutationFunctionNames: (willMutate: String, didMutate: String)?
     var storage: KotlinVariableStorage?
@@ -2357,8 +2357,15 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             kstatement.mayBeSharedMutableStruct = true
         }
         if statement.apiFlags.contains(.writeable) && kstatement.mayBeSharedMutableStruct {
-            kstatement.onUpdate = kstatement.role.isProperty ? "{ this.\(kstatement.propertyName) = it }" : "{ \(kstatement.propertyName) = it }"
-            kstatement.getter = statement.getter?.translate(translator: translator, expectedReturn: .sref(kstatement.onUpdate))
+            // Use a closure to build onUpdate code on-demand in case our property name is changed
+            kstatement.onUpdate = { [weak kstatement] in
+                guard let kstatement else {
+                    return ""
+                }
+                return kstatement.role.isProperty ? "{ this.\(kstatement.propertyName) = it }" : "{ \(kstatement.propertyName) = it }"
+            }
+            // If a transformer changes our onUpdate closure, the resulting getter code will change
+            kstatement.getter = statement.getter?.translate(translator: translator, expectedReturn: .sref({ [weak kstatement] in kstatement?.onUpdate?() ?? "" }))
         } else {
             kstatement.getter = statement.getter?.translate(translator: translator, expectedReturn: .yes)
         }
@@ -2700,7 +2707,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
 
     private func appendGetField(to output: OutputGenerator, indentation: Indentation, storage: KotlinVariableStorage?, isSingleStatement: Bool) {
-        let sref: () -> Void = apiFlags.contains(.writeable) && mayBeSharedMutableStruct ? { output.append(".sref(\(self.onUpdate ?? ""))") } : { }
+        let sref: () -> Void = apiFlags.contains(.writeable) && mayBeSharedMutableStruct ? { output.append(".sref(\(self.onUpdate?() ?? ""))") } : { }
         if let storage {
             storage.appendGet(self, sref, isSingleStatement, output, indentation)
         } else {

@@ -65,6 +65,32 @@ final class NamingTests: XCTestCase {
             """)
     }
 
+    func testMutableStructTypeVariableKeyword() async throws {
+        try await check(swift: """
+        struct S {
+            var object: S
+        """, kotlin: """
+        internal class S: MutableStruct {
+            internal var object_: S
+                get() = field.sref({ this.object_ = it })
+                set(newValue) {
+                    @Suppress("NAME_SHADOWING") val newValue = newValue.sref()
+                    willmutate()
+                    field = newValue
+                    didmutate()
+                }
+
+            constructor(object_: S) {
+                this.object_ = object_
+            }
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct = S(object_)
+        }
+        """)
+    }
+
     func testSwiftModuleQualifiedType() async throws {
         try await check(supportingSwift: """
         extension Swift.Int {
