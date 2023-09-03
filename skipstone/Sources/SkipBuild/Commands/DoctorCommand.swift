@@ -20,7 +20,7 @@ struct DoctorCommand: SkipCommand {
         try await runDoctor()
         let latestVersion = try await checkSkipUpdates()
         if let latestVersion = latestVersion, latestVersion != skipVersion {
-            outputOptions.write("A new version is Skip (\(latestVersion)) is available to update with: skip update")
+            outputOptions.write("A new version is Skip (\(latestVersion)) is available to update with: skip upgrade")
         } else {
             outputOptions.write("Skip (\(skipVersion)) checks complete")
         }
