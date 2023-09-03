@@ -1694,6 +1694,8 @@ private func WTERMSIG(_ status: Int32) -> Int32 {
     return status & 0x7f
 }
 
+#if canImport(Darwin)
+
 /// Open the given pipe.
 private func open(pipe: inout [Int32]) throws {
     let rv = Darwin.pipe(&pipe)
@@ -1713,6 +1715,8 @@ private func close(fd: Int32) throws {
     var innerFd = fd
     try innerClose(&innerFd)
 }
+
+#endif
 
 extension Process.Error: CustomStringConvertible {
     public var description: String {
@@ -2691,6 +2695,8 @@ extension FileSystemError: CustomNSError {
     }
 }
 
+#if canImport(Darwin)
+
 public extension FileSystemError {
     init(errno: Int32, _ path: URL) {
         switch errno {
@@ -2709,7 +2715,6 @@ public extension FileSystemError {
 }
 
 
-#if canImport(Darwin)
 
 /// Public stdout stream instance.
 public var stdoutStream: ThreadSafeOutputByteStream = try! ThreadSafeOutputByteStream(LocalFileOutputByteStream(
