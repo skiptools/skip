@@ -258,6 +258,26 @@ final class TriviaTests: XCTestCase {
             print("From Kotlin!")
         }
         """)
+
+        try await check(swift: """
+        func f() {
+            let c = {
+                print("Hello")
+                print("Here")
+                // SKIP INSERT: print("From Kotlin!")
+            }
+            c()
+        }
+        """, kotlin: """
+        internal fun f() {
+            val c = {
+                print("Hello")
+                print("Here")
+                print("From Kotlin!")
+            }
+            c()
+        }
+        """)
     }
 
     func testDeclareDirective() async throws {

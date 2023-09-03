@@ -538,7 +538,12 @@ class Closure: Expression {
         let attributes = Attributes.for(syntax: closureExpr.signature?.attributes, in: syntaxTree)
         let isAsync = closureExpr.signature?.effectSpecifiers?.asyncSpecifier != nil
         let isThrows = closureExpr.signature?.effectSpecifiers?.throwsSpecifier != nil
-        let statements = StatementDecoder.decode(syntaxList: closureExpr.statements, in: syntaxTree)
+        var statements = StatementDecoder.decode(syntaxList: closureExpr.statements, in: syntaxTree)
+        if let extras = StatementExtras.decode(syntax: closureExpr.rightBrace) {
+            let (extraStatements, _) = extras.statements(syntax: closureExpr.rightBrace, in: syntaxTree)
+            statements += extraStatements
+            statements.append(Empty(syntax: closureExpr.rightBrace, extras: extras, in: syntaxTree))
+        }
         let body = CodeBlock(statements: statements)
         let expression = Closure(captureList: captureList, returnType: returnType, parameters: parameters, attributes: attributes, isAsync: isAsync, isThrows: isThrows, body: body, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
         expression.messages = messages
