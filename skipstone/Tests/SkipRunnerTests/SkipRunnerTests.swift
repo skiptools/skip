@@ -13,7 +13,7 @@ public class SkipRunnerTests : XCTestCase {
 
         #if DEBUG
         let debug = true
-        try await XCTAssertEqualX("skipstone version \(v) (debug)", tool("version").out)
+        try await XCTAssertEqualX("skip version \(v) (debug)", tool("version").out)
 
         func endOfFirstLine(_ output: String, count: Int) throws -> String {
             let firstLine = try XCTUnwrap(output.split(separator: "\n").first)

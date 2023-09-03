@@ -19,9 +19,9 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-syntax.git", branch: "main"),
-        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.2.2"),
+        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.2.3"),
         .package(url: "https://github.com/apple/swift-tools-support-core.git", from: "0.5.2"),
-        .package(url: "https://github.com/apple/swift-crypto.git", from: "2.5.0"),
+        .package(url: "https://github.com/apple/swift-crypto.git", from: "2.6.0"),
         .package(url: "https://github.com/marcprux/universal.git", from: "5.2.0"),
     ],
     targets: [
@@ -32,14 +32,14 @@ let package = Package(
         .testTarget(name: "SkipSyntaxTests", dependencies: [
             "SkipSyntax",
             "SkipBuild",
-            .product(name: "TSCBasic", package: "swift-tools-support-core"),
+            .product(name: "SwiftToolsSupport", package: "swift-tools-support-core"),
         ]),
 
         .target(name: "SkipBuild", dependencies: [
             "SkipSyntax",
             .product(name: "SwiftParser", package: "swift-syntax"),
             .product(name: "ArgumentParser", package: "swift-argument-parser"),
-            .product(name: "TSCBasic", package: "swift-tools-support-core"),
+            .product(name: "SwiftToolsSupport", package: "swift-tools-support-core"),
             .product(name: "Universal", package: "universal"),
             .product(name: "Crypto", package: "swift-crypto", condition: .when(platforms: [.linux])),
         ]),
