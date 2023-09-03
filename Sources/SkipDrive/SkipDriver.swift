@@ -118,7 +118,7 @@ struct UpgradeCommand: SkipCommand {
             return
         }
 
-        try await outputOptions.run("Updating Homebew", ["brew", "update", "-f"])
+        try await outputOptions.run("Updating Homebew", ["brew", "update"])
         let upgradeOutput = try await outputOptions.run("Updating Skip", ["brew", "upgrade", "skip"])
         outputOptions.write(upgradeOutput.out)
         outputOptions.write(upgradeOutput.err)
