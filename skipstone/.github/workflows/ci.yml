@@ -37,6 +37,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
+      - uses: swift-actions/setup-swift@v1
+        with:
+          swift-version: "5.7"
+
+      - name: Get swift version
+        run: swift --version
+
       # checkout both skipstone.git and skip.git for the linked SkipDrive
       - name: Checkout skipstone.git
         uses: actions/checkout@v3
@@ -59,7 +66,7 @@ jobs:
       - name: Swift Build (Release)
         if: startsWith(github.ref, 'refs/tags/')
         working-directory: skipstone
-        run: swift build --product SkipRunner -c release -Xswiftc -static-stdlib
+        run: swift build --product SkipRunner -c release --static-swift-stdlib
 
       - name: Copy skiptool
         if: startsWith(github.ref, 'refs/tags/')

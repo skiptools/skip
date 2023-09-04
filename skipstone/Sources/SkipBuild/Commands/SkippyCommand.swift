@@ -46,7 +46,7 @@ struct SkippyCommand: AsyncParsableCommand, CheckPhase {
         if outputFileName.hasSuffix(".swift") {
             outputFileName = String(outputFileName.dropLast(".swift".count))
         }
-        outputFileName += "_preflight.swift"
+        outputFileName += "_skippy.swift"
         return outputDir.appendingPathComponent(outputFileName)
     }
 }
