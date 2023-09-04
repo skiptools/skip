@@ -37,10 +37,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
-      - uses: swift-actions/setup-swift@v1
-        with:
-          swift-version: "5.7"
-
       - name: Get swift version
         run: swift --version
 
