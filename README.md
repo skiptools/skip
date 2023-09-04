@@ -53,6 +53,9 @@ lib-name
 ├── Package.resolved
 ├── Package.swift
 ├── README.md
+├── Skip
+│   ├── build
+│   └── skip.yml
 ├── Sources
 │   ├── ModuleName
 │   │   └── ModuleName.swift
@@ -85,7 +88,7 @@ let package = Package(
         .library(name: "ModuleNameKt", targets: ["ModuleNameKt"]),
     ],
     dependencies: [
-        .package(url: "https://source.skip.tools/skip.git", from: "0.6.28"),
+        .package(url: "https://source.skip.tools/skip.git", from: "0.6.29"),
         .package(url: "https://source.skip.tools/skip-unit.git", from: "0.0.0"),
         .package(url: "https://source.skip.tools/skip-lib.git", from: "0.0.0"),
         .package(url: "https://source.skip.tools/skip-foundation.git", from: "0.0.0"),
