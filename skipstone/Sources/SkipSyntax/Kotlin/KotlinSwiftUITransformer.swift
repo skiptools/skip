@@ -116,7 +116,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         }
     }
 
-    /// If the given expression is a reference to a @State property, return the underlying State property name.
+    /// If the given expression is a reference to a @State or @StateObject property, return the underlying State property name.
     private func statePropertyName(for expression: KotlinExpression, in view: KotlinClassDeclaration?) -> String? {
         guard let view else {
             return nil
@@ -132,7 +132,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         }
         for member in view.members {
             if let variable = member as? KotlinVariableDeclaration, variable.propertyName == variableName {
-                return variable.attributes.contains(.state) ? variableName : nil
+                return variable.attributes.contains(.state) || variable.attributes.contains(.stateObject) ? variableName : nil
             }
         }
         return nil
