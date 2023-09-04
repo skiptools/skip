@@ -5,7 +5,7 @@ import Foundation
 // Non-Darwin (e.g., Linux) do not yet support async URLSession functions, so we re-create them here
 // https://github.com/apple/swift-corelibs-foundation/issues/3205
 extension URLSession {
-    /// TODO: implement deleate for Linux
+    /// TODO: implement delegate for Linux
     public typealias URLSessionTaskDelegate = Void
 
     public func data(for request: URLRequest, delegate: URLSessionTaskDelegate? = nil) async throws -> (Data, URLResponse) {
