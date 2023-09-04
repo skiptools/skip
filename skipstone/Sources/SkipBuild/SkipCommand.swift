@@ -53,7 +53,7 @@ public struct SkipRunnerExecutor: SkipCommandExecutor {
             VersionCommand.self,
 
             DoctorCommand.self,
-            SelftestCommand.self,
+            CheckupCommand.self,
             UpgradeCommand.self,
 
             CreateCommand.self,

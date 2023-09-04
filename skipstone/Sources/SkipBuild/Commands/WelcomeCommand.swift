@@ -30,7 +30,7 @@ struct WelcomeCommand: SkipCommand {
             Welcome to Skip \(skipVersion)!
 
             Run "skip doctor" to check system requirements.
-            Run "skip selftest" to perform a full system evaluation.
+            Run "skip checkup" to perform a full system evaluation.
             Run "skip create --open AppName" to create a new Skip Xcode project.
 
             Visit https://skip.tools for documentation, samples, and FAQs.

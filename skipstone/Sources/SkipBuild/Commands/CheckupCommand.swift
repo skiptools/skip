@@ -3,9 +3,9 @@ import ArgumentParser
 import SkipSyntax
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-struct SelftestCommand: SkipCommand {
+struct CheckupCommand: SkipCommand {
     static var configuration = CommandConfiguration(
-        commandName: "selftest",
+        commandName: "checkup",
         abstract: "Run tests to ensure Skip is in working order",
         shouldDisplay: true)
 
@@ -15,7 +15,7 @@ struct SelftestCommand: SkipCommand {
     func run() async throws {
         try await runDoctor()
 
-        func selftest() throws -> [String] {
+        func checkup() throws -> [String] {
             let tmpdir = NSTemporaryDirectory() + "/" + UUID().uuidString
             try FileManager.default.createDirectory(atPath: tmpdir, withIntermediateDirectories: true)
             return ["skip", "init", "--build", "--test", "-d", tmpdir, "lib-name", "ModuleName"]
@@ -24,10 +24,10 @@ struct SelftestCommand: SkipCommand {
         // if we have not initiailized Gradle before (indicated by the absence of a ~/.gradle/caches/ folder), indicate that the first run will take a while
         var isDir: ObjCBool = false
         if FileManager.default.fileExists(atPath: home(".gradle/caches"), isDirectory: &isDir) == false || isDir.boolValue == false {
-            try await outputOptions.run("Pre-Caching Gradle Dependencies (~1G)", selftest())
+            try await outputOptions.run("Pre-Caching Gradle Dependencies (~1G)", checkup())
         }
 
-        let _ = try await outputOptions.run("Running Skip Self-Test", selftest())
+        let _ = try await outputOptions.run("Running Skip Checkup", checkup())
 
         //outputOptions.write(output.out)
         //outputOptions.write(output.err)
