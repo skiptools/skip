@@ -15,7 +15,7 @@ import PackagePlugin
         let runner = try context.tool(named: "skip").path
         let inputPaths = sourceModuleTarget.sourceFiles(withSuffix: ".swift").map { $0.path }
         let outputDir = context.pluginWorkDirectory
-        return inputPaths.map { Command.buildCommand(displayName: "Skip Preflight \(target.name)", executable: runner, arguments: ["skippy", "-O", "\(outputDir.string)", $0.string], inputFiles: [$0], outputFiles: [$0.outputPath(in: outputDir)]) }
+        return inputPaths.map { Command.buildCommand(displayName: "Skippy \(target.name)", executable: runner, arguments: ["skippy", "-O", "\(outputDir.string)", $0.string], inputFiles: [$0], outputFiles: [$0.outputPath(in: outputDir)]) }
     }
 }
 
@@ -37,13 +37,13 @@ extension SkipPreflightPlugIn: XcodeBuildToolPlugin {
 extension Path {
     /// Xcode requires that we create an output file in order for incremental build tools to work.
     ///
-    /// - Warning: This is duplicated in Runner.
+    /// - Warning: This is duplicated in SkippyCommand.
     func outputPath(in outputDir: Path) -> Path {
         var outputFileName = self.lastComponent
         if outputFileName.hasSuffix(".swift") {
             outputFileName = String(lastComponent.dropLast(".swift".count))
         }
-        outputFileName += "_preflight.swift"
+        outputFileName += "_skippy.swift"
         return outputDir.appending(subpath: outputFileName)
     }
 }
