@@ -11,8 +11,8 @@ class SkipCommandTests : XCTestCase {
         try await skip("welcome")
     }
 
-    func testSkipSelftest() async throws {
-        try await skip("selftest")
+    func testSkipCheckup() async throws {
+        try await skip("checkup")
     }
 
     func testSkipDoctor() async throws {
