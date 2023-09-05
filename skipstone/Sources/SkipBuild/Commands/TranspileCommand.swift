@@ -85,7 +85,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         let resourcesOutputFolder = try AbsolutePath(AbsolutePath(validating: outputFolder, relativeTo: baseOutputPath), "resources")
 
         if !fs.isDirectory(kotlinOutputFolder) {
-            // e.g.: ~Library/Developer/Xcode/DerivedData/PACKAGE-ID/SourcePackages/plugins/skiphub.output/SkipFoundationKotlinTests/skip-transpiler/SkipFoundation/src/test/kotlin
+            // e.g.: ~Library/Developer/Xcode/DerivedData/PACKAGE-ID/SourcePackages/plugins/skiphub.output/SkipFoundationKotlinTests/skipstone/SkipFoundation/src/test/kotlin
             //throw error("Folder specified by --output-folder did not exist: \(outputFolder)")
             try fs.createDirectory(kotlinOutputFolder, recursive: true)
         }
@@ -488,7 +488,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             continuation.yield(.init(output))
 
             func saveTranspilation() throws -> (output: AbsolutePath, changed: Bool, overridden: Bool) {
-                // the build plug-in's output folder base will be something like ~/Library/Developer/Xcode/DerivedData/Mod-ID/SourcePackages/plugins/module-name.output/ModuleNameKotlin/skip-transpiler/ModuleName/src/test/kotlin
+                // the build plug-in's output folder base will be something like ~/Library/Developer/Xcode/DerivedData/Mod-ID/SourcePackages/plugins/module-name.output/ModuleNameKotlin/skipstone/ModuleName/src/test/kotlin
                 trace("path: \(kotlinOutputFolder)")
 
                 let kotlinName = transpilation.kotlinFileName
@@ -570,7 +570,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         }
 
         // NOTE: when linking between modules, SPM and Xcode will use different output paths:
-        // Xcode: ~/Library/Developer/Xcode/DerivedData/PROJECT-ID/SourcePackages/plugins/skiphub.output/SkipFoundationKotlinTests/skip-transpiler/SkipFoundation
+        // Xcode: ~/Library/Developer/Xcode/DerivedData/PROJECT-ID/SourcePackages/plugins/skiphub.output/SkipFoundationKotlinTests/skipstone/SkipFoundation
         // SPM: .build/plugins/outputs/skiphub/
         func linkDependentModuleSources() throws -> [String] {
             var dependentModules: [String] = []

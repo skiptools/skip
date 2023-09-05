@@ -95,11 +95,11 @@ struct TestCommand: SkipCommand {
             let junitFolder: URL
             if let junit = junit {
                 // TODO: use the skip modules to form the junit path relative to the project folder
-                // .build/plugins/outputs/skip-zip/SkipZipTests/skip-transpiler/SkipZip/.build/SkipZip/test-results/testDebugUnitTest/TEST-skip.zip.SkipZipTests.xml
+                // .build/plugins/outputs/skip-zip/SkipZipTests/skipstone/SkipZip/.build/SkipZip/test-results/testDebugUnitTest/TEST-skip.zip.SkipZipTests.xml
                 junitFolder = URL(fileURLWithPath: junit, isDirectory: true)
             } else {
                 let packageName = try await packageName()
-                let testOutput = ".build/plugins/outputs/\(packageName)/\(skipModule)Tests/skip-transpiler/\(skipModule)/.build/\(skipModule)/test-results/test\(configuration.capitalized)UnitTest/"
+                let testOutput = ".build/plugins/outputs/\(packageName)/\(skipModule)Tests/skipstone/\(skipModule)/.build/\(skipModule)/test-results/test\(configuration.capitalized)UnitTest/"
                 junitFolder = URL(fileURLWithPath: testOutput, isDirectory: true)
             }
 
