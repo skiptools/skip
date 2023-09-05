@@ -30,13 +30,13 @@ jobs:
           TAG="${GITHUB_REF#refs/tags/}"
           test -n "${TAG}"
 
-          gradle assemble --project-dir Packages/Skip/${PACKAGE}/${MODULE}KtTests/skip-transpiler -PbuildDir=.build/${MODULE}
+          gradle assemble --project-dir Packages/Skip/${PACKAGE}/${MODULE}Tests/skipstone -PbuildDir=.build/${MODULE}
 
           echo "Creating release: ${TAG}"
           mkdir -p Packages/Skip/artifacts/
           PKGDIR="../../../../../../Packages/Skip/artifacts/"
           # create the release .aar
-          cd ./.build/plugins/outputs/${PACKAGE}/${MODULE}KtTests/skip-transpiler
+          cd ./.build/plugins/outputs/${PACKAGE}/${MODULE}KtTests/skipstone
           cp -a ${MODULE}/.build/${MODULE}/outputs/aar/${MODULE}-release.aar ${PKGDIR}/${PACKAGE}-${TAG}.aar
           # copy the license for the source jar
           cp ../../../../../../LICENSE* .
