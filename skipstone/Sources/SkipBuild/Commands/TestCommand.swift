@@ -77,7 +77,7 @@ struct TestCommand: SkipCommand {
         let xunitCases = xunitResults.flatMap(\.testCases).sorted(by: testNameComparison)
 
         // <testcase classname="SkipZipTests.SkipZipTests" name="testSkipModule" time="7.729628">
-        let skipModuleTests = xunitCases.filter({ $0.name == "testSkipModule" && $0.classname.split(separator: ".").first?.hasSuffix("Tests") == true })
+        let skipModuleTests = xunitCases.filter({ $0.name == "testSkipModule" })
 
         if skipModuleTests.isEmpty {
             throw SkipDriveError(errorDescription: "Could not find Skip test testSkipModule in: \(xunitCases.map(\.name))")
