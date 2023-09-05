@@ -1,4 +1,4 @@
-name: "skipapp"
+name: "Skip App Workflow"
 on:
   workflow_call:
 jobs:

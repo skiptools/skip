@@ -1,4 +1,4 @@
-name: "skiplib"
+name: "Skip Library Workflow"
 on:
   workflow_call:
 jobs:
