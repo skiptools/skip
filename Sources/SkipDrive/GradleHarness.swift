@@ -12,6 +12,8 @@ public protocol GradleHarness {
     func scanGradleOutput(line: String)
 }
 
+let pluginFolderName = "skip"
+
 @available(macOS 13, macCatalyst 16, iOS 16, tvOS 16, watchOS 8, *)
 extension GradleHarness {
     /// Returns the URL to the folder that holds the top-level `settings.gradle.kts` file for the destination module.
@@ -84,7 +86,7 @@ extension GradleHarness {
         }
     }
 
-    public func linkFolder(from linkFolderBase: String? = "Packages/Skip", forSourceFile sourcePath: StaticString?) -> URL? {
+    public func linkFolder(from linkFolderBase: String? = "Skip/build", forSourceFile sourcePath: StaticString?) -> URL? {
         // walk up from the test case swift file until we find the folder that contains "Package.swift", which we treat as the package root
         if let sourcePath = sourcePath, let linkFolderBase = linkFolderBase {
             if let packageRootURL = packageBaseFolder(forSourceFile: sourcePath) {
@@ -146,7 +148,7 @@ extension GradleHarness {
 
         let adb = ["adb"] + (device.flatMap { ["-s", $0] } ?? [])
 
-        // adb install -r Packages/Skip/skipapp.swiftpm.output/AppDemoKtTests/skip-transpiler/AppDemo/.build/AppDemo/outputs/apk/debug/AppDemo-debug.apk
+        // adb install -r Packages/Skip/skipapp.swiftpm.output/AppDemoTests/skip/AppDemo/.build/AppDemo/outputs/apk/debug/AppDemo-debug.apk
         let adbInstall = adb + [
             "install",
             "-r", // replace existing application
@@ -292,7 +294,7 @@ extension GradleHarness {
             throw AppLaunchError(errorDescription: "The BUILT_PRODUCTS_DIR environment variable must be set to the output of the build process")
         }
 
-        return URL(fileURLWithPath: "../../../SourcePackages/plugins/\(packageName)\(packageFolderExtension)/\(moduleName)/skip-transpiler/", isDirectory: true, relativeTo: URL(fileURLWithPath: buildFolder, isDirectory: true))
+        return URL(fileURLWithPath: "../../../SourcePackages/plugins/\(packageName)\(packageFolderExtension)/\(moduleName)/\(pluginFolderName)/", isDirectory: true, relativeTo: URL(fileURLWithPath: buildFolder, isDirectory: true))
     }
 
     public func launch(appName: String, appId: String, packageName: String, deviceID: String? = ProcessInfo.processInfo.environment["SKIP_TEST_DEVICE"]) async throws {
@@ -304,7 +306,7 @@ extension GradleHarness {
                 "*:S", // all other log messages are silenced
         ]
 
-        let moduleName = appName + "Kt"
+        let moduleName = appName
 
         let path = "\(appName)/.build/\(appName)/outputs/apk/"
         let artifact = releaseBuild ? "release/\(appName)-release.apk" : "debug/\(appName)-debug.apk"
@@ -324,7 +326,7 @@ extension GradleHarness {
     public func gradleExec(appName: String, packageName: String, arguments: [String], outputPrefix: String? = "GRADLE>") async throws {
         let driver = try await GradleDriver()
 
-        let moduleName = appName + "Kt"
+        let moduleName = appName
         let acts: [String] = [] // releaseBuild ? ["assembleRelease"] : ["assembleDebug"] // expected in the arguments to the command
 
         var exitCode: ProcessResult.ExitStatus? = nil

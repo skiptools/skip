@@ -8,7 +8,7 @@
 #else
 import SkipBuild
 
-/// Command-line `skip` tool.
+/// The plugin runner for the command-line `skip` tool when executed in the plugin environment.
 @main public struct SkipToolMain {
     static func main() async throws {
         await SkipRunnerExecutor.main()

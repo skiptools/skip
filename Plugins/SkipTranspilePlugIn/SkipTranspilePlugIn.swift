@@ -15,7 +15,7 @@ import PackagePlugin
     let skipcodeExtension = ".skipcode.json"
 
     func createBuildCommands(context: PluginContext, target: Target) async throws -> [Command] {
-        let skip = try context.tool(named: "skip")
+        let skip = try context.tool(named: "SkipTool")
         let outputFolder = context.pluginWorkDirectory
 
         // In SPM the per-module outputs has no suffix, but in Xcode it is "ModuleName.output" below DerivedData/

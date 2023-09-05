@@ -6,16 +6,18 @@
 import Foundation
 import PackagePlugin
 
+let preflightOutputSuffix = "_skippy"
+
 /// Build plugin to do pre-work like emit warnings about incompatible Swift before transpiling with Skip.
 @main struct SkipPreflightPlugIn: BuildToolPlugin {
     func createBuildCommands(context: PluginContext, target: Target) async throws -> [Command] {
         guard let sourceModuleTarget = target as? SourceModuleTarget else {
             return []
         }
-        let runner = try context.tool(named: "skip").path
+        let runner = try context.tool(named: "SkipTool").path
         let inputPaths = sourceModuleTarget.sourceFiles(withSuffix: ".swift").map { $0.path }
         let outputDir = context.pluginWorkDirectory
-        return inputPaths.map { Command.buildCommand(displayName: "Skippy \(target.name)", executable: runner, arguments: ["skippy", "-O", "\(outputDir.string)", $0.string], inputFiles: [$0], outputFiles: [$0.outputPath(in: outputDir)]) }
+        return inputPaths.map { Command.buildCommand(displayName: "Skippy \(target.name)", executable: runner, arguments: ["skippy", "-O", outputDir.string, "--", preflightOutputSuffix, $0.string], inputFiles: [$0], outputFiles: [$0.outputPath(in: outputDir)]) }
     }
 }
 
@@ -24,7 +26,7 @@ import XcodeProjectPlugin
 
 extension SkipPreflightPlugIn: XcodeBuildToolPlugin {
     func createBuildCommands(context: XcodePluginContext, target: XcodeTarget) throws -> [Command] {
-        let runner = try context.tool(named: "skip").path
+        let runner = try context.tool(named: "SkipTool").path
         let inputPaths = target.inputFiles
             .filter { $0.type == .source && $0.path.extension == "swift" }
             .map { $0.path }
@@ -43,7 +45,7 @@ extension Path {
         if outputFileName.hasSuffix(".swift") {
             outputFileName = String(lastComponent.dropLast(".swift".count))
         }
-        outputFileName += "_skippy.swift"
+        outputFileName += preflightOutputSuffix + ".swift"
         return outputDir.appending(subpath: outputFileName)
     }
 }

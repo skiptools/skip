@@ -329,6 +329,7 @@ public struct GradleDriver {
 
         /// Loads the test suite information from the JUnit-compatible XML format.
         public static func parse(contentsOf url: URL) throws -> [TestSuite] {
+            #if os(macOS) || os(Linux) || targetEnvironment(macCatalyst)
             let results = try XMLDocument(contentsOf: url)
             //print("parsed XML results:", results)
 
@@ -417,6 +418,10 @@ public struct GradleDriver {
             }
 
             return suites
+            #else
+            // no XMLDocument on iOS
+            return []
+            #endif
         }
     }
 
