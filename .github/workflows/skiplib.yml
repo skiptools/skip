@@ -35,8 +35,12 @@ jobs:
           echo "Creating release: ${TAG}"
           mkdir -p Skip/build/artifacts/
           PKGDIR="../../../../../../Skip/build/artifacts/"
+
+          brew install tree
+          tree ./.build/plugins/outputs/
+
           # create the release .aar
-          cd ./.build/plugins/outputs/${PACKAGE}/${MODULE}KtTests/skipstone
+          cd ./.build/plugins/outputs/${PACKAGE}/${MODULE}Tests/skipstone
           cp -a ${MODULE}/.build/${MODULE}/outputs/aar/${MODULE}-release.aar ${PKGDIR}/${PACKAGE}-${TAG}.aar
           # copy the license for the source jar
           cp ../../../../../../LICENSE* .
