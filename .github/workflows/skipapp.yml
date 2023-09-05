@@ -22,7 +22,7 @@ jobs:
 
       - name: Build ipa
         run: |
-          mkdir -p Packages/Skip/artifacts
+          mkdir -p Skip/build/artifacts
           APPARTIFACT="App"
           for CONFIGURATION in "Debug" "Release"; do
             ARCHIVE_PATH=".build/Skip/artifacts/${CONFIGURATION}/${APPARTIFACT}.xcarchive"
@@ -35,7 +35,7 @@ jobs:
             zip -9 -r "${APPARTIFACT}-${CONFIGURATION}.ipa" "Payload"
 
             cd -
-            cp -av "${ARCHIVE_PATH}/Products/${APPARTIFACT}-${CONFIGURATION}.ipa" Packages/Skip/artifacts/
+            cp -av "${ARCHIVE_PATH}/Products/${APPARTIFACT}-${CONFIGURATION}.ipa" Skip/build/artifacts/
           done
 
       - name: Build apk
@@ -51,8 +51,8 @@ jobs:
         run: |
           # create the source zip file with predictable timestamps for reproducibility
           find . -exec touch -d "${COMMIT_DATE:0:19}" {} \;
-          mkdir -p Packages/Skip/artifacts/
-          zip -9 -r "Packages/Skip/artifacts/App-Source.zip" . -x "Packages/*" -x ".git/*" -x ".build/*" -x ".*/*"
+          mkdir -p Skip/build/artifacts/
+          zip -9 -r "Skip/build/artifacts/App-Source.zip" . -x "Skip/*" -x ".git/*" -x ".build/*" -x ".*/*"
 
       - name: Assemble Kotlin Source
         run: |
@@ -60,13 +60,13 @@ jobs:
           rm -rf .gradle .build */.build
           # create the zip file with predictable timestamps for reproducibility
           find . -exec touch -d "${COMMIT_DATE:0:19}" {} \;
-          zip -9 -r "${OLDPWD}/Packages/Skip/artifacts/App-android-source.zip" . -x ".build/*" -x "*/.gradle/*" -x "*/.build/*" -x "*/build/*"
+          zip -9 -r "${OLDPWD}/Skip/build/artifacts/App-android-source.zip" . -x ".build/*" -x "*/.gradle/*" -x "*/.build/*" -x "*/build/*"
           cd -
 
       - name: Merge Artifacts
         run: |
           # merge the ipa and apk zips into a single archive
-          cd Packages/Skip/artifacts/
+          cd Skip/build/artifacts/
           ls -la
 
           APPNAME="App"
@@ -91,7 +91,7 @@ jobs:
         run: |
           TAG=${GITHUB_REF#refs/tags/}
           echo "Creating release: ${TAG}"
-          cd Packages/Skip/artifacts/
+          cd Skip/build/artifacts/
 
           ls -la 
 
@@ -130,5 +130,5 @@ jobs:
         uses: actions/upload-artifact@v3
         if: always()
         with: 
-          path: Packages/Skip/artifacts/
+          path: Skip/build/artifacts/
 
