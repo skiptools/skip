@@ -15,6 +15,9 @@ struct SkippyCommand: AsyncParsableCommand, CheckPhase {
     @OptionGroup(title: "License Options")
     var licenseOptions: LicenseOptions
 
+    @Option(help: ArgumentHelp("Suffix for output file", valueName: "suffix"))
+    var preflightOutputSuffix: String
+
     func run() async throws {
         try await perform(on: checkOptions.files.map({ Source.FilePath(path: $0) }), options: checkOptions)
     }
@@ -34,7 +37,9 @@ struct SkippyCommand: AsyncParsableCommand, CheckPhase {
             messages.forEach { print($0) }
 
             if let outputDir = options.directory {
-                let outputFileURL = outputFileURL(for: sourceFile, in: URL(fileURLWithPath: outputDir))
+                let outputDirURL = URL(fileURLWithPath: outputDir, isDirectory: true)
+                let outputFileURL = outputFileURL(for: sourceFile, in: outputDirURL)
+                try FileManager.default.createDirectory(at: outputDirURL, withIntermediateDirectories: true)
                 try "".write(to: outputFileURL, atomically: false, encoding: .utf8)
             }
         }
@@ -46,8 +51,7 @@ struct SkippyCommand: AsyncParsableCommand, CheckPhase {
         if outputFileName.hasSuffix(".swift") {
             outputFileName = String(outputFileName.dropLast(".swift".count))
         }
-        outputFileName += "_skippy.swift"
+        outputFileName += preflightOutputSuffix + ".swift"
         return outputDir.appendingPathComponent(outputFileName)
     }
 }
-

@@ -23,6 +23,9 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
     @OptionGroup(title: "License Options")
     var licenseOptions: LicenseOptions
 
+    @Option(help: ArgumentHelp("Only run if the given environment is nil", valueName: "envkey"))
+    var conditionalEnvironment: String? = nil // SUPPORTED_DEVICE_FAMILIES
+
     struct Output : MessageConvertible {
         let transpilation: Transpilation
 
@@ -52,8 +55,12 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         #else
         let v = skipVersion
         #endif
-        info("Skip \(v): transpiling to: \(transpileOptions.outputFolder ?? "nowhere") for: \(sourceFiles.map(\.basename))")
-        try await self.transpile(fs: localFileSystem, sourceFiles: Set(sourceFiles), with: continuation)
+        if let conditionalEnvironment = conditionalEnvironment, let value = ProcessInfo.processInfo.environment[conditionalEnvironment] {
+            info("Skip \(v): transpiler disabled when building for platform (\(conditionalEnvironment)=\(value))")
+        } else {
+            info("Skip \(v): transpiling to: \(transpileOptions.outputFolder ?? "nowhere") for: \(sourceFiles.map(\.basename))")
+            try await self.transpile(fs: localFileSystem, sourceFiles: Set(sourceFiles), with: continuation)
+        }
     }
 
     private func transpile(fs: FileSystem, sourceFiles: Set<AbsolutePath>, with continuation: AsyncThrowingStream<OutputMessage, Error>.Continuation) async throws {
@@ -164,8 +171,8 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
                 do {
                     let codebaseLoadStart = Date().timeIntervalSinceReferenceDate
+                    trace("dependencyCodebaseInfo \(dependencyCodebaseInfo): exists \(fs.exists(dependencyCodebaseInfo))")
                     let cbdata = try inputSource(dependencyCodebaseInfo).withData { Data($0) }
-                    trace("dependencyCodebaseInfo \(dependencyCodebaseInfo): exists \(fs.exists(dependencyCodebaseInfo)) data: \(cbdata.count)")
                     let cbinfo = try decoder.decode(CodebaseInfo.self, from: cbdata)
                     dependentCodebaseInfos.append(cbinfo)
                     let codebaseLoadEnd = Date().timeIntervalSinceReferenceDate
@@ -322,7 +329,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             configMap[primaryModuleName] = currentModuleConfig
 
             let currentModuleJSON = try currentModuleConfig.json()
-            try trace("loading skip.yml from \(skipConfigPath): \(currentModuleJSON.prettyJSON)", sourceFile: skipConfigPath.sourceFile)
+            info("loading skip.yml from \(skipConfigPath)", sourceFile: skipConfigPath.sourceFile)
 
             if !merge {
                 return (currentModuleConfig, currentModuleConfig, configMap) // just the unmerged base YAML
@@ -336,7 +343,12 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             }
 
             for (moduleName, modulePath) in moduleNamePaths {
-                info("moduleName: \(moduleName) modulePath: \(modulePath)")
+                trace("moduleName: \(moduleName) modulePath: \(modulePath) primaryModuleName: \(primaryModuleName)")
+                if moduleName == primaryModuleName {
+                    // don't merge the primary module name with itself
+                    continue
+                }
+
                 let moduleSkipBasePath = try AbsolutePath(validating: modulePath, relativeTo: moduleRootPath.parentDirectory)
                     .appending(components: ["Skip"])
 
@@ -648,7 +660,7 @@ struct TranspilePhaseOptions: ParsableArguments {
     var outputFolder: String? = nil
 
     @Option(name: [.long], help: ArgumentHelp("The Gradle wrapper version to generate", valueName: "version"))
-    var gradleVersion: String = "8.1.1" // note: this should not be higher than the pre-installed version on the active CI runner image: https://github.com/actions/runner-images/tree/main/images/macos
+    var gradleVersion: String = "8.3.0" // note: this should not be higher than the pre-installed version on the active CI runner image: https://github.com/actions/runner-images/tree/main/images/macos
 }
 
 struct TranspileResult {

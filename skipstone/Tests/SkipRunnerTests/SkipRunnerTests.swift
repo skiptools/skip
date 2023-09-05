@@ -124,26 +124,6 @@ public class SkipRunnerTests : XCTestCase {
         return tmpFile
     }
 
-    /// Demo of reproducing a transpiler crash in-process by taking the arguments from the xcode plug-in log and running them manually
-    public func XXXtestSkipRunnerCrash() async throws {
-        let _ = try await tool("transpile",
-             "--output-folder",
-             "~/Library/Developer/Xcode/DerivedData/Skip-XXX/SourcePackages/plugins/skiphub.output/SkipFoundationKt/skip-transpiler/SkipFoundation/src/main/kotlin",
-             "--module-root",
-             "~/Library/Developer/Xcode/DerivedData/Skip-XXX/SourcePackages/plugins/skiphub.output/SkipFoundationKt/skip-transpiler/SkipFoundation",
-             "--skip-folder",
-             "/opt/src/github/skiptools/skiphub/Sources/SkipFoundationKt/skip",
-             "--module",
-             "SkipFoundation:/opt/src/github/skiptools/skiphub/Sources/SkipFoundation",
-             "--module",
-             "SkipLib:/opt/src/github/skiptools/skiphub/Sources/SkipLibKt",
-             "--link",
-             "SkipLib:../../../SkipLibKt/skip-transpiler/SkipLib",
-             "~/skiptools/skiphub/Sources/SkipFoundation/Bundle.swift",
-             "~/skiptools/skiphub/Sources/SkipFoundation/UUID.swift"
-        )
-    }
-
     /// Runs the tool with the given arguments, returning the entire output string as well as a function to parse it to `JSON`
     func tool(_ args: String...) async throws -> (out: String, err: String, json: () throws -> JSON) {
         let out = BufferedOutputByteStream()
