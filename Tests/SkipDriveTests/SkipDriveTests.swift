@@ -64,7 +64,7 @@ class SkipCommandTests : XCTestCase {
         try FileManager.default.createDirectory(atPath: junit, withIntermediateDirectories: true)
         try Data(junitResults.utf8).write(to: URL(fileURLWithPath: junit + "/TEST-skip.zip.SkipZipTests.xml"))
 
-        // .build/plugins/outputs/skip-zip/SkipZipKtTests/skip-transpiler/SkipZip/.build/SkipZip/test-results/testDebugUnitTest/TEST-skip.zip.SkipZipTests.xml
+        // .build/plugins/outputs/skip-zip/SkipZipKtTests/skipstone/SkipZip/.build/SkipZip/test-results/testDebugUnitTest/TEST-skip.zip.SkipZipTests.xml
         let report = try await skip("test", "--configuration", "debug", "--no-test", "--max-column-length", "15", "--xunit", xunit, "--junit", junit)
         XCTAssertEqual(report.out, """
         | Test         | Case            | Swift | Kotlin |
@@ -224,7 +224,7 @@ struct ProjectBuildSettings : Decodable {
 // sample test output generated with the following command in the skip-zip package:
 // swift test --enable-code-coverage --parallel --xunit-output=.build/swift-xunit.xml --filter=SkipZipTests
 
-// .build/plugins/outputs/skip-zip/SkipZipKtTests/skip-transpiler/SkipZip/.build/SkipZip/test-results/testDebugUnitTest/TEST-skip.zip.SkipZipTests.xml
+// .build/plugins/outputs/skip-zip/SkipZipKtTests/skipstone/SkipZip/.build/SkipZip/test-results/testDebugUnitTest/TEST-skip.zip.SkipZipTests.xml
 let junitResults = """
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="skip.zip.SkipZipTests" tests="2" skipped="1" failures="0" errors="0" timestamp="2023-08-23T16:53:50" hostname="zap.local" time="0.02">
