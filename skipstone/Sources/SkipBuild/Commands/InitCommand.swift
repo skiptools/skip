@@ -24,6 +24,9 @@ struct InitCommand: SkipCommand {
     @OptionGroup(title: "Build Options")
     var buildOptions: BuildOptions
 
+    @Option(help: ArgumentHelp("The package dependencies for this module"))
+    var dependency: [String] = ["skip", "skip-foundation"]
+
     @Argument(help: ArgumentHelp("Project folder name"))
     var projectName: String
 
@@ -61,8 +64,6 @@ struct InitCommand: SkipCommand {
         let dependencies = """
             dependencies: [
                 .package(url: "https://source.skip.tools/skip.git", from: "0.0.0"),
-                .package(url: "https://source.skip.tools/skip-unit.git", from: "0.0.0"),
-                .package(url: "https://source.skip.tools/skip-lib.git", from: "0.0.0"),
                 .package(url: "https://source.skip.tools/skip-foundation.git", from: "0.0.0"),
             ]
         """
@@ -82,13 +83,13 @@ struct InitCommand: SkipCommand {
         """
 
         for moduleName in moduleNames {
-            let moduleKtName = moduleName + "Kt"
+            //let moduleKtName = moduleName + "Kt"
 
             let sourceDir = sourcesURL.appending(path: moduleName)
             try FileManager.default.createDirectory(at: sourceDir, withIntermediateDirectories: false)
 
-            let sourceKtDir = sourcesURL.appending(path: moduleKtName)
-            try FileManager.default.createDirectory(at: sourceKtDir, withIntermediateDirectories: false)
+            let sourceKtDir = sourceDir // sourcesURL.appending(path: moduleKtName)
+            //try FileManager.default.createDirectory(at: sourceKtDir, withIntermediateDirectories: false)
 
             let sourceSkipDir = sourceKtDir.appending(path: "Skip")
             try FileManager.default.createDirectory(at: sourceSkipDir, withIntermediateDirectories: false)
@@ -106,20 +107,11 @@ struct InitCommand: SkipCommand {
 
             """.write(to: sourceSwiftFile, atomically: true, encoding: .utf8)
 
-            let sourceKtSwiftFile = sourceKtDir.appending(path: "\(moduleName)Bundle.swift")
-            try """
-            import Foundation
-            public extension Bundle {
-                static let \(moduleName)Bundle = Bundle.module
-            }
-
-            """.write(to: sourceKtSwiftFile, atomically: true, encoding: .utf8)
-
             let testDir = testsURL.appending(path: moduleName + "Tests")
             try FileManager.default.createDirectory(at: testDir, withIntermediateDirectories: false)
 
-            let testKtDir = testsURL.appending(path: moduleKtName + "Tests")
-            try FileManager.default.createDirectory(at: testKtDir, withIntermediateDirectories: false)
+            let testKtDir = testDir // testsURL.appending(path: moduleKtName + "Tests")
+            //try FileManager.default.createDirectory(at: testKtDir, withIntermediateDirectories: false)
 
             let testSkipDir = testKtDir.appending(path: "Skip")
             try FileManager.default.createDirectory(at: testSkipDir, withIntermediateDirectories: false)
@@ -143,20 +135,23 @@ struct InitCommand: SkipCommand {
 
             """.write(to: testSwiftFile, atomically: true, encoding: .utf8)
 
-            let testKtSwiftFile = testKtDir.appending(path: "\(moduleName)KtTests.swift")
+            let testKtSwiftFile = testKtDir.appending(path: "XCSkipTests.swift")
             try """
+            #if canImport(SkipUnit)
             import SkipUnit
 
             /// This test case will run the transpiled tests for the Skip module.
             @available(macOS 13, macCatalyst 16, *)
-            final class SkipFoundationKtTests: XCTestCase, XCGradleHarness {
-                /// This test case will run the transpiled tests defined in the Swift peer module.
-                /// New tests should be added there, not here.
+            final class XCSkipTests: XCTestCase, XCGradleHarness {
                 public func testSkipModule() async throws {
+                    #if DEBUG
                     try await gradle(actions: ["testDebug"])
+                    #else
+                    try await gradle(actions: ["testRelease"])
+                    #endif
                 }
             }
-
+            #endif
             """.write(to: testKtSwiftFile, atomically: true, encoding: .utf8)
 
             let testSkipYamlFile = testSkipDir.appending(path: "skip.yml")
@@ -167,23 +162,11 @@ struct InitCommand: SkipCommand {
 
             products += """
                     .library(name: "\(moduleName)", targets: ["\(moduleName)"]),
-                    .library(name: "\(moduleKtName)", targets: ["\(moduleKtName)"]),
 
             """
             targets += """
-                    .target(name: "\(moduleName)", plugins: [.plugin(name: "skippy", package: "skip")]),
-                    .testTarget(name: "\(moduleName)Tests", dependencies: ["\(moduleName)"], plugins: [.plugin(name: "skippy", package: "skip")]),
-
-                    .target(name: "\(moduleKtName)", dependencies: [
-                        "\(moduleName)",
-                        .product(name: "SkipUnitKt", package: "skip-unit"),
-                        .product(name: "SkipLibKt", package: "skip-lib"),
-                        .product(name: "SkipFoundationKt", package: "skip-foundation"),
-                    ], resources: [.process("Skip")], plugins: [.plugin(name: "transpile", package: "skip")]),
-                    .testTarget(name: "\(moduleKtName)Tests", dependencies: [
-                        "\(moduleKtName)",
-                        .product(name: "SkipUnit", package: "skip-unit"),
-                    ], resources: [.process("Skip")], plugins: [.plugin(name: "transpile", package: "skip")]),
+                    .target(name: "\(moduleName)", dependencies: [.product(name: "SkipFoundation", package: "skip-foundation", condition: .when(platforms: [.macOS]))], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                    .testTarget(name: "\(moduleName)Tests", dependencies: ["\(moduleName)"], plugins: [.plugin(name: "skipstone", package: "skip")]),
 
             """
         }
