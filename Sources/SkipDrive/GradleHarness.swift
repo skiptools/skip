@@ -12,7 +12,7 @@ public protocol GradleHarness {
     func scanGradleOutput(line: String)
 }
 
-let pluginFolderName = "skip"
+let pluginFolderName = "skipstone"
 
 @available(macOS 13, macCatalyst 16, iOS 16, tvOS 16, watchOS 8, *)
 extension GradleHarness {

@@ -14,7 +14,7 @@ let preflightOutputSuffix = "_skippy"
         guard let sourceModuleTarget = target as? SourceModuleTarget else {
             return []
         }
-        let runner = try context.tool(named: "SkipTool").path
+        let runner = try context.tool(named: "skip").path
         let inputPaths = sourceModuleTarget.sourceFiles(withSuffix: ".swift").map { $0.path }
         let outputDir = context.pluginWorkDirectory
         return inputPaths.map { Command.buildCommand(displayName: "Skippy \(target.name)", executable: runner, arguments: ["skippy", "-O", outputDir.string, "--", preflightOutputSuffix, $0.string], inputFiles: [$0], outputFiles: [$0.outputPath(in: outputDir)]) }
@@ -26,7 +26,7 @@ import XcodeProjectPlugin
 
 extension SkipPreflightPlugIn: XcodeBuildToolPlugin {
     func createBuildCommands(context: XcodePluginContext, target: XcodeTarget) throws -> [Command] {
-        let runner = try context.tool(named: "SkipTool").path
+        let runner = try context.tool(named: "skip").path
         let inputPaths = target.inputFiles
             .filter { $0.type == .source && $0.path.extension == "swift" }
             .map { $0.path }

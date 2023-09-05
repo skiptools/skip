@@ -15,13 +15,13 @@ import PackagePlugin
     let skipRootTargetName = "SkipDrive"
 
     /// The name of the plug-in's output folder is the same as the target name for the transpiler, which matches the ".plugin(name)" in the Package.swift
-    let pluginFolderName = "skip"
+    let pluginFolderName = "skipstone"
 
     /// The output folder in which to place Skippy files
     let skippyOutputFolder = ".skippy"
 
     /// The executable command forked by the plugin; this is the build artifact whose name matches the built `skip` binary
-    let skipPluginCommandName = "SkipTool"
+    let skipPluginCommandName = "skip"
 
     /// The file extension for the metadata about skipcode
     let skipcodeExtension = ".skipcode.json"
