@@ -76,14 +76,14 @@ struct TestCommand: SkipCommand {
 
         let xunitCases = xunitResults.flatMap(\.testCases).sorted(by: testNameComparison)
 
-        // <testcase classname="SkipZipKtTests.SkipZipKtTests" name="testSkipModule" time="7.729628">
-        let skipModuleTests = xunitCases.filter({ $0.name == "testSkipModule" && $0.classname.split(separator: ".").first?.hasSuffix("KtTests") == true })
+        // <testcase classname="SkipZipTests.SkipZipTests" name="testSkipModule" time="7.729628">
+        let skipModuleTests = xunitCases.filter({ $0.name == "testSkipModule" && $0.classname.split(separator: ".").first?.hasSuffix("Tests") == true })
 
         if skipModuleTests.isEmpty {
             throw SkipDriveError(errorDescription: "Could not find Skip test testSkipModule in: \(xunitCases.map(\.name))")
         }
 
-        let skipModules = skipModuleTests.compactMap({ ($0.classname.split(separator: ".").first)?.dropLast("KtTests".count) })
+        let skipModules = skipModuleTests.compactMap({ ($0.classname.split(separator: ".").first)?.dropLast("Tests".count) })
 
         // XUnit: <testcase name="testDeflateInflate" classname="SkipZipTests.SkipZipTests" time="0.047230875">
         // JUnit: <testcase name="testDeflateInflate$SkipZip_debugUnitTest" classname="skip.zip.SkipZipTests" time="0.024"/>
@@ -95,11 +95,11 @@ struct TestCommand: SkipCommand {
             let junitFolder: URL
             if let junit = junit {
                 // TODO: use the skip modules to form the junit path relative to the project folder
-                // .build/plugins/outputs/skip-zip/SkipZipKtTests/skip-transpiler/SkipZip/.build/SkipZip/test-results/testDebugUnitTest/TEST-skip.zip.SkipZipTests.xml
+                // .build/plugins/outputs/skip-zip/SkipZipTests/skip-transpiler/SkipZip/.build/SkipZip/test-results/testDebugUnitTest/TEST-skip.zip.SkipZipTests.xml
                 junitFolder = URL(fileURLWithPath: junit, isDirectory: true)
             } else {
                 let packageName = try await packageName()
-                let testOutput = ".build/plugins/outputs/\(packageName)/\(skipModule)KtTests/skip-transpiler/\(skipModule)/.build/\(skipModule)/test-results/test\(configuration.capitalized)UnitTest/"
+                let testOutput = ".build/plugins/outputs/\(packageName)/\(skipModule)Tests/skip-transpiler/\(skipModule)/.build/\(skipModule)/test-results/test\(configuration.capitalized)UnitTest/"
                 junitFolder = URL(fileURLWithPath: testOutput, isDirectory: true)
             }
 
