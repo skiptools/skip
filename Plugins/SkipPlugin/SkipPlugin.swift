@@ -149,9 +149,11 @@ import PackagePlugin
         let outputFiles: [Path] = [skipcodeOutputPath]
         var inputFiles: [Path] = sourceTarget.sourceFiles.map(\.path) + swiftSourceTarget.sourceFiles.map(\.path)
 
-        struct Dep {
+        struct Dep : Identifiable {
             let package: Package
             let target: Target
+
+            var id: String { target.id }
         }
 
         var buildModuleArgs: [String] = [
@@ -194,7 +196,9 @@ import PackagePlugin
             }
         }
 
-        let deps = dependencies(for: target.dependencies, in: context.package)
+        var deps = dependencies(for: target.dependencies, in: context.package)
+        deps = makeUniqueById(deps)
+
         for dep in deps {
             // lookup the correct package name that contains this product (whose id will be an arbtrary number like "32")
             if dep.target.name != skipRootTargetName {
@@ -247,4 +251,15 @@ extension Path {
         outputFileName += suffix + ".swift"
         return outputDir.appending(subpath: outputFileName)
     }
+}
+
+func makeUniqueById<T: Identifiable>(_ items: [T]) -> [T] {
+    var uniqueItems = Set<T.ID>()
+    var result = [T]()
+    for item in items {
+        if uniqueItems.insert(item.id).inserted {
+            result.append(item)
+        }
+    }
+    return result
 }
