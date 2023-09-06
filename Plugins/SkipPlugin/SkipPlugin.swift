@@ -53,6 +53,7 @@ import PackagePlugin
     }
 
     func createTranspileBuildCommands(context: PluginContext, target: Target) async throws -> [Command] {
+        Diagnostics.remark("Skip transpile target: \(target.name)")
         if skipRootTargetNames.contains(target.name) {
             // never transpile the root target names
         }
