@@ -8,7 +8,7 @@ import PackagePlugin
     let testSuffix = "Tests"
 
     /// The root of target dependencies that are don't have any skipcode output
-    let skipRootTargetNames: Set<String> = ["SkipDrive"]
+    let skipRootTargetNames: Set<String> = ["SkipDrive", "SkipTest"]
 
     /// The name of the plug-in's output folder is the same as the target name for the transpiler, which matches the ".plugin(name)" in the Package.swift
     let pluginFolderName = "skipstone"
