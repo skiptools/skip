@@ -88,7 +88,7 @@ let package = Package(
         .library(name: "ModuleNameKt", targets: ["ModuleNameKt"]),
     ],
     dependencies: [
-        .package(url: "https://source.skip.tools/skip.git", from: "0.6.42"),
+        .package(url: "https://source.skip.tools/skip.git", from: "0.6.43"),
         .package(url: "https://source.skip.tools/skip-unit.git", from: "0.0.0"),
         .package(url: "https://source.skip.tools/skip-lib.git", from: "0.0.0"),
         .package(url: "https://source.skip.tools/skip-foundation.git", from: "0.0.0"),
