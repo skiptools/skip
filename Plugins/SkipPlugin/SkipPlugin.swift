@@ -30,29 +30,32 @@ import PackagePlugin
     let preflightOutputSuffix = "_skippy"
 
     func createBuildCommands(context: PluginContext, target: Target) async throws -> [Command] {
+        if skipRootTargetNames.contains(target.name) {
+            Diagnostics.remark("Skip eliding target name \(target.name)")
+            return []
+        }
+        guard let sourceTarget = target as? SourceModuleTarget else {
+            Diagnostics.remark("Skip skipping non-source target name \(target.name)")
+            return []
+        }
+
         var cmds: [Command] = []
-        cmds += try await createPreflightBuildCommands(context: context, target: target)
+        cmds += try await createPreflightBuildCommands(context: context, target: sourceTarget)
 
         // We only want to run the transpiler when targeting macOS and not iOS, but there doesn't appear to by any way to identify that from this phase of the plugin execution; so the transpiler will check the envrionment (e.g., "SUPPORTED_DEVICE_FAMILIES") and only run conditionally
-        cmds += try await createTranspileBuildCommands(context: context, target: target)
+        cmds += try await createTranspileBuildCommands(context: context, target: sourceTarget)
 
         return cmds
     }
 
-    func createPreflightBuildCommands(context: PluginContext, target: Target) async throws -> [Command] {
-        if skipRootTargetNames.contains(target.name) {
-            // never transpile the root target names
-        }
-        guard let sourceModuleTarget = target as? SourceModuleTarget else {
-            return []
-        }
+    func createPreflightBuildCommands(context: PluginContext, target: SourceModuleTarget) async throws -> [Command] {
         let runner = try context.tool(named: skipPluginCommandName).path
-        let inputPaths = sourceModuleTarget.sourceFiles(withSuffix: ".swift").map { $0.path }
+        let inputPaths = target.sourceFiles(withSuffix: ".swift").map { $0.path }
         let outputDir = context.pluginWorkDirectory.appending(subpath: skippyOutputFolder)
         return inputPaths.map { Command.buildCommand(displayName: "Skippy \(target.name)", executable: runner, arguments: ["skippy", "--preflight-output-suffix", preflightOutputSuffix, "-O", outputDir.string, $0.string], inputFiles: [$0], outputFiles: [$0.outputPath(in: outputDir, suffix: preflightOutputSuffix)]) }
     }
 
-    func createTranspileBuildCommands(context: PluginContext, target: Target) async throws -> [Command] {
+    func createTranspileBuildCommands(context: PluginContext, target: SourceModuleTarget) async throws -> [Command] {
         Diagnostics.remark("Skip transpile target: \(target.name)")
         if skipRootTargetNames.contains(target.name) {
             // never transpile the root target names
@@ -71,13 +74,8 @@ import PackagePlugin
         // Diagnostics.warning("ENVIRONMENT: \(env)")
         let packageFolderExtension = isXcode ? ".output" : ""
 
-        //print("createBuildCommands:", context.package.id)
-        guard let sourceTarget = target as? SourceModuleTarget else {
-            throw SkipPluginError(errorDescription: "Target «\(target.name)» was not a source module")
-        }
-
         // look for ModuleKotlin/Sources/Skip/skip.yml
-        let skipFolder = sourceTarget.directory.appending(["Skip"])
+        let skipFolder = target.directory.appending(["Skip"])
 
         // the peer for the current target
         // e.g.: SkipLibKotlin -> SkipLib
@@ -140,7 +138,7 @@ import PackagePlugin
         // the input files consist of all the swift, kotlin, and .yml files in all of the sources
         // having no inputs or outputs in Xcode seems to result in the command running *every* time, but in SPM is appears to have the opposite effect: it never seems to run when there are no inputs or outputs
         //#warning("build sourceFiles from directory rather than from SPM")
-        let sourceDir = sourceTarget.directory
+        let sourceDir = target.directory
         // TODO: find .swift files in tree
         let _ = sourceDir
 
@@ -157,7 +155,7 @@ import PackagePlugin
         Diagnostics.remark("add skipbuild output for \(target.name): \(skipbuildMarkerOutputPath)", file: skipbuildMarkerOutputPath.string)
 
         let outputFiles: [Path] = [skipbuildMarkerOutputPath]
-        var inputFiles: [Path] = sourceTarget.sourceFiles.map(\.path) + swiftSourceTarget.sourceFiles.map(\.path)
+        var inputFiles: [Path] = target.sourceFiles.map(\.path) + swiftSourceTarget.sourceFiles.map(\.path)
 
         struct Dep : Identifiable {
             let package: Package
