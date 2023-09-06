@@ -12,22 +12,15 @@ let package = Package(
         .macCatalyst(.v16),
     ],
     products: [
+        .executable(name: "skip", targets: ["skip"]),
         .plugin(name: "skipstone", targets: ["skipstone"]),
         .library(name: "SkipDrive", targets: ["SkipDrive"]),
     ],
-    dependencies: [
-    ],
     targets: [
-        .plugin(name: "skipstone",
-                capability: .buildTool(),
-                dependencies: ["skip"],
-                path: "Plugins/SkipPlugin"),
-
-        .target(name: "SkipDrive", dependencies: []),
-
+        .plugin(name: "skipstone", capability: .buildTool(), dependencies: ["skip"], path: "Plugins/SkipPlugin"),
+        .target(name: "SkipDrive", dependencies: ["skip"]),
         .testTarget(name: "SkipDriveTests", dependencies: ["SkipDrive"]),
-
-        .binaryTarget(name: "skip", url: "https://source.skip.tools/skip/releases/download/0.6.39/skip.zip", checksum: "4d72fa1ef6bd461f02ee50b4fb335bda4384e196f063fa728d81e8f1c64d5868")
+        .binaryTarget(name: "skip", url: "https://source.skip.tools/skip/releases/download/0.6.40/skip.zip", checksum: "8ef5cb9456eac1ddf184bd0bc2e4c31d37c3668cd75ae810b493db2b2f198db9")
     ]
 )
 
