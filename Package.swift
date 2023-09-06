@@ -19,7 +19,7 @@ let package = Package(
     ],
     targets: [
         .plugin(name: "skipstone", capability: .buildTool(), dependencies: ["skip"], path: "Plugins/SkipPlugin"),
-        .target(name: "SkipDrive", dependencies: ["skipstone"]),
+        .target(name: "SkipDrive"),
         .target(name: "SkipTest", dependencies: ["SkipDrive"]),
         .testTarget(name: "SkipTestTests", dependencies: ["SkipTest"]),
         .testTarget(name: "SkipDriveTests", dependencies: ["SkipDrive"]),
