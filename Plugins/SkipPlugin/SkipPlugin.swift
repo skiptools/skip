@@ -214,6 +214,10 @@ import PackagePlugin
                 continue
             }
 
+            if skipRootTargetNames.contains(depTarget.name) {
+                continue
+            }
+
             if let moduleLinkTarget = try addModuleLinkFlag(depTarget, packageID: dep.package.id) {
                 // adds an input file dependency on all the .skipcode.json files output from the dependent targets
                 // this should block the invocation of the transpiler plugin for this module
