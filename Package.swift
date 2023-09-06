@@ -14,13 +14,13 @@ let package = Package(
     products: [
         .executable(name: "skip", targets: ["skip"]),
         .plugin(name: "skipstone", targets: ["skipstone"]),
-        .library(name: "SkipDrive", targets: ["SkipDrive"]),
+        .library(name: "SkipDrive", type: .dynamic, targets: ["SkipDrive"]),
     ],
     targets: [
         .plugin(name: "skipstone", capability: .buildTool(), dependencies: ["skip"], path: "Plugins/SkipPlugin"),
         .target(name: "SkipDrive", dependencies: ["skip"]),
         .testTarget(name: "SkipDriveTests", dependencies: ["SkipDrive"]),
-        .binaryTarget(name: "skip", url: "https://source.skip.tools/skip/releases/download/0.6.42/skip.zip", checksum: "077af4cb1de82b920b7772bfcf81c8fd6046d6f98f0669e3789b934709a2f2be")
+        .binaryTarget(name: "skip", url: "https://source.skip.tools/skip/releases/download/0.6.43/skip.zip", checksum: "bcac09b78e78e3ebacde072c876cd3fda9613b078594c616057ecb6ff0ca9b20")
     ]
 )
 

@@ -24,7 +24,12 @@ import PackagePlugin
     let skipPluginCommandName = "skip"
 
     /// The file extension for the metadata about skipcode
-    let skipcodeExtension = ".skipcode.json"
+    //let skipcodeExtension = ".skipcode.json"
+
+    /// The skip transpile marker that is always output regardless of whether the transpile was successful or not
+    let skipbuildMarker = ".skipbuild"
+
+    /// The process identifier for Xcode, which is used to determine whether plugins go in the "plugins/package-name.output" or "plugins/package-name" folder.
     let xcodeIdentifier = "com.apple.dt.Xcode"
     let preflightOutputSuffix = "_skippy"
 
@@ -143,10 +148,11 @@ import PackagePlugin
 
         // the output files contains the .skipcode.json, and the input files contains all the dependent .skipcode.json files
         let outputURL = URL(fileURLWithPath: outputFolder.string, isDirectory: true)
-        let skipcodeOutputPath = Path(outputURL.appendingPathComponent(peerTarget.name + skipcodeExtension).path)
-        Diagnostics.remark("add skipcode output for \(target.name): \(skipcodeOutputPath)", file: skipcodeOutputPath.string)
+        //let skipcodeOutputPath = Path(outputURL.appendingPathComponent(peerTarget.name + skipcodeExtension).path)
+        let skipbuildMarkerOutputPath = Path(outputURL.appendingPathComponent(peerTarget.name + skipbuildMarker).path)
+        Diagnostics.remark("add skipbuild output for \(target.name): \(skipbuildMarkerOutputPath)", file: skipbuildMarkerOutputPath.string)
 
-        let outputFiles: [Path] = [skipcodeOutputPath]
+        let outputFiles: [Path] = [skipbuildMarkerOutputPath]
         var inputFiles: [Path] = sourceTarget.sourceFiles.map(\.path) + swiftSourceTarget.sourceFiles.map(\.path)
 
         struct Dep : Identifiable {
@@ -186,6 +192,10 @@ import PackagePlugin
                     }
 
                     return product.targets.flatMap { target in
+                        // stop at any external targets
+                        if skipRootTargetNames.contains(target.name) {
+                            return [] as [Dep]
+                        }
                         return [Dep(package: productPackage, target: target)] + dependencies(for: target.dependencies, in: productPackage)
                     }
                 case .target(let target):
@@ -205,20 +215,18 @@ import PackagePlugin
                 continue
             }
 
-            // lookup the correct package name that contains this product (whose id will be an arbtrary number like "32")
-            if skipRootTargetNames.contains(depTarget.name) {
-                continue
-            }
-
             if let moduleLinkTarget = try addModuleLinkFlag(depTarget, packageID: dep.package.id) {
                 // adds an input file dependency on all the .skipcode.json files output from the dependent targets
                 // this should block the invocation of the transpiler plugin for this module
                 // until the dependent modules have all been transpiled and their skipcode JSON files emitted
-                let skipcodeInputFile = outputFolder.appending(subpath: moduleLinkTarget + skipcodeExtension)
-                let skipcodeURL = URL(fileURLWithPath: skipcodeInputFile.string)
-                let skipcodeStandardizedPath = Path(skipcodeURL.standardized.path)
-                Diagnostics.remark("add skipcode input to \(depTarget.name): \(skipcodeStandardizedPath)", file: skipcodeStandardizedPath.string)
-                inputFiles.append(skipcodeStandardizedPath)
+                //let skipcodeInputFile = outputFolder.appending(subpath: moduleLinkTarget + skipcodeExtension)
+
+                // new build system: always output a .skipbuild so the transiler can skip the run for unsupported platforms (i.e., non-macOS) and still be able to use the same input files without the plugin needing to know the target platform (which seems to be a deficiency in the plugin environment)
+                let buildMarkerInputFile = outputFolder.appending(subpath: moduleLinkTarget + skipbuildMarker)
+                let buildMarkerInputURL = URL(fileURLWithPath: buildMarkerInputFile.string)
+                let buildMarkerStandardizedPath = Path(buildMarkerInputURL.standardized.path)
+                Diagnostics.remark("add build marker input to \(depTarget.name): \(buildMarkerStandardizedPath)", file: buildMarkerStandardizedPath.string)
+                inputFiles.append(buildMarkerStandardizedPath)
             }
         }
 
