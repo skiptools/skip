@@ -53,9 +53,10 @@ jobs:
           # create a release with the assets and a checksums.txt file
           cd ${PKGDIR}
           shasum -a 256 *.* > checksums.txt
-          echo 'Release artifact SHA-256 hashes:' >> .relnotes
-          echo '```' >> .relnotes
-          cat checksums.txt >> .relnotes
-          echo '```' >> .relnotes
-          gh release create "${TAG}" -t "Release ${TAG}" -F .relnotes *.*
+          gh release create "${TAG}" -t "Release ${TAG}" --generate-notes *.*
+          #echo 'Release artifact SHA-256 hashes:' >> .relnotes
+          #echo '```' >> .relnotes
+          #cat checksums.txt >> .relnotes
+          #echo '```' >> .relnotes
+          #gh release create "${TAG}" -t "Release ${TAG}" -F .relnotes *.*
 
