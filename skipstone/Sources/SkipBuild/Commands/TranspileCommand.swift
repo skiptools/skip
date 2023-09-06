@@ -55,12 +55,8 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         #else
         let v = skipVersion
         #endif
-        if let conditionalEnvironment = conditionalEnvironment, let value = ProcessInfo.processInfo.environment[conditionalEnvironment] {
-            info("Skip \(v): transpiler disabled when building for platform (\(conditionalEnvironment)=\(value))")
-        } else {
-            info("Skip \(v): transpiling to: \(transpileOptions.outputFolder ?? "nowhere") for: \(sourceFiles.map(\.basename))")
-            try await self.transpile(fs: localFileSystem, sourceFiles: Set(sourceFiles), with: continuation)
-        }
+        info("Skip \(v): transpiling to: \(transpileOptions.outputFolder ?? "nowhere") for: \(sourceFiles.map(\.basename))")
+        try await self.transpile(fs: localFileSystem, sourceFiles: Set(sourceFiles), with: continuation)
     }
 
     private func transpile(fs: FileSystem, sourceFiles: Set<AbsolutePath>, with continuation: AsyncThrowingStream<OutputMessage, Error>.Continuation) async throws {
@@ -80,20 +76,15 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             throw error("Must specify --output-folder")
         }
 
-        let kotlinOutputFolder = try AbsolutePath(AbsolutePath(validating: outputFolder, relativeTo: baseOutputPath), "kotlin")
-        // the standard base name for resources, which will be linked from a path like: src/main/resources/package/name/resname.ext
-        let resourcesOutputFolder = try AbsolutePath(AbsolutePath(validating: outputFolder, relativeTo: baseOutputPath), "resources")
-
-        if !fs.isDirectory(kotlinOutputFolder) {
-            // e.g.: ~Library/Developer/Xcode/DerivedData/PACKAGE-ID/SourcePackages/plugins/skiphub.output/SkipFoundationKotlinTests/skipstone/SkipFoundation/src/test/kotlin
-            //throw error("Folder specified by --output-folder did not exist: \(outputFolder)")
-            try fs.createDirectory(kotlinOutputFolder, recursive: true)
-        }
-
         guard let moduleRoot = transpileOptions.moduleRoot else {
             throw error("Must specify --module-root")
         }
         let moduleRootPath = try AbsolutePath(validating: moduleRoot)
+
+        if !fs.isDirectory(moduleRootPath) {
+            try fs.createDirectory(moduleRootPath, recursive: true)
+        }
+
         if !fs.isDirectory(moduleRootPath) {
             throw error("Module root path did not exist at: \(moduleRootPath.pathString)")
         }
@@ -104,6 +95,27 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
         let _ = primaryModulePath
 
+        let moduleBasePath = moduleRootPath.parentDirectory
+
+        // at this point, alway touch the build completion marker
+        defer { try? touchBuildCompletionMarker() }
+
+        // at this point, check for the conditional environment and halt transpilation on unsupported (i.e., non-macOS) platforms; this will still output the .skipbuild file, because the plugin needs to have it created for evey plugin invocation (since we don't know in SkipPlugin.swift what the target platform is).
+        if let conditionalEnvironment = conditionalEnvironment, let value = ProcessInfo.processInfo.environment[conditionalEnvironment] {
+            info("Skip transpiler disabled when building for platform (\(conditionalEnvironment)=\(value))")
+            return
+        }
+
+        let kotlinOutputFolder = try AbsolutePath(AbsolutePath(validating: outputFolder, relativeTo: baseOutputPath), "kotlin")
+        // the standard base name for resources, which will be linked from a path like: src/main/resources/package/name/resname.ext
+        let resourcesOutputFolder = try AbsolutePath(AbsolutePath(validating: outputFolder, relativeTo: baseOutputPath), "resources")
+
+        if !fs.isDirectory(kotlinOutputFolder) {
+            // e.g.: ~Library/Developer/Xcode/DerivedData/PACKAGE-ID/SourcePackages/plugins/skiphub.output/SkipFoundationKotlinTests/skipstone/SkipFoundation/src/test/kotlin
+            //throw error("Folder specified by --output-folder did not exist: \(outputFolder)")
+            try fs.createDirectory(kotlinOutputFolder, recursive: true)
+        }
+
         let packageName = KotlinTranslator.packageName(forModule: primaryModuleName)
         // skip over any source file whose name would match a copied Kotlin file
         let sources = sourceFiles.map(\.sourceFile)
@@ -113,8 +125,6 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         let transformers: [KotlinTransformer] = try createTransformers(for: baseSkipConfig, with: configMap)
 
         var dependentCodebaseInfos: [CodebaseInfo] = []
-
-        let moduleBasePath = moduleRootPath.parentDirectory
 
         let codebaseInfo = try await loadCodebaseInfo() // initialize the codebaseinfo and load DependentModuleName.skipcode.json
 
@@ -148,6 +158,11 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         /// Load the given source file, tracking its last modified date for the timestamp on the `.skipbuild` marker file
         func inputSource(_ path: AbsolutePath) throws -> ByteString {
             try fs.readFileContents(path)
+        }
+
+        /// The relative path for completion mark file that is always output when the transpile completes
+        func skipCompletionMarkerPath(forModule moduleName: String) -> RelativePath {
+            RelativePath(moduleName + ".skipbuild")
         }
 
         /// The relative path for cached codebase info JSON
@@ -185,6 +200,15 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             let codebaseInfo = CodebaseInfo(moduleName: primaryModuleName)
             codebaseInfo.dependentModules = dependentCodebaseInfos
             return codebaseInfo
+        }
+
+        func touchBuildCompletionMarker() throws {
+            if !fs.isDirectory(moduleBasePath) {
+                try fs.createDirectory(moduleBasePath, recursive: true)
+            }
+            let outputFilePath = moduleBasePath.appending(skipCompletionMarkerPath(forModule: primaryModuleName))
+            // just save empty data to the file
+            try Data().write(to: outputFilePath.asURL, options: .atomic)
         }
 
         func saveCodebaseInfo() throws {
