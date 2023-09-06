@@ -206,7 +206,7 @@ import PackagePlugin
             }
 
             // lookup the correct package name that contains this product (whose id will be an arbtrary number like "32")
-            if !skipRootTargetNames.contains(depTarget.name) {
+            if skipRootTargetNames.contains(depTarget.name) {
                 continue
             }
 
