@@ -1,4 +1,5 @@
 // Copyright 2023 Skip
+#if !SKIP
 import Foundation
 
 /// A harness for invoking `gradle` and processing the output of builds and tests.
@@ -387,3 +388,4 @@ public struct NoModuleFolder : LocalizedError {
 public struct ADBError : LocalizedError {
     public var errorDescription: String?
 }
+#endif

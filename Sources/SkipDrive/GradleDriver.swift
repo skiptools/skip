@@ -1,4 +1,5 @@
 // Copyright 2023 Skip
+#if !SKIP
 import Foundation
 #if canImport(FoundationNetworking)
 import FoundationNetworking
@@ -593,3 +594,4 @@ public enum GradleDriverError : Error, LocalizedError {
         }
     }
 }
+#endif

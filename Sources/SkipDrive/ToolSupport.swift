@@ -1,4 +1,5 @@
 // Copyright 2023 Skip
+#if !SKIP
 import Foundation
 #if canImport(FoundationXML)
 import FoundationXML
@@ -2723,3 +2724,4 @@ public var stderrStream: ThreadSafeOutputByteStream = try! ThreadSafeOutputByteS
     closeOnDeinit: false))
 #endif
 
+#endif

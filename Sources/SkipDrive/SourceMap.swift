@@ -1,4 +1,5 @@
 // Copyright 2023 Skip
+#if !SKIP
 import Foundation
 
 /// A line and column in a particular source location.
@@ -90,3 +91,4 @@ public struct SourceMap : Decodable {
         }
     }
 }
+#endif

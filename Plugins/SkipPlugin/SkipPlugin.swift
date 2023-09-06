@@ -40,6 +40,9 @@ import PackagePlugin
     }
 
     func createPreflightBuildCommands(context: PluginContext, target: Target) async throws -> [Command] {
+        if skipRootTargetNames.contains(target.name) {
+            // never transpile the root target names
+        }
         guard let sourceModuleTarget = target as? SourceModuleTarget else {
             return []
         }
@@ -50,6 +53,10 @@ import PackagePlugin
     }
 
     func createTranspileBuildCommands(context: PluginContext, target: Target) async throws -> [Command] {
+        if skipRootTargetNames.contains(target.name) {
+            // never transpile the root target names
+        }
+
         let skip = try context.tool(named: skipPluginCommandName)
         let outputFolder = context.pluginWorkDirectory
 
