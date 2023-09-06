@@ -20,7 +20,7 @@ let package = Package(
         .plugin(name: "skipstone", capability: .buildTool(), dependencies: ["skip"], path: "Plugins/SkipPlugin"),
         .target(name: "SkipDrive", dependencies: ["skip"]),
         .testTarget(name: "SkipDriveTests", dependencies: ["SkipDrive"]),
-        .binaryTarget(name: "skip", url: "https://source.skip.tools/skip/releases/download/0.6.40/skip.zip", checksum: "8ef5cb9456eac1ddf184bd0bc2e4c31d37c3668cd75ae810b493db2b2f198db9")
+        .binaryTarget(name: "skip", url: "https://source.skip.tools/skip/releases/download/0.6.41/skip.zip", checksum: "d7399100f3898b53b5bdc7e77d2d5447462b202a312667de29c7d3817613e65f")
     ]
 )
 
