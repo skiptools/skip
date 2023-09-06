@@ -11,8 +11,8 @@ import PackagePlugin
     /// The suffix that is requires
     let testSuffix = "Tests"
 
-    /// The root of target dependencies
-    let skipRootTargetName = "SkipDrive"
+    /// The root of target dependencies that are don't have any skipcode output
+    let skipRootTargetNames: Set<String> = ["SkipDrive"]
 
     /// The name of the plug-in's output folder is the same as the target name for the transpiler, which matches the ".plugin(name)" in the Package.swift
     let pluginFolderName = "skipstone"
@@ -161,7 +161,7 @@ import PackagePlugin
             peerTarget.name + ":" + peerTarget.directory.string,
         ]
 
-        @discardableResult func addModuleLinkFlag(_ target: Target, packageID: String?) throws -> String? {
+        @discardableResult func addModuleLinkFlag(_ target: SourceModuleTarget, packageID: String?) throws -> String? {
             let targetName = target.name
             // build up a relative link path to the related module based on the plug-in output directory structure
             buildModuleArgs += ["--module", targetName + ":" + target.directory.string]
@@ -200,18 +200,25 @@ import PackagePlugin
         deps = makeUniqueById(deps)
 
         for dep in deps {
+            guard let depTarget = dep.target as? SourceModuleTarget else {
+                // only consider source module targets
+                continue
+            }
+
             // lookup the correct package name that contains this product (whose id will be an arbtrary number like "32")
-            if dep.target.name != skipRootTargetName {
-                if let moduleLinkTarget = try addModuleLinkFlag(dep.target, packageID: dep.package.id) {
-                    // adds an input file dependency on all the .skipcode.json files output from the dependent targets
-                    // this should block the invocation of the transpiler plugin for this module
-                    // until the dependent modules have all been transpiled and their skipcode JSON files emitted
-                    let skipcodeInputFile = outputFolder.appending(subpath: moduleLinkTarget + skipcodeExtension)
-                    let skipcodeURL = URL(fileURLWithPath: skipcodeInputFile.string)
-                    let skipcodeStandardizedPath = Path(skipcodeURL.standardized.path)
-                    Diagnostics.remark("add skipcode input to \(dep.target.name): \(skipcodeStandardizedPath)", file: skipcodeStandardizedPath.string)
-                    inputFiles.append(skipcodeStandardizedPath)
-                }
+            if !skipRootTargetNames.contains(depTarget.name) {
+                continue
+            }
+
+            if let moduleLinkTarget = try addModuleLinkFlag(depTarget, packageID: dep.package.id) {
+                // adds an input file dependency on all the .skipcode.json files output from the dependent targets
+                // this should block the invocation of the transpiler plugin for this module
+                // until the dependent modules have all been transpiled and their skipcode JSON files emitted
+                let skipcodeInputFile = outputFolder.appending(subpath: moduleLinkTarget + skipcodeExtension)
+                let skipcodeURL = URL(fileURLWithPath: skipcodeInputFile.string)
+                let skipcodeStandardizedPath = Path(skipcodeURL.standardized.path)
+                Diagnostics.remark("add skipcode input to \(depTarget.name): \(skipcodeStandardizedPath)", file: skipcodeStandardizedPath.string)
+                inputFiles.append(skipcodeStandardizedPath)
             }
         }
 
