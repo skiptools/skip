@@ -327,7 +327,7 @@ extension GradleHarness {
         let acts: [String] = [] // releaseBuild ? ["assembleRelease"] : ["assembleDebug"] // expected in the arguments to the command
 
         var exitCode: ProcessResult.ExitStatus? = nil
-        let (output, _) = try await driver.launchGradleProcess(in: projectRoot(forModule: moduleName, packageName: packageName), module: appName, actions: acts, arguments: arguments, info: true, rerunTasks: false, exitHandler: { result in
+        let (output, _) = try await driver.launchGradleProcess(in: projectRoot(forModule: moduleName, packageName: packageName), module: appName, actions: acts, arguments: arguments, info: false, rerunTasks: false, exitHandler: { result in
             print("GRADLE RESULT: \(result)")
             exitCode = result.exitStatus
         })
