@@ -11,9 +11,6 @@ final class SwiftUITests: XCTestCase {
     extension View {
         func mod() -> some View {
         }
-
-        func navigationDestination(for: Any, @ViewBuilder destination: (Any) -> any View) -> some View {
-        }
     }
 
     struct VStack: View {
@@ -1462,6 +1459,93 @@ final class SwiftUITests: XCTestCase {
             override fun body(): View {
                 return ComposeView { composectx: ComposeContext ->
                     VStack().environment({ EnvironmentValues.shared.setfont(it) }, Font.body).Compose(composectx)
+                }
+            }
+        }
+        """)
+    }
+
+    func testNavigationDestination() async throws {
+        let supportingSwift = """
+        extension View {
+            func navigationDestination(for: Any, @ViewBuilder content: () -> some View) -> some View {
+                return self
+            }
+        }
+
+        struct NavigationStack: View {
+            init(@ViewBuilder content: () -> some View) {
+            }
+        }
+        """
+
+        try await check(supportingSwift: baseSupportingSwift + supportingSwift, swift: """
+        import SwiftUI
+        struct MyV: View {
+            var body: some View {
+                NavigationStack {
+                    Text("text")
+                        .mod()
+                        .navigationDestination(for: String.self) {
+                        }
+                        .navigationDestination(for: Int.self) {
+                        }
+                }
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
+
+        import skip.ui.*
+        internal class MyV: View {
+            override fun body(): View {
+                return ComposeView { composectx: ComposeContext ->
+                    NavigationStack {
+                        ComposeView { composectx: ComposeContext ->
+                            Text("text")
+                                .mod()
+                                .navigationDestination(for_ = String::class) {
+                                ComposeView { composectx: ComposeContext ->  }
+                            }
+                                .navigationDestination(for_ = Int::class) {
+                                ComposeView { composectx: ComposeContext ->  }
+                            }.Compose(composectx)
+                        }
+                    }.Compose(composectx)
+                }
+            }
+        }
+        """)
+
+        try await checkProducesMessage(preflight: true, swift: """
+        import SwiftUI
+        struct MyV: View {
+            var body: some View {
+                NavigationStack {
+                    Text("text")
+                        .navigationDestination(for: String.self) {
+                        }
+                        .mod()
+                }
+            }
+        }
+        """)
+
+        try await checkProducesMessage(preflight: true, swift: """
+        import SwiftUI
+        struct MyV: View {
+            var body: some View {
+                NavigationStack {
+                    VStack {
+                        Text("text")
+                            .navigationDestination(for: String.self) {
+                            }
+                    }
                 }
             }
         }

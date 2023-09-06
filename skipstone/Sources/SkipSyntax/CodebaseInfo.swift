@@ -26,6 +26,7 @@ public class CodebaseInfo: Codable {
     static let moduleNameMap: [String: String] = [
         "Combine": "SkipLib",
         "CoreFoundation": "SkipFoundation",
+        "CoreGraphics": "SkipLib",
         "CryptoKit": "SkipFoundation",
         "Dispatch": "SkipFoundation",
         "Foundation": "SkipFoundation",
