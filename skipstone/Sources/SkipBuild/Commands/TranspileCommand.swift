@@ -69,7 +69,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
         let skipFolderPath = try AbsolutePath(validating: skipFolder, relativeTo: baseOutputPath)
         if !fs.isDirectory(skipFolderPath) {
-            throw error("Folder specified by --skip-folder did not exist: \(skipFolderPath)")
+            throw error("In order to transpile the module, a Skip/ folder must exist and contain a skip.yml file at: \(skipFolderPath)")
         }
 
         guard let outputFolder = transpileOptions.outputFolder else {

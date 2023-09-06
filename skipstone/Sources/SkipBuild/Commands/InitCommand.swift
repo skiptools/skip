@@ -137,11 +137,11 @@ struct InitCommand: SkipCommand {
 
             let testKtSwiftFile = testKtDir.appending(path: "XCSkipTests.swift")
             try """
-            #if canImport(SkipUnit)
-            import SkipUnit
+            #if canImport(SkipTest)
+            import SkipTest
 
             /// This test case will run the transpiled tests for the Skip module.
-            @available(macOS 13, macCatalyst 16, *)
+            @available(macOS 13, *)
             final class XCSkipTests: XCTestCase, XCGradleHarness {
                 public func testSkipModule() async throws {
                     #if DEBUG
