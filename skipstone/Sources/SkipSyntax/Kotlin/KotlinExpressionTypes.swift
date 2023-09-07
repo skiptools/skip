@@ -68,9 +68,9 @@ class KotlinArrayLiteral: KotlinExpression {
     override func insertDependencies(into dependencies: inout KotlinDependencies) {
         if !isOptionSet {
             if case .set = inferredType {
-                dependencies.insertSkipLibImport(inferredType.name)
+                dependencies.insertSkipLibType(inferredType.name)
             } else if case .array = inferredType {
-                dependencies.insertSkipLibImport(inferredType.name)
+                dependencies.insertSkipLibType(inferredType.name)
             }
         }
     }
@@ -1084,7 +1084,7 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
     override func insertDependencies(into dependencies: inout KotlinDependencies) {
         generics?.forEach { $0.insertDependencies(into: &dependencies) }
         if TypeSignature.kotlinSkipLibImports.contains(name) {
-            dependencies.insertSkipLibImport(name)
+            dependencies.insertSkipLibType(name)
         }
     }
 

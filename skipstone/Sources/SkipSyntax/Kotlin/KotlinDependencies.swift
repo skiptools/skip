@@ -2,14 +2,13 @@
 struct KotlinDependencies {
     /// Package names to import, e.g. "kotlin.reflect.\*".
     var imports: Set<String> = []
-    /// Gradle libraries to add to dependencies, e.g. "org.jetbrains.kotlin:kotlin-reflect:1.8.20".
-    var gradle: Set<String> = []
+    // Note: we could expand this to track gradle or other dependencies as well
 }
 
 /// Known dependency sets.
 extension KotlinDependencies {
     /// Add an explicit import of the given `skip.lib` type.
-    mutating func insertSkipLibImport(_ typeName: String) {
+    mutating func insertSkipLibType(_ typeName: String) {
         imports.insert("skip.lib.\(typeName)")
     }
 

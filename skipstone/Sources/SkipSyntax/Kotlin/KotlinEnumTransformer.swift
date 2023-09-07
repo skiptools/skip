@@ -51,7 +51,7 @@ final class KotlinEnumTransformer: KotlinTransformer {
         guard !typeInfos.contains(where: { $0.members.contains(where: \.isAllCasesVar) }) else {
             return
         }
-        syntaxTree.dependencies.insertSkipLibImport("Array")
+        syntaxTree.dependencies.insertSkipLibType("Array")
 
         let allCasesVar = KotlinVariableDeclaration(names: ["allCases"], variableTypes: [.array(classDeclaration.signature)])
         allCasesVar.modifiers.isStatic = true

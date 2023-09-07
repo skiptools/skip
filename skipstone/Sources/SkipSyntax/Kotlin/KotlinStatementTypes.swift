@@ -1723,7 +1723,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         parameters.forEach { $0.insertDependencies(into: &dependencies) }
         // We use an array to represent variadic parameters
         if parameters.contains(where: { $0.isVariadic }) {
-            dependencies.insertSkipLibImport("Array")
+            dependencies.insertSkipLibType("Array")
         }
     }
 

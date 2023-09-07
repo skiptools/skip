@@ -352,7 +352,7 @@ extension TypeSignature {
         visit {
             switch $0 {
             case .array:
-                dependencies.insertSkipLibImport($0.name)
+                dependencies.insertSkipLibType($0.name)
             case .metaType:
                 dependencies.insertReflect()
             case .module(_, let type):
@@ -360,10 +360,10 @@ extension TypeSignature {
                 return .skip
             case .named(let name, _):
                 if !isModuleQualified && Self.kotlinSkipLibImports.contains(name) {
-                    dependencies.insertSkipLibImport(name)
+                    dependencies.insertSkipLibType(name)
                 }
             case .set:
-                dependencies.insertSkipLibImport($0.name)
+                dependencies.insertSkipLibType($0.name)
             default:
                 break
             }
