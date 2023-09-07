@@ -50,9 +50,14 @@ extension SkipCommand {
             throw SkipUpdateError(errorDescription: "Update check from \(atomURL.absoluteString) returned error: \(code)")
         }
 
+        #if canImport(AppKit) || canImport(FoundationXML)
         // parse the Atom XML and get the latest version, which is the title of the first entry
         let document = try XMLDocument(data: data)
         return document.rootElement()?.elements(forName: "entry").first?.elements(forName: "title").first?.stringValue
+        #else
+        // no XMLDocument on iOS, so do it the hard way with a CFXMLParser…
+        throw SkipUpdateError(errorDescription: "Cannot check for updates from iOS")
+        #endif
     }
 
 }
