@@ -476,4 +476,27 @@ final class ExpressionTests: XCTestCase {
         }
         """)
     }
+
+    func testImportDeduping() async throws {
+        try await check(swift: """
+        import Foundation
+        import SwiftUI
+
+        struct V: View {
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
+
+        import skip.foundation.*
+        import skip.ui.*
+
+        internal class V: View {
+        }
+        """)
+    }
 }

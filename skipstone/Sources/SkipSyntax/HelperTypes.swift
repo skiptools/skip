@@ -951,7 +951,7 @@ enum VisitResult<N> {
 }
 
 extension Array where Element == Statement {
-    /// Parse import statements for imported module paths.
+    /// Parse import statements for imports.
     var importedModulePaths: [[String]] {
         return compactMap { statement in
             guard statement.type == .importDeclaration, let importDeclaration = statement as? ImportDeclaration else {

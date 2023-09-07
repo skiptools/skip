@@ -1984,6 +1984,17 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
 
 class KotlinImportDeclaration: KotlinStatement {
     var modulePath: [String]
+    var modulePathString: String {
+        guard modulePath.count > 0 else {
+            return ""
+        }
+        let packageName = KotlinTranslator.packageName(forModule: modulePath[0])
+        if modulePath.count == 1 {
+            return packageName + ".*"
+        } else {
+            return packageName + "." + modulePath[1...].joined(separator: ".")
+        }
+    }
 
     init(modulePath: [String], sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.modulePath = modulePath
@@ -2001,12 +2012,7 @@ class KotlinImportDeclaration: KotlinStatement {
         }
         output.append(indentation)
         output.append("import ")
-        output.append(KotlinTranslator.packageName(forModule: modulePath[0]))
-        if modulePath.count == 1 {
-            output.append(".*")
-        } else {
-            output.append(".").append(modulePath[1...].joined(separator: "."))
-        }
+        output.append(modulePathString)
         output.append("\n")
     }
 }

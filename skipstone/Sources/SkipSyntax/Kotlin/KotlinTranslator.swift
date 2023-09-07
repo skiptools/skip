@@ -274,7 +274,7 @@ public class KotlinTranslator {
 
     private func addPackageAndRequiredImportStatements(to kotlinSyntaxTree: KotlinSyntaxTree) {
         let packageStatements = packageStatements()
-        let requiredImportStatements = requiredImportStatements(dependencies: kotlinSyntaxTree.dependencies)
+        let requiredImportStatements = requiredImportStatements(syntaxTree: kotlinSyntaxTree)
         kotlinSyntaxTree.root.insert(statements: packageStatements + requiredImportStatements, after: nil)
     }
 
@@ -285,20 +285,28 @@ public class KotlinTranslator {
         return [KotlinRawStatement(sourceCode: "package \(packageName)"), KotlinRawStatement(sourceCode: "")]
     }
 
-    private func requiredImportStatements(dependencies: KotlinDependencies) -> [KotlinStatement] {
+    private func requiredImportStatements(syntaxTree: KotlinSyntaxTree) -> [KotlinStatement] {
+        var modulePathStrings = syntaxTree.dependencies.imports
         // Manual whitelist of the packages above skip.lib
-        var importStrings: [String] = []
         if let packageName = packageName, ![
             "skip.unit",
             "skip.lib",
         ].contains(packageName) {
-            importStrings.append("import skip.lib.*")
+            modulePathStrings.insert("skip.lib.*")
         }
-        importStrings += dependencies.imports.map { "import \($0)" }
-        if !importStrings.isEmpty {
-            importStrings.sort()
-            importStrings.append("")
+        
+        // De-dupe with user imports
+        syntaxTree.root.statements.forEach {
+            if let importDeclaration = $0 as? KotlinImportDeclaration {
+                modulePathStrings.remove(importDeclaration.modulePathString)
+            }
         }
-        return importStrings.map { KotlinRawStatement(sourceCode: $0) }
+
+        guard !modulePathStrings.isEmpty else {
+            return []
+        }
+        var statements = modulePathStrings.sorted().map { KotlinRawStatement(sourceCode: "import " + $0) }
+        statements.append(KotlinRawStatement(sourceCode: "")) // Spacer
+        return statements
     }
 }

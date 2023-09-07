@@ -18,9 +18,9 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             }
         }
         if needsTranslation {
-            if translator.codebaseInfo == nil {
-                syntaxTree.root.visit { addMessagesVisit($0, translator: translator) }
-            } else {
+            // Add messages in a separate first pass so that we aren't confused by our SwiftUI transformations
+            syntaxTree.root.visit { addMessagesVisit($0, translator: translator) }
+            if translator.codebaseInfo != nil {
                 syntaxTree.root.visit { translateVisit($0, translator: translator) }
             }
         }
@@ -595,5 +595,6 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         syntaxTree.dependencies.imports.insert("androidx.compose.runtime.setValue")
         syntaxTree.dependencies.imports.insert("androidx.compose.runtime.saveable.rememberSaveable")
         syntaxTree.dependencies.imports.insert("androidx.compose.runtime.saveable.Saver")
+        syntaxTree.dependencies.imports.insert("skip.foundation.*")
     }
 }
