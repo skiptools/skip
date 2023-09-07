@@ -8,7 +8,7 @@ protocol TranspilePhase: CheckPhase {
     var transpileOptions: TranspilePhaseOptions { get }
 }
 
-struct TranspileCommand: TranspilePhase, StreamingCommand {
+struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
     static var configuration = CommandConfiguration(commandName: "transpile", abstract: "Transpile Swift to Kotlin", shouldDisplay: false)
 
     @OptionGroup(title: "Check Options")

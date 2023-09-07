@@ -12,11 +12,8 @@ struct SkippyCommand: AsyncParsableCommand, CheckPhase {
     @OptionGroup(title: "Output Options")
     var outputOptions: OutputOptions
 
-    @OptionGroup(title: "License Options")
-    var licenseOptions: LicenseOptions
-
     @Option(help: ArgumentHelp("Suffix for output file", valueName: "suffix"))
-    var preflightOutputSuffix: String
+    var outputSuffix: String?
 
     func run() async throws {
         try await perform(on: checkOptions.files.map({ Source.FilePath(path: $0) }), options: checkOptions)
@@ -38,20 +35,27 @@ struct SkippyCommand: AsyncParsableCommand, CheckPhase {
 
             if let outputDir = options.directory {
                 let outputDirURL = URL(fileURLWithPath: outputDir, isDirectory: true)
-                let outputFileURL = outputFileURL(for: sourceFile, in: outputDirURL)
-                try FileManager.default.createDirectory(at: outputDirURL, withIntermediateDirectories: true)
-                try "".write(to: outputFileURL, atomically: false, encoding: .utf8)
+                if let outputFileURL = outputFileURL(for: sourceFile, in: outputDirURL) {
+                    if (try? outputDirURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) != true {
+                        try FileManager.default.createDirectory(at: outputDirURL, withIntermediateDirectories: true)
+                    }
+                    // the output file is just empty data
+                    try Data().write(to: outputFileURL)
+                }
             }
         }
     }
 
     /// Xcode requires that we create an output file in order for incremental build tools to work.
-    func outputFileURL(for sourceFile: Source.FilePath, in outputDir: URL) -> URL {
+    func outputFileURL(for sourceFile: Source.FilePath, in outputDir: URL) -> URL? {
+        guard let outputSuffix = outputSuffix else {
+            return nil
+        }
         var outputFileName = sourceFile.name
         if outputFileName.hasSuffix(".swift") {
             outputFileName = String(outputFileName.dropLast(".swift".count))
         }
-        outputFileName += preflightOutputSuffix + ".swift"
+        outputFileName += outputSuffix
         return outputDir.appendingPathComponent(outputFileName)
     }
 }
