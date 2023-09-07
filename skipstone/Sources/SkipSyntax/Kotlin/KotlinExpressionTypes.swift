@@ -1885,15 +1885,10 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
                     if useMultilineFormatting {
                         output.append("\n").append(incrementsIndentation ? indentation.inc() : indentation)
                     }
-                    if let baseIdentifier = base as? KotlinIdentifier,
-                       TypeSignature.kotlinInnerExtensions.keys.contains(baseIdentifier.name + "." + member) {
-                        output.append("") // e.g. String.Encoding to StringEncoding
-                    } else {
-                        output.append(".")
-                        if mainActorOutputMode != .none && !isBaseIncludedInMainActor {
-                            // base.mainactor { it.member...
-                            output.append("mainactor { it.")
-                        }
+                    output.append(".")
+                    if mainActorOutputMode != .none && !isBaseIncludedInMainActor {
+                        // base.mainactor { it.member...
+                        output.append("mainactor { it.")
                     }
                 }
                 if let memberIndex = Int(member) {

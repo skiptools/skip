@@ -676,7 +676,12 @@ final class TypeDeclarationTests: XCTestCase {
     }
 
     func testStringEncoding() async throws {
-        try await check(swift: """
+        try await check(supportingSwift: """
+        extension String {
+            typealias Encoding = StringEncoding
+            typealias Index = Int
+        }
+        """, swift: """
         {
             let encoding: String.Encoding = String.Encoding.utf8
             let whatever: String.Whatever = String.Whatever.abcd
@@ -684,14 +689,14 @@ final class TypeDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         {
-            val encoding: StringEncoding = StringEncoding.utf8.sref()
+            val encoding: StringEncoding = StringEncoding.utf8
             val whatever: String.Whatever = String.Whatever.abcd.sref()
-            val strindex: StringIndex = 0
+            val strindex: Int = 0
         }
         """)
 
         try await check(supportingSwift: """
-        typealias PlatformStringEncoding = String.Encoding
+        typealias PlatformStringEncoding = StringEncoding
         struct StringEncoding {
             static let utf8 = StringEncoding()
         }

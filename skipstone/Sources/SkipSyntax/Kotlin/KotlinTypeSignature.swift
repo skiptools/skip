@@ -1,11 +1,4 @@
 extension TypeSignature {
-    /// The types from the standard library that should be re-mapped to a joined form of the name.
-    /// For example, Swift references to `String.Encoding.utf8` will be converted to `StringEncoding.utf8`.
-    static let kotlinInnerExtensions: [String: String] = [
-        "String.Encoding": "StringEncoding",
-        "String.Index": "StringIndex",
-    ]
-
     /// The types from the standard library that must be explicitly imported as dependencies because Kotlin implicitly imports
     /// same-named types.
     static let kotlinSkipLibImports: Set<String> = [
@@ -69,8 +62,7 @@ extension TypeSignature {
         case .int64:
             return "Long"
         case .member(let baseType, let type):
-            let typeName = "\(baseType.kotlin).\(type.kotlin)"
-            return Self.kotlinInnerExtensions[typeName] ?? typeName
+            return "\(baseType.kotlin).\(type.kotlin)"
         case .metaType(let baseType):
             if baseType == .any {
                 return "KClass<*>"
