@@ -1510,11 +1510,11 @@ final class SwiftUITests: XCTestCase {
                             Text("text")
                                 .mod()
                                 .navigationDestination(for_ = String::class) {
-                                ComposeView { composectx: ComposeContext ->  }
-                            }
+                                    ComposeView { composectx: ComposeContext ->  }
+                                }
                                 .navigationDestination(for_ = Int::class) {
-                                ComposeView { composectx: ComposeContext ->  }
-                            }.Compose(composectx)
+                                    ComposeView { composectx: ComposeContext ->  }
+                                }.Compose(composectx)
                         }
                     }.Compose(composectx)
                 }

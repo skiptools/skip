@@ -153,7 +153,7 @@ class KotlinAwait: KotlinExpression {
     }
 }
 
-class KotlinBinaryOperator: KotlinExpression {
+class KotlinBinaryOperator: KotlinExpression, KotlinSingleStatementVetoing {
     var op: Operator
     var lhs: KotlinExpression
     var rhs: KotlinExpression
@@ -273,6 +273,10 @@ class KotlinBinaryOperator: KotlinExpression {
         }
         negated.mayBeSharedMutableStruct = mayBeSharedMutableStruct
         return negated
+    }
+
+    func isSingleStatementAppendable(mode: KotlinSingleStatementAppendMode) -> Bool {
+        return mode != .function || op.precedence != .assignment
     }
 
     override func mayBeSharedMutableStructExpression(orType: Bool) -> Bool {
@@ -518,6 +522,12 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
     var body: KotlinCodeBlock
     var hasReturnLabel = false
     var isTaskClosure = false
+    var useMultilineFormatting: Bool {
+        guard labeledCaptureList.isEmpty else {
+            return true
+        }
+        return !body.isSingleStatementAppendable(mode: isAnonymousFunction ? .function : .closure)
+    }
 
     static func translate(expression: Closure, translator: KotlinTranslator) -> KotlinClosure {
         let labeledCaptureList = expression.captureList.compactMap { (capture: (CaptureType, LabeledValue<Expression>)) -> LabeledValue<KotlinExpression>? in
@@ -657,7 +667,7 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
             }
         }
         output.append("): ").append(returnType.kotlin)
-        if labeledCaptureList.isEmpty && body.isSingleStatementAppendable(mode: .function) {
+        if !useMultilineFormatting {
             output.append(" = ")
             body.appendAsSingleStatement(to: output, indentation: indentation, mode: .function)
         } else {
@@ -679,7 +689,7 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
             output.append(returnLabel)
         }
         output.append("{")
-        let isSingleStatement = labeledCaptureList.isEmpty && body.isSingleStatementAppendable(mode: .closure)
+        let isSingleStatement = !useMultilineFormatting
         if parameters.isEmpty && implicitParameterLabels.isEmpty {
             if isMainActor {
                 output.append(" MainActor.run \(returnLabel){")
@@ -907,6 +917,7 @@ class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting, APICallExp
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
         var arguments = arguments
+        var argumentIndentation = indentation
         var trailingClosure: KotlinExpression? = nil
         var forceParentheses = false
         var isReduceFunction = false
@@ -927,6 +938,9 @@ class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting, APICallExp
                 output.append(dictionaryLiteral.entries[0].value, indentation: indentation).append(">")
             } else {
                 output.append(function, indentation: indentation)
+                if (function as? KotlinMemberAccess)?.incrementsIndentation == true {
+                    argumentIndentation = argumentIndentation.inc()
+                }
                 // Kotlin does not support <closure>?(args); use <closure>?.invoke(args)
                 if function.optionalChain == .explicit {
                     output.append(".invoke")
@@ -973,7 +987,7 @@ class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting, APICallExp
             if let identifier = argument.value as? KotlinIdentifier, identifier.isOperatorIdentifier {
                 output.append("{ it, it_1 -> it \(identifier.name) it_1 }")
             } else {
-                output.append(argument.value, indentation: indentation)
+                output.append(argument.value, indentation: argumentIndentation)
             }
             if index < arguments.count - 1 {
                 output.append(", ")
@@ -983,7 +997,7 @@ class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting, APICallExp
             output.append(")")
         }
         if let trailingClosure {
-            output.append(" ").append(trailingClosure, indentation: indentation)
+            output.append(" ").append(trailingClosure, indentation: argumentIndentation)
         }
         if mainActorMode.output != .none {
             // Cooperate with our function child, which will output the beginning part of the closure to execute this
@@ -1584,24 +1598,47 @@ struct KotlinMatchingCase {
     }
 }
 
-class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwiftUIBindable, KotlinCastTarget, APICallExpression {
+class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwiftUIBindable, KotlinCastTarget, KotlinSingleStatementVetoing, APICallExpression {
     var base: KotlinExpression?
     var baseKClass: TypeSignature?
     var member: String
     var apiMatch: APIMatch?
-    var useMultlineFormatting = false
+    var useMultilineFormatting = false
     var baseType: TypeSignature = .none
     var mayBeSharedMutableStruct = false
     var isFunctionReference = false
     var isStaticReferenceOrTypeName = false
     var isTypealiasFor: TypeSignature = .none
+    var incrementsIndentation: Bool {
+        guard useMultilineFormatting else {
+            return false
+        }
+        // Be consistent when chaining
+        if let baseMemberAccess = base as? KotlinMemberAccess, baseMemberAccess.useMultilineFormatting {
+            return baseMemberAccess.incrementsIndentation
+        }
+        if let baseFunctionCall = base as? KotlinFunctionCall {
+            if let functionMemberAccess = baseFunctionCall.function as? KotlinMemberAccess, functionMemberAccess.useMultilineFormatting {
+                return functionMemberAccess.incrementsIndentation
+            }
+            // Don't indent following a mutliline closure, as in:
+            // Base {
+            //    closure
+            // }
+            // .member
+            if let closure = baseFunctionCall.arguments.last?.value as? KotlinClosure, closure.useMultilineFormatting {
+                return false
+            }
+        }
+        return true
+    }
 
     static func translate(expression: MemberAccess, translator: KotlinTranslator) -> KotlinMemberAccess {
         let kexpression = KotlinMemberAccess(expression: expression)
         if let base = expression.base {
             let kbase = translator.translateExpression(base)
             kexpression.base = kbase
-            kexpression.useMultlineFormatting = expression.useMultlineFormatting
+            kexpression.useMultilineFormatting = expression.useMultilineFormatting
             if let functionCall = kbase as? KotlinFunctionCall, functionCall.optionalChain == .implicit {
                 // f({ ... })?.member is cleaner and simpler for us than (f() { ... })?.member
                 functionCall.hasTrailingClosures = false
@@ -1759,6 +1796,10 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
         }
     }
 
+    func isSingleStatementAppendable(mode: KotlinSingleStatementAppendMode) -> Bool {
+        return !useMultilineFormatting
+    }
+
     var generics: [TypeSignature]?
     var castTargetType: KotlinCastTargetType = .none
 
@@ -1841,8 +1882,8 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
                     // To refer to a function rather than call it, Kotlin uses ::
                     output.append("::")
                 } else {
-                    if useMultlineFormatting {
-                        output.append("\n").append(indentation.inc())
+                    if useMultilineFormatting {
+                        output.append("\n").append(incrementsIndentation ? indentation.inc() : indentation)
                     }
                     if let baseIdentifier = base as? KotlinIdentifier,
                        TypeSignature.kotlinInnerExtensions.keys.contains(baseIdentifier.name + "." + member) {
@@ -1864,8 +1905,8 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
         } else if baseType != .none {
             output.append(baseType.kotlin)
             if member != "init" {
-                if useMultlineFormatting {
-                    output.append("\n").append(indentation.inc())
+                if useMultilineFormatting {
+                    output.append("\n").append(incrementsIndentation ? indentation.inc() : indentation)
                 }
                 output.append(".").append(member)
             }

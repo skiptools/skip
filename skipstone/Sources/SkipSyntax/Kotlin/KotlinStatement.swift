@@ -110,9 +110,15 @@ enum KotlinSingleStatementAppendMode {
     case function
 }
 
-/// A statement that can be appended in Kotlin single-statement format, e.g. `fun f() = <statement>`
-protocol KotlinSingleStatementAppendable {
+/// A statement **or expression** that can veto Kotlin's single-statement format, e.g. `fun f() = <statement>`.
+///
+/// Expressions are single-statement appendable by default. Statements are not.
+protocol KotlinSingleStatementVetoing {
     func isSingleStatementAppendable(mode: KotlinSingleStatementAppendMode) -> Bool
+}
+
+/// A statement that can be appended in Kotlin single-statement format, e.g. `fun f() = <statement>`.
+protocol KotlinSingleStatementAppendable: KotlinSingleStatementVetoing {
     func appendAsSingleStatement(to output: OutputGenerator, indentation: Indentation, mode: KotlinSingleStatementAppendMode)
 }
 

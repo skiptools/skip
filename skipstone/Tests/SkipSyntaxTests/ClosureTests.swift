@@ -392,4 +392,44 @@ final class ClosureTests: XCTestCase {
         }
         """)
     }
+
+    func testModifierCallFormatting() async throws {
+        try await check(swift: """
+        Base()
+            .trailing {
+                Base()
+                    .trailing()
+            }
+            .trailing()
+        """, kotlin: """
+        Base()
+            .trailing {
+                Base()
+                    .trailing()
+            }
+            .trailing()
+        """)
+
+        try await check(swift: """
+        Base {
+            Inner().trailing {
+                X()
+                Y()
+            }
+            .trailing()
+        }
+        .trailing()
+        .trailing()
+        """, kotlin: """
+        Base {
+            Inner().trailing {
+                X()
+                Y()
+            }
+            .trailing()
+        }
+        .trailing()
+        .trailing()
+        """)
+    }
 }

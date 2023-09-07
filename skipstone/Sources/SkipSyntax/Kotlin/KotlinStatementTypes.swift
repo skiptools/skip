@@ -349,12 +349,17 @@ class KotlinCodeBlock: KotlinStatement, KotlinSingleStatementAppendable {
                         if !appendable.isSingleStatementAppendable(mode: mode) {
                             hasDisallowed = true
                         }
+                    } else if let vetoing = statement as? KotlinSingleStatementVetoing {
+                        if !vetoing.isSingleStatementAppendable(mode: mode) {
+                            hasDisallowed = true
+                        }
                     } else {
                         hasDisallowed = true
                     }
-                }
-                if mode == .function && ($0 as? KotlinBinaryOperator)?.op.precedence == .assignment {
-                    hasDisallowed = true
+                } else if let vetoing = $0 as? KotlinSingleStatementVetoing {
+                    if !vetoing.isSingleStatementAppendable(mode: mode) {
+                        hasDisallowed = true
+                    }
                 }
             }
             return statementCount <= 1 && !hasDisallowed ? .recurse(nil) : .skip

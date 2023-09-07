@@ -1176,14 +1176,14 @@ class MemberAccess: Expression, APICallExpression {
     private(set) var baseType: TypeSignature // Will be .module(name, .none) for module qualifier
     let member: String
     private(set) var generics: [TypeSignature]?
-    let useMultlineFormatting: Bool
+    let useMultilineFormatting: Bool
 
-    init(base: Expression?, baseType: TypeSignature = .none, member: String, generics: [TypeSignature]? = nil, useMultlineFormatting: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
+    init(base: Expression?, baseType: TypeSignature = .none, member: String, generics: [TypeSignature]? = nil, useMultilineFormatting: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.base = base
         self.baseType = baseType
         self.member = member
         self.generics = generics
-        self.useMultlineFormatting = useMultlineFormatting
+        self.useMultilineFormatting = useMultilineFormatting
         super.init(type: .memberAccess, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
@@ -1202,7 +1202,7 @@ class MemberAccess: Expression, APICallExpression {
             base = ExpressionDecoder.decode(syntax: baseSyntax, in: syntaxTree)
         }
         let member = memberAccessExpr.declName.baseName.text
-        let useMultlineFormatting = base != nil && memberAccessExpr.period.leadingTrivia.contains {
+        let useMultilineFormatting = base != nil && memberAccessExpr.period.leadingTrivia.contains {
             switch $0 {
             case .newlines:
                 return true
@@ -1210,7 +1210,7 @@ class MemberAccess: Expression, APICallExpression {
                 return false
             }
         }
-        return MemberAccess(base: base, member: member, generics: generics, useMultlineFormatting: useMultlineFormatting, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+        return MemberAccess(base: base, member: member, generics: generics, useMultilineFormatting: useMultilineFormatting, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
     override func resolveAttributes(in syntaxTree: SyntaxTree, context: TypeResolutionContext) {
