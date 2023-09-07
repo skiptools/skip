@@ -27,7 +27,9 @@ import PackagePlugin
 
     /// The process identifier for Xcode, which is used to determine whether plugins go in the "plugins/package-name.output" or "plugins/package-name" folder.
     let xcodeIdentifier = "com.apple.dt.Xcode"
-    let preflightOutputSuffix = "_skippy"
+
+    //let outputSuffix = "_skippy.swift"
+    let outputSuffix = ".skippy"
 
     func createBuildCommands(context: PluginContext, target: Target) async throws -> [Command] {
         if skipRootTargetNames.contains(target.name) {
@@ -52,7 +54,7 @@ import PackagePlugin
         let runner = try context.tool(named: skipPluginCommandName).path
         let inputPaths = target.sourceFiles(withSuffix: ".swift").map { $0.path }
         let outputDir = context.pluginWorkDirectory.appending(subpath: skippyOutputFolder)
-        return inputPaths.map { Command.buildCommand(displayName: "Skippy \(target.name)", executable: runner, arguments: ["skippy", "--preflight-output-suffix", preflightOutputSuffix, "-O", outputDir.string, $0.string], inputFiles: [$0], outputFiles: [$0.outputPath(in: outputDir, suffix: preflightOutputSuffix)]) }
+        return inputPaths.map { Command.buildCommand(displayName: "Skippy \(target.name)", executable: runner, arguments: ["skippy", "--output-suffix", outputSuffix, "-O", outputDir.string, $0.string], inputFiles: [$0], outputFiles: [$0.outputPath(in: outputDir, suffix: outputSuffix)]) }
     }
 
     func createTranspileBuildCommands(context: PluginContext, target: SourceModuleTarget) async throws -> [Command] {
@@ -272,7 +274,7 @@ extension Path {
         if outputFileName.hasSuffix(".swift") {
             outputFileName = String(lastComponent.dropLast(".swift".count))
         }
-        outputFileName += suffix + ".swift"
+        outputFileName += suffix
         return outputDir.appending(subpath: outputFileName)
     }
 }
