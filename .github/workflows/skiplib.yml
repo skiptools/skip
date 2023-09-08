@@ -11,8 +11,10 @@ jobs:
       - uses: actions/checkout@v3
       - name: Build
         run: swift build
-      - name: Test
+      - name: Test (Local)
         run: skip test --plain
+      - name: Test (Simulator)
+        run: xcodebuild -skipPackagePluginValidation -configuration debug -sdk "iphonesimulator" -destination "platform=iOS Simulator,name=iPhone 14" -scheme $(basename $PWD) test
       - name: Release
         if: startsWith(github.ref, 'refs/tags/')
         env:

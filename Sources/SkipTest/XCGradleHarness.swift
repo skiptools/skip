@@ -5,6 +5,7 @@ import SkipDrive
 #if canImport(XCTest)
 @_exported import XCTest
 
+#if os(macOS)
 /// A `XCTestCase` that invokes the `gradle` process.
 ///
 /// When run as part of a test suite, JUnit XML test reports are parsed and converted to Xcode issues, along with any reverse-source mappings from transpiled Kotlin back into the original Swift.
@@ -433,6 +434,7 @@ struct GradleBuildError : LocalizedError {
     var errorDescription: String?
 }
 
+#endif // os(macOS)
 #endif // canImport(XCTest)
 #endif // canImport(SkipDrive)
 #endif // !SKIP
