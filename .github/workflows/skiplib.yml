@@ -21,16 +21,16 @@ jobs:
           MODULE=$(swift package dump-package | jq -r '.targets[0].name')
           brew install tree
           tree .build/
-          ln -s ./.build/plugins/outputs/${PACKAGE}/${MODULE}Tests/skipstone ./build/android
-          cd ./build/android/
+          ln -s .build/plugins/outputs/${PACKAGE}/${MODULE}Tests/skipstone .build/android-tests
+          cd .build/android-tests
           # create the "gradlew" wrapper if it does not already exist
           gradle wrapper
       - name: Test Android
         uses: ReactiveCircus/android-emulator-runner@v2
         with:
-          api-level: 28
+          api-level: 33
           script: ./gradlew connectedCheck
-          working-directory: .build/android/
+          working-directory: .build/android-tests
       - name: Release
         if: startsWith(github.ref, 'refs/tags/')
         env:
