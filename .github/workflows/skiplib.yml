@@ -19,6 +19,8 @@ jobs:
         run: |
           PACKAGE=$(swift package dump-package | jq -r '.name')
           MODULE=$(swift package dump-package | jq -r '.targets[0].name')
+          brew install tree
+          tree .build/
           ln -s ./.build/plugins/outputs/${PACKAGE}/${MODULE}Tests/skipstone ./build/android
           cd ./build/android/
           # create the "gradlew" wrapper if it does not already exist
