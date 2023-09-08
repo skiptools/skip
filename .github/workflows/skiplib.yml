@@ -8,10 +8,24 @@ jobs:
       DEVELOPER_DIR: /Applications/Xcode_15.0.app/Contents/Developer
     steps:
       - uses: actions/checkout@v3
-      - run: xcodebuild test -sdk iphonesimulator -destination "platform=iOS Simulator,name=iPhone 14" -skipPackagePluginValidation -configuration debug -scheme $(basename $PWD)
-      - run: brew install skiptools/skip/skip
+      - name: Test iOS
+        run: xcodebuild test -sdk iphonesimulator -destination "platform=iOS Simulator,name=iPhone 14" -skipPackagePluginValidation -configuration debug -scheme $(basename $PWD)
+      - name: Install Skip
+        run: brew install skiptools/skip/skip
       - run: swift build
-      - run: skip test --plain
+      - name: Test Skip
+        run: skip test --plain
+      - name: Setup Android
+        run: |
+          ln -s ./.build/plugins/outputs/skip-lib/*/skipstone android
+          cd android/
+          gradle wrapper
+      - name: Test Android
+        uses: ReactiveCircus/android-emulator-runner@v2
+        with:
+          api-level: 28
+          script: ./gradlew connectedCheck
+          working-directory: android/
       - name: Release
         if: startsWith(github.ref, 'refs/tags/')
         env:
