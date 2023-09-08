@@ -275,7 +275,15 @@ public class KotlinTranslator {
     private func addPackageAndRequiredImportStatements(to kotlinSyntaxTree: KotlinSyntaxTree) {
         let packageStatements = packageStatements()
         let requiredImportStatements = requiredImportStatements(syntaxTree: kotlinSyntaxTree)
+        
+        var header: [String]? = nil
+        if let firstStatement = kotlinSyntaxTree.root.statements.first {
+            header = firstStatement.extras?.extractHeader(isImportStatement: firstStatement.type == .importDeclaration)
+        }
         kotlinSyntaxTree.root.insert(statements: packageStatements + requiredImportStatements, after: nil)
+        if let header, !header.isEmpty {
+            kotlinSyntaxTree.root.insert(statements: [KotlinRawStatement(sourceCode: header.joined())], after: nil)
+        }
     }
 
     private func packageStatements() -> [KotlinStatement] {

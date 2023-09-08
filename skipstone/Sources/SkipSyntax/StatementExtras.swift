@@ -261,4 +261,32 @@ struct StatementExtras {
         }
         return joined
     }
+
+    /// Detect and extract any header comments on the first statement's extras in each file.
+    mutating func extractHeader(isImportStatement: Bool) -> [String] {
+        guard !leadingTrivia.isEmpty else {
+            return []
+        }
+
+        var nonDocCommentsBeforeNewline: [String] = []
+        var hasTrailingNewline = false
+        for line in leadingTrivia {
+            if line.hasPrefix("/**") || line.hasPrefix("///") || line == "\n" {
+                hasTrailingNewline = line == "\n"
+                break
+            } else {
+                nonDocCommentsBeforeNewline.append(line)
+            }
+        }
+        guard !nonDocCommentsBeforeNewline.isEmpty else {
+            return []
+        }
+        // Consider any initial non-doc comments before a newline/doc comment or import statement to be a header
+        guard isImportStatement || nonDocCommentsBeforeNewline.count < leadingTrivia.count else {
+            return []
+        }
+
+        leadingTrivia = Array(leadingTrivia.dropFirst(nonDocCommentsBeforeNewline.count + (hasTrailingNewline ? 1 : 0)))
+        return nonDocCommentsBeforeNewline
+    }
 }

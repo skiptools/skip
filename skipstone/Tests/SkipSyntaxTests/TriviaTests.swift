@@ -415,4 +415,118 @@ final class TriviaTests: XCTestCase {
         // Trailing comment
         """)
     }
+
+    func testHeaderCommentExtraction() async throws {
+        try await check(swift: """
+        // This is not a header
+        class C {
+            let a: [Int]
+        }
+        """, kotlin: """
+        import skip.lib.Array
+
+        // This is not a header
+        internal open class C {
+            internal val a: Array<Int>
+        }
+        """)
+
+        try await check(swift: """
+        // This is a header
+
+        class C {
+            let a: [Int]
+        }
+        """, kotlin: """
+        // This is a header
+
+        import skip.lib.Array
+
+        internal open class C {
+            internal val a: Array<Int>
+        }
+        """)
+
+        try await check(swift: """
+        // This is a header
+
+        class C {
+        }
+        """, kotlin: """
+        // This is a header
+
+        internal open class C {
+        }
+        """)
+
+        try await check(swift: """
+        // This is a header
+        import Foundation
+
+        class C {
+        }
+        """, kotlin: """
+        // This is a header
+
+        import skip.foundation.*
+
+        internal open class C {
+        }
+        """)
+
+        try await check(swift: """
+        /// This is not a header
+        import Foundation
+
+        class C {
+        }
+        """, kotlin: """
+        /// This is not a header
+        import skip.foundation.*
+
+        internal open class C {
+        }
+        """)
+
+        try await check(swift: """
+        // This is a header
+        /// This is not a header
+
+        class C {
+            let a: [Int]
+        }
+        """, kotlin: """
+        // This is a header
+
+        import skip.lib.Array
+
+        /// This is not a header
+
+        internal open class C {
+            internal val a: Array<Int>
+        }
+        """)
+
+        try await check(swift: """
+        /**
+         This is not a header
+
+         End
+         */
+        class C {
+            let a: [Int]
+        }
+        """, kotlin: """
+        import skip.lib.Array
+
+        /**
+        This is not a header
+
+        End
+        */
+        internal open class C {
+            internal val a: Array<Int>
+        }
+        """)
+    }
 }
