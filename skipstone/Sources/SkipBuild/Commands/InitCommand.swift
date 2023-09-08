@@ -74,10 +74,6 @@ struct InitCommand: SkipCommand {
         """
 
         var targets = """
-            // Each pure Swift target "ModuleName"
-            // must have a peer target "ModuleNameKt"
-            // that contains the Skip/skip.yml configuration
-            // and any custom Kotlin.
             targets: [
 
         """
@@ -166,7 +162,7 @@ struct InitCommand: SkipCommand {
             """
             targets += """
                     .target(name: "\(moduleName)", dependencies: [.product(name: "SkipFoundation", package: "skip-foundation", condition: .when(platforms: [.macOS]))], plugins: [.plugin(name: "skipstone", package: "skip")]),
-                    .testTarget(name: "\(moduleName)Tests", dependencies: ["\(moduleName)"], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                    .testTarget(name: "\(moduleName)Tests", dependencies: ["\(moduleName)", .product(name: "SkipTest", package: "skip", condition: .when(platforms: [.macOS]))], plugins: [.plugin(name: "skipstone", package: "skip")]),
 
             """
         }

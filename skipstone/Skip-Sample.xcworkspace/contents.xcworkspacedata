@@ -17,6 +17,9 @@
       location = "group:../skip-foundation">
    </FileRef>
    <FileRef
+      location = "group:../skip-model">
+   </FileRef>
+   <FileRef
       location = "group:../skip-ui">
    </FileRef>
    <FileRef
