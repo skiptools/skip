@@ -26,6 +26,8 @@ jobs:
           pwd
           # create the "gradlew" wrapper if it does not already exist
           echo Running Gradle wrapper in ${PWD}
+          # ensure we can write to everything
+          chmod -Rf +w .
           gradle wrapper
           echo Done running Gradle wrapper in ${PWD}
       - name: Test Android
