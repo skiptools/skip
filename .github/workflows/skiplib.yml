@@ -17,19 +17,13 @@ jobs:
         run: |
           PACKAGE=$(swift package dump-package | jq -r '.name')
           MODULE=$(swift package dump-package | jq -r '.targets[0].name')
-          brew install tree
           cd .build/
-          tree
-          echo ln -vs plugins/outputs/${PACKAGE}/${MODULE}Tests/skipstone android-tests
           ln -vs plugins/outputs/${PACKAGE}/${MODULE}Tests/skipstone android-tests
           cd android-tests/
-          pwd
-          # create the "gradlew" wrapper if it does not already exist
-          echo Running Gradle wrapper in ${PWD}
-          # ensure we can write to everything
+          # ensure we can write to the foldr
           chmod -Rf +w .
+          # create the "gradlew" wrapper if it does not already exist
           gradle wrapper
-          echo Done running Gradle wrapper in ${PWD}
       - name: Test Android
         uses: ReactiveCircus/android-emulator-runner@v2
         with:
