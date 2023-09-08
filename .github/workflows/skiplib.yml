@@ -33,7 +33,8 @@ jobs:
       - name: Test Android
         uses: ReactiveCircus/android-emulator-runner@v2
         with:
-          api-level: 33
+          api-level: 30
+          arch: x86_64
           script: ./gradlew connectedCheck
           working-directory: .build/android-tests
       - name: Test iOS
