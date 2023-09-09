@@ -63,6 +63,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
         import skip.foundation.*
+        import skip.model.*
 
         import skip.ui.*
         internal class V: View {
@@ -89,6 +90,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
         import skip.foundation.*
+        import skip.model.*
 
         import skip.ui.*
         internal class V: MyView {
@@ -134,6 +136,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
         import skip.foundation.*
+        import skip.model.*
 
         import skip.ui.*
         internal interface P {
@@ -196,6 +199,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
         import skip.foundation.*
+        import skip.model.*
 
         import skip.ui.*
         internal fun f() {
@@ -222,6 +226,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
         import skip.foundation.*
+        import skip.model.*
 
         import skip.ui.*
         internal class MyV: View {
@@ -254,6 +259,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
         import skip.foundation.*
+        import skip.model.*
 
         import skip.ui.*
         internal class MyV: View {
@@ -313,6 +319,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
         import skip.foundation.*
+        import skip.model.*
 
         import skip.ui.*
         internal class MyV: View {
@@ -365,6 +372,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
         import skip.foundation.*
+        import skip.model.*
 
         import skip.ui.*
         internal fun f() {
@@ -401,6 +409,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
         import skip.foundation.*
+        import skip.model.*
 
         import skip.ui.*
         internal fun f() {
@@ -458,6 +467,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
         import skip.foundation.*
+        import skip.model.*
 
         import skip.ui.*
         internal open class O: Observable {
@@ -542,6 +552,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
         import skip.foundation.*
+        import skip.model.*
 
         import skip.ui.*
         internal class S: MutableStruct {
@@ -611,6 +622,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
         import skip.foundation.*
+        import skip.model.*
 
         import skip.ui.*
         internal class V: View {
@@ -651,6 +663,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
         import skip.foundation.*
+        import skip.model.*
 
         import skip.ui.*
         internal class V: View {
@@ -684,6 +697,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
         import skip.foundation.*
+        import skip.model.*
 
         import skip.ui.*
         internal class V: View {
@@ -721,6 +735,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
         import skip.foundation.*
+        import skip.model.*
 
         import skip.ui.*
         internal class V: View {
@@ -762,6 +777,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
         import skip.foundation.*
+        import skip.model.*
 
         import skip.ui.*
         internal class V: View {
@@ -799,6 +815,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
         import skip.foundation.*
+        import skip.model.*
 
         import skip.ui.*
         internal class V: View {
@@ -838,6 +855,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
         import skip.foundation.*
+        import skip.model.*
 
         import skip.ui.*
         internal class V: View {
@@ -885,6 +903,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
         import skip.foundation.*
+        import skip.model.*
 
         import skip.ui.*
         internal class V: View {
@@ -936,6 +955,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
         import skip.foundation.*
+        import skip.model.*
 
         import skip.ui.*
         internal class V: View {
@@ -973,6 +993,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
         import skip.foundation.*
+        import skip.model.*
 
         import skip.ui.*
         internal class V: View {
@@ -1009,6 +1030,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
         import skip.foundation.*
+        import skip.model.*
 
         import skip.ui.*
         internal class V: View {
@@ -1049,6 +1071,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.setValue
         import skip.foundation.*
         import skip.lib.Array
+        import skip.model.*
 
         import skip.ui.*
         internal class V: View {
@@ -1090,6 +1113,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
         import skip.foundation.*
+        import skip.model.*
 
         import skip.ui.*
         internal class V: View, MutableStruct {
@@ -1167,6 +1191,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
         import skip.foundation.*
+        import skip.model.*
 
         import skip.ui.*
         internal class V: View, MutableStruct {
@@ -1246,6 +1271,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
         import skip.foundation.*
+        import skip.model.*
 
         import skip.ui.*
         internal class HStack<Content>: View where Content: View {
@@ -1283,6 +1309,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
         import skip.foundation.*
+        import skip.model.*
 
         import skip.ui.*
         internal class MyV: View {
@@ -1326,6 +1353,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
         import skip.foundation.*
+        import skip.model.*
 
         import skip.ui.*
         internal class MyV: View {
@@ -1369,6 +1397,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
         import skip.foundation.*
+        import skip.model.*
 
         import skip.ui.*
         internal class MyV: View {
@@ -1408,6 +1437,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
         import skip.foundation.*
+        import skip.model.*
 
         import skip.ui.*
         internal class EnvironmentValues {
@@ -1446,6 +1476,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
         import skip.foundation.*
+        import skip.model.*
 
         import skip.ui.*
         class MyKey: EnvironmentKey<String> {
@@ -1485,6 +1516,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
         import skip.foundation.*
+        import skip.model.*
 
         import skip.ui.*
         internal class MyV: View {
@@ -1533,6 +1565,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
         import skip.foundation.*
+        import skip.model.*
 
         import skip.ui.*
         internal class MyV: View {

@@ -684,7 +684,7 @@ struct TranspilePhaseOptions: ParsableArguments {
     var outputFolder: String? = nil
 
     @Option(name: [.long], help: ArgumentHelp("The Gradle wrapper version to generate", valueName: "version"))
-    var gradleVersion: String = "8.3.0" // note: this should not be higher than the pre-installed version on the active CI runner image: https://github.com/actions/runner-images/tree/main/images/macos
+    var gradleVersion: String = "8.3" // note: this should not be higher than the pre-installed version on the active CI runner image: https://github.com/actions/runner-images/tree/main/images/macos
 }
 
 struct TranspileResult {

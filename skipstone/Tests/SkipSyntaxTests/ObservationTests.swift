@@ -34,6 +34,7 @@ final class ObservationTests: XCTestCase {
         import androidx.compose.runtime.mutableStateOf
         import androidx.compose.runtime.setValue
 
+        import skip.model.*
 
         internal open class C: Observable {
             internal val a = 1
@@ -262,7 +263,8 @@ final class ObservationTests: XCTestCase {
         import androidx.compose.runtime.mutableStateOf
         import androidx.compose.runtime.setValue
 
-        
+        import skip.model.*
+
         internal open class C1: ObservableObject {
             internal open var a = 1
             internal open var b: Int
