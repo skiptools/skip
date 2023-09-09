@@ -68,7 +68,7 @@ jobs:
           # create a source .jar distribution with consistent timestamps
           find . -exec touch -d "${COMMIT_DATE:0:19}" {} \;
 
-          zip -r ${PKGDIR}/${PACKAGE}-${TAG}-sources.jar . -x '.*' -x '.*/*' -x '*/.*/*'
+          zip -r ${PKGDIR}/${PACKAGE}-${TAG}-sources.jar . -x '.*' -x 'build/*' -x '.*/*' -x '*/.*/*'
 
           # create a release with the assets and a checksums.txt file
           cd ${PKGDIR}
