@@ -22,6 +22,19 @@ public protocol XCGradleHarness : GradleHarness {
 @available(tvOS, unavailable, message: "Gradle tests can only be run on macOS")
 extension XCGradleHarness where Self : XCTestCase {
 
+    /// Invoke the Gradle tests using the Robolectric simulator, or the specified device emulator/device ID (or blank string to use the first one)
+    public func runGradleTests(device: String?) async throws {
+        if let device = device {
+            try await gradle(actions: ["connectedCheck"], deviceID: device.isEmpty ? nil : device)
+        } else {
+            #if DEBUG
+            try await gradle(actions: ["testDebug"])
+            #else
+            try await gradle(actions: ["testRelease"])
+            #endif
+        }
+    }
+
     /// Invokes the `gradle` process with the specified arguments.
     ///
     /// This is typically used to invoke test cases, but any actions and arguments can be specified, which can be used to drive the Gradle project in custom ways from a Skip test case.
@@ -29,10 +42,11 @@ extension XCGradleHarness where Self : XCTestCase {
     ///   - actions: the actions to invoke, such as `test` or `assembleDebug`
     ///   - arguments: and additional arguments
     ///   - outputPrefix: the prefix for funneling Gradle output messages to the console, or `nil` to mute the console
+    ///   - deviceID: the optional device ID against which to run
     ///   - moduleSuffix: the expected module name for automatic test determination
     ///   - sourcePath: the full path to the test case call site, which is used to determine the package root
     @available(macOS 13, macCatalyst 16, iOS 16, tvOS 16, watchOS 8, *)
-    public func gradle(actions: [String], arguments: [String] = [], pluginFolderName: String = "skipstone", outputPrefix: String? = "GRADLE>", moduleName: String? = nil, maxMemory: UInt64? = ProcessInfo.processInfo.physicalMemory, fromSourceFileRelativeToPackageRoot sourcePath: StaticString? = #file) async throws {
+    public func gradle(actions: [String], arguments: [String] = [], pluginFolderName: String = "skipstone", outputPrefix: String? = "GRADLE>", deviceID: String? = nil, moduleName: String? = nil, maxMemory: UInt64? = ProcessInfo.processInfo.physicalMemory, fromSourceFileRelativeToPackageRoot sourcePath: StaticString? = #file) async throws {
 
         var actions = actions
         let isTestAction = actions.contains(where: { $0.hasPrefix("test") })
@@ -69,7 +83,12 @@ extension XCGradleHarness where Self : XCTestCase {
                 let baseModuleName = moduleName.dropLast(testModuleSuffix.count).description
 
                 var testProcessResult: ProcessResult? = nil
-                let (output, parseResults) = try await driver.launchGradleProcess(in: dir, module: baseModuleName, actions: actions, arguments: arguments, maxMemory: maxMemory, exitHandler: { result in
+
+                var env: [String: String] = [:]
+                if let deviceID = deviceID, !deviceID.isEmpty {
+                    env["ANDROID_SERIAL"] = deviceID
+                }
+                let (output, parseResults) = try await driver.launchGradleProcess(in: dir, module: baseModuleName, actions: actions, arguments: arguments, environment: env, maxMemory: maxMemory, exitHandler: { result in
                     // do not fail on non-zero exit code because we want to be able to parse the test results first
                     testProcessResult = result
                 })
