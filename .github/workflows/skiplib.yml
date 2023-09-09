@@ -50,7 +50,7 @@ jobs:
           TAG="${GITHUB_REF#refs/tags/}"
           test -n "${TAG}"
 
-          gradle assemble --project-dir Skip/build/${PACKAGE}/${MODULE}Tests/skipstone -PbuildDir=.build/${MODULE}
+          gradle assemble --project-dir .build/plugins/outputs/${PACKAGE}/${MODULE}Tests/skipstone -PbuildDir=.build/${MODULE}
 
           echo "Creating release: ${TAG}"
           mkdir -p Skip/build/artifacts/
