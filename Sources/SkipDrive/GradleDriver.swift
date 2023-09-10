@@ -193,6 +193,11 @@ public struct GradleDriver {
             jvmargs += ["-Dfile.encoding=UTF-8"]
             jvmargs += ["-Xms256m"]
 
+            // large amounts of log output can cause connected Android tests to fail with an error like:
+            // io.grpc.StatusRuntimeException: RESOURCE_EXHAUSTED: gRPC message exceeds maximum size 4194304: 9677208
+            // TODO: add in gRPC max package size here
+            //jvmargs += ["-Dxxx.maxSize=XXX"]
+
             // make a nice memory string if we are dividible by kb/mb/gb
             let memstr: String
             let kb = Double(maxMemory) / 1024
