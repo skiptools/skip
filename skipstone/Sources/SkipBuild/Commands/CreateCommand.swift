@@ -51,7 +51,7 @@ struct CreateCommand: SkipCommand {
             let (url, response) = try await URLSession.shared.download(from: templateURL)
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
             if !(200..<300).contains(code) {
-                throw CreateError(errorDescription: "Download for template URL \(downloadURL.absoluteString) returned error: \(code)")
+                throw CreateError(errorDescription: "Download for template URL \(templateURL.absoluteString) returned error: \(code)")
             }
             return url
         }
