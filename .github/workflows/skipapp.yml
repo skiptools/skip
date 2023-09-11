@@ -52,7 +52,13 @@ jobs:
           # create the source zip file with predictable timestamps for reproducibility
           find . -exec touch -d "${COMMIT_DATE:0:19}" {} \;
           mkdir -p Skip/build/artifacts/
-          zip -9 -r "Skip/build/artifacts/App-Source.zip" . -x "Skip/*" -x ".git/*" -x ".build/*" -x ".*/*"
+  
+          # create 2 zips: one with the Package.resolved for reproducibility,
+          zip -9 -r "Skip/build/artifacts/App-Source.zip" . -x "Skip/*" -x ".*/*"
+
+          # and the other without the Package.resolved for templating.
+          zip -9 -r "Skip/build/artifacts/skip-template-source.zip" . -x "Package.resolved" -x "Skip/*" -x ".git/*" -x ".build/*" -x ".swiftpm/*"
+
 
       - name: Assemble Kotlin Source
         run: |
@@ -96,9 +102,6 @@ jobs:
           ls -la 
 
           APPNAME="App"
-
-          # TODO: check whether this is a template project
-          cp -v ${APPNAME}-Source.zip skip-template-source.zip
 
           # fix artifact names for release (retain App-Source.zip for template)
           mv -v ${APPNAME}-Source.zip ${APPNAME}-ios-${TAG}-source.zip
