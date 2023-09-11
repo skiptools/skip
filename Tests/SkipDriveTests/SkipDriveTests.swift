@@ -1,6 +1,9 @@
 // Copyright 2023 Skip
 import XCTest
 import SkipDrive
+#if canImport(SkipBuild)
+import SkipBuild
+#endif
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 class SkipCommandTests : XCTestCase {
@@ -87,11 +90,11 @@ class SkipCommandTests : XCTestCase {
 
     /// Runs the tool with the given arguments, returning the entire output string as well as a function to parse it to `JSON`
     @discardableResult func skip(checkError: Bool = true, _ args: String...) async throws -> (out: String, err: String) {
-        #if canImport(SkipDriver)
+        #if canImport(SkipBuildXXX) // TODO: need to adapt BufferedOutputByteStream to WritableByteStream
         let out = BufferedOutputByteStream()
         let err = BufferedOutputByteStream()
 
-        try await SkipDriver.run(args, out: out, err: err)
+        try await SkipRunnerExecutor.run(args, out: out, err: err)
 
         let outString = out.bytes.description.trimmingCharacters(in: .whitespacesAndNewlines)
         let errString = err.bytes.description.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -106,9 +109,11 @@ class SkipCommandTests : XCTestCase {
         }
         return (out: outString, err: errString)
         #else
-        // we are not linking to the skip driver, so fork the process instead with the proper arguments
-
+        // we are not linking to SkipBuild, so fork the process instead with the proper arguments
+        //var env = ProcessInfo.processInfo.environment
+        //env["NOSKIP"] = "1" // prevent skip.git from trying to include local tools
         let result = try await Process.popen(arguments: ["skip"] + args, loggingHandler: nil)
+
         // Throw if there was a non zero termination.
         guard result.exitStatus == .terminated(code: 0) else {
             throw ProcessResult.Error.nonZeroExit(result)

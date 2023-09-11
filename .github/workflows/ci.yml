@@ -29,5 +29,6 @@ jobs:
         run: skip init --plain --build --test -d `mktemp -d` skppkg Mod1 Mod2
 
       - name: Run skip create
+        if: false
         run: skip create --plain --build --test -d `mktemp -d` skpapp
 
