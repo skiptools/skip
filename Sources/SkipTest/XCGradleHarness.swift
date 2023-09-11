@@ -85,10 +85,17 @@ extension XCGradleHarness where Self : XCTestCase {
                 var testProcessResult: ProcessResult? = nil
 
                 var env: [String: String] = [:]
-                if let deviceID = deviceID, !deviceID.isEmpty {
-                    env["ANDROID_SERIAL"] = deviceID
+                let quiet: Bool
+                if let deviceID = deviceID {
+                    quiet = true // needed for some tests with large output to avoid gRPC max packet size errors
+                    if !deviceID.isEmpty {
+                        env["ANDROID_SERIAL"] = deviceID
+                    }
+                } else {
+                    quiet = false
                 }
-                let (output, parseResults) = try await driver.launchGradleProcess(in: dir, module: baseModuleName, actions: actions, arguments: arguments, environment: env, maxMemory: maxMemory, exitHandler: { result in
+
+                let (output, parseResults) = try await driver.launchGradleProcess(in: dir, module: baseModuleName, actions: actions, arguments: arguments, environment: env, quiet: quiet, maxMemory: maxMemory, exitHandler: { result in
                     // do not fail on non-zero exit code because we want to be able to parse the test results first
                     testProcessResult = result
                 })
