@@ -140,11 +140,7 @@ struct InitCommand: SkipCommand {
             @available(macOS 13, *)
             final class XCSkipTests: XCTestCase, XCGradleHarness {
                 public func testSkipModule() async throws {
-                    #if DEBUG
-                    try await gradle(actions: ["testDebug"])
-                    #else
-                    try await gradle(actions: ["testRelease"])
-                    #endif
+                    try await runGradleTests(device: .none) // set device ID to run in Android emulator vs. robolectric
                 }
             }
             #endif

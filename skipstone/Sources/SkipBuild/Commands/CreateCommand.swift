@@ -46,9 +46,9 @@ struct CreateCommand: SkipCommand {
             throw CreateError(errorDescription: "Specified project path already exists: \(projectFolder)")
         }
 
-        let downloadURL: URL = try await outputOptions.monitor("Downloading template \(createOptions.template)") {
-            let downloadURL = try createOptions.projectTemplateURL
-            let (url, response) = try await URLSession.shared.download(from: downloadURL)
+        let templateURL = try createOptions.projectTemplateURL
+        let downloadURL: URL = try await outputOptions.monitor("Downloading template \(templateURL)") {
+            let (url, response) = try await URLSession.shared.download(from: templateURL)
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
             if !(200..<300).contains(code) {
                 throw CreateError(errorDescription: "Download for template URL \(downloadURL.absoluteString) returned error: \(code)")
@@ -90,17 +90,6 @@ struct CreateCommand: SkipCommand {
 }
 
 struct CreateOptions: ParsableArguments {
-    /// TODO: dynamic loading of template data
-    static let templates = [
-        ProjectTemplate(id: "skipapp", url: URL(string: "https://github.com/skiptools/skipapp/releases/latest/download/skip-template-source.zip")!, localizedTitle: [
-            "en": "Skip Sample App"
-        ], localizedDescription: [
-            "en": """
-                A Skip sample app for iOS and Android.
-                """
-        ])
-    ]
-
     @Option(help: ArgumentHelp("Application identifier"))
     var id: String = "net.example.MyApp"
 
@@ -111,14 +100,38 @@ struct CreateOptions: ParsableArguments {
     var configuration: String = "debug"
 
     @Option(name: [.customShort("t"), .long], help: ArgumentHelp("Template name/ID for new project", valueName: "id"))
-    var template: String = templates.first!.id
+    var template: String = "skipapp"
+
+    @Option(name: [.customShort("h"), .long], help: ArgumentHelp("The host name for the template repository", valueName: "host"))
+    var templateHost: String = "https://github.com"
 
     var projectTemplateURL: URL {
         get throws {
-            guard let sample = Self.templates.first(where: { $0.id == template }) else {
+            let url: URL?
+            let templateParts = template.split(separator: "/")
+
+            // construct, e.g.:
+            // https://github.com/skiptools/skipapp/releases/latest/download/skip-template-source.zip
+            if templateParts.isEmpty {
+                throw SkipDriveError(errorDescription: "Sample named “\(template)” must be a repository name")
+            } else if templateParts.count == 1, let repo = templateParts.last {
+                url = URL(string: templateHost + "/skiptools/\(repo)")
+            } else if templateParts.count == 2, let org = templateParts.first, let repo = templateParts.last {
+                url = URL(string: templateHost + "/\(org)/\(repo)")
+            } else {
+                // if it is not "repo" or "org/repo", then assume it is a full URL to the actual template zip
+                url = URL(string: template)
+                if let url = url {
+                    return url // return the actual URL to the template zip
+                }
+            }
+
+            guard let url = url else {
                 throw SkipDriveError(errorDescription: "Sample named \(template) could not be found")
             }
-            return sample.url
+
+            let templateURL = url.appending(path: "releases/latest/download/skip-template-source.zip")
+            return templateURL
         }
     }
 }

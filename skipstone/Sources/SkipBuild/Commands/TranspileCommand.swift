@@ -298,6 +298,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
                 org.gradle.jvmargs=-Xmx2048m
                 android.useAndroidX=true
                 kotlin.code.style=official
+                android.suppressUnsupportedCompileSdk=34
                 """
 
                 let changed = try fs.writeChanges(path: gradlePropertiesPath, makeReadOnly: true, bytes: ByteString(encodingAsUTF8: gradePropertiesContents))
