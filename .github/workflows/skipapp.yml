@@ -41,11 +41,10 @@ jobs:
       - name: Build apk
         run: |
           for CONFIGURATION in "Release" "Debug"; do
-            # for some reason we need to build twice
-            for X in "A" "B"; do 
-              BUILT_PRODUCTS_DIR=".build" xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -configuration "${CONFIGURATION}" -destination "platform=macosx" -scheme "AppDroid" build
-            done
+            BUILT_PRODUCTS_DIR=".build" xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -configuration "${CONFIGURATION}" -destination "platform=macosx" -scheme "AppDroid" build
           done
+          ls -la Skip/build/artifacts/*.apk
+          shasum -a 256 Skip/build/artifacts/*.apk
 
       - name: Assemble Swift Source
         run: |
