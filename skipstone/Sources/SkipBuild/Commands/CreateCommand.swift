@@ -30,7 +30,9 @@ struct CreateCommand: SkipCommand {
     var open: Bool = false
 
     func run() async throws {
-        outputOptions.write("Creating project \(projectName) from template \(createOptions.template)")
+        let pname = projectName.split(separator: "/").last?.description ?? projectName
+
+        outputOptions.write("Creating project \(pname) from template \(createOptions.template)")
 
         let outputFolder = createOptions.dir ?? "."
         var isDir: Foundation.ObjCBool = false
@@ -47,7 +49,7 @@ struct CreateCommand: SkipCommand {
         }
 
         let templateURL = try createOptions.projectTemplateURL
-        let downloadURL: URL = try await outputOptions.monitor("Downloading template \(templateURL)") {
+        let downloadURL: URL = templateURL.isFileURL ? templateURL : try await outputOptions.monitor("Downloading template \(templateURL.absoluteString)") {
             let (url, response) = try await URLSession.shared.download(from: templateURL)
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
             if !(200..<300).contains(code) {
@@ -57,19 +59,20 @@ struct CreateCommand: SkipCommand {
         }
 
         let projectFolderURL = URL(fileURLWithPath: projectFolder, isDirectory: true)
+        try FileManager.default.createDirectory(at: projectFolderURL, withIntermediateDirectories: true)
 
-        try await outputOptions.run("Unpacking template \(createOptions.template) for project \(projectName)", ["unzip", downloadURL.path, "-d", projectFolderURL.path])
+        try await outputOptions.run("Unpacking template \(createOptions.template) (\(ByteCountFormatter().string(fromByteCount: Int64((try? downloadURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)))) for project \(pname)", ["unzip", downloadURL.path, "-d", projectFolderURL.path])
 
-        let packageJSONString = try await outputOptions.run("Checking project \(projectName)", [toolOptions.swift, "package", "dump-package", "--package-path", projectFolderURL.path]).out
+        let packageJSONString = try await outputOptions.run("Checking project \(pname)", [toolOptions.swift, "package", "dump-package", "--package-path", projectFolderURL.path]).out
 
         let packageJSON = try JSONDecoder().decode(PackageManifest.self, from: Data(packageJSONString.utf8))
 
         if buildOptions.build == true {
-            try await outputOptions.run("Building project \(projectName) for package \(packageJSON.name)", [toolOptions.swift, "build", "-c", createOptions.configuration, "--package-path", projectFolderURL.path])
+            try await outputOptions.run("Building project \(pname) for package \(packageJSON.name)", [toolOptions.swift, "build", "-c", createOptions.configuration, "--package-path", projectFolderURL.path])
         }
 
         if buildOptions.test == true {
-            try await outputOptions.run("Testing project \(projectName)", [toolOptions.swift, "test", "-j", "1", "-c", createOptions.configuration, "--package-path", projectFolderURL.path])
+            try await outputOptions.run("Testing project \(pname)", [toolOptions.swift, "test", "-j", "1", "-c", createOptions.configuration, "--package-path", projectFolderURL.path])
         }
 
         let projectPath = projectFolderURL.path + "/" + "App.xcodeproj"
@@ -105,6 +108,9 @@ struct CreateOptions: ParsableArguments {
     @Option(name: [.customShort("h"), .long], help: ArgumentHelp("The host name for the template repository", valueName: "host"))
     var templateHost: String = "https://github.com"
 
+    @Option(name: [.customShort("f"), .long], help: ArgumentHelp("A path to the template zip file to use", valueName: "zip"))
+    var templateFile: String?
+
     var projectTemplateURL: URL {
         get throws {
             let url: URL?
@@ -112,7 +118,13 @@ struct CreateOptions: ParsableArguments {
 
             // construct, e.g.:
             // https://github.com/skiptools/skipapp/releases/latest/download/skip-template-source.zip
-            if templateParts.isEmpty {
+            if let templateFile = templateFile {
+                let fileURL = URL(fileURLWithPath: templateFile)
+                if !FileManager.default.fileExists(atPath: fileURL.path) {
+                    throw SkipDriveError(errorDescription: "template-file could not be found at: \(templateFile)")
+                }
+                return fileURL
+            } else if templateParts.isEmpty {
                 throw SkipDriveError(errorDescription: "Sample named “\(template)” must be a repository name")
             } else if templateParts.count == 1, let repo = templateParts.last {
                 url = URL(string: templateHost + "/skiptools/\(repo)")
