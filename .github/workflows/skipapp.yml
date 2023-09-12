@@ -72,6 +72,9 @@ jobs:
           zip -9 -r "${OLDPWD}/Skip/build/artifacts/App-android-source.zip" . -x ".build/*" -x "*/.gradle/*" -x "*/.build/*" -x "*/build/*"
           cd -
 
+      - name: "Verify Template"
+        run: skip create --template-file Skip/build/artifacts/skip-template-source.zip --build --test $(mktemp -d)
+
       - name: Merge Artifacts
         run: |
           # merge the ipa and apk zips into a single archive
@@ -130,13 +133,6 @@ jobs:
           #cat checksums.txt >> .relnotes
           #echo '```' >> .relnotes
           #gh release create "${TAG}" -t "Release ${TAG}" -F .relnotes *.*
-
-      - name: "Verify Release"
-        if: startsWith(github.ref, 'refs/tags/')
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          skip create --template "${GITHUB_REPOSITORY}" --template-host "${GITHUB_SERVER_URL}" --test /tmp/Demo-App
 
       - name: "Upload Build Artifacts"
         # upload the artifacts generated from each build
