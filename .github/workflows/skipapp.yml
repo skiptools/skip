@@ -60,7 +60,11 @@ jobs:
           zip -9 -r "Skip/build/artifacts/App-Source.zip" . -x "Skip/*" -x ".*/*"
 
           # and the other without the Package.resolved for templating.
-          zip -9 -r "Skip/build/artifacts/skip-template-source.zip" . -x "Package.resolved" -x "Skip/*" -x ".git/*" -x ".build/*" -x ".swiftpm/*"
+          TEMPLATE_FILE="Skip/build/artifacts/skip-template-source.zip"
+          zip -9 -r "${TEMPLATE_FILE}" . -x "Package.resolved" -x "Skip/*" -x ".git/*" -x ".build/*" -x ".swiftpm/*"
+
+          # verify that the template can be used to derive a new app
+          skip create --template-file "${TEMPLATE_FILE}" --build --test $(mktemp -d)
 
 
       - name: Assemble Kotlin Source
@@ -71,9 +75,6 @@ jobs:
           find . -exec touch -d "${COMMIT_DATE:0:19}" {} \;
           zip -9 -r "${OLDPWD}/Skip/build/artifacts/App-android-source.zip" . -x ".build/*" -x "*/.gradle/*" -x "*/.build/*" -x "*/build/*"
           cd -
-
-      - name: "Verify Template"
-        run: skip create --template-file Skip/build/artifacts/skip-template-source.zip --build --test $(mktemp -d)
 
       - name: Merge Artifacts
         run: |
