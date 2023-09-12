@@ -41,9 +41,13 @@ jobs:
       - name: Build apk
         run: |
           for CONFIGURATION in "Release" "Debug"; do
-            BUILT_PRODUCTS_DIR=".build" xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -configuration "${CONFIGURATION}" -destination "platform=macosx" -scheme "AppDroid" build
+            for X in "A" "B"; do
+              BUILT_PRODUCTS_DIR=".build" xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -configuration "${CONFIGURATION}" -destination "platform=macosx" -scheme "AppDroid" build
+            done
           done
-          ls -la Skip/build/artifacts/*.apk
+          ls -la Skip/build/
+          ls -la Skip/build/artifacts/
+          ls -lah Skip/build/artifacts/*.apk
           shasum -a 256 Skip/build/artifacts/*.apk
 
       - name: Assemble Swift Source
