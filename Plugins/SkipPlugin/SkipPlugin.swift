@@ -59,6 +59,11 @@ import PackagePlugin
 
     func createTranspileBuildCommands(context: PluginContext, target: SourceModuleTarget) async throws -> [Command] {
         //Diagnostics.remark("Skip transpile target: \(target.name)")
+
+        //for key in ProcessInfo.processInfo.environment.keys.sorted() {
+            //Diagnostics.remark("Skip transpile env: \(key)=\(ProcessInfo.processInfo.environment[key] ?? "")")
+        //}
+
         if skipRootTargetNames.contains(target.name) {
             // never transpile the root target names
         }
@@ -250,7 +255,8 @@ import PackagePlugin
                 "--output-folder", sourceBase.path,
                 "--module-root", outputBase.path,
                 "--skip-folder", skipFolder.string,
-                //"--conditional-environment", "SUPPORTED_DEVICE_FAMILIES", // only run if the given environment is unset
+                "--env-disable", "CLANG_COVERAGE_MAPPING", // only run if the given environment is unset (CLANG_COVERAGE_MAPPING is enabled for App target, but Aggregate target disables it)
+                //"--env-enable", "SKIP_TARGET", // or run if we explicitly set this environment variable
                 ]
                 + resourceArgs
                 + buildModuleArgs
