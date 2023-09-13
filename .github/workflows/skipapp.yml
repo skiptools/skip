@@ -26,7 +26,7 @@ jobs:
           APPARTIFACT="App"
           for CONFIGURATION in "Debug" "Release"; do
             ARCHIVE_PATH=".build/Skip/artifacts/${CONFIGURATION}/${APPARTIFACT}.xcarchive"
-            BUILT_PRODUCTS_DIR=".build" xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -archivePath "${ARCHIVE_PATH}" -configuration "${CONFIGURATION}" -scheme "App" -sdk "iphoneos" -destination "generic/platform=iOS" -jobs 1 archive CODE_SIGNING_ALLOWED=NO
+            xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -archivePath "${ARCHIVE_PATH}" -configuration "${CONFIGURATION}" -scheme "App" -sdk "iphoneos" -destination "generic/platform=iOS" -jobs 1 archive CODE_SIGNING_ALLOWED=NO
             cd "${ARCHIVE_PATH}"/Products/
             find . -type f
             mv "Applications" "Payload"
