@@ -61,13 +61,13 @@ import PackagePlugin
         //Diagnostics.remark("Skip transpile target: \(target.name)")
 
         // we need to know the names of peer target folders in order to set up dependency links, so we need to determine the output folder structure
-        
+
         // output named vary dependeding on whether we are running from Xcode/xcodebuild and SPM:
         // xcode: DERIVED/SourcePackages/plugins/skip-unit.output/SkipUnit/skipstone/SkipUnit.skipcode.json
         // SPM:     PROJECT_HOME/.build/plugins/outputs/skip-unit/SkipUnit/skipstone/SkipUnit.skipcode.json
         //Diagnostics.warning("OUTPUT: \(context.pluginWorkDirectory)")
         let outputExt = context.pluginWorkDirectory.removingLastComponent().removingLastComponent().extension
-        let pkgext = outputExt.flatMap({ "." + $0 }) : ""
+        let pkgext = outputExt.flatMap({ "." + $0 }) ?? ""
 
         let skip = try context.tool(named: skipPluginCommandName)
         let outputFolder = context.pluginWorkDirectory
