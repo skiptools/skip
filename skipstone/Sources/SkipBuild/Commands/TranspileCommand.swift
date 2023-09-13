@@ -23,8 +23,11 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
     @OptionGroup(title: "License Options")
     var licenseOptions: LicenseOptions
 
-    @Option(help: ArgumentHelp("Only run if the given environment is nil", valueName: "envkey"))
-    var conditionalEnvironment: String? = nil // SUPPORTED_DEVICE_FAMILIES
+    @Option(help: ArgumentHelp("Only run if the given environment is unset", valueName: "envkey"))
+    var envDisable: [String] = []
+
+    @Option(help: ArgumentHelp("Run when the given environment is set", valueName: "envkey"))
+    var envEnable: [String] = []
 
     struct Output : MessageConvertible {
         let transpilation: Transpilation
@@ -100,9 +103,14 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
         // at this point, alway touch the build completion marker
         defer { try? touchBuildCompletionMarker() }
 
+        let env = ProcessInfo.processInfo.environment
+
         // at this point, check for the conditional environment and halt transpilation on unsupported (i.e., non-macOS) platforms; this will still output the .skipbuild file, because the plugin needs to have it created for evey plugin invocation (since we don't know in SkipPlugin.swift what the target platform is).
-        if let conditionalEnvironment = conditionalEnvironment, let value = ProcessInfo.processInfo.environment[conditionalEnvironment] {
-            info("Skip transpiler disabled when building for platform (\(conditionalEnvironment)=\(value))")
+        let explicitlyEnabled = envEnable.contains(where: { env[$0] != nil })
+        let explicitlyDisabled = envDisable.contains(where: { env[$0] != nil })
+
+        if explicitlyEnabled == false && explicitlyDisabled == true {
+            info("Skip transpiler explicitly disabled for environment key: \(envDisable)")
             return
         }
 
