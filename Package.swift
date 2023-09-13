@@ -19,8 +19,8 @@ let package = Package(
     ],
     targets: [
         .plugin(name: "skipstone", capability: .buildTool(), dependencies: ["skip"], path: "Plugins/SkipPlugin"),
-        .target(name: "SkipDrive", dependencies: ["skipstone", .target(name: "skip", condition: .when(platforms: [.macOS]))]),
-        .target(name: "SkipTest", dependencies: ["SkipDrive"]),
+        .target(name: "SkipDrive", dependencies: ["skipstone", .target(name: "skip")]),
+        .target(name: "SkipTest", dependencies: [.target(name: "SkipDrive", condition: .when(platforms: [.macOS]))]),
         .testTarget(name: "SkipTestTests", dependencies: ["SkipTest"]),
         .testTarget(name: "SkipDriveTests", dependencies: ["SkipDrive"]),
         .binaryTarget(name: "skip", url: "https://source.skip.tools/skip/releases/download/0.6.66/skip.zip", checksum: "4297169fab48f0b3370c9c8eca9ba2eb3db1caa3c7e20f8ef5127c2a65b7d5e7")

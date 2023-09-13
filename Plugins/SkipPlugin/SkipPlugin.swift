@@ -255,7 +255,7 @@ import PackagePlugin
                 "--output-folder", sourceBase.path,
                 "--module-root", outputBase.path,
                 "--skip-folder", skipFolder.string,
-                "--env-disable", "CLANG_COVERAGE_MAPPING", // only run if the given environment is unset (CLANG_COVERAGE_MAPPING is enabled for App target, but Aggregate target disables it)
+                //"--env-disable", "CLANG_COVERAGE_MAPPING", // only run if the given environment is unset (CLANG_COVERAGE_MAPPING is enabled for App target, but Aggregate target disables it)
                 //"--env-enable", "SKIP_TARGET", // or run if we explicitly set this environment variable
                 ]
                 + resourceArgs
