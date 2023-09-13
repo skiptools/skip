@@ -58,7 +58,7 @@ import PackagePlugin
     }
 
     func createTranspileBuildCommands(context: PluginContext, target: SourceModuleTarget) async throws -> [Command] {
-        Diagnostics.remark("Skip transpile target: \(target.name)")
+        //Diagnostics.remark("Skip transpile target: \(target.name)")
         if skipRootTargetNames.contains(target.name) {
             // never transpile the root target names
         }
@@ -66,7 +66,7 @@ import PackagePlugin
         let skip = try context.tool(named: skipPluginCommandName)
         let outputFolder = context.pluginWorkDirectory
 
-        // In SPM the per-module outputs has no suffix, but in Xcode it is "ModuleName.output" below DerivedData/
+        // In SPM the per-module outputs has no suffix, but in Xcode it is "module-name.output" below DerivedData/
         // We determine we are in Xcode by checking for environment variables that should only be present for Xcode
         // Note that xcodebuild some has different environment variables, so we need to also check for those.
         let env = ProcessInfo.processInfo.environment
@@ -154,7 +154,7 @@ import PackagePlugin
         let outputURL = URL(fileURLWithPath: outputFolder.string, isDirectory: true)
         //let skipcodeOutputPath = Path(outputURL.appendingPathComponent(peerTarget.name + skipcodeExtension).path)
         let skipbuildMarkerOutputPath = Path(outputURL.appendingPathComponent(peerTarget.name + skipbuildMarker).path)
-        Diagnostics.remark("add skipbuild output for \(target.name): \(skipbuildMarkerOutputPath)", file: skipbuildMarkerOutputPath.string)
+        //Diagnostics.remark("add skipbuild output for \(target.name): \(skipbuildMarkerOutputPath)", file: skipbuildMarkerOutputPath.string)
 
         let outputFiles: [Path] = [skipbuildMarkerOutputPath]
         var inputFiles: [Path] = target.sourceFiles.map(\.path) + swiftSourceTarget.sourceFiles.map(\.path)
@@ -236,7 +236,7 @@ import PackagePlugin
                 let buildMarkerInputFile = outputFolder.appending(subpath: moduleLinkTarget + skipbuildMarker)
                 let buildMarkerInputURL = URL(fileURLWithPath: buildMarkerInputFile.string)
                 let buildMarkerStandardizedPath = Path(buildMarkerInputURL.standardized.path)
-                Diagnostics.remark("add build marker input to \(depTarget.name): \(buildMarkerStandardizedPath)", file: buildMarkerStandardizedPath.string)
+                //Diagnostics.remark("add build marker input to \(depTarget.name): \(buildMarkerStandardizedPath)", file: buildMarkerStandardizedPath.string)
                 inputFiles.append(buildMarkerStandardizedPath)
             }
         }
@@ -250,7 +250,7 @@ import PackagePlugin
                 "--output-folder", sourceBase.path,
                 "--module-root", outputBase.path,
                 "--skip-folder", skipFolder.string,
-                "--conditional-environment", "SUPPORTED_DEVICE_FAMILIES", // only run if the given environment is unset
+                //"--conditional-environment", "SUPPORTED_DEVICE_FAMILIES", // only run if the given environment is unset
                 ]
                 + resourceArgs
                 + buildModuleArgs
