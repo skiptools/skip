@@ -11,10 +11,10 @@ jobs:
       - name: Install Skip
         run: brew install skiptools/skip/skip
       - run: swift build
-      - name: Test iOS
-        run: xcodebuild test -sdk iphonesimulator -destination "platform=iOS Simulator,name=iPhone 14" -skipPackagePluginValidation -configuration debug -scheme $(basename $PWD)
       - name: Test Skip
         run: skip test --plain
+      - name: Test iOS
+        run: xcodebuild test -sdk iphonesimulator -destination "platform=iOS Simulator,name=iPhone 14" -skipPackagePluginValidation -configuration debug -scheme $(basename $PWD)
       - name: Setup Android
         run: |
           PACKAGE=$(swift package dump-package | jq -r '.name')

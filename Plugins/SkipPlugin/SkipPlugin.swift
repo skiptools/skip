@@ -60,26 +60,17 @@ import PackagePlugin
     func createTranspileBuildCommands(context: PluginContext, target: SourceModuleTarget) async throws -> [Command] {
         //Diagnostics.remark("Skip transpile target: \(target.name)")
 
-        //for key in ProcessInfo.processInfo.environment.keys.sorted() {
-            //Diagnostics.remark("Skip transpile env: \(key)=\(ProcessInfo.processInfo.environment[key] ?? "")")
-        //}
-
-        if skipRootTargetNames.contains(target.name) {
-            // never transpile the root target names
-        }
+        // we need to know the names of peer target folders in order to set up dependency links, so we need to determine the output folder structure
+        
+        // output named vary dependeding on whether we are running from Xcode/xcodebuild and SPM:
+        // xcode: DERIVED/SourcePackages/plugins/skip-unit.output/SkipUnit/skipstone/SkipUnit.skipcode.json
+        // SPM:     PROJECT_HOME/.build/plugins/outputs/skip-unit/SkipUnit/skipstone/SkipUnit.skipcode.json
+        //Diagnostics.warning("OUTPUT: \(context.pluginWorkDirectory)")
+        let outputExt = context.pluginWorkDirectory.removingLastComponent().removingLastComponent().extension
+        let pkgext = outputExt.flatMap({ "." + $0 }) : ""
 
         let skip = try context.tool(named: skipPluginCommandName)
         let outputFolder = context.pluginWorkDirectory
-
-        // In SPM the per-module outputs has no suffix, but in Xcode it is "module-name.output" below DerivedData/
-        // We determine we are in Xcode by checking for environment variables that should only be present for Xcode
-        // Note that xcodebuild some has different environment variables, so we need to also check for those.
-        let env = ProcessInfo.processInfo.environment
-        let xcodeBuildFolder = env["__XCODE_BUILT_PRODUCTS_DIR_PATHS"] ?? env["BUILT_PRODUCTS_DIR"]
-        let isXcode = env["__CFBundleIdentifier"] == xcodeIdentifier || xcodeBuildFolder != nil
-
-        // Diagnostics.warning("ENVIRONMENT: \(env)")
-        let packageFolderExtension = isXcode ? ".output" : ""
 
         // look for ModuleKotlin/Sources/Skip/skip.yml
         let skipFolder = target.directory.appending(["Skip"])
@@ -184,7 +175,7 @@ import PackagePlugin
             // e.g. ../../SkipFoundationKotlin/skip/SkipFoundation
             let targetLink: String
             if let packageID = packageID { // go further up to the external package name
-                targetLink = "../../../" + packageID + packageFolderExtension + "/" + target.name + "/" + pluginFolderName + "/" + targetName
+                targetLink = "../../../" + packageID + pkgext + "/" + target.name + "/" + pluginFolderName + "/" + targetName
             } else {
                 targetLink = "../../" + target.name + "/" + pluginFolderName + "/" + targetName
             }
