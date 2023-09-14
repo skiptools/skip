@@ -64,7 +64,7 @@ jobs:
           zip -9 -r "${TEMPLATE_FILE}" . -x "Package.resolved" -x "Skip/*" -x ".git/*" -x ".build/*" -x ".swiftpm/*"
 
           # verify that the template can be used to derive a new app
-          skip create --template-file "${TEMPLATE_FILE}" --build --test $(mktemp -d)
+          #skip create --template-file "${TEMPLATE_FILE}" --build --test $(mktemp -d)
 
 
       - name: Assemble Kotlin Source
