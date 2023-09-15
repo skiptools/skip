@@ -24,6 +24,7 @@ jobs:
         run: |
           mkdir -p Skip/build/artifacts
           APPARTIFACT="App"
+          export NOSKIP=1
           for CONFIGURATION in "Debug" "Release"; do
             ARCHIVE_PATH=".build/Skip/artifacts/${CONFIGURATION}/${APPARTIFACT}.xcarchive"
             xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -archivePath "${ARCHIVE_PATH}" -configuration "${CONFIGURATION}" -scheme "App" -sdk "iphoneos" -destination "generic/platform=iOS" -jobs 1 archive CODE_SIGNING_ALLOWED=NO
