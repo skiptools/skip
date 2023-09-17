@@ -2,6 +2,7 @@ name: "Skip Library Workflow"
 on:
   workflow_call:
 jobs:
+  timeout-minutes: 60
   skiplib:
     runs-on: macos-13
     env:     
