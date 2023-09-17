@@ -451,12 +451,16 @@ final class ExpressionTests: XCTestCase {
         import Foundation
         import Foo
         import FooBar
+        import FooBar.Baz
         import com.xyz.Bar
+        import com.xyz.__
         """, kotlin: """
         import skip.foundation.*
         import foo.*
         import foo.bar.*
+        import foo.bar.Baz
         import com.xyz.Bar
+        import com.xyz.*
         """)
 
         try await checkProducesMessage(swift: """

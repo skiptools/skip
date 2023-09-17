@@ -1988,11 +1988,21 @@ class KotlinImportDeclaration: KotlinStatement {
         guard modulePath.count > 0 else {
             return ""
         }
+
+        // If equivalent package name is the same, assume this is a Kotlin import, otherwise treat as a Swift import
         let packageName = KotlinTranslator.packageName(forModule: modulePath[0])
-        if modulePath.count == 1 {
-            return packageName + ".*"
+        if packageName == modulePath[0] {
+            if modulePath.last == "__" {
+                return modulePath.dropLast().joined(separator: ".") + ".*"
+            } else {
+                return modulePath.joined(separator: ".")
+            }
         } else {
-            return packageName + "." + modulePath[1...].joined(separator: ".")
+            if modulePath.count == 1 {
+                return packageName + ".*"
+            } else {
+                return packageName + "." + modulePath[1...].joined(separator: ".")
+            }
         }
     }
 
