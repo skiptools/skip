@@ -33,7 +33,7 @@ jobs:
         with:
           api-level: 29
           arch: x86_64
-          emulator-boot-timeout: 3000
+          emulator-boot-timeout: 6000
           script: ./gradlew connectedCheck
           working-directory: .build/android-tests
       - name: Release
