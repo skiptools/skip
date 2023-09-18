@@ -129,6 +129,12 @@ public struct GradleDriver {
     /// - Returns: an array of parsed test suites containing information about the test run
     @available(macOS 13, macCatalyst 16, iOS 16, tvOS 16, watchOS 8, *)
     public func launchGradleProcess(in workingDirectory: URL, buildFolder: String = ".build", module: String, actions: [String], arguments: [String], environment: [String: String] = [:], daemon enableDaemon: Bool = true, info infoFlag: Bool = false, quiet quietFlag: Bool = false, plain plainFlag: Bool = true, maxMemory: UInt64? = nil, failFast failFastFlag: Bool = false, noBuildCache noBuildCacheFlag: Bool = false, continue continueFlag: Bool = false, offline offlineFlag: Bool = false, rerunTasks rerunTasksFlag: Bool = true, exitHandler: @escaping (ProcessResult) throws -> ()) async throws -> (output: Process.AsyncLineOutput, result: () throws -> [TestSuite]) {
+
+        let moduleURL = URL(fileURLWithPath: module, isDirectory: true, relativeTo: workingDirectory)
+        if !FileManager.default.fileExists(atPath: moduleURL.path) {
+            throw GradleDriverError("The expected gradle folder did not exist, which may mean the Skip transpiler is not enabled or encountered errors. Try running `skip doctor` to diagnose and re-building the project. See https://github.com/skiptools/skip/issues/1. Missing path: \(moduleURL.path)")
+        }
+
         // rather than the top-level "build" folder, we place the module in per-module .build/ sub-folder in order to enable concurrent testing as well as placing generated files in a typically-gitignored
         let buildDir = "\(buildFolder)/\(module)"
         let testResultPath = "\(buildDir)/test-results"
@@ -222,11 +228,6 @@ public struct GradleDriver {
             env["GRADLE_OPTS"] = jvmargs.joined(separator: " ")
             //args += ["-Dorg.gradle.jvmargs=" + jvmargs.joined(separator: " ")]
 
-        }
-
-        let moduleURL = URL(fileURLWithPath: module, isDirectory: true, relativeTo: workingDirectory)
-        if !FileManager.default.fileExists(atPath: moduleURL.path) {
-            throw URLError(.fileDoesNotExist, userInfo: [NSFilePathErrorKey: moduleURL.path])
         }
 
         let testResultFolder = URL(fileURLWithPath: testResultPath, isDirectory: true, relativeTo: moduleURL)
@@ -534,7 +535,7 @@ public struct GradleDriver {
         let fm = FileManager.default
         if !fm.fileExists(atPath: testFolder.path) {
             // missing folder
-            throw URLError(.fileDoesNotExist, userInfo: [NSFilePathErrorKey: testFolder.path])
+            throw GradleDriverError("The expected test output folder did not exist, which may indicate that the gradle process encountered a build error or other issue. Missing folder: \(testFolder.path)")
         }
 
         func parseTestSuite(resultURL: URL) throws -> [TestSuite] {
@@ -560,6 +561,12 @@ public struct GradleDriver {
 }
 
 public enum GradleDriverError : Error, LocalizedError {
+    public init(_ custom: String) {
+        self = .custom(custom)
+    }
+
+    case custom(String)
+
     case gradleNotInstalled(String)
 
     /// The command did not return any output
@@ -586,6 +593,8 @@ public enum GradleDriverError : Error, LocalizedError {
 
     public var errorDescription: String? {
         switch self {
+        case .custom(let string):
+            return string
         case .gradleNotInstalled(let string):
             return "Could not locate tool: «\(string)». Gradle must be installed in order to run tests. Install it using homebrew with: brew install gradle"
         case .commandNoResult(let string):

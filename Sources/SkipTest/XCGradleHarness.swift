@@ -22,15 +22,19 @@ public protocol XCGradleHarness : GradleHarness {
 extension XCGradleHarness where Self : XCTestCase {
 
     /// Invoke the Gradle tests using the Robolectric simulator, or the specified device emulator/device ID (or blank string to use the first one)
-    public func runGradleTests(device: String?) async throws {
-        if let device = device {
-            try await gradle(actions: ["connectedCheck"], deviceID: device.isEmpty ? nil : device)
-        } else {
-            #if DEBUG
-            try await gradle(actions: ["testDebug"])
-            #else
-            try await gradle(actions: ["testRelease"])
-            #endif
+    public func runGradleTests(device: String?, file: StaticString = #file, line: UInt = #line) async throws {
+        do {
+            if let device = device {
+                try await gradle(actions: ["connectedCheck"], deviceID: device.isEmpty ? nil : device)
+            } else {
+                #if DEBUG
+                try await gradle(actions: ["testDebug"])
+                #else
+                try await gradle(actions: ["testRelease"])
+                #endif
+            }
+        } catch {
+            XCTFail("GRADLE TEST FAILURE: \((error as? LocalizedError)?.localizedDescription ?? error.localizedDescription)", file: file, line: line)
         }
     }
 
@@ -64,7 +68,6 @@ extension XCGradleHarness where Self : XCTestCase {
         if #unavailable(macOS 13, macCatalyst 16) {
             fatalError("unsupported platform")
         } else {
-            #if os(macOS)
             // only run in subclasses, not in the base test
             if self.className == "SkipUnit.XCGradleHarness" {
                 // TODO: add a general system gradle checkup test here
@@ -106,12 +109,16 @@ extension XCGradleHarness where Self : XCTestCase {
                     scanGradleOutput(line: line) // check for errors and report them to the IDE
                 }
 
+                let failTotal: Int
+
                 // if any of the actions are a test case, when try to parse the XML results
                 if isTestAction {
                     let testSuites = try parseResults()
                     // the absense of any test data probably indicates some sort of mis-configuration or else a build failure
                     XCTAssertNotEqual(0, testSuites.count, "No tests were run")
-                    reportTestResults(testSuites, dir)
+                    failTotal = reportTestResults(testSuites, dir)
+                } else {
+                    failTotal = -1
                 }
 
                 switch testProcessResult?.exitStatus {
@@ -119,13 +126,16 @@ extension XCGradleHarness where Self : XCTestCase {
                     // this is a general error that is reported whenever gradle fails, so that the overall test will fail even when we cannot parse any build errors or test failures
                     // there should be additional messages in the log to provide better indication of where the test failed
                     if code != 0 {
-                        throw GradleBuildError(errorDescription: "Gradle failed with exit code \(code)")
+                        if failTotal > 0 {
+                            throw GradleDriverError("The gradle action \(actions) failed with \(failTotal) test failures. Review the logs for individual test case results.")
+                        } else {
+                            throw GradleDriverError("The gradle action \(actions) failed, which may indicate a build error or a test failure. Examing the log tab for more details.")
+                        }
                     }
                 default:
                     throw GradleBuildError(errorDescription: "Gradle failed with result: \(testProcessResult?.description ?? "")")
                 }
             }
-            #endif
         }
     }
 
@@ -292,7 +302,7 @@ extension XCGradleHarness where Self : XCTestCase {
         }
     }
 
-    private func reportTestResults(_ testSuites: [GradleDriver.TestSuite], _ dir: URL, showStreams: Bool = true) {
+    private func reportTestResults(_ testSuites: [GradleDriver.TestSuite], _ dir: URL, showStreams: Bool = true) -> Int {
 
         // do one intial pass to show the stdout and stderror
         if showStreams {
@@ -440,6 +450,7 @@ extension XCGradleHarness where Self : XCTestCase {
         print("JUNIT SUITES \(suiteTotal) TESTS \(testsTotal) PASSED \(passTotal) (\(round(passPercentage * 100))%) FAILED \(failTotal) SKIPPED \(skipTotal) TIME \(round(timeTotal * 100.0) / 100.0)")
 
         // TODO: compare the output with the SPM test output "xunit" xml reports
+        return failTotal
     }
 
 }
