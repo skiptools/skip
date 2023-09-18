@@ -309,6 +309,26 @@ final class BuiltinTypeTests: XCTestCase {
             val a = Array<Int>()
         }
         """)
+
+        try await check(supportingSwift: """
+        struct S {}
+        """, swift: """
+        {
+            let a = [
+                S(),
+                S()
+            ]
+        }
+        """, kotlin: """
+        import skip.lib.Array
+
+        {
+            val a = arrayOf(
+                S(),
+                S()
+            )
+        }
+        """)
     }
 
     func testDictionaryLiteral() async throws {
@@ -339,6 +359,24 @@ final class BuiltinTypeTests: XCTestCase {
         """, kotlin: """
         {
             val d = Dictionary<Int, String>()
+        }
+        """)
+
+        try await check(supportingSwift: """
+        struct S {}
+        """, swift: """
+        {
+            let d = [
+                1: S(),
+                2: S()
+            ]
+        }
+        """, kotlin: """
+        {
+            val d = dictionaryOf(
+                Tuple2(1, S()),
+                Tuple2(2, S())
+            )
         }
         """)
     }

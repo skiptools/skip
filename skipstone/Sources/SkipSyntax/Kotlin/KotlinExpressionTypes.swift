@@ -41,6 +41,7 @@ class KotlinArrayLiteral: KotlinExpression {
     static func translate(expression: ArrayLiteral, translator: KotlinTranslator) -> KotlinArrayLiteral {
         let kexpression = KotlinArrayLiteral(expression: expression)
         kexpression.elements = expression.elements.map { translator.translateExpression($0) }
+        kexpression.useMultilineFormatting = expression.useMultilineFormatting
         kexpression.inferredType = expression.inferredType.resolvingSelf(in: expression)
         if case .array(let element) = expression.inferredType {
             kexpression.isOptionSet = translator.codebaseInfo?.global.protocolSignatures(forNamed: element).contains(where: \.isOptionSet) == true
@@ -91,7 +92,10 @@ class KotlinArrayLiteral: KotlinExpression {
             // No need to sref() because the array already does
             output.append(element, indentation: elementIndentation)
             if index != elements.count - 1 {
-                output.append(", ")
+                output.append(",")
+                if !useMultilineFormatting {
+                    output.append(" ")
+                }
             }
         }
         if (useMultilineFormatting) {
@@ -748,6 +752,7 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
 
 class KotlinDictionaryLiteral: KotlinExpression {
     var entries: [(key: KotlinExpression, value: KotlinExpression)] = []
+    var useMultilineFormatting = false
 
     static func translate(expression: DictionaryLiteral, translator: KotlinTranslator) -> KotlinDictionaryLiteral {
         let kexpression = KotlinDictionaryLiteral(expression: expression)
@@ -756,6 +761,7 @@ class KotlinDictionaryLiteral: KotlinExpression {
             let valueExpression = translator.translateExpression($0.value)
             return (keyExpression, valueExpression)
         }
+        kexpression.useMultilineFormatting = expression.useMultilineFormatting
         return kexpression
     }
 
@@ -774,16 +780,26 @@ class KotlinDictionaryLiteral: KotlinExpression {
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
         output.append("dictionaryOf(")
+        let entryIndentation = useMultilineFormatting ? indentation.inc() : indentation
         for (index, entry) in entries.enumerated() {
+            if (useMultilineFormatting) {
+                output.append("\n").append(entryIndentation)
+            }
             // No need to sref() because the dictionary already does
             output.append("Tuple2(")
-            output.append(entry.key, indentation: indentation)
+            output.append(entry.key, indentation: entryIndentation)
             output.append(", ")
-            output.append(entry.value, indentation: indentation)
+            output.append(entry.value, indentation: entryIndentation)
             output.append(")")
             if index != entries.count - 1 {
-                output.append(", ")
+                output.append(",")
+                if !useMultilineFormatting {
+                    output.append(" ")
+                }
             }
+        }
+        if (useMultilineFormatting) {
+            output.append("\n").append(indentation)
         }
         output.append(")")
     }

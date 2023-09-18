@@ -112,9 +112,11 @@ enum ExpressionType: CaseIterable {
 /// `[a, b, c]`
 class ArrayLiteral: Expression {
     let elements: [Expression]
+    let useMultilineFormatting: Bool
 
-    init(elements: [Expression], syntax: SyntaxProtocol?, sourceFile: Source.FilePath?, sourceRange: Source.Range? = nil) {
+    init(elements: [Expression], useMultilineFormatting: Bool, syntax: SyntaxProtocol?, sourceFile: Source.FilePath?, sourceRange: Source.Range? = nil) {
         self.elements = elements
+        self.useMultilineFormatting = useMultilineFormatting
         super.init(type: .arrayLiteral, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
@@ -125,7 +127,15 @@ class ArrayLiteral: Expression {
         let elements = arrayExpr.elements.map {
             ExpressionDecoder.decode(syntax: $0.expression, in: syntaxTree)
         }
-        return ArrayLiteral(elements: elements, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+        let useMultilineFormatting = arrayExpr.elements.first?.leadingTrivia.contains {
+            switch $0 {
+            case .newlines:
+                return true
+            default:
+                return false
+            }
+        } == true
+        return ArrayLiteral(elements: elements, useMultilineFormatting: useMultilineFormatting, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
@@ -595,9 +605,11 @@ class Closure: Expression {
 /// `[a: b, c: d]`
 class DictionaryLiteral: Expression {
     let entries: [(key: Expression, value: Expression)]
+    let useMultilineFormatting: Bool
 
-    init(entries: [(key: Expression, value: Expression)], syntax: SyntaxProtocol?, sourceFile: Source.FilePath?, sourceRange: Source.Range? = nil) {
+    init(entries: [(key: Expression, value: Expression)], useMultilineFormatting: Bool, syntax: SyntaxProtocol?, sourceFile: Source.FilePath?, sourceRange: Source.Range? = nil) {
         self.entries = entries
+        self.useMultilineFormatting = useMultilineFormatting
         super.init(type: .dictionaryLiteral, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
@@ -606,14 +618,23 @@ class DictionaryLiteral: Expression {
             return nil
         }
         var entries: [(Expression, Expression)] = []
+        var useMultilineFormatting = false
         if case .elements(let elements) = dictionaryExpr.content {
             entries = elements.map {
                 let keyExpression = ExpressionDecoder.decode(syntax: $0.key, in: syntaxTree)
                 let valueExpression = ExpressionDecoder.decode(syntax: $0.value, in: syntaxTree)
                 return (keyExpression, valueExpression)
             }
+            useMultilineFormatting = elements.first?.key.leadingTrivia.contains {
+                switch $0 {
+                case .newlines:
+                    return true
+                default:
+                    return false
+                }
+            } == true
         }
-        return DictionaryLiteral(entries: entries, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+        return DictionaryLiteral(entries: entries, useMultilineFormatting: useMultilineFormatting, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
