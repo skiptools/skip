@@ -901,6 +901,7 @@ struct APIMatch {
     var apiFlags: APIFlags = []
     /// May be `nil` for bultins like tuple members.
     var declarationType: StatementType?
+    var isMember = false
     var availability: Availability = .available
 }
 

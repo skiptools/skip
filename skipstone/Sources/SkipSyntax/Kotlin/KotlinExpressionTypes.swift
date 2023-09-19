@@ -215,12 +215,10 @@ class KotlinBinaryOperator: KotlinExpression, KotlinSingleStatementVetoing {
         }
 
         // Apart from constructor 'let' assignments above, we can assume that any member assignment does not
-        // need an sref because the property will sref the value it gets. We have no direct detection of members
-        // that are simple identifiers (e.g. 'x' rather than 'self.x'), but only members get the 'writeable' API
-        // flag and we can only be assigning to something writeable, so it's a good proxy
+        // need an sref because the property will sref the value it gets
         if memberAccess != nil {
             return false
-        } else if identifier?.name == "self" || identifier?.apiMatch?.apiFlags.contains(.writeable) == true {
+        } else if identifier?.name == "self" || identifier?.apiMatch?.isMember == true {
             return false
         } else {
             return true
@@ -1045,7 +1043,7 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
         kexpression.mayBeSharedMutableStruct = !kexpression.isOperatorIdentifier && expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
         kexpression.isLocalOrSelfIdentifier = expression.isLocalOrSelfIdentifier
         kexpression.isModuleNameFor = expression.isModuleNameFor.resolvingSelf(in: expression)
-        if case .function = expression.inferredType {
+        if expression.inferredType.isFunction {
             kexpression.isFunctionReference = !expression.isLocalOrSelfIdentifier && !expression.isCalledAsFunction && translator.codebaseInfo?.isFunctionName(expression.name, in: expression.owningTypeDeclaration?.signature) == true
         } else if expression.inferredType.isMetaType && expression.apiMatch?.declarationType == .typealiasDeclaration {
             kexpression.isTypealiasFor = expression.inferredType.resolvingSelf(in: expression).asMetaType(false)
@@ -1660,7 +1658,7 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
                 functionCall.hasTrailingClosures = false
             }
             kexpression.baseKClass = kclass(for: base, accessingMember: expression.member, codebaseInfo: translator.codebaseInfo)
-            if case .function = expression.inferredType {
+            if expression.inferredType.isFunction {
                 kexpression.isFunctionReference = !expression.isCalledAsFunction && translator.codebaseInfo?.isFunctionName(expression.member, in: base.inferredType) == true
             } else if expression.inferredType.isMetaType, expression.apiMatch?.declarationType == .typealiasDeclaration {
                 kexpression.isTypealiasFor = expression.inferredType.asMetaType(false)

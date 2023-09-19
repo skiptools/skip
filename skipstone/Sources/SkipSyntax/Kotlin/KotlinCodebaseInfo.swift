@@ -172,7 +172,7 @@ extension CodebaseInfo.Context {
         guard let enumInfo = typeInfos(forNamed: type).first(where: { $0.declarationType == .enumDeclaration }) else {
             return false
         }
-        if enumInfo.cases.contains(where: { if case .function = $0.signature { return true } else { return false } }) {
+        if enumInfo.cases.contains(where: { $0.signature.isFunction }) {
             return true
         }
         return conformsToError(type: type)

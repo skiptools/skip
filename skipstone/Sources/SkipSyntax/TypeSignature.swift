@@ -343,6 +343,26 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         }
     }
 
+    /// Whether this is a function type.
+    var isFunction: Bool {
+        switch self {
+        case .function:
+            return true
+        case .member(_, let type):
+            return type.isFunction
+        case .module(_, let type):
+            return type.isFunction
+        case .optional(let type):
+            return type.isFunction
+        case .typealiased(_, let type):
+            return type.isFunction
+        case .unwrappedOptional(let type):
+            return type.isFunction
+        default:
+            return false
+        }
+    }
+
     /// The parameter types of this function.
     var parameters: [Parameter] {
         switch self {

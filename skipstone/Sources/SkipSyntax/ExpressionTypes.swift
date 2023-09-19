@@ -1417,8 +1417,9 @@ class OptionalBinding: Expression, BindingExpression {
         variableType = variableType.asOptional(false)
 
         if names.count == 1, let name = names[0], !context.isLocalOrSelfIdentifier(name), value == nil || (value as? Identifier)?.name == name {
-            if let (_, match) = context.identifier(name, messagesNode: nil) {
-                nameShadowsUnstableValue = match.apiFlags.contains(.writeable)
+            if let (signature, match) = context.identifier(name, messagesNode: nil) {
+                // For some reason Kotlin considers all closure members unstable
+                nameShadowsUnstableValue = match.isMember && (match.apiFlags.contains(.writeable) || signature.isFunction)
             } else {
                 nameShadowsUnstableValue = true // Better safe than sorry
             }

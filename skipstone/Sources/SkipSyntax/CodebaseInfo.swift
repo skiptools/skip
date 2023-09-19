@@ -459,11 +459,11 @@ public class CodebaseInfo: Codable {
                     // Slice - fall through to symbols
                 } else {
                     let signature: TypeSignature = .function([TypeSignature.Parameter(type: .int)], elementType.mappingSelf(to: type), [], nil)
-                    return [APIMatch(signature: signature)]
+                    return [APIMatch(signature: signature, isMember: true)]
                 }
             } else if case .dictionary(let keyType, let valueType) = type, arguments.count == 1 {
                 let signature: TypeSignature = .function([TypeSignature.Parameter(type: keyType)], valueType.mappingSelf(to: type).asOptional(true), [], nil)
-                return [APIMatch(signature: signature)]
+                return [APIMatch(signature: signature, isMember: true)]
             }
             let isStatic = type.isMetaType
             type = type.asMetaType(false)
@@ -665,7 +665,7 @@ public class CodebaseInfo: Codable {
 
         private func syntheticInitCandidate(for type: TypeSignature, arguments: [LabeledValue<TypeSignature>], apiFlags: APIFlags = [], availability: Availability = .available) -> FunctionCandidate {
             let initParameters = arguments.map { TypeSignature.Parameter(label: $0.label, type: $0.value) }
-            let match = APIMatch(signature: .function(initParameters, type, apiFlags, nil), apiFlags: apiFlags, declarationType: .initDeclaration, availability: availability)
+            let match = APIMatch(signature: .function(initParameters, type, apiFlags, nil), apiFlags: apiFlags, declarationType: .initDeclaration, isMember: true, availability: availability)
             return FunctionCandidate(match: match, score: 0.0, level: 0)
         }
 
@@ -681,7 +681,7 @@ public class CodebaseInfo: Codable {
             default:
                 // Is this a cast?
                 if type.isNumeric && arguments.count == 1 && arguments[0].label == nil && arguments[0].value.isNumeric {
-                    return [FunctionCandidate(match: APIMatch(signature: .function([.init(type: arguments[0].value)], type, [], nil), apiFlags: [], declarationType: .initDeclaration, availability: .available), score: 1.0, level: 0)]
+                    return [FunctionCandidate(match: APIMatch(signature: .function([.init(type: arguments[0].value)], type, [], nil), apiFlags: [], declarationType: .initDeclaration, isMember: true, availability: .available), score: 1.0, level: 0)]
                 }
                 return functionCandidates(name: type.name, moduleName: moduleName, constrainedGenerics: constrainedGenerics, arguments: arguments, includeTypes: false)
             }
@@ -798,7 +798,7 @@ public class CodebaseInfo: Codable {
             for i in 0..<matchingParameters.count {
                 matchingParameters[i] = matchingParameters[i].or(mappedParameters[i], replaceAny: true)
             }
-            let match = APIMatch(signature: .function(matchingParameters, mappedSignature.returnType, apiFlags, attributes), apiFlags: apiFlags, declarationType: declarationType, availability: availability)
+            let match = APIMatch(signature: .function(matchingParameters, mappedSignature.returnType, apiFlags, attributes), apiFlags: apiFlags, declarationType: declarationType, isMember: typeInfo != nil, availability: availability)
             return FunctionCandidate(match: match, score: totalScore, level: level)
         }
 
@@ -820,7 +820,7 @@ public class CodebaseInfo: Codable {
                     // If there is no label, then either this parameter has to have no label, be a variadic continuation, or be a trailing closure
                     if (isVariadicContinuation || parameter.label == nil || isSubscript), let score = argument.value.compatibilityScore(target: parameter.type, codebaseInfo: self) {
                         return (startIndex + index, 1.0 + score)
-                    } else if case .function = parameter.type, let score = argument.value.compatibilityScore(target: parameter.type, codebaseInfo: self) {
+                    } else if parameter.type.isFunction, let score = argument.value.compatibilityScore(target: parameter.type, codebaseInfo: self) {
                         return (startIndex + index, score)
                     } else if !parameter.hasDefaultValue {
                         return nil
@@ -1857,7 +1857,7 @@ protocol CodebaseInfoItem {
 
 extension CodebaseInfoItem {
     fileprivate var apiMatch: APIMatch {
-        return APIMatch(signature: signature, apiFlags: apiFlags ?? [], declarationType: declarationType, availability: availability)
+        return APIMatch(signature: signature, apiFlags: apiFlags ?? [], declarationType: declarationType, isMember: declaringType != nil, availability: availability)
     }
 }
 

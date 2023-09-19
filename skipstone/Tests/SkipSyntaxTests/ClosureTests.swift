@@ -180,23 +180,62 @@ final class ClosureTests: XCTestCase {
         }
         """)
 
+        // The simple != null trick doesn't work with member closures
         try await check(swift: """
         class C {
-            var c: ((String) -> Int)? = nil
+            var varc: ((String) -> Int)? = nil
+            let valc: ((String) -> Int)? = nil
 
             func f() {
-                if let c {
-                    let i = c("s")
+                if let varc {
+                    let i = varc("s")
+                }
+                if let valc {
+                    let i = valc("s")
+                }
+            }
+
+            func g() {
+                if let varc {
+                    let i = varc("s")
+                } else {
+                    print("else")
+                }
+                if let valc {
+                    let i = valc("s")
+                } else {
+                    print("else")
                 }
             }
         }
         """, kotlin: """
         internal open class C {
-            internal open var c: ((String) -> Int)? = null
+            internal open var varc: ((String) -> Int)? = null
+            internal val valc: ((String) -> Int)? = null
 
             internal open fun f() {
-                c?.let { c ->
-                    val i = c("s")
+                varc?.let { varc ->
+                    val i = varc("s")
+                }
+                valc?.let { valc ->
+                    val i = valc("s")
+                }
+            }
+
+            internal open fun g() {
+                val matchtarget_0 = varc
+                if (matchtarget_0 != null) {
+                    val varc = matchtarget_0
+                    val i = varc("s")
+                } else {
+                    print("else")
+                }
+                val matchtarget_1 = valc
+                if (matchtarget_1 != null) {
+                    val valc = matchtarget_1
+                    val i = valc("s")
+                } else {
+                    print("else")
                 }
             }
         }
