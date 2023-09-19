@@ -1610,7 +1610,8 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
 
         // Use codebaseInfo rather than .type directly so that extension API is also handled correctly
         let owningDeclarationType = translator.codebaseInfo?.declarationType(forNamed: owningTypeDeclaration.signature) ?? owningTypeDeclaration.type
-        let owningSignature = translator.codebaseInfo?.primaryTypeInfo(forNamed: owningTypeDeclaration.signature)?.signature ?? owningTypeDeclaration.signature
+        let owningDeclarationPrimaryTypeInfo = translator.codebaseInfo?.primaryTypeInfo(forNamed: owningTypeDeclaration.signature)
+        let owningSignature = owningDeclarationPrimaryTypeInfo?.signature ?? owningTypeDeclaration.signature
 
         if statement.type == .initDeclaration {
             kstatement.isOpen = false
@@ -1630,6 +1631,10 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             if owningDeclarationType == .protocolDeclaration {
                 // Kotlin uses default public visibility on all interface members
                 kstatement.modifiers.visibility = .public
+                // Warn if developer was trying to decrease the visibility of this member
+                if let owningDeclarationPrimaryTypeInfo, modifiers.visibility < owningDeclarationPrimaryTypeInfo.modifiers.visibility {
+                    kstatement.messages.append(.kotlinProtocolMemberVisibility(statement, source: translator.syntaxTree.source))
+                }
             } else {
                 if !kstatement.modifiers.isOverride && translator.codebaseInfo?.isImplementingKotlinInterfaceMember(declaration: statement, in: owningSignature) == true {
                     kstatement.modifiers.isOverride = true

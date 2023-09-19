@@ -259,6 +259,10 @@ extension Message {
         return Message(kind: .error, message: "Kotlin does not support constructors in protocols", sourceDerived: sourceDerived, source: source)
     }
 
+    static func kotlinProtocolMemberVisibility(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .warning, message: "Kotlin does not support protocol members with lower visibility than their declaring protocol", sourceDerived: sourceDerived, source: source)
+    }
+
     static func kotlinProtocolStaticMember(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Kotlin does not support static members in protocols", sourceDerived: sourceDerived, source: source)
     }
