@@ -468,19 +468,6 @@ final class ExpressionTests: XCTestCase {
         """)
     }
 
-    func testFatalError() async throws {
-        // Should not be implemented in single-statement format because returns Never
-        try await check(swift: """
-        func f() {
-            fatalError()
-        }
-        """, kotlin: """
-        internal fun f() {
-            fatalError()
-        }
-        """)
-    }
-
     func testImportDeduping() async throws {
         try await check(swift: """
         import Foundation
@@ -501,6 +488,49 @@ final class ExpressionTests: XCTestCase {
         import skip.ui.*
 
         internal class V: View {
+        }
+        """)
+    }
+
+    func testImportsMovedToTop() async throws {
+        try await check(swift: """
+        import MyModule1
+
+        class C {
+        }
+
+        import MyModule2
+        import MyModule3
+
+        class D {
+        }
+
+        import MyModule4
+        """, kotlin: """
+        import my.module1.*
+        
+        import my.module2.*
+        import my.module3.*
+
+        import my.module4.*
+
+        internal open class C {
+        }
+
+        internal open class D {
+        }
+        """)
+    }
+
+    func testFatalError() async throws {
+        // Should not be implemented in single-statement format because returns Never
+        try await check(swift: """
+        func f() {
+            fatalError()
+        }
+        """, kotlin: """
+        internal fun f() {
+            fatalError()
         }
         """)
     }
