@@ -1,0 +1,24 @@
+name: skip check
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+jobs:
+  skip-init:
+    runs-on: macos-13
+    env:     
+      DEVELOPER_DIR: /Applications/Xcode_15.0.app/Contents/Developer
+    steps:
+      - run: brew install skiptools/skip/skip
+
+      - name: Run skip doctor
+        run: skip doctor --plain
+
+      - name: Run skip init
+        run: skip init --plain --build --test -d `mktemp -d` skppkg Mod1 Mod2
+
+      - name: Run skip create
+        run: skip create --plain --build --test -d `mktemp -d` skpapp
+

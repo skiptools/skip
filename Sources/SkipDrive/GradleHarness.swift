@@ -224,6 +224,18 @@ extension GradleHarness {
     /// ```
     /// /tmp/Foo.swift:12:0: error: Compile Error
     /// ```
+    ///
+    /// From https://developer.apple.com/documentation/xcode/running-custom-scripts-during-a-build#Log-errors-and-warnings-from-your-script :
+    ///
+    /// Log errors and warnings from your script
+    ///
+    /// During your script’s execution, you can report errors, warnings, and general notes to the Xcode build system. Use these messages to diagnose problems or track your script’s progress. To write messages, use the echo command and format your message as follows:
+    ///
+    /// ```
+    /// [filename]:[linenumber]: error | warning | note : [message]
+    /// ```
+    ///
+    /// If the error:, warning:, or note: string is present, Xcode adds your message to the build logs. If the issue occurs in a specific file, include the filename as an absolute path. If the issue occurs at a specific line in the file, include the line number as well. The filename and line number are optional.
     public func scanGradleOutput(line: String) {
         func report(_ issue: GradleIssue) {
             print("\(issue.location.path):\(issue.location.position.line):\(issue.location.position.column): \(issue.kind.xcode): \(issue.message)")
