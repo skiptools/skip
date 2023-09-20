@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Workspace
+   version = "1.0">
+   <FileRef
+      location = "group:">
+   </FileRef>
+   <FileRef
+      location = "group:../skip">
+   </FileRef>
+   <FileRef
+      location = "group:../skip-unit">
+   </FileRef>
+   <FileRef
+      location = "group:../skip-lib">
+   </FileRef>
+   <FileRef
+      location = "group:../skip-foundation">
+   </FileRef>
+   <FileRef
+      location = "group:../skip-model">
+   </FileRef>
+   <FileRef
+      location = "group:../skip-ui">
+   </FileRef>
+   <FileRef
+      location = "group:../skip-data">
+   </FileRef>
+   <FileRef
+      location = "group:../skip-device">
+   </FileRef>
+   <FileRef
+      location = "group:../skip-mark">
+   </FileRef>
+   <FileRef
+      location = "group:../skip-motion">
+   </FileRef>
+   <FileRef
+      location = "group:../skip-notify">
+   </FileRef>
+   <FileRef
+      location = "group:../skip-proto">
+   </FileRef>
+   <FileRef
+      location = "group:../skip-script">
+   </FileRef>
+   <FileRef
+      location = "group:../skip-sql">
+   </FileRef>
+   <FileRef
+      location = "group:../skip-vault">
+   </FileRef>
+   <FileRef
+      location = "group:../skip-xml">
+   </FileRef>
+   <FileRef
+      location = "group:../skip-yaml">
+   </FileRef>
+   <FileRef
+      location = "group:../skip-zip">
+   </FileRef>
+   <FileRef
+      location = "group:/opt/src/github/skiptools/skipapp-weather/WeatherApp.xcodeproj">
+   </FileRef>
+   <FileRef
+      location = "group:/opt/src/github/skiptools/skipapp-playground/PlaygroundApp.xcodeproj">
+   </FileRef>
+</Workspace>

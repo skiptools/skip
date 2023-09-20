@@ -133,7 +133,7 @@ struct InitCommand: SkipCommand {
 
             let testKtSwiftFile = testKtDir.appending(path: "XCSkipTests.swift")
             try """
-            #if canImport(SkipTest)
+            #if os(macOS) // Skip transpiled tests only run on macOS targets
             import SkipTest
 
             /// This test case will run the transpiled tests for the Skip module.
