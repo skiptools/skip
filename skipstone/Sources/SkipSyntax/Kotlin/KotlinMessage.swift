@@ -260,7 +260,7 @@ extension Message {
     }
 
     static func kotlinProtocolMemberVisibility(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .warning, message: "Kotlin does not support protocol members with lower visibility than their declaring protocol", sourceDerived: sourceDerived, source: source)
+        return Message(kind: .warning, message: "Kotlin does not support protocol members with lower visibility than their declaring protocol. Skip will elevate the visibility of this member, which may cause problems if it exposes internal types", sourceDerived: sourceDerived, source: source)
     }
 
     static func kotlinProtocolStaticMember(_ sourceDerived: SourceDerived, source: Source) -> Message {
