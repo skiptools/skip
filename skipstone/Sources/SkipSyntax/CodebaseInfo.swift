@@ -88,6 +88,16 @@ public class CodebaseInfo: Codable {
     ///
     /// - Warning: Codebase info should not be used until this has been called. After calling this function, do not mutate info.
     func prepareForUse() {
+        // We may have had `gather` called in any order as source files were processed. We want to always produce the same encoded output
+        // for the same input, because new output from one module might be a signal that modules depending on it have to re-transpile. Sort
+        // as if the files were processed in alphabetical order
+        let sortBy: (CodebaseInfoItem, CodebaseInfoItem) -> Bool = { ($0.sourceFile?.path ?? "") < ($1.sourceFile?.path ?? "") }
+        rootTypes = rootTypes.sorted(by: sortBy)
+        rootTypealiases = rootTypealiases.sorted(by: sortBy)
+        rootVariables = rootVariables.sorted(by: sortBy)
+        rootFunctions = rootFunctions.sorted(by: sortBy)
+        rootExtensions = rootExtensions.sorted(by: sortBy)
+
         isInUse = true
         buildItemsByName() // We use this for lookups in subsequent steps
         inferVariableTypes() // May need variable types to match signatures to protocol generics

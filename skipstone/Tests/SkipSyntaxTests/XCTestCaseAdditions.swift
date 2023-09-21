@@ -221,8 +221,8 @@ extension XCTestCase {
     }
 
     /// Creates a temporary file with the given name and optional contents.
-    public func tmpFile(named fileName: String, contents: String? = nil) throws -> URL {
-        let tmpDir = URL(fileURLWithPath: UUID().uuidString, isDirectory: true, relativeTo: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true))
+    public func tmpFile(named fileName: String, tmpDirectoryName: String? = nil, contents: String? = nil) throws -> URL {
+        let tmpDir = URL(fileURLWithPath: tmpDirectoryName ?? UUID().uuidString, isDirectory: true, relativeTo: URL(fileURLWithPath: tmpDirectoryName != nil ? "/tmp" : NSTemporaryDirectory(), isDirectory: true))
         try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
         let tmpFile = URL(fileURLWithPath: fileName, isDirectory: false, relativeTo: tmpDir)
         if let contents = contents {
