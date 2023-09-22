@@ -288,7 +288,7 @@ extension XCGradleHarness where Self : XCTestCase {
     /// e: file:///…/skiphub.output/SkipSQLTests/skipstone/SkipSQL/src/main/kotlin/skip/sql/SkipSQL.kt:94:26 Function invocation 'blob(...)' expected
     /// ```
     public func scanGradleOutput(line1: String, line2: String) {
-        guard var issue = parseGradleOutput(line1: line, line2: line2) else {
+        guard var issue = parseGradleOutput(line1: line1, line2: line2) else {
             return
         }
 
