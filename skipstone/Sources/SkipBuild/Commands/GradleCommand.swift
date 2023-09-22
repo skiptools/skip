@@ -5,7 +5,8 @@ import SkipSyntax
 import SkipDriveExternal
 
 extension GradleCommand : GradleHarness { }
-fileprivate let gradleCommandEnabled = true
+//fileprivate let gradleCommandEnabled = true
+fileprivate let gradleCommandEnabled = false // advanced command, so do not display
 #else
 fileprivate let gradleCommandEnabled = false
 #endif

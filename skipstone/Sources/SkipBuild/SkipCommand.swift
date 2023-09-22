@@ -61,6 +61,7 @@ public struct SkipRunnerExecutor: SkipCommandExecutor {
 
             // Conditional on SkipDrive being imported
             GradleCommand.self,
+            ADBCommand.self,
             TestCommand.self,
 
             // Hidden commands used by the plugin
@@ -575,6 +576,27 @@ private extension AbsolutePath {
 }
 
 extension ProcessInfo {
+    /// True when the current architecture is ARM
+    public static let isARM = {
+        #if os(macOS)
+        var size: size_t = 0
+        sysctlbyname("hw.machine", nil, &size, nil, 0)
+        var machine = [CChar](repeating: 0, count: size)
+        sysctlbyname("hw.machine", &machine, &size, nil, 0)
+        let platform = String(cString: machine)
+        return platform.lowercased().contains("arm")
+
+        #elseif os(Linux)
+        if let cpuInfo = try? String(contentsOfFile: "/proc/cpuinfo") {
+            return cpuInfo.lowercased().contains("arm")
+        }
+        return false
+
+        #else
+        return false
+        #endif
+    }()
+
         /// The unique host identifier as returned from `IOPlatformExpertDevice` on Darwin and the contents of "/etc/machine-id" on Linux
     public var hostIdentifier: String? {
         #if canImport(IOKit)
@@ -654,7 +676,7 @@ struct ToolOptions: ParsableArguments {
 
     // TODO: check processor for intel vs. arm for homebrew location rather than querying file system
     @Option(help: ArgumentHelp("Gradle command path", valueName: "path"))
-    var gradle: String = FileManager.default.fileExists(atPath: "/usr/local/bin/gradle") ? "/usr/local/bin/gradle" : "/opt/homebrew/bin/gradle"
+    var gradle: String = ProcessInfo.isARM ? "/opt/homebrew/bin/gradle" : "/usr/local/bin/gradle"
 
     @Option(help: ArgumentHelp("Path to the Android SDK (ANDROID_HOME)", valueName: "path"))
     var androidHome: String?

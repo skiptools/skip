@@ -63,6 +63,9 @@ git diff "${SKIPSTONE_VERSION_PATH}"
 
 swift build --arch arm64 --arch x86_64 --configuration ${SKIPCONFIG} --product ${PRODUCT}
 
+# build for linux using docker
+#docker run -v "$PWD:/code" -w /code --platform linux/amd64 -e QEMU_CPU=max swift:focal swift build
+
 # try to back up any old artifactbundle folder
 mv -f ${DIR}/${ARTIFACTBUNDLE} ${DIR}/${ARTIFACTBUNDLE}.bk.`date +%s` || true
 mkdir -p ${DIR}/${ARTIFACTBUNDLE}/macos
