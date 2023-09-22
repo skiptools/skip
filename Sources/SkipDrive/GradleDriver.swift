@@ -276,10 +276,7 @@ public struct GradleDriver {
     /// Finds the given tool in the current process' `PATH`.
     private static func findGradle() throws -> URL {
         // add in standard Homebrew paths, in case they aren't in the user's PATH
-        let homeBrewPaths = [
-            "/opt/homebrew/bin", // ARM
-            "/usr/local/bin", // Intel
-        ]
+        let homeBrewPaths = ProcessInfo.isARM ? ["/opt/homebrew/bin"] : ["/usr/local/bin"]
         return try findInPath(toolName: "gradle", withAdditionalPaths: homeBrewPaths)
     }
 

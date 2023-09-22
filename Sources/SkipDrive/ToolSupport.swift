@@ -83,6 +83,29 @@ extension Process {
     }
 }
 
+extension ProcessInfo {
+    /// True when the current architecture is ARM
+    public static let isARM = {
+        #if os(macOS)
+        var size: size_t = 0
+        sysctlbyname("hw.machine", nil, &size, nil, 0)
+        var machine = [CChar](repeating: 0, count: size)
+        sysctlbyname("hw.machine", &machine, &size, nil, 0)
+        let platform = String(cString: machine)
+        return platform.lowercased().contains("arm")
+        #elseif os(Linux)
+        if let cpuInfo = try? String(contentsOfFile: "/proc/cpuinfo") {
+            return cpuInfo.lowercased().contains("arm")
+        }
+        return false
+        #else
+        // TODO: check Android, Windows, etc.
+
+        return false
+        #endif
+    }()
+}
+
 extension URL {
     /// The system temporary folder
     public static let tmpdir: URL = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
@@ -94,26 +117,6 @@ extension FileManager {
         let url = URL(fileURLWithPath: name, isDirectory: true, relativeTo: URL(fileURLWithPath: folder, isDirectory: true, relativeTo: tmpDir))
         try createDirectory(at: url, withIntermediateDirectories: true)
         return url
-    }
-}
-
-extension ProcessInfo {
-        /// The unique host identifier as returned from `IOPlatformExpertDevice` on Darwin and the contents of "/etc/machine-id" on Linux
-    public var hostIdentifier: String? {
-        #if canImport(IOKit)
-        let matchingDict = IOServiceMatching("IOPlatformExpertDevice")
-        let service = IOServiceGetMatchingService(kIOMainPortDefault, matchingDict)
-        defer { IOObjectRelease(service) }
-        guard service != .zero else { return nil }
-        return (IORegistryEntryCreateCFProperty(service, kIOPlatformUUIDKey as CFString, kCFAllocatorDefault, .zero).takeRetainedValue() as? String)
-        #elseif os(Linux)
-        return (try? String(contentsOfFile: "/etc/machine-id")) ?? (try? String(contentsOfFile: "/var/lib/dbus/machine-id"))
-        #elseif os(Windows)
-        // TODO: Windows registry key `MachineGuid`
-        return nil
-        #else
-        return nil // unsupported platform
-        #endif
     }
 }
 

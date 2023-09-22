@@ -6,7 +6,7 @@ import Foundation
 @available(macOS 13, macCatalyst 16, iOS 16, tvOS 16, watchOS 8, *)
 public protocol GradleHarness {
     /// Scans the output line of the Gradle command and processes it for errors or issues.
-    func scanGradleOutput(line: String)
+    func scanGradleOutput(line1: String, line2: String)
 }
 
 let pluginFolderName = "skipstone"
@@ -236,12 +236,12 @@ extension GradleHarness {
     /// ```
     ///
     /// If the error:, warning:, or note: string is present, Xcode adds your message to the build logs. If the issue occurs in a specific file, include the filename as an absolute path. If the issue occurs at a specific line in the file, include the line number as well. The filename and line number are optional.
-    public func scanGradleOutput(line: String) {
+    public func scanGradleOutput(line1: String, line2: String) {
         func report(_ issue: GradleIssue) {
             print("\(issue.location.path):\(issue.location.position.line):\(issue.location.position.column): \(issue.kind.xcode): \(issue.message)")
         }
 
-        if let kotlinIssue = parseGradleOutput(line: line) {
+        if let kotlinIssue = parseGradleOutput(line1: line1, line2: line2) {
             if let swiftIssue = try? kotlinIssue.location.findSourceMapLine() {
                 report(GradleIssue(kind: kotlinIssue.kind, message: kotlinIssue.message, location: swiftIssue))
             }
@@ -250,9 +250,44 @@ extension GradleHarness {
     }
 
 
-    /// Parse the given gradle output line for error or warning pattern, optionally mapping back to the source Swift locationl
-    public func parseGradleOutput(line: String) -> GradleIssue? {
-        guard let match = gradleRegex.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)) else {
+    /// Parse a 2-line output buffer for the gradle command and look for error or warning pattern, optionally mapping back to the source Swift location when the location is found in a known .skipcode.json file.
+    public func parseGradleOutput(line1: String, line2: String) -> GradleIssue? {
+        // check against known Kotlin error patterns
+        if let issue = parseKotlinErrorOutput(line: line1) {
+            return issue
+        }
+        // check against other Gradle error output patterns
+        if let issue = parseGradleErrorOutput(line1: line1, line2: line2) {
+            return issue
+        }
+        return nil
+    }
+
+    private func parseGradleErrorOutput(line1: String, line2: String) -> GradleIssue? {
+        guard let matchResult = gradleIssuePattern.firstMatch(in: line1, range: NSRange(line1.startIndex..., in: line1)) else {
+            return nil
+        }
+
+        func match(at index: Int) -> String {
+            (line1 as NSString).substring(with: matchResult.range(at: index))
+        }
+
+        // turn "Error:" and "Warning:" into a error or warning
+        let kind: GradleIssue.Kind
+        switch match(at: 5) {
+        case "Error": kind = .error
+        case "Warning": kind = .warning
+        default: fatalError("Should have matched either Error or Warning: \(line1)")
+        }
+
+        let path = "/" + match(at: 1) // the regex removes the leading slash
+
+        // the issue description is on the line(s) following the expression pattern
+        return GradleIssue(kind: kind, message: line2.trimmingCharacters(in: .whitespacesAndNewlines), location: SourceLocation(path: path, position: SourceLocation.Position(line: Int(match(at: 2)) ?? 0, column: Int(match(at: 3)) ?? 0)))
+    }
+
+    private func parseKotlinErrorOutput(line: String) -> GradleIssue? {
+        guard let match = kotlinIssuePattern.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)) else {
             return nil
         }
         let l = (line as NSString)
@@ -344,11 +379,14 @@ extension GradleHarness {
             exitCode = result.exitStatus
         })
 
+        var previousLine: String? = nil
         for try await line in output {
             if let outputPrefix = outputPrefix {
                 print(outputPrefix, line)
             }
-            scanGradleOutput(line: line) // check for errors and report them to the IDE
+            // check for errors and report them to the IDE with a 1-line buffer
+            scanGradleOutput(line1: previousLine ?? line, line2: line)
+            previousLine = line
         }
 
         guard let exitCode = exitCode, case .terminated(0) = exitCode else {
@@ -367,7 +405,12 @@ public struct AppLaunchError : LocalizedError {
 }
 
 
-fileprivate let gradleRegex = try! NSRegularExpression(pattern: #"^([we]): file://(.*):([0-9]+):([0-9]+) (.*)$"#)
+
+// /DerivedData/Skip-Everything/SourcePackages/plugins/skipapp-weather.output/WeatherAppUI/skipstone/WeatherAppUI/src/main/AndroidManifest.xml:18:13-69 Error:
+
+
+fileprivate let kotlinIssuePattern = try! NSRegularExpression(pattern: #"^([we]): file://(.*):([0-9]+):([0-9]+) (.*)$"#)
+fileprivate let gradleIssuePattern = try! NSRegularExpression(pattern: #"^/(.*):([0-9]+):([0-9]+)-([0-9]+) (Error|Warning):$"#)
 
 /// A source-related issue reported during the execution of Gradle. In the form of:
 ///

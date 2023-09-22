@@ -102,11 +102,14 @@ extension XCGradleHarness where Self : XCTestCase {
                     testProcessResult = result
                 })
 
+                var previousLine: String? = nil
                 for try await line in output {
                     if let outputPrefix = outputPrefix {
                         print(outputPrefix, line)
                     }
-                    scanGradleOutput(line: line) // check for errors and report them to the IDE
+                    // check for errors and report them to the IDE with a 1-line buffer
+                    scanGradleOutput(line1: previousLine ?? line, line2: line)
+                    previousLine = line
                 }
 
                 let failTotal: Int
@@ -284,8 +287,8 @@ extension XCGradleHarness where Self : XCTestCase {
     /// ```
     /// e: file:///…/skiphub.output/SkipSQLTests/skipstone/SkipSQL/src/main/kotlin/skip/sql/SkipSQL.kt:94:26 Function invocation 'blob(...)' expected
     /// ```
-    public func scanGradleOutput(line: String) {
-        guard var issue = parseGradleOutput(line: line) else {
+    public func scanGradleOutput(line1: String, line2: String) {
+        guard var issue = parseGradleOutput(line1: line, line2: line2) else {
             return
         }
 
