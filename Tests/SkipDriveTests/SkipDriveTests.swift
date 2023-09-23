@@ -112,7 +112,8 @@ class SkipCommandTests : XCTestCase {
         // we are not linking to SkipBuild, so fork the process instead with the proper arguments
         //var env = ProcessInfo.processInfo.environment
         //env["NOSKIP"] = "1" // prevent skip.git from trying to include local tools
-        let result = try await Process.popen(arguments: ["skip"] + args, loggingHandler: nil)
+        let skiptool = ".build/artifacts/skip/skip/skip.artifactbundle/macos/skip"
+        let result = try await Process.popen(arguments: [skiptool] + args, loggingHandler: nil)
 
         // Throw if there was a non zero termination.
         guard result.exitStatus == .terminated(code: 0) else {
