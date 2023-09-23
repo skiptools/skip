@@ -237,15 +237,11 @@ extension GradleHarness {
     ///
     /// If the error:, warning:, or note: string is present, Xcode adds your message to the build logs. If the issue occurs in a specific file, include the filename as an absolute path. If the issue occurs at a specific line in the file, include the line number as well. The filename and line number are optional.
     public func scanGradleOutput(line1: String, line2: String) {
-        func report(_ issue: GradleIssue) {
-            print("\(issue.location.path):\(issue.location.position.line):\(issue.location.position.column): \(issue.kind.xcode): \(issue.message)")
-        }
-
         if let kotlinIssue = parseGradleOutput(line1: line1, line2: line2) {
             if let swiftIssue = try? kotlinIssue.location.findSourceMapLine() {
-                report(GradleIssue(kind: kotlinIssue.kind, message: kotlinIssue.message, location: swiftIssue))
+                print(GradleIssue(kind: kotlinIssue.kind, message: kotlinIssue.message, location: swiftIssue).xcodeMessageString)
             }
-            report(kotlinIssue)
+            print(kotlinIssue.xcodeMessageString)
         }
     }
 
@@ -433,6 +429,11 @@ public struct GradleIssue {
             case .warning: return "warning"
             }
         }
+    }
+    
+    /// A message string that will show up in the Xcode Issue Navigator
+    public var xcodeMessageString: String {
+        "\(location.path):\(location.position.line):\(location.position.column): \(kind.xcode): \(message)"
     }
 }
 
