@@ -669,14 +669,16 @@ extension String {
 
 struct ToolOptions: ParsableArguments {
     @Option(help: ArgumentHelp("Xcode command path", valueName: "path"))
-    var xcode: String = "/usr/bin/xcodebuild"
+    var xcode: String = ProcessInfo.processInfo.environment["SKIP_XCODEBUILD_PATH"] ?? "/usr/bin/xcodebuild"
 
     @Option(help: ArgumentHelp("Swift command path", valueName: "path"))
-    var swift: String = "/usr/bin/swift"
+    var swift: String = ProcessInfo.processInfo.environment["SKIP_SWIFT_PATH"] ?? "/usr/bin/swift"
 
-    // TODO: check processor for intel vs. arm for homebrew location rather than querying file system
     @Option(help: ArgumentHelp("Gradle command path", valueName: "path"))
-    var gradle: String = ProcessInfo.isARM ? "/opt/homebrew/bin/gradle" : "/usr/local/bin/gradle"
+    var gradle: String = ProcessInfo.processInfo.environment["SKIP_GRADLE_PATH"] ?? (ProcessInfo.isARM ? "/opt/homebrew/bin/gradle" : "/usr/local/bin/gradle")
+
+    @Option(help: ArgumentHelp("ADB command path", valueName: "path"))
+    var adb: String = ProcessInfo.processInfo.environment["SKIP_ADB_PATH"] ?? (ProcessInfo.isARM ? "/opt/homebrew/bin/adb" : "/usr/local/bin/adb")
 
     @Option(help: ArgumentHelp("Path to the Android SDK (ANDROID_HOME)", valueName: "path"))
     var androidHome: String?

@@ -21,7 +21,10 @@ struct ADBCommand: SkipCommand {
     @OptionGroup(title: "Output Options")
     var outputOptions: OutputOptions
 
-    @Argument(help: ArgumentHelp("The arguments to pass to the adb command"))
+    @OptionGroup(title: "Tool Options")
+    var toolOptions: ToolOptions
+
+    @Argument(parsing: .allUnrecognized, help: ArgumentHelp("The arguments to pass to the adb command"))
     var arguments: [String]
 
     func run() async throws {
@@ -36,8 +39,8 @@ struct ADBCommand: SkipCommand {
         }
 
         for try await line in output {
-            print("ADB>", line)
-            // scanADBOutput(line: line) // check for errors and report them to the IDE
+            outputOptions.write("ADB> \(line)")
+            scanADBOutput(line: line) // check for errors and report them to the IDE
         }
 
         guard let exitCode = exitCode, case .terminated(0) = exitCode else {
@@ -45,6 +48,24 @@ struct ADBCommand: SkipCommand {
         }
 
         #endif
+    }
+    
+    /// Check for common ADB error patterns and report them back to Xcode.
+    /// - Parameter line: the ADB output line to scan
+    func scanADBOutput(line: String) {
+        func err(_ msg: String) {
+            // Xcode will report "error:" strings as an error; insert a file prefix to add a link
+            outputOptions.write("error: \(msg) [\(line)] https://skip.tools/docs")
+        }
+
+        switch line {
+        case "adb: more than one device/emulator":
+            return err("The Android Debug Bridge found more than one running Android emulator or connected device. Check device list with adb devices.")
+        case "adb: no devices/emulators found":
+            return err("No Android emulators or devices were found. Launch Android Studio.app and open the Virtual Device Manager to create an emulator to continue.")
+        default:
+            return
+        }
     }
 
     #if canImport(SkipDriveExternal)
@@ -60,7 +81,7 @@ struct ADBCommand: SkipCommand {
         for (key, value) in env {
             penv[key] = value
         }
-        return Process.streamLines(command: args, environment: penv, workingDirectory: workingDirectory, onExit: onExit)
+        return Process.streamLines(command: [toolOptions.adb] + args, environment: penv, workingDirectory: workingDirectory, onExit: onExit)
     }
     #endif
 

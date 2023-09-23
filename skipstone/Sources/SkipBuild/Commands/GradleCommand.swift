@@ -21,13 +21,16 @@ struct GradleCommand: SkipCommand {
     @OptionGroup(title: "Output Options")
     var outputOptions: OutputOptions
 
+    @OptionGroup(title: "Tool Options")
+    var toolOptions: ToolOptions
+
     @Option(help: ArgumentHelp("App package name", valueName: "package-name"))
     var package: String
 
     @Option(help: ArgumentHelp("App module name", valueName: "ModuleName"))
     var module: String
 
-    @Argument(help: ArgumentHelp("The arguments to pass to the gradle command"))
+    @Argument(parsing: .allUnrecognized, help: ArgumentHelp("The arguments to pass to the gradle command"))
     var gradleArguments: [String]
 
     func run() async throws {
