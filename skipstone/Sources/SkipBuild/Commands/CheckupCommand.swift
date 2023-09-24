@@ -12,13 +12,16 @@ struct CheckupCommand: SkipCommand {
     @OptionGroup(title: "Output Options")
     var outputOptions: OutputOptions
 
+    @OptionGroup(title: "Tool Options")
+    var toolOptions: ToolOptions
+
     func run() async throws {
         try await runDoctor()
 
         func checkup() throws -> [String] {
             let tmpdir = NSTemporaryDirectory() + "/" + UUID().uuidString
             try FileManager.default.createDirectory(atPath: tmpdir, withIntermediateDirectories: true)
-            return ["skip", "init", "--build", "--test", "-d", tmpdir, "lib-name", "ModuleName"]
+            return [toolOptions.skip, "init", "--build", "--test", "-d", tmpdir, "lib-name", "ModuleName"]
         }
 
         // if we have not initiailized Gradle before (indicated by the absence of a ~/.gradle/caches/ folder), indicate that the first run will take a while

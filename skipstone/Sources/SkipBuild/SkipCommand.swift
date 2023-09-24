@@ -675,13 +675,21 @@ struct ToolOptions: ParsableArguments {
     var swift: String = ProcessInfo.processInfo.environment["SKIP_SWIFT_PATH"] ?? "/usr/bin/swift"
 
     @Option(help: ArgumentHelp("Gradle command path", valueName: "path"))
-    var gradle: String = ProcessInfo.processInfo.environment["SKIP_GRADLE_PATH"] ?? (ProcessInfo.isARM ? "/opt/homebrew/bin/gradle" : "/usr/local/bin/gradle")
+    var gradle: String = ProcessInfo.processInfo.environment["SKIP_GRADLE_PATH"] ?? (homebrewRoot + "/bin/gradle")
 
     @Option(help: ArgumentHelp("ADB command path", valueName: "path"))
-    var adb: String = ProcessInfo.processInfo.environment["SKIP_ADB_PATH"] ?? (ProcessInfo.isARM ? "/opt/homebrew/bin/adb" : "/usr/local/bin/adb")
+    var adb: String = ProcessInfo.processInfo.environment["SKIP_ADB_PATH"] ?? (homebrewRoot + "/bin/adb")
+
+    @Option(help: ArgumentHelp("Skip command path", valueName: "path"))
+    var skip: String = CommandLine.arguments.first ?? "skip"
 
     @Option(help: ArgumentHelp("Path to the Android SDK (ANDROID_HOME)", valueName: "path"))
     var androidHome: String?
+
+    private static var homebrewRoot: String {
+        ProcessInfo.processInfo.environment["HOMEBREW_PREFIX"]
+            ?? (ProcessInfo.isARM ? "/opt/homebrew" : "/usr/local")
+    }
 }
 
 struct BuildOptions: ParsableArguments {
