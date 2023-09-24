@@ -30,7 +30,7 @@ jobs:
       - name: Test Android
         uses: ReactiveCircus/android-emulator-runner@v2
         with:
-          api-level: 30
+          api-level: 31
           arch: x86_64
           emulator-boot-timeout: 6000
           script: ./gradlew connectedCheck
