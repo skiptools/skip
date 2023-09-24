@@ -34,7 +34,7 @@ extension XCGradleHarness where Self : XCTestCase {
                 #endif
             }
         } catch {
-            XCTFail("GRADLE TEST FAILURE: \((error as? LocalizedError)?.localizedDescription ?? error.localizedDescription)", file: file, line: line)
+            XCTFail("\((error as? LocalizedError)?.localizedDescription ?? error.localizedDescription)", file: file, line: line)
         }
     }
 
@@ -112,16 +112,16 @@ extension XCGradleHarness where Self : XCTestCase {
                     previousLine = line
                 }
 
-                let failTotal: Int
+                let failedTests: [String]
 
                 // if any of the actions are a test case, when try to parse the XML results
                 if isTestAction {
                     let testSuites = try parseResults()
                     // the absense of any test data probably indicates some sort of mis-configuration or else a build failure
                     XCTAssertNotEqual(0, testSuites.count, "No tests were run")
-                    failTotal = reportTestResults(testSuites, dir)
+                    failedTests = reportTestResults(testSuites, dir).map(\.fullName)
                 } else {
-                    failTotal = -1
+                    failedTests = []
                 }
 
                 switch testProcessResult?.exitStatus {
@@ -129,10 +129,11 @@ extension XCGradleHarness where Self : XCTestCase {
                     // this is a general error that is reported whenever gradle fails, so that the overall test will fail even when we cannot parse any build errors or test failures
                     // there should be additional messages in the log to provide better indication of where the test failed
                     if code != 0 {
-                        if failTotal > 0 {
-                            throw GradleDriverError("The gradle action \(actions) failed with \(failTotal) test failures. Review the logs for individual test case results.")
+                        if !failedTests.isEmpty {
+                            // TODO: output test summary and/or a log file and have the xcode error link to the file so the user can see a summary of the failed tests
+                            throw GradleDriverError("The gradle action \(actions) failed with \(failedTests.count) test \(failedTests.count == 1 ? "failure" : "failures"). Review the logs for individual test case results. Failed tests: \(failedTests.joined(separator: ", "))")
                         } else {
-                            throw GradleDriverError("The gradle action \(actions) failed, which may indicate a build error or a test failure. Examing the log tab for more details.")
+                            throw GradleDriverError("gradle \(actions.first?.description ?? "") failed, which may indicate a build error or a test failure. Examing the log tab for more details.")
                         }
                     }
                 default:
@@ -304,8 +305,10 @@ extension XCGradleHarness where Self : XCTestCase {
             record(XCTIssue(type: .assertionFailure, compactDescription: issue.message, detailedDescription: issue.message, sourceCodeContext: XCTSourceCodeContext(location: swiftLocation.contextLocation), associatedError: nil, attachments: []))
         }
     }
-
-    private func reportTestResults(_ testSuites: [GradleDriver.TestSuite], _ dir: URL, showStreams: Bool = true) -> Int {
+    
+    /// Parse the test suite results and output the summary to standard out
+    /// - Returns: an array of failed test case names
+    private func reportTestResults(_ testSuites: [GradleDriver.TestSuite], _ dir: URL, showStreams: Bool = true) -> [GradleDriver.TestCase] {
 
         // do one intial pass to show the stdout and stderror
         if showStreams {
@@ -437,9 +440,13 @@ extension XCGradleHarness where Self : XCTestCase {
         }
 
 
+        var failedTests: [GradleDriver.TestCase] = []
         // show all the failures just before the final summary for ease of browsing
         for testSuite in testSuites {
             for testCase in testSuite.testCases {
+                if !testCase.failures.isEmpty {
+                    failedTests.append(testCase)
+                }
                 for failure in testCase.failures {
                     print(testCase.name, failure.message)
                     if let stackTrace = failure.contents {
@@ -452,8 +459,7 @@ extension XCGradleHarness where Self : XCTestCase {
         let passPercentage = Double(passTotal) / (testsTotal == 0 ? Double.nan : Double(testsTotal))
         print("JUNIT SUITES \(suiteTotal) TESTS \(testsTotal) PASSED \(passTotal) (\(round(passPercentage * 100))%) FAILED \(failTotal) SKIPPED \(skipTotal) TIME \(round(timeTotal * 100.0) / 100.0)")
 
-        // TODO: compare the output with the SPM test output "xunit" xml reports
-        return failTotal
+        return failedTests
     }
 
 }

@@ -449,6 +449,11 @@ public struct GradleDriver {
             self.failures = failures
         }
 
+        /// `classname.name` with any trailing "$" cruft trimmed off
+        public var fullName: String {
+            classname + "." + (name.split(separator: "$").first?.description ?? name)
+        }
+
         #if os(macOS) || os(Linux) || targetEnvironment(macCatalyst)
         init(from element: XMLElement, in url: URL) throws {
             guard let testCaseName = element.attribute(forName: "name")?.stringValue else {
