@@ -2,7 +2,15 @@
 ///
 /// We rely on our UI libraries to provide the implementation of the SwiftUI-like API that this translation will result in.
 final class KotlinSwiftUITransformer: KotlinTransformer {
+
+//~~~ REMOVE NAVIGATION DESTINATION RESTRICTIONS
+
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
+        // No need to transpile SwiftUI if not a full build
+        guard translator.codebaseInfo != nil else {
+            return
+        }
+
         // Does this file need translation?
         var needsTranslation = false
         if translator.packageName == "skip.ui" {
@@ -18,52 +26,8 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             }
         }
         if needsTranslation {
-            // Add messages in a separate first pass so that we aren't confused by our SwiftUI transformations
-            syntaxTree.root.visit { addMessagesVisit($0, translator: translator) }
-            if translator.codebaseInfo != nil {
-                syntaxTree.root.visit { translateVisit($0, translator: translator) }
-            }
+            syntaxTree.root.visit { translateVisit($0, translator: translator) }
         }
-    }
-
-    private func addMessagesVisit(_ node: KotlinSyntaxNode, translator: KotlinTranslator) -> VisitResult<KotlinSyntaxNode> {
-        guard let functionCall = node as? KotlinFunctionCall, let memberAccess = functionCall.function as? KotlinMemberAccess, let baseCall = memberAccess.base as? KotlinFunctionCall else {
-            return .recurse(nil)
-        }
-        if isNavigationDestination(functionCall) {
-            if !isDirectlyInNavigationStack(functionCall) {
-                node.messages.append(.kotlinSwiftUINavigationDestination(node, source: translator.syntaxTree.source))
-            }
-        } else if isNavigationDestination(baseCall) {
-            node.messages.append(.kotlinSwiftUINavigationDestination(node, source: translator.syntaxTree.source))
-        }
-        return .recurse(nil)
-    }
-
-    private func isNavigationDestination(_ functionCall: KotlinFunctionCall) -> Bool {
-        if let memberAccess = functionCall.function as? KotlinMemberAccess, memberAccess.member == "navigationDestination", functionCall.arguments.count == 2, functionCall.arguments[0].label == "for_" {
-            return true
-        } else {
-            return false
-        }
-    }
-
-    private func isDirectlyInNavigationStack(_ node: KotlinSyntaxNode) -> Bool {
-        guard let parent = node.parent else {
-            return false
-        }
-        // Must be in the stack's content closure
-        if let closure = parent as? KotlinClosure {
-            if let functionCall = closure.parent as? KotlinFunctionCall, (functionCall.function as? KotlinIdentifier)?.name == "NavigationStack" || (functionCall.function as? KotlinMemberAccess)?.member == "NavigationStack" {
-                return true
-            } else {
-                return false
-            }
-        } else if parent is KotlinFunctionDeclaration {
-            // Shortcut when user nests in body() of custom view
-            return false
-        }
-        return isDirectlyInNavigationStack(parent)
     }
 
     private func translateVisit(_ node: KotlinSyntaxNode, translator: KotlinTranslator) -> VisitResult<KotlinSyntaxNode> {
