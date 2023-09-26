@@ -136,6 +136,11 @@ extension Message {
         return Message(kind: .error, message: "Skip does not support type declarations within functions. Consider making this an independent type", sourceDerived: sourceDerived, source: source)
     }
 
+    static func macroExpansionUnsupported(_ syntax: SyntaxProtocol, source: Source) -> Message {
+        let range = syntax.range(in: source)
+        return Message(kind: .error, message: "Skip does not support this Swift macro", source: source, sourceRange: range)
+    }
+
     static func preprocessorTooComplex(_ syntax: SyntaxProtocol, source: Source) -> Message {
         let range = syntax.range(in: source)
         return Message(kind: .warning, message: "Skip does not understand complex preprocessor directives. When using Skip-related preprocessor symbols, use only SYMBOL, !SYMBOL, or a list where all symbols are combined by either && or || (but not a combination of the two)", source: source, sourceRange: range)

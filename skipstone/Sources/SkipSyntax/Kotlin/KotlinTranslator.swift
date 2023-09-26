@@ -202,6 +202,9 @@ public class KotlinTranslator {
                 return KotlinInOut.translate(expression: expression as! InOut, translator: self)
             case .keyPathLiteral:
                 return KotlinKeyPathLiteral.translate(expression: expression as! KeyPathLiteral, translator: self)
+            case .macroExpansion:
+                // This should never happen, as we never make the MacroExpansionExpr expression part of the syntax tree
+                break
             case .matchingCase:
                 break // Should be translated directly by parent expressions
             case .memberAccess:

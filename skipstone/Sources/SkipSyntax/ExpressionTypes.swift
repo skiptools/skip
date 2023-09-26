@@ -16,6 +16,7 @@ enum ExpressionType: CaseIterable {
     case `if`
     case `inout`
     case keyPathLiteral
+    case macroExpansion
     case matchingCase
     case memberAccess
     case nilLiteral
@@ -68,6 +69,8 @@ enum ExpressionType: CaseIterable {
             return InOut.self
         case .keyPathLiteral:
             return KeyPathLiteral.self
+        case .macroExpansion:
+            return MacroExpansion.self
         case .matchingCase:
             return MatchingCase.self
         case .memberAccess:
@@ -1132,6 +1135,20 @@ class KeyPathLiteral: Expression {
             }
         }
         return [PrettyPrintTree(root: string)]
+    }
+}
+
+/// `#Macro`
+class MacroExpansion: Expression {
+    override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
+        guard syntax.kind == .macroExpansionExpr, let macroExpansionExpr = syntax.as(MacroExpansionExprSyntax.self) else {
+            return nil
+        }
+        // We don't yet support macro expansion, but we know we can safely ignore these
+        if macroExpansionExpr.macroName.text == "Preview" {
+            return RawExpression(sourceCode: "// #\(macroExpansionExpr.macroName.text) omitted", syntax: syntax, in: syntaxTree)
+        }
+        throw Message.macroExpansionUnsupported(syntax, source: syntaxTree.source)
     }
 }
 

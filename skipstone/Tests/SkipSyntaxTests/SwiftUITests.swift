@@ -1288,7 +1288,7 @@ final class SwiftUITests: XCTestCase {
         """)
     }
 
-    func testOmitPreviews() async throws {
+    func testOmitPreviewProvider() async throws {
         try await check(supportingSwift: baseSupportingSwift, swift: """
         import SwiftUI
         struct MyV: View {
@@ -1317,6 +1317,39 @@ final class SwiftUITests: XCTestCase {
                 return ComposeView { composectx: ComposeContext -> Text("Hello").Compose(composectx) }
             }
         }
+        """)
+    }
+
+    func testOmitPreviewMacro() async throws {
+        try await check(supportingSwift: baseSupportingSwift, swift: """
+        import SwiftUI
+        struct MyV: View {
+            var body: some View {
+                return Text("Hello")
+            }
+        }
+
+        #Preview {
+            MyV()
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
+        import skip.foundation.*
+        import skip.model.*
+
+        import skip.ui.*
+        internal class MyV: View {
+            override fun body(): View {
+                return ComposeView { composectx: ComposeContext -> Text("Hello").Compose(composectx) }
+            }
+        }
+
+        // #Preview omitted
         """)
     }
 
