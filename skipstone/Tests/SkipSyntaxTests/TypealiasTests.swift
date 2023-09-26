@@ -363,4 +363,30 @@ final class TypealiasTests: XCTestCase {
         }
         """)
     }
+
+    func testTypealiasClosureReturn() async throws {
+        try await check(supportingSwift: """
+        extension String {
+            static let empty = ""
+        }
+        """, swift: """
+        typealias IntStringDict = Dictionary<Int, String>
+        func f(c: () -> IntStringDict) {
+            for entry in c() {
+                if entry.value == .empty {
+                    print("EMPTY")
+                }
+            }
+        }
+        """, kotlin: """
+        internal typealias IntStringDict = Dictionary<Int, String>
+        internal fun f(c: () -> Dictionary<Int, String>) {
+            for (entry in c()) {
+                if (entry.value == String.empty) {
+                    print("EMPTY")
+                }
+            }
+        }
+        """)
+    }
 }
