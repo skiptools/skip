@@ -494,8 +494,13 @@ final class ExpressionTests: XCTestCase {
 
     func testImportsMovedToTop() async throws {
         try await check(swift: """
-        import MyModule1
+        // Header comment
 
+        #if SKIP
+        import MyModule1
+        #endif
+
+        // Class comment
         class C {
         }
 
@@ -507,17 +512,36 @@ final class ExpressionTests: XCTestCase {
 
         import MyModule4
         """, kotlin: """
+        // Header comment
+
         import my.module1.*
-        
+
         import my.module2.*
         import my.module3.*
 
         import my.module4.*
 
+        // Class comment
         internal open class C {
         }
 
         internal open class D {
+        }
+        """)
+
+        try await check(swift: """
+        // Class comment
+        class C {
+        }
+
+        import MyModule1
+        import MyModule2
+        """, kotlin: """
+
+        import my.module1.*
+        import my.module2.*
+        // Class comment
+        internal open class C {
         }
         """)
     }

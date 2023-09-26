@@ -82,7 +82,7 @@ public class KotlinTranslator {
     /// Translate syntax trees only.
     public func translateSyntaxTree() -> KotlinSyntaxTree {
         let translatedStatements = syntaxTree.root.statements.flatMap { translateStatement($0) }
-        let importsFirstStatements = translatedStatements.sorted { $0.type == .importDeclaration && $1.type != .importDeclaration }
+        let importsFirstStatements = moveImportsToTop(statements: translatedStatements)
         let dependencies = gatherDependencies(from: importsFirstStatements)
         let kotlinRoot = KotlinCodeBlock(statements: importsFirstStatements)
         kotlinRoot.messages = syntaxTree.root.messages
@@ -260,6 +260,38 @@ public class KotlinTranslator {
         let (output, outputMap) = outputGenerator.generateOutput(file: outputFile)
         let endTime = Date().timeIntervalSinceReferenceDate // track the duration for logging
         return Transpilation(sourceFile: kotlinSyntaxTree.sourceFile, output: output, outputMap: outputMap, messages: messages, duration: endTime - startTime)
+    }
+
+    private func moveImportsToTop(statements: [KotlinStatement]) -> [KotlinStatement] {
+        var importIndexes: IndexSet = []
+        var contentStartIndex: Int? = nil
+        for i in 0..<statements.count {
+            switch statements[i].type {
+            case .empty:
+                // Keep empty statements used for comments, etc in place
+                break
+            case .importDeclaration:
+                importIndexes.insert(i)
+            default:
+                if contentStartIndex == nil {
+                    contentStartIndex = i
+                }
+            }
+        }
+        guard let contentStartIndex, let lastImportIndex = importIndexes.last, lastImportIndex > contentStartIndex else {
+            return statements
+        }
+
+        var sortedStatements = statements
+        var insertionIndex = contentStartIndex
+        for importIndex in importIndexes {
+            if importIndex > contentStartIndex {
+                let importStatement = sortedStatements.remove(at: importIndex)
+                sortedStatements.insert(importStatement, at: insertionIndex)
+                insertionIndex += 1
+            }
+        }
+        return sortedStatements
     }
 
     private func gatherDependencies(from translatedStatements: [KotlinStatement]) -> KotlinDependencies {
