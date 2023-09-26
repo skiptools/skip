@@ -8,12 +8,11 @@ jobs:
     env:     
       DEVELOPER_DIR: /Applications/Xcode_15.0.app/Contents/Developer
     steps:
+      - run: brew update
+      - run: brew install skiptools/skip/skip
       - uses: actions/checkout@v3
-      - name: Install Skip
-        run: brew install skiptools/skip/skip
       - run: swift build
-      - name: Test Skip
-        run: skip test --plain
+      - run: skip test --plain
       - name: Test iOS
         run: |
           killall java
