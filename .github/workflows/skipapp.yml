@@ -70,9 +70,7 @@ jobs:
       - name: Build apk
         run: |
           for CONFIGURATION in "Release" "Debug"; do
-            for X in "A" "B"; do
-              BUILT_PRODUCTS_DIR=".build" xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -configuration "${CONFIGURATION}" -destination "platform=macosx" -scheme "SkipApp" build
-            done
+            BUILT_PRODUCTS_DIR=".build" xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -configuration "${CONFIGURATION}" -destination "platform=macosx" -scheme "SkipApp" build
           done
           ls -la Skip/build/
           ls -la Skip/build/artifacts/
@@ -98,7 +96,9 @@ jobs:
 
       - name: Assemble Kotlin Source
         run: |
-          cd .build/DerivedData/SourcePackages/plugins/*.output/AppUI/skipstone/
+          # the primary skip module is the first target of the first product
+          SKIP_MODULE=$(swift package dump-package | jq -r '.products[0].targets[0]')
+          cd .build/DerivedData/SourcePackages/plugins/*.output/${SKIP_MODULE}/skipstone/
           rm -rf .gradle .build */.build
           # create the zip file with predictable timestamps for reproducibility
           find . -exec touch -d "${COMMIT_DATE:0:19}" {} \;
