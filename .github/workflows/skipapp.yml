@@ -35,6 +35,7 @@ jobs:
     env:     
       DEVELOPER_DIR: /Applications/Xcode_15.0.app/Contents/Developer
     steps:
+      - run: brew update
       - run: brew install skiptools/skip/skip
       - uses: actions/checkout@v3
       - name: Environment
