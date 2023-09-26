@@ -105,13 +105,14 @@ jobs:
           zip -9 -r "${OLDPWD}/Skip/build/artifacts/App-android-source.zip" . -x ".build/*" -x "*/.gradle/*" -x "*/.build/*" -x "*/build/*"
           cd -
 
-      - name: Merge Artifacts
+      - name: Prepare Artifacts
         run: |
+          APPNAME="App"
+          SKIP_MODULE=$(swift package dump-package | jq -r '.products[0].targets[0]')
           # merge the ipa and apk zips into a single archive
           cd Skip/build/artifacts/
           ls -la
 
-          APPNAME="App"
           IPA="${APPNAME}-Release.ipa"
           APK="${APPNAME}UI-release.apk"
           APPZ="${APPNAME}.appz"
@@ -122,9 +123,25 @@ jobs:
           cd "${TMPDIR}"
           zip -qr9 ".source.apk" ./*
           cd -
+
           mv "${TMPDIR}/.source.apk" "${APPZ}"
           shasum -a 256 ${APK} ${IPA} ${APPZ}
           ls -lah ${APK} ${IPA} ${APPZ}
+
+          # fix artifact names for release (retain App-Source.zip for template)
+          mv -v ${APPNAME}-Source.zip ${SKIP_MODULE}-ios-${TAG}-source.zip
+          mv -v ${SKIP_MODULE}UI-release.apk ${SKIP_MODULE}-android-${TAG}.apk
+          #mv -v ${SKIP_MODULE}UI-debug.apk ${SKIP_MODULE}-android-${TAG}-debug.apk
+          mv -v ${APPNAME}-Release.ipa ${SKIP_MODULE}-ios-${TAG}.ipa
+          mv -v ${APPNAME}-Debug.ipa ${SKIP_MODULE}-ios-${TAG}-debug.ipa
+          mv -v ${APPNAME}-android-source.zip ${SKIP_MODULE}-android-${TAG}-source.zip
+          mv -v ${APPNAME}.appz ${SKIP_MODULE}-${TAG}.appz
+
+          # move debug build out of release candidates
+          mkdir debug
+          mv *-debug.* debug/
+          mv *.appz debug/
+
 
       - name: "Release"
         if: startsWith(github.ref, 'refs/tags/')
@@ -135,34 +152,8 @@ jobs:
           echo "Creating release: ${TAG}"
           cd Skip/build/artifacts/
 
-          ls -la 
-
-          APPNAME="App"
-
-          # fix artifact names for release (retain App-Source.zip for template)
-          mv -v ${APPNAME}-Source.zip ${APPNAME}-ios-${TAG}-source.zip
-          mv -v ${APPNAME}UI-release.apk ${APPNAME}-android-${TAG}.apk
-          #mv -v ${APPNAME}UI-debug.apk ${APPNAME}-android-${TAG}-debug.apk
-          mv -v ${APPNAME}-Release.ipa ${APPNAME}-ios-${TAG}.ipa
-          mv -v ${APPNAME}-Debug.ipa ${APPNAME}-ios-${TAG}-debug.ipa
-          mv -v ${APPNAME}-android-source.zip ${APPNAME}-android-${TAG}-source.zip
-          mv -v ${APPNAME}.appz ${APPNAME}-${TAG}.appz
-
-          # move debug build out of release list
-          mkdir debug
-          mv *-debug.* debug/
-          mv *.appz debug/
-
           shasum -a 256 *.* > checksums.txt
           gh release create "${TAG}" -t "Release ${TAG}" --generate-notes *.*
-
-          #cat > .relnotes << EOF
-          #These are the checksums for the release artifacts:
-          #EOF
-          #echo '```' >> .relnotes
-          #cat checksums.txt >> .relnotes
-          #echo '```' >> .relnotes
-          #gh release create "${TAG}" -t "Release ${TAG}" -F .relnotes *.*
 
       - name: "Verify Release Templae"
         run: skip create --template-file Skip/build/artifacts/skip-template-source.zip --build --test SomeApp
