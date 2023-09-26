@@ -1280,7 +1280,7 @@ class MemberAccess: Expression, APICallExpression {
                 memberType = memberType.withGenerics(generics)
             }
             // Were we able to resolve the member by treating our unknown base identifier as a module name?
-            if self.baseType == .none, memberType != .none, let baseIdentifier, baseIdentifier.generics?.isEmpty != false {
+            if self.baseType == .none, memberType != .none, member != "self" && member != "Type", let baseIdentifier, baseIdentifier.generics?.isEmpty != false {
                 baseIdentifier.isModuleNameFor = memberType
                 self.baseType = .module(baseIdentifier.name, .none)
             }
