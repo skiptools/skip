@@ -115,8 +115,8 @@ jobs:
           ls -la
 
           IPA="${APPNAME}-Release.ipa"
-          APK="${APPNAME}UI-release.apk"
-          APPZ="${APPNAME}.appz"
+          APK="${SKIP_MODULE}UI-release.apk"
+          APPZ="${SKIP_MODULE}.appz"
 
           TMPDIR=$(mktemp -d)
           unzip -q "$IPA" -d "$TMPDIR"
