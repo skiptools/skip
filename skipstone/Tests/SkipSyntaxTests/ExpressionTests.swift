@@ -454,6 +454,7 @@ final class ExpressionTests: XCTestCase {
         import FooBar.Baz
         import com.xyz.Bar
         import com.xyz.__
+        import func Foundation.x
         """, kotlin: """
         import skip.foundation.*
         import foo.*
@@ -461,10 +462,7 @@ final class ExpressionTests: XCTestCase {
         import foo.bar.Baz
         import com.xyz.Bar
         import com.xyz.*
-        """)
-
-        try await checkProducesMessage(swift: """
-        import func Foundation.x
+        import skip.foundation.x
         """)
     }
 

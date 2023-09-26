@@ -23,37 +23,13 @@
       location = "group:../skip-ui">
    </FileRef>
    <FileRef
-      location = "group:../skip-data">
-   </FileRef>
-   <FileRef
-      location = "group:../skip-device">
-   </FileRef>
-   <FileRef
-      location = "group:../skip-mark">
-   </FileRef>
-   <FileRef
-      location = "group:../skip-motion">
-   </FileRef>
-   <FileRef
-      location = "group:../skip-notify">
-   </FileRef>
-   <FileRef
-      location = "group:../skip-proto">
+      location = "group:../skip-sql">
    </FileRef>
    <FileRef
       location = "group:../skip-script">
    </FileRef>
    <FileRef
-      location = "group:../skip-sql">
-   </FileRef>
-   <FileRef
-      location = "group:../skip-vault">
-   </FileRef>
-   <FileRef
       location = "group:../skip-xml">
-   </FileRef>
-   <FileRef
-      location = "group:../skip-yaml">
    </FileRef>
    <FileRef
       location = "group:../skip-zip">

@@ -443,7 +443,7 @@ struct Attributes: Hashable, PrettyPrintable, Codable {
 
     /// Some property wrappers are non-mutating.
     var isNonMutating: Bool {
-        return contains(.nonmutating) || contains(.state) || contains(.stateObject) || contains(.environment) || contains(.environmentObject) || contains(.bindable) || contains(.binding)
+        return contains(.nonmutating) || contains(.state) || contains(.stateObject) || contains(.environment) || contains(.environmentObject) || contains(.bindable) || contains(.binding) || contains(.appStorage)
     }
 
     func resolved(in node: SyntaxNode? = nil, context: TypeResolutionContext) -> Attributes {
@@ -493,6 +493,7 @@ struct Attribute: Hashable, Codable {
 
     /// The attribute kind, if it is recognized.
     enum Kind: Equatable {
+        case appStorage
         case autoclosure
         case available
         case bindable
@@ -528,6 +529,8 @@ struct Attribute: Hashable, Codable {
             return .unknown
         }
         switch name {
+        case "AppStorage":
+            return .appStorage
         case "autoclosure":
             return .autoclosure
         case "available":

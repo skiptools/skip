@@ -1819,6 +1819,11 @@ extension TypeSignature {
     func asState() -> TypeSignature {
         return .named("skip.ui.State", [self])
     }
+
+    /// Return a SwiftUI AppStorage of this type.
+    func asAppStorage() -> TypeSignature {
+        return .named("skip.ui.AppStorage", [self])
+    }
 }
 
 extension Array where Element == TypeSignature {

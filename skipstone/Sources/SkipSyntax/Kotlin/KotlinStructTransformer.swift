@@ -185,6 +185,19 @@ final class KotlinStructTransformer: KotlinTransformer {
                     value += ".sref()"
                 }
                 assignment = "this._\(variableDeclaration.propertyName) = skip.ui.State(\(value))"
+            } else if variableDeclaration.attributes.contains(.appStorage) {
+                var value = variableDeclaration.propertyName
+                if variableDeclaration.mayBeSharedMutableStruct {
+                    value += ".sref()"
+                }
+                // parse annotation tokens to transfer into the constructor args: `@AppStorage("prefsKey", store: UserDefaults.standard)`
+                let tokens = variableDeclaration.attributes.of(kind: .appStorage).first?.tokens ?? []
+                let keyName = tokens.first ?? "storageKey"
+                if tokens.count == 2, let storeName = tokens.last {
+                    assignment = "this._\(variableDeclaration.propertyName) = skip.ui.AppStorage(wrappedValue = \(value), \(keyName), store = \(storeName))"
+                } else {
+                    assignment = "this._\(variableDeclaration.propertyName) = skip.ui.AppStorage(wrappedValue = \(value), \(keyName))"
+                }
             } else if variableDeclaration.attributes.contains(.binding) {
                 assignment = "this._\(variableDeclaration.propertyName) = \(variableDeclaration.propertyName)"
             } else {

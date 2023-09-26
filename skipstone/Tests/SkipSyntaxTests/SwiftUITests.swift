@@ -1561,4 +1561,124 @@ final class SwiftUITests: XCTestCase {
         }
         """)
     }
+
+    func testAppStorage() async throws {
+        try await check(supportingSwift: baseSupportingSwift, swift: """
+        import SwiftUI
+        struct V: View {
+            @AppStorage("appStorageKey") var appStorageProp = "appStorageDefaultValue"
+            var body: some View {
+                VStack {
+                    Text("A: \\(appStorageProp)")
+                    Button("Tap") {
+                        appStorageProp += "X"
+                    }
+                }
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
+        import skip.foundation.*
+        import skip.model.*
+
+        import skip.ui.*
+        internal class V: View {
+            internal var appStorageProp: String
+                get() = _appStorageProp.wrappedValue
+                set(newValue) {
+                    _appStorageProp.wrappedValue = newValue
+                }
+            internal var _appStorageProp: skip.ui.AppStorage<String>
+            override fun body(): View {
+                return ComposeView { composectx: ComposeContext ->
+                    VStack {
+                        ComposeView { composectx: ComposeContext ->
+                            Text("A: ${appStorageProp}").Compose(composectx)
+                            Button("Tap") { appStorageProp += "X" }.Compose(composectx)
+                        }
+                    }.Compose(composectx)
+                }
+            }
+
+            @Composable
+            override fun ComposeContent(composectx: ComposeContext) {
+                val initialappStorageProp = _appStorageProp.wrappedValue
+                var composeappStorageProp by androidx.compose.runtime.remember { mutableStateOf(initialappStorageProp) }
+                _appStorageProp.sync(composeappStorageProp, { composeappStorageProp = it })
+
+                body().Compose(composectx)
+            }
+
+            constructor(appStorageProp: String = "appStorageDefaultValue") {
+                this._appStorageProp = skip.ui.AppStorage(wrappedValue = appStorageProp, "appStorageKey")
+            }
+        }
+        """)
+    }
+
+    func testAppStorageWithCustomStore() async throws {
+        try await check(supportingSwift: baseSupportingSwift, swift: """
+        import SwiftUI
+        struct V: View {
+            @AppStorage("storageKey", store: UserDefaults.standard) var doublePref: Double = 1.0
+
+            var body: some View {
+                VStack {
+                    Text("A: \\(doublePref)")
+                    Button("Tap") {
+                        doublePref += 1.0
+                    }
+                }
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
+        import skip.foundation.*
+        import skip.model.*
+
+        import skip.ui.*
+        internal class V: View {
+            internal var doublePref: Double
+                get() = _doublePref.wrappedValue
+                set(newValue) {
+                    _doublePref.wrappedValue = newValue
+                }
+            internal var _doublePref: skip.ui.AppStorage<Double>
+
+            override fun body(): View {
+                return ComposeView { composectx: ComposeContext ->
+                    VStack {
+                        ComposeView { composectx: ComposeContext ->
+                            Text("A: ${doublePref}").Compose(composectx)
+                            Button("Tap") { doublePref += 1.0 }.Compose(composectx)
+                        }
+                    }.Compose(composectx)
+                }
+            }
+
+            @Composable
+            override fun ComposeContent(composectx: ComposeContext) {
+                val initialdoublePref = _doublePref.wrappedValue
+                var composedoublePref by androidx.compose.runtime.remember { mutableStateOf(initialdoublePref) }
+                _doublePref.sync(composedoublePref, { composedoublePref = it })
+
+                body().Compose(composectx)
+            }
+
+            constructor(doublePref: Double = 1.0) {
+                this._doublePref = skip.ui.AppStorage(wrappedValue = doublePref, "storageKey", store = UserDefaults.standard)
+            }
+        }
+        """)
+    }
 }

@@ -116,7 +116,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         }
     }
 
-    /// If the given expression is a reference to a @State or @StateObject property, return the underlying State property name.
+    /// If the given expression is a reference to a @State or @StateObject or @AppStorage property, return the underlying State property name.
     private func statePropertyName(for expression: KotlinExpression, in view: KotlinClassDeclaration?) -> String? {
         guard let view else {
             return nil
@@ -218,21 +218,26 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         let variableDeclarations = view.members.compactMap { $0 as? KotlinVariableDeclaration }
         let stateVariables = variableDeclarations.filter { $0.attributes.contains(.state) || $0.attributes.contains(.stateObject) }
         let environmentVariables = variableDeclarations.filter { $0.attributes.contains(.environment) || $0.attributes.contains(.environmentObject) }
-        if !stateVariables.isEmpty || !environmentVariables.isEmpty {
-            let composeFunction = synthesizeComposeFunction(view: view, stateVariables: stateVariables, environmentVariables: environmentVariables, translator: translator)
+        let bindingVariables = variableDeclarations.filter { $0.attributes.contains(.binding) }
+        let appStorageVariables = variableDeclarations.filter { $0.attributes.contains(.appStorage) }
+        if !stateVariables.isEmpty || !environmentVariables.isEmpty || !appStorageVariables.isEmpty {
+            let composeFunction = synthesizeComposeFunction(view: view, stateVariables: stateVariables, environmentVariables: environmentVariables, appStorageVariables: appStorageVariables, translator: translator)
             view.insert(statements: [composeFunction], after: body)
             
             for stateVariable in stateVariables {
                 synthesizeStateBacking(variable: stateVariable, in: view)
             }
         }
-        for bindingVariable in variableDeclarations.filter({ $0.attributes.contains(.binding) }) {
+        for bindingVariable in bindingVariables {
             synthesizeBindingBacking(variable: bindingVariable, in: view, source: translator.syntaxTree.source)
+        }
+        for appStorageVariable in appStorageVariables {
+            synthesizeAppStorageBacking(variable: appStorageVariable, in: view, source: translator.syntaxTree.source)
         }
     }
 
     /// Create an override of the SkipUI `Compose` function on views to handle state synchronization, etc.
-    private func synthesizeComposeFunction(view: KotlinClassDeclaration, stateVariables: [KotlinVariableDeclaration], environmentVariables: [KotlinVariableDeclaration], translator: KotlinTranslator) -> KotlinStatement {
+    private func synthesizeComposeFunction(view: KotlinClassDeclaration, stateVariables: [KotlinVariableDeclaration], environmentVariables: [KotlinVariableDeclaration], appStorageVariables: [KotlinVariableDeclaration], translator: KotlinTranslator) -> KotlinStatement {
         let composeFunction = KotlinFunctionDeclaration(name: "ComposeContent")
         composeFunction.modifiers.visibility = .public
         composeFunction.modifiers.isOverride = true
@@ -260,6 +265,13 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             }
             composeBodyStatements.append(statement)
         }
+        for appStorageVariable in appStorageVariables {
+            let statements = synthesizeAppStorageSync(variable: appStorageVariable)
+            if !composeBodyStatements.isEmpty {
+                statements[0].extras = .singleNewline
+            }
+            composeBodyStatements += statements
+        }
 
         let statement = KotlinRawStatement(sourceCode: "body().Compose(composectx)")
         statement.extras = .singleNewline
@@ -276,6 +288,14 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
     private func synthesizeStateSync(variable: KotlinVariableDeclaration) -> [KotlinStatement] {
         let initialValue = KotlinRawStatement(sourceCode: "val initial\(variable.propertyName) = _\(variable.propertyName).wrappedValue")
         let composeValue = KotlinRawStatement(sourceCode: "var compose\(variable.propertyName) by rememberSaveable(stateSaver = composectx.stateSaver as Saver<\(variable.propertyType.kotlin), Any>) { mutableStateOf(initial\(variable.propertyName)) }")
+        let syncValue = KotlinRawStatement(sourceCode: "_\(variable.propertyName).sync(compose\(variable.propertyName), { compose\(variable.propertyName) = it })")
+        return [initialValue, composeValue, syncValue]
+    }
+
+    /// Create code to remember and sync a state variable.
+    private func synthesizeAppStorageSync(variable: KotlinVariableDeclaration) -> [KotlinStatement] {
+        let initialValue = KotlinRawStatement(sourceCode: "val initial\(variable.propertyName) = _\(variable.propertyName).wrappedValue")
+        let composeValue = KotlinRawStatement(sourceCode: "var compose\(variable.propertyName) by androidx.compose.runtime.remember { mutableStateOf(initial\(variable.propertyName)) }")
         let syncValue = KotlinRawStatement(sourceCode: "_\(variable.propertyName).sync(compose\(variable.propertyName), { compose\(variable.propertyName) = it })")
         return [initialValue, composeValue, syncValue]
     }
@@ -416,6 +436,40 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         }
         storage.appendStorage = { variable, output, indentation in
             output.append(indentation).append(variable.modifiers.kotlinMemberString(isGlobal: false, isOpen: false, suffix: " ")).append("var ").append(storageName).append(": ").append(variable.propertyType.asBinding().kotlin).append("\n")
+        }
+        variable.storage = storage
+    }
+
+    /// Create the additional property synthesized for `@AppStorage` variables.
+    private func synthesizeAppStorageBacking(variable: KotlinVariableDeclaration, in view: KotlinClassDeclaration, source: Source) {
+        // Tell the @AppStorage variable to get and set its value using _variable of type AppStorage
+        let storageName = "_\(variable.propertyName)"
+        var storage = KotlinVariableStorage()
+        storage.isSingleStatementAppendable = { _ in true }
+        storage.appendGet = { variable, sref, isSingleStatement, output, indentation in
+            if !isSingleStatement {
+                output.append(indentation).append("return ")
+            }
+            output.append(storageName).append(".wrappedValue")
+            sref()
+            output.append("\n")
+        }
+        storage.appendSet = { variable, value, output, indentation in
+            output.append(indentation).append(storageName).append(".wrappedValue = ")
+            value()
+            output.append("\n")
+        }
+        storage.appendStorage = { variable, output, indentation in
+            let storageType = variable.propertyType.asAppStorage().kotlin
+            output.append(indentation).append(variable.modifiers.kotlinMemberString(isGlobal: false, isOpen: false, suffix: " ")).append("var ").append(storageName).append(": ").append(storageType)
+            if let value = variable.value {
+                output.append(" = skip.ui.AppStorage(")
+                value.append(to: output, indentation: indentation)
+                output.append(")")
+            } else if variable.propertyType.isOptional {
+                output.append(" = skip.ui.AppStorage(null)")
+            }
+            output.append("\n")
         }
         variable.storage = storage
     }

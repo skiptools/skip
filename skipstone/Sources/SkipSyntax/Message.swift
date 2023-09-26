@@ -109,10 +109,6 @@ extension Message {
         return Message(kind: .error, message: "Skip does not support this use of #if. Only placement around statement blocks, switch cases, or member chains is supported", source: source, sourceRange: range)
     }
 
-    static func importKindSpecifier(_ sourceDerived: SourceDerived, source: Source? = nil) -> Message {
-        return Message(kind: .warning, message: "Skip only supports full module imports", sourceDerived: sourceDerived, source: source)
-    }
-
     static func internalError(_ sourceDerived: SourceDerived, source: Source? = nil) -> Message {
         return Message(kind: .error, message: "Internal error. Please report to Skip support", sourceDerived: sourceDerived, source: source)
     }

@@ -1066,9 +1066,6 @@ class ImportDeclaration: Statement {
         }
         let modulePath = importDecl.path.map { $0.name.text }
         let statement = ImportDeclaration(modulePath: modulePath, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
-        if importDecl.importKindSpecifier != nil {
-            statement.messages.append(.importKindSpecifier(statement, source: syntaxTree.source))
-        }
         return [statement]
     }
 

@@ -34,11 +34,17 @@ struct GradleCommand: SkipCommand {
     var gradleArguments: [String]
 
     func run() async throws {
-        #if !canImport(SkipDriveExternal)
-        throw SkipDriveError(errorDescription: "SkipDrive not linked")
-        #else
-        try await self.gradleExec(appName: module, packageName: package, arguments: gradleArguments)
-        #endif
+        do {
+            #if !canImport(SkipDriveExternal)
+            throw SkipDriveError(errorDescription: "SkipDrive not linked")
+            #else
+            try await self.gradleExec(appName: module, packageName: package, arguments: gradleArguments)
+            #endif
+        } catch {
+            // output error message in an xcode-friendly way
+            print("error: \(error.localizedDescription)")
+            throw error
+        }
     }
 }
 
