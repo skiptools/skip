@@ -131,7 +131,7 @@ jobs:
 
           # fix artifact names for release (retain App-Source.zip for template)
           mv -v ${APPNAME}-Source.zip ${SKIP_MODULE}-ios-${TAG}-source.zip
-          mv -v ${SKIP_MODULE}UI-release.apk ${SKIP_MODULE}-android-${TAG}.apk
+          mv -v ${APK} ${SKIP_MODULE}-android-${TAG}.apk
           #mv -v ${SKIP_MODULE}UI-debug.apk ${SKIP_MODULE}-android-${TAG}-debug.apk
           mv -v ${APPNAME}-Release.ipa ${SKIP_MODULE}-ios-${TAG}.ipa
           mv -v ${APPNAME}-Debug.ipa ${SKIP_MODULE}-ios-${TAG}-debug.ipa
