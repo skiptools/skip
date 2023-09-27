@@ -107,6 +107,7 @@ jobs:
           cd -
 
       - name: Prepare Artifacts
+        if: startsWith(github.ref, 'refs/tags/')
         run: |
           APPNAME="App"
           SKIP_MODULE=$(swift package dump-package | jq -r '.products[0].targets[0]')
