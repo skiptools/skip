@@ -137,7 +137,7 @@ jobs:
           mv -v ${APPNAME}-Release.ipa ${SKIP_MODULE}-ios-${TAG}.ipa
           mv -v ${APPNAME}-Debug.ipa ${SKIP_MODULE}-ios-${TAG}-debug.ipa
           mv -v ${APPNAME}-android-source.zip ${SKIP_MODULE}-android-${TAG}-source.zip
-          mv -v ${APPNAME}.appz ${SKIP_MODULE}-${TAG}.appz
+          mv -v ${APPZ} ${SKIP_MODULE}-${TAG}.appz
 
           # move debug build out of release candidates
           mkdir debug
