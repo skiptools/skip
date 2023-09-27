@@ -295,7 +295,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
     /// Create code to remember and sync a state variable.
     private func synthesizeAppStorageSync(variable: KotlinVariableDeclaration) -> [KotlinStatement] {
         let initialValue = KotlinRawStatement(sourceCode: "val initial\(variable.propertyName) = _\(variable.propertyName).wrappedValue")
-        let composeValue = KotlinRawStatement(sourceCode: "var compose\(variable.propertyName) by androidx.compose.runtime.remember { mutableStateOf(initial\(variable.propertyName)) }")
+        let composeValue = KotlinRawStatement(sourceCode: "var compose\(variable.propertyName) by remember { mutableStateOf(initial\(variable.propertyName)) }")
         let syncValue = KotlinRawStatement(sourceCode: "_\(variable.propertyName).sync(compose\(variable.propertyName), { compose\(variable.propertyName) = it })")
         return [initialValue, composeValue, syncValue]
     }
@@ -607,6 +607,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         syntaxTree.dependencies.imports.insert("androidx.compose.runtime.Composable")
         syntaxTree.dependencies.imports.insert("androidx.compose.runtime.getValue")
         syntaxTree.dependencies.imports.insert("androidx.compose.runtime.mutableStateOf")
+        syntaxTree.dependencies.imports.insert("androidx.compose.runtime.remember")
         syntaxTree.dependencies.imports.insert("androidx.compose.runtime.setValue")
         syntaxTree.dependencies.imports.insert("androidx.compose.runtime.saveable.rememberSaveable")
         syntaxTree.dependencies.imports.insert("androidx.compose.runtime.saveable.Saver")

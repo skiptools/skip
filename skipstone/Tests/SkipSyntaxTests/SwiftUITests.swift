@@ -59,6 +59,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.Composable
         import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
@@ -86,6 +87,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.Composable
         import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
@@ -132,6 +134,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.Composable
         import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
@@ -195,6 +198,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.Composable
         import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
@@ -222,6 +226,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.Composable
         import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
@@ -255,6 +260,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.Composable
         import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
@@ -315,6 +321,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.Composable
         import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
@@ -368,6 +375,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.Composable
         import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
@@ -405,6 +413,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.Composable
         import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
@@ -463,6 +472,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.Stable
         import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
@@ -548,6 +558,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.Composable
         import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
@@ -618,6 +629,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.Composable
         import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
@@ -659,6 +671,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.Composable
         import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
@@ -693,6 +706,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.Composable
         import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
@@ -731,6 +745,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.Composable
         import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
@@ -773,6 +788,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.Composable
         import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
@@ -811,6 +827,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.Composable
         import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
@@ -851,6 +868,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.Composable
         import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
@@ -899,6 +917,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.Composable
         import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
@@ -951,6 +970,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.Composable
         import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
@@ -989,6 +1009,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.Composable
         import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
@@ -1026,6 +1047,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.Composable
         import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
@@ -1066,6 +1088,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.Composable
         import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
@@ -1109,6 +1132,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.Composable
         import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
@@ -1187,6 +1211,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.Composable
         import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
@@ -1267,6 +1292,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.Composable
         import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
@@ -1305,6 +1331,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.Composable
         import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
@@ -1336,6 +1363,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.Composable
         import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
@@ -1382,6 +1410,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.Composable
         import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
@@ -1426,6 +1455,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.Composable
         import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
@@ -1466,6 +1496,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.Composable
         import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
@@ -1505,6 +1536,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.Composable
         import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
@@ -1545,6 +1577,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.Composable
         import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
@@ -1580,6 +1613,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.Composable
         import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
@@ -1608,7 +1642,7 @@ final class SwiftUITests: XCTestCase {
             @Composable
             override fun ComposeContent(composectx: ComposeContext) {
                 val initialappStorageProp = _appStorageProp.wrappedValue
-                var composeappStorageProp by androidx.compose.runtime.remember { mutableStateOf(initialappStorageProp) }
+                var composeappStorageProp by remember { mutableStateOf(initialappStorageProp) }
                 _appStorageProp.sync(composeappStorageProp, { composeappStorageProp = it })
 
                 body().Compose(composectx)
@@ -1640,6 +1674,7 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.Composable
         import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
@@ -1669,7 +1704,7 @@ final class SwiftUITests: XCTestCase {
             @Composable
             override fun ComposeContent(composectx: ComposeContext) {
                 val initialdoublePref = _doublePref.wrappedValue
-                var composedoublePref by androidx.compose.runtime.remember { mutableStateOf(initialdoublePref) }
+                var composedoublePref by remember { mutableStateOf(initialdoublePref) }
                 _doublePref.sync(composedoublePref, { composedoublePref = it })
 
                 body().Compose(composectx)
