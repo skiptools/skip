@@ -63,6 +63,8 @@ struct ADBCommand: SkipCommand {
             return err("The Android Debug Bridge found more than one running Android emulator or connected device. Check device list with adb devices.")
         case "adb: no devices/emulators found":
             return err("No Android emulators or devices were found. Launch Android Studio.app and open the Virtual Device Manager to create an emulator to continue.")
+        case _ where line.hasPrefix("Error:"): // general ADB error output
+            return err(line)
         default:
             return
         }
