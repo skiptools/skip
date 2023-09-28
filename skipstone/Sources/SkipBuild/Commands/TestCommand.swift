@@ -44,6 +44,12 @@ struct TestCommand: SkipCommand {
     var configuration: String = "debug"
 
     func run() async throws {
+        // only run tests when there is a Tests/ folder
+        if FileManager.default.fileExists(atPath: project + "/Tests") {
+            outputOptions.write("No Tests folder")
+            return
+        }
+
         let xunit = xunit ?? ".build/xcunit-\(UUID().uuidString).xml"
 
         func packageName() async throws -> String {
