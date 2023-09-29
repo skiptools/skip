@@ -11,8 +11,11 @@ jobs:
       - run: brew update
       - run: brew install skiptools/skip/skip
       - uses: actions/checkout@v3
-      - run: swift build
-      - run: skip test --plain
+      - name: Test iOS
+        run: |
+          xcodebuild test -jobs 1 -sdk iphonesimulator -destination "platform=iOS Simulator,name=iPhone 14" -skipPackagePluginValidation -configuration debug -scheme $(basename $PWD)
+      - name: Test Robolectric
+        run: skip test --plain
       - name: Setup Android
         run: |
           PACKAGE=$(swift package dump-package | jq -r '.name')
@@ -32,10 +35,6 @@ jobs:
           emulator-boot-timeout: 6000
           script: ./gradlew connectedCheck
           working-directory: .build/android-tests
-      - name: Test iOS
-        run: |
-          killall java
-          xcodebuild test -jobs 1 -sdk iphonesimulator -destination "platform=iOS Simulator,name=iPhone 14" -skipPackagePluginValidation -configuration debug -scheme $(basename $PWD)
       - name: Release
         if: startsWith(github.ref, 'refs/tags/')
         env:
