@@ -1,7 +1,7 @@
 import SwiftSyntax
 
 /// An Xcode-formatted message for the user.
-public struct Message: Error, CustomStringConvertible, Codable {
+public struct Message: Error, Codable {
     public enum Kind: String, Codable, Equatable {
         /// A trace-level statement that will only be emitted in debug mode
         case trace
@@ -36,7 +36,8 @@ public struct Message: Error, CustomStringConvertible, Codable {
         self.sourceRange = sourceDerived.sourceRange
     }
 
-    public var description: String {
+    /// The message with the source path and line number in a way that when output to the Xcode console it will be handled in the report navigator
+    public var formattedMessage: String {
         let messageString = "\(kind.rawValue): \(message)"
         guard let sourceFile else {
             return messageString

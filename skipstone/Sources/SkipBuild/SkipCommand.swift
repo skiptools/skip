@@ -103,7 +103,8 @@ public struct SkipKeyExecutor: SkipCommandExecutor {
         var expiration: Date
         var key: String
 
-        var description: String {
+        
+        func message(ansi: ANSIColor) -> String? {
             """
             id: \(id)
             expiration: \(ISO8601DateFormatter.string(from: expiration, timeZone: TimeZone(secondsFromGMT: 0)!))
@@ -200,10 +201,14 @@ struct VersionCommand: SingleStreamingCommand {
         var version: String = skipVersion
         #if DEBUG
         let debug: Bool = true
-        var description: String { "Skip version \(skipVersion) (debug)" }
+        func message(ansi: ANSIColor) -> String? {
+            "Skip version \(skipVersion) (debug)"
+        }
         #else
         let debug: Bool? = nil
-        var description: String { "Skip version \(skipVersion)" }
+        func message(ansi: ANSIColor) -> String? {
+            "Skip version \(skipVersion)"
+        }
         #endif
     }
 
@@ -263,7 +268,7 @@ struct CheckPhaseOptions: ParsableArguments {
     var directory: String? = nil
 
     @Argument(help: ArgumentHelp("List of files to process"))
-    var files: [String]
+    var files: [String] = []
 }
 
 extension CheckPhase {
@@ -327,57 +332,6 @@ extension AbsolutePath {
     }
 }
 
-extension FileSystem {
-
-    /// A version of `FileSystem.writeIfChanged` that allows control over permissions and size check optimizations.
-    @discardableResult func writeChanges(path: AbsolutePath, checkSize: Bool = true, makeWritable: Bool = true, makeReadOnly: Bool = false, bytes: ByteString) throws -> Bool {
-        if !isFile(path) {
-            return try save()
-        }
-
-        // make sure we can overwrite the file (usually clearing the read-only bit we set after writing the file)
-        if makeWritable && !isWritable(path) {
-            try chmod(.userWritable, path: path)
-        }
-
-        let info = try getFileInfo(path)
-        let size = info.size
-        if size != bytes.count {
-            // different size; they must be different
-            return try save()
-        }
-
-        // compare for changes
-        let changed = try bytes.withData { data1 in
-            try readFileContents(path).withData { data2 in
-                data1 != data2
-            }
-        }
-
-        if changed {
-            return try save()
-        } else {
-            return false // file was unchanged
-        }
-
-        func save() throws -> Bool {
-            if isSymlink(path) {
-                // if the file already exists but it is a link, delete it so we can overwrite it
-                try? removeFileTree(path)
-            }
-            try createDirectory(path.parentDirectory, recursive: true)
-            try writeFileContents(path, bytes: bytes)
-            if makeReadOnly == true {
-                // remove write access
-                try chmod(.userUnWritable, path: path)
-            }
-            return true
-        }
-
-    }
-}
-
-
 
 // MARK: Utilities
 
@@ -412,10 +366,16 @@ extension MessageConvertible {
 }
 
 extension Never: MessageConvertible {
-    public var description: String { "never" }
+    public func message(ansi: ANSIColor) -> String? {
+        nil
+    }
 }
 
 extension Message: MessageConvertible {
+    public func message(ansi: ANSIColor) -> String? {
+        // TODO: use ANSI colors to highlight transpile errors in console environments
+        self.formattedMessage
+    }
 }
 
 /// A command that contains options for how messages will be conveyed to the user
@@ -482,7 +442,7 @@ extension StreamingCommand {
 extension StreamingCommand {
     func warnExperimental(_ experimental: Bool) {
         if experimental {
-            msg(.warning, "the \(Self.configuration.commandName ?? "") command is experimental and may change in minor releases")
+            self.msg(.warning, "the \(Self.configuration.commandName ?? "") command is experimental and may change in minor releases")
         }
     }
 }
@@ -498,10 +458,54 @@ extension SingleStreamingCommand {
 }
 
 
+public struct ANSIColor {
+    public static let plain = ANSIColor(colors: false)
+    public static let colorful = ANSIColor(colors: true)
+
+    /// Whether to use color or plain output
+    public let colors: Bool
+
+    func color(_ string: String, code: String) -> String {
+        if colors == false {
+            return string // return the plain string
+        } else {
+            return code + string + Self.reset
+        }
+    }
+
+    /// Returns the string with and ANSI `black` code when colors are enabled, or the raw string when they are disabled
+    public func black(_ string: String) -> String { color(string, code: Self.black) }
+    /// Returns the string with and ANSI `red` code when colors are enabled, or the raw string when they are disabled
+    public func red(_ string: String) -> String { color(string, code: Self.red) }
+    /// Returns the string with and ANSI `green` code when colors are enabled, or the raw string when they are disabled
+    public func green(_ string: String) -> String { color(string, code: Self.green) }
+    /// Returns the string with and ANSI `yellow` code when colors are enabled, or the raw string when they are disabled
+    public func yellow(_ string: String) -> String { color(string, code: Self.yellow) }
+    /// Returns the string with and ANSI `blue` code when colors are enabled, or the raw string when they are disabled
+    public func blue(_ string: String) -> String { color(string, code: Self.blue) }
+    /// Returns the string with and ANSI `magenta` code when colors are enabled, or the raw string when they are disabled
+    public func magenta(_ string: String) -> String { color(string, code: Self.magenta) }
+    /// Returns the string with and ANSI `cyan` code when colors are enabled, or the raw string when they are disabled
+    public func cyan(_ string: String) -> String { color(string, code: Self.cyan) }
+    /// Returns the string with and ANSI `white` code when colors are enabled, or the raw string when they are disabled
+    public func white(_ string: String) -> String { color(string, code: Self.white) }
+
+    // ANSI escape sequences for text colors
+    private static let reset = "\u{001B}[0m"
+    private static let black = "\u{001B}[30m"
+    private static let red = "\u{001B}[31m"
+    private static let green = "\u{001B}[32m"
+    private static let yellow = "\u{001B}[33m"
+    private static let blue = "\u{001B}[34m"
+    private static let magenta = "\u{001B}[35m"
+    private static let cyan = "\u{001B}[36m"
+    private static let white = "\u{001B}[37m"
+}
+
 /// A type that can be output in a sequence of messages
-public protocol MessageConvertible: Encodable & CustomStringConvertible {
-    /// The attributed output string, used for ANSI terminals
-    // var attributedString: String { get }
+public protocol MessageConvertible: Encodable {
+    /// Returns the message for the output with optional ANSI coloring
+    func message(ansi: ANSIColor) -> String?
 }
 
 public extension StreamingCommand {
@@ -517,8 +521,9 @@ public extension StreamingCommand {
     /// The closure that will output a message
     fileprivate func writeMessage(_ message: Message, output: String? = nil, terminator: String = "\n") {
         if !outputOptions.emitJSON || outputOptions.messagePlain {
-            let message = message.description
-            outputOptions.streams.write(error: !outputOptions.messageErrout, output: output, message, terminator: terminator)
+            if let messageString = message.message(ansi: ANSIColor.plain) {
+                outputOptions.streams.write(error: !outputOptions.messageErrout, output: output, messageString, terminator: terminator)
+            }
         } else {
             yield(message: message)
         }

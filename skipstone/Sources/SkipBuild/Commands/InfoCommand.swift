@@ -29,9 +29,9 @@ struct InfoCommand: SingleStreamingCommand {
         var debug = false
         #endif
 
-        var description: String {
+        func message(ansi: ANSIColor) -> String? {
             """
-            skip: \(version)
+            \(ansi.green("skip")): \(version)
             debug: \(debug)
             os: \(operatingSystemVersion)
             cwd: \(workingDirectory) (\(cwdReadable ? "r" : "")\(cwdWritable ? "w" : "")\(cwdExecutable ? "x" : ""))

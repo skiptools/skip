@@ -98,7 +98,7 @@ extension XCTestCase {
 
         var messages: [Message] = []
         for transpilation in transpilations {
-            let messagesString = transpilation.messages.map(\.description).joined(separator: ",")
+            let messagesString = transpilation.messages.map(\.formattedMessage).joined(separator: ",")
             messages += transpilation.messages
             if !transpilation.messages.isEmpty && !expectMessages && !expectFailure {
                 XCTFail("Transpilation produced unexpected messages: \(messagesString)", file: file, line: line)

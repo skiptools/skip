@@ -7,29 +7,29 @@ import SkipSyntax
 public struct OutputOptions: ParsableArguments {
     @Option(name: [.customShort("o"), .long], help: ArgumentHelp("Send output to the given file (stdout: -)", valueName: "path"))
     var output: String?
-
+    
     @Flag(name: [.customShort("E"), .long], help: ArgumentHelp("Emit messages to the output rather than stderr"))
     var messageErrout: Bool = false
-
+    
     @Flag(name: [.customShort("v"), .long], help: ArgumentHelp("Whether to display verbose messages"))
     var verbose: Bool = false
-
+    
     @Flag(name: [.customShort("q"), .long], help: ArgumentHelp("Quiet mode: suppress output"))
     var quiet: Bool = false
-
+    
     @Flag(name: [.customShort("J"), .long], help: ArgumentHelp("Emit output as formatted JSON"))
     var json: Bool = false
-
+    
     @Flag(name: [.customShort("j"), .long], help: ArgumentHelp("Emit output as compact JSON"))
     var jsonCompact: Bool = false
-
+    
     @Flag(name: [.customShort("M"), .long], help: ArgumentHelp("Emit messages as plain text rather than JSON"))
-    var messagePlain: Bool = false
+    var messagePlain: Bool = ProcessInfo.processInfo.environment["TERM"] == "dumb" || ProcessInfo.processInfo.environment["TERM"] == nil || ProcessInfo.processInfo.environment["CI"] != nil // try to auto-detect when we shouldn't be using ANSI colors
 
     @Flag(name: [.customShort("A"), .long], help: ArgumentHelp("Wrap and delimit JSON output as an array"))
     var jsonArray: Bool = false
 
-    @Flag(name: [.customShort("p"), .long], help: ArgumentHelp("Show no ANSI colors or progress animations"))
+    @Flag(name: [.long], help: ArgumentHelp("Show no ANSI colors or progress animations"))
     var plain: Bool = false
 
     /// progress animation sequences
@@ -125,7 +125,9 @@ public struct OutputOptions: ParsableArguments {
         if emitJSON {
             try streams.write(error: false, output: output, item.toJSON(outputFormatting: [.sortedKeys, .withoutEscapingSlashes, (jsonCompact ? .sortedKeys : .prettyPrinted)], dateEncodingStrategy: .iso8601).utf8String ?? "")
         } else {
-            streams.write(error: messageErrout == true ? false : error, output: output, item.description)
+            if let messageString = item.message(ansi: plain ? ANSIColor.plain : ANSIColor.colorful) {
+                streams.write(error: messageErrout == true ? false : error, output: output, messageString)
+            }
         }
     }
 }

@@ -8,6 +8,13 @@ protocol TranspilePhase: CheckPhase {
     var transpileOptions: TranspilePhaseOptions { get }
 }
 
+/// The file extension for the metadata about skipcode
+let skipcodeExtension = ".skipcode.json"
+
+/// The skip transpile marker that is always output regardless of whether the transpile was successful or not
+let skipbuildMarkerExtension = ".skipbuild"
+
+
 struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
     static var configuration = CommandConfiguration(commandName: "transpile", abstract: "Transpile Swift to Kotlin", shouldDisplay: false)
 
@@ -32,8 +39,9 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
     struct Output : MessageConvertible {
         let transpilation: Transpilation
 
-        var description: String {
-            "transpilation successful: \(transpilation.messages.count > 0 ? transpilation.messages.count.description : "no") messages" // transpilation.sourceFile.url.lastPathComponent
+        func message(ansi: ANSIColor) -> String? {
+            // successful transpile outputs no message so as to not clutter xcode logs
+            return nil
         }
     }
 
@@ -58,11 +66,16 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
         #else
         let v = skipVersion
         #endif
-        info("Skip \(v): transpiling to: \(transpileOptions.outputFolder ?? "nowhere") for: \(sourceFiles.map(\.basename))")
+
+        // show the local time in the transpile output; this helps identify from the Xcode Navigator when an old log file is being replayed for a plugin re-execution
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "HH:mm:ss"
+
+        info("Skip \(v): transpile plugin at \(dateFormatter.string(from: .now)) to: \(transpileOptions.outputFolder ?? "nowhere") for: \(sourceFiles.map(\.basename))")
         try await self.transpile(fs: localFileSystem, sourceFiles: Set(sourceFiles), with: continuation)
     }
 
-    private func transpile(fs: FileSystem, sourceFiles: Set<AbsolutePath>, with continuation: AsyncThrowingStream<OutputMessage, Error>.Continuation) async throws {
+    private func transpile(fs: FileSystem, sourceFiles sourceFileSet: Set<AbsolutePath>, with continuation: AsyncThrowingStream<OutputMessage, Error>.Continuation) async throws {
         // the path that will contain the `skip.yml`
         guard let skipFolder = transpileOptions.skipFolder else {
             throw error("Must specify --skip-folder")
@@ -70,6 +83,10 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
 
         let baseOutputPath = try fs.currentWorkingDirectory ?? fs.tempDirectory
 
+        // the --project flag
+        let projectFolderPath = try AbsolutePath(validating: transpileOptions.projectFolder, relativeTo: baseOutputPath)
+
+        // the --skip-folder flag
         let skipFolderPath = try AbsolutePath(validating: skipFolder, relativeTo: baseOutputPath)
         if !fs.isDirectory(skipFolderPath) {
             throw error("In order to transpile the module, a Skip/ folder must exist and contain a skip.yml file at: \(skipFolderPath)")
@@ -77,6 +94,49 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
 
         guard let outputFolder = transpileOptions.outputFolder else {
             throw error("Must specify --output-folder")
+        }
+        let outputFolderPath = try AbsolutePath(validating: outputFolder, relativeTo: baseOutputPath)
+
+        // when renaming SomeClassA.swift to SomeClassB.swift, the stale SomeClassA.kt file from previous runs will be left behind, and will then cause a "Redeclaration:" error from the Kotlin compiler if they declare the same types
+        // so keep a snapshot of the output folder files that existed at the start of the transpile operation, so we can then clean up any output files that are no longer being produced
+        let outputFilesSnapshot: [URL] = try FileManager.default.enumeratedURLs(of: outputFolderPath.asURL)
+        //msg(.warning, "transpiling to \(outputFolderPath.pathString) with existing files: \(outputFilesSnapshot.map(\.lastPathComponent).sorted().joined(separator: ", "))")
+
+        var outputFiles: [AbsolutePath] = []
+
+        func cleanupStaleOutputFiles() {
+            let staleFiles = Set(outputFilesSnapshot.map(\.path))
+                .subtracting(outputFiles.map(\.pathString))
+            for staleFile in staleFiles.sorted() {
+                let staleFileURL = URL(fileURLWithPath: staleFile, isDirectory: false)
+                msg(.warning, "removing stale output files: \(staleFileURL.lastPathComponent)")
+
+                do {
+                    // don't actually trash it, since the output files often have read-only permissions set, and that prevents trash from working
+                    try FileManager.default.trash(fileURL: staleFileURL, trash: false)
+                } catch {
+                    msg(.warning, "error removing stale output files: \(staleFileURL.lastPathComponent): \(error)")
+                }
+            }
+        }
+
+        /// track every output file written using `addOutputFile` to prevent the file from being cleaned up at the end
+        func addOutputFile(_ path: AbsolutePath) -> AbsolutePath {
+            outputFiles.append(path)
+            return path
+        }
+
+        var inputFiles: [AbsolutePath] = []
+        // add the given file to the list of input files for consideration of mod time
+        func addInputFile(_ path: AbsolutePath) -> AbsolutePath {
+            inputFiles.append(path)
+            return path
+        }
+
+        /// Load the given source file, tracking its last modified date for the timestamp on the `.skipbuild` marker file
+        func inputSource(_ path: AbsolutePath) throws -> ByteString {
+            _ = addInputFile(path)
+            return try fs.readFileContents(path)
         }
 
         guard let moduleRoot = transpileOptions.moduleRoot else {
@@ -98,10 +158,60 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
 
         let _ = primaryModulePath
 
+        func buildSourceList() throws -> (sources: [URL], resources: [URL]) {
+            let allProjectFiles: [URL] = try FileManager.default.enumeratedURLs(of: projectFolderPath.asURL)
+
+            let swiftPathExtensions: Set<String> = ["swift"]
+            let resourcePathExclusions: Set<String> = swiftPathExtensions // resource files are anything that isn't a swift file
+
+            let sourceURLs: [URL] = allProjectFiles.filter({ swiftPathExtensions.contains($0.pathExtension) })
+            let resourceURLs: [URL] = allProjectFiles.filter({ !resourcePathExclusions.contains($0.pathExtension) })
+
+            return (sources: sourceURLs, resources: resourceURLs)
+        }
+
+        let (sourceURLs, resourceURLs) = try buildSourceList()
+
         let moduleBasePath = moduleRootPath.parentDirectory
 
-        // at this point, alway touch the build completion marker
-        defer { try? touchBuildCompletionMarker() }
+        // always touch the build completion marker with the most recent file mod time
+        /// Create a link from the source to the destination; this is used for resources and custom Kotlin files in order to permit edits to target file and have them reflected in the original source
+        func addLink(at linkSource: AbsolutePath, pointingAt destPath: AbsolutePath, relative: Bool) throws {
+            let modTime = try? fs.getFileInfo(destPath).modTime
+            try? fs.removeFileTree(linkSource) // remove any existing link in order to re-create it
+            try fs.createSymbolicLink(addOutputFile(linkSource), pointingAt: destPath, relative: relative)
+            // set the output link mod time to match the source link mod time
+            if let modTime = modTime {
+                // this will try to set the mod time of the *destination* file, which is incorrect (and also not allowed, since the dest is likely outside of our sandboxed write folder list)
+                //try FileManager.default.setAttributes([.modificationDate: modTime], ofItemAtPath: linkSource.pathString)
+
+                // using setResourceValue instead does apply it to the link
+                // https://stackoverflow.com/questions/10608724/set-modification-date-on-symbolic-link-in-cocoa
+                try (linkSource.asURL as NSURL).setResourceValue(modTime, forKey: .contentModificationDateKey)
+            }
+        }
+
+
+        // the shared JSON encoder for serializing .skipcode.json codebase and .skipbuild marker contents
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [
+            .sortedKeys, // needed for deterministic output
+            .withoutEscapingSlashes,
+            //.prettyPrinted, // compacting JSON significantly reduces the size of the codebase files
+        ]
+
+        // touch the build marker with the most recent file time from the complete build list
+        // if we were to touch it afresh every time, the plugin would be re-executed every time
+        defer {
+            do {
+                // get the modification times for all the files we have written and which were used as inputs
+                let fileDates = try (outputFiles + inputFiles).map({ try fs.getFileInfo($0).modTime })
+                // touch the build marker with the max file time of all the inputs and outputs
+                try touchBuildCompletionMarker(at: fileDates.max() ?? Date.now)
+            } catch {
+                msg(.warning, "could not create build completion marker: \(error)")
+            }
+        }
 
         let env = ProcessInfo.processInfo.environment
 
@@ -114,9 +224,11 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
             return
         }
 
-        let kotlinOutputFolder = try AbsolutePath(AbsolutePath(validating: outputFolder, relativeTo: baseOutputPath), "kotlin")
+        // the standard base name for Gradle Kotlin source files
+        let kotlinOutputFolder = AbsolutePath(outputFolderPath, "kotlin")
+
         // the standard base name for resources, which will be linked from a path like: src/main/resources/package/name/resname.ext
-        let resourcesOutputFolder = try AbsolutePath(AbsolutePath(validating: outputFolder, relativeTo: baseOutputPath), "resources")
+        let resourcesOutputFolder = AbsolutePath(outputFolderPath, "resources")
 
         if !fs.isDirectory(kotlinOutputFolder) {
             // e.g.: ~Library/Developer/Xcode/DerivedData/PACKAGE-ID/SourcePackages/plugins/skiphub.output/SkipFoundationKotlinTests/skipstone/SkipFoundation/src/test/kotlin
@@ -125,8 +237,6 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
         }
 
         let packageName = KotlinTranslator.packageName(forModule: primaryModuleName)
-        // skip over any source file whose name would match a copied Kotlin file
-        let sources = sourceFiles.map(\.sourceFile)
 
         // load and merge each of the skip.yml files for the dependent modules
         let (baseSkipConfig, mergedSkipConfig, configMap) = try loadSkipConfig(merge: true)
@@ -136,24 +246,18 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
 
         let codebaseInfo = try await loadCodebaseInfo() // initialize the codebaseinfo and load DependentModuleName.skipcode.json
 
-        var sourceURLs = sourceFiles.map(\.asURL)
-
         let overridden = try linkSkipFolder(skipFolderPath, to: kotlinOutputFolder, topLevel: true)
         let overriddenKotlinFiles = overridden.map({ $0.basename })
 
-        // also check any Kotlin files in the skipFolderFile
+        // also add any Kotlin files in the skipFolderFile to the list of sources
         let skipFolderPathContents = try fs.getDirectoryContents(skipFolderPath)
             .map { AbsolutePath(skipFolderPath, $0) }
 
-        for kotlinFile in skipFolderPathContents {
-            if kotlinFile.extension == "kt" {
-                sourceURLs += [kotlinFile.asURL]
-            }
-        }
+        // validate licenses in all the Skip source files, as well as any custom Kotlin files in the Skip folder
+        try await validateLicense(sourceURLs: sourceURLs + skipFolderPathContents.map(\.asURL).filter({ $0.pathExtension == "kt" }))
 
-        try await validateLicense(sourceURLs: sourceURLs)
+        let transpiler = Transpiler(packageName: packageName, sourceFiles: sourceURLs.map(\.path).sorted().map(Source.FilePath.init(path:)), codebaseInfo: codebaseInfo, preprocessorSymbols: Set(checkOptions.symbols), transformers: transformers)
 
-        let transpiler = Transpiler(packageName: packageName, sourceFiles: sources, codebaseInfo: codebaseInfo, preprocessorSymbols: Set(checkOptions.symbols), transformers: transformers)
         try await transpiler.transpile(handler: handleTranspilation)
         try saveCodebaseInfo() // save out the ModuleName.skipcode.json
 
@@ -161,21 +265,20 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
         try linkResources()
         try generateGradle(for: sourceModules, with: mergedSkipConfig)
 
-        return // everything following is a stage of the transpilation process
+        // finally, remove any "stale" files from the output folder that probably indicate a deleted or renamed file once all the known outputs have been written
+        cleanupStaleOutputFiles()
+        return // done
 
-        /// Load the given source file, tracking its last modified date for the timestamp on the `.skipbuild` marker file
-        func inputSource(_ path: AbsolutePath) throws -> ByteString {
-            try fs.readFileContents(path)
-        }
+        // MARK: Transpilation helper functions
 
         /// The relative path for completion mark file that is always output when the transpile completes
         func skipCompletionMarkerPath(forModule moduleName: String) -> RelativePath {
-            RelativePath(moduleName + ".skipbuild")
+            RelativePath(moduleName + skipbuildMarkerExtension)
         }
 
         /// The relative path for cached codebase info JSON
         func codebaseInfoPath(forModule moduleName: String) -> RelativePath {
-            RelativePath(moduleName + ".skipcode.json")
+            RelativePath(moduleName + skipcodeExtension)
         }
 
         func loadCodebaseInfo() async throws -> CodebaseInfo {
@@ -210,37 +313,43 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
             return codebaseInfo
         }
 
-        func touchBuildCompletionMarker() throws {
+        func writeChanges(tag: String, to outputFilePath: AbsolutePath, contents: ByteString, readOnly: Bool) throws {
+            let changed = try fs.writeChanges(path: addOutputFile(outputFilePath), makeReadOnly: readOnly, bytes: contents)
+            info("\(outputFilePath.relative(to: moduleBasePath).pathString) (\(byteCount(for: .init(contents.count)))) \(tag) \(!changed ? "unchanged" : "written")", sourceFile: outputFilePath.sourceFile)
+        }
+
+        func touchBuildCompletionMarker(at dateOfLastFileChange: Date) throws {
             if !fs.isDirectory(moduleBasePath) {
                 try fs.createDirectory(moduleBasePath, recursive: true)
             }
+
+            struct SkipMarkerContents : Encodable {
+                /// The version of Skip that generates this marker file
+                let skipstone: String = skipVersion
+
+                /// The ordered input paths for source files, in order to identify when input file lists have changed even if none of the contents have
+                let sourceFiles: [String]?
+            }
+
+            let marker = SkipMarkerContents(sourceFiles: sourceURLs.map(\.path))
+            let markerContents = ByteString(Array(try encoder.encode(marker)))
             let outputFilePath = moduleBasePath.appending(skipCompletionMarkerPath(forModule: primaryModuleName))
-            // just save empty data to the file
-            try Data().write(to: outputFilePath.asURL, options: .atomic)
+            try writeChanges(tag: "marker", to: outputFilePath, contents: markerContents, readOnly: false)
         }
 
         func saveCodebaseInfo() throws {
             let outputFilePath = moduleBasePath.appending(codebaseInfoPath(forModule: primaryModuleName))
-
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [
-                .sortedKeys, // needed for deterministic output
-                .withoutEscapingSlashes,
-                //.prettyPrinted,
-            ]
             let codebaseBytes = ByteString(Array(try encoder.encode(codebaseInfo)))
-
-            let codebaseWritten = try fs.writeChanges(path: outputFilePath, checkSize: true, makeReadOnly: true, bytes: codebaseBytes)
-            info("\(outputFilePath.basename) (\(byteCount(for: .init(codebaseBytes.count)))) codebase \(!codebaseWritten ? "unchanged" : "saved")", sourceFile: outputFilePath.sourceFile)
+            try writeChanges(tag: "codebase", to: outputFilePath, contents: codebaseBytes, readOnly: true)
         }
 
         func generateGradle(for sourceModules: [String], with skipConfig: SkipConfig) throws {
-            try generateSettingsGradle()
             try generatePerModuleGradle()
             try generateGradleProperties()
             if let gradleVersion = transpileOptions.gradleVersion as String? {
                 try generateGradleWrapperProperties(version: gradleVersion)
             }
+            try generateSettingsGradle()
 
             func generatePerModuleGradle() throws {
                 let buildContents = (skipConfig.build ?? .init()).generate(context: .init(dsl: .kotlin))
@@ -253,8 +362,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
 
                 """ + buildContents
 
-                let changed = try fs.writeChanges(path: buildGradle, makeReadOnly: true, bytes: ByteString(encodingAsUTF8: contents))
-                info("\(buildGradle.basename) (\(byteCount(for: .init(contents.count)))) \(!changed ? "unchanged" : "saved")", sourceFile: buildGradle.sourceFile)
+                try writeChanges(tag: "gradle build", to: buildGradle, contents: ByteString(encodingAsUTF8: contents), readOnly: true)
             }
 
             func generateSettingsGradle() throws {
@@ -282,8 +390,8 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
                     """
                 }
 
-                let changed = try fs.writeChanges(path: settingsPath, makeReadOnly: true, bytes: ByteString(encodingAsUTF8: settingsContents))
-                info("\(settingsPath.basename) (\(byteCount(for: .init(settingsContents.count)))) \(!changed ? "unchanged" : "written")", sourceFile: settingsPath.sourceFile)
+                try writeChanges(tag: "gradle settings", to: settingsPath, contents: ByteString(encodingAsUTF8: settingsContents), readOnly: true)
+                msg(.note, "\(primaryModuleName): Gradle build file: \(settingsPath.pathString)", sourceFile: settingsPath.sourceFile)
             }
 
             /// Create the gradle-wrapper.properties file, which will dictate which version of Gradle that Android Studio should use to build the project.
@@ -295,8 +403,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
                 distributionUrl=https\\://services.gradle.org/distributions/gradle-\(version)-all.zip
                 """
 
-                let changed = try fs.writeChanges(path: gradleWrapperPath, makeReadOnly: true, bytes: ByteString(encodingAsUTF8: gradeWrapperContents))
-                info("\(gradleWrapperPath.basename) (\(byteCount(for: .init(gradeWrapperContents.count)))) \(!changed ? "unchanged" : "written")", sourceFile: gradleWrapperPath.sourceFile)
+                try writeChanges(tag: "gradle wrapper", to: gradleWrapperPath, contents: ByteString(encodingAsUTF8: gradeWrapperContents), readOnly: true)
             }
 
             func generateGradleProperties() throws {
@@ -309,8 +416,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
                 android.suppressUnsupportedCompileSdk=34
                 """
 
-                let changed = try fs.writeChanges(path: gradlePropertiesPath, makeReadOnly: true, bytes: ByteString(encodingAsUTF8: gradePropertiesContents))
-                info("\(gradlePropertiesPath.basename) (\(byteCount(for: .init(gradePropertiesContents.count)))) \(!changed ? "unchanged" : "written")", sourceFile: gradlePropertiesPath.sourceFile)
+                try writeChanges(tag: "gradle config", to: gradlePropertiesPath, contents: ByteString(encodingAsUTF8: gradePropertiesContents), readOnly: true)
             }
         }
 
@@ -455,7 +561,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
         /// and other custom resources.
         ///
         /// Any Kotlin files that are overridden will not be transpiled.
-        func linkSkipFolder(_ path: AbsolutePath, to outputFilePath: AbsolutePath, topLevel: Bool, makeLinks: Bool = true) throws -> Set<AbsolutePath> {
+        func linkSkipFolder(_ path: AbsolutePath, to outputFilePath: AbsolutePath, topLevel: Bool) throws -> Set<AbsolutePath> {
             var copiedFiles: Set<AbsolutePath> = []
             for fileName in try fs.getDirectoryContents(path) {
                 if fileName.hasPrefix(".") {
@@ -466,23 +572,15 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
 
                 if fs.isDirectory(sourcePath) {
                     // make recursive folders for sub-linked resources
-                    let subPaths = try linkSkipFolder(sourcePath, to: outputPath, topLevel: false, makeLinks: makeLinks)
+                    let subPaths = try linkSkipFolder(sourcePath, to: outputPath, topLevel: false)
                     copiedFiles.formUnion(subPaths)
                 } else {
                     if let outputFilePath = kotlinOutputPath(for: sourcePath.basename, in: topLevel ? nil : outputFilePath) {
                         copiedFiles.insert(outputFilePath)
-                        if makeLinks {
-                            // we make links instead of copying so the file can be edited from the gradle project structure without needing to be manually synchronized
-                            try? fs.removeFileTree(outputFilePath)
-                            try fs.createDirectory(outputFilePath.parentDirectory, recursive: true) // ensure parent exists
-                            try fs.createSymbolicLink(outputFilePath, pointingAt: sourcePath, relative: false)
-                            trace("linked overridden source: \(sourcePath.pathString) to: \(outputFilePath.pathString)", sourceFile: sourcePath.sourceFile)
-                            info("\(outputFilePath.basename) override linked from project", sourceFile: sourcePath.sourceFile)
-                        } else {
-                            try fs.writeChanges(path: outputFilePath, checkSize: true, bytes: inputSource(sourcePath))
-                            trace("copied overridden source: \(sourcePath.pathString) to: \(outputFilePath.pathString)", sourceFile: sourcePath.sourceFile)
-                            info("\(outputFilePath.basename) copied from project", sourceFile: sourcePath.sourceFile)
-                        }
+                        try fs.createDirectory(outputFilePath.parentDirectory, recursive: true) // ensure parent exists
+                        // we make links instead of copying so the file can be edited from the gradle project structure without needing to be manually synchronized
+                        try addLink(at: outputFilePath, pointingAt: sourcePath, relative: false)
+                        info("\(outputFilePath.relative(to: moduleBasePath).pathString) override linked from project source \(sourcePath.pathString)", sourceFile: sourcePath.sourceFile)
                     }
                 }
             }
@@ -502,11 +600,12 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
             let (outputFile, changed, overridden) = try saveTranspilation()
 
             // 2 separate log messages, one linking to the source swift and the second linking to the kotlin
-            if !transpilation.isSourceFileSynthetic {
-                info("\(sourcePath.basename) (\(byteCount(for: .init(sourceSize)))) transpiling to \(outputFile.basename)", sourceFile: transpilation.sourceFile)
-            }
+            // this makes the log rather noisy, and isn't very useful
+            //if !transpilation.isSourceFileSynthetic {
+            //    info("\(sourcePath.basename) (\(byteCount(for: .init(sourceSize)))) transpiling to \(outputFile.basename)", sourceFile: transpilation.sourceFile)
+            //}
 
-            info("\(outputFile.basename) (\(byteCount(for: transpilation.output.content.lengthOfBytes(using: .utf8)))) transpilation \(overridden ? "overridden" : !changed ? "unchanged" : "saved") from \(sourcePath.basename) (\(byteCount(for: .init(sourceSize)))) in \(Int64(transpilation.duration * 1000)) ms", sourceFile: overridden ? transpilation.sourceFile : outputFile.sourceFile)
+            info("\(outputFile.relative(to: moduleBasePath).pathString) (\(byteCount(for: transpilation.output.content.lengthOfBytes(using: .utf8)))) transpilation \(overridden ? "overridden" : !changed ? "unchanged" : "saved") from \(sourcePath.basename) (\(byteCount(for: .init(sourceSize)))) in \(Int64(transpilation.duration * 1000)) ms", sourceFile: overridden ? transpilation.sourceFile : outputFile.sourceFile)
 
             for message in transpilation.messages {
                 //writeMessage(message)
@@ -534,7 +633,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
                 }
 
                 let kotlinBytes = ByteString(encodingAsUTF8: transpilation.output.content)
-                let fileWritten = try fs.writeChanges(path: outputFilePath, checkSize: true, makeReadOnly: true, bytes: kotlinBytes)
+                let fileWritten = try fs.writeChanges(path: addOutputFile(outputFilePath), checkSize: true, makeReadOnly: true, bytes: kotlinBytes)
 
                 trace("wrote to: \(outputFilePath)\(!fileWritten ? " (unchanged)" : "")", sourceFile: outputFilePath.sourceFile)
 
@@ -547,7 +646,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
                     //.prettyPrinted,
                 ]
                 let sourceMapData = try encoder.encode(transpilation.outputMap)
-                try fs.writeChanges(path: sourceMappingPath, makeReadOnly: true, bytes: ByteString(sourceMapData))
+                try fs.writeChanges(path: addOutputFile(sourceMappingPath), makeReadOnly: true, bytes: ByteString(sourceMapData))
 
                 return (output: outputFilePath, changed: fileWritten, overridden: false)
             }
@@ -562,7 +661,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
 
             var resourcesIndex: [String] = []
 
-            for resourceFile in self.transpileOptions.resources {
+            for resourceFile in resourceURLs.map(\.path).sorted() {
                 guard let resourceSourceURL = moduleNamePaths.compactMap({ (_, folder) in
                     resourceFile.hasPrefix(folder) ? URL(fileURLWithPath: resourceFile.dropFirst(folder.count).trimmingCharacters(in: CharacterSet(charactersIn: "/")).description, relativeTo: URL(fileURLWithPath: folder, isDirectory: true)) : nil }).first else {
                     msg(.warning, "no module root parent for \(resourceFile)")
@@ -581,12 +680,12 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
 
                 // only create links for files that exist
                 if fs.isFile(sourcePath) {
-                    info("linking resource \(destinationPath.pathString) to \(sourcePath.sourceFile)", sourceFile: sourcePath.sourceFile)
+                    info("\(destinationPath.relative(to: moduleBasePath).pathString) linking to \(sourcePath.pathString)", sourceFile: sourcePath.sourceFile)
                     try fs.createDirectory(destinationPath.parentDirectory, recursive: true)
                     if fs.isSymlink(destinationPath) {
                         try fs.removeFileTree(destinationPath) // clear any pre-existing symlink
                     }
-                    try fs.createSymbolicLink(destinationPath, pointingAt: sourcePath, relative: false)
+                    try addLink(at: destinationPath, pointingAt: sourcePath, relative: false)
                 }
             }
 
@@ -594,7 +693,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
 
             if !resourcesIndex.isEmpty {
                 // write out the resources index file that acts as the directory for Java/Android resources
-                try fs.writeChanges(path: indexPath, bytes: ByteString(encodingAsUTF8: resourcesIndex.sorted().joined(separator: "\n")))
+                try fs.writeChanges(path: addOutputFile(indexPath), bytes: ByteString(encodingAsUTF8: resourcesIndex.sorted().joined(separator: "\n")))
                 info("indexed \(resourcesIndex.count) resources at \(indexPath.pathString)", sourceFile: indexPath.sourceFile)
             } else {
                 // remove the resources file if it should be empty
@@ -637,7 +736,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
                         try createMergedLinkTree(from: fromSubPath, to: "../" + relative + "/" + fsEntry)
                     }
                 } else {
-                    try fs.createSymbolicLink(fromPath, pointingAt: destPath, relative: true)
+                    try addLink(at: fromPath, pointingAt: destPath, relative: true)
                 }
             }
 
@@ -668,14 +767,14 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
 }
 
 struct TranspilePhaseOptions: ParsableArguments {
+    @Option(name: [.customLong("project"), .long], help: ArgumentHelp("The project folder to transpile", valueName: "folder"))
+    var projectFolder: String // --project
+
     @Option(help: ArgumentHelp("Condition for transpile phase", valueName: "force/no"))
     var transpile: PhaseGuard = .onDemand // --transpile
 
     @Option(name: [.customLong("module")], help: ArgumentHelp("ModuleName:SourcePath", valueName: "module"))
     var moduleNames: [String] = [] // --module name:path
-
-    @Option(name: [.customLong("resource")], help: ArgumentHelp("Resource path to link", valueName: "file"))
-    var resources: [String] = [] // --resource Source/App/Resources/fr.lproj/Localizable.strings
 
     @Option(name: [.customLong("link")], help: ArgumentHelp("ModuleName:LinkPath", valueName: "module"))
     var linkPaths: [String] = [] // --link name:path
@@ -707,3 +806,99 @@ extension TranspilePhase {
         return (checkResult, transpileResult)
     }
 }
+
+extension URL {
+    /// The path from this URL, validatating that it is an absolute path
+    var absolutePath: AbsolutePath {
+        get throws {
+            try AbsolutePath(validating: path)
+        }
+    }
+}
+
+extension FileManager {
+    /// Remove the given file URL, attempting to trash it when on macOS, otherwise just deleting it
+    public func trash(fileURL: URL, trash: Bool) throws {
+        if trash, #available(macOS 10.12, *) {
+            do {
+                // make sure it is writeable, since trashItem will fail if it is not
+                try localFileSystem.chmod(.userWritable, path: fileURL.absolutePath)
+
+                // trash it on macOS so the user can recover it from the trash
+                try FileManager.default.trashItem(at: fileURL, resultingItemURL: nil)
+            } catch {
+                // just in case trash fails for some other reason (e.g., disk full), try calling remove directly
+                try FileManager.default.removeItem(at: fileURL)
+            }
+        } else {
+            // trash not supported
+            try FileManager.default.removeItem(at: fileURL)
+        }
+    }
+
+    /// Returns the deep contents of a given directory URL.
+    public func enumeratedURLs(of folderURL: URL) throws -> [URL] {
+        var childFileURLs: [URL] = []
+
+        if let fileURLs = self.enumerator(at: folderURL, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles, .skipsPackageDescendants]) {
+            for case let fileURL as URL in fileURLs {
+                if try fileURL.resourceValues(forKeys:[.isRegularFileKey]).isRegularFile == true {
+                    childFileURLs.append(fileURL)
+                }
+            }
+        }
+
+        return childFileURLs
+    }
+}
+
+extension FileSystem {
+
+    /// A version of `FileSystem.writeIfChanged` that allows control over permissions and size check optimizations.
+    @discardableResult func writeChanges(path: AbsolutePath, checkSize: Bool = true, makeWritable: Bool = true, makeReadOnly: Bool = false, bytes: ByteString) throws -> Bool {
+        if !isFile(path) {
+            return try save()
+        }
+
+        // make sure we can overwrite the file (usually clearing the read-only bit we set after writing the file)
+        if makeWritable && !isWritable(path) {
+            try chmod(.userWritable, path: path)
+        }
+
+        let info = try getFileInfo(path)
+        let size = info.size
+        if size != bytes.count {
+            // different size; they must be different
+            return try save()
+        }
+
+        // compare for changes
+        let changed = try bytes.withData { data1 in
+            try readFileContents(path).withData { data2 in
+                data1 != data2
+            }
+        }
+
+        if changed {
+            return try save()
+        } else {
+            return false // file was unchanged
+        }
+
+        func save() throws -> Bool {
+            if isSymlink(path) {
+                // if the file already exists but it is a link, delete it so we can overwrite it
+                try? removeFileTree(path)
+            }
+            try createDirectory(path.parentDirectory, recursive: true)
+            try writeFileContents(path, bytes: bytes)
+            if makeReadOnly == true {
+                // remove write access
+                try chmod(.userUnWritable, path: path)
+            }
+            return true
+        }
+
+    }
+}
+

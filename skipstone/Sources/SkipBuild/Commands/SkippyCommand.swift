@@ -15,11 +15,19 @@ struct SkippyCommand: AsyncParsableCommand, CheckPhase {
     @Option(help: ArgumentHelp("Suffix for output file", valueName: "suffix"))
     var outputSuffix: String?
 
+    @Option(help: ArgumentHelp("Allow missing source files", valueName: "allow"))
+    var allowMissingSources: Bool = true
+
     func run() async throws {
         try await perform(on: checkOptions.files.map({ Source.FilePath(path: $0) }), options: checkOptions)
     }
 
-    func perform(on sourceFiles: [Source.FilePath], options: CheckPhaseOptions) async throws {
+    func perform(on candidateSourceFiles: [Source.FilePath], options: CheckPhaseOptions) async throws {
+        // due to FB12969712 https://github.com/apple/swift-package-manager/issues/6816 , we need to tolerate missing source files because Xcode sends the same cached list of sources regardless of changes to the underlying project structure
+        let sourceFiles = candidateSourceFiles.filter({
+            !allowMissingSources || FileManager.default.fileExists(atPath: $0.path)
+        })
+
         for sourceFile in sourceFiles {
             let source = try Source(file: sourceFile)
             let syntaxTree = SyntaxTree(source: source, preprocessorSymbols: Set(options.symbols), unavailableAPI: KotlinUnavailableAPI())
