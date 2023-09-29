@@ -23,13 +23,9 @@ import PackagePlugin
     //let skipcodeExtension = ".skipcode.json"
 
     /// The skip transpile marker that is always output regardless of whether the transpile was successful or not
-    let skipbuildMarker = ".skipbuild"
+    let skipbuildMarkerExtension = ".skipbuild"
 
-    /// The process identifier for Xcode, which is used to determine whether plugins go in the "plugins/package-name.output" or "plugins/package-name" folder.
-    let xcodeIdentifier = "com.apple.dt.Xcode"
-
-    //let outputSuffix = "_skippy.swift"
-    let outputSuffix = ".skippy"
+    let skippyOuptputExtension = ".skippy"
 
     func createBuildCommands(context: PluginContext, target: Target) async throws -> [Command] {
         if skipRootTargetNames.contains(target.name) {
@@ -54,7 +50,7 @@ import PackagePlugin
         let runner = try context.tool(named: skipPluginCommandName).path
         let inputPaths = target.sourceFiles(withSuffix: ".swift").map { $0.path }
         let outputDir = context.pluginWorkDirectory.appending(subpath: skippyOutputFolder)
-        return inputPaths.map { Command.buildCommand(displayName: "Skippy \(target.name): \($0.lastComponent)", executable: runner, arguments: ["skippy", "--output-suffix", outputSuffix, "-O", outputDir.string, $0.string], inputFiles: [$0], outputFiles: [$0.outputPath(in: outputDir, suffix: outputSuffix)]) }
+        return inputPaths.map { Command.buildCommand(displayName: "Skippy \(target.name): \($0.lastComponent)", executable: runner, arguments: ["skippy", "--output-suffix", skippyOuptputExtension, "-O", outputDir.string, $0.string], inputFiles: [$0], outputFiles: [$0.outputPath(in: outputDir, suffix: skippyOuptputExtension)]) }
     }
 
     func createTranspileBuildCommands(context: PluginContext, target: SourceModuleTarget) async throws -> [Command] {
@@ -108,17 +104,9 @@ import PackagePlugin
             peerTarget = dependencyTarget
         }
 
-        guard let swiftSourceTarget  = peerTarget as? SourceModuleTarget else {
+        guard let swiftSourceTarget = peerTarget as? SourceModuleTarget else {
             throw SkipPluginError(errorDescription: "Peer target «\(peerTarget.name)» was not a source module")
         }
-
-        let swiftSourceFiles = swiftSourceTarget.sourceFiles.filter({ $0.type == .source })
-
-        guard !swiftSourceFiles.isEmpty else {
-            throw SkipPluginError(errorDescription: "The target «\(peerTarget.name)» does not contain any .swift files for transpilation.")
-        }
-
-        let sourceFilePaths = swiftSourceFiles.map(\.path.string)
 
         func recursivePackageDependencies(for package: Package) -> [PackageDependency] {
             package.dependencies + package.dependencies.flatMap({ recursivePackageDependencies(for: $0.package) })
@@ -133,27 +121,11 @@ import PackagePlugin
             }
         }
 
-        // the input files consist of all the swift, kotlin, and .yml files in all of the sources
-        // having no inputs or outputs in Xcode seems to result in the command running *every* time, but in SPM is appears to have the opposite effect: it never seems to run when there are no inputs or outputs
-        //#warning("build sourceFiles from directory rather than from SPM")
-        let sourceDir = target.directory
-        // TODO: find .swift files in tree
-        let _ = sourceDir
-
-        // collect the resources for linking
-        var resourceArgs: [String] = []
-        for resource in swiftSourceTarget.sourceFiles.filter({ $0.type == .resource }) {
-            resourceArgs += ["--resource", resource.path.string]
-        }
-
         // the output files contains the .skipcode.json, and the input files contains all the dependent .skipcode.json files
         let outputURL = URL(fileURLWithPath: outputFolder.string, isDirectory: true)
         //let skipcodeOutputPath = Path(outputURL.appendingPathComponent(peerTarget.name + skipcodeExtension).path)
-        let skipbuildMarkerOutputPath = Path(outputURL.appendingPathComponent(peerTarget.name + skipbuildMarker).path)
+        let skipbuildMarkerOutputPath = Path(outputURL.appendingPathComponent(peerTarget.name + skipbuildMarkerExtension).path)
         //Diagnostics.remark("add skipbuild output for \(target.name): \(skipbuildMarkerOutputPath)", file: skipbuildMarkerOutputPath.string)
-
-        let outputFiles: [Path] = [skipbuildMarkerOutputPath]
-        var inputFiles: [Path] = target.sourceFiles.map(\.path) + swiftSourceTarget.sourceFiles.map(\.path)
 
         struct Dep : Identifiable {
             let package: Package
@@ -212,6 +184,11 @@ import PackagePlugin
         var deps = dependencies(for: target.dependencies, in: context.package)
         deps = makeUniqueById(deps)
 
+        let outputFiles: [Path] = [skipbuildMarkerOutputPath]
+        // input files consist of the source folder itself (we can't rely on individual files due to ), as well as all the dependent module output build marker files, which will be modified whenever a transpiled module changes
+        // note that using the directory as the input will cause the transpile to re-run for any sub-folder change, although this behavior is not explicitly documented
+        var inputFiles: [Path] = [target.directory]
+
         for dep in deps {
             guard let depTarget = dep.target as? SourceModuleTarget else {
                 // only consider source module targets
@@ -228,14 +205,20 @@ import PackagePlugin
                 // until the dependent modules have all been transpiled and their skipcode JSON files emitted
                 //let skipcodeInputFile = outputFolder.appending(subpath: moduleLinkTarget + skipcodeExtension)
 
-                // new build system: always output a .skipbuild so the transiler can skip the run for unsupported platforms (i.e., non-macOS) and still be able to use the same input files without the plugin needing to know the target platform (which seems to be a deficiency in the plugin environment)
-                let buildMarkerInputFile = outputFolder.appending(subpath: moduleLinkTarget + skipbuildMarker)
-                let buildMarkerInputURL = URL(fileURLWithPath: buildMarkerInputFile.string)
-                let buildMarkerStandardizedPath = Path(buildMarkerInputURL.standardized.path)
+                // output a .skipbuild file contains all the input files, so the transpile will be re-run when any of the input sources have changed
+                let markerFile = outputFolder.appending(subpath: moduleLinkTarget + skipbuildMarkerExtension)
+                // need to standardize the path to remove ../../ elements form the symlinks, otherwise the input and output paths don't match and Xcode will re-build everything each time
+                let markerFileStandardized = Path(URL(fileURLWithPath: markerFile.string, isDirectory: false).standardized.path)
+                inputFiles.append(markerFileStandardized)
+
+                //Diagnostics.remark("add skipbuild input for \(depTarget.name): \(buildMarkerInputFilePath.path)", file: buildMarkerInputFile.string)
                 //Diagnostics.remark("add build marker input to \(depTarget.name): \(buildMarkerStandardizedPath)", file: buildMarkerStandardizedPath.string)
-                inputFiles.append(buildMarkerStandardizedPath)
             }
         }
+
+        // due to FB12969712 https://github.com/apple/swift-package-manager/issues/6816 , we cannot trust the list of input files sent to the plugin because Xcode caches them onces and doesn't change them when the package source file list changes (unless first manually running: File -> Packages -> Reset Package Caches)
+        // so instead we just pass the targets folder to the skip tool, and rely on it the tool to walk the file system and determine which files have changed or been renamed
+        //let inputSources = target.sourceFiles // source file list will be built by walking the --project flag instead
 
         let outputBase = URL(fileURLWithPath: kotlinModule, isDirectory: true, relativeTo: outputURL)
         let sourceBase = URL(fileURLWithPath: isTest ? "src/test" : "src/main", isDirectory: true, relativeTo: outputBase)
@@ -243,15 +226,12 @@ import PackagePlugin
         return [
             .buildCommand(displayName: "Skip \(target.name)", executable: skip.path, arguments: [
                 "transpile",
+                "--project", swiftSourceTarget.directory.string,
+                "--skip-folder", skipFolder.string,
                 "--output-folder", sourceBase.path,
                 "--module-root", outputBase.path,
-                "--skip-folder", skipFolder.string,
-                //"--env-disable", "CLANG_COVERAGE_MAPPING", // only run if the given environment is unset (CLANG_COVERAGE_MAPPING is enabled for App target, but Aggregate target disables it)
-                //"--env-enable", "SKIP_TARGET", // or run if we explicitly set this environment variable
                 ]
-                + resourceArgs
-                + buildModuleArgs
-                + sourceFilePaths,
+                + buildModuleArgs,
                 inputFiles: inputFiles,
                 outputFiles: outputFiles)
         ]
