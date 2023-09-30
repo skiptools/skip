@@ -48,6 +48,18 @@ jobs:
 
           echo "COMMIT_DATE=$(git log -1 --format=%ad --date=iso-strict ${GITHUB_REF#refs/tags/})" >> $GITHUB_ENV
 
+          # the primary skip module is the first product name
+          echo "SKIP_MODULE=$(swift package dump-package | jq -r '.products[0].name')" >> $GITHUB_ENV
+
+          SKIP_MODULE=$(swift package dump-package | jq -r '.products[0].targets[0]')
+          echo "SKIP_MODULE=${SKIP_MODULE}" >> $GITHUB_ENV
+
+          # a SKIP_MODULE like MyApp needs to be have a MyApp.xcodeproj folder
+          XCODE_SETTINGS=$(xcodebuild -showBuildSettings -alltargets -json -project ${SKIP_MODULE}.xcodeproj)
+
+          # log the build settings
+          echo "${XCODE_SETTINGS}" | jq .
+
           # update App.xcconfig to set version string to the latest semver tag
           sed -i '' "s;MARKETING_VERSION = .*;MARKETING_VERSION = $(git describe --tags --abbrev=0 --match '[0-9]*\.[0-9]*\.[0-9]*' --first-parent);g" App.xcconfig
 
@@ -104,8 +116,6 @@ jobs:
 
       - name: Assemble Kotlin Source
         run: |
-          # the primary skip module is the first target of the first product
-          SKIP_MODULE=$(swift package dump-package | jq -r '.products[0].targets[0]')
           cd .build/DerivedData/SourcePackages/plugins/*.output/${SKIP_MODULE}/skipstone/
           rm -rf .gradle .build */.build
           # create the zip file with predictable timestamps for reproducibility
@@ -117,7 +127,6 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         run: |
           APPNAME="App"
-          SKIP_MODULE=$(swift package dump-package | jq -r '.products[0].targets[0]')
           # merge the ipa and apk zips into a single archive
           cd ${RELDIR}/
           ls -la
