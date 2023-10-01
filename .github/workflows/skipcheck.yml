@@ -12,11 +12,11 @@ jobs:
       DEVELOPER_DIR: /Applications/Xcode_15.0.app/Contents/Developer
     steps:
       - run: brew install skiptools/skip/skip
-      - run: skip doctor --plain
-      - run: skip checkup --plain
-      - run: skip lib create --plain --build --test -d `mktemp -d` skppkg Mod1 Mod2
-      - run: skip app create --plain --build --test -d `mktemp -d` skpapp
-      - run: skip app create --template skipapp-weather --plain --build --test -d `mktemp -d` skpapp
-      #- run: skip app create --template skipapp-playground --plain --build --test -d `mktemp -d` skpapp
-      #- run: skip app create --template skipapp-hello --plain --build --test -d `mktemp -d` skpapp
+      - run: skip doctor
+      - run: skip checkup
+      - run: skip lib init --build --test -d $(mktemp -d) skppkg Mod1 Mod2
+      - run: skip app init --build --test -d $(mktemp -d) skpapp
+      - run: skip app init --template skipapp-weather --build --test -d $(mktemp -d) skpapp
+      #- run: skip app init --template skipapp-playground --build --test -d $(mktemp -d) skpapp
+      #- run: skip app init --template skipapp-hello --build --test -d $(mktemp -d) skpapp
 
