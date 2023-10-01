@@ -238,6 +238,7 @@ extension GradleHarness {
     /// If the error:, warning:, or note: string is present, Xcode adds your message to the build logs. If the issue occurs in a specific file, include the filename as an absolute path. If the issue occurs at a specific line in the file, include the line number as well. The filename and line number are optional.
     public func scanGradleOutput(line1: String, line2: String) {
         if let kotlinIssue = parseGradleOutput(line1: line1, line2: line2) {
+            // check for match Swift source lines
             if let swiftIssue = try? kotlinIssue.location.findSourceMapLine() {
                 print(GradleIssue(kind: kotlinIssue.kind, message: kotlinIssue.message, location: swiftIssue).xcodeMessageString)
             }
@@ -249,6 +250,7 @@ extension GradleHarness {
     /// Parse a 2-line output buffer for the gradle command and look for error or warning pattern, optionally mapping back to the source Swift location when the location is found in a known .skipcode.json file.
     public func parseGradleOutput(line1: String, line2: String) -> GradleIssue? {
         // check against known Kotlin error patterns
+        // e.g.: "e: file:///PATH/build.gradle.kts:102:17: Unresolved reference: option"
         if let issue = parseKotlinErrorOutput(line: line1) {
             return issue
         }
@@ -260,7 +262,7 @@ extension GradleHarness {
     }
 
     private func parseGradleErrorOutput(line1: String, line2: String) -> GradleIssue? {
-        guard let matchResult = gradleIssuePattern.firstMatch(in: line1, range: NSRange(line1.startIndex..., in: line1)) else {
+        guard let matchResult = gradleFailurePattern.firstMatch(in: line1, range: NSRange(line1.startIndex..., in: line1)) else {
             return nil
         }
 
@@ -283,7 +285,7 @@ extension GradleHarness {
     }
 
     private func parseKotlinErrorOutput(line: String) -> GradleIssue? {
-        guard let match = kotlinIssuePattern.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)) else {
+        guard let match = gradleIssuePattern.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)) else {
             return nil
         }
         let l = (line as NSString)
@@ -371,7 +373,7 @@ extension GradleHarness {
 
         var exitCode: ProcessResult.ExitStatus? = nil
         let (output, _) = try await driver.launchGradleProcess(in: projectRoot(forModule: moduleName, packageName: packageName), module: appName, actions: acts, arguments: arguments, info: false, rerunTasks: false, exitHandler: { result in
-            print("GRADLE RESULT: \(result)")
+            print("note: Gradle command result: \(result)")
             exitCode = result.exitStatus
         })
 
@@ -405,8 +407,15 @@ public struct AppLaunchError : LocalizedError {
 // /DerivedData/Skip-Everything/SourcePackages/plugins/skipapp-weather.output/WeatherAppUI/skipstone/WeatherAppUI/src/main/AndroidManifest.xml:18:13-69 Error:
 
 
-fileprivate let kotlinIssuePattern = try! NSRegularExpression(pattern: #"^([we]): file://(.*):([0-9]+):([0-9]+) (.*)$"#)
-fileprivate let gradleIssuePattern = try! NSRegularExpression(pattern: #"^/(.*):([0-9]+):([0-9]+)-([0-9]+) (Error|Warning):$"#)
+/// Gradle-formatted lines start with "e:" or "w:", and the line:column specifer seems to sometimes trail with a colon and other times not
+let gradleIssuePattern = try! NSRegularExpression(pattern: #"^([we]): file://(.*):([0-9]+):([0-9]+)[:]* +(.*)$"#)
+let gradleFailurePattern = try! NSRegularExpression(pattern: #"^/(.*):([0-9]+):([0-9]+)-([0-9]+) (Error|Warning):$"#)
+
+extension NSRegularExpression {
+    func matches(in string: String, options: MatchingOptions = []) -> [NSTextCheckingResult] {
+        matches(in: string, options: options, range: NSRange(string.startIndex ..< string.endIndex, in: string))
+    }
+}
 
 /// A source-related issue reported during the execution of Gradle. In the form of:
 ///

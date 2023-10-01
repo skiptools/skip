@@ -1,21 +1,32 @@
 // Copyright 2023 Skip
 import XCTest
 import SkipDrive
-#if canImport(SkipBuild)
-import SkipBuild
-#endif
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 class SkipCommandTests : XCTestCase {
     func testSkipVersion() async throws {
-        try await XCTAssertEqualX("Skip version \(skipVersion)", skip("version").out)
+        var versionOut = try await skip("version").out
+        if versionOut.hasSuffix(" (debug)") {
+            versionOut.removeLast(" (debug)".count)
+        }
+
+        XCTAssertEqual("Skip version \(SkipDrive.skipVersion)", versionOut)
+    }
+
+    func testSkipVersionJSON() async throws {
+        try await XCTAssertEqualAsync(SkipDrive.skipVersion, skip("version", "--json").out.parseJSONObject()["version"] as? String)
     }
 
     func testSkipWelcome() async throws {
         try await skip("welcome")
     }
 
-    func testSkipCheckup() async throws {
+    func testSkipWelcomeJSON() async throws {
+        let welcome = try await skip("welcome", "--json", "--json-array").out.parseJSONArray()
+        XCTAssertNotEqual(0, welcome.count, "Welcome message should not be empty")
+    }
+
+    func XXXtestSkipCheckup() async throws {
         try await skip("checkup")
     }
 
@@ -25,29 +36,31 @@ class SkipCommandTests : XCTestCase {
 
     func testSkipCreate() async throws {
         let tempDir = try mktmp()
+        let templateModuleName = "WeatherApp"
         let name = "cool_app"
-        let (stdout, _) = try await skip("create", "--no-build", "--no-test", "-d", tempDir, name)
+        let (stdout, _) = try await skip("app", "create", "--no-build", "--no-test", "-d", tempDir, name)
         //print("skip create stdout: \(stdout)")
         let out = stdout.split(separator: "\n")
         XCTAssertEqual("Creating project \(name) from template skipapp", out.first)
         let dir = tempDir + "/" + name + "/"
-        for path in ["Package.swift", "App.xcodeproj", "App.xcconfig", "Sources", "Tests"] {
+        for path in ["Package.swift", templateModuleName + ".xcodeproj", "App.xcconfig", "Sources", "Tests"] {
             XCTAssertTrue(FileManager.default.fileExists(atPath: dir + path), "missing file at: \(path)")
         }
 
         let project = try await loadProjectPackage(dir)
-        XCTAssertEqual("App", project.name)
+        XCTAssertEqual(templateModuleName, project.name)
 
-        let config = try await loadProjectConfig(dir + "/App.xcodeproj", scheme: "App")
-        XCTAssertEqual("App", config.first?.buildSettings["PROJECT_NAME"])
+        let config = try await loadProjectConfig(dir + "/\(templateModuleName).xcodeproj", scheme: "App")
+        XCTAssertEqual(templateModuleName, config.first?.buildSettings["PROJECT_NAME"])
 
-        //try await skip("check", "-d", tempDir)
+        // run the app checks and verify JSON output
+        //let checkResults = try await skip("app", "check", "--json", "-d", tempDir).out.parseJSONArray()
     }
 
     func testSkipInit() async throws {
         let tempDir = try mktmp()
         let name = "cool-lib"
-        let (stdout, _) = try await skip("init", "--no-build", "--no-test", "-d", tempDir, name, "CoolA") // , "CoolB", "CoolC", "CoolD", "CoolE")
+        let (stdout, _) = try await skip("lib", "init", "--no-build", "--no-test", "-d", tempDir, name, "CoolA") // , "CoolB", "CoolC", "CoolD", "CoolE")
         let out = stdout.split(separator: "\n")
         XCTAssertEqual("Initializing Skip library \(name)", out.first)
         let dir = tempDir + "/" + name + "/"
@@ -61,7 +74,7 @@ class SkipCommandTests : XCTestCase {
         //try await skip("check", "-d", tempDir)
     }
 
-    func XXXtestSkipTestReport() async throws {
+    func testSkipTestReport() async throws {
         let xunit = try mktmpFile(contents: Data(xunitResults.utf8))
         let tempDir = try mktmp()
         let junit = tempDir + "/" + "testDebugUnitTest"
@@ -90,29 +103,18 @@ class SkipCommandTests : XCTestCase {
 
     /// Runs the tool with the given arguments, returning the entire output string as well as a function to parse it to `JSON`
     @discardableResult func skip(checkError: Bool = true, _ args: String...) async throws -> (out: String, err: String) {
-        #if canImport(SkipBuildXXX) // TODO: need to adapt BufferedOutputByteStream to WritableByteStream
-        let out = BufferedOutputByteStream()
-        let err = BufferedOutputByteStream()
+        // the default SPM location of the current skip CLI for testing
+        var skiptool = ".build/artifacts/skip/skip/skip.artifactbundle/macos/skip"
 
-        try await SkipRunnerExecutor.run(args, out: out, err: err)
-
-        let outString = out.bytes.description.trimmingCharacters(in: .whitespacesAndNewlines)
-        let errString = err.bytes.description.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        if checkError {
-            if !errString.isEmpty {
-                struct SkipErrorResult : LocalizedError {
-                    var errorDescription: String?
-                }
-                throw SkipErrorResult(errorDescription: "")
+        // when running tests from Xcode, we need to use the tool download folder, which seems to be placed in one of the envrionment property `__XCODE_BUILT_PRODUCTS_DIR_PATHS`, so check those folders and override if skip is found
+        for checkFolder in (ProcessInfo.processInfo.environment["__XCODE_BUILT_PRODUCTS_DIR_PATHS"] ?? "").split(separator: ":") {
+            let xcodeSkipPath = checkFolder.description + "/skip"
+            if FileManager.default.isExecutableFile(atPath: xcodeSkipPath) {
+                skiptool = xcodeSkipPath
+                break
             }
         }
-        return (out: outString, err: errString)
-        #else
-        // we are not linking to SkipBuild, so fork the process instead with the proper arguments
-        //var env = ProcessInfo.processInfo.environment
-        //env["NOSKIP"] = "1" // prevent skip.git from trying to include local tools
-        let skiptool = ".build/artifacts/skip/skip/skip.artifactbundle/macos/skip"
+
         let result = try await Process.popen(arguments: [skiptool] + args, loggingHandler: nil)
 
         // Throw if there was a non zero termination.
@@ -120,8 +122,36 @@ class SkipCommandTests : XCTestCase {
             throw ProcessResult.Error.nonZeroExit(result)
         }
         let (out, err) = try (result.utf8Output(), result.utf8stderrOutput())
+
         return (out: out.trimmingCharacters(in: .whitespacesAndNewlines), err: err.trimmingCharacters(in: .whitespacesAndNewlines))
-        #endif
+    }
+
+}
+
+/// A JSON object
+typealias JSONObject = [String: Any]
+
+private extension String {
+    /// Attempts to parse the given String as a JSON object
+    func parseJSONObject() throws -> JSONObject {
+        let json = try JSONSerialization.jsonObject(with: Data(utf8), options: [])
+        if let obj = json as? JSONObject {
+            return obj
+        } else {
+            struct CannotParseJSONIntoObject : LocalizedError { var errorDescription: String? }
+            throw CannotParseJSONIntoObject(errorDescription: "JSON object was of wrong type: \(type(of: json))")
+        }
+    }
+
+    /// Attempts to parse the given String as a JSON object
+    func parseJSONArray() throws -> [Any] {
+        let json = try JSONSerialization.jsonObject(with: Data(utf8), options: [])
+        if let arr = json as? [Any] {
+            return arr
+        } else {
+            struct CannotParseJSONIntoArray : LocalizedError { var errorDescription: String? }
+            throw CannotParseJSONIntoArray(errorDescription: "JSON object was of wrong type: \(type(of: json))")
+        }
     }
 
 }
@@ -156,7 +186,7 @@ func execJSON<T: Decodable>(_ arguments: [String]) async throws -> T {
 
 /// Cover for `XCTAssertEqual` that permit async autoclosures.
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-func XCTAssertEqualX<T>(_ expression1: T, _ expression2: T, _ message: @autoclosure () -> String = "", file: StaticString = #filePath, line: UInt = #line) where T : Equatable {
+func XCTAssertEqualAsync<T>(_ expression1: T, _ expression2: T, _ message: @autoclosure () -> String = "", file: StaticString = #filePath, line: UInt = #line) where T : Equatable {
     XCTAssertEqual(expression1, expression2, message(), file: file, line: line)
 }
 

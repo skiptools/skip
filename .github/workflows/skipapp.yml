@@ -111,7 +111,7 @@ jobs:
           zip -9 -r "${TEMPLATE_FILE}" . -x "Package.resolved" -x "Skip/*" -x ".git/*" -x ".build/*" -x ".swiftpm/*"
 
           # verify that the template can be used to derive a new app
-          #skip create --template-file "${TEMPLATE_FILE}" --build --test $(mktemp -d)
+          #skip app create --template-file "${TEMPLATE_FILE}" --build --test $(mktemp -d)
 
 
       - name: Assemble Kotlin Source
@@ -173,7 +173,7 @@ jobs:
           gh release create "${RELTAG}" -t "Release ${RELTAG}" --generate-notes *.*
 
       - name: "Verify Release Templae"
-        run: skip create --template-file ${RELDIR}/skip-template-source.zip --build --test SomeApp
+        run: skip app create --template-file ${RELDIR}/skip-template-source.zip --build --test SomeApp
 
       - name: "Upload Build Artifacts"
         # upload the artifacts generated from each build

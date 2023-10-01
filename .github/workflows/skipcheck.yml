@@ -1,4 +1,4 @@
-name: skip distribution checks
+name: skip checks
 
 on:
   schedule:
@@ -14,8 +14,9 @@ jobs:
       - run: brew install skiptools/skip/skip
       - run: skip doctor --plain
       - run: skip checkup --plain
-      - run: skip init --plain --build --test -d `mktemp -d` skppkg Mod1 Mod2
-      - run: skip create --plain --build --test -d `mktemp -d` skpapp
-      - run: skip create --template skipapp-weather --plain --build --test -d `mktemp -d` skpapp
-      #- run: skip create --template skipapp-playground --plain --build --test -d `mktemp -d` skpapp
+      - run: skip lib create --plain --build --test -d `mktemp -d` skppkg Mod1 Mod2
+      - run: skip app create --plain --build --test -d `mktemp -d` skpapp
+      - run: skip app create --template skipapp-weather --plain --build --test -d `mktemp -d` skpapp
+      #- run: skip app create --template skipapp-playground --plain --build --test -d `mktemp -d` skpapp
+      #- run: skip app create --template skipapp-hello --plain --build --test -d `mktemp -d` skpapp
 
