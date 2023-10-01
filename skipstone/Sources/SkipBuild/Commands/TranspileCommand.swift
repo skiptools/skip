@@ -826,7 +826,8 @@ extension URL {
 extension FileManager {
     /// Remove the given file URL, attempting to trash it when on macOS, otherwise just deleting it
     public func trash(fileURL: URL, trash: Bool) throws {
-        if trash, #available(macOS 10.12, *) {
+        if trash {
+            #if os(macOS)
             do {
                 // make sure it is writeable, since trashItem will fail if it is not
                 try localFileSystem.chmod(.userWritable, path: fileURL.absolutePath)
@@ -834,13 +835,13 @@ extension FileManager {
                 // trash it on macOS so the user can recover it from the trash
                 try FileManager.default.trashItem(at: fileURL, resultingItemURL: nil)
             } catch {
-                // just in case trash fails for some other reason (e.g., disk full), try calling remove directly
-                try FileManager.default.removeItem(at: fileURL)
+                // tolerate failures and fall back to removing the item
             }
-        } else {
-            // trash not supported
-            try FileManager.default.removeItem(at: fileURL)
+            #endif
         }
+
+        // trash not supported or requested
+        try FileManager.default.removeItem(at: fileURL)
     }
 
     /// Returns the deep contents of a given directory URL.
