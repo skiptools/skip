@@ -3,7 +3,9 @@ import ArgumentParser
 import SkipSyntax
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-struct CheckupCommand: SkipCommand {
+struct CheckupCommand: SkipCommand, StreamingCommand {
+    typealias Output = MessageBlock
+
     static var configuration = CommandConfiguration(
         commandName: "checkup",
         abstract: "Run tests to ensure Skip is in working order",
@@ -15,8 +17,8 @@ struct CheckupCommand: SkipCommand {
     @OptionGroup(title: "Tool Options")
     var toolOptions: ToolOptions
 
-    func run() async throws {
-        try await runDoctor()
+    func performCommand(msg continuation: Messenger) async throws {
+        try await runDoctor(tool: toolOptions, with: continuation)
 
         func checkup() throws -> [String] {
             let tmpdir = NSTemporaryDirectory() + "/" + UUID().uuidString

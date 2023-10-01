@@ -4,7 +4,7 @@ import SkipSyntax
 import TSCBasic
 
 struct InfoCommand: SingleStreamingCommand {
-    struct Output : MessageConvertible {
+    struct Output : MessageEncodable {
         var version: String = skipVersion
         var hostName = pinfo.hostName
         var arguments = pinfo.arguments
@@ -29,9 +29,9 @@ struct InfoCommand: SingleStreamingCommand {
         var debug = false
         #endif
 
-        func message(ansi: ANSIColor) -> String? {
+        func message(term: Term) -> String? {
             """
-            \(ansi.green("skip")): \(version)
+            \(term.green("skip")): \(version)
             debug: \(debug)
             os: \(operatingSystemVersion)
             cwd: \(workingDirectory) (\(cwdReadable ? "r" : "")\(cwdWritable ? "w" : "")\(cwdExecutable ? "x" : ""))

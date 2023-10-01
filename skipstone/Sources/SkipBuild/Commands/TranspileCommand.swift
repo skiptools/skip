@@ -36,10 +36,10 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
     @Option(help: ArgumentHelp("Run when the given environment is set", valueName: "envkey"))
     var envEnable: [String] = []
 
-    struct Output : MessageConvertible {
+    struct Output : MessageEncodable {
         let transpilation: Transpilation
 
-        func message(ansi: ANSIColor) -> String? {
+        func message(term: Term) -> String? {
             // successful transpile outputs no message so as to not clutter xcode logs
             return nil
         }
@@ -59,7 +59,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
         })
     }
 
-    func performCommand(with continuation: AsyncThrowingStream<OutputMessage, Error>.Continuation) async throws {
+    func performCommand(msg continuation: Messenger) async throws {
         let sourceFiles = try checkOptions.files.map(AbsolutePath.init(validating:))
         #if DEBUG
         let v = skipVersion + "*" // * indicates debug version
@@ -72,10 +72,10 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
         dateFormatter.dateFormat = "HH:mm:ss"
 
         info("Skip \(v): transpile plugin at \(dateFormatter.string(from: .now)) to: \(transpileOptions.outputFolder ?? "nowhere") for: \(sourceFiles.map(\.basename))")
-        try await self.transpile(fs: localFileSystem, sourceFiles: Set(sourceFiles), with: continuation)
+        try await self.transpile(fs: localFileSystem, sourceFiles: Set(sourceFiles), msg: continuation)
     }
 
-    private func transpile(fs: FileSystem, sourceFiles sourceFileSet: Set<AbsolutePath>, with continuation: AsyncThrowingStream<OutputMessage, Error>.Continuation) async throws {
+    private func transpile(fs: FileSystem, sourceFiles sourceFileSet: Set<AbsolutePath>, msg continuation: Messenger) async throws {
         // the path that will contain the `skip.yml`
         guard let skipFolder = transpileOptions.skipFolder else {
             throw error("Must specify --skip-folder")
@@ -313,8 +313,8 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
             return codebaseInfo
         }
 
-        func writeChanges(tag: String, to outputFilePath: AbsolutePath, contents: ByteString, readOnly: Bool) throws {
-            let changed = try fs.writeChanges(path: addOutputFile(outputFilePath), makeReadOnly: readOnly, bytes: contents)
+        func writeChanges(tag: String, to outputFilePath: AbsolutePath, contents: any DataProtocol, readOnly: Bool) throws {
+            let changed = try fs.writeChanges(path: addOutputFile(outputFilePath), makeReadOnly: readOnly, bytes: ByteString(contents))
             info("\(outputFilePath.relative(to: moduleBasePath).pathString) (\(byteCount(for: .init(contents.count)))) \(tag) \(!changed ? "unchanged" : "written")", sourceFile: outputFilePath.sourceFile)
         }
 
@@ -332,23 +332,22 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
             }
 
             let marker = SkipMarkerContents(sourceFiles: sourceURLs.map(\.path))
-            let markerContents = ByteString(Array(try encoder.encode(marker)))
             let outputFilePath = moduleBasePath.appending(skipCompletionMarkerPath(forModule: primaryModuleName))
-            try writeChanges(tag: "marker", to: outputFilePath, contents: markerContents, readOnly: false)
+            try writeChanges(tag: "marker", to: outputFilePath, contents: try encoder.encode(marker), readOnly: false)
         }
 
         func saveCodebaseInfo() throws {
             let outputFilePath = moduleBasePath.appending(codebaseInfoPath(forModule: primaryModuleName))
-            let codebaseBytes = ByteString(Array(try encoder.encode(codebaseInfo)))
-            try writeChanges(tag: "codebase", to: outputFilePath, contents: codebaseBytes, readOnly: true)
+            try writeChanges(tag: "codebase", to: outputFilePath, contents: encoder.encode(codebaseInfo), readOnly: true)
         }
 
         func generateGradle(for sourceModules: [String], with skipConfig: SkipConfig) throws {
-            try generatePerModuleGradle()
-            try generateGradleProperties()
             if let gradleVersion = transpileOptions.gradleVersion as String? {
                 try generateGradleWrapperProperties(version: gradleVersion)
             }
+            try generateProguardFile()
+            try generatePerModuleGradle()
+            try generateGradleProperties()
             try generateSettingsGradle()
 
             func generatePerModuleGradle() throws {
@@ -362,7 +361,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
 
                 """ + buildContents
 
-                try writeChanges(tag: "gradle build", to: buildGradle, contents: ByteString(encodingAsUTF8: contents), readOnly: true)
+                try writeChanges(tag: "gradle project", to: buildGradle, contents: contents.utf8Data, readOnly: true)
             }
 
             func generateSettingsGradle() throws {
@@ -390,9 +389,17 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
                     """
                 }
 
-                try writeChanges(tag: "gradle settings", to: settingsPath, contents: ByteString(encodingAsUTF8: settingsContents), readOnly: true)
-                msg(.note, "\(primaryModuleName): Gradle build file: \(settingsPath.pathString)", sourceFile: settingsPath.sourceFile)
+                try writeChanges(tag: "gradle settings", to: settingsPath, contents: settingsContents.utf8Data, readOnly: true)
             }
+
+            /// Create the proguard-rules.pro file, which configures the optimization settings for release buils
+            func generateProguardFile() throws {
+                try writeChanges(tag: "proguard", to: moduleRootPath.appending(component: "proguard-rules.pro"), contents: """
+                    -dontobfuscate
+                    -keep class skip.** { *; }
+                    """.utf8Data, readOnly: true)
+            }
+
 
             /// Create the gradle-wrapper.properties file, which will dictate which version of Gradle that Android Studio should use to build the project.
             func generateGradleWrapperProperties(version: String) throws {
@@ -403,7 +410,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
                 distributionUrl=https\\://services.gradle.org/distributions/gradle-\(version)-all.zip
                 """
 
-                try writeChanges(tag: "gradle wrapper", to: gradleWrapperPath, contents: ByteString(encodingAsUTF8: gradeWrapperContents), readOnly: true)
+                try writeChanges(tag: "gradle wrapper", to: gradleWrapperPath, contents: gradeWrapperContents.utf8Data, readOnly: true)
             }
 
             func generateGradleProperties() throws {
@@ -416,7 +423,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
                 android.suppressUnsupportedCompileSdk=34
                 """
 
-                try writeChanges(tag: "gradle config", to: gradlePropertiesPath, contents: ByteString(encodingAsUTF8: gradePropertiesContents), readOnly: true)
+                try writeChanges(tag: "gradle config", to: gradlePropertiesPath, contents: gradePropertiesContents.utf8Data, readOnly: true)
             }
         }
 
@@ -589,7 +596,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
 
         func handleTranspilation(transpilation: Transpilation) throws {
             for message in transpilation.messages {
-                continuation.yield(.init(message))
+                continuation.yield(message)
             }
 
             trace(transpilation.output.content)
@@ -617,7 +624,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
             }
 
             let output = Output(transpilation: transpilation)
-            continuation.yield(.init(output))
+            continuation.yield(output)
 
             func saveTranspilation() throws -> (output: AbsolutePath, changed: Bool, overridden: Bool) {
                 // the build plug-in's output folder base will be something like ~/Library/Developer/Xcode/DerivedData/Mod-ID/SourcePackages/plugins/module-name.output/ModuleNameKotlin/skipstone/ModuleName/src/test/kotlin
@@ -851,54 +858,3 @@ extension FileManager {
         return childFileURLs
     }
 }
-
-extension FileSystem {
-
-    /// A version of `FileSystem.writeIfChanged` that allows control over permissions and size check optimizations.
-    @discardableResult func writeChanges(path: AbsolutePath, checkSize: Bool = true, makeWritable: Bool = true, makeReadOnly: Bool = false, bytes: ByteString) throws -> Bool {
-        if !isFile(path) {
-            return try save()
-        }
-
-        // make sure we can overwrite the file (usually clearing the read-only bit we set after writing the file)
-        if makeWritable && !isWritable(path) {
-            try chmod(.userWritable, path: path)
-        }
-
-        let info = try getFileInfo(path)
-        let size = info.size
-        if size != bytes.count {
-            // different size; they must be different
-            return try save()
-        }
-
-        // compare for changes
-        let changed = try bytes.withData { data1 in
-            try readFileContents(path).withData { data2 in
-                data1 != data2
-            }
-        }
-
-        if changed {
-            return try save()
-        } else {
-            return false // file was unchanged
-        }
-
-        func save() throws -> Bool {
-            if isSymlink(path) {
-                // if the file already exists but it is a link, delete it so we can overwrite it
-                try? removeFileTree(path)
-            }
-            try createDirectory(path.parentDirectory, recursive: true)
-            try writeFileContents(path, bytes: bytes)
-            if makeReadOnly == true {
-                // remove write access
-                try chmod(.userUnWritable, path: path)
-            }
-            return true
-        }
-
-    }
-}
-

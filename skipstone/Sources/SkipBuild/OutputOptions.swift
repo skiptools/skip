@@ -4,6 +4,11 @@ import Universal
 import TSCBasic
 import SkipSyntax
 
+public protocol OutputOptionsCommand : ParsableArguments {
+    /// This command's output options
+    var outputOptions: OutputOptions { get }
+}
+
 public struct OutputOptions: ParsableArguments {
     @Option(name: [.customShort("o"), .long], help: ArgumentHelp("Send output to the given file (stdout: -)", valueName: "path"))
     var output: String?
@@ -23,39 +28,45 @@ public struct OutputOptions: ParsableArguments {
     @Flag(name: [.customShort("j"), .long], help: ArgumentHelp("Emit output as compact JSON"))
     var jsonCompact: Bool = false
     
-    @Flag(name: [.customShort("M"), .long], help: ArgumentHelp("Emit messages as plain text rather than JSON"))
-    var messagePlain: Bool = ProcessInfo.processInfo.environment["TERM"] == "dumb" || ProcessInfo.processInfo.environment["TERM"] == nil || ProcessInfo.processInfo.environment["CI"] != nil // try to auto-detect when we shouldn't be using ANSI colors
+    @Flag(name: [.customShort("M"), .long], help: ArgumentHelp("Show console messages as plain text rather than JSON"))
+    var messagePlain: Bool = false
 
     @Flag(name: [.customShort("A"), .long], help: ArgumentHelp("Wrap and delimit JSON output as an array"))
     var jsonArray: Bool = false
 
-    @Flag(name: [.long], help: ArgumentHelp("Show no ANSI colors or progress animations"))
-    var plain: Bool = false
+    @Flag(name: [.long], inversion: .prefixedNo, help: ArgumentHelp("Show no colors or progress animations"))
+    var plain: Bool = ProcessInfo.processInfo.environment["TERM"] == "dumb" || ProcessInfo.processInfo.environment["TERM"] == nil || ProcessInfo.processInfo.environment["CI"] != nil // try to auto-detect when we shouldn't be using ANSI colors
+
+    static var isTerminal: Bool { isatty(fileno(stdout)) != 0 }
 
     /// progress animation sequences
     static let progressAimations = [
+        "⡀⣄⣦⢷⠻⠙⠈⠀⠁⠋⠟⡾⣴⣠⢀⠀", // slide up and down
+        "⠙⠚⠖⠦⢤⣠⣄⡤⠴⠲⠓⠋", // crawl up and down, small
+        "⠁⠋⠞⡴⣠⢀⠀⠈⠙⠻⢷⣦⣄⡀⠀⠉⠛⠲⢤⢀⠀", // falling water
+        "⣀⣠⣤⣦⣶⣾⣿⡿⠿⠻⠛⠋⠉⠙⠛⠟⠿⢿⣿⣷⣶⣴⣤⣄", // crawl up and down, large
         "⠙⠸⢰⣠⣄⡆⠇⠋", // clockwise line
         "⠐⢐⢒⣒⣲⣶⣷⣿⡿⡷⡧⠧⠇⠃⠁⠀⡀⡠⡡⡱⣱⣳⣷⣿⢿⢯⢧⠧⠣⠃⠂⠀⠈⠨⠸⠺⡺⡾⡿⣿⡿⡷⡗⡇⡅⡄⠄⠀⡀⡐⣐⣒⣓⣳⣻⣿⣾⣼⡼⡸⡘⡈⠈⠀", // fade
         "⣀⡠⠤⠔⠒⠊⠉⠑⠒⠢⠤⢄", // crawl up and down, tiny
         "⢇⢣⢱⡸⡜⡎", // vertical wobble up
         "⣾⣽⣻⢿⣿⣷⣯⣟⡿⣿", // alternating rain
-        "⣀⣠⣤⣦⣶⣾⣿⡿⠿⠻⠛⠋⠉⠙⠛⠟⠿⢿⣿⣷⣶⣴⣤⣄", // crawl up and down, large
         "⣾⣷⣯⣽⣻⣟⡿⢿⣻⣟⣯⣽", // snaking
-        "⠙⠚⠖⠦⢤⣠⣄⡤⠴⠲⠓⠋", // crawl up and down, small
-        "⠄⡢⢑⠈⠀⢀⣠⣤⡶⠞⠋⠁⠀⠈⠙⠳⣆⡀⠀⠆⡷⣹⢈⠀⠐⠪⢅⡀⠀", // fireworks
         "⡀⣀⣐⣒⣖⣶⣾⣿⢿⠿⠯⠭⠩⠉⠁⠀", // swirl
         "⠁⠈⠐⠠⢀⡀⠄⠂", // clockwise dot
-        "⠁⠋⠞⡴⣠⢀⠀⠈⠙⠻⢷⣦⣄⡀⠀⠉⠛⠲⢤⢀⠀", // falling water
         "⣾⣽⣻⢿⡿⣟⣯⣷", // counter-clockwise
         "⣾⣷⣯⣟⡿⢿⣻⣽", // clockwise
         "⣾⣷⣯⣟⡿⢿⣻⣽⣷⣾⣽⣻⢿⡿⣟⣯⣷", // bouncing clockwise and counter-clockwise
-        "⡀⣄⣦⢷⠻⠙⠈⠀⠁⠋⠟⡾⣴⣠⢀⠀", // slide up and down
         "⡇⡎⡜⡸⢸⢱⢣⢇", // vertical wobble down
         "⠁⠐⠄⢀⢈⢂⢠⣀⣁⣐⣄⣌⣆⣤⣥⣴⣼⣶⣷⣿⣾⣶⣦⣤⣠⣀⡀⠀⠀", // snowing and melting
     ]
 
     /// A transient handler for tool output; this acts as a temporary holder of output streams
     internal var streams: OutputHandler = OutputHandler()
+
+    /// The terminal implementation to use for colorization of console output
+    var term: Term {
+        plain ? Term.plain : Term.ansi
+    }
 
     public init() {
         let _ = Self.isFirstRun
@@ -87,7 +98,7 @@ public struct OutputOptions: ParsableArguments {
         }
 
         /// The closure that will handle converting and writing the output type to stream
-        var yield: (Either<MessageConvertible>.Or<Message>) -> () = { _ in }
+        var yield: (Either<MessageConvertible & Encodable>.Or<Message>) -> () = { _ in }
 
         init() {
         }
@@ -99,6 +110,7 @@ public struct OutputOptions: ParsableArguments {
     }
 
     /// Write the given message to the output streams buffer
+    //@available(*, deprecated, message: "send to output instead")
     func write(_ value: String) {
         streams.write(error: false, output: output, value)
     }
@@ -121,11 +133,11 @@ public struct OutputOptions: ParsableArguments {
     /// Whether tool output should be emitted as JSON or not
     var emitJSON: Bool { json || jsonCompact }
 
-    func writeOutput<T: MessageConvertible>(_ item: T, error: Bool) throws {
+    func writeOutput<T: MessageConvertible & Encodable>(_ item: T, error: Bool) throws {
         if emitJSON {
             try streams.write(error: false, output: output, item.toJSON(outputFormatting: [.sortedKeys, .withoutEscapingSlashes, (jsonCompact ? .sortedKeys : .prettyPrinted)], dateEncodingStrategy: .iso8601).utf8String ?? "")
         } else {
-            if let messageString = item.message(ansi: plain ? ANSIColor.plain : ANSIColor.colorful) {
+            if let messageString = item.message(term: self.term) {
                 streams.write(error: messageErrout == true ? false : error, output: output, messageString)
             }
         }
@@ -134,11 +146,6 @@ public struct OutputOptions: ParsableArguments {
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 extension OutputOptions {
-
-    /// The characters for the current progress sequence
-    private var progressSeq: [Character] {
-        Self.progressAimations.first!.map({ $0 })
-    }
 
     static func initialize() {
         checkFirstRun()
@@ -156,9 +163,10 @@ extension OutputOptions {
         }
     }
 
+    //@available(*, deprecated, message: "use StreamingCommand.exec() instead")
     @discardableResult
     func run(_ message: String, flush: Bool = true, progress: Bool = true, _ args: [String], environment: [String: String] = ProcessInfo.processInfo.environment) async throws -> (out: String, err: String) {
-        let (out, err) = try await monitor(message, progress: progress) {
+        let (out, err) = try await monitor(message, progress: progress ? Self.progressAimations.first : nil) {
             //try await Process.checkNonZeroExit(arguments: args, environment: environment, loggingHandler: nil)
 
             let result = try await Process.popen(arguments: args, environment: environment, loggingHandler: nil)
@@ -174,64 +182,114 @@ extension OutputOptions {
             write("", flush: true)
         }
 
+
         return (out, err)
     }
 
-    static var isTerminal: Bool { isatty(fileno(stdout)) != 0 }
+    /// Apply an ease-out effect to the given input; used to create a progress monitor character sequence that creates the appearance of slowing down as it proceeds
+    func easeOutValue(for input: Double, base: Double = 100.0, factor: Double = 20.0) -> Double {
+        // Ensure the input is within the range 0.0 to 20.0
+        let clampedInput = max(0.0, min(factor, input))
 
-    /// Perform an operation with a given progress animation
-    @discardableResult func monitor<T>(_ message: String, progress: Bool = Self.isTerminal, block: () async throws -> T) async throws -> T {
-        var progressMonitor: Task<(), Error>? = nil
+        // Apply ease-out timing curve formula
+        let t = clampedInput / factor
+        //print("pow(1 - t, 3): \(pow(1 - t, 3))")
 
-        @Sendable func clear(_ count: Int) {
-            // clear the current line
-            write(String(repeating: "\u{8}", count: count), terminator: "", flush: true)
+        let output = base - (base * pow(1 - t, 3))
+        //print("output: \(output)")
+
+        // Ensure the output is within the range 0.1 to 100.0
+        return max(1.0, output)
+    }
+
+    func monitorPrefix<T>(_ progressCharacters: String?, for result: Result<T, Error>?, startTime: Date) -> String {
+        switch result {
+        case .success: 
+            return "[" + term.green("✓") + "]"
+        case .failure:
+            return "[" + term.red("✗") + "]"
+        case .none:
+            let pseq = progressCharacters ?? "…" // fall back to a single ellipsis if no progress sequence is specified
+            // use an ease-out animation to start the progress spinner quick and then slow it down as time progresses
+            let cidx = (Int(easeOutValue(for: Date.now.timeIntervalSince(startTime)) * 1000.0) % (pseq.count * 1000)) / 1000
+            let pchar = pseq[pseq.index(pseq.startIndex, offsetBy: cidx)]
+            return "[" + term.yellow(String(pchar)) + "]"
+        }
+    }
+
+    /// Perform an operation with a given message handler, which will be invoked in the progress cycle with a nil result, and then a final time with the result of the block invocation
+    @discardableResult func monitor<T>(_ message: String, progress: String? = progressAimations.randomElement(), block: @escaping () async throws -> T, messageHandler handler: ((Result<T, Error>?) -> String)? = nil) async throws -> T {
+        let startTime = Date.now
+
+        /// The default implementation of the message handler cycles through the default progress animation and then outputs the result
+        let messageHandler = handler ?? { result in
+            // the progress index is based on the current time index
+            // fatalError()
+            monitorPrefix(progress, for: result, startTime: startTime) + " " + message
         }
 
-        if progress == false || plain == true {
+        let progressMonitor: Task<(), Error>?
+
+        if progress == nil || plain == true {
+            progressMonitor = nil
             write(message)
         } else {
             progressMonitor = Task {
                 var lastMessage: String? = nil
-                func printMessage(_ char: Character) {
-                    if let lastMessage = lastMessage {
-                        clear(lastMessage.count)
-                    }
-                    lastMessage = "[\(char)] \(message)"
-                    if let lastMessage = lastMessage {
-                        write(lastMessage, terminator: "", flush: true)
+                func printMessage() -> Int {
+                    let newMessage = messageHandler(nil)
+                    if newMessage == lastMessage {
+                        // the messages are exactly the same, so don't clear the console and print the message again
+                        return 0
+                    } else {
+                        lastMessage = newMessage
+                        write(newMessage, terminator: "", flush: true)
+                        return newMessage.count
                     }
                 }
 
                 while true {
-                    for char in progressSeq {
-                        printMessage(char)
-//                        do {
-//                            try await Task.sleep(for: .milliseconds(150))
-//                        } catch {
-//                            break // cancelled
-//                        }
-                        try Task.checkCancellation()
-                        try await Task.sleep(for: .milliseconds(150))
-                        try Task.checkCancellation()
+                    while true {
+                        let printed = printMessage()
+                        defer {
+                            @Sendable func clear(_ count: Int) {
+                                // clear the current line; we explicitly do not flush so the cursor doesn't jump around
+                                write(String(repeating: "\u{8}", count: count), terminator: "", flush: false)
+                            }
 
+                            clear(printed) // clear whatever we just printed
+                        }
+                        try Task.checkCancellation()
+                        try await Task.sleep(for: .milliseconds(50))
+                        try Task.checkCancellation()
                     }
                 }
             }
         }
 
-        do {
-            let result = try await block()
-            progressMonitor?.cancel() // cancel the progress task
-            clear(message.count + 4)
-            write("[✓] " + message, terminator: "", flush: true)
-            return result
-        } catch {
-            progressMonitor?.cancel() // cancel the progress task
-            clear(message.count + 4)
-            write("[✗] " + message, flush: true)
-            throw error
+        let resultTask = Task {
+            // Capture the async block as a Result
+            await {
+                defer {
+                    // after the task completes, stop the progress monitor
+                    progressMonitor?.cancel()
+                }
+                do {
+                    return .success(try await block())
+                } catch {
+                    return .failure(error)
+                }
+            }() as Result<T, Error>
         }
+
+        let result = await resultTask.value
+
+        // wait for the progress monitor to clear the final line, which it will do when it sees that the result is complete
+        _ = try? await progressMonitor?.value
+
+        // now output the final result message
+        write(messageHandler(result), terminator: "", flush: true)
+        return try result.get()
     }
 
     static var isFirstRun: Bool = checkFirstRun()
@@ -254,3 +312,6 @@ extension OutputOptions {
     }
 }
 
+struct ProcessDidNotLaunchError : LocalizedError {
+    var errorDescription: String?
+}

@@ -16,8 +16,6 @@ struct ADBCommand: SkipCommand {
         abstract: "Launch the adb build tool",
         shouldDisplay: adbCommandEnabled)
 
-    static let adbRegex = try! NSRegularExpression(pattern: #"^error: (.*)"#)
-
     @OptionGroup(title: "Output Options")
     var outputOptions: OutputOptions
 
@@ -34,7 +32,7 @@ struct ADBCommand: SkipCommand {
         throw SkipDriveError(errorDescription: "SkipDrive not linked")
         #else
         var exitCode: ProcessResult.ExitStatus? = nil
-        let output = try await self.adb(args: arguments) {
+        let output = try await self.launchADB() {
             exitCode = $0.exitStatus
         }
 
@@ -49,33 +47,13 @@ struct ADBCommand: SkipCommand {
 
         #endif
     }
-    
-    /// Check for common ADB error patterns and report them back to Xcode.
-    /// - Parameter line: the ADB output line to scan
-    func scanADBOutput(line: String) {
-        func err(_ msg: String) {
-            // Xcode will report "error:" strings as an error; insert a file prefix to add a link
-            outputOptions.write("error: \(msg) [\(line)] https://skip.tools/docs")
-        }
-
-        switch line {
-        case "adb: more than one device/emulator":
-            return err("The Android Debug Bridge found more than one running Android emulator or connected device. Check device list with adb devices.")
-        case "adb: no devices/emulators found":
-            return err("No Android emulators or devices were found. Launch Android Studio.app and open the Virtual Device Manager to create an emulator to continue.")
-        case _ where line.hasPrefix("Error:"): // general ADB error output
-            return err(line)
-        default:
-            return
-        }
-    }
 
     #if canImport(SkipDriveExternal)
     /// Executes `adb` with the current default arguments and the additional args and returns an async stream of the lines from the combined standard err and standard out.
-    private func adb(in workingDirectory: URL? = nil, args: [String], env: [String: String] = [:], onExit: @escaping (ProcessResult) throws -> () = { _ in }) async throws -> SkipDriveExternal.Process.AsyncLineOutput {
+    private func launchADB(in workingDirectory: URL? = nil, env: [String: String] = [:], onExit: @escaping (ProcessResult) throws -> () = { _ in }) async throws -> SkipDriveExternal.Process.AsyncLineOutput {
         #if DEBUG
         // output the launch message in a format that makes it easy to copy and paste the result into the terminal
-        print("adb:", env.keys.sorted().map { $0 + "=\"" + env[$0, default: ""] + "\"" }.joined(separator: " "), (args).joined(separator: " "))
+        print("note: skip adb env:", env.keys.sorted().map { $0 + "=\"" + env[$0, default: ""] + "\"" }.joined(separator: " "), (arguments).joined(separator: " "))
         #endif
 
         // transfer process environment along with the additional environment
@@ -83,9 +61,32 @@ struct ADBCommand: SkipCommand {
         for (key, value) in env {
             penv[key] = value
         }
-        return Process.streamLines(command: [toolOptions.adb] + args, environment: penv, workingDirectory: workingDirectory, onExit: onExit)
+        return Process.streamLines(command: [toolOptions.adb] + arguments, environment: penv, workingDirectory: workingDirectory, onExit: onExit)
     }
     #endif
+
+
+    /// Check for common ADB error patterns and report them back to Xcode.
+    /// - Parameter line: the ADB output line to scan
+    func scanADBOutput(line: String) {
+        func err(_ msg: String) {
+            // Xcode will report "error:" strings as an error; insert a file prefix to add a link
+            outputOptions.write("error: skip adb error: \(msg) (troubleshoot at https://skip.tools/docs)")
+        }
+
+        switch line {
+        case "adb: more than one device/emulator":
+            return err("The Android Debug Bridge found more than one running Android emulator or connected device. Check device list with adb devices.")
+        case "adb: no devices/emulators found":
+            return err("No Android emulators or devices were found. Launch Android Studio.app and open the Virtual Device Manager to create an emulator to continue.")
+        case _ where line.hasPrefix("Exception occurred while executing"): // command-specifiec error output
+            return err(line)
+        case _ where line.hasPrefix("Error:"): // general ADB error output
+            return err(line)
+        default:
+            return
+        }
+    }
 
 }
 

@@ -7,12 +7,14 @@ import TSCBasic
 import Universal
 import struct Universal.JSON
 
+/// The version of Skip, via `SkipSyntax`
+public let skipVersion = SkipSyntax.skipVersion // we don't want to have to import SkipSyntax just to get the version, so re-export it
+
 struct Options {
     var preprocessorSymbols: [String] = []
 }
 
-protocol SkipPhase : AsyncParsableCommand {
-    var outputOptions: OutputOptions { get }
+protocol SkipPhase : AsyncParsableCommand, OutputOptionsCommand {
 }
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
@@ -42,6 +44,15 @@ public protocol SkipCommandExecutor : AsyncParsableCommand {
 
 }
 
+
+/// Runs the tool with the given arguments, returning the entire output string as well as a function to parse it to `JSON`
+public func skipstone(_ args: String...) async throws -> (out: String, err: String, json: () throws -> JSON) {
+    let out = BufferedOutputByteStream()
+    let err = BufferedOutputByteStream()
+    try await SkipRunnerExecutor.run(args, out: out, err: err)
+    return (out.bytes.description.trimmingCharacters(in: .whitespacesAndNewlines), err.bytes.description.trimmingCharacters(in: .whitespacesAndNewlines), { try JSON.parse(out.bytes.description.utf8Data) })
+}
+
 /// The command that is run by "SkipRunner" (aka "skip")
 public struct SkipRunnerExecutor: SkipCommandExecutor {
     public static var configuration = CommandConfiguration(
@@ -56,8 +67,10 @@ public struct SkipRunnerExecutor: SkipCommandExecutor {
             CheckupCommand.self,
             UpgradeCommand.self,
 
-            CreateCommand.self,
-            InitCommand.self,
+            AppCommand.self,
+            LibCommand.self,
+            AppCreateCommand.self, // skip create is shorthand for skip app create
+            LibInitCommand.self, // skip init is shorthand for skip lib init
 
             // Conditional on SkipDrive being imported
             GradleCommand.self,
@@ -98,13 +111,13 @@ public struct SkipKeyExecutor: SkipCommandExecutor {
     public init() {
     }
 
-    struct KeyOutput : MessageConvertible {
+    struct KeyOutput : MessageEncodable {
         var id: String
         var expiration: Date
         var key: String
 
         
-        func message(ansi: ANSIColor) -> String? {
+        func message(term: Term) -> String? {
             """
             id: \(id)
             expiration: \(ISO8601DateFormatter.string(from: expiration, timeZone: TimeZone(secondsFromGMT: 0)!))
@@ -169,7 +182,7 @@ public struct SkipKeyExecutor: SkipCommandExecutor {
 
 
 extension SkipCommandExecutor {
-    /// Run the transpiler on the given arguments.
+    /// Run the given command on the given arguments.
     public static func run(_ arguments: [String], basePath: AbsolutePath = localFileSystem.currentWorkingDirectory!, out: WritableByteStream? = nil, err: WritableByteStream? = nil) async throws {
         var cmd: ParsableCommand = try parseAsRoot(arguments)
         if var cmd = cmd as? any StreamingCommand {
@@ -197,16 +210,16 @@ extension SkipCommandExecutor {
 
 struct VersionCommand: SingleStreamingCommand {
     static let experimental = false
-    struct Output : MessageConvertible {
+    struct Output : MessageEncodable {
         var version: String = skipVersion
         #if DEBUG
         let debug: Bool = true
-        func message(ansi: ANSIColor) -> String? {
+        func message(term: Term) -> String? {
             "Skip version \(skipVersion) (debug)"
         }
         #else
         let debug: Bool? = nil
-        func message(ansi: ANSIColor) -> String? {
+        func message(term: Term) -> String? {
             "Skip version \(skipVersion)"
         }
         #endif
@@ -316,6 +329,11 @@ extension Transpilation {
     }
 }
 
+protocol LicenseOptionsCommand : ParsableArguments {
+    /// This command's output options
+    var licenseOptions: LicenseOptions { get }
+}
+
 struct LicenseOptions: ParsableArguments {
     @Option(help: ArgumentHelp("The license key for transpiling non-free sources", valueName: "SKIPKEY"))
     var skipKey: String? = nil // --skip-key SKP657AB7680CA6789F76ABB65975678CDCA34PKS
@@ -366,42 +384,46 @@ extension MessageConvertible {
 }
 
 extension Never: MessageConvertible {
-    public func message(ansi: ANSIColor) -> String? {
+    public func message(term: Term) -> String? {
         nil
     }
 }
 
 extension Message: MessageConvertible {
-    public func message(ansi: ANSIColor) -> String? {
-        // TODO: use ANSI colors to highlight transpile errors in console environments
+    public func message(term: Term) -> String? {
+        // TODO: use terminal colors to highlight transpile errors in console environments
         self.formattedMessage
     }
 }
 
+/// A stream of output messages that can be issued by a command; they can be encodables for JSON output or message handles for rich terminal output
+public typealias MessageStream = AsyncThrowingStream<MessageEncodable, Error>
+
+/// The callback for yielding or failings a message stream
+public typealias Messenger = MessageStream.Continuation
+
 /// A command that contains options for how messages will be conveyed to the user
 public protocol StreamingCommand: AsyncParsableCommand {
     /// The structured output of this tool
-    associatedtype Output : MessageConvertible
-    typealias OutputMessage = Either<Output>.Or<Message>
-
     var outputOptions: OutputOptions { get set }
 
-    func performCommand(with continuation: AsyncThrowingStream<OutputMessage, Error>.Continuation) async throws
+    //associatedtype Output : MessageConvertible
+    //typealias OutputMessage = Either<Output>.Or<Message>
+
+    func performCommand(msg: Messenger) async throws
 }
 
 extension StreamingCommand {
-    func writeOutput(message: OutputMessage) throws {
-        switch message {
-        case .a(let a): try outputOptions.writeOutput(a as Output, error: false)
-        case .b(let b): try outputOptions.writeOutput(b as Message, error: true)
-        }
+    func writeOutput(message: MessageEncodable) throws {
+        #warning("is the error parameter correct?")
+        try outputOptions.writeOutput(message, error: message is Message ? true : false)
     }
 
     mutating func run() async throws {
         outputOptions.beginCommandOutput()
         var elements = self.startCommand().makeAsyncIterator()
-        if let first = try await elements.next() {
-            try writeOutput(message: first)
+        if let message = try await elements.next() {
+            try writeOutput(message: message)
             while let element = try await elements.next() {
                 outputOptions.writeOutputSeparator()
                 try writeOutput(message: element)
@@ -413,12 +435,12 @@ extension StreamingCommand {
 
 extension StreamingCommand {
 
-    mutating func startCommand() -> AsyncThrowingStream<OutputMessage, Error> {
-        AsyncThrowingStream { (continuation: AsyncThrowingStream.Continuation) in
+    mutating func startCommand() -> MessageStream {
+        AsyncThrowingStream { continuation in
             self.outputOptions.streams.yield = {
                 switch $0 {
-                case .a(let a): continuation.yield(.init(a as! Output))
-                case .b(let b): continuation.yield(.init(b))
+                case .a(let a): continuation.yield(a)
+                case .b(let b): continuation.yield(b)
                 }
 
             }
@@ -427,10 +449,10 @@ extension StreamingCommand {
         }
     }
 
-    func doCommand(continuation: AsyncThrowingStream<OutputMessage, Error>.Continuation) {
+    func doCommand(continuation: Messenger) {
         Task {
             do {
-                try await performCommand(with: continuation)
+                try await performCommand(msg: continuation)
                 continuation.finish()
             } catch {
                 continuation.finish(throwing: error)
@@ -448,47 +470,49 @@ extension StreamingCommand {
 }
 
 public protocol SingleStreamingCommand : StreamingCommand {
+    associatedtype Output : MessageEncodable
     func executeCommand() async throws -> Output
 }
 
 extension SingleStreamingCommand {
-    public func performCommand(with continuation: AsyncThrowingStream<OutputMessage, Error>.Continuation) async throws {
+    public func performCommand(msg: Messenger) async throws {
         yield(output: try await executeCommand())
     }
 }
 
 
-public struct ANSIColor {
-    public static let plain = ANSIColor(colors: false)
-    public static let colorful = ANSIColor(colors: true)
+/// Terminal output information, such as how to output messages in various ANSI colors.
+public struct Term {
+    public static let plain = Term(colors: false)
+    public static let ansi = Term(colors: true)
 
     /// Whether to use color or plain output
     public let colors: Bool
 
-    func color(_ string: String, code: String) -> String {
+    func color(_ string: any StringProtocol, code: String) -> String {
         if colors == false {
-            return string // return the plain string
+            return string.description // return the plain string
         } else {
             return code + string + Self.reset
         }
     }
 
     /// Returns the string with and ANSI `black` code when colors are enabled, or the raw string when they are disabled
-    public func black(_ string: String) -> String { color(string, code: Self.black) }
+    public func black(_ string: any StringProtocol) -> String { color(string, code: Self.black) }
     /// Returns the string with and ANSI `red` code when colors are enabled, or the raw string when they are disabled
-    public func red(_ string: String) -> String { color(string, code: Self.red) }
+    public func red(_ string: any StringProtocol) -> String { color(string, code: Self.red) }
     /// Returns the string with and ANSI `green` code when colors are enabled, or the raw string when they are disabled
-    public func green(_ string: String) -> String { color(string, code: Self.green) }
+    public func green(_ string: any StringProtocol) -> String { color(string, code: Self.green) }
     /// Returns the string with and ANSI `yellow` code when colors are enabled, or the raw string when they are disabled
-    public func yellow(_ string: String) -> String { color(string, code: Self.yellow) }
+    public func yellow(_ string: any StringProtocol) -> String { color(string, code: Self.yellow) }
     /// Returns the string with and ANSI `blue` code when colors are enabled, or the raw string when they are disabled
-    public func blue(_ string: String) -> String { color(string, code: Self.blue) }
+    public func blue(_ string: any StringProtocol) -> String { color(string, code: Self.blue) }
     /// Returns the string with and ANSI `magenta` code when colors are enabled, or the raw string when they are disabled
-    public func magenta(_ string: String) -> String { color(string, code: Self.magenta) }
+    public func magenta(_ string: any StringProtocol) -> String { color(string, code: Self.magenta) }
     /// Returns the string with and ANSI `cyan` code when colors are enabled, or the raw string when they are disabled
-    public func cyan(_ string: String) -> String { color(string, code: Self.cyan) }
+    public func cyan(_ string: any StringProtocol) -> String { color(string, code: Self.cyan) }
     /// Returns the string with and ANSI `white` code when colors are enabled, or the raw string when they are disabled
-    public func white(_ string: String) -> String { color(string, code: Self.white) }
+    public func white(_ string: any StringProtocol) -> String { color(string, code: Self.white) }
 
     // ANSI escape sequences for text colors
     private static let reset = "\u{001B}[0m"
@@ -502,16 +526,59 @@ public struct ANSIColor {
     private static let white = "\u{001B}[37m"
 }
 
-/// A type that can be output in a sequence of messages
-public protocol MessageConvertible: Encodable {
+/// A "message" that can be output in various ways.
+///
+/// The default `message(term:)` must minimally be implemented for terminal messages.
+public protocol MessageConvertible {
     /// Returns the message for the output with optional ANSI coloring
-    func message(ansi: ANSIColor) -> String?
+    func message(term: Term) -> String?
 }
 
+/// Any message that can be output either as a terminal message or a JSON encoded string
+public typealias MessageEncodable = MessageConvertible & Encodable
+
+/// A message that is encoded by its string value
+public protocol StringMessageEncodable : MessageConvertible, Encodable {
+}
+
+extension StringMessageEncodable {
+    /// Message convertable blocks default to encoding the string output
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        if let plainString = self.message(term: .plain) {
+            try container.encode(plainString)
+        } else {
+            try container.encodeNil()
+        }
+    }
+
+}
+
+extension Optional : MessageConvertible where Wrapped : MessageConvertible {
+    /// An option return value will just return nil for an empty wrapped value
+    public func message(term: Term) -> String? {
+        flatMap({ $0.message(term: term) })
+    }
+}
+
+/// A message that can optionally be highlighted colors for rich terinal output
+public struct MessageBlock : StringMessageEncodable {
+    let _message: (_ term: Term) -> String?
+
+    public init(_ message: @escaping (_ term: Term) -> String?) {
+        self._message = message
+    }
+
+    public func message(term: Term) -> String? {
+        self._message(term)
+    }
+}
+
+
 public extension StreamingCommand {
-    /// Sends the output to the hander
-    func yield(output: Output) {
-        outputOptions.streams.yield(Either.Or.a(output))
+    /// Sends the output message the the handler, which will handle formatting it for various outputs like a terminal or JSON
+    func yield(output: MessageEncodable) {
+        outputOptions.streams.yield(.init(output))
     }
 
     func yield(message: Message) {
@@ -521,7 +588,7 @@ public extension StreamingCommand {
     /// The closure that will output a message
     fileprivate func writeMessage(_ message: Message, output: String? = nil, terminator: String = "\n") {
         if !outputOptions.emitJSON || outputOptions.messagePlain {
-            if let messageString = message.message(ansi: ANSIColor.plain) {
+            if let messageString = message.message(term: .plain) {
                 outputOptions.streams.write(error: !outputOptions.messageErrout, output: output, messageString, terminator: terminator)
             }
         } else {
@@ -651,7 +718,7 @@ extension String {
     func extract(pattern: String) throws -> String? {
         let regex = try NSRegularExpression(pattern: pattern)
         let range = NSRange(location: 0, length: self.utf16.count)
-        if let match = regex.firstMatch(in: self, options: [], range: range) {
+        if let match = regex.firstMatch(in: self, options: [], range: range), match.numberOfRanges >= 2 {
             let matchRange = match.range(at: 1)
             if let range = Range(matchRange, in: self) {
                 return String(self[range])
@@ -670,6 +737,11 @@ extension String {
             return String(self[..<self.index(self.startIndex, offsetBy: length)])
         }
     }
+}
+
+protocol ToolOptionsCommand : ParsableArguments {
+    /// This command's output options
+    var toolOptions: ToolOptions { get }
 }
 
 struct ToolOptions: ParsableArguments {
@@ -695,6 +767,11 @@ struct ToolOptions: ParsableArguments {
         ProcessInfo.processInfo.environment["HOMEBREW_PREFIX"]
             ?? (ProcessInfo.isARM ? "/opt/homebrew" : "/usr/local")
     }
+}
+
+protocol BuildOptionsCommand : ParsableArguments {
+    /// This command's output options
+    var buildOptions: BuildOptions { get }
 }
 
 struct BuildOptions: ParsableArguments {
@@ -781,3 +858,101 @@ public struct SkipDriveError : LocalizedError {
     public var errorDescription: String?
 }
 
+
+extension FileSystem {
+    /// Helper method to recurse the tree and perform the given block on each file.
+    ///
+    /// Note: `Task.isCancelled` is not checked; the controlling block should check for task cancellation.
+    public func recurse(path: AbsolutePath, block: (AbsolutePath) async throws -> ()) async throws {
+        let contents = try getDirectoryContents(path)
+
+        for entry in contents {
+            let entryPath = path.appending(component: entry)
+            try await block(entryPath)
+            if isDirectory(entryPath) {
+                try await recurse(path: entryPath, block: block)
+            }
+        }
+    }
+
+    /// Output the filesystem tree of the given path.
+    public func treeASCIIRepresentation(at path: AbsolutePath = .root) throws -> String {
+        var writer: String = ""
+        print(".", to: &writer)
+        try treeASCIIRepresent(fs: self, path: path, to: &writer)
+        return writer
+    }
+
+    /// Helper method to recurse and print the tree.
+    private func treeASCIIRepresent<T: TextOutputStream>(fs: FileSystem, path: AbsolutePath, prefix: String = "", to writer: inout T) throws {
+        let contents = try fs.getDirectoryContents(path)
+        // content order is undefined
+        let entries = contents.sorted(using: .localizedStandard)
+
+        for (idx, entry) in entries.enumerated() {
+            let isLast = idx == entries.count - 1
+            let line = prefix + (isLast ? "└─ " : "├─ ") + entry
+            print(line, to: &writer)
+
+            let entryPath = path.appending(component: entry)
+            if fs.isDirectory(entryPath) {
+                let childPrefix = prefix + (isLast ?  "   " : "│  ")
+                try treeASCIIRepresent(fs: fs, path: entryPath, prefix: String(childPrefix), to: &writer)
+            }
+        }
+    }
+
+    /// A version of `FileSystem.writeIfChanged` that allows control over permissions and size check optimizations.
+    @discardableResult func writeChanges(path: AbsolutePath, checkSize: Bool = true, makeWritable: Bool = true, makeReadOnly: Bool = false, bytes: ByteString) throws -> Bool {
+        if !isFile(path) {
+            return try save()
+        }
+
+        // make sure we can overwrite the file (usually clearing the read-only bit we set after writing the file)
+        if makeWritable && !isWritable(path) {
+            try chmod(.userWritable, path: path)
+        }
+
+        let info = try getFileInfo(path)
+        let size = info.size
+        if size != bytes.count {
+            // different size; they must be different
+            return try save()
+        }
+
+        // compare for changes
+        let changed = try bytes.withData { data1 in
+            try readFileContents(path).withData { data2 in
+                data1 != data2
+            }
+        }
+
+        if changed {
+            return try save()
+        } else {
+            return false // file was unchanged
+        }
+
+        func save() throws -> Bool {
+            if isSymlink(path) {
+                // if the file already exists but it is a link, delete it so we can overwrite it
+                try? removeFileTree(path)
+            }
+            try createDirectory(path.parentDirectory, recursive: true)
+            try writeFileContents(path, bytes: bytes)
+            if makeReadOnly == true {
+                // remove write access
+                try chmod(.userUnWritable, path: path)
+            }
+            return true
+        }
+
+    }
+}
+
+extension Collection {
+    /// Returns the substring of the given string
+    func slice(_ i1: Int, _ i2: Int? = nil) -> SubSequence {
+        self[index(startIndex, offsetBy: i1)..<((i2 == nil ? nil : index(startIndex, offsetBy: i2!, limitedBy: endIndex)) ?? endIndex)]
+    }
+}

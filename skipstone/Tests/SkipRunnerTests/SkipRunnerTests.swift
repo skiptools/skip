@@ -6,14 +6,16 @@ import TSCBasic
 
 public class SkipRunnerTests : XCTestCase {
     public func testSkipRunnerCommands() async throws {
-        let v = skipVersion
+        let v = SkipBuild.skipVersion
 
-        try await XCTAssertEqualX(v, tool("version", "-jM").json()["version"]?.string)
-        try await XCTAssertEqualX(v, tool("version", "-JM").json()["version"]?.string)
+        XCTAssertEqual(SkipBuild.skipVersion, SkipSyntax.skipVersion) // they point to the same field, so it would be surprising if they differed
+
+        try await XCTAssertEqualAsync(v, skipstone("version", "-jM").json()["version"]?.string)
+        try await XCTAssertEqualAsync(v, skipstone("version", "-JM").json()["version"]?.string)
 
         #if DEBUG
         let debug = true
-        try await XCTAssertEqualX("Skip version \(v) (debug)", tool("version").out)
+        try await XCTAssertEqualAsync("Skip version \(v) (debug)", skipstone("version").out)
 
         func endOfFirstLine(_ output: String, count: Int) throws -> String {
             let firstLine = try XCTUnwrap(output.split(separator: "\n").first)
@@ -21,21 +23,21 @@ public class SkipRunnerTests : XCTestCase {
         }
 
         // test sending plain console messages to stdout; ensure that trace messages are only sent when verbose is enabled
-        //XCTAssertEqualX("note: info message", try endOfFirstLine(await tool("info", "-ME").out, count: "note: info message".count))
-        //XCTAssertEqualX("trace: trace message", try endOfFirstLine(await tool("info", "-MEv").out, count: "trace: trace message".count)) // verbose variant starts with "remark:"
+        //XCTAssertEqualAsync("note: info message", try endOfFirstLine(await skipstone("info", "-ME").out, count: "note: info message".count))
+        //XCTAssertEqualAsync("trace: trace message", try endOfFirstLine(await skipstone("info", "-MEv").out, count: "trace: trace message".count)) // verbose variant starts with "remark:"
 
         #else
         let debug = false
-        try await XCTAssertEqualX("Skip version \(v)", tool("version").out)
+        try await XCTAssertEqualAsync("Skip version \(v)", skipstone("version").out)
         #endif
 
-        try await XCTAssertEqualX(debug, tool("info", "-JA").json().array?.last?["debug"]?.boolean)
+        try await XCTAssertEqualAsync(debug, skipstone("info", "-JA").json().array?.last?["debug"]?.boolean)
     }
 
     public func testSnippets() async throws {
         func snippet(swift: String, kotlin: String?, messages: [String]? = nil) async throws {
             let srcFile = try tmpFile(named: "Source.swift", contents: swift)
-            let (out, err, json) = try await tool("snippet", "-jM", srcFile.path)
+            let (out, err, json) = try await skipstone("snippet", "-jM", srcFile.path)
             struct SnippetResult : Decodable {
                 let kotlin: String?
                 let messages: [Message]?
@@ -124,18 +126,10 @@ public class SkipRunnerTests : XCTestCase {
         return tmpFile
     }
 
-    /// Runs the tool with the given arguments, returning the entire output string as well as a function to parse it to `JSON`
-    func tool(_ args: String...) async throws -> (out: String, err: String, json: () throws -> JSON) {
-        let out = BufferedOutputByteStream()
-        let err = BufferedOutputByteStream()
-        try await SkipRunnerExecutor.run(args, out: out, err: err)
-        return (out.bytes.description.trimmingCharacters(in: .whitespacesAndNewlines), err.bytes.description.trimmingCharacters(in: .whitespacesAndNewlines), { try JSON.parse(out.bytes.description.utf8Data) })
-    }
-
 }
 
 /// Cover for `XCTAssertEqual` that permit async values
-public func XCTAssertEqualX<T>(_ expression1: T, _ expression2: T, _ message: @autoclosure () -> String = "", file: StaticString = #filePath, line: UInt = #line) where T : Equatable {
+public func XCTAssertEqualAsync<T>(_ expression1: T, _ expression2: T, _ message: @autoclosure () -> String = "", file: StaticString = #filePath, line: UInt = #line) where T : Equatable {
     XCTAssertEqual(expression1, expression2, message(), file: file, line: line)
 }
 

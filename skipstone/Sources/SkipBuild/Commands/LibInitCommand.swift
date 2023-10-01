@@ -6,7 +6,7 @@ import FoundationNetworking
 #endif
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-struct InitCommand: SkipCommand {
+struct LibInitCommand: SkipCommand {
     static var configuration = CommandConfiguration(
         commandName: "init",
         abstract: "Initialize a new Skip library project",

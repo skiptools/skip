@@ -3,7 +3,7 @@ import ArgumentParser
 import SkipSyntax
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-struct WelcomeCommand: SkipCommand {
+struct WelcomeCommand: SkipCommand, SingleStreamingCommand {
     static var configuration = CommandConfiguration(
         commandName: "welcome",
         abstract: "Show the skip welcome message",
@@ -15,28 +15,47 @@ struct WelcomeCommand: SkipCommand {
     @Flag(help: ArgumentHelp("Show message only on first run"))
     var firstRun: Bool = false
 
-    func run() async throws {
-        if !firstRun || OutputOptions.isFirstRun == true {
-            outputOptions.write("""
+    /// The return value for Welcome is just a string message
+    struct WelcomeInfo : StringMessageEncodable {
 
-              ▄▄▄▄▄▄▄ ▄▄▄   ▄ ▄▄▄ ▄▄▄▄▄▄▄
-             █       █   █ █ █   █       █
-             █  ▄▄▄▄▄█   █▄█ █   █    ▄  █
-             █ █▄▄▄▄▄█      ▄█   █   █▄█ █
-             █▄▄▄▄▄  █     █▄█   █    ▄▄▄█
-              ▄▄▄▄▄█ █    ▄  █   █   █
-             █▄▄▄▄▄▄▄█▄▄▄█ █▄█▄▄▄█▄▄▄█
+        func message(term: Term) -> String? {
+            /// Colorize ASCI art banner by in fixed-width columns
+            func col(_ value: String) -> String {
+                term.cyan(value.slice(0, 9))
+                + term.green(value.slice(9, 18))
+                + term.yellow(value.slice(18, 22))
+                + term.red(value.slice(22))
+            }
+
+            return """
+
+             \(col(" ▄▄▄▄▄▄▄  ▄▄▄  ▄▄▄ ▄▄  ▄▄▄▄▄▄▄ "))
+             \(col("█       ██   █ █ ██  ██       █"))
+             \(col("█  ▄▄▄▄▄██   █▄█ ██  ██    ▄  █"))
+             \(col("█ █▄▄▄▄▄██      ▄██  ██   █▄█ █"))
+             \(col("█▄▄▄▄▄  ██     █▄██  ██    ▄▄▄█"))
+             \(col(" ▄▄▄▄▄█ ██    ▄  ██  ██   █    "))
+             \(col("█▄▄▄▄▄▄▄██▄▄▄█ █▄██▄▄██▄▄▄█    "))
 
             Welcome to Skip \(skipVersion)!
 
             Run "skip doctor" to check system requirements.
             Run "skip checkup" to perform a full system evaluation.
-            Run "skip create --open AppName" to create a new Skip Xcode project.
+            Run "skip lib init lib-name ModuleName" to create a new Skip library.
+            Run "skip app init --open AppName" to create a new Skip Xcode project.
 
             Visit https://skip.tools for documentation, samples, and FAQs.
 
             Happy Skipping!
-            """)
+            """
+        }
+    }
+
+    func executeCommand() async throws -> WelcomeInfo? {
+        if !firstRun || OutputOptions.isFirstRun == true {
+            return WelcomeInfo()
+        } else {
+            return nil
         }
     }
 }
