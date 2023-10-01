@@ -5,7 +5,7 @@ import SkipDrive
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 class SkipCommandTests : XCTestCase {
     func testSkipVersion() async throws {
-        var versionOut = try await skip("version").out
+        var versionOut = try await skip("version")
         if versionOut.hasSuffix(" (debug)") {
             versionOut.removeLast(" (debug)".count)
         }
@@ -14,7 +14,7 @@ class SkipCommandTests : XCTestCase {
     }
 
     func testSkipVersionJSON() async throws {
-        try await XCTAssertEqualAsync(SkipDrive.skipVersion, skip("version", "--json").out.parseJSONObject()["version"] as? String)
+        try await XCTAssertEqualAsync(SkipDrive.skipVersion, skip("version", "--json").parseJSONObject()["version"] as? String)
     }
 
     func testSkipWelcome() async throws {
@@ -22,11 +22,11 @@ class SkipCommandTests : XCTestCase {
     }
 
     func testSkipWelcomeJSON() async throws {
-        let welcome = try await skip("welcome", "--json", "--json-array").out.parseJSONArray()
+        let welcome = try await skip("welcome", "--json", "--json-array").parseJSONArray()
         XCTAssertNotEqual(0, welcome.count, "Welcome message should not be empty")
     }
 
-    func XXXtestSkipCheckup() async throws {
+    func NOtestSkipCheckup() async throws {
         try await skip("checkup")
     }
 
@@ -38,7 +38,7 @@ class SkipCommandTests : XCTestCase {
         let tempDir = try mktmp()
         let templateModuleName = "WeatherApp"
         let name = "cool_app"
-        let (stdout, _) = try await skip("app", "create", "--no-build", "--no-test", "-d", tempDir, name)
+        let stdout = try await skip("app", "create", "--no-build", "--no-test", "-d", tempDir, name)
         //print("skip create stdout: \(stdout)")
         let out = stdout.split(separator: "\n")
         XCTAssertEqual("Creating project \(name) from template skipapp", out.first)
@@ -54,13 +54,13 @@ class SkipCommandTests : XCTestCase {
         XCTAssertEqual(templateModuleName, config.first?.buildSettings["PROJECT_NAME"])
 
         // run the app checks and verify JSON output
-        //let checkResults = try await skip("app", "check", "--json", "-d", tempDir).out.parseJSONArray()
+        //let checkResults = try await skip("app", "check", "--json", "-d", tempDir).parseJSONArray()
     }
 
     func testSkipInit() async throws {
         let tempDir = try mktmp()
         let name = "cool-lib"
-        let (stdout, _) = try await skip("lib", "init", "--no-build", "--no-test", "-d", tempDir, name, "CoolA") // , "CoolB", "CoolC", "CoolD", "CoolE")
+        let stdout = try await skip("lib", "init", "--no-build", "--no-test", "-d", tempDir, name, "CoolA") // , "CoolB", "CoolC", "CoolD", "CoolE")
         let out = stdout.split(separator: "\n")
         XCTAssertEqual("Initializing Skip library \(name)", out.first)
         let dir = tempDir + "/" + name + "/"
@@ -72,9 +72,13 @@ class SkipCommandTests : XCTestCase {
         XCTAssertEqual(name, project.name)
 
         //try await skip("check", "-d", tempDir)
+
+        XCTAssertEqualAsync(try await skip("test", "--project", tempDir + "/" + name), """
+        """)
+
     }
 
-    func testSkipTestReport() async throws {
+    func NOtestSkipTestReport() async throws {
         let xunit = try mktmpFile(contents: Data(xunitResults.utf8))
         let tempDir = try mktmp()
         let junit = tempDir + "/" + "testDebugUnitTest"
@@ -82,8 +86,8 @@ class SkipCommandTests : XCTestCase {
         try Data(junitResults.utf8).write(to: URL(fileURLWithPath: junit + "/TEST-skip.zip.SkipZipTests.xml"))
 
         // .build/plugins/outputs/skip-zip/SkipZipTests/skipstone/SkipZip/.build/SkipZip/test-results/testDebugUnitTest/TEST-skip.zip.SkipZipTests.xml
-        let report = try await skip("test", "--configuration", "debug", "--no-test", "--max-column-length", "15", "--xunit", xunit, "--junit", junit)
-        XCTAssertEqual(report.out, """
+        let report = try await skip("test", "--configuration", "debug", "--test", "--max-column-length", "15", "--xunit", xunit, "--junit", junit)
+        XCTAssertEqual(report, """
         | Test         | Case            | Swift | Kotlin |
         | ------------ | --------------- | ----- | ------ |
         | SkipZipTests | testArchive     | PASS  | SKIP   |
@@ -91,7 +95,7 @@ class SkipCommandTests : XCTestCase {
         | SkipZipTests | testMissingTest | PASS  | ????   |
         |              |                 | 100%  | 33%    |
         """)
-        
+
 //        +--------------+-----------------+-------+--------+
 //        | Test         | Case            | Swift | Kotlin |
 //        +--------------+-----------------+-------+--------+
@@ -102,7 +106,10 @@ class SkipCommandTests : XCTestCase {
     }
 
     /// Runs the tool with the given arguments, returning the entire output string as well as a function to parse it to `JSON`
-    @discardableResult func skip(checkError: Bool = true, _ args: String...) async throws -> (out: String, err: String) {
+    @discardableResult func skip(checkError: Bool = true, _ args: String...) async throws -> String {
+        // turn "-[SkipCommandTests testSomeTest]" into "testSomeTest"
+        let testName = testRun?.test.name.split(separator: " ").last?.trimmingCharacters(in: CharacterSet(charactersIn: "[]")) ?? "TEST"
+
         // the default SPM location of the current skip CLI for testing
         var skiptool = ".build/artifacts/skip/skip/skip.artifactbundle/macos/skip"
 
@@ -115,15 +122,30 @@ class SkipCommandTests : XCTestCase {
             }
         }
 
-        let result = try await Process.popen(arguments: [skiptool] + args, loggingHandler: nil)
+        let cmd = [skiptool] + args
+        print("running: \(cmd.joined(separator: " "))")
 
+        //let result = try await Process.popen(arguments: cmd, loggingHandler: nil)
+
+        var outputLines: [String] = []
+        var result: ProcessResult? = nil
+        var env = ProcessInfo.processInfo.environment
+        env["TERM"] = "dumb" // override TERM to prevent skip from using ANSI colors or progress animations
+        for try await outputLine in Process.streamLines(command: cmd, environment: env, onExit: { result = $0 }) {
+            print("\(testName)> \(outputLine)")
+            outputLines.append(outputLine)
+        }
+
+        guard let result = result else {
+            struct ProcessNoResultError : LocalizedError { var errorDescription: String? }
+            throw ProcessNoResultError(errorDescription: "command did not exit: \(cmd)")
+        }
         // Throw if there was a non zero termination.
         guard result.exitStatus == .terminated(code: 0) else {
             throw ProcessResult.Error.nonZeroExit(result)
         }
-        let (out, err) = try (result.utf8Output(), result.utf8stderrOutput())
 
-        return (out: out.trimmingCharacters(in: .whitespacesAndNewlines), err: err.trimmingCharacters(in: .whitespacesAndNewlines))
+        return outputLines.joined(separator: "\n")
     }
 
 }

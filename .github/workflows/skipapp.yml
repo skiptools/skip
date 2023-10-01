@@ -49,9 +49,7 @@ jobs:
           echo "COMMIT_DATE=$(git log -1 --format=%ad --date=iso-strict ${GITHUB_REF#refs/tags/})" >> $GITHUB_ENV
 
           # the primary skip module is the first product name
-          echo "SKIP_MODULE=$(swift package dump-package | jq -r '.products[0].name')" >> $GITHUB_ENV
-
-          SKIP_MODULE=$(swift package dump-package | jq -r '.products[0].targets[0]')
+          SKIP_MODULE=$(swift package dump-package | jq -r '.products[0].name')
           echo "SKIP_MODULE=${SKIP_MODULE}" >> $GITHUB_ENV
 
           # a SKIP_MODULE like MyApp needs to be have a MyApp.xcodeproj folder

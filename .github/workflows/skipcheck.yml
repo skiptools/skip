@@ -15,8 +15,8 @@ jobs:
       - run: skip doctor
       - run: skip checkup
       - run: skip lib init --build --test -d $(mktemp -d) skppkg Mod1 Mod2
-      - run: skip app init --build --test -d $(mktemp -d) skpapp
-      - run: skip app init --template skipapp-weather --build --test -d $(mktemp -d) skpapp
-      #- run: skip app init --template skipapp-playground --build --test -d $(mktemp -d) skpapp
-      #- run: skip app init --template skipapp-hello --build --test -d $(mktemp -d) skpapp
+      - run: skip app create --build --test -d $(mktemp -d) skpapp
+      - run: skip app create --template skipapp-weather --build --test -d $(mktemp -d) skpapp
+      #- run: skip app create --template skipapp-playground --build --test -d $(mktemp -d) skpapp
+      #- run: skip app create --template skipapp-hello --build --test -d $(mktemp -d) skpapp
 
