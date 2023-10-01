@@ -52,8 +52,12 @@ jobs:
           SKIP_MODULE=$(swift package dump-package | jq -r '.products[0].name')
           echo "SKIP_MODULE=${SKIP_MODULE}" >> $GITHUB_ENV
 
-          # a SKIP_MODULE like MyApp needs to be have a MyApp.xcodeproj folder
-          XCODE_SETTINGS=$(xcodebuild -showBuildSettings -alltargets -json -project ${SKIP_MODULE}.xcodeproj)
+          xcodebuild -showBuildSettings -json -project ${SKIP_MODULE}.xcodeproj -scheme "${SKIP_MODULE}"
+
+          SKIP_MODULE_PLUS="${SKIP_MODULE}+"
+          echo "SKIP_MODULE_PLUS=${SKIP_MODULE_PLUS}" >> $GITHUB_ENV
+
+          XCODE_SETTINGS=$(xcodebuild -showBuildSettings -json -project ${SKIP_MODULE}.xcodeproj -scheme "${SKIP_MODULE_PLUS}")
 
           # log the build settings
           echo "${XCODE_SETTINGS}" | jq .
@@ -89,7 +93,7 @@ jobs:
       - name: Build apk
         run: |
           for CONFIGURATION in "Release" "Debug"; do
-            BUILT_PRODUCTS_DIR=".build" xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -configuration "${CONFIGURATION}" -destination "platform=macosx" -scheme "${SKIP_MODULE}" build SKIP_LAUNCH_APK="NO"
+            BUILT_PRODUCTS_DIR=".build" xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -configuration "${CONFIGURATION}" -destination "platform=macosx" -scheme "${SKIP_MODULE_PLUS}" build SKIP_LAUNCH_APK="NO"
           done
 
           ls -la ${RELDIR}/
