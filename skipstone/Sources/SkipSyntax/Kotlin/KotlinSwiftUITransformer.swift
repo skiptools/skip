@@ -27,6 +27,18 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         }
     }
 
+    /// Return a string of the init parameters needed to construct an `AppStorage` after the `wrappedValue`.
+    static func appStorageAdditionalInitParameters(for variableDeclaration: KotlinVariableDeclaration) -> String {
+        // Parse annotation tokens to transfer into the constructor args: `@AppStorage("prefsKey", store: UserDefaults.standard)`
+        let tokens = variableDeclaration.attributes.of(kind: .appStorage).first?.tokens ?? []
+        let keyName = tokens.first ?? "storageKey"
+        if tokens.count == 2, let storeName = tokens.last {
+            return "\(keyName), store = \(storeName)"
+        } else {
+            return keyName
+        }
+    }
+
     private func translateVisit(_ node: KotlinSyntaxNode, translator: KotlinTranslator) -> VisitResult<KotlinSyntaxNode> {
         if let classDeclaration = node as? KotlinClassDeclaration {
             if omitPreviewProvider(classDeclaration, codebaseInfo: translator.codebaseInfo) {
@@ -465,9 +477,13 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             if let value = variable.value {
                 output.append(" = skip.ui.AppStorage(")
                 value.append(to: output, indentation: indentation)
+                output.append(", ")
+                output.append(Self.appStorageAdditionalInitParameters(for: variable))
                 output.append(")")
             } else if variable.propertyType.isOptional {
-                output.append(" = skip.ui.AppStorage(null)")
+                output.append(" = skip.ui.AppStorage(null, ")
+                output.append(Self.appStorageAdditionalInitParameters(for: variable))
+                output.append(")")
             }
             output.append("\n")
         }

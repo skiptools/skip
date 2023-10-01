@@ -190,14 +190,8 @@ final class KotlinStructTransformer: KotlinTransformer {
                 if variableDeclaration.mayBeSharedMutableStruct {
                     value += ".sref()"
                 }
-                // parse annotation tokens to transfer into the constructor args: `@AppStorage("prefsKey", store: UserDefaults.standard)`
-                let tokens = variableDeclaration.attributes.of(kind: .appStorage).first?.tokens ?? []
-                let keyName = tokens.first ?? "storageKey"
-                if tokens.count == 2, let storeName = tokens.last {
-                    assignment = "this._\(variableDeclaration.propertyName) = skip.ui.AppStorage(wrappedValue = \(value), \(keyName), store = \(storeName))"
-                } else {
-                    assignment = "this._\(variableDeclaration.propertyName) = skip.ui.AppStorage(wrappedValue = \(value), \(keyName))"
-                }
+                let appStorageParameters = KotlinSwiftUITransformer.appStorageAdditionalInitParameters(for: variableDeclaration)
+                assignment = "this._\(variableDeclaration.propertyName) = skip.ui.AppStorage(wrappedValue = \(value), \(appStorageParameters))"
             } else if variableDeclaration.attributes.contains(.binding) {
                 assignment = "this._\(variableDeclaration.propertyName) = \(variableDeclaration.propertyName)"
             } else {
@@ -227,7 +221,7 @@ final class KotlinStructTransformer: KotlinTransformer {
         bodyStatements += variableDeclarations.map { variableDeclaration in
             if variableDeclaration.attributes.contains(.state) || variableDeclaration.attributes.contains(.stateObject) {
                 return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = skip.ui.State(copy.\(variableDeclaration.propertyName))")
-            } else if variableDeclaration.attributes.contains(.binding) {
+            } else if variableDeclaration.attributes.contains(.appStorage) || variableDeclaration.attributes.contains(.binding) {
                 return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = copy._\(variableDeclaration.propertyName)")
             } else {
                 return KotlinRawStatement(sourceCode: "this.\(variableDeclaration.propertyName) = copy.\(variableDeclaration.propertyName)")
@@ -340,7 +334,7 @@ final class KotlinStructTransformer: KotlinTransformer {
         return storedVariableDeclarations.map { variableDeclaration in
             if variableDeclaration.attributes.contains(.state) {
                 return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = skip.ui.State(\(copy).\(variableDeclaration.propertyName))")
-            } else if variableDeclaration.attributes.contains(.binding) {
+            } else if variableDeclaration.attributes.contains(.appStorage) || variableDeclaration.attributes.contains(.binding) {
                 return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = \(copy)._\(variableDeclaration.propertyName)")
             } else {
                 return KotlinRawStatement(sourceCode: "this.\(variableDeclaration.propertyName) = \(copy).\(variableDeclaration.propertyName)")
