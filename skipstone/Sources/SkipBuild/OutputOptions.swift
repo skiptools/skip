@@ -186,22 +186,6 @@ extension OutputOptions {
         return (out, err)
     }
 
-    /// Apply an ease-out effect to the given input; used to create a progress monitor character sequence that creates the appearance of slowing down as it proceeds
-    func easeOutValue(for input: Double, base: Double = 100.0, factor: Double = 20.0) -> Double {
-        // Ensure the input is within the range 0.0 to 20.0
-        let clampedInput = max(0.0, min(factor, input))
-
-        // Apply ease-out timing curve formula
-        let t = clampedInput / factor
-        //print("pow(1 - t, 3): \(pow(1 - t, 3))")
-
-        let output = base - (base * pow(1 - t, 3))
-        //print("output: \(output)")
-
-        // Ensure the output is within the range 0.1 to 100.0
-        return max(1.0, output)
-    }
-
     func monitorPrefix<T>(_ progressCharacters: String?, for result: Result<T, Error>?, startTime: Date) -> String {
         switch result {
         case .success: 
@@ -211,7 +195,11 @@ extension OutputOptions {
         case .none:
             let pseq = progressCharacters ?? "…" // fall back to a single ellipsis if no progress sequence is specified
             // use an ease-out animation to start the progress spinner quick and then slow it down as time progresses
-            let cidx = (Int(easeOutValue(for: Date.now.timeIntervalSince(startTime)) * 1000.0) % (pseq.count * 1000)) / 1000
+            let t = Date.now.timeIntervalSince(startTime)
+            
+            let mag = 100_000
+            let factor = 1.0 / 1.5 // sqrt timing factor; 1.5 is a good slowdown rate
+            let cidx = (Int(pow(t * 100.0, factor)) * mag) % (pseq.count * mag) / mag
             let pchar = pseq[pseq.index(pseq.startIndex, offsetBy: cidx)]
             return "[" + term.yellow(String(pchar)) + "]"
         }

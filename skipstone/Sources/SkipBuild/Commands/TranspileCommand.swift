@@ -345,7 +345,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
             if let gradleVersion = transpileOptions.gradleVersion as String? {
                 try generateGradleWrapperProperties(version: gradleVersion)
             }
-            try generateProguardFile()
+            //try generateProguardFile() // TODO: causing errors
             try generatePerModuleGradle()
             try generateGradleProperties()
             try generateSettingsGradle()
@@ -394,6 +394,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
 
             /// Create the proguard-rules.pro file, which configures the optimization settings for release buils
             func generateProguardFile() throws {
+                // NOTE: currently disabled
                 try writeChanges(tag: "proguard", to: moduleRootPath.appending(component: "proguard-rules.pro"), contents: """
                     -dontobfuscate
                     -keep class skip.** { *; }

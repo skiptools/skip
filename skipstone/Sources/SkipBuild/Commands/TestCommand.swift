@@ -46,7 +46,7 @@ struct TestCommand: SkipCommand {
     func run() async throws {
         // only run tests when there is a Tests/ folder
         if !FileManager.default.fileExists(atPath: project + "/Tests") {
-            outputOptions.write("No Tests folder")
+            outputOptions.write("No Tests folder in project: \(project)")
             return
         }
 
