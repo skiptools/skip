@@ -415,7 +415,6 @@ public protocol StreamingCommand: AsyncParsableCommand {
 
 extension StreamingCommand {
     func writeOutput(message: MessageEncodable) throws {
-        #warning("is the error parameter correct?")
         try outputOptions.writeOutput(message, error: message is Message ? true : false)
     }
 
@@ -887,7 +886,8 @@ extension FileSystem {
     private func treeASCIIRepresent<T: TextOutputStream>(fs: FileSystem, path: AbsolutePath, prefix: String = "", to writer: inout T) throws {
         let contents = try fs.getDirectoryContents(path)
         // content order is undefined
-        let entries = contents.sorted(using: .localizedStandard)
+        //let entries = contents.sorted(using: .localizedStandard) // Darwin only
+        let entries = contents.sorted()
 
         for (idx, entry) in entries.enumerated() {
             let isLast = idx == entries.count - 1
