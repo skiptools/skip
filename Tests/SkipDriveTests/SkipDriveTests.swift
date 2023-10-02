@@ -31,7 +31,8 @@ class SkipCommandTests : XCTestCase {
     }
 
     func testSkipDoctor() async throws {
-        try await skip("doctor")
+        // run `skip doctor` with JSON array output and make sure we can parse the result
+        _ = try await skip("doctor", "-jA").parseJSONArray()
     }
 
     func testSkipCreate() async throws {
