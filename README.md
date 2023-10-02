@@ -21,3 +21,22 @@ You can also get help on a particular command. For example, to see details and a
 ```
 
 See the Skip product [documentation](https://skip.tools/docs) for common use cases, including how to use `skip` to [start a Skip app](https://skip.tools/docs/#start-new-app) and [start a dual-platform Skip library](http://skip.tools/docs/#start-new-library).
+
+## Known Issues
+
+This section lists known issues with the `skip` tool and associated Xcode plugins.
+
+- Xcode sometimes reports error messages like the following:
+
+    ```shell
+    Internal inconsistency error (didStartTask): targetID (174) not found in _activeTargets.
+    Internal inconsistency error (didEndTask): '12' missing from _activeTasks.
+    ```
+
+    When these errors occur, the build may appear to complete successfully although changes are not applied. Unfortunately, this appears to be an Xcode bug. We have found the following workarounds:
+
+    - Continue to retry the build. Eventually Xcode will complete successfully, although the errors may continue to become more frequest until you are foced to apply one of the other solutions below.
+    - Restart Xcode.
+    - Clean and rebuild.
+
+    You can read more about this Xcode error on the [Swift.org forums](https://forums.swift.org/t/internal-inconsistency-error-didstarttask/61194/2).
