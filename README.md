@@ -39,4 +39,4 @@ This section lists known issues with the `skip` tool and associated Xcode plugin
     - Restart Xcode.
     - Clean and rebuild.
 
-    You can read more about this Xcode error on the [Swift.org forums](https://forums.swift.org/t/internal-inconsistency-error-didstarttask/61194/2).
+    You can read more about this Xcode error on the [Swift.org forums](https://forums.swift.org/t/internal-inconsistency-error-didstarttask/61194).
