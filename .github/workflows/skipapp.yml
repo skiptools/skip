@@ -129,13 +129,18 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         run: |
           APPNAME="${SKIP_MODULE}"
+
           # merge the ipa and apk zips into a single archive
           cd ${RELDIR}/
           ls -la
 
-          IPA="${APPNAME}-Release.ipa"
-          APK="${SKIP_MODULE}-release.apk"
           APPZ="${SKIP_MODULE}.appz"
+          IPA="${APPNAME}-Release.ipa"
+
+          # the .apk name will default to the name of the enclosing module
+          # (e.g., "SkipWeatherUI-release.apk" rather than "SkipWeather-")
+          APPMODULE="${APPNAME}UI"
+          APK="${APPMODULE}-release.apk"
 
           TMPDIR=$(mktemp -d)
           unzip -q "$IPA" -d "$TMPDIR"
@@ -149,13 +154,13 @@ jobs:
           ls -lah ${APK} ${IPA} ${APPZ}
 
           # fix artifact names for release (retain App-Source.zip for template)
-          mv -v ${APPNAME}-Source.zip ${SKIP_MODULE}-ios-${RELTAG}-source.zip
-          mv -v ${APK} ${SKIP_MODULE}-android-${RELTAG}.apk
-          #mv -v ${SKIP_MODULE}-debug.apk ${SKIP_MODULE}-android-${RELTAG}-debug.apk
-          mv -v ${APPNAME}-Release.ipa ${SKIP_MODULE}-ios-${RELTAG}.ipa
-          mv -v ${APPNAME}-Debug.ipa ${SKIP_MODULE}-ios-${RELTAG}-debug.ipa
-          mv -v ${APPNAME}-android-source.zip ${SKIP_MODULE}-android-${RELTAG}-source.zip
-          mv -v ${APPZ} ${SKIP_MODULE}-${RELTAG}.appz
+          mv -v ${APPNAME}-Source.zip ${APPNAME}-ios-${RELTAG}-source.zip
+          mv -v ${APK} ${APPNAME}-android-${RELTAG}.apk
+          #mv -v ${APPNAME}-debug.apk ${APPNAME}-android-${RELTAG}-debug.apk
+          mv -v ${APPNAME}-Release.ipa ${APPNAME}-ios-${RELTAG}.ipa
+          mv -v ${APPNAME}-Debug.ipa ${APPNAME}-ios-${RELTAG}-debug.ipa
+          mv -v ${APPNAME}-android-source.zip ${APPNAME}-android-${RELTAG}-source.zip
+          mv -v ${APPZ} ${APPNAME}-${RELTAG}.appz
 
           # move debug build out of release candidates
           mkdir debug
@@ -165,6 +170,10 @@ jobs:
           # finally create the checksums file for everything remaining
           shasum -a 256 *.* > checksums.txt
 
+      - name: "Verify skipapp template"
+        if: false
+        run: skip app create --template-file ${RELDIR}/skip-template-source.zip --verify --build --test --archive -c release SomeApp
+
       - name: "Release"
         if: startsWith(github.ref, 'refs/tags/')
         env:
@@ -173,9 +182,6 @@ jobs:
           echo "Creating release: ${RELTAG}"
           cd ${RELDIR}/
           gh release create "${RELTAG}" -t "Release ${RELTAG}" --generate-notes *.*
-
-      - name: "Verify Release Templae"
-        run: skip app create --template-file ${RELDIR}/skip-template-source.zip --build --test SomeApp
 
       - name: "Upload Build Artifacts"
         # upload the artifacts generated from each build
