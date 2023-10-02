@@ -110,23 +110,22 @@ public struct OutputOptions: ParsableArguments {
     }
 
     /// Write the given message to the output streams buffer
-    //@available(*, deprecated, message: "send to output instead")
-    func write(_ value: String) {
+    internal func write(_ value: String) {
         streams.write(error: false, output: output, value)
     }
 
     /// The output that comes at the beginning of a sequence of elements; an opening bracket, for JSON arrays
-    func beginCommandOutput() {
+    internal func beginCommandOutput() {
         if jsonArray { write("[") }
     }
 
     /// The output that comes at the end of a sequence of elements; a closing bracket, for JSON arrays
-    func endCommandOutput() {
+    internal func endCommandOutput() {
         if jsonArray { write("]") }
     }
 
     /// The output that separates elements; a comma, for JSON arrays
-    func writeOutputSeparator() {
+    internal func writeOutputSeparator() {
         if jsonArray { write(",") }
     }
 
@@ -163,12 +162,9 @@ extension OutputOptions {
         }
     }
 
-    //@available(*, deprecated, message: "use StreamingCommand.exec() instead")
     @discardableResult
-    func run(_ message: String, flush: Bool = true, progress: Bool = true, _ args: [String], environment: [String: String] = ProcessInfo.processInfo.environment) async throws -> (out: String, err: String) {
-        let (out, err) = try await monitor(message, progress: progress ? Self.progressAimations.first : nil) {
-            //try await Process.checkNonZeroExit(arguments: args, environment: environment, loggingHandler: nil)
-
+    func run(_ message: String, flush: Bool = true, _ args: [String], environment: [String: String] = ProcessInfo.processInfo.environment) async throws -> (out: String, err: String) {
+        try await monitor(message) {
             let result = try await Process.popen(arguments: args, environment: environment, loggingHandler: nil)
             // Throw if there was a non zero termination.
             guard result.exitStatus == .terminated(code: 0) else {
@@ -177,13 +173,6 @@ extension OutputOptions {
             let (out, err) = try (result.utf8Output(), result.utf8stderrOutput())
             return (out: out, err: err)
         }
-
-        if flush { // write a final newline (since monitor does not
-            write("", flush: true)
-        }
-
-
-        return (out, err)
     }
 
     func monitorPrefix<T>(_ progressCharacters: String?, for result: Result<T, Error>?, startTime: Date) -> String {
@@ -206,24 +195,23 @@ extension OutputOptions {
     }
 
     /// Perform an operation with a given message handler, which will be invoked in the progress cycle with a nil result, and then a final time with the result of the block invocation
-    @discardableResult func monitor<T>(_ message: String, progress: String? = progressAimations.randomElement(), block: @escaping () async throws -> T, messageHandler handler: ((Result<T, Error>?) -> String)? = nil) async throws -> T {
+    ///
+    /// If we are using a rich terminal (and no specifying plain or JSON output), when output a progress animation while waiting for the given process to complete
+    @discardableResult func monitor<T>(_ message: String, block: @escaping () async throws -> T, messageHandler handler: ((Result<T, Error>?) -> String)? = nil) async throws -> T {
         let startTime = Date.now
-
-        /// The default implementation of the message handler cycles through the default progress animation and then outputs the result
-        let messageHandler = handler ?? { result in
-            // the progress index is based on the current time index
-            // fatalError()
-            monitorPrefix(progress, for: result, startTime: startTime) + " " + message
-        }
-
+        let progress = (self.emitJSON == false && self.messagePlain == false && self.plain == false) ? Self.progressAimations.first : nil
         let progressMonitor: Task<(), Error>?
-
-        if progress == nil || plain == true {
+        if progress == nil {
             progressMonitor = nil
-            write(message)
         } else {
             progressMonitor = Task {
                 var lastMessage: String? = nil
+                /// The default implementation of the message handler cycles through the default progress animation and then outputs the result
+                let messageHandler = handler ?? { result in
+                    // the progress index is based on the current time index
+                    monitorPrefix(progress, for: result, startTime: startTime) + " " + message
+                }
+
                 func printMessage() -> Int {
                     let newMessage = messageHandler(nil)
                     if newMessage == lastMessage {
@@ -237,20 +225,12 @@ extension OutputOptions {
                 }
 
                 while true {
-                    while true {
-                        let printed = printMessage()
-                        defer {
-                            @Sendable func clear(_ count: Int) {
-                                // clear the current line; we explicitly do not flush so the cursor doesn't jump around
-                                write(String(repeating: "\u{8}", count: count), terminator: "", flush: false)
-                            }
-
-                            clear(printed) // clear whatever we just printed
-                        }
-                        try Task.checkCancellation()
-                        try await Task.sleep(for: .milliseconds(50))
-                        try Task.checkCancellation()
+                    let printed = printMessage()
+                    defer {
+                        // clear the current line; we explicitly do not flush so the cursor doesn't jump around
+                        write(String(repeating: "\u{8}", count: printed), terminator: "", flush: false)
                     }
+                    try await Task.sleep(for: .milliseconds(50))
                 }
             }
         }
@@ -276,7 +256,7 @@ extension OutputOptions {
         _ = try? await progressMonitor?.value
 
         // now output the final result message
-        write(messageHandler(result), terminator: "", flush: true)
+        //write(messageHandler(result), terminator: "", flush: true)
         return try result.get()
     }
 

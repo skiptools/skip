@@ -560,16 +560,57 @@ extension Optional : MessageConvertible where Wrapped : MessageConvertible {
     }
 }
 
-/// A message that can optionally be highlighted colors for rich terinal output
+/// A message that can optionally be highlighted with colors for rich terminal output, or a `nil` Terminal for omitting a status prefix from the message
 public struct MessageBlock : StringMessageEncodable {
-    let _message: (_ term: Term) -> String?
+    public enum Status : String, Encodable {
+        case pass, warn, fail, skip
 
-    public init(_ message: @escaping (_ term: Term) -> String?) {
+        /// The character prefix to output before the command result
+        func prefix(_ term: Term?) -> String? {
+            guard let term = term else {
+                return nil
+            }
+            switch self {
+            case .pass:
+                return "[" + term.green("✓") + "] "
+            case .fail:
+                return "[" + term.red("✗") + "] "
+            case .warn:
+                return "[" + term.yellow("!") + "] "
+            case .skip:
+                return "[" + term.magenta("-") + "] "
+            }
+        }
+    }
+
+    public let status: Status?
+    let _message: (_ term: Term?) -> String?
+
+    public init(status: Status?, _ message: String) {
+        self.status = status
+        self._message = { term in
+            (status?.prefix(term) ?? "") + message
+        }
+    }
+
+    public init(_ message: @escaping (_ term: Term?) -> String?) {
+        self.status = nil
         self._message = message
     }
 
     public func message(term: Term) -> String? {
         self._message(term)
+    }
+
+    public enum CodingKeys : CodingKey {
+        case status, msg
+    }
+
+    /// Messages are encoded like `{ "status": "fail", "msg": "operation failed" }`
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(status, forKey: .status)
+        try container.encodeIfPresent(_message(nil), forKey: .msg)
     }
 }
 

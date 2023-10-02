@@ -21,13 +21,14 @@ struct DoctorCommand: SkipCommand, StreamingCommand {
     var toolOptions: ToolOptions
 
     func performCommand(msg continuation: Messenger) async throws {
-        outputOptions.write("Skip Doctor")
+        continuation.yield(MessageBlock(status: nil, "Skip Doctor"))
+
         try await runDoctor(tool: toolOptions, with: continuation)
-        let latestVersion = try await checkSkipUpdates()
+        let latestVersion = try await checkSkipUpdates(with: continuation)
         if let latestVersion = latestVersion, latestVersion != skipVersion {
-            outputOptions.write("A new version is Skip (\(latestVersion)) is available to update with: skip upgrade")
+            continuation.yield(MessageBlock(status: .warn, "A new version is Skip (\(latestVersion)) is available to update with: skip upgrade"))
         } else {
-            outputOptions.write("Skip (\(skipVersion)) checks complete")
+            continuation.yield(MessageBlock(status: .pass, "Skip (\(skipVersion)) checks complete"))
         }
     }
 }
@@ -49,19 +50,19 @@ extension SkipCommand where Self : StreamingCommand {
                     // the ToolSupport `Version` constructor only accepts three-part versions,
                     // so we need to augment versions like "8.3" and "2022.3" with an extra ".0"
                     guard let semver = Version(v) ?? Version(v + ".0") ?? Version(v + ".0.0") else {
-                        outputOptions.write(": PARSE ERROR")
+                        continuation.yield(MessageBlock(status: .warn, "\(title) PARSE ERROR"))
                         return
                     }
-                    if let min = min, semver < min {
-                        outputOptions.write(": \(semver) (NEEDS \(min))")
+                    if let min = min {
+                        continuation.yield(MessageBlock(status: semver < min ? .warn : .pass, "\(title) \(semver) (\(semver < min ? "<" : semver > min ? ">" : "=") \(min))"))
                     } else {
-                        outputOptions.write(": \(semver)")
+                        continuation.yield(MessageBlock(status: .pass, "\(title) \(semver)"))
                     }
                 } else {
-                    outputOptions.write(": ERROR")
+                    continuation.yield(MessageBlock(status: .fail, "\(title) ERROR"))
                 }
             } catch {
-                outputOptions.write(": ERROR: \(error)")
+                continuation.yield(MessageBlock(status: .fail, "\(title) ERROR: \(error)"))
             }
         }
 

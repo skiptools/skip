@@ -6,6 +6,12 @@ final class SkipCommandTests: XCTestCase {
     func testSkipVersion() async throws {
         try await XCTAssertEqualAsync(skipVersion.json(), skipstone("version", "-j").json()["version"])
     }
+
+    func testSkipDoctor() async throws {
+        // run skip doctor with JSON array output and make sure we can parse the result
+        try await XCTAssertEqualAsync(["msg": "Skip Doctor"], skipstone("doctor", "-jA").json().array?.first)
+    }
+
 }
 
 

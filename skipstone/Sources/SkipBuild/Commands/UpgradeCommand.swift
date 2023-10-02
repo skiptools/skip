@@ -19,12 +19,12 @@ struct UpgradeCommand: SkipCommand {
     var outputOptions: OutputOptions
 
     func run() async throws {
-        if try await checkSkipUpdates() == skipVersion {
-            outputOptions.write("Skip \(skipVersion) is up to date.")
-            return
-        }
+        //if try await checkSkipUpdates() == skipVersion {
+        //    outputOptions.write("Skip \(skipVersion) is up to date.")
+        //    return
+        //}
 
-        try await outputOptions.run("Updating Homebew", ["brew", "update"])
+        //try await outputOptions.run("Updating Homebew", ["brew", "update"])
         let upgradeOutput = try await outputOptions.run("Updating Skip", ["brew", "upgrade", "skip"])
         outputOptions.write(upgradeOutput.out)
         outputOptions.write(upgradeOutput.err)
@@ -34,12 +34,19 @@ struct UpgradeCommand: SkipCommand {
 
 extension SkipCommand {
     /// Checks the https://source.skip.tools/skip/releases.atom page and returns the semantic version contained in the title of the first entry (i.e., the latest release of Skip)
-    func checkSkipUpdates() async throws -> String? {
-        let latestVersion: String? = try await outputOptions.monitor("Check Skip Updates") {
+    func checkSkipUpdates(with continuation: Messenger) async throws -> String? {
+        let msg = "Check Skip Updates"
+        let latestVersion: String? = try await outputOptions.monitor(msg) {
             try await fetchLatestRelease(from: URL(string: "https://source.skip.tools/skip/releases.atom")!)
         }
-        outputOptions.write(": " + ((try? latestVersion?.extract(pattern: "([0-9.]+)")) ?? "unknown"))
-        return latestVersion
+
+        if let version = try? latestVersion?.extract(pattern: "([0-9.]+)") {
+            continuation.yield(MessageBlock(status: .pass, "\(msg): \(version)"))
+            return version
+        } else {
+            continuation.yield(MessageBlock(status: .fail, "\(msg): unknown version: \(latestVersion ?? "")"))
+            return nil
+        }
     }
 
     /// Grabs an Atom XML feed of releases and returns the first title.
