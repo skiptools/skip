@@ -8,6 +8,15 @@ final class SkipAssemberTests: XCTestCase {
         try fileSystemTest(fs: localFileSystem)
     }
 
+    public func testEmbedResource() throws {
+        XCTAssertEqual(String(data: Data(SomeFile_txt), encoding: .utf8), """
+
+        Some File Contents
+
+        
+        """)
+    }
+
     public func fileSystemTest<FS: FileSystem>(fs: FS) throws {
         let tmpRoot = try AbsolutePath(validating: UUID().uuidString, relativeTo: AbsolutePath(validating: NSTemporaryDirectory()))
 

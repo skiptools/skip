@@ -1,4 +1,4 @@
-// swift-tools-version: 5.8
+// swift-tools-version: 5.9
 import PackageDescription
 
 let package = Package(
@@ -47,6 +47,8 @@ let package = Package(
             .product(name: "SwiftToolsSupport-auto", package: "swift-tools-support-core"),
             .product(name: "Universal", package: "universal"),
             .product(name: "Crypto", package: "swift-crypto", condition: .when(platforms: [.linux])),
+        ], resources: [
+            .embedInCode("Resources")
         ]),
         .testTarget(name: "SkipBuildTests", dependencies: ["SkipBuild"]),
 
