@@ -40,4 +40,4 @@ This section lists known issues with the `skip` tool and associated Xcode plugin
     - Clean and rebuild.
 
     You can read more about this Xcode error on the [Swift.org forums](https://forums.swift.org/t/internal-inconsistency-error-didstarttask/61194).
-- Skip may highlight the wrong line number for build errors. When Skip reports the wrong line number, it is typically only one line off.
+- Skip may highlight the wrong line in build errors. When Skip surfaces the wrong line number, it is typically only one line off.
