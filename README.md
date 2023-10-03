@@ -33,7 +33,7 @@ This section lists known issues with the `skip` tool and associated Xcode plugin
     Internal inconsistency error (didEndTask): '12' missing from _activeTasks.
     ```
 
-    When these errors occur, the build may appear to complete successfully although changes are not applied. Unfortunately, this appears to be an Xcode bug. We have found the following workarounds:
+    When these errors occur, the build appears to complete successfully although changes are not applied. Unfortunately, this is an Xcode bug. We have found the following workarounds:
 
     - Continue to retry the build. Eventually Xcode will complete successfully, although the errors may continue to become more frequest until you are foced to apply one of the other solutions below.
     - Restart Xcode.
