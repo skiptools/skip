@@ -9,7 +9,7 @@ import FoundationXML // for non-Darwin
 #endif
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-struct UpgradeCommand: SkipCommand {
+struct UpgradeCommand: MessageCommand {
     static var configuration = CommandConfiguration(
         commandName: "upgrade",
         abstract: "Upgrade to the latest Skip version using Homebrew",
@@ -18,33 +18,34 @@ struct UpgradeCommand: SkipCommand {
     @OptionGroup(title: "Output Options")
     var outputOptions: OutputOptions
 
-    func run() async throws {
+    func performCommand(with out: Messenger) async throws {
         //if try await checkSkipUpdates() == skipVersion {
         //    outputOptions.write("Skip \(skipVersion) is up to date.")
         //    return
         //}
 
         //try await outputOptions.run("Updating Homebew", ["brew", "update"])
-        let upgradeOutput = try await outputOptions.run("Updating Skip", ["brew", "upgrade", "skip"])
-        outputOptions.write(upgradeOutput.out)
-        outputOptions.write(upgradeOutput.err)
+        let upgradeOutput = try await outputOptions.run(with: out, "Updating Skip", ["brew", "upgrade", "skip"])
+        //outputOptions.write(upgradeOutput.out)
+        //outputOptions.write(upgradeOutput.err)
     }
 }
 
-
 extension SkipCommand {
     /// Checks the https://source.skip.tools/skip/releases.atom page and returns the semantic version contained in the title of the first entry (i.e., the latest release of Skip)
-    func checkSkipUpdates(with continuation: Messenger) async throws -> String? {
+    func checkSkipUpdates(with out: Messenger) async throws -> String? {
         let msg = "Check Skip Updates"
-        let latestVersion: String? = try await outputOptions.monitor(msg) {
+        let latestVersion: String? = try await outputOptions.monitor(with: out, msg, resultHandler: { result in
+            (result, nil)
+        }) { loggingHandler in
             try await fetchLatestRelease(from: URL(string: "https://source.skip.tools/skip/releases.atom")!)
-        }
+        }.get()
 
         if let version = try? latestVersion?.extract(pattern: "([0-9.]+)") {
-            continuation.yield(MessageBlock(status: .pass, "\(msg): \(version)"))
+            out.yield(MessageBlock(status: .pass, "\(msg): \(version)"))
             return version
         } else {
-            continuation.yield(MessageBlock(status: .fail, "\(msg): unknown version: \(latestVersion ?? "")"))
+            out.yield(MessageBlock(status: .fail, "\(msg): unknown version: \(latestVersion ?? "")"))
             return nil
         }
     }

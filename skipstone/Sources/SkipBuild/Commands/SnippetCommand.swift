@@ -37,21 +37,21 @@ struct SnippetCommand: SnippetPhase, StreamingCommand {
         }
     }
 
-    func performCommand(msg continuation: Messenger) async throws {
+    func performCommand(with out: Messenger) async throws {
         let totalSize = try files.compactMap({ try URL(fileURLWithPath: $0).resourceValues(forKeys: [.fileSizeKey]).fileSize }).reduce(0, +)
 
         // snippets are hardwired to not exceed the default codebase threshold size
         if let codebaseThresholdSize = Self.codebaseThresholdSize, totalSize > codebaseThresholdSize {
-            continuation.yield(Output(kotlin: nil, messages: [Message(kind: .error, message: "Snippet too large \(byteCount(for: .init(totalSize)))")], duration: 0))
-            continuation.finish()
+            out.yield(Output(kotlin: nil, messages: [Message(kind: .error, message: "Snippet too large \(byteCount(for: .init(totalSize)))")], duration: 0))
+            out.finish()
             return
         }
 
         let sourceFiles = files.map(Source.FilePath.init(path:))
-        try await self.transpile(fs: localFileSystem, sourceFiles: sourceFiles, msg: continuation)
+        try await self.transpile(fs: localFileSystem, sourceFiles: sourceFiles, with: out)
     }
 
-    private func transpile(fs: FileSystem, sourceFiles: Array<Source.FilePath>, msg continuation: Messenger) async throws {
+    private func transpile(fs: FileSystem, sourceFiles: Array<Source.FilePath>, with out: Messenger) async throws {
 
         let codebaseInfo = CodebaseInfo()
 
@@ -68,9 +68,9 @@ struct SnippetCommand: SnippetPhase, StreamingCommand {
             // note that transpilation messages are included as part of the output itself, rather than being logged as a message
             let msgs = transpilation.messages
             let output = Output(kotlin: transpilation.output.content, messages: msgs, duration: transpilation.duration)
-            continuation.yield(output)
+            out.yield(output)
         }
-        continuation.finish()
+        out.finish()
     }
 }
 

@@ -5,7 +5,7 @@ import FoundationNetworking
 #endif
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-struct AppCreateCommand: SkipCommand {
+struct AppCreateCommand: MessageCommand {
     static var configuration = CommandConfiguration(
         commandName: "create",
         abstract: "Create a new Skip app project from a template",
@@ -29,10 +29,10 @@ struct AppCreateCommand: SkipCommand {
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Open the new project in Xcode"))
     var open: Bool = false
 
-    func run() async throws {
+    func performCommand(with out: Messenger) async throws {
         let pname = projectName.split(separator: "/").last?.description ?? projectName
 
-        outputOptions.write("Creating project \(pname) from template \(createOptions.template)")
+        out.write(status: nil, "Creating project \(pname) from template \(createOptions.template)")
 
         let outputFolder = createOptions.dir ?? "."
         var isDir: Foundation.ObjCBool = false
@@ -49,42 +49,44 @@ struct AppCreateCommand: SkipCommand {
         }
 
         let templateURL = try createOptions.projectTemplateURL
-        let downloadURL: URL = templateURL.isFileURL ? templateURL : try await outputOptions.monitor("Downloading template \(templateURL.absoluteString)") {
+        let downloadURL: URL = templateURL.isFileURL ? templateURL : try await outputOptions.monitor(with: out, "Downloading template \(templateURL.absoluteString)", resultHandler: { result in
+            (result, nil) // TODO: show positive message
+        }) { loggingHandler in
             let (url, response) = try await URLSession.shared.download(from: templateURL)
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
             if !(200..<300).contains(code) {
                 throw CreateError(errorDescription: "Download for template URL \(templateURL.absoluteString) returned error: \(code)")
             }
             return url
-        }
+        }.get()
 
         let projectFolderURL = URL(fileURLWithPath: projectFolder, isDirectory: true)
         try FileManager.default.createDirectory(at: projectFolderURL, withIntermediateDirectories: true)
 
-        try await outputOptions.run("Unpacking template \(createOptions.template) (\(ByteCountFormatter().string(fromByteCount: Int64((try? downloadURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)))) for project \(pname)", ["unzip", downloadURL.path, "-d", projectFolderURL.path])
+        await outputOptions.run(with: out, "Unpacking template \(createOptions.template) (\(ByteCountFormatter().string(fromByteCount: Int64((try? downloadURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)))) for project \(pname)", ["unzip", downloadURL.path, "-d", projectFolderURL.path])
 
-        let packageJSONString = try await outputOptions.run("Checking project \(pname)", [toolOptions.swift, "package", "dump-package", "--package-path", projectFolderURL.path]).out
+        let packageJSONString = try await outputOptions.run(with: out, "Checking project \(pname)", [toolOptions.swift, "package", "dump-package", "--package-path", projectFolderURL.path]).get().stdout
 
         let packageJSON = try JSONDecoder().decode(PackageManifest.self, from: Data(packageJSONString.utf8))
 
         if buildOptions.build == true {
-            try await outputOptions.run("Building project \(pname) for package \(packageJSON.name)", [toolOptions.swift, "build", "-c", createOptions.configuration, "--package-path", projectFolderURL.path])
+            await outputOptions.run(with: out, "Building \(pname)", [toolOptions.swift, "build", "-c", createOptions.configuration, "--package-path", projectFolderURL.path])
         }
 
         if buildOptions.test == true {
-            try await outputOptions.run("Testing project \(pname)", [toolOptions.swift, "test", "-j", "1", "-c", createOptions.configuration, "--package-path", projectFolderURL.path])
+            await outputOptions.run(with: out, "Testing \(pname)", [toolOptions.swift, "test", "-j", "1", "-c", createOptions.configuration, "--package-path", projectFolderURL.path])
         }
 
         let projectPath = projectFolderURL.path + "/" + "App.xcodeproj"
         if !FileManager.default.isReadableFile(atPath: projectPath) {
-            outputOptions.write("Warning: path did not exist at: \(projectPath)", error: true, flush: true)
+            out.write(status: .warn, "Warning: path did not exist at: \(projectPath)")
         }
 
         if open == true {
-            try await outputOptions.run("Launching project \(projectPath)", ["open", projectPath])
+            await outputOptions.run(with: out, "Launching project \(projectPath)", ["open", projectPath])
         }
 
-        outputOptions.write("Created project: \(projectPath)")
+        out.write(status: .pass, "Created project: \(projectPath)")
     }
 
     public struct CreateError : LocalizedError {

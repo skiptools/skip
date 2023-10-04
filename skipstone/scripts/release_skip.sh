@@ -26,6 +26,13 @@
 #eval ${SKIPDIFF:-"git diff --exit-code"}
 set -o pipefail
 
+# get latest skip
+git pull
+
+# make sure both private skipstone/ and public skip/ tests pass
+swift test
+SKIPLOCAL=1 swift test --package-path ../skip/ 
+
 SKIPCONFIG=${SKIPCONFIG:-"release"}
 
 PRODUCT=SkipRunner

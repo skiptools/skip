@@ -3,11 +3,15 @@ import XCTest
 import TSCBasic
 
 final class SkipCommandTests: XCTestCase {
-    func testSkipVersion() async throws {
+    func testVersionCommand() async throws {
         try await XCTAssertEqualAsync(skipVersion.json(), skipstone("version", "-j").json()["version"])
     }
 
-    func testSkipDoctor() async throws {
+    func testInfoCommand() async throws {
+        _ = try await skipstone("info", "-jA").json()
+    }
+
+    func testDoctorCommand() async throws {
         // run skip doctor with JSON array output and make sure we can parse the result
         try await XCTAssertEqualAsync(["msg": "Skip Doctor"], skipstone("doctor", "-jA").json().array?.first)
     }

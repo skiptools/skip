@@ -3,9 +3,7 @@ import ArgumentParser
 import SkipSyntax
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-struct CheckupCommand: SkipCommand, StreamingCommand {
-    typealias Output = MessageBlock
-
+struct CheckupCommand: MessageCommand, ToolOptionsCommand  {
     static var configuration = CommandConfiguration(
         commandName: "checkup",
         abstract: "Run tests to ensure Skip is in working order",
@@ -17,27 +15,24 @@ struct CheckupCommand: SkipCommand, StreamingCommand {
     @OptionGroup(title: "Tool Options")
     var toolOptions: ToolOptions
 
-    func performCommand(msg continuation: Messenger) async throws {
-        try await runDoctor(tool: toolOptions, with: continuation)
+    func performCommand(with out: Messenger) async throws {
+        try await runDoctor(tool: toolOptions, with: out)
 
-        func checkup() throws -> [String] {
-            let tmpdir = NSTemporaryDirectory() + "/" + UUID().uuidString
-            try FileManager.default.createDirectory(atPath: tmpdir, withIntermediateDirectories: true)
-            return [toolOptions.skip, "init", "--build", "--test", "-d", tmpdir, "lib-name", "ModuleName"]
-        }
+        let tmpdir = NSTemporaryDirectory() + "/" + UUID().uuidString
+        try FileManager.default.createDirectory(atPath: tmpdir, withIntermediateDirectories: true)
+//        func checkup() throws -> [String] {
+//            return [toolOptions.skip, "init", "--build", "--plain", "--test", "-d", tmpdir, "lib-name", "ModuleName"]
+//        }
+//
+//        // if we have not initiailized Gradle before (indicated by the absence of a ~/.gradle/caches/ folder), indicate that the first run will take a while
+//        var isDir: ObjCBool = false
+//        if FileManager.default.fileExists(atPath: home(".gradle/caches"), isDirectory: &isDir) == false || isDir.boolValue == false {
+//            try await outputOptions.run(with: out, "Pre-Caching Gradle Dependencies (~1G)", checkup())
+//        }
 
-        // if we have not initiailized Gradle before (indicated by the absence of a ~/.gradle/caches/ folder), indicate that the first run will take a while
-        var isDir: ObjCBool = false
-        if FileManager.default.fileExists(atPath: home(".gradle/caches"), isDirectory: &isDir) == false || isDir.boolValue == false {
-            try await outputOptions.run("Pre-Caching Gradle Dependencies (~1G)", checkup())
-        }
+        try await performLibInitCommand(projectName: "lib-name", moduleNames: ["ModuleNameA", "ModuleNameB"], dir: tmpdir, configuration: "debug", build: true, test: true, with: out)
 
-        let _ = try await outputOptions.run("Running Skip Checkup", checkup())
-
-        //outputOptions.write(output.out)
-        //outputOptions.write(output.err)
-        outputOptions.write("Skip \(skipVersion) self-test passed!")
-
+        out.write(status: .pass, "Skip \(skipVersion) self-test passed!")
     }
 }
 

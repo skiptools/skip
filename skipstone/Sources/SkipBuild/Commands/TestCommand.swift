@@ -9,7 +9,7 @@ fileprivate let testCommandEnabled = false
 #endif
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-struct TestCommand: SkipCommand {
+struct TestCommand: MessageCommand {
     static var configuration = CommandConfiguration(
         commandName: "test",
         abstract: "Run parity tests and generate reports",
@@ -43,24 +43,24 @@ struct TestCommand: SkipCommand {
     @Option(name: [.customShort("c"), .long], help: ArgumentHelp("Configuration debug/release", valueName: "c"))
     var configuration: String = "debug"
 
-    func run() async throws {
+    func performCommand(with out: Messenger) async throws {
         // only run tests when there is a Tests/ folder
         if !FileManager.default.fileExists(atPath: project + "/Tests") {
-            outputOptions.write("No Tests folder in project: \(project)")
+            out.write(status: .fail, "No Tests folder in project: \(project)")
             return
         }
 
         let xunit = xunit ?? ".build/xcunit-\(UUID().uuidString).xml"
 
         func packageName() async throws -> String {
-            let packageJSONString = try await outputOptions.run("Checking project", [toolOptions.swift, "package", "dump-package", "--package-path", project]).out
+            let packageJSONString = try await outputOptions.run(with: out, "Checking project", [toolOptions.swift, "package", "dump-package", "--package-path", project]).get().stdout
             let packageJSON = try JSONDecoder().decode(PackageManifest.self, from: Data(packageJSONString.utf8))
             let packageName = packageJSON.name
             return packageName
         }
 
         if test == true {
-            try await outputOptions.run("Testing project", [toolOptions.swift, "test", "--parallel", "-c", configuration, "--enable-code-coverage", "--xunit-output", xunit, "--package-path", project])
+            try await outputOptions.run(with: out, "Testing project", [toolOptions.swift, "test", "--parallel", "-c", configuration, "--enable-code-coverage", "--xunit-output", xunit, "--package-path", project])
         } else if self.xunit == nil {
             // we can only use the generated xunit if we are running the tests
             throw SkipDriveError(errorDescription: "Must either specify --xunit path or run tests with --test")
@@ -238,6 +238,7 @@ struct TestCommand: SkipCommand {
             }
 
             let rowCount = outputColumns.map({ $0.count }).min() ?? 0
+            var testsTable = ""
             for row in 0..<rowCount {
                 let row = outputColumns.map({ $0[row] })
 
@@ -248,14 +249,16 @@ struct TestCommand: SkipCommand {
                 //let term = sep == "-" ? "+" : "|"
 
                 let sep = " "
-                let term = "|"
+                let div = "|"
 
-                outputOptions.write("", terminator: term)
+                testsTable += div
                 for cell in row {
-                    outputOptions.write(sep + cell + sep, terminator: term)
+                    testsTable += sep + cell + sep + div
                 }
-                outputOptions.write("", terminator: "\n")
+                testsTable += "\n"
             }
+
+            out.write(status: nil, testsTable)
         }
         #endif
     }

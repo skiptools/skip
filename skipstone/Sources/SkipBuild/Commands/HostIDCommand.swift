@@ -3,7 +3,7 @@ import ArgumentParser
 import SkipSyntax
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-struct HostIDCommand: SkipCommand {
+struct HostIDCommand: MessageCommand {
     static var configuration = CommandConfiguration(
         commandName: "hostid",
         abstract: "Display the current host ID",
@@ -12,11 +12,11 @@ struct HostIDCommand: SkipCommand {
     @OptionGroup(title: "Output Options")
     var outputOptions: OutputOptions
 
-    func run() async throws {
+    func performCommand(with out: Messenger) async throws {
         guard let hostid = ProcessInfo.processInfo.hostIdentifier else {
             throw HostIDError(errorDescription: "Could not access Host ID")
         }
-        outputOptions.write(hostid)
+        out.write(status: nil, hostid)
     }
 
     public struct HostIDError : LocalizedError {

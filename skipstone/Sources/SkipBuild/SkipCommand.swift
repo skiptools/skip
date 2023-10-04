@@ -402,6 +402,13 @@ public typealias MessageStream = AsyncThrowingStream<MessageEncodable, Error>
 /// The callback for yielding or failings a message stream
 public typealias Messenger = MessageStream.Continuation
 
+extension Messenger {
+    /// Writes the given message to the continuation
+    func write(status: MessageBlock.Status?, _ message: String) {
+        self.yield(MessageBlock(status: status, message))
+    }
+}
+
 /// A command that contains options for how messages will be conveyed to the user
 public protocol StreamingCommand: AsyncParsableCommand {
     /// The structured output of this tool
@@ -410,7 +417,7 @@ public protocol StreamingCommand: AsyncParsableCommand {
     //associatedtype Output : MessageConvertible
     //typealias OutputMessage = Either<Output>.Or<Message>
 
-    func performCommand(msg: Messenger) async throws
+    func performCommand(with out: Messenger) async throws
 }
 
 extension StreamingCommand {
@@ -444,17 +451,17 @@ extension StreamingCommand {
 
             }
             // defer { self.output.streams.yield = { _ in } } // clears output
-            doCommand(continuation: continuation)
+            doCommand(with: continuation)
         }
     }
 
-    func doCommand(continuation: Messenger) {
+    func doCommand(with out: Messenger) {
         Task {
             do {
-                try await performCommand(msg: continuation)
-                continuation.finish()
+                try await performCommand(with: out)
+                out.finish()
             } catch {
-                continuation.finish(throwing: error)
+                out.finish(throwing: error)
             }
         }
     }
@@ -468,13 +475,19 @@ extension StreamingCommand {
     }
 }
 
+/// A simple command that issues messages
+protocol MessageCommand : SkipCommand, StreamingCommand, OutputOptionsCommand {
+    typealias Output = MessageBlock
+    // func performCommand(with out: Messenger) async throws
+}
+
 public protocol SingleStreamingCommand : StreamingCommand {
     associatedtype Output : MessageEncodable
     func executeCommand() async throws -> Output
 }
 
 extension SingleStreamingCommand {
-    public func performCommand(msg: Messenger) async throws {
+    public func performCommand(with out: Messenger) async throws {
         yield(output: try await executeCommand())
     }
 }
@@ -488,41 +501,48 @@ public struct Term {
     /// Whether to use color or plain output
     public let colors: Bool
 
-    func color(_ string: any StringProtocol, code: String) -> String {
+    func color(_ string: any StringProtocol, code: Color) -> String {
         if colors == false {
             return string.description // return the plain string
         } else {
-            return code + string + Self.reset
+            return code.rawValue + string + Color.reset.rawValue
         }
     }
 
     /// Returns the string with and ANSI `black` code when colors are enabled, or the raw string when they are disabled
-    public func black(_ string: any StringProtocol) -> String { color(string, code: Self.black) }
+    public func black(_ string: any StringProtocol) -> String { color(string, code: .black) }
     /// Returns the string with and ANSI `red` code when colors are enabled, or the raw string when they are disabled
-    public func red(_ string: any StringProtocol) -> String { color(string, code: Self.red) }
+    public func red(_ string: any StringProtocol) -> String { color(string, code: .red) }
     /// Returns the string with and ANSI `green` code when colors are enabled, or the raw string when they are disabled
-    public func green(_ string: any StringProtocol) -> String { color(string, code: Self.green) }
+    public func green(_ string: any StringProtocol) -> String { color(string, code: .green) }
     /// Returns the string with and ANSI `yellow` code when colors are enabled, or the raw string when they are disabled
-    public func yellow(_ string: any StringProtocol) -> String { color(string, code: Self.yellow) }
+    public func yellow(_ string: any StringProtocol) -> String { color(string, code: .yellow) }
     /// Returns the string with and ANSI `blue` code when colors are enabled, or the raw string when they are disabled
-    public func blue(_ string: any StringProtocol) -> String { color(string, code: Self.blue) }
+    public func blue(_ string: any StringProtocol) -> String { color(string, code: .blue) }
     /// Returns the string with and ANSI `magenta` code when colors are enabled, or the raw string when they are disabled
-    public func magenta(_ string: any StringProtocol) -> String { color(string, code: Self.magenta) }
+    public func magenta(_ string: any StringProtocol) -> String { color(string, code: .magenta) }
     /// Returns the string with and ANSI `cyan` code when colors are enabled, or the raw string when they are disabled
-    public func cyan(_ string: any StringProtocol) -> String { color(string, code: Self.cyan) }
+    public func cyan(_ string: any StringProtocol) -> String { color(string, code: .cyan) }
+    /// Returns the string with and ANSI `gray` code when colors are enabled, or the raw string when they are disabled
+    public func gray(_ string: any StringProtocol) -> String { color(string, code: .gray) }
     /// Returns the string with and ANSI `white` code when colors are enabled, or the raw string when they are disabled
-    public func white(_ string: any StringProtocol) -> String { color(string, code: Self.white) }
+    public func white(_ string: any StringProtocol) -> String { color(string, code: .white) }
 
     // ANSI escape sequences for text colors
-    private static let reset = "\u{001B}[0m"
-    private static let black = "\u{001B}[30m"
-    private static let red = "\u{001B}[31m"
-    private static let green = "\u{001B}[32m"
-    private static let yellow = "\u{001B}[33m"
-    private static let blue = "\u{001B}[34m"
-    private static let magenta = "\u{001B}[35m"
-    private static let cyan = "\u{001B}[36m"
-    private static let white = "\u{001B}[37m"
+    enum Color : String, CaseIterable {
+        static let esc = "\u{001B}"
+
+        case reset = "\u{001B}[0m"
+        case black = "\u{001B}[30m"
+        case red = "\u{001B}[31m"
+        case green = "\u{001B}[32m"
+        case yellow = "\u{001B}[33m"
+        case blue = "\u{001B}[34m"
+        case magenta = "\u{001B}[35m"
+        case cyan = "\u{001B}[36m"
+        case white = "\u{001B}[37m"
+        case gray = "\u{001B}[30;1m"
+    }
 }
 
 /// A "message" that can be output in various ways.
@@ -535,6 +555,9 @@ public protocol MessageConvertible {
 
 /// Any message that can be output either as a terminal message or a JSON encoded string
 public typealias MessageEncodable = MessageConvertible & Encodable
+
+/// A callback that converts a result into a `MessageBlock` and returns it along with the result
+typealias MessageResultHandler<T> = (Result<T, Error>?) -> (result: Result<T, Error>?, message: MessageBlock?)
 
 /// A message that is encoded by its string value
 public protocol StringMessageEncodable : MessageConvertible, Encodable {
@@ -593,6 +616,11 @@ public struct MessageBlock : StringMessageEncodable {
         }
     }
 
+    /// Create a message from the given error with the expected prefix
+    public init(error: Error, prefix: String = "") {
+        self.init(status: .fail, prefix + error.localizedDescription)
+    }
+
     public init(_ message: @escaping (_ term: Term?) -> String?) {
         self.status = nil
         self._message = message
@@ -629,7 +657,7 @@ public extension StreamingCommand {
     fileprivate func writeMessage(_ message: Message, output: String? = nil, terminator: String = "\n") {
         if !outputOptions.emitJSON || outputOptions.messagePlain {
             if let messageString = message.message(term: .plain) {
-                outputOptions.streams.write(error: !outputOptions.messageErrout, output: output, messageString, terminator: terminator)
+                outputOptions.streams.writeStream(error: !outputOptions.messageErrout, output: output, messageString, terminator: terminator)
             }
         } else {
             yield(message: message)
@@ -755,6 +783,7 @@ internal func home(_ file: String) -> String {
 
 
 extension String {
+    /// Extracts a regular expression created from the given string
     func extract(pattern: String) throws -> String? {
         let regex = try NSRegularExpression(pattern: pattern)
         let range = NSRange(location: 0, length: self.utf16.count)
@@ -796,9 +825,6 @@ struct ToolOptions: ParsableArguments {
 
     @Option(help: ArgumentHelp("ADB command path", valueName: "path"))
     var adb: String = ProcessInfo.processInfo.environment["SKIP_ADB_PATH"] ?? (homebrewRoot + "/bin/adb")
-
-    @Option(help: ArgumentHelp("Skip command path", valueName: "path"))
-    var skip: String = CommandLine.arguments.first ?? "skip"
 
     @Option(help: ArgumentHelp("Path to the Android SDK (ANDROID_HOME)", valueName: "path"))
     var androidHome: String?

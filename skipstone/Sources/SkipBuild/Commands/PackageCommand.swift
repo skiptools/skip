@@ -1,5 +1,6 @@
 import Foundation
 import ArgumentParser
+import TSCBasic
 import SkipSyntax
 
 /// Common functions for managing Skip Packages common protocol for `AppCommand` and `LibCommand`.
@@ -33,7 +34,7 @@ struct LibCommand: AsyncParsableCommand {
 
 protocol CreateOptionsCommand : ParsableArguments {
     /// This command's create options
-    var createOptions: CreateOptionsCommand { get }
+    var createOptions: CreateOptions { get }
 }
 
 struct CreateOptions : ParsableArguments {
@@ -54,6 +55,9 @@ struct CreateOptions : ParsableArguments {
 
     @Option(name: [.customShort("f"), .long], help: ArgumentHelp("A path to the template zip file to use", valueName: "zip"))
     var templateFile: String?
+
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Display a file system tree summary of the new files", valueName: "show"))
+    var tree: Bool = true
 
     var projectTemplateURL: URL {
         get throws {
@@ -92,3 +96,14 @@ struct CreateOptions : ParsableArguments {
     }
 }
 
+extension OutputOptionsCommand {
+    /// Output an ASCII tree representation of the file system as a result of the command
+    func showFileTree(in dir: String, with out: Messenger) {
+        do {
+            let tree = try localFileSystem.treeASCIIRepresentation(at: AbsolutePath(validating: dir))
+            out.write(status: nil, tree)
+        } catch {
+            out.yield(MessageBlock(error: error))
+        }
+    }
+}

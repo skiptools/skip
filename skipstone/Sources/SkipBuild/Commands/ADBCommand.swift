@@ -10,7 +10,7 @@ fileprivate let adbCommandEnabled = false
 #endif
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-struct ADBCommand: SkipCommand {
+struct ADBCommand: MessageCommand {
     static var configuration = CommandConfiguration(
         commandName: "adb",
         abstract: "Launch the adb build tool",
@@ -25,7 +25,7 @@ struct ADBCommand: SkipCommand {
     @Argument(parsing: .allUnrecognized, help: ArgumentHelp("The arguments to pass to the adb command"))
     var arguments: [String]
 
-    func run() async throws {
+    func performCommand(with out: Messenger) async throws {
         // ADB itself doesn't ever exit with a non-zero exit code (https://issuetracker.google.com/issues/36908392?pli=1)
         // So we need to parse the output for known error patterns and translate them into Xcode-aware messages
         #if !canImport(SkipDriveExternal)
@@ -37,8 +37,10 @@ struct ADBCommand: SkipCommand {
         }
 
         for try await line in output {
-            outputOptions.write("ADB> \(line)")
-            scanADBOutput(line: line) // check for errors and report them to the IDE
+            out.write(status: nil, "ADB> \(line)")
+            if let formattedError = scanADBOutput(line: line) { // check for errors and report them to the IDE
+                out.write(status: nil, formattedError)
+            }
         }
 
         guard let exitCode = exitCode, case .terminated(0) = exitCode else {
@@ -68,10 +70,10 @@ struct ADBCommand: SkipCommand {
 
     /// Check for common ADB error patterns and report them back to Xcode.
     /// - Parameter line: the ADB output line to scan
-    func scanADBOutput(line: String) {
-        func err(_ msg: String) {
+    func scanADBOutput(line: String) -> String? {
+        func err(_ msg: String) -> String {
             // Xcode will report "error:" strings as an error; insert a file prefix to add a link
-            outputOptions.write("error: skip adb error: \(msg) (troubleshoot at https://skip.tools/docs)")
+            return "error: skip adb error: \(msg) (troubleshoot at https://skip.tools/docs)"
         }
 
         switch line {
@@ -84,7 +86,7 @@ struct ADBCommand: SkipCommand {
         case _ where line.hasPrefix("Error:"): // general ADB error output
             return err(line)
         default:
-            return
+            return nil
         }
     }
 

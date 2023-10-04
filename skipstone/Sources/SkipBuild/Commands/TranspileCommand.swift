@@ -59,7 +59,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
         })
     }
 
-    func performCommand(msg continuation: Messenger) async throws {
+    func performCommand(with out: Messenger) async throws {
         let sourceFiles = try checkOptions.files.map(AbsolutePath.init(validating:))
         #if DEBUG
         let v = skipVersion + "*" // * indicates debug version
@@ -67,15 +67,20 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
         let v = skipVersion
         #endif
 
+        if ProcessInfo.processInfo.environment["CONFIGURATION"] == "Skippy" {
+            info("Skip \(v): transpile plugin not running for CONFIGURATION=Skippy")
+            return
+        }
+
         // show the local time in the transpile output; this helps identify from the Xcode Navigator when an old log file is being replayed for a plugin re-execution
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "HH:mm:ss"
 
         info("Skip \(v): transpile plugin at \(dateFormatter.string(from: .now)) to: \(transpileOptions.outputFolder ?? "nowhere") for: \(sourceFiles.map(\.basename))")
-        try await self.transpile(fs: localFileSystem, sourceFiles: Set(sourceFiles), msg: continuation)
+        try await self.transpile(fs: localFileSystem, sourceFiles: Set(sourceFiles), with: out)
     }
 
-    private func transpile(fs: FileSystem, sourceFiles sourceFileSet: Set<AbsolutePath>, msg continuation: Messenger) async throws {
+    private func transpile(fs: FileSystem, sourceFiles sourceFileSet: Set<AbsolutePath>, with out: Messenger) async throws {
         // the path that will contain the `skip.yml`
         guard let skipFolder = transpileOptions.skipFolder else {
             throw error("Must specify --skip-folder")
@@ -597,7 +602,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
 
         func handleTranspilation(transpilation: Transpilation) throws {
             for message in transpilation.messages {
-                continuation.yield(message)
+                out.yield(message)
             }
 
             trace(transpilation.output.content)
@@ -619,13 +624,13 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
                 //writeMessage(message)
                 if message.kind == .error {
                     // throw the first error we see
-                    continuation.finish(throwing: message)
+                    out.finish(throwing: message)
                     return
                 }
             }
 
             let output = Output(transpilation: transpilation)
-            continuation.yield(output)
+            out.yield(output)
 
             func saveTranspilation() throws -> (output: AbsolutePath, changed: Bool, overridden: Bool) {
                 // the build plug-in's output folder base will be something like ~/Library/Developer/Xcode/DerivedData/Mod-ID/SourcePackages/plugins/module-name.output/ModuleNameKotlin/skipstone/ModuleName/src/test/kotlin
