@@ -17,7 +17,7 @@ final class SkipCommandTests: XCTestCase {
     }
 
     func testLibInitCommand() async throws {
-        let tmpDir = URL(fileURLWithPath: UUID().uuidString, isDirectory: true, relativeTo: URL(fileURLWithPath: NSTemporaryDirectory() + "/" + #function, isDirectory: true))
+        let tmpDir = URL(fileURLWithPath: UUID().uuidString, isDirectory: true, relativeTo: URL(fileURLWithPath: NSTemporaryDirectory() + "/testLibInitCommand/", isDirectory: true))
         try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
         let created = try await skipstone("init", "-jA", "--no-build", "--no-test", "--tree", "-d", tmpDir.path, "project-name", "ModuleA", "ModuleB").json()
         XCTAssertEqual(created.array?.first, ["msg": "Initializing Skip library project-name"])
