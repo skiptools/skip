@@ -43,7 +43,7 @@ public protocol SkipCommandExecutor : AsyncParsableCommand {
 
 
 /// Runs the tool with the given arguments, returning the entire output string as well as a function to parse it to `JSON`
-public func skipstone(_ args: String...) async throws -> (out: String, err: String, json: () throws -> JSON) {
+public func skipstone(_ args: [String]) async throws -> (out: String, err: String, json: () throws -> JSON) {
     let out = BufferedOutputByteStream()
     let err = BufferedOutputByteStream()
     try await SkipRunnerExecutor.run(args, out: out, err: err)
@@ -903,6 +903,28 @@ struct ToolOptions: ParsableArguments {
         }
         return try URL.findCommandInPath(toolName: tool, withAdditionalPaths: ProcessInfo.isARM ? ["/opt/homebrew/bin"] : ["/usr/local/bin"]).path
     }
+}
+
+extension URL {
+    /// Locates the given tool in the user's path
+    public static func findCommandInPath(toolName: String, withAdditionalPaths extraPATH: [String]) throws -> URL {
+        let env = ProcessInfo.processInfo.environment
+        let path = env["PATH"] ?? ""
+        let pathParts = path.split(separator: ":", omittingEmptySubsequences: true).map(String.init)
+        for pathPart in pathParts + extraPATH {
+            let dir = URL(fileURLWithPath: pathPart, isDirectory: true)
+            let exePath = URL(fileURLWithPath: toolName, relativeTo: dir)
+            if FileManager.default.isExecutableFile(atPath: exePath.path) {
+                return exePath
+            }
+        }
+
+        struct ToolNotFoundError : LocalizedError {
+            var errorDescription: String?
+        }
+        throw ToolNotFoundError(errorDescription: "An executable tool named '\(toolName)' could not be found in the PATH, nor was it specified as part of the command-line flags.")
+    }
+
 }
 
 protocol BuildOptionsCommand : ParsableArguments {

@@ -10,12 +10,12 @@ public class SkipRunnerTests : XCTestCase {
 
         XCTAssertEqual(SkipBuild.skipVersion, SkipSyntax.skipVersion) // they point to the same field, so it would be surprising if they differed
 
-        try await XCTAssertEqualAsync(v, skipstone("version", "-jM").json()["version"]?.string)
-        try await XCTAssertEqualAsync(v, skipstone("version", "-JM").json()["version"]?.string)
+        try await XCTAssertEqualAsync(v, skipstone(["version", "-jM"]).json()["version"]?.string)
+        try await XCTAssertEqualAsync(v, skipstone(["version", "-JM"]).json()["version"]?.string)
 
         #if DEBUG
         let debug = true
-        try await XCTAssertEqualAsync("Skip version \(v) (debug)", skipstone("version").out)
+        try await XCTAssertEqualAsync("Skip version \(v) (debug)", skipstone(["version"]).out)
 
         func endOfFirstLine(_ output: String, count: Int) throws -> String {
             let firstLine = try XCTUnwrap(output.split(separator: "\n").first)
@@ -31,13 +31,13 @@ public class SkipRunnerTests : XCTestCase {
         try await XCTAssertEqualAsync("Skip version \(v)", skipstone("version").out)
         #endif
 
-        try await XCTAssertEqualAsync(debug, skipstone("info", "-JA").json().array?.last?["debug"]?.boolean)
+        try await XCTAssertEqualAsync(debug, skipstone(["info", "-JA"]).json().array?.last?["debug"]?.boolean)
     }
 
     public func testSnippets() async throws {
         func snippet(swift: String, kotlin: String?, messages: [String]? = nil) async throws {
             let srcFile = try tmpFile(named: "Source.swift", contents: swift)
-            let (out, err, json) = try await skipstone("snippet", "-jM", srcFile.path)
+            let (out, err, json) = try await skipstone(["snippet", "-jM", srcFile.path])
             struct SnippetResult : Decodable {
                 let kotlin: String?
                 let messages: [Message]?
