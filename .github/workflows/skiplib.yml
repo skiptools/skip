@@ -14,7 +14,7 @@ jobs:
       - name: Test iOS
         run: |
           xcodebuild test -jobs 1 -sdk iphonesimulator -destination "platform=iOS Simulator,name=iPhone 14" -skipPackagePluginValidation -configuration debug -scheme $(basename $PWD)
-      - name: Test Robolectric
+      - name: Test Local
         run: skip test --plain
       - name: Setup Android
         run: |
