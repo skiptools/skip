@@ -5,7 +5,7 @@ final class SwiftUITests: XCTestCase {
     import SwiftUI
     
     protocol View {
-        @ViewBuilder var body: some View { get }
+        @ViewBuilder @MainActor var body: some View { get }
     }
 
     extension View {
@@ -1740,6 +1740,91 @@ final class SwiftUITests: XCTestCase {
 
             constructor(doublePref: Double = 1.0) {
                 this._doublePref = skip.ui.AppStorage(wrappedValue = doublePref, "storageKey", store = UserDefaults.standard)
+            }
+        }
+        """)
+    }
+
+    func testMainActorViewBody() async throws {
+        let supportingSwift = """
+        struct Task<Success, Failure> where Failure: Error {
+            init(priority: TaskPriority? = nil, operation: @escaping () async throws -> Success) {
+            }
+            static func detached<T>(operation: () throws -> T) async -> T {
+                fatalError()
+            }
+            static func sleep(nanoseconds: UInt64) async throws {
+            }
+        }
+
+        extension View {
+            public func task(priority: TaskPriority = .userInitiated, _ action: @escaping () async -> Void) -> some View {
+                return self
+            }
+        }
+        """
+
+        try await check(supportingSwift: baseSupportingSwift + supportingSwift, swift: """
+        import SwiftUI
+        struct V: View {
+            var body: some View {
+                Task {
+                    print("task")
+                }
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
+        import skip.foundation.*
+        import skip.model.*
+
+        import skip.ui.*
+        internal class V: View {
+            override fun body(): View {
+                return ComposeView { composectx: ComposeContext ->
+                    Task(isMainActor = true) { print("task") }
+                }
+            }
+        }
+        """)
+
+        try await check(supportingSwift: baseSupportingSwift + supportingSwift, swift: """
+        import SwiftUI
+        struct V: View {
+            var body: some View {
+                VStack {
+                }
+                .task {
+                    print("task")
+                }
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
+        import skip.foundation.*
+        import skip.model.*
+
+        import skip.ui.*
+        internal class V: View {
+            override fun body(): View {
+                return ComposeView { composectx: ComposeContext ->
+                    VStack {
+                        ComposeView { composectx: ComposeContext -> ComposeResult.ok }
+                    }
+                    .task { MainActor.run { print("task") } }.Compose(composectx)
+                }
             }
         }
         """)

@@ -39,6 +39,31 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         }
     }
 
+    /// If the given variable is the `body` of a `View`, return the parent view.
+    static func viewForBody(_ variableDeclaration: KotlinVariableDeclaration, codebaseInfo: CodebaseInfo.Context?) -> KotlinClassDeclaration? {
+        guard variableDeclaration.role == .property, variableDeclaration.propertyName == "body", !variableDeclaration.isStatic, let classDeclaration = variableDeclaration.parent as? KotlinClassDeclaration else {
+            return nil
+        }
+        guard isSwiftUIType(named: "View", declaration: classDeclaration, type: classDeclaration.signature, codebaseInfo: codebaseInfo) else {
+            return nil
+        }
+        return classDeclaration
+    }
+
+    private static func isSwiftUIType(named: String, declaration: KotlinClassDeclaration? = nil, type: TypeSignature, codebaseInfo: CodebaseInfo.Context?) -> Bool {
+        if let declaration, declaration.inherits.contains(where: { $0.isNamed(named, moduleName: "SwiftUI", generics: []) }) {
+            return true
+        }
+        guard let codebaseInfo else {
+            return false
+        }
+        guard case .named = type else {
+            return false
+        }
+        return codebaseInfo.global.protocolSignatures(forNamed: type)
+            .contains { $0.isNamed(named, moduleName: "SwiftUI") }
+    }
+
     private func translateVisit(_ node: KotlinSyntaxNode, translator: KotlinTranslator) -> VisitResult<KotlinSyntaxNode> {
         if let classDeclaration = node as? KotlinClassDeclaration {
             if omitPreviewProvider(classDeclaration, codebaseInfo: translator.codebaseInfo) {
@@ -64,10 +89,10 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
 
     private func omitPreviewProvider(_ classDeclaration: KotlinClassDeclaration, codebaseInfo: CodebaseInfo.Context?) -> Bool {
         // The most common thing in a SwiftUI file will be Views, so do a quick exclusion
-        guard !isSwiftUIType(named: "View", declaration: classDeclaration, type: classDeclaration.signature, codebaseInfo: codebaseInfo) else {
+        guard !Self.isSwiftUIType(named: "View", declaration: classDeclaration, type: classDeclaration.signature, codebaseInfo: codebaseInfo) else {
             return false
         }
-        guard isSwiftUIType(named: "PreviewProvider", declaration: classDeclaration, type: classDeclaration.signature, codebaseInfo: codebaseInfo) else {
+        guard Self.isSwiftUIType(named: "PreviewProvider", declaration: classDeclaration, type: classDeclaration.signature, codebaseInfo: codebaseInfo) else {
             return false
         }
         guard let parentStatement = classDeclaration.parent as? KotlinStatement else {
@@ -107,7 +132,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
 
     private func translateConstructorDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, translator: KotlinTranslator) {
         // Only need to consider Views
-        guard let classDeclaration = functionDeclaration.parent as? KotlinClassDeclaration, isSwiftUIType(named: "View", declaration: classDeclaration, type: classDeclaration.signature, codebaseInfo: translator.codebaseInfo) else {
+        guard let classDeclaration = functionDeclaration.parent as? KotlinClassDeclaration, Self.isSwiftUIType(named: "View", declaration: classDeclaration, type: classDeclaration.signature, codebaseInfo: translator.codebaseInfo) else {
             return
         }
 
@@ -195,7 +220,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
     
     private func translateVariableDeclaration(_ statement: KotlinVariableDeclaration, translator: KotlinTranslator) {
         var viewBuilder: KotlinCodeBlock? = nil
-        if let viewDeclaration = viewForBody(statement, codebaseInfo: translator.codebaseInfo) {
+        if let viewDeclaration = Self.viewForBody(statement, codebaseInfo: translator.codebaseInfo) {
             // We perform our View transformations when we find the body
             transform(view: viewDeclaration, body: statement, translator: translator)
             viewBuilder = statement.getter?.body
@@ -210,17 +235,6 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             statement.getter?.body = translateViewBuilder(codeBlock: viewBuilder, translator: translator)
             statement.getter?.body?.parent = statement
         }
-    }
-
-    /// If the given variable is the `body` of a `View`, return the parent view.
-    private func viewForBody(_ variableDeclaration: KotlinVariableDeclaration, codebaseInfo: CodebaseInfo.Context?) -> KotlinClassDeclaration? {
-        guard variableDeclaration.role == .property, variableDeclaration.propertyName == "body", !variableDeclaration.isStatic, let classDeclaration = variableDeclaration.parent as? KotlinClassDeclaration else {
-            return nil
-        }
-        guard isSwiftUIType(named: "View", declaration: classDeclaration, type: classDeclaration.signature, codebaseInfo: codebaseInfo) else {
-            return nil
-        }
-        return classDeclaration
     }
 
     /// Perform `View` transformations.
@@ -499,7 +513,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             } else if let apiCall = node as? APICallExpression, let expressionStatement = node.parent as? KotlinExpressionStatement, !isInAssignmentExpression(expressionStatement, in: codeBlock) {
                 // Add our compose tail call to expressions that evaluate to Views and are used as statements
                 if let apiMatch = apiCall.apiMatch {
-                    if isSwiftUIType(named: "View", type: apiMatch.signature, codebaseInfo: translator.codebaseInfo) || isSwiftUIType(named: "View", type: apiMatch.signature.returnType, codebaseInfo: translator.codebaseInfo) {
+                    if Self.isSwiftUIType(named: "View", type: apiMatch.signature, codebaseInfo: translator.codebaseInfo) || Self.isSwiftUIType(named: "View", type: apiMatch.signature.returnType, codebaseInfo: translator.codebaseInfo) {
                         addComposeTailCall(to: node as! KotlinExpression, statement: expressionStatement)
                     }
                 } else {
@@ -548,20 +562,6 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
 
         composeCall.parent = statement
         composeCall.assignParentReferences()
-    }
-
-    private func isSwiftUIType(named: String, declaration: KotlinClassDeclaration? = nil, type: TypeSignature, codebaseInfo: CodebaseInfo.Context?) -> Bool {
-        if let declaration, declaration.inherits.contains(where: { $0.isNamed(named, moduleName: "SwiftUI", generics: []) }) {
-            return true
-        }
-        guard let codebaseInfo else {
-            return false
-        }
-        guard case .named = type else {
-            return false
-        }
-        return codebaseInfo.global.protocolSignatures(forNamed: type)
-            .contains { $0.isNamed(named, moduleName: "SwiftUI") }
     }
 
     private func isInAssignmentExpression(_ statement: KotlinStatement, in codeBlock: KotlinCodeBlock) -> Bool {
