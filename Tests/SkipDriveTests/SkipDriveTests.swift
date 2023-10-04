@@ -80,8 +80,8 @@ class SkipCommandTests : XCTestCase {
 
         //try await skip("check", "-d", tempDir)
 
-        //XCTAssertEqualAsync(try await skip("test", "--project", tempDir + "/" + name), """
-        //""")
+//        XCTAssertEqualAsync(try await skip("test", "--project", tempDir + "/" + name), """
+//        """)
 
     }
 

@@ -79,22 +79,6 @@ public struct GradleDriver {
         GradleDriver(gradlePath: gradlePath, gradleInfo: gradleInfo, gradleVersion: gradleVersion, kotlinVersion: kotlinVersion, gradleArgs: gradleArgs)
     }
 
-    /// Locates the given tool in the user's path
-    public static func findInPath(toolName: String, withAdditionalPaths extraPATH: [String]) throws -> URL {
-        let env = ProcessInfo.processInfo.environment
-        let path = env["PATH"] ?? ""
-        let pathParts = path.split(separator: ":", omittingEmptySubsequences: true).map(String.init)
-        for pathPart in pathParts + extraPATH {
-            let dir = URL(fileURLWithPath: pathPart, isDirectory: true)
-            let exePath = URL(fileURLWithPath: toolName, relativeTo: dir)
-            if FileManager.default.isExecutableFile(atPath: exePath.path) {
-                return exePath
-            }
-        }
-
-        throw GradleDriverError.gradleNotInstalled(toolName)
-    }
-
     /// Executes `gradle` with the current default arguments and the additional args and returns an async stream of the lines from the combined standard err and standard out.
     public func execGradle(in workingDirectory: URL, args: [String], env: [String: String] = [:], onExit: @escaping (ProcessResult) throws -> ()) async throws -> Process.AsyncLineOutput {
         // the resulting command will be something like:
@@ -279,7 +263,7 @@ public struct GradleDriver {
     private static func findGradle() throws -> URL {
         // add in standard Homebrew paths, in case they aren't in the user's PATH
         let homeBrewPaths = ProcessInfo.isARM ? ["/opt/homebrew/bin"] : ["/usr/local/bin"]
-        return try findInPath(toolName: "gradle", withAdditionalPaths: homeBrewPaths)
+        return try URL.findCommandInPath(toolName: "gradle", withAdditionalPaths: homeBrewPaths)
     }
 
     /* The contents of the JUnit test case XML result files look a bit like this:
@@ -571,8 +555,6 @@ public enum GradleDriverError : Error, LocalizedError {
 
     case custom(String)
 
-    case gradleNotInstalled(String)
-
     /// The command did not return any output
     case commandNoResult(String)
 
@@ -599,8 +581,6 @@ public enum GradleDriverError : Error, LocalizedError {
         switch self {
         case .custom(let string):
             return string
-        case .gradleNotInstalled(let string):
-            return "Could not locate tool: «\(string)». Gradle must be installed in order to run tests. Install it using homebrew with: brew install gradle"
         case .commandNoResult(let string):
             return "The command «\(string)» returned no result."
         case .noGradleVersion(let gradle, let props):
