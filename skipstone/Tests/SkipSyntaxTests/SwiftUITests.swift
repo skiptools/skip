@@ -69,7 +69,7 @@ final class SwiftUITests: XCTestCase {
         import skip.ui.*
         internal class V: View {
             override fun body(): View {
-                return ComposeView { composectx: ComposeContext ->  }
+                return ComposeView { composectx: ComposeContext -> ComposeResult.ok }
             }
         }
         """)
@@ -97,7 +97,7 @@ final class SwiftUITests: XCTestCase {
         import skip.ui.*
         internal class V: MyView {
             override fun body(): View {
-                return ComposeView { composectx: ComposeContext ->  }
+                return ComposeView { composectx: ComposeContext -> ComposeResult.ok }
             }
         }
         """)
@@ -150,26 +150,26 @@ final class SwiftUITests: XCTestCase {
             override fun v(): View {
                 return ComposeView { composectx: ComposeContext ->
                     VStack {
-                        ComposeView { composectx: ComposeContext ->  }
+                        ComposeView { composectx: ComposeContext -> ComposeResult.ok }
                     }.Compose(composectx)
                 }
             }
             internal open val v2: View
                 get() {
                     return VStack {
-                        ComposeView { composectx: ComposeContext ->  }
+                        ComposeView { composectx: ComposeContext -> ComposeResult.ok }
                     }
                 }
             override fun f(): View {
                 return ComposeView { composectx: ComposeContext ->
                     VStack {
-                        ComposeView { composectx: ComposeContext ->  }
+                        ComposeView { composectx: ComposeContext -> ComposeResult.ok }
                     }.Compose(composectx)
                 }
             }
             internal open fun f2(): View {
                 return VStack {
-                    ComposeView { composectx: ComposeContext ->  }
+                    ComposeView { composectx: ComposeContext -> ComposeResult.ok }
                 }
             }
             internal open fun f3(b: Boolean): View = (if (b) v() else v2).sref()
@@ -208,7 +208,10 @@ final class SwiftUITests: XCTestCase {
         import skip.ui.*
         internal fun f() {
             VStack {
-                ComposeView { composectx: ComposeContext -> V().Compose(composectx) }
+                ComposeView { composectx: ComposeContext ->
+                    V().Compose(composectx)
+                    ComposeResult.ok
+                }
             }
         }
         """)
@@ -238,7 +241,10 @@ final class SwiftUITests: XCTestCase {
             override fun body(): View {
                 return ComposeView { composectx: ComposeContext ->
                     VStack {
-                        ComposeView { composectx: ComposeContext -> V().mod().Compose(composectx) }
+                        ComposeView { composectx: ComposeContext ->
+                            V().mod().Compose(composectx)
+                            ComposeResult.ok
+                        }
                     }.mod().Compose(composectx)
                 }
             }
@@ -276,6 +282,7 @@ final class SwiftUITests: XCTestCase {
                             val v = V().mod()
                             v.Compose(composectx)
                             v.Compose(composectx)
+                            ComposeResult.ok
                         }
                     }.Compose(composectx)
                 }
@@ -334,18 +341,26 @@ final class SwiftUITests: XCTestCase {
                 return ComposeView l@{ composectx: ComposeContext ->
                     if (b(v = V())) {
                         return@l VStack {
-                            ComposeView { composectx: ComposeContext -> V().mod().Compose(composectx) }
+                            ComposeView { composectx: ComposeContext ->
+                                V().mod().Compose(composectx)
+                                ComposeResult.ok
+                            }
                         }.Compose(composectx)
                     } else {
                         val test = b(v = V())
                         return@l v(b = test) {
                             ComposeView { composectx: ComposeContext ->
                                 VStack {
-                                    ComposeView { composectx: ComposeContext -> V().mod().Compose(composectx) }
+                                    ComposeView { composectx: ComposeContext ->
+                                        V().mod().Compose(composectx)
+                                        ComposeResult.ok
+                                    }
                                 }.Compose(composectx)
+                                ComposeResult.ok
                             }
                         }.Compose(composectx)
                     }
+                    ComposeResult.ok
                 }
             }
             internal fun b(v: View): Boolean = true
@@ -392,6 +407,7 @@ final class SwiftUITests: XCTestCase {
                         V()
                     }
                     v.Compose(composectx)
+                    ComposeResult.ok
                 }
             }
         }
@@ -430,6 +446,7 @@ final class SwiftUITests: XCTestCase {
                         else -> V()
                     }
                     v.Compose(composectx)
+                    ComposeResult.ok
                 }
             }
         }
@@ -504,6 +521,7 @@ final class SwiftUITests: XCTestCase {
                         ComposeView { composectx: ComposeContext ->
                             Text("O: ${o}").Compose(composectx)
                             Button("Tap") { s += 1 }.Compose(composectx)
+                            ComposeResult.ok
                         }
                     }.Compose(composectx)
                 }
@@ -594,6 +612,7 @@ final class SwiftUITests: XCTestCase {
                     VStack {
                         ComposeView { composectx: ComposeContext ->
                             Button("Tap") { s = S(x = 100) }.Compose(composectx)
+                            ComposeResult.ok
                         }
                     }.Compose(composectx)
                 }
@@ -1105,6 +1124,7 @@ final class SwiftUITests: XCTestCase {
                         var o = o
                         TextField(Binding.instance(o, { it.string }, { it, newvalue -> it.string = newvalue })).Compose(composectx)
                     }
+                    ComposeResult.ok
                 }
             }
 
@@ -1384,13 +1404,16 @@ final class SwiftUITests: XCTestCase {
     func testEmbedCompose() async throws {
         try await check(supportingSwift: baseSupportingSwift + """
         #if SKIP
+        struct ComposeResult {
+            static let ok = ComposeResult()
+        }
         struct ComposeView: View {
-            let content: @Composable (ComposeContext) -> Void
-            init(content: @Composable (ComposeContext) -> Void) {
+            let content: @Composable (ComposeContext) -> ComposeResult
+            init(content: @Composable (ComposeContext) -> ComposeResult) {
                 self.content = content
             }
-            @Composable public override func ComposeContentcontext: ComposeContext) {
-                content(context)
+            @Composable public override func ComposeContent(context: ComposeContext) {
+                let _ = content(context)
             }
         }
         #endif
@@ -1403,6 +1426,7 @@ final class SwiftUITests: XCTestCase {
                     androidx.compose.Column(modifier: $0.modifier) {
                         androidx.compose.Text("y")
                     }
+                    return .ok
                 }
             }
         }
@@ -1422,9 +1446,11 @@ final class SwiftUITests: XCTestCase {
             override fun body(): View {
                 return ComposeView { composectx: ComposeContext ->
                     Text("x").Compose(composectx)
-                    ComposeView { it ->
+                    ComposeView l@{ it ->
                         androidx.compose.Column(modifier = it.modifier) { androidx.compose.Text("y") }
+                        return@l ComposeResult.ok
                     }.Compose(composectx)
+                    ComposeResult.ok
                 }
             }
         }
@@ -1634,6 +1660,7 @@ final class SwiftUITests: XCTestCase {
                         ComposeView { composectx: ComposeContext ->
                             Text("A: ${appStorageProp}").Compose(composectx)
                             Button("Tap") { appStorageProp += "X" }.Compose(composectx)
+                            ComposeResult.ok
                         }
                     }.Compose(composectx)
                 }
@@ -1696,6 +1723,7 @@ final class SwiftUITests: XCTestCase {
                         ComposeView { composectx: ComposeContext ->
                             Text("A: ${doublePref}").Compose(composectx)
                             Button("Tap") { doublePref += 1.0 }.Compose(composectx)
+                            ComposeResult.ok
                         }
                     }.Compose(composectx)
                 }

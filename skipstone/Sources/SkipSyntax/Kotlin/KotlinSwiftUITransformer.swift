@@ -519,6 +519,8 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             } else {
                 needsReturnLabel = codeBlock.updateWithExpectedReturn(.labelIfPresent(KotlinClosure.returnLabel))
             }
+            // Add a final return value just in case the closure logic doesn't guarantee one
+            codeBlock.statements.append(KotlinRawStatement(sourceCode: "ComposeResult.ok"))
         }
 
         // Wrap the code block in 'return ComposeView { ... }' to return a single view that will compose
