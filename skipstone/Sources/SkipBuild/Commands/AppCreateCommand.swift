@@ -68,7 +68,8 @@ struct AppCreateCommand: MessageCommand {
         let packageJSONString = try await outputOptions.run(with: out, "Checking project \(pname)", [toolOptions.swift, "package", "dump-package", "--package-path", projectFolderURL.path]).get().stdout
 
         let packageJSON = try JSONDecoder().decode(PackageManifest.self, from: Data(packageJSONString.utf8))
-
+        _ = packageJSON
+        
         if buildOptions.build == true {
             await outputOptions.run(with: out, "Building \(pname)", [toolOptions.swift, "build", "-c", createOptions.configuration, "--package-path", projectFolderURL.path])
         }

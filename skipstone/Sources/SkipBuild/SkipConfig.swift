@@ -17,7 +17,4 @@ struct TranspilationConfig : Codable {
     var package: String?
 }
 
-// example export of embedded code
-public let SomeFile_txt = PackageResources.SomeFile_txt
-
 

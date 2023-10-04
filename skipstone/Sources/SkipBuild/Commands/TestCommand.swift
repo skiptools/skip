@@ -60,7 +60,7 @@ struct TestCommand: MessageCommand {
         }
 
         if test == true {
-            try await outputOptions.run(with: out, "Testing project", [toolOptions.swift, "test", "--parallel", "-c", configuration, "--enable-code-coverage", "--xunit-output", xunit, "--package-path", project])
+            await outputOptions.run(with: out, "Testing project", [toolOptions.swift, "test", "--parallel", "-c", configuration, "--enable-code-coverage", "--xunit-output", xunit, "--package-path", project])
         } else if self.xunit == nil {
             // we can only use the generated xunit if we are running the tests
             throw SkipDriveError(errorDescription: "Must either specify --xunit path or run tests with --test")

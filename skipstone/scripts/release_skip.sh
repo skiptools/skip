@@ -29,10 +29,6 @@ set -o pipefail
 # get latest skip
 git pull
 
-# make sure both private skipstone/ and public skip/ tests pass
-swift test --parallel
-SKIPLOCAL=1 swift test --parallel --package-path ../skip/ 
-
 SKIPCONFIG=${SKIPCONFIG:-"release"}
 
 PRODUCT=SkipRunner
@@ -63,14 +59,27 @@ cd '-'
 
 echo "Creating release and tagging new skip version: ${SKIP_VERSION}"
 
-# mark the internal version
+# mark the internal version in skipstone/Sources/SkipSyntax/Version.swift
 SKIPSTONE_VERSION_PATH="Sources/SkipSyntax/Version.swift"
 sed -I '' 's;public let skipVersion = .*;public let skipVersion = "'${SKIP_VERSION}'";g' "${SKIPSTONE_VERSION_PATH}"
-git diff "${SKIPSTONE_VERSION_PATH}"
+#git diff "${SKIPSTONE_VERSION_PATH}" || true
 
+# also sync the plugin version in skip/Sources/SkipDrive/Version.swift
+cd ${SKIPPKGDIR}
+SKIPDRIVE_VERSION_PATH="Sources/SkipDrive/Version.swift"
+sed -I '' 's;public let skipVersion = .*;public let skipVersion = "'${SKIP_VERSION}'";g' "${SKIPDRIVE_VERSION_PATH}"
+#git diff "${SKIPSTONE_VERSION_PATH}" || true
+cd -
+
+
+# make sure both private skipstone/ and public skip/ tests pass
+SKIPLOCAL=1 swift test --configuration debug --parallel --package-path ../skip/ 
+swift test --configuration debug --parallel
+
+# now make the final release build for both architectures
 swift build --arch arm64 --arch x86_64 --configuration ${SKIPCONFIG} --product ${PRODUCT}
 
-# build for linux using docker
+# build for linux using docker (or else try a cross-compilation toolchain)
 #docker run -v "$PWD:/code" -w /code --platform linux/amd64 -e QEMU_CPU=max swift:focal swift build
 
 # try to back up any old artifactbundle folder
@@ -119,11 +128,6 @@ cd -
 
 # make a release of the skip command
 cd ${SKIPPKGDIR}
-pwd
-
-SKIPDRIVE_VERSION_PATH="Sources/SkipDrive/Version.swift"
-
-sed -I '' 's;public let skipVersion = .*;public let skipVersion = "'${SKIP_VERSION}'";g' "${SKIPDRIVE_VERSION_PATH}"
 
 #SKIP_ARTIFACT_ZIP="skip.zip"
 #echo "Building ${SKIP_ARTIFACT_ZIP}"
