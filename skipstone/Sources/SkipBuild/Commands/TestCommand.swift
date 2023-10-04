@@ -9,7 +9,7 @@ fileprivate let testCommandEnabled = false
 #endif
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-struct TestCommand: SkipCommand, ToolOptionsCommand {
+struct TestCommand: SkipCommand, StreamingCommand, ToolOptionsCommand {
     static var configuration = CommandConfiguration(
         commandName: "test",
         abstract: "Run parity tests and generate reports",
