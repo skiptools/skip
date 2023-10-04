@@ -146,6 +146,8 @@ public struct GradleDriver {
         // add in the project dir for explicitness (even though it is assumed from the current working directory as well)
         args += ["--project-dir", workingDirectory.path]
 
+        args += ["--warning-mode", "all"]
+
         args += ["-PbuildDir=\(buildDir)"]
 
         // this allows multiple simultaneous gradle builds to take place

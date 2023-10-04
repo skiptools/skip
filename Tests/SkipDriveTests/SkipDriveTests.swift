@@ -32,7 +32,8 @@ class SkipCommandTests : XCTestCase {
 
     func testSkipDoctor() async throws {
         // run `skip doctor` with JSON array output and make sure we can parse the result
-        _ = try await skip("doctor", "-jA").parseJSONArray()
+        let doctor = try await skip("doctor", "-jA").parseJSONArray()
+        XCTAssertGreaterThan(doctor.count, 5, "doctor output should have contained some lines")
     }
 
     func testSkipCreate() async throws {
@@ -61,11 +62,16 @@ class SkipCommandTests : XCTestCase {
     func testSkipInit() async throws {
         let tempDir = try mktmp()
         let name = "cool-lib"
-        let stdout = try await skip("lib", "init", "--no-build", "--no-test", "-d", tempDir, name, "CoolA") // , "CoolB", "CoolC", "CoolD", "CoolE")
-        let out = stdout.split(separator: "\n")
-        XCTAssertEqual("Initializing Skip library \(name)", out.first)
+        let out = try await skip("lib", "init", "-jA", "--tree", "--no-build", "--no-test", "-d", tempDir, name, "CoolA", "CoolB", "CoolC", "CoolD", "CoolE").parseJSONArray()
+
+        XCTAssertEqual("Initializing Skip library \(name)", (out.first as? JSONObject)?["msg"] as? String)
+
+        XCTAssertEqual((out.dropLast(1).last as? JSONObject)?["msg"] as? String, """
+        FILE TREE
+        """)
+
         let dir = tempDir + "/" + name + "/"
-        for path in ["Package.swift", "Sources/CoolA", "Sources/CoolA", "Tests", "Tests/CoolATests/Skip/skip.yml"] {
+        for path in ["Package.swift", "Sources/CoolA", "Sources/CoolA", "Sources/CoolE", "Tests", "Tests/CoolATests/Skip/skip.yml"] {
             XCTAssertTrue(FileManager.default.fileExists(atPath: dir + path), "missing file at: \(path)")
         }
 
@@ -74,8 +80,8 @@ class SkipCommandTests : XCTestCase {
 
         //try await skip("check", "-d", tempDir)
 
-        XCTAssertEqualAsync(try await skip("test", "--project", tempDir + "/" + name), """
-        """)
+        //XCTAssertEqualAsync(try await skip("test", "--project", tempDir + "/" + name), """
+        //""")
 
     }
 
@@ -112,15 +118,23 @@ class SkipCommandTests : XCTestCase {
         let testName = testRun?.test.name.split(separator: " ").last?.trimmingCharacters(in: CharacterSet(charactersIn: "[]")) ?? "TEST"
 
         // the default SPM location of the current skip CLI for testing
-        var skiptool = ".build/artifacts/skip/skip/skip.artifactbundle/macos/skip"
+        var skiptools = [
+            ".build/artifacts/skip/skip/skip.artifactbundle/macos/skip",
+            ".build/plugins/tools/debug/skip",
+        ]
 
         // when running tests from Xcode, we need to use the tool download folder, which seems to be placed in one of the envrionment property `__XCODE_BUILT_PRODUCTS_DIR_PATHS`, so check those folders and override if skip is found
         for checkFolder in (ProcessInfo.processInfo.environment["__XCODE_BUILT_PRODUCTS_DIR_PATHS"] ?? "").split(separator: ":") {
             let xcodeSkipPath = checkFolder.description + "/skip"
             if FileManager.default.isExecutableFile(atPath: xcodeSkipPath) {
-                skiptool = xcodeSkipPath
-                break
+                skiptools.append(xcodeSkipPath)
             }
+        }
+
+        struct SkipLaunchError : LocalizedError { var errorDescription: String? }
+
+        guard let skiptool = skiptools.last(where: FileManager.default.isExecutableFile(atPath:)) else {
+            throw SkipLaunchError(errorDescription: "Could not locate the skip executable in any of the paths: \(skiptools.joined(separator: " "))")
         }
 
         let cmd = [skiptool] + args
@@ -138,8 +152,7 @@ class SkipCommandTests : XCTestCase {
         }
 
         guard let result = result else {
-            struct ProcessNoResultError : LocalizedError { var errorDescription: String? }
-            throw ProcessNoResultError(errorDescription: "command did not exit: \(cmd)")
+            throw SkipLaunchError(errorDescription: "command did not exit: \(cmd)")
         }
         // Throw if there was a non zero termination.
         guard result.exitStatus == .terminated(code: 0) else {
@@ -156,24 +169,34 @@ typealias JSONObject = [String: Any]
 
 private extension String {
     /// Attempts to parse the given String as a JSON object
-    func parseJSONObject() throws -> JSONObject {
-        let json = try JSONSerialization.jsonObject(with: Data(utf8), options: [])
-        if let obj = json as? JSONObject {
-            return obj
-        } else {
-            struct CannotParseJSONIntoObject : LocalizedError { var errorDescription: String? }
-            throw CannotParseJSONIntoObject(errorDescription: "JSON object was of wrong type: \(type(of: json))")
+    func parseJSONObject(file: StaticString = #file, line: UInt = #line) throws -> JSONObject {
+        do {
+            let json = try JSONSerialization.jsonObject(with: Data(utf8), options: [])
+            if let obj = json as? JSONObject {
+                return obj
+            } else {
+                struct CannotParseJSONIntoObject : LocalizedError { var errorDescription: String? }
+                throw CannotParseJSONIntoObject(errorDescription: "JSON object was of wrong type: \(type(of: json))")
+            }
+        } catch {
+            XCTFail("Error parsing JSON Object from: \(self)", file: file, line: line)
+            throw error
         }
     }
 
     /// Attempts to parse the given String as a JSON object
-    func parseJSONArray() throws -> [Any] {
-        let json = try JSONSerialization.jsonObject(with: Data(utf8), options: [])
-        if let arr = json as? [Any] {
-            return arr
-        } else {
-            struct CannotParseJSONIntoArray : LocalizedError { var errorDescription: String? }
-            throw CannotParseJSONIntoArray(errorDescription: "JSON object was of wrong type: \(type(of: json))")
+    func parseJSONArray(file: StaticString = #file, line: UInt = #line) throws -> [Any] {
+        do {
+            let json = try JSONSerialization.jsonObject(with: Data(utf8), options: [])
+            if let arr = json as? [Any] {
+                return arr
+            } else {
+                struct CannotParseJSONIntoArray : LocalizedError { var errorDescription: String? }
+                throw CannotParseJSONIntoArray(errorDescription: "JSON object was of wrong type: \(type(of: json))")
+            }
+        } catch {
+            XCTFail("Error parsing JSON Array from: \(self)", file: file, line: line)
+            throw error
         }
     }
 

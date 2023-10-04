@@ -52,8 +52,6 @@ jobs:
           SKIP_MODULE=$(swift package dump-package | jq -r '.products[0].name')
           echo "SKIP_MODULE=${SKIP_MODULE}" >> $GITHUB_ENV
 
-          xcodebuild -showBuildSettings -json -project ${SKIP_MODULE}.xcodeproj -scheme "${SKIP_MODULE}"
-
           SKIP_MODULE_PLUS="${SKIP_MODULE}+"
           echo "SKIP_MODULE_PLUS=${SKIP_MODULE_PLUS}" >> $GITHUB_ENV
 
@@ -75,7 +73,7 @@ jobs:
         run: |
           mkdir -p ${RELDIR}
           APPARTIFACT="${SKIP_MODULE}"
-          export NOSKIP=1
+          #export NOSKIP=1
           for CONFIGURATION in "Debug" "Release"; do
             ARCHIVE_PATH=".build/Skip/artifacts/${CONFIGURATION}/${APPARTIFACT}.xcarchive"
             xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -archivePath "${ARCHIVE_PATH}" -configuration "${CONFIGURATION}" -scheme "${SKIP_MODULE}" -sdk "iphoneos" -destination "generic/platform=iOS" -jobs 1 archive CODE_SIGNING_ALLOWED=NO
