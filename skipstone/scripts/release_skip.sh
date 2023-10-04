@@ -30,8 +30,8 @@ set -o pipefail
 git pull
 
 # make sure both private skipstone/ and public skip/ tests pass
-swift test
-SKIPLOCAL=1 swift test --package-path ../skip/ 
+swift test --parallel
+SKIPLOCAL=1 swift test --parallel --package-path ../skip/ 
 
 SKIPCONFIG=${SKIPCONFIG:-"release"}
 
