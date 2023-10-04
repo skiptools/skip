@@ -10,10 +10,10 @@ class SkipCommandTests : XCTestCase {
             versionOut.removeLast(" (debug)".count)
         }
 
-        //XCTAssertEqual("Skip version \(SkipDrive.skipVersion)", versionOut)
+        XCTAssertEqual("Skip version \(SkipDrive.skipVersion)", versionOut)
     }
 
-    func NOtestSkipVersionJSON() async throws {
+    func testSkipVersionJSON() async throws {
         try await XCTAssertEqualAsync(SkipDrive.skipVersion, skip("version", "--json").parseJSONObject()["version"] as? String)
     }
 
