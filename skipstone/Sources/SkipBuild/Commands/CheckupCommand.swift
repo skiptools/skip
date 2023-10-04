@@ -16,7 +16,7 @@ struct CheckupCommand: MessageCommand, ToolOptionsCommand  {
     var toolOptions: ToolOptions
 
     func performCommand(with out: MessageQueue) async throws {
-        try await runDoctor(tool: toolOptions, with: out)
+        try await runDoctor(with: out)
 
         let tmpdir = NSTemporaryDirectory() + "/" + UUID().uuidString
         try FileManager.default.createDirectory(atPath: tmpdir, withIntermediateDirectories: true)

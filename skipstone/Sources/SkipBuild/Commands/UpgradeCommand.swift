@@ -9,7 +9,7 @@ import FoundationXML // for non-Darwin
 #endif
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-struct UpgradeCommand: MessageCommand {
+struct UpgradeCommand: MessageCommand, ToolOptionsCommand {
     static var configuration = CommandConfiguration(
         commandName: "upgrade",
         abstract: "Upgrade to the latest Skip version using Homebrew",
@@ -18,6 +18,9 @@ struct UpgradeCommand: MessageCommand {
     @OptionGroup(title: "Output Options")
     var outputOptions: OutputOptions
 
+    @OptionGroup(title: "Tool Options")
+    var toolOptions: ToolOptions
+
     func performCommand(with out: MessageQueue) async throws {
         //if try await checkSkipUpdates() == skipVersion {
         //    outputOptions.write("Skip \(skipVersion) is up to date.")
@@ -25,7 +28,7 @@ struct UpgradeCommand: MessageCommand {
         //}
 
         //try await outputOptions.run("Updating Homebew", ["brew", "update"])
-        let _ = await outputOptions.run(with: out, "Updating Skip", ["brew", "upgrade", "skip"])
+        let _ = await run(with: out, "Updating Skip", ["brew", "upgrade", "skip"])
         //outputOptions.write(upgradeOutput.out)
         //outputOptions.write(upgradeOutput.err)
     }

@@ -854,30 +854,54 @@ extension String {
     }
 }
 
-protocol ToolOptionsCommand : ParsableArguments {
-    /// This command's output options
+/// A `ToolOptionsCommand` holds options that can be used to control the paths of commonly-used tools
+protocol ToolOptionsCommand : OutputOptionsCommand {
+    /// This command's tool options
     var toolOptions: ToolOptions { get }
 }
 
 struct ToolOptions: ParsableArguments {
     @Option(help: ArgumentHelp("Xcode command path", valueName: "path"))
-    var xcode: String = ProcessInfo.processInfo.environment["SKIP_XCODEBUILD_PATH"] ?? "/usr/bin/xcodebuild"
+    var xcodebuild: String? = nil
 
     @Option(help: ArgumentHelp("Swift command path", valueName: "path"))
-    var swift: String = ProcessInfo.processInfo.environment["SKIP_SWIFT_PATH"] ?? "/usr/bin/swift"
+    var swift: String? = nil
 
     @Option(help: ArgumentHelp("Gradle command path", valueName: "path"))
-    var gradle: String = ProcessInfo.processInfo.environment["SKIP_GRADLE_PATH"] ?? (homebrewRoot + "/bin/gradle")
+    var gradle: String? = nil
 
     @Option(help: ArgumentHelp("ADB command path", valueName: "path"))
-    var adb: String = ProcessInfo.processInfo.environment["SKIP_ADB_PATH"] ?? (homebrewRoot + "/bin/adb")
+    var adb: String? = nil
+
+    @Option(help: ArgumentHelp("Android emulator path", valueName: "path"))
+    var emulator: String? = nil
 
     @Option(help: ArgumentHelp("Path to the Android SDK (ANDROID_HOME)", valueName: "path"))
-    var androidHome: String?
+    var androidHome: String? = nil
 
     private static var homebrewRoot: String {
         ProcessInfo.processInfo.environment["HOMEBREW_PREFIX"]
             ?? (ProcessInfo.isARM ? "/opt/homebrew" : "/usr/local")
+    }
+
+    /// Returns the path for the given tool, or throws an error if no executable tool was found.
+    ///
+    /// Note that some tools can be overridden by name
+    func toolPath(for tool: String) throws -> String {
+        func customTool() -> String? {
+            switch tool {
+            case "swift": return self.swift ?? ProcessInfo.processInfo.environment["SKIP_SWIFT_PATH"]
+            case "xcodebuild": return self.xcodebuild ?? ProcessInfo.processInfo.environment["SKIP_XCODEBUILD_PATH"]
+            case "gradle": return self.gradle ?? ProcessInfo.processInfo.environment["SKIP_GRADLE_PATH"]
+            case "adb": return self.adb ?? ProcessInfo.processInfo.environment["SKIP_ADB_PATH"]
+            case "emulator": return self.emulator ?? ProcessInfo.processInfo.environment["SKIP_EMULATOR_PATH"]
+            default: return nil
+            }
+        }
+        if let toolPath = customTool() {
+            return toolPath
+        }
+        return try URL.findCommandInPath(toolName: tool, withAdditionalPaths: ProcessInfo.isARM ? ["/opt/homebrew/bin"] : ["/usr/local/bin"]).path
     }
 }
 

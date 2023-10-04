@@ -179,23 +179,32 @@ public struct OutputOptions: ParsableArguments {
 typealias ProcessOutput = (exitCode: Int, stdout: String, stderr: String)
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-extension OutputOptions {
-
-    static func initialize() {
-        checkFirstRun()
-    }
+extension ToolOptionsCommand {
     
-    /// Executes a process with the given arguments and prefix message, waits for the result while showing a progress animation,
+    /// Executes a tool with the given arguments and prefix message, waits for the result while showing a progress animation,
     /// and then processes the result and outputs the given message block.
-    @discardableResult func run(with messenger: MessageQueue, _ message: String, _ args: [String], environment: [String: String] = ProcessInfo.processInfo.environment, watch: Bool = true, resultHandler: @escaping MessageResultHandler<ProcessOutput> = { ($0, nil) }) async -> Result<ProcessOutput, Error> {
-        await monitor(with: messenger, message, watch: watch, resultHandler: resultHandler) { outputHandler in
+    @discardableResult func run(with messenger: MessageQueue, _ message: String, _ commandArgs: [String], environment: [String: String] = ProcessInfo.processInfo.environment, watch: Bool = true, resultHandler: @escaping MessageResultHandler<ProcessOutput> = { ($0, nil) }) async -> Result<ProcessOutput, Error> {
+
+        var cmd = commandArgs.first ?? ""
+        do {
+            // attempt to resolve the tool command if it is not prefixed with a slash
+            if !cmd.hasPrefix("/") {
+                cmd = try toolOptions.toolPath(for: cmd)
+            }
+        } catch {
+            return Result.failure(error)
+        }
+
+        let args = [cmd] + commandArgs.dropFirst()
+
+        return await outputOptions.monitor(with: messenger, message, watch: watch, resultHandler: resultHandler) { outputHandler in
             //let result = try await Process.popen(arguments: args, environment: environment, loggingHandler: outputHandler)
             var outBufferComplete: [UInt8] = []
             var outBuffer: [UInt8] = []
             var errBufferComplete: [UInt8] = []
             var errBuffer: [UInt8] = []
             let newline = UnicodeScalar("\n")
-
+            
             // both stdout and stderr go the an output buffer; when there are any newlines available in the buffer, flush it
             func addBuffer(err: Bool) -> (_ bytes: [UInt8]?) -> () {
                 return { bytes in
@@ -228,32 +237,34 @@ extension OutputOptions {
                     }
                 }
             }
-
+            
             let process = Process(arguments: args, environment: environment, outputRedirection: .stream(stdout: addBuffer(err: false), stderr: addBuffer(err: true)), loggingHandler: nil)
             try process.launch()
             let result = try await process.waitUntilExit()
             // flush the final output buffers
             addBuffer(err: true)(nil)
             addBuffer(err: false)(nil)
-
+            
             let code: Int
             switch result.exitStatus {
             case .terminated(let c): code = Int(c)
-            #if os(Windows)
+#if os(Windows)
             case .abnormal(let c): code = Int(c)
-            #else
+#else
             case .signalled(let c): code = Int(c)
-            #endif
+#endif
             }
             //let (out, err) = try (result.utf8Output(), result.utf8stderrOutput())
             //return (exitCode: code, stdout: out, stderr: err)
             return (exitCode: code, stdout: String(bytes: outBufferComplete, encoding: .utf8) ?? "", stderr: String(bytes: errBufferComplete, encoding: .utf8) ?? "")
         }
     }
+}
 
+extension OutputOptions {
     func monitorPrefix(_ progressCharacters: String?, for status: MessageBlock.Status?, startTime: Date) -> String? {
         if let status = status {
-            return status.prefix(term)
+            return status.prefix(self.term)
         }
         let pseq = progressCharacters ?? "…" // fall back to a single ellipsis if no progress sequence is specified
         // use an ease-out animation to start the progress spinner quick and then slow it down as time progresses
@@ -369,6 +380,9 @@ extension OutputOptions {
         return result
     }
 
+    static func initialize() {
+        checkFirstRun()
+    }
 
 
     static var isFirstRun: Bool = checkFirstRun()

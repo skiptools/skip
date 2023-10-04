@@ -5,7 +5,7 @@ import FoundationNetworking
 #endif
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-struct AppCreateCommand: MessageCommand {
+struct AppCreateCommand: MessageCommand, ToolOptionsCommand {
     static var configuration = CommandConfiguration(
         commandName: "create",
         abstract: "Create a new Skip app project from a template",
@@ -63,19 +63,19 @@ struct AppCreateCommand: MessageCommand {
         let projectFolderURL = URL(fileURLWithPath: projectFolder, isDirectory: true)
         try FileManager.default.createDirectory(at: projectFolderURL, withIntermediateDirectories: true)
 
-        await outputOptions.run(with: out, "Unpacking template \(createOptions.template) (\(ByteCountFormatter().string(fromByteCount: Int64((try? downloadURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)))) for project \(pname)", ["unzip", downloadURL.path, "-d", projectFolderURL.path])
+        await run(with: out, "Unpacking template \(createOptions.template) (\(ByteCountFormatter().string(fromByteCount: Int64((try? downloadURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)))) for project \(pname)", ["unzip", downloadURL.path, "-d", projectFolderURL.path])
 
-        let packageJSONString = try await outputOptions.run(with: out, "Checking project \(pname)", [toolOptions.swift, "package", "dump-package", "--package-path", projectFolderURL.path]).get().stdout
+        let packageJSONString = try await run(with: out, "Checking project \(pname)", ["swift", "package", "dump-package", "--package-path", projectFolderURL.path]).get().stdout
 
         let packageJSON = try JSONDecoder().decode(PackageManifest.self, from: Data(packageJSONString.utf8))
         _ = packageJSON
         
         if buildOptions.build == true {
-            await outputOptions.run(with: out, "Building \(pname)", [toolOptions.swift, "build", "-c", createOptions.configuration, "--package-path", projectFolderURL.path])
+            await run(with: out, "Building \(pname)", ["swift", "build", "-c", createOptions.configuration, "--package-path", projectFolderURL.path])
         }
 
         if buildOptions.test == true {
-            await outputOptions.run(with: out, "Testing \(pname)", [toolOptions.swift, "test", "-j", "1", "-c", createOptions.configuration, "--package-path", projectFolderURL.path])
+            await run(with: out, "Testing \(pname)", ["swift", "test", "-j", "1", "-c", createOptions.configuration, "--package-path", projectFolderURL.path])
         }
 
         let projectPath = projectFolderURL.path + "/" + "App.xcodeproj"
@@ -84,7 +84,7 @@ struct AppCreateCommand: MessageCommand {
         }
 
         if open == true {
-            await outputOptions.run(with: out, "Launching project \(projectPath)", ["open", projectPath])
+            await run(with: out, "Launching project \(projectPath)", ["open", projectPath])
         }
 
         await out.write(status: .pass, "Created project: \(projectPath)")

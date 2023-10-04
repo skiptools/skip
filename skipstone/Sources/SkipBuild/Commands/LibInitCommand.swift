@@ -6,7 +6,7 @@ import FoundationNetworking
 #endif
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-struct LibInitCommand: MessageCommand, CreateOptionsCommand, ToolOptionsCommand, BuildOptionsCommand {
+struct LibInitCommand: MessageCommand, CreateOptionsCommand, ToolOptionsCommand, BuildOptionsCommand, StreamingCommand {
     static var configuration = CommandConfiguration(
         commandName: "init",
         abstract: "Initialize a new Skip library project",
@@ -45,7 +45,7 @@ struct LibInitCommand: MessageCommand, CreateOptionsCommand, ToolOptionsCommand,
     }
 }
 
-extension ToolOptionsCommand where Self : OutputOptionsCommand {
+extension ToolOptionsCommand {
     func initSkipLibrary(projectName: String, moduleNames: [String], dir outputFolder: String, configuration: String, build: Bool, test: Bool, with out: MessageQueue) async throws {
         var isDir: Foundation.ObjCBool = false
         if !FileManager.default.fileExists(atPath: outputFolder, isDirectory: &isDir) {
@@ -181,7 +181,7 @@ extension ToolOptionsCommand where Self : OutputOptionsCommand {
         """
 
         let packageSource = """
-        // swift-tools-version: 5.8
+        // swift-tools-version: 5.9
         // This is a [Skip](https://skip.tools) package,
         // containing Swift "ModuleName" library targets
         // alongside peer "ModuleNameKt" targets that
@@ -219,17 +219,17 @@ extension ToolOptionsCommand where Self : OutputOptionsCommand {
         //            return try JSONDecoder().decode(PackageManifest.self, from: Data(stdout.utf8))
         //        })
 
-        let packageJSONString = try await outputOptions.run(with: out, "Checking project \(projectName)", [toolOptions.swift, "package", "dump-package", "--package-path", projectFolderURL.path]).get().stdout
+        let packageJSONString = try await run(with: out, "Checking project \(projectName)", ["swift", "package", "dump-package", "--package-path", projectFolderURL.path]).get().stdout
 
         let packageJSON = try JSONDecoder().decode(PackageManifest.self, from: Data(packageJSONString.utf8))
         _ = packageJSON
 
         if build == true {
-            await outputOptions.run(with: out, "Building \(projectName)", [toolOptions.swift, "build", "-v", "-c", configuration, "--package-path", projectFolderURL.path])
+            await run(with: out, "Building \(projectName)", ["swift", "build", "-v", "-c", configuration, "--package-path", projectFolderURL.path])
         }
 
         if test == true {
-            await runSkipTests(in: projectFolderURL, configuration: configuration, swift: true, kotlin: true, with: out)
+            try await runSkipTests(in: projectFolderURL, configuration: configuration, swift: true, kotlin: true, with: out)
         }
     }
 }

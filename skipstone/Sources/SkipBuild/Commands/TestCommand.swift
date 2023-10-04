@@ -9,7 +9,7 @@ fileprivate let testCommandEnabled = false
 #endif
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-struct TestCommand: MessageCommand {
+struct TestCommand: SkipCommand, ToolOptionsCommand {
     static var configuration = CommandConfiguration(
         commandName: "test",
         abstract: "Run parity tests and generate reports",
@@ -63,14 +63,14 @@ extension TestCommand {
         let xunit = xunit ?? ".build/xcunit-\(UUID().uuidString).xml"
 
         func packageName() async throws -> String {
-            let packageJSONString = try await outputOptions.run(with: out, "Checking project", [toolOptions.swift, "package", "dump-package", "--package-path", project]).get().stdout
+            let packageJSONString = try await run(with: out, "Checking project", ["swift", "package", "dump-package", "--package-path", project]).get().stdout
             let packageJSON = try JSONDecoder().decode(PackageManifest.self, from: Data(packageJSONString.utf8))
             let packageName = packageJSON.name
             return packageName
         }
 
         if test == true {
-            await outputOptions.run(with: out, "Testing project", [toolOptions.swift, "test", "--parallel", "-c", configuration, "--enable-code-coverage", "--xunit-output", xunit, "--package-path", project])
+            await run(with: out, "Testing project", ["swift", "test", "--parallel", "-c", configuration, "--enable-code-coverage", "--xunit-output", xunit, "--package-path", project])
         } else if self.xunit == nil {
             // we can only use the generated xunit if we are running the tests
             throw SkipDriveError(errorDescription: "Must either specify --xunit path or run tests with --test")
@@ -278,12 +278,12 @@ extension TestCommand {
 
 extension ToolOptionsCommand where Self : OutputOptionsCommand {
 
-    func runSkipTests(in projectFolderURL: URL, configuration: String, swift: Bool, kotlin: Bool, with out: MessageQueue) async {
+    func runSkipTests(in projectFolderURL: URL, configuration: String, swift: Bool, kotlin: Bool, with out: MessageQueue) async throws {
         // run Swift and Kotlin tests separately
         // await outputOptions.run(with: out, "Testing \(projectName)", [toolOptions.swift, "test", "-v", "-c", configuration, "--package-path", projectFolderURL.path])
         // TODO: exclude XCSkipTest.testSkipModule from the tests somehow
-        await outputOptions.run(with: out, "Testing Swift", [toolOptions.swift, "testX", "--verbose", "--configuration", configuration, "--package-path", projectFolderURL.path])
-        await outputOptions.run(with: out, "Testing Kotlin", [toolOptions.swift, "test", "--verbose", "--configuration", configuration, "--filter", "testSkipModule", "--package-path", projectFolderURL.path])
+        await run(with: out, "Testing Swift", ["swift", "testX", "--verbose", "--configuration", configuration, "--package-path", projectFolderURL.path])
+        await run(with: out, "Testing Kotlin", ["swift", "test", "--verbose", "--configuration", configuration, "--filter", "testSkipModule", "--package-path", projectFolderURL.path])
     }
 }
 
