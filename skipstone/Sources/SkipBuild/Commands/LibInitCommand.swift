@@ -1,6 +1,7 @@
 import Foundation
 import ArgumentParser
 import SkipSyntax
+import TSCBasic
 #if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
@@ -24,9 +25,6 @@ struct LibInitCommand: MessageCommand, CreateOptionsCommand, ToolOptionsCommand,
     @OptionGroup(title: "Build Options")
     var buildOptions: BuildOptions
 
-    @Option(help: ArgumentHelp("The package dependencies for this module"))
-    var dependency: [String] = ["skip", "skip-foundation"]
-
     @Argument(help: ArgumentHelp("Project folder name"))
     var projectName: String
 
@@ -34,19 +32,18 @@ struct LibInitCommand: MessageCommand, CreateOptionsCommand, ToolOptionsCommand,
     var moduleNames: [String]
 
     func performCommand(with out: MessageQueue) async throws {
-        await out.yield(MessageBlock(status: nil, "Initializing Skip library \(projectName)"))
+        await out.yield(MessageBlock(status: nil, "Initializing Skip library \(self.projectName)"))
 
         let dir = self.createOptions.dir ?? "."
 
-        try await initSkipLibrary(projectName: projectName, moduleNames: moduleNames, dir: dir, configuration: createOptions.configuration, build: buildOptions.build, test: buildOptions.test, with: out)
-
-        await showFileTree(in: dir, with: out)
+        let projectURL = try await initSkipLibrary(projectName: self.projectName, moduleNames: moduleNames, resourceFolder: createOptions.resourcePath, dir: dir, configuration: createOptions.configuration, build: buildOptions.build, test: buildOptions.test, with: out)
+        await showFileTree(in: try projectURL.absolutePath, with: out)
         await out.yield(MessageBlock(status: .pass, "Created module \(moduleNames.joined(separator: ", ")) in \(dir)"))
     }
 }
 
 extension ToolOptionsCommand {
-    func initSkipLibrary(projectName: String, moduleNames: [String], dir outputFolder: String, configuration: String, build: Bool, test: Bool, with out: MessageQueue) async throws {
+    func initSkipLibrary(projectName: String, moduleNames: [String], resourceFolder: String?, dir outputFolder: String, configuration: String, build: Bool, test: Bool, with out: MessageQueue) async throws -> URL {
         var isDir: Foundation.ObjCBool = false
         if !FileManager.default.fileExists(atPath: outputFolder, isDirectory: &isDir) {
             throw InitError(errorDescription: "Specified output folder does not exist: \(outputFolder)")
@@ -231,6 +228,8 @@ extension ToolOptionsCommand {
         if test == true {
             try await runSkipTests(in: projectFolderURL, configuration: configuration, swift: true, kotlin: true, with: out)
         }
+
+        return projectFolderURL
     }
 }
 

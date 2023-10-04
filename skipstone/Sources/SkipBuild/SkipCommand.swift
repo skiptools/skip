@@ -1034,19 +1034,22 @@ extension FileSystem {
     }
 
     /// Output the filesystem tree of the given path.
-    public func treeASCIIRepresentation(at path: AbsolutePath = .root) throws -> String {
+    public func treeASCIIRepresentation(at path: AbsolutePath, hideHiddenFiles: Bool = true) throws -> String {
         var writer: String = ""
         print(".", to: &writer)
-        try treeASCIIRepresent(fs: self, path: path, to: &writer)
+        try treeASCIIRepresent(fs: self, path: path, hideHiddenFiles: hideHiddenFiles, to: &writer)
         return writer
     }
 
     /// Helper method to recurse and print the tree.
-    private func treeASCIIRepresent<T: TextOutputStream>(fs: FileSystem, path: AbsolutePath, prefix: String = "", to writer: inout T) throws {
+    private func treeASCIIRepresent<T: TextOutputStream>(fs: FileSystem, path: AbsolutePath, hideHiddenFiles: Bool, prefix: String = "", to writer: inout T) throws {
         let contents = try fs.getDirectoryContents(path)
-        // content order is undefined
-        //let entries = contents.sorted(using: .localizedStandard) // Darwin only
-        let entries = contents.sorted()
+        let entries = contents
+            .filter {
+                !hideHiddenFiles || ($0.hasPrefix(".") == false)
+            }
+            //.sorted(using: .localizedStandard) // Darwin only
+            .sorted()
 
         for (idx, entry) in entries.enumerated() {
             let isLast = idx == entries.count - 1
@@ -1056,7 +1059,7 @@ extension FileSystem {
             let entryPath = path.appending(component: entry)
             if fs.isDirectory(entryPath) {
                 let childPrefix = prefix + (isLast ?  "   " : "│  ")
-                try treeASCIIRepresent(fs: fs, path: entryPath, prefix: String(childPrefix), to: &writer)
+                try treeASCIIRepresent(fs: fs, path: entryPath, hideHiddenFiles: hideHiddenFiles, prefix: String(childPrefix), to: &writer)
             }
         }
     }

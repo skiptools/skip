@@ -17,48 +17,43 @@ final class SkipCommandTests: XCTestCase {
     }
 
     func testLibInitCommand() async throws {
-        let tree = try await libInitComand()
-        XCTAssertEqual(tree, """
+        let basicProject = try await libInitComand(projectName: "basicProject", moduleNames: "SomeModule")
+        XCTAssertEqual(basicProject ?? "", """
         .
-        └─ project-name
-           ├─ Package.swift
-           ├─ README.md
-           ├─ Sources
-           │  ├─ ModuleA
-           │  │  ├─ ModuleA.swift
-           │  │  └─ Skip
-           │  │     └─ skip.yml
-           │  └─ ModuleB
-           │     ├─ ModuleB.swift
-           │     └─ Skip
-           │        └─ skip.yml
-           └─ Tests
-              ├─ ModuleATests
-              │  ├─ ModuleATests.swift
-              │  ├─ Skip
-              │  │  └─ skip.yml
-              │  └─ XCSkipTests.swift
-              └─ ModuleBTests
-                 ├─ ModuleBTests.swift
-                 ├─ Skip
-                 │  └─ skip.yml
-                 └─ XCSkipTests.swift
+        ├─ Package.swift
+        ├─ README.md
+        ├─ Sources
+        │  └─ SomeModule
+        │     ├─ Skip
+        │     │  └─ skip.yml
+        │     └─ SomeModule.swift
+        └─ Tests
+           └─ SomeModuleTests
+              ├─ Skip
+              │  └─ skip.yml
+              ├─ SomeModuleTests.swift
+              └─ XCSkipTests.swift
 
         """)
     }
 
-    func libInitComand(withResources: String? = nil) async throws -> String? {
+    func libInitComand(projectName: String, resourcePath: String? = nil, moduleNames: String...) async throws -> String? {
         let tmpDir = URL(fileURLWithPath: UUID().uuidString, isDirectory: true, relativeTo: URL(fileURLWithPath: NSTemporaryDirectory() + "/testLibInitCommand/", isDirectory: true))
         try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
         var cmd = ["lib", "init", "-jA", "--no-build", "--no-test", "--tree"]
-        cmd += ["-d", tmpDir.path, "project-name", "ModuleA", "ModuleB"]
+        if let resourcePath = resourcePath {
+            cmd += ["--resource-path", resourcePath]
+        }
+        cmd += ["-d", tmpDir.path]
+
+        cmd += [projectName]
+        cmd += moduleNames
 
         let created = try await skipstone(cmd).json()
-        XCTAssertEqual(created.array?.first, ["msg": "Initializing Skip library project-name"])
+        XCTAssertEqual(created.array?.first, ["msg": .string("Initializing Skip library \(projectName)")])
         // return the tree output, which is in the 2nd-to-last message
         return created.array?.dropLast().last?["msg"]?.string
     }
-
 }
 
 

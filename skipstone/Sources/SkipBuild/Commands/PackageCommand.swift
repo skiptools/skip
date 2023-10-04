@@ -56,6 +56,12 @@ struct CreateOptions : ParsableArguments {
     @Option(name: [.customShort("f"), .long], help: ArgumentHelp("A path to the template zip file to use", valueName: "zip"))
     var templateFile: String?
 
+//    @Option(help: ArgumentHelp("The package dependencies for this module"))
+//    var dependency: [String] = ["skip", "skip-foundation"]
+
+    @Option(help: ArgumentHelp("Resource folder name"))
+    var resourcePath: String?
+
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Display a file system tree summary of the new files", valueName: "show"))
     var tree: Bool = true
 
@@ -98,9 +104,9 @@ struct CreateOptions : ParsableArguments {
 
 extension OutputOptionsCommand {
     /// Output an ASCII tree representation of the file system as a result of the command
-    func showFileTree(in dir: String, with out: MessageQueue) async {
+    func showFileTree(in dir: AbsolutePath, with out: MessageQueue) async {
         do {
-            let tree = try localFileSystem.treeASCIIRepresentation(at: AbsolutePath(validating: dir))
+            let tree = try localFileSystem.treeASCIIRepresentation(at: dir, hideHiddenFiles: true)
             await out.write(status: nil, tree)
         } catch {
             await out.yield(MessageBlock(error: error))
