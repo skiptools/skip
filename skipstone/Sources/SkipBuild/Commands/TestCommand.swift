@@ -25,6 +25,9 @@ struct TestCommand: MessageCommand {
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Run the project tests"))
     var test: Bool = true
 
+    @Option(help: ArgumentHelp("Test filter(s) to run", valueName: "Test.testFun"))
+    var filter: [String] = []
+
     @Option(help: ArgumentHelp("Project folder", valueName: "dir"))
     var project: String = "."
 
@@ -43,10 +46,17 @@ struct TestCommand: MessageCommand {
     @Option(name: [.customShort("c"), .long], help: ArgumentHelp("Configuration debug/release", valueName: "c"))
     var configuration: String = "debug"
 
-    func performCommand(with out: Messenger) async throws {
+    func performCommand(with out: MessageQueue) async throws {
+        try await runTestCommand(with: out)
+    }
+}
+
+extension TestCommand {
+    func runTestCommand(with out: MessageQueue) async throws {
+
         // only run tests when there is a Tests/ folder
         if !FileManager.default.fileExists(atPath: project + "/Tests") {
-            out.write(status: .fail, "No Tests folder in project: \(project)")
+            await out.write(status: .fail, "No Tests folder in project: \(project)")
             return
         }
 
@@ -258,8 +268,22 @@ struct TestCommand: MessageCommand {
                 testsTable += "\n"
             }
 
-            out.write(status: nil, testsTable)
+            await out.write(status: nil, testsTable)
         }
         #endif
     }
+    
 }
+
+
+extension ToolOptionsCommand where Self : OutputOptionsCommand {
+
+    func runSkipTests(in projectFolderURL: URL, configuration: String, swift: Bool, kotlin: Bool, with out: MessageQueue) async {
+        // run Swift and Kotlin tests separately
+        // await outputOptions.run(with: out, "Testing \(projectName)", [toolOptions.swift, "test", "-v", "-c", configuration, "--package-path", projectFolderURL.path])
+        // TODO: exclude XCSkipTest.testSkipModule from the tests somehow
+        await outputOptions.run(with: out, "Testing Swift", [toolOptions.swift, "testX", "--verbose", "--configuration", configuration, "--package-path", projectFolderURL.path])
+        await outputOptions.run(with: out, "Testing Kotlin", [toolOptions.swift, "test", "--verbose", "--configuration", configuration, "--filter", "testSkipModule", "--package-path", projectFolderURL.path])
+    }
+}
+

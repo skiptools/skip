@@ -3,11 +3,11 @@ import ArgumentParser
 import TSCBasic
 import SkipSyntax
 
-struct SnippetCommand: SnippetPhase, StreamingCommand {
+struct SnippetCommand: SnippetOptionsCommand, StreamingCommand {
     static var configuration = CommandConfiguration(commandName: "snippet", abstract: "Transpile a snippet of Swift to Kotlin", shouldDisplay: false)
 
     @OptionGroup(title: "Snippet Options")
-    var snippetOptions: SnippetPhaseOptions
+    var snippetOptions: SnippetOptions
 
     @OptionGroup(title: "Output Options")
     var outputOptions: OutputOptions
@@ -37,21 +37,21 @@ struct SnippetCommand: SnippetPhase, StreamingCommand {
         }
     }
 
-    func performCommand(with out: Messenger) async throws {
+    func performCommand(with out: MessageQueue) async throws {
         let totalSize = try files.compactMap({ try URL(fileURLWithPath: $0).resourceValues(forKeys: [.fileSizeKey]).fileSize }).reduce(0, +)
 
         // snippets are hardwired to not exceed the default codebase threshold size
         if let codebaseThresholdSize = Self.codebaseThresholdSize, totalSize > codebaseThresholdSize {
-            out.yield(Output(kotlin: nil, messages: [Message(kind: .error, message: "Snippet too large \(byteCount(for: .init(totalSize)))")], duration: 0))
-            out.finish()
+            await out.yield(Output(kotlin: nil, messages: [Message(kind: .error, message: "Snippet too large \(byteCount(for: .init(totalSize)))")], duration: 0))
+            await out.finish()
             return
         }
 
         let sourceFiles = files.map(Source.FilePath.init(path:))
-        try await self.transpile(fs: localFileSystem, sourceFiles: sourceFiles, with: out)
+        try await self.transpileSnippet(fs: localFileSystem, sourceFiles: sourceFiles, with: out)
     }
 
-    private func transpile(fs: FileSystem, sourceFiles: Array<Source.FilePath>, with out: Messenger) async throws {
+    private func transpileSnippet(fs: FileSystem, sourceFiles: Array<Source.FilePath>, with out: MessageQueue) async throws {
 
         let codebaseInfo = CodebaseInfo()
 
@@ -68,9 +68,9 @@ struct SnippetCommand: SnippetPhase, StreamingCommand {
             // note that transpilation messages are included as part of the output itself, rather than being logged as a message
             let msgs = transpilation.messages
             let output = Output(kotlin: transpilation.output.content, messages: msgs, duration: transpilation.duration)
-            out.yield(output)
+            await out.yield(output)
         }
-        out.finish()
+        await out.finish()
     }
 }
 

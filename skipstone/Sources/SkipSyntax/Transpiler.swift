@@ -20,7 +20,7 @@ public struct Transpiler {
     }
 
     /// Perform transpilation, feeding results to the given handler.
-    public func transpile(handler: (Transpilation) throws -> Void) async throws {
+    public func transpile(handler: (Transpilation) async throws -> Void) async throws {
         guard !sourceFiles.isEmpty else {
             return
         }
@@ -55,12 +55,12 @@ public struct Transpiler {
                 }
             }
             for try await transpilation in group {
-                try handler(transpilation)
+                try await handler(transpilation)
             }
         }
         // Finally create an additional source file for any package-level code
         if let packageSupportTranspilation = KotlinTranslator.transpilePackageSupport(sourceFile: sourceFiles[0].kotlinPackageSupport, codebaseInfo: codebaseInfo, transformers: transformers) {
-            try handler(packageSupportTranspilation)
+            try await handler(packageSupportTranspilation)
         }
     }
 }

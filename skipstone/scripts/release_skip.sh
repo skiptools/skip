@@ -145,7 +145,7 @@ sed -I '' 's;.binaryTarget(name: "'${ARTIFACT}'", url:.*);.binaryTarget(name: "'
 
 git add Package.swift ${README_PATH} ${SKIPDRIVE_VERSION_PATH}
 git add .
-git commit -m "Release ${SKIP_VERSION}"
+git commit --allow-empty --allow-empty-message -m "Release ${SKIP_VERSION}"
 git tag --sign "${SKIP_VERSION}" -m "Release ${SKIP_VERSION}"
 git push --follow-tags
 
@@ -189,7 +189,7 @@ curl --location --fail --retry 10 --retry-all-errors --retry-max-time 120 -o /de
 cd ${SKIPSTONEDIR}
 
 git add "${SKIPSTONE_VERSION_PATH}"
-git commit -m "Release ${SKIP_VERSION}"
+git commit --allow-empty --allow-empty-message -m "Release ${SKIP_VERSION}"
 git tag --sign "${SKIP_VERSION}" -m "Release ${SKIP_VERSION}"
 git push --follow-tags
 

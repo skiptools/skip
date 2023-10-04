@@ -4,6 +4,7 @@ import Universal
 import TSCBasic
 import SkipSyntax
 
+/// A command type that contains a `outputOptions: OutputOptions` accessor.
 public protocol OutputOptionsCommand : ParsableArguments {
     /// This command's output options
     var outputOptions: OutputOptions { get }
@@ -186,7 +187,7 @@ extension OutputOptions {
     
     /// Executes a process with the given arguments and prefix message, waits for the result while showing a progress animation,
     /// and then processes the result and outputs the given message block.
-    @discardableResult func run(with messenger: Messenger, _ message: String, _ args: [String], environment: [String: String] = ProcessInfo.processInfo.environment, watch: Bool = true, resultHandler: @escaping MessageResultHandler<ProcessOutput> = { ($0, nil) }) async -> Result<ProcessOutput, Error> {
+    @discardableResult func run(with messenger: MessageQueue, _ message: String, _ args: [String], environment: [String: String] = ProcessInfo.processInfo.environment, watch: Bool = true, resultHandler: @escaping MessageResultHandler<ProcessOutput> = { ($0, nil) }) async -> Result<ProcessOutput, Error> {
         await monitor(with: messenger, message, watch: watch, resultHandler: resultHandler) { outputHandler in
             //let result = try await Process.popen(arguments: args, environment: environment, loggingHandler: outputHandler)
             var outBufferComplete: [UInt8] = []
@@ -268,7 +269,7 @@ extension OutputOptions {
     /// Perform an operation with a given message handler, which will be invoked in the progress cycle with a nil result, and then a final time with the result of the block invocation
     ///
     /// If we are using a rich terminal (and not specifying plain or JSON output), outputs a progress animation while waiting for the given process to complete
-    @discardableResult func monitor<T>(with messenger: Messenger, _ message: String, watch: Bool = false, resultHandler: MessageResultHandler<T>?, block monitorAction: @escaping (_ outputHandler: @escaping (String) -> ()) async throws -> T) async -> Result<T, Error> {
+    @discardableResult func monitor<T>(with messenger: MessageQueue, _ message: String, watch: Bool = false, resultHandler: MessageResultHandler<T>?, block monitorAction: @escaping (_ outputHandler: @escaping (String) -> ()) async throws -> T) async -> Result<T, Error> {
         self.streams.currentOutputLine(reset: true) // reset the output line buffer
 
         let terminalWidth = TerminalController.terminalWidth()
@@ -278,7 +279,7 @@ extension OutputOptions {
 
         /// The default implementation of the message handler cycles through the default progress animation and then outputs the result
         let messageHandler: ((Result<T, Error>?) -> String) = { result in
-            let prefix = monitorPrefix(progress, for: result?.messageStatus, startTime: startTime)
+            let prefix = monitorPrefix(progress, for: result?.messageStatusAny, startTime: startTime)
             if let result = result, let msg = resultHandler?(result) {
                 return msg.message.message(term: term) ?? ((prefix ?? "") + message)
             } else {
@@ -360,7 +361,7 @@ extension OutputOptions {
         } else {
             // send the final message to the block
             if let msg = resultHandler?(result) {
-                messenger.yield(msg.message)
+                await messenger.yield(msg.message)
                 //messenger.yield(MessageBlock(status: .pass, message))
             }
         }
@@ -390,8 +391,18 @@ extension OutputOptions {
     }
 }
 
+extension Result where Success == MessageEncodable {
+    /// The `MessageBlock.Status` of a `Result` is underlying status, or `.fail` for an error
+    var messageStatus: MessageBlock.Status? {
+        switch self {
+        case .success(let x): return x.status
+        case .failure: return .fail
+        }
+    }
+}
+
 extension Result {
-    var messageStatus: MessageBlock.Status {
+    var messageStatusAny: MessageBlock.Status {
         switch self {
         case .success: return .pass
         case .failure: return .fail

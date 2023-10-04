@@ -12,11 +12,11 @@ struct HostIDCommand: MessageCommand {
     @OptionGroup(title: "Output Options")
     var outputOptions: OutputOptions
 
-    func performCommand(with out: Messenger) async throws {
+    func performCommand(with out: MessageQueue) async throws {
         guard let hostid = ProcessInfo.processInfo.hostIdentifier else {
             throw HostIDError(errorDescription: "Could not access Host ID")
         }
-        out.write(status: nil, hostid)
+        await out.write(status: nil, hostid)
     }
 
     public struct HostIDError : LocalizedError {

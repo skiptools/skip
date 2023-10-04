@@ -20,22 +20,39 @@ struct DoctorCommand: SkipCommand, StreamingCommand {
     @OptionGroup(title: "Tool Options")
     var toolOptions: ToolOptions
 
-    func performCommand(with out: Messenger) async throws {
-        out.yield(MessageBlock(status: nil, "Skip Doctor"))
+    func performCommand(with out: MessageQueue) async throws {
+        await out.yield(MessageBlock(status: nil, "Skip Doctor"))
 
         try await runDoctor(tool: toolOptions, with: out)
         let latestVersion = try await checkSkipUpdates(with: out)
+
+        let messages = await out.elements
+
+        //let total = messages.count
+        let warnings = messages.filter({ $0.messageStatus == .warn }).count
+        let errors = messages.filter({ $0.messageStatus == .fail }).count
+
         if let latestVersion = latestVersion, latestVersion != skipVersion {
-            out.yield(MessageBlock(status: .warn, "A new version is Skip (\(latestVersion)) is available to update with: skip upgrade"))
-        } else {
-            out.yield(MessageBlock(status: .pass, "Skip (\(skipVersion)) checks complete"))
+            await out.yield(MessageBlock(status: .warn, "A new version is Skip (\(latestVersion)) is available to update with: skip upgrade"))
         }
+
+        var msg = "Skip (\(skipVersion)) checks complete"
+        if warnings > 0 || errors > 0 {
+            if errors > 0 {
+                msg += " with \(errors) errors\(warnings == 1 ? "" : "s")"
+            }
+            if warnings > 0 {
+                msg += " \(errors > 0 ? "and" : "with") \(warnings) warning\(warnings == 1 ? "" : "s")"
+            }
+        }
+
+        await out.yield(MessageBlock(status: errors > 0 ? .fail : warnings > 0 ? .warn : .pass, msg))
     }
 }
 
 extension SkipCommand where Self : StreamingCommand {
     /// Runs the `skip doctor` command and stream the results to the messenger
-    func runDoctor(tool toolOptions: ToolOptions, with out: Messenger) async throws {
+    func runDoctor(tool toolOptions: ToolOptions, with out: MessageQueue) async throws {
 
         /// Invokes the given command and attempts to parse the output against the given regular expression pattern to validate that it is a semantic version string
         func checkVersion(title: String, cmd: [String], min: Version? = nil, pattern: String, watch: Bool = false) async {

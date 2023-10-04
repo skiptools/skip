@@ -33,21 +33,20 @@ struct LibInitCommand: MessageCommand, CreateOptionsCommand, ToolOptionsCommand,
     @Argument(help: ArgumentHelp("The module name(s) to create"))
     var moduleNames: [String]
 
-    func performCommand(with out: Messenger) async throws {
-        out.yield(MessageBlock(status: nil, "Initializing Skip library \(projectName)"))
+    func performCommand(with out: MessageQueue) async throws {
+        await out.yield(MessageBlock(status: nil, "Initializing Skip library \(projectName)"))
 
         let dir = self.createOptions.dir ?? "."
 
-        try await performLibInitCommand(projectName: projectName, moduleNames: moduleNames, dir: dir, configuration: createOptions.configuration, build: buildOptions.build, test: buildOptions.test, with: out)
+        try await initSkipLibrary(projectName: projectName, moduleNames: moduleNames, dir: dir, configuration: createOptions.configuration, build: buildOptions.build, test: buildOptions.test, with: out)
 
-        //showFileTree(in: outputFolder, with: out)
-        out.yield(MessageBlock(status: .pass, "Created module \(moduleNames.joined(separator: ", ")) in \(dir)"))
-
+        await showFileTree(in: dir, with: out)
+        await out.yield(MessageBlock(status: .pass, "Created module \(moduleNames.joined(separator: ", ")) in \(dir)"))
     }
 }
 
-extension MessageCommand where Self : ToolOptionsCommand {
-    func performLibInitCommand(projectName: String, moduleNames: [String], dir outputFolder: String, configuration: String, build: Bool, test: Bool, with out: Messenger) async throws {
+extension ToolOptionsCommand where Self : OutputOptionsCommand {
+    func initSkipLibrary(projectName: String, moduleNames: [String], dir outputFolder: String, configuration: String, build: Bool, test: Bool, with out: MessageQueue) async throws {
         var isDir: Foundation.ObjCBool = false
         if !FileManager.default.fileExists(atPath: outputFolder, isDirectory: &isDir) {
             throw InitError(errorDescription: "Specified output folder does not exist: \(outputFolder)")
@@ -215,21 +214,22 @@ extension MessageCommand where Self : ToolOptionsCommand {
 
         """.write(to: readmeURL, atomically: true, encoding: .utf8)
 
-//        let packageJSONString = try await outputOptions.exec("Checking project \(projectName)", [toolOptions.swift, "package", "dump-package", "--package-path", projectFolderURL.path], resultHandler: { result in
-//            guard let stdout = try result?.get().out else { return nil }
-//            return try JSONDecoder().decode(PackageManifest.self, from: Data(stdout.utf8))
-//        })
+        //        let packageJSONString = try await outputOptions.exec("Checking project \(projectName)", [toolOptions.swift, "package", "dump-package", "--package-path", projectFolderURL.path], resultHandler: { result in
+        //            guard let stdout = try result?.get().out else { return nil }
+        //            return try JSONDecoder().decode(PackageManifest.self, from: Data(stdout.utf8))
+        //        })
 
         let packageJSONString = try await outputOptions.run(with: out, "Checking project \(projectName)", [toolOptions.swift, "package", "dump-package", "--package-path", projectFolderURL.path]).get().stdout
 
         let packageJSON = try JSONDecoder().decode(PackageManifest.self, from: Data(packageJSONString.utf8))
+        _ = packageJSON
 
         if build == true {
             await outputOptions.run(with: out, "Building \(projectName)", [toolOptions.swift, "build", "-v", "-c", configuration, "--package-path", projectFolderURL.path])
         }
 
         if test == true {
-            await outputOptions.run(with: out, "Testing \(projectName)", [toolOptions.swift, "test", "-v", "-c", configuration, "--package-path", projectFolderURL.path])
+            await runSkipTests(in: projectFolderURL, configuration: configuration, swift: true, kotlin: true, with: out)
         }
     }
 }

@@ -15,7 +15,7 @@ struct CheckupCommand: MessageCommand, ToolOptionsCommand  {
     @OptionGroup(title: "Tool Options")
     var toolOptions: ToolOptions
 
-    func performCommand(with out: Messenger) async throws {
+    func performCommand(with out: MessageQueue) async throws {
         try await runDoctor(tool: toolOptions, with: out)
 
         let tmpdir = NSTemporaryDirectory() + "/" + UUID().uuidString
@@ -30,9 +30,9 @@ struct CheckupCommand: MessageCommand, ToolOptionsCommand  {
 //            try await outputOptions.run(with: out, "Pre-Caching Gradle Dependencies (~1G)", checkup())
 //        }
 
-        try await performLibInitCommand(projectName: "lib-name", moduleNames: ["ModuleNameA", "ModuleNameB"], dir: tmpdir, configuration: "debug", build: true, test: true, with: out)
+        try await initSkipLibrary(projectName: "lib-name", moduleNames: ["ModuleNameA", "ModuleNameB"], dir: tmpdir, configuration: "debug", build: true, test: true, with: out)
 
-        out.write(status: .pass, "Skip \(skipVersion) self-test passed!")
+        await out.write(status: .pass, "Skip \(skipVersion) self-test passed!")
     }
 }
 

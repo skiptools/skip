@@ -18,7 +18,7 @@ struct UpgradeCommand: MessageCommand {
     @OptionGroup(title: "Output Options")
     var outputOptions: OutputOptions
 
-    func performCommand(with out: Messenger) async throws {
+    func performCommand(with out: MessageQueue) async throws {
         //if try await checkSkipUpdates() == skipVersion {
         //    outputOptions.write("Skip \(skipVersion) is up to date.")
         //    return
@@ -33,7 +33,7 @@ struct UpgradeCommand: MessageCommand {
 
 extension SkipCommand {
     /// Checks the https://source.skip.tools/skip/releases.atom page and returns the semantic version contained in the title of the first entry (i.e., the latest release of Skip)
-    func checkSkipUpdates(with out: Messenger) async throws -> String? {
+    func checkSkipUpdates(with out: MessageQueue) async throws -> String? {
         let msg = "Check Skip Updates"
         let latestVersion: String? = try await outputOptions.monitor(with: out, msg, resultHandler: { result in
             (result, nil)
@@ -42,10 +42,10 @@ extension SkipCommand {
         }.get()
 
         if let version = try? latestVersion?.extract(pattern: "([0-9.]+)") {
-            out.yield(MessageBlock(status: .pass, "\(msg): \(version)"))
+            await out.yield(MessageBlock(status: .pass, "\(msg): \(version)"))
             return version
         } else {
-            out.yield(MessageBlock(status: .fail, "\(msg): unknown version: \(latestVersion ?? "")"))
+            await out.yield(MessageBlock(status: .fail, "\(msg): unknown version: \(latestVersion ?? "")"))
             return nil
         }
     }

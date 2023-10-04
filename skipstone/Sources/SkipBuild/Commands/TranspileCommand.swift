@@ -4,7 +4,7 @@ import Universal
 import SkipSyntax
 import TSCBasic
 
-protocol TranspilePhase: CheckPhase {
+protocol TranspilePhase: TranspilerInputOptionsCommand {
     var transpileOptions: TranspilePhaseOptions { get }
 }
 
@@ -19,7 +19,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
     static var configuration = CommandConfiguration(commandName: "transpile", abstract: "Transpile Swift to Kotlin", shouldDisplay: false)
 
     @OptionGroup(title: "Check Options")
-    var checkOptions: CheckPhaseOptions
+    var inputOptions: TranspilerInputOptions
 
     @OptionGroup(title: "Transpile Options")
     var transpileOptions: TranspilePhaseOptions
@@ -59,8 +59,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
         })
     }
 
-    func performCommand(with out: Messenger) async throws {
-        let sourceFiles = try checkOptions.files.map(AbsolutePath.init(validating:))
+    func performCommand(with out: MessageQueue) async throws {
         #if DEBUG
         let v = skipVersion + "*" // * indicates debug version
         #else
@@ -72,15 +71,17 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
             return
         }
 
+        let sourceFiles = try inputOptions.files.map(AbsolutePath.init(validating:))
+
         // show the local time in the transpile output; this helps identify from the Xcode Navigator when an old log file is being replayed for a plugin re-execution
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "HH:mm:ss"
 
-        info("Skip \(v): transpile plugin at \(dateFormatter.string(from: .now)) to: \(transpileOptions.outputFolder ?? "nowhere") for: \(sourceFiles.map(\.basename))")
+        info("Skip \(v): transpile plugin to: \(transpileOptions.outputFolder ?? "nowhere") for: \(sourceFiles.map(\.basename)) at \(dateFormatter.string(from: .now))")
         try await self.transpile(fs: localFileSystem, sourceFiles: Set(sourceFiles), with: out)
     }
 
-    private func transpile(fs: FileSystem, sourceFiles sourceFileSet: Set<AbsolutePath>, with out: Messenger) async throws {
+    private func transpile(fs: FileSystem, sourceFiles sourceFileSet: Set<AbsolutePath>, with out: MessageQueue) async throws {
         // the path that will contain the `skip.yml`
         guard let skipFolder = transpileOptions.skipFolder else {
             throw error("Must specify --skip-folder")
@@ -261,7 +262,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
         // validate licenses in all the Skip source files, as well as any custom Kotlin files in the Skip folder
         try await validateLicense(sourceURLs: sourceURLs + skipFolderPathContents.map(\.asURL).filter({ $0.pathExtension == "kt" }))
 
-        let transpiler = Transpiler(packageName: packageName, sourceFiles: sourceURLs.map(\.path).sorted().map(Source.FilePath.init(path:)), codebaseInfo: codebaseInfo, preprocessorSymbols: Set(checkOptions.symbols), transformers: transformers)
+        let transpiler = Transpiler(packageName: packageName, sourceFiles: sourceURLs.map(\.path).sorted().map(Source.FilePath.init(path:)), codebaseInfo: codebaseInfo, preprocessorSymbols: Set(inputOptions.symbols), transformers: transformers)
 
         try await transpiler.transpile(handler: handleTranspilation)
         try saveCodebaseInfo() // save out the ModuleName.skipcode.json
@@ -600,9 +601,9 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
             return copiedFiles
         }
 
-        func handleTranspilation(transpilation: Transpilation) throws {
+        func handleTranspilation(transpilation: Transpilation) async throws {
             for message in transpilation.messages {
-                out.yield(message)
+                await out.yield(message)
             }
 
             trace(transpilation.output.content)
@@ -624,13 +625,13 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
                 //writeMessage(message)
                 if message.kind == .error {
                     // throw the first error we see
-                    out.finish(throwing: message)
+                    await out.finish(throwing: message)
                     return
                 }
             }
 
             let output = Output(transpilation: transpilation)
-            out.yield(output)
+            await out.yield(output)
 
             func saveTranspilation() throws -> (output: AbsolutePath, changed: Bool, overridden: Bool) {
                 // the build plug-in's output folder base will be something like ~/Library/Developer/Xcode/DerivedData/Mod-ID/SourcePackages/plugins/module-name.output/ModuleNameKotlin/skipstone/ModuleName/src/test/kotlin

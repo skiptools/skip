@@ -14,11 +14,8 @@ struct Options {
     var preprocessorSymbols: [String] = []
 }
 
-protocol SkipPhase : AsyncParsableCommand, OutputOptionsCommand {
-}
-
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-protocol SkipCommand : SkipPhase {
+protocol SkipCommand : AsyncParsableCommand, OutputOptionsCommand {
     var outputOptions: OutputOptions { get set }
 }
 
@@ -116,7 +113,6 @@ public struct SkipKeyExecutor: SkipCommandExecutor {
         var expiration: Date
         var key: String
 
-        
         func message(term: Term) -> String? {
             """
             id: \(id)
@@ -248,7 +244,7 @@ extension FileManager {
 
 // MARK: Command Phases
 
-extension SkipPhase {
+extension SkipCommand {
     /// The total size of all input source files, below which we will not enforce either license key or valid header comments
     /// this is meant to be large enough to accomodate simple demos and experiments without requiring any license
     static var codebaseThresholdSize: Int? { nil }
@@ -264,13 +260,19 @@ enum PhaseGuard : String, Decodable, CaseIterable {
 extension PhaseGuard : ExpressibleByArgument {
 }
 
-// MARK: CheckPhase
+// MARK: TranspilerInputOptionsCommand
 
-protocol CheckPhase : SkipPhase {
-    var checkOptions: CheckPhaseOptions { get }
+protocol TranspilerInputOptionsCommand : SkipCommand {
+    var inputOptions: TranspilerInputOptions { get }
 }
 
-struct CheckPhaseOptions: ParsableArguments {
+extension TranspilerInputOptionsCommand {
+    func performSkippyCommands() async throws -> CheckResult {
+        return CheckResult()
+    }
+}
+
+struct TranspilerInputOptions: ParsableArguments {
     @Option(help: ArgumentHelp("Condition for check phase", valueName: "force/no"))
     var check: PhaseGuard = .onDemand
 
@@ -284,23 +286,17 @@ struct CheckPhaseOptions: ParsableArguments {
     var files: [String] = []
 }
 
-extension CheckPhase {
-    func performSkippyCommands() async throws -> CheckResult {
-        return CheckResult()
-    }
-}
-
 struct CheckResult {
 
 }
 
-// MARK: SnippetPhase
+// MARK: SnippetOptions
 
-protocol SnippetPhase: SkipPhase {
-    var snippetOptions: SnippetPhaseOptions { get }
+protocol SnippetOptionsCommand: SkipCommand {
+    var snippetOptions: SnippetOptions { get }
 }
 
-struct SnippetPhaseOptions: ParsableArguments {
+struct SnippetOptions: ParsableArguments {
     @Option(help: ArgumentHelp("Condition for snippet phase", valueName: "force/no"))
     var snippet: PhaseGuard = .onDemand // --snippet
 }
@@ -379,17 +375,22 @@ func byteCount(for size: Int) -> String {
 // MARK: Streaming command support
 
 
-extension MessageConvertible {
-    //var attributedString: String { description }
-}
-
-extension Never: MessageConvertible {
-    public func message(term: Term) -> String? {
-        nil
-    }
-}
-
 extension Message: MessageConvertible {
+    /// A transpiler mesage converts warnings and errors to warn/fail
+    public var status: MessageBlock.Status? {
+        switch kind {
+        case .trace:
+            return .none
+        case .note:
+            return .none
+        case .warning:
+            return .warn
+        case .error:
+            return .fail
+        }
+
+    }
+
     public func message(term: Term) -> String? {
         // TODO: use terminal colors to highlight transpile errors in console environments
         self.formattedMessage
@@ -399,25 +400,50 @@ extension Message: MessageConvertible {
 /// A stream of output messages that can be issued by a command; they can be encodables for JSON output or message handles for rich terminal output
 public typealias MessageStream = AsyncThrowingStream<MessageEncodable, Error>
 
-/// The callback for yielding or failings a message stream
-public typealias Messenger = MessageStream.Continuation
+/// A message handler for the results of commands. The messenger remembers the output of previous commands, and can also forward messages to various formatters, such as JSON or colored console output.
+actor MessageQueue {
+    let retain: Bool
+    let continuation: MessageStream.Continuation
+    var elements: [Result<MessageStream.Element, Error>] = []
 
-extension Messenger {
+    init(retain: Bool, continuation: MessageStream.Continuation) {
+        self.retain = retain
+        self.continuation = continuation
+    }
+
+    @discardableResult public func yield(_ value: MessageStream.Element) -> AsyncThrowingStream<MessageStream.Element, Error>.Continuation.YieldResult {
+        if retain {
+            elements.append(.success(value))
+        }
+        return continuation.yield(value)
+    }
+
+    public func yield(with result: Result<MessageEncodable, Error>) {
+        if retain {
+            elements.append(result)
+        }
+        continuation.yield(with: result)
+    }
+
+    public func finish(throwing error: Error? = nil) async {
+        continuation.finish(throwing: error)
+    }
+
     /// Writes the given message to the continuation
-    func write(status: MessageBlock.Status?, _ message: String) {
+    public func write(status: MessageBlock.Status?, _ message: String) {
         self.yield(MessageBlock(status: status, message))
     }
 }
 
 /// A command that contains options for how messages will be conveyed to the user
-public protocol StreamingCommand: AsyncParsableCommand {
+protocol StreamingCommand: AsyncParsableCommand {
     /// The structured output of this tool
     var outputOptions: OutputOptions { get set }
 
     //associatedtype Output : MessageConvertible
     //typealias OutputMessage = Either<Output>.Or<Message>
 
-    func performCommand(with out: Messenger) async throws
+    func performCommand(with out: MessageQueue) async throws
 }
 
 extension StreamingCommand {
@@ -451,17 +477,19 @@ extension StreamingCommand {
 
             }
             // defer { self.output.streams.yield = { _ in } } // clears output
-            doCommand(with: continuation)
+            let messenger = MessageQueue(retain: true, continuation: continuation)
+            doCommand(with: messenger)
+            //doCommand(with: continuation)
         }
     }
 
-    func doCommand(with out: Messenger) {
-        Task {
+    func doCommand(with out: MessageQueue) {
+        Task.detached {
             do {
                 try await performCommand(with: out)
-                out.finish()
+                await out.finish()
             } catch {
-                out.finish(throwing: error)
+                await out.finish(throwing: error)
             }
         }
     }
@@ -481,17 +509,16 @@ protocol MessageCommand : SkipCommand, StreamingCommand, OutputOptionsCommand {
     // func performCommand(with out: Messenger) async throws
 }
 
-public protocol SingleStreamingCommand : StreamingCommand {
+protocol SingleStreamingCommand : StreamingCommand {
     associatedtype Output : MessageEncodable
     func executeCommand() async throws -> Output
 }
 
 extension SingleStreamingCommand {
-    public func performCommand(with out: Messenger) async throws {
+    func performCommand(with out: MessageQueue) async throws {
         yield(output: try await executeCommand())
     }
 }
-
 
 /// Terminal output information, such as how to output messages in various ANSI colors.
 public struct Term {
@@ -551,6 +578,8 @@ public struct Term {
 public protocol MessageConvertible {
     /// Returns the message for the output with optional ANSI coloring
     func message(term: Term) -> String?
+
+    var status: MessageBlock.Status? { get }
 }
 
 /// Any message that can be output either as a terminal message or a JSON encoded string
@@ -561,6 +590,19 @@ typealias MessageResultHandler<T> = (Result<T, Error>?) -> (result: Result<T, Er
 
 /// A message that is encoded by its string value
 public protocol StringMessageEncodable : MessageConvertible, Encodable {
+}
+
+extension MessageConvertible {
+    //var attributedString: String { description }
+
+    /// The default status is nil
+    public var status: MessageBlock.Status? { nil }
+}
+
+extension Never: MessageConvertible {
+    public func message(term: Term) -> String? {
+        nil
+    }
 }
 
 extension StringMessageEncodable {
@@ -577,6 +619,10 @@ extension StringMessageEncodable {
 }
 
 extension Optional : MessageConvertible where Wrapped : MessageConvertible {
+    public var status: MessageBlock.Status? {
+        flatMap(\.status)
+    }
+
     /// An option return value will just return nil for an empty wrapped value
     public func message(term: Term) -> String? {
         flatMap({ $0.message(term: term) })
@@ -643,7 +689,7 @@ public struct MessageBlock : StringMessageEncodable {
 }
 
 
-public extension StreamingCommand {
+extension StreamingCommand {
     /// Sends the output message the the handler, which will handle formatting it for various outputs like a terminal or JSON
     func yield(output: MessageEncodable) {
         outputOptions.streams.yield(.init(output))

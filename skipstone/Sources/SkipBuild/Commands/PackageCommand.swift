@@ -98,12 +98,12 @@ struct CreateOptions : ParsableArguments {
 
 extension OutputOptionsCommand {
     /// Output an ASCII tree representation of the file system as a result of the command
-    func showFileTree(in dir: String, with out: Messenger) {
+    func showFileTree(in dir: String, with out: MessageQueue) async {
         do {
             let tree = try localFileSystem.treeASCIIRepresentation(at: AbsolutePath(validating: dir))
-            out.write(status: nil, tree)
+            await out.write(status: nil, tree)
         } catch {
-            out.yield(MessageBlock(error: error))
+            await out.yield(MessageBlock(error: error))
         }
     }
 }

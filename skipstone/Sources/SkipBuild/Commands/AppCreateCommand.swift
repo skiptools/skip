@@ -29,10 +29,10 @@ struct AppCreateCommand: MessageCommand {
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Open the new project in Xcode"))
     var open: Bool = false
 
-    func performCommand(with out: Messenger) async throws {
+    func performCommand(with out: MessageQueue) async throws {
         let pname = projectName.split(separator: "/").last?.description ?? projectName
 
-        out.write(status: nil, "Creating project \(pname) from template \(createOptions.template)")
+        await out.write(status: nil, "Creating project \(pname) from template \(createOptions.template)")
 
         let outputFolder = createOptions.dir ?? "."
         var isDir: Foundation.ObjCBool = false
@@ -80,14 +80,14 @@ struct AppCreateCommand: MessageCommand {
 
         let projectPath = projectFolderURL.path + "/" + "App.xcodeproj"
         if !FileManager.default.isReadableFile(atPath: projectPath) {
-            out.write(status: .warn, "Warning: path did not exist at: \(projectPath)")
+            await out.write(status: .warn, "Warning: path did not exist at: \(projectPath)")
         }
 
         if open == true {
             await outputOptions.run(with: out, "Launching project \(projectPath)", ["open", projectPath])
         }
 
-        out.write(status: .pass, "Created project: \(projectPath)")
+        await out.write(status: .pass, "Created project: \(projectPath)")
     }
 
     public struct CreateError : LocalizedError {

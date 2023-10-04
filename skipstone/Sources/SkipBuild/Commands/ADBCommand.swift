@@ -25,7 +25,7 @@ struct ADBCommand: MessageCommand {
     @Argument(parsing: .allUnrecognized, help: ArgumentHelp("The arguments to pass to the adb command"))
     var arguments: [String]
 
-    func performCommand(with out: Messenger) async throws {
+    func performCommand(with out: MessageQueue) async throws {
         // ADB itself doesn't ever exit with a non-zero exit code (https://issuetracker.google.com/issues/36908392?pli=1)
         // So we need to parse the output for known error patterns and translate them into Xcode-aware messages
         #if !canImport(SkipDriveExternal)
@@ -37,9 +37,9 @@ struct ADBCommand: MessageCommand {
         }
 
         for try await line in output {
-            out.write(status: nil, "ADB> \(line)")
+            await out.write(status: nil, "ADB> \(line)")
             if let formattedError = scanADBOutput(line: line) { // check for errors and report them to the IDE
-                out.write(status: nil, formattedError)
+                await out.write(status: nil, formattedError)
             }
         }
 

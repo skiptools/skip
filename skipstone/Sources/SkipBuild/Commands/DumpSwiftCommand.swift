@@ -17,13 +17,13 @@ struct DumpSwiftCommand: AsyncParsableCommand {
     var files: [String]
 
     func run() async throws {
-        var opts = CheckPhaseOptions()
+        var opts = TranspilerInputOptions()
         opts.directory = directory
         opts.symbols = symbols
         try await perform(on: files.map({ Source.FilePath(path: $0) }), options: opts)
     }
 
-    func perform(on sourceFiles: [Source.FilePath], options: CheckPhaseOptions) async throws {
+    func perform(on sourceFiles: [Source.FilePath], options: TranspilerInputOptions) async throws {
         for sourceFile in sourceFiles {
             let syntax = try Parser.parse(source: Source(file: sourceFile).content)
             print(syntax.root.prettyPrintTree)
