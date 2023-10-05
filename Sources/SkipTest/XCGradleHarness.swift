@@ -393,7 +393,7 @@ extension XCGradleHarness where Self : XCTestCase {
 
                     // extract the file path and report the failing file and line to Xcode via an issue
                     var msg = msg
-                    msg += failure.type
+                    msg += failure.type ?? ""
                     msg += ": "
                     msg += failureMessage
                     msg += ": "
@@ -403,8 +403,8 @@ extension XCGradleHarness where Self : XCTestCase {
                     let issueType: XCTIssueReference.IssueType
 
                     // check for common known assertion failure exception types
-                    if failure.type.hasPrefix("org.junit.")
-                        || failure.type.hasPrefix("org.opentest4j.") {
+                    if failure.type?.hasPrefix("org.junit.") == true
+                        || failure.type?.hasPrefix("org.opentest4j.") == true {
                         issueType = .assertionFailure
                     } else {
                         // we might rather mark it as a `thrownError`, but Xcode seems to only report a single thrownError, whereas it will report multiple `assertionFailure`
