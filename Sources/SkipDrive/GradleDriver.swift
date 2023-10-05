@@ -490,11 +490,11 @@ public struct GradleDriver {
         /// e.g.: "org.opentest4j.AssertionFailedError: THIS TEST CASE ALWAYS FAILS"
         public var message: String
         /// e.g.: "org.opentest4j.AssertionFailedError"
-        public var type: String
+        public var type: String?
         /// e.g.: "at app//org.junit.jupiter.api.AssertionUtils.fail(AssertionUtils.java:38)"…
         public var contents: String?
 
-        public init(message: String, type: String, contents: String?) {
+        public init(message: String, type: String?, contents: String?) {
             self.message = message
             self.type = type
             self.contents = contents
@@ -506,9 +506,7 @@ public struct GradleDriver {
                 throw GradleDriverError.missingProperty(url: url, propertyName: "message")
             }
 
-            guard let type = element.attribute(forName: "type")?.stringValue else {
-                throw GradleDriverError.missingProperty(url: url, propertyName: "type")
-            }
+            let type = element.attribute(forName: "type")?.stringValue
 
             let contents = element.stringValue
             
