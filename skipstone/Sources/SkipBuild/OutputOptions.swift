@@ -181,9 +181,18 @@ typealias ProcessOutput = (exitCode: Int, stdout: String, stderr: String)
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 extension ToolOptionsCommand {
     
+    static func timingResultHandler<T>(message: String, time: Date = .now) -> (_ result: Result<T, Error>?) -> (result: Result<T, Error>?, message: MessageBlock?) {
+        return { result in
+            (result, MessageBlock(status: result?.messageStatusAny, message + " (\(round(-time.timeIntervalSinceNow * 100.0) / 100.0)s)"))
+        }
+    }
+
     /// Executes a tool with the given arguments and prefix message, waits for the result while showing a progress animation,
     /// and then processes the result and outputs the given message block.
-    @discardableResult func run(with messenger: MessageQueue, _ message: String, _ commandArgs: [String], environment: [String: String] = ProcessInfo.processInfo.environment, handleFailure: Bool = true, watch: Bool = true, resultHandler: @escaping MessageResultHandler<ProcessOutput> = { ($0, nil) }) async -> Result<ProcessOutput, Error> {
+    @discardableResult func run(with messenger: MessageQueue, _ message: String, _ commandArgs: [String], environment: [String: String] = ProcessInfo.processInfo.environment, watch: Bool = true, resultHandler finalResultHandler: MessageResultHandler<ProcessOutput>? = nil) async -> Result<ProcessOutput, Error> {
+
+        // default to a result handler that outputs the duration of the operation
+        let resultHandler = finalResultHandler ?? Self.timingResultHandler(message: message)
 
         var cmd = commandArgs.first ?? ""
         do {
@@ -252,9 +261,6 @@ extension ToolOptionsCommand {
 #endif
             }
 
-            if handleFailure && code != 0 {
-                await messenger.yield(MessageBlock(status: .fail, message))
-            }
             // flush the final output buffers
             addBuffer(err: true)(nil)
             addBuffer(err: false)(nil)
@@ -321,13 +327,18 @@ extension OutputOptions {
                             var status = statusLine.trimmingCharacters(in: .whitespacesAndNewlines)
                             let msglen = stripANSIAttributes(from: msg).count // need to remove any ANSI characters in the prefix to match the terminal output width
 
-                            if let width = terminalWidth, width > 0, (status.count + msglen + 2) > width {
+                            if let width = terminalWidth, width > 0, msglen > width {
                                 let swidth = Int(floor(Double(width) - Double(msglen) - 2.0) / 2.0)
-                                // middle truncation for highlighted commands
-                                status = String(status.slice(0, swidth - 1) + "…" + status.slice(status.count - swidth))
+                                // command output itself too wide; middle-truncate it
+                                msg = String(msg.slice(0, swidth - 1) + "…" + status.slice(msglen - swidth))
+                            } else {
+                                if let width = terminalWidth, width > 0, (status.count + msglen + 2) > width {
+                                    let swidth = Int(floor(Double(width) - Double(msglen) - 2.0) / 2.0)
+                                    // middle truncation for highlighted commands
+                                    status = String(status.slice(0, swidth - 1) + "…" + status.slice(status.count - swidth))
+                                }
+                                msg += ": " + term.cyan(status)
                             }
-
-                            msg += ": " + term.cyan(status)
                         }
                         // the last message is the truncated message, so we can erase it
                         writeOutput(msg, terminator: "", flush: true)
@@ -339,11 +350,9 @@ extension OutputOptions {
                 while true {
                     let printed = printMessage()?.count ?? 0
                     defer {
-                        // clear the current line; we explicitly do not flush so the cursor doesn't jump around
-                        writeOutput(String(repeating: "\u{8}", count: printed), terminator: "", flush: false)
-
-                        // also clear the line ahead
-                        writeOutput("\u{001B}[2K", terminator: "", flush: false)
+                        // clear the current line, as well as the line ahead
+                        // this will happen one last time when we are cancelled with a CancellationError
+                        writeOutput(String(repeating: "\u{8}", count: printed) + "\u{001B}[2K", terminator: "", flush: false)
                     }
                     try await Task.sleep(for: .milliseconds(50))
                 }
@@ -373,13 +382,15 @@ extension OutputOptions {
             progressMonitor.cancel()
             _ = try? await progressMonitor.value // wait for compltion
             // send the final message to the output stream
-            writeOutput(messageHandler(result), terminator: "\n", flush: true) // output the final result message
+
+            //writeOutput(messageHandler(result), terminator: "\n", flush: true) // output the final result message
+        }
+
+        // send the final message to the block
+        if let msg = resultHandler?(result) {
+            await messenger.yield(msg.message)
         } else {
-            // send the final message to the block
-            if let msg = resultHandler?(result) {
-                await messenger.yield(msg.message)
-                //messenger.yield(MessageBlock(status: .pass, message))
-            }
+            await messenger.yield(MessageBlock(status: .pass, message))
         }
 
         return result

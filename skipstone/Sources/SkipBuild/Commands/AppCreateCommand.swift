@@ -49,8 +49,10 @@ struct AppCreateCommand: MessageCommand, ToolOptionsCommand {
         }
 
         let templateURL = try createOptions.projectTemplateURL
-        let downloadURL: URL = templateURL.isFileURL ? templateURL : try await outputOptions.monitor(with: out, "Downloading template \(templateURL.absoluteString)", resultHandler: { result in
-            (result, nil) // TODO: show positive message
+        let tmsg = "template \(templateURL.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().lastPathComponent)"
+        let downloadURL: URL = templateURL.isFileURL ? templateURL : try await outputOptions.monitor(with: out, "Downloading \(tmsg)", resultHandler: { result in
+            let fileSize = try? result?.get().resourceValues(forKeys: [.fileSizeKey]).fileSize
+            return (result, MessageBlock(status: result?.messageStatusAny, "Downloaded \(tmsg) \(ByteCountFormatter.string(fromByteCount: Int64(fileSize ?? 0), countStyle: .file))"))
         }) { loggingHandler in
             let (url, response) = try await URLSession.shared.download(from: templateURL)
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
@@ -68,17 +70,20 @@ struct AppCreateCommand: MessageCommand, ToolOptionsCommand {
         let packageJSONString = try await run(with: out, "Checking project \(pname)", ["swift", "package", "dump-package", "--package-path", projectFolderURL.path]).get().stdout
 
         let packageJSON = try JSONDecoder().decode(PackageManifest.self, from: Data(packageJSONString.utf8))
-        _ = packageJSON
-        
+        let appName = packageJSON.products.first?.name ?? "App"
+
+        await run(with: out, "Resolving \(pname)/\(appName)", ["swift", "package", "resolve", "--package-path", projectFolderURL.path])
+
         if buildOptions.build == true {
-            await run(with: out, "Building \(pname)", ["swift", "build", "-c", createOptions.configuration, "--package-path", projectFolderURL.path])
+            await run(with: out, "Building \(pname)/\(appName)", ["swift", "build", "-c", createOptions.configuration, "--package-path", projectFolderURL.path])
         }
 
         if buildOptions.test == true {
-            await run(with: out, "Testing \(pname)", ["swift", "test", "-j", "1", "-c", createOptions.configuration, "--package-path", projectFolderURL.path])
+            await run(with: out, "Testing \(pname)/\(appName)", ["swift", "test", "-j", "1", "-c", createOptions.configuration, "--package-path", projectFolderURL.path])
         }
 
-        let projectPath = projectFolderURL.path + "/" + "App.xcodeproj"
+        // TODO: make code project match project name
+        let projectPath = projectFolderURL.path + "/" + appName + ".xcodeproj"
         if !FileManager.default.isReadableFile(atPath: projectPath) {
             await out.write(status: .warn, "Warning: path did not exist at: \(projectPath)")
         }
