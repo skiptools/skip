@@ -94,6 +94,30 @@ extension ToolOptionsCommand {
         await checkVersion(title: "Gradle version", cmd: ["gradle", "-version"], min: Version("8.3.0"), pattern: "Gradle ([0-9.]+)")
         //await checkVersion(title: "Java version", cmd: ["java", "-version"], min: Version("17.0.0"), pattern: "version \"([0-9.]+)\"") // we don't necessarily need java in the path (which it doesn't seem to be by default with Homebrew)
         await checkVersion(title: "Android Debug Bridge version", cmd: ["adb", "version"], min: Version("1.0.40"), pattern: "version ([0-9.]+)")
-        await checkVersion(title: "Android Studio version", cmd: ["/usr/libexec/PlistBuddy", "-c", "Print CFBundleShortVersionString", "/Applications/Android Studio.app/Contents/Info.plist"], min: Version("2022.3.0"), pattern: "([0-9.]+)")
+
+        await checkAndroidStudioVersion(with: out)
     }
+
+    func checkAndroidStudioVersion(with out: MessageQueue) async {
+        #if os(macOS) // on macOS, check for Android Studio
+        //await checkVersion(title: "Android Studio version", cmd: ["/usr/libexec/PlistBuddy", "-c", "Print CFBundleShortVersionString", "/Applications/Android Studio.app/Contents/Info.plist"], min: Version("2022.3.0"), pattern: "([0-9.]+)")
+
+
+        // Manually try to parse the Android Studio version; tolerate failures
+        await outputOptions.monitor(with: out, "Android Studio version", resultHandler: { result in
+            let studioVersion = try? result?.get()
+            return (result, MessageBlock(status: studioVersion == nil ? .warn : .pass, studioVersion != nil 
+                                         ? "Android Studio version: \(studioVersion!)"
+                                         : "Android Studio not found: brew install android-studio"))
+        }, block: { _ in
+            try androidInfoPlist()?["CFBundleShortVersionString"] as? String
+        })
+        #endif
+    }
+
+    func androidInfoPlist() throws -> [String: Any]? {
+        let appsFolder = FileManager.default.urls(for: .applicationDirectory, in: .localDomainMask).first?.path ?? "/Applications"
+        return try PropertyListSerialization.propertyList(from: Data(contentsOf: URL(fileURLWithPath: "\(appsFolder)/Android Studio.app/Contents/Info.plist")), format: nil) as? [String: Any]
+    }
+
 }
