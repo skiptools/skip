@@ -72,14 +72,14 @@ struct AppCreateCommand: MessageCommand, ToolOptionsCommand {
         let packageJSON = try JSONDecoder().decode(PackageManifest.self, from: Data(packageJSONString.utf8))
         let appName = packageJSON.products.first?.name ?? "App"
 
-        await run(with: out, "Resolving \(pname)/\(appName)", ["swift", "package", "resolve", "--package-path", projectFolderURL.path])
+        await run(with: out, "Resolving \(pname)/\(appName)", ["swift", "package", "resolve", "--verbose", "--package-path", projectFolderURL.path])
 
         if buildOptions.build == true {
-            await run(with: out, "Building \(pname)/\(appName)", ["swift", "build", "-c", createOptions.configuration, "--package-path", projectFolderURL.path])
+            await run(with: out, "Building \(pname)/\(appName)", ["swift", "build", "--verbose", "-c", createOptions.configuration, "--package-path", projectFolderURL.path])
         }
 
         if buildOptions.test == true {
-            await run(with: out, "Testing \(pname)/\(appName)", ["swift", "test", "-j", "1", "-c", createOptions.configuration, "--package-path", projectFolderURL.path])
+            await run(with: out, "Testing \(pname)/\(appName)", ["swift", "test", "-j", "1", "--verbose", "-c", createOptions.configuration, "--package-path", projectFolderURL.path])
         }
 
         // TODO: make code project match project name

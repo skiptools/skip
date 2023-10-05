@@ -14,7 +14,6 @@ let skipcodeExtension = ".skipcode.json"
 /// The skip transpile marker that is always output regardless of whether the transpile was successful or not
 let skipbuildMarkerExtension = ".skipbuild"
 
-
 struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
     static var configuration = CommandConfiguration(commandName: "transpile", abstract: "Transpile Swift to Kotlin", shouldDisplay: false)
 
@@ -335,9 +334,12 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
 
                 /// The ordered input paths for source files, in order to identify when input file lists have changed even if none of the contents have
                 let sourceFiles: [String]?
+
+                /// The date of the build; used to ensure the file changes and the transpiler is re-run for input file changes
+                let buildDate: Date
             }
 
-            let marker = SkipMarkerContents(sourceFiles: sourceURLs.map(\.path))
+            let marker = SkipMarkerContents(sourceFiles: sourceURLs.map(\.path), buildDate: .now)
             let outputFilePath = moduleBasePath.appending(skipCompletionMarkerPath(forModule: primaryModuleName))
             try writeChanges(tag: "marker", to: outputFilePath, contents: try encoder.encode(marker), readOnly: false)
         }

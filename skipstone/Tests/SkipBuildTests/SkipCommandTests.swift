@@ -24,11 +24,15 @@ final class SkipCommandTests: XCTestCase {
         ├─ README.md
         ├─ Sources
         │  └─ SomeModule
+        │     ├─ Resources
+        │     │  └─ Localizable.xcstrings
         │     ├─ Skip
         │     │  └─ skip.yml
         │     └─ SomeModule.swift
         └─ Tests
            └─ SomeModuleTests
+              ├─ Resources
+              │  └─ TestData.json
               ├─ Skip
               │  └─ skip.yml
               ├─ SomeModuleTests.swift
@@ -37,7 +41,7 @@ final class SkipCommandTests: XCTestCase {
         """)
     }
 
-    func libInitComand(projectName: String, resourcePath: String? = nil, moduleNames: String...) async throws -> String? {
+    func libInitComand(projectName: String, resourcePath: String? = "Resources", moduleNames: String...) async throws -> String? {
         let tmpDir = URL(fileURLWithPath: UUID().uuidString, isDirectory: true, relativeTo: URL(fileURLWithPath: NSTemporaryDirectory() + "/testLibInitCommand/", isDirectory: true))
         try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
         var cmd = ["lib", "init", "-jA", "--no-build", "--no-test", "--tree"]

@@ -60,10 +60,13 @@ struct CreateOptions : ParsableArguments {
 //    var dependency: [String] = ["skip", "skip-foundation"]
 
     @Option(help: ArgumentHelp("Resource folder name"))
-    var resourcePath: String?
+    var resourcePath: String = "Resources"
+
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Create library dependencies between modules", valueName: "show"))
+    var chain: Bool = true
 
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Display a file system tree summary of the new files", valueName: "show"))
-    var tree: Bool = true
+    var tree: Bool = false
 
     var projectTemplateURL: URL {
         get throws {

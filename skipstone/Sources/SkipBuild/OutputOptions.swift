@@ -78,16 +78,19 @@ public struct OutputOptions: ParsableArguments {
         var err: WritableByteStream = stderrStream
         var file: LocalFileOutputByteStream? = nil
 
-        private var _currentOutput: (line: String?, lock: NSLock) = (nil, NSLock())
+        private var _currentOutput: (lines: [String], lock: NSLock) = ([], NSLock())
 
         /// Returns the current output line, optionally also setting it; guarded behind a lock
-        @discardableResult func currentOutputLine(set line: String? = nil, reset: Bool = false) -> String? {
+        @discardableResult func outputBuffer(add line: String? = nil, reset: Bool = false) -> [String] {
             _currentOutput.lock.lock()
             defer { _currentOutput.lock.unlock() }
-            if reset || line != nil { _currentOutput.line = line }
-            return _currentOutput.line
+            if reset {
+                _currentOutput.lines.removeAll(keepingCapacity: true)
+            } else if let line = line {
+                _currentOutput.lines.append(line)
+            }
+            return _currentOutput.lines
         }
-
 
         func fileStream(for outputPath: String?) -> LocalFileOutputByteStream? {
             guard let outputPath else { return nil }
@@ -176,7 +179,7 @@ public struct OutputOptions: ParsableArguments {
 }
 
 /// The result of a process, with a code, standard out, and standard error
-typealias ProcessOutput = (exitCode: Int, stdout: String, stderr: String)
+typealias ProcessOutput = (exitCode: Int32, stdout: String, stderr: String)
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 extension ToolOptionsCommand {
@@ -251,13 +254,13 @@ extension ToolOptionsCommand {
             try process.launch()
             let result = try await process.waitUntilExit()
 
-            let code: Int
+            let code: Int32
             switch result.exitStatus {
-            case .terminated(let c): code = Int(c)
+            case .terminated(let c): code = Int32(c)
 #if os(Windows)
-            case .abnormal(let c): code = Int(c)
+            case .abnormal(let c): code = Int32(c)
 #else
-            case .signalled(let c): code = Int(c)
+            case .signalled(let c): code = Int32(c)
 #endif
             }
 
@@ -265,9 +268,11 @@ extension ToolOptionsCommand {
             addBuffer(err: true)(nil)
             addBuffer(err: false)(nil)
 
-            //let (out, err) = try (result.utf8Output(), result.utf8stderrOutput())
-            //return (exitCode: code, stdout: out, stderr: err)
-            return (exitCode: code, stdout: String(bytes: outBufferComplete, encoding: .utf8) ?? "", stderr: String(bytes: errBufferComplete, encoding: .utf8) ?? "")
+            if code != 0 {
+                throw ExitCode(code)
+            }
+            let res = ProcessOutput(exitCode: code, stdout: String(bytes: outBufferComplete, encoding: .utf8) ?? "", stderr: String(bytes: errBufferComplete, encoding: .utf8) ?? "")
+            return res
         }
     }
 }
@@ -292,7 +297,7 @@ extension OutputOptions {
     ///
     /// If we are using a rich terminal (and not specifying plain or JSON output), outputs a progress animation while waiting for the given process to complete
     @discardableResult func monitor<T>(with messenger: MessageQueue, _ message: String, watch: Bool = false, resultHandler: MessageResultHandler<T>?, block monitorAction: @escaping (_ outputHandler: @escaping (String) -> ()) async throws -> T) async -> Result<T, Error> {
-        self.streams.currentOutputLine(reset: true) // reset the output line buffer
+        self.streams.outputBuffer(reset: true) // reset the output line buffer
 
         let terminalWidth = TerminalController.terminalWidth()
 
@@ -323,7 +328,7 @@ extension OutputOptions {
                         return nil
                     } else {
                         var msg = newMessage
-                        if watch == true, let statusLine = self.streams.currentOutputLine(), !statusLine.isEmpty {
+                        if watch == true, let statusLine = self.streams.outputBuffer().last, !statusLine.isEmpty {
                             var status = statusLine.trimmingCharacters(in: .whitespacesAndNewlines)
                             let msglen = stripANSIAttributes(from: msg).count // need to remove any ANSI characters in the prefix to match the terminal output width
 
@@ -364,7 +369,7 @@ extension OutputOptions {
             await {
                 do {
                     let result = try await monitorAction({ line in
-                        streams.currentOutputLine(set: line) // remember the current output line
+                        streams.outputBuffer(add: line) // remember the current output line
                     })
 
                     return .success(result)

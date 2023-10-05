@@ -313,13 +313,15 @@ extension TestCommand {
 
 extension ToolOptionsCommand where Self : OutputOptionsCommand {
 
-    func runSkipTests(in projectFolderURL: URL, configuration: String, swift: Bool, kotlin: Bool, with out: MessageQueue) async throws {
-        // run Swift and Kotlin tests separately
-        // await outputOptions.run(with: out, "Testing \(projectName)", [toolOptions.swift, "test", "-v", "-c", configuration, "--package-path", projectFolderURL.path])
+    func runSkipTests(in projectFolderURL: URL, configuration: String, swift: Bool, kotlin: Bool, separateModule: String? = "testSkipModule", with out: MessageQueue) async throws {
+        if let separateModule = separateModule {
+            await run(with: out, "Testing Swift", ["swift", "test", "--verbose", "--configuration", configuration, "--skip", separateModule, "--package-path", projectFolderURL.path])
 
-        await run(with: out, "Testing Swift", ["swift", "test", "--verbose", "--configuration", configuration, "--skip", "testSkipModule", "--package-path", projectFolderURL.path])
-
-        await run(with: out, "Testing Kotlin", ["swift", "test", "--verbose", "--configuration", configuration, "--filter", "testSkipModule", "--package-path", projectFolderURL.path])
+            await run(with: out, "Testing Kotlin", ["swift", "test", "--verbose", "--configuration", configuration, "--filter", "testSkipModule", "--package-path", projectFolderURL.path])
+        } else {
+            // run Swift and Kotlin tests at the same time
+             await run(with: out, "Testing Project", ["swift", "test", "--verbose", "--configuration", configuration, "--package-path", projectFolderURL.path])
+        }
     }
 }
 

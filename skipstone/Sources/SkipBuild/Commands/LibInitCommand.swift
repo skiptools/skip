@@ -36,14 +36,32 @@ struct LibInitCommand: MessageCommand, CreateOptionsCommand, ToolOptionsCommand,
 
         let dir = self.createOptions.dir ?? "."
 
-        let projectURL = try await initSkipLibrary(projectName: self.projectName, moduleNames: moduleNames, resourceFolder: createOptions.resourcePath, dir: dir, configuration: createOptions.configuration, build: buildOptions.build, test: buildOptions.test, with: out)
-        await showFileTree(in: try projectURL.absolutePath, with: out)
-        await out.yield(MessageBlock(status: .pass, "Created module \(moduleNames.joined(separator: ", ")) in \(dir)"))
+        let createdURL = try await buildSkipLibrary(projectName: self.projectName, moduleNames: moduleNames, resourceFolder: createOptions.resourcePath, dir: dir, configuration: createOptions.configuration, build: buildOptions.build, test: buildOptions.test, tree: self.createOptions.tree, chain: createOptions.chain, with: out)
+
+        await out.yield(MessageBlock(status: .pass, "Created module \(moduleNames.joined(separator: ", ")) in \(createdURL.path)"))
     }
 }
 
 extension ToolOptionsCommand {
-    func initSkipLibrary(projectName: String, moduleNames: [String], resourceFolder: String?, dir outputFolder: String, configuration: String, build: Bool, test: Bool, with out: MessageQueue) async throws -> URL {
+    func buildSkipLibrary(projectName: String, moduleNames: [String], resourceFolder: String?, dir outputFolder: String, configuration: String, build: Bool, test: Bool, tree: Bool, chain: Bool, with out: MessageQueue) async throws -> URL {
+        let projectURL = try await initSkipLibrary(projectName: projectName, moduleNames: moduleNames, resourceFolder: resourceFolder, dir: outputFolder, chain: chain, with: out)
+        if tree {
+            await showFileTree(in: try projectURL.absolutePath, with: out)
+        }
+
+        if build == true {
+            await run(with: out, "Resolving \(projectName)", ["swift", "package", "resolve", "-v", "--package-path", projectURL.path])
+            await run(with: out, "Building \(projectName)", ["swift", "build", "-v", "-c", configuration, "--package-path", projectURL.path])
+        }
+
+        if test == true {
+            try await runSkipTests(in: projectURL, configuration: configuration, swift: true, kotlin: true, with: out)
+        }
+
+        return projectURL
+    }
+
+    func initSkipLibrary(projectName: String, moduleNames: [String], resourceFolder: String?, dir outputFolder: String, chain: Bool, with out: MessageQueue) async throws -> URL {
         var isDir: Foundation.ObjCBool = false
         if !FileManager.default.fileExists(atPath: outputFolder, isDirectory: &isDir) {
             throw InitError(errorDescription: "Specified output folder does not exist: \(outputFolder)")
@@ -62,15 +80,12 @@ extension ToolOptionsCommand {
 
         let packageURL = projectFolderURL.appending(path: "Package.swift")
 
-        let sourcesURL = projectFolderURL.appending(path: "Sources")
-        try FileManager.default.createDirectory(at: sourcesURL, withIntermediateDirectories: false)
-
-        let testsURL = projectFolderURL.appending(path: "Tests")
-        try FileManager.default.createDirectory(at: testsURL, withIntermediateDirectories: false)
+        let sourcesURL = try projectFolderURL.mkdir(path: "Sources")
+        let testsURL = try projectFolderURL.mkdir(path: "Tests")
 
         let dependencies = """
             dependencies: [
-                .package(url: "https://source.skip.tools/skip.git", from: "0.0.0"),
+                .package(url: "https://source.skip.tools/skip.git", from: "\(skipVersion)"),
                 .package(url: "https://source.skip.tools/skip-foundation.git", from: "0.0.0"),
             ]
         """
@@ -85,17 +100,14 @@ extension ToolOptionsCommand {
 
         """
 
-        for moduleName in moduleNames {
+        for i in moduleNames.indices {
+            let moduleName = moduleNames[i]
+            let nextModuleName = i < moduleNames.endIndex - 1 ? moduleNames[i+1] : nil
+
             //let moduleKtName = moduleName + "Kt"
 
-            let sourceDir = sourcesURL.appending(path: moduleName)
-            try FileManager.default.createDirectory(at: sourceDir, withIntermediateDirectories: false)
-
-            let sourceKtDir = sourceDir // sourcesURL.appending(path: moduleKtName)
-            //try FileManager.default.createDirectory(at: sourceKtDir, withIntermediateDirectories: false)
-
-            let sourceSkipDir = sourceKtDir.appending(path: "Skip")
-            try FileManager.default.createDirectory(at: sourceSkipDir, withIntermediateDirectories: false)
+            let sourceDir = try sourcesURL.mkdir(path: moduleName)
+            let sourceSkipDir = try sourceDir.mkdir(path: "Skip")
 
             let sourceSkipYamlFile = sourceSkipDir.appending(path: "skip.yml")
             try """
@@ -110,14 +122,9 @@ extension ToolOptionsCommand {
 
             """.write(to: sourceSwiftFile, atomically: true, encoding: .utf8)
 
-            let testDir = testsURL.appending(path: moduleName + "Tests")
-            try FileManager.default.createDirectory(at: testDir, withIntermediateDirectories: false)
+            let testDir = try testsURL.mkdir(path: moduleName + "Tests")
 
-            let testKtDir = testDir // testsURL.appending(path: moduleKtName + "Tests")
-            //try FileManager.default.createDirectory(at: testKtDir, withIntermediateDirectories: false)
-
-            let testSkipDir = testKtDir.appending(path: "Skip")
-            try FileManager.default.createDirectory(at: testSkipDir, withIntermediateDirectories: false)
+            let testSkipDir = try testDir.mkdir(path: "Skip")
 
             let testSwiftFile = testDir.appending(path: "\(moduleName)Tests.swift")
 
@@ -128,17 +135,32 @@ extension ToolOptionsCommand {
 
             let logger: Logger = Logger(subsystem: "\(moduleName)", category: "Tests")
 
-            @available(macOS 13, macCatalyst 16, iOS 16, tvOS 16, watchOS 8, *)
+            @available(macOS 13, *)
             final class \(moduleName)Tests: XCTestCase {
                 func test\(moduleName)() throws {
                     logger.log("running test\(moduleName)")
                     XCTAssertEqual(1 + 2, 3, "basic test")
+                    \(resourceFolder.flatMap { folderName in
+                    """
+
+                    // load the TestData.json file from the \(folderName) folder and decode it into a struct
+                    let resourceURL: URL = try XCTUnwrap(Bundle.module.url(forResource: "TestData", withExtension: "json"))
+                    let testData = try JSONDecoder().decode(TestData.self, from: Data(contentsOf: resourceURL))
+                    XCTAssertEqual("\(moduleName)", testData.testModuleName)
+                    """
+                    } ?? "")
                 }
             }
+            \(resourceFolder.flatMap { folderName in
+            """
 
+            struct TestData : Codable, Hashable {
+                var testModuleName: String
+            }
+            """ } ?? "")
             """.write(to: testSwiftFile, atomically: true, encoding: .utf8)
 
-            let testKtSwiftFile = testKtDir.appending(path: "XCSkipTests.swift")
+            let testSkipModuleFile = testDir.appending(path: "XCSkipTests.swift")
             try """
             #if os(macOS) // Skip transpiled tests only run on macOS targets
             import SkipTest
@@ -151,21 +173,55 @@ extension ToolOptionsCommand {
                 }
             }
             #endif
-            """.write(to: testKtSwiftFile, atomically: true, encoding: .utf8)
+            """.write(to: testSkipModuleFile, atomically: true, encoding: .utf8)
 
             let testSkipYamlFile = testSkipDir.appending(path: "skip.yml")
             try """
             # Configuration file for https://skip.tools project
+            #
+            # Kotlin dependencies and Gradle build options for this module can be configured here
+            #build:
+            #  contents:
+            #    - block: 'dependencies'
+            #      contents:
+            #        - 'implementation("androidx.compose.runtime:runtime")'
 
             """.write(to: testSkipYamlFile, atomically: true, encoding: .utf8)
+
 
             products += """
                     .library(name: "\(moduleName)", targets: ["\(moduleName)"]),
 
             """
+
+            var resourcesAttribute: String = ""
+            if let resourceFolder = resourceFolder, !resourceFolder.isEmpty {
+                let sourceResourcesDir = try sourceDir.mkdir(path: resourceFolder)
+                let sourceResourcesFile = sourceResourcesDir.appending(path: "Localizable.xcstrings")
+                try """
+                {
+                  "sourceLanguage" : "en",
+                  "strings" : {},
+                  "version" : "1.0"
+                }
+                """.write(to: sourceResourcesFile, atomically: true, encoding: .utf8)
+
+                let testResourcesDir = try testDir.mkdir(path: resourceFolder)
+                let testResourcesFile = testResourcesDir.appending(path: "TestData.json")
+                try """
+                {
+                  "testModuleName": "\(moduleName)"
+                }
+                """.write(to: testResourcesFile, atomically: true, encoding: .utf8)
+
+                resourcesAttribute = ", resources: [.process(\"\(resourceFolder)\")]"
+            }
+
+            let moduleDep = chain == true && nextModuleName != nil ? ("\"" + nextModuleName! + "\"") : #".product(name: "SkipFoundation", package: "skip-foundation")"#
+
             targets += """
-                    .target(name: "\(moduleName)", dependencies: [.product(name: "SkipFoundation", package: "skip-foundation", condition: .when(platforms: [.macOS]))], plugins: [.plugin(name: "skipstone", package: "skip")]),
-                    .testTarget(name: "\(moduleName)Tests", dependencies: ["\(moduleName)", .product(name: "SkipTest", package: "skip", condition: .when(platforms: [.macOS]))], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                    .target(name: "\(moduleName)", dependencies: [\(moduleDep)]\(resourcesAttribute), plugins: [.plugin(name: "skipstone", package: "skip")]),
+                    .testTarget(name: "\(moduleName)Tests", dependencies: ["\(moduleName)", .product(name: "SkipTest", package: "skip")]\(resourcesAttribute), plugins: [.plugin(name: "skipstone", package: "skip")]),
 
             """
         }
@@ -181,8 +237,7 @@ extension ToolOptionsCommand {
         // swift-tools-version: 5.9
         // This is a [Skip](https://skip.tools) package,
         // containing Swift "ModuleName" library targets
-        // alongside peer "ModuleNameKt" targets that
-        // will use the Skip plugin to transpile the
+        // that will use the Skip plugin to transpile the
         // Swift Package, Sources, and Tests into an
         // Android Gradle Project with Kotlin sources and JUnit tests.
         import PackageDescription
@@ -221,19 +276,19 @@ extension ToolOptionsCommand {
         let packageJSON = try JSONDecoder().decode(PackageManifest.self, from: Data(packageJSONString.utf8))
         _ = packageJSON
 
-        if build == true {
-            await run(with: out, "Resolving \(projectName)", ["swift", "package", "resolve", "--package-path", projectFolderURL.path])
-            await run(with: out, "Building \(projectName)", ["swift", "build", "-v", "-c", configuration, "--package-path", projectFolderURL.path])
-        }
-
-        if test == true {
-            try await runSkipTests(in: projectFolderURL, configuration: configuration, swift: true, kotlin: true, with: out)
-        }
-
         return projectFolderURL
     }
 }
 
 struct InitError : LocalizedError {
     var errorDescription: String?
+}
+
+extension URL {
+    /// Create the child directory of the given parent
+    func mkdir(path: String) throws -> URL {
+        let dir = appending(path: path)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: false)
+        return dir
+    }
 }
