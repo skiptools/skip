@@ -222,6 +222,7 @@ extension ToolOptionsCommand {
         _ = packageJSON
 
         if build == true {
+            await run(with: out, "Resolving \(projectName)", ["swift", "package", "resolve", "--package-path", projectFolderURL.path])
             await run(with: out, "Building \(projectName)", ["swift", "build", "-v", "-c", configuration, "--package-path", projectFolderURL.path])
         }
 

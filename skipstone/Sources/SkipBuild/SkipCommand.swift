@@ -452,16 +452,32 @@ extension StreamingCommand {
     }
 
     mutating func run() async throws {
+        var totalErrors: [any MessageEncodable] = []
         outputOptions.beginCommandOutput()
         var elements = self.startCommand().makeAsyncIterator()
         if let message = try await elements.next() {
-            try writeOutput(message: message)
+            try writeOutput(message: message) // the initial element
             while let element = try await elements.next() {
                 outputOptions.writeOutputSeparator()
-                try writeOutput(message: element)
+                try writeOutput(message: element) // subsequent elements after the first separator
+                if element.status == .fail {
+                    totalErrors.append(element)
+                }
             }
         }
         outputOptions.endCommandOutput()
+
+        if totalErrors.count > 0 {
+            throw StreamCommandError(errorDescription: "\(totalErrors.count) \(totalErrors.count == 1 ? "error" : "errors")")
+        }
+    }
+}
+
+struct StreamCommandError : LocalizedError {
+    var errorDescription: String?
+
+    var description: String {
+        errorDescription ?? ""
     }
 }
 

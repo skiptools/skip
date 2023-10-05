@@ -69,8 +69,9 @@ extension TestCommand {
             return packageName
         }
 
+        var testResult: Result<ProcessOutput, Error>? = nil
         if test == true {
-            await run(with: out, "Testing project", ["swift", "test", "--parallel", "-c", configuration, "--enable-code-coverage", "--xunit-output", xunit, "--package-path", project])
+            testResult = await run(with: out, "Testing project", ["swift", "test", "--parallel", "-c", configuration, "--enable-code-coverage", "--xunit-output", xunit, "--package-path", project])
         } else if self.xunit == nil {
             // we can only use the generated xunit if we are running the tests
             throw SkipDriveError(errorDescription: "Must either specify --xunit path or run tests with --test")
@@ -85,15 +86,15 @@ extension TestCommand {
             throw SkipDriveError(errorDescription: "No test results found in \(xunit)")
         }
 
-
         func testNameComparison(_ t1: GradleDriver.TestCase, _ t2: GradleDriver.TestCase) -> Bool {
             t1.classname < t2.classname || (t1.classname == t2.classname && t1.name < t2.name)
         }
 
-        let xunitCases = xunitResults.flatMap(\.testCases).sorted(by: testNameComparison)
+        let xunitCasesAll = xunitResults.flatMap(\.testCases).sorted(by: testNameComparison)
 
         // <testcase classname="SkipZipTests.SkipZipTests" name="testSkipModule" time="7.729628">
-        let skipModuleTests = xunitCases.filter({ $0.name == "testSkipModule" })
+        let skipModuleTests = xunitCasesAll.filter({ $0.name == "testSkipModule" })
+        let xunitCases = xunitCasesAll.filter({ $0.name != "testSkipModule" })
 
         if skipModuleTests.isEmpty {
             throw SkipDriveError(errorDescription: "Could not find Skip test testSkipModule in: \(xunitCases.map(\.name))")
@@ -103,6 +104,36 @@ extension TestCommand {
 
         // XUnit: <testcase name="testDeflateInflate" classname="SkipZipTests.SkipZipTests" time="0.047230875">
         // JUnit: <testcase name="testDeflateInflate$SkipZip_debugUnitTest" classname="skip.zip.SkipZipTests" time="0.024"/>
+
+        struct Stats {
+            var passed: Int = 0
+            var failed: Int = 0
+            var skipped: Int = 0
+            var missing: Int = 0
+
+            var total: Int {
+                passed + failed + skipped + missing
+            }
+
+            mutating func update(_ test: GradleDriver.TestCase?) {
+                if test?.skipped == true {
+                    skipped += 1
+                } else if test?.failures.isEmpty == false {
+                    failed += 1
+                } else if test == nil {
+                    missing += 1
+                } else {
+                    passed += 1
+                }
+            }
+
+            var passRate: String {
+                NumberFormatter.localizedString(from: (Double(passed) / Double(total)) as NSNumber, number: .percent)
+            }
+        }
+
+        var allXunitStats: [Stats] = []
+        var allJunitStats: [Stats] = []
 
         // load the junit result folders
         for skipModule in skipModules {
@@ -166,6 +197,7 @@ extension TestCommand {
                     // permit missing cases (e.g., ones inside an #if !SKIP block)
                     // throw SkipDriveError(errorDescription: "Could not match XUnit and JUnit test case named “\(testName)” in \(skipModule).")
                 }
+
                 matchedCases.append((xunit: xunitCase, junit: cases.first))
             }
 
@@ -185,34 +217,11 @@ extension TestCommand {
             addRow(["Test", "Case", "Swift", "Kotlin"])
             addSeparator()
 
-            struct Stats {
-                var passed: Int = 0
-                var failed: Int = 0
-                var skipped: Int = 0
-                var missing: Int = 0
-
-                var total: Int {
-                    passed + failed + skipped + missing
-                }
-
-                mutating func update(_ test: GradleDriver.TestCase?) {
-                    if test?.skipped == true {
-                        skipped += 1
-                    } else if test?.failures.isEmpty == false {
-                        failed += 1
-                    } else if test == nil {
-                        missing += 1
-                    } else {
-                        passed += 1
-                    }
-                }
-
-                var passRate: String {
-                    NumberFormatter.localizedString(from: (Double(passed) / Double(total)) as NSNumber, number: .percent)
-                }
-            }
-
             var (xunitStats, junitStats) = (Stats(), Stats())
+            defer {
+                allXunitStats.append(xunitStats)
+                allJunitStats.append(junitStats)
+            }
 
             for (xunit, junit) in matchedCases.sorted(by: { testNameComparison($0.xunit, $1.xunit) }) {
                 let testName = xunit.name
@@ -270,9 +279,35 @@ extension TestCommand {
 
             await out.write(status: nil, testsTable)
         }
+
+        let exitCode = try? testResult?.get().exitCode
+
+        let aggregateStats = { ($0 as [Stats]).reduce(into: Stats()) { stats, result in
+            stats.failed += result.failed
+            stats.passed += result.passed
+            stats.skipped += result.skipped
+            stats.missing += result.missing
+        }
+        }
+
+        let allJStats = aggregateStats(allJunitStats)
+        let allXStats = aggregateStats(allXunitStats)
+
+        let totalFailures = allJStats.failed + allXStats.failed
+        let totalMissing = allJStats.missing + allXStats.missing
+
+        if totalFailures > 0 {
+            await out.yield(MessageBlock(status: .fail, "Tests failed with \(totalFailures) failures"))
+        } else if totalMissing > 0 {
+            await out.yield(MessageBlock(status: .warn, "Tests (\(allXStats.passed) / \(allJStats.passed)) passed with \(totalMissing) missing"))
+        } else if let code = exitCode, code != 0 {
+            //await out.yield(with: .failure(TestFailureError(errorDescription: "Tests failed with exit: \(code)")))
+            await out.yield(MessageBlock(status: .fail, "Tests failed with exit: \(code)"))
+        } else {
+            await out.yield(MessageBlock(status: .pass, "Tests \(allXStats.passed) / \(allJStats.passed) passed"))
+        }
         #endif
     }
-    
 }
 
 
@@ -281,8 +316,9 @@ extension ToolOptionsCommand where Self : OutputOptionsCommand {
     func runSkipTests(in projectFolderURL: URL, configuration: String, swift: Bool, kotlin: Bool, with out: MessageQueue) async throws {
         // run Swift and Kotlin tests separately
         // await outputOptions.run(with: out, "Testing \(projectName)", [toolOptions.swift, "test", "-v", "-c", configuration, "--package-path", projectFolderURL.path])
-        // TODO: exclude XCSkipTest.testSkipModule from the tests somehow
-        await run(with: out, "Testing Swift", ["swift", "testX", "--verbose", "--configuration", configuration, "--package-path", projectFolderURL.path])
+
+        await run(with: out, "Testing Swift", ["swift", "test", "--verbose", "--configuration", configuration, "--skip", "testSkipModule", "--package-path", projectFolderURL.path])
+
         await run(with: out, "Testing Kotlin", ["swift", "test", "--verbose", "--configuration", configuration, "--filter", "testSkipModule", "--package-path", projectFolderURL.path])
     }
 }

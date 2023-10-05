@@ -183,7 +183,7 @@ extension ToolOptionsCommand {
     
     /// Executes a tool with the given arguments and prefix message, waits for the result while showing a progress animation,
     /// and then processes the result and outputs the given message block.
-    @discardableResult func run(with messenger: MessageQueue, _ message: String, _ commandArgs: [String], environment: [String: String] = ProcessInfo.processInfo.environment, watch: Bool = true, resultHandler: @escaping MessageResultHandler<ProcessOutput> = { ($0, nil) }) async -> Result<ProcessOutput, Error> {
+    @discardableResult func run(with messenger: MessageQueue, _ message: String, _ commandArgs: [String], environment: [String: String] = ProcessInfo.processInfo.environment, handleFailure: Bool = true, watch: Bool = true, resultHandler: @escaping MessageResultHandler<ProcessOutput> = { ($0, nil) }) async -> Result<ProcessOutput, Error> {
 
         var cmd = commandArgs.first ?? ""
         do {
@@ -241,10 +241,7 @@ extension ToolOptionsCommand {
             let process = Process(arguments: args, environment: environment, outputRedirection: .stream(stdout: addBuffer(err: false), stderr: addBuffer(err: true)), loggingHandler: nil)
             try process.launch()
             let result = try await process.waitUntilExit()
-            // flush the final output buffers
-            addBuffer(err: true)(nil)
-            addBuffer(err: false)(nil)
-            
+
             let code: Int
             switch result.exitStatus {
             case .terminated(let c): code = Int(c)
@@ -254,6 +251,14 @@ extension ToolOptionsCommand {
             case .signalled(let c): code = Int(c)
 #endif
             }
+
+            if handleFailure && code != 0 {
+                await messenger.yield(MessageBlock(status: .fail, message))
+            }
+            // flush the final output buffers
+            addBuffer(err: true)(nil)
+            addBuffer(err: false)(nil)
+
             //let (out, err) = try (result.utf8Output(), result.utf8stderrOutput())
             //return (exitCode: code, stdout: out, stderr: err)
             return (exitCode: code, stdout: String(bytes: outBufferComplete, encoding: .utf8) ?? "", stderr: String(bytes: errBufferComplete, encoding: .utf8) ?? "")
