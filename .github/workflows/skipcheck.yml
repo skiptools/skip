@@ -12,8 +12,8 @@ jobs:
       DEVELOPER_DIR: /Applications/Xcode_15.0.app/Contents/Developer
     steps:
       - run: brew install skiptools/skip/skip
-      - run: brew install android-studio
       - run: skip doctor
+      - run: ! skip doctor --swift=/bin/false
       - run: skip checkup
       - run: skip lib init --build --test -d $(mktemp -d) skppkg Mod1 Mod2
       - run: skip app create --build --test -d $(mktemp -d) skpapp
