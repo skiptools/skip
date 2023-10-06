@@ -72,7 +72,8 @@ extension ToolOptionsCommand {
             await run(with: out, "Building \(projectName)", ["swift", "build", "-v", "-c", configuration, "--package-path", projectURL.path])
 
             if assemble == true {
-                var env = ProcessInfo.processInfo.environment
+                // TODO: override PRODUCT_NAME/MARKETING_VERSION/PRODUCT_BUNDLE_IDENTIFIER with environment variables
+                let env = ProcessInfo.processInfo.environment
 
                 let primaryModuleName = modules.first?.moduleName ?? "App"
                 let gradleProjectDir = projectURL.path + "/.build/plugins/outputs/" + projectName + "/" + primaryModuleName + "/skipstone"
@@ -137,8 +138,13 @@ extension ToolOptionsCommand {
         """
 
 
+        #if DEBUG
+        let skipPackageVersion = "0.0.0"
+        #else
+        let skipPackageVersion = skipVersion
+        #endif
         var packageDependencies: [String] = [
-            ".package(url: \"https://source.skip.tools/skip.git\", from: \"\(skipVersion)\")"
+            ".package(url: \"https://source.skip.tools/skip.git\", from: \"\(skipPackageVersion)\")"
         ]
 
         for i in modules.indices {

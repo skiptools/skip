@@ -539,7 +539,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
                             ]
                         } else {
                             moduleDependencyBlocks += [
-                                .init("implementation(project(\":\(moduleName)\"))"),
+                                .init("api(project(\":\(moduleName)\"))"),
                             ]
                         }
                     }
