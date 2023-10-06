@@ -30,7 +30,7 @@ struct CheckupCommand: MessageCommand, ToolOptionsCommand  {
 //            try await outputOptions.run(with: out, "Pre-Caching Gradle Dependencies (~1G)", checkup())
 //        }
 
-        _ = try await buildSkipLibrary(projectName: "lib-name", moduleNames: ["ModuleNameA", "ModuleNameB"], resourceFolder: "Resources", dir: tmpdir, configuration: "debug", build: true, test: true, tree: false, chain: true, app: true, with: out)
+        _ = try await buildSkipProject(projectName: "lib-name", modules: [PackageModule(moduleName: "ModuleNameA:skip-ui/SkipUI"), PackageModule(moduleName: "ModuleNameB:skip-foundation/SkipFoundation")], resourceFolder: "Resources", dir: tmpdir, configuration: "debug", build: true, test: true, tree: false, chain: true, app: true, assemble: true, archive: true, with: out)
 
         await out.write(status: .pass, "Skip \(skipVersion) self-test passed!")
     }

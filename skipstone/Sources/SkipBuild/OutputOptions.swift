@@ -307,7 +307,6 @@ extension OutputOptions {
     /// If we are using a rich terminal (and not specifying plain or JSON output), outputs a progress animation while waiting for the given process to complete
     @discardableResult func monitor<T>(with messenger: MessageQueue, _ message: String, watch: Bool = false, resultHandler: MessageResultHandler<T>?, block monitorAction: @escaping (_ outputHandler: @escaping (String) -> ()) async throws -> T) async -> Result<T, Error> {
         let flushedLines = self.streams.outputBuffer(reset: true) // reset the output line buffer
-
         let terminalWidth = TerminalController.terminalWidth()
 
         let startTime = Date.now
@@ -336,7 +335,7 @@ extension OutputOptions {
                         // the messages are exactly the same, so don't clear the console and print the message again
                         return nil
                     } else {
-                        let outputBufferLines = self.streams.outputBuffer(reset: true) // reset the output line buffer
+                        let outputBufferLines = self.streams.outputBuffer()
                         var msg = newMessage
                         if watch == true, let statusLine = outputBufferLines.last, !statusLine.isEmpty {
                             var status = statusLine.trimmingCharacters(in: .whitespacesAndNewlines)

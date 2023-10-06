@@ -41,12 +41,54 @@ final class SkipCommandTests: XCTestCase {
         """)
     }
 
-    func libInitComand(projectName: String, resourcePath: String? = "Resources", moduleNames: String...) async throws -> String? {
+    func testLibInitAppCommand() async throws {
+        let basicProject = try await libInitComand(projectName: "cool-app", app: true, moduleNames: "CoolApp", "CoolModel")
+        XCTAssertEqual(basicProject ?? "", """
+        .
+        ├─ Package.swift
+        ├─ README.md
+        ├─ Sources
+        │  ├─ CoolApp
+        │  │  ├─ CoolApp.swift
+        │  │  ├─ Resources
+        │  │  │  └─ Localizable.xcstrings
+        │  │  └─ Skip
+        │  │     ├─ AndroidManifest.xml
+        │  │     └─ skip.yml
+        │  └─ CoolModel
+        │     ├─ CoolModel.swift
+        │     ├─ Resources
+        │     │  └─ Localizable.xcstrings
+        │     └─ Skip
+        │        └─ skip.yml
+        └─ Tests
+           ├─ CoolAppTests
+           │  ├─ CoolAppTests.swift
+           │  ├─ Resources
+           │  │  └─ TestData.json
+           │  ├─ Skip
+           │  │  └─ skip.yml
+           │  └─ XCSkipTests.swift
+           └─ CoolModelTests
+              ├─ CoolModelTests.swift
+              ├─ Resources
+              │  └─ TestData.json
+              ├─ Skip
+              │  └─ skip.yml
+              └─ XCSkipTests.swift
+        
+        """)
+    }
+
+    func libInitComand(projectName: String, app: Bool = false, resourcePath: String? = "Resources", moduleNames: String...) async throws -> String? {
         let tmpDir = URL(fileURLWithPath: UUID().uuidString, isDirectory: true, relativeTo: URL(fileURLWithPath: NSTemporaryDirectory() + "/testLibInitCommand/", isDirectory: true))
         try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
         var cmd = ["lib", "init", "-jA", "--no-build", "--no-test", "--tree"]
         if let resourcePath = resourcePath {
             cmd += ["--resource-path", resourcePath]
+        }
+        if app {
+            cmd += ["--app"]
         }
         cmd += ["-d", tmpDir.path]
 

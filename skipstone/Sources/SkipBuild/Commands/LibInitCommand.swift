@@ -34,27 +34,48 @@ struct LibInitCommand: MessageCommand, CreateOptionsCommand, ToolOptionsCommand,
     @Flag(help: ArgumentHelp("Create an App.xcodeproj and embed module as an app"))
     var app: Bool = false
 
+    @Flag(help: ArgumentHelp("Build the Android .apk file"))
+    var assemble: Bool = false
+
+    @Flag(help: ArgumentHelp("Build the iOS .ipa file"))
+    var archive: Bool = false
+
+    /// Attempts to parse module names like "skiptools/skip-ui/SkipUI" into a full repo and path
+    var modules: [PackageModule] {
+        get throws {
+            try self.moduleNames.map {
+                try PackageModule(parse: $0)
+            }
+        }
+    }
+
     func performCommand(with out: MessageQueue) async throws {
         await out.yield(MessageBlock(status: nil, "Initializing Skip library \(self.projectName)"))
 
         let dir = self.createOptions.dir ?? "."
 
-        let createdURL = try await buildSkipLibrary(projectName: self.projectName, moduleNames: moduleNames, resourceFolder: createOptions.resourcePath, dir: dir, configuration: createOptions.configuration, build: buildOptions.build, test: buildOptions.test, tree: self.createOptions.tree, chain: createOptions.chain, app: self.app, with: out)
+        let createdURL = try await buildSkipProject(projectName: self.projectName, modules: self.modules, resourceFolder: createOptions.resourcePath, dir: dir, configuration: createOptions.configuration, build: buildOptions.build, test: buildOptions.test, tree: self.createOptions.tree, chain: createOptions.chain, app: self.app, assemble: assemble, archive: archive, with: out)
 
         await out.yield(MessageBlock(status: .pass, "Created module \(moduleNames.joined(separator: ", ")) in \(createdURL.path)"))
     }
 }
 
 extension ToolOptionsCommand {
-    func buildSkipLibrary(projectName: String, moduleNames: [String], resourceFolder: String?, dir outputFolder: String, configuration: String, build: Bool, test: Bool, tree: Bool, chain: Bool, app: Bool, with out: MessageQueue) async throws -> URL {
-        let projectURL = try await initSkipLibrary(projectName: projectName, moduleNames: moduleNames, resourceFolder: resourceFolder, dir: outputFolder, chain: chain, app: app, with: out)
+    func buildSkipProject(projectName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: String, configuration: String, build: Bool, test: Bool, tree: Bool, chain: Bool, app: Bool, assemble: Bool, archive: Bool, with out: MessageQueue) async throws -> URL {
+        let projectURL = try await initSkipLibrary(projectName: projectName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, chain: chain, app: app, with: out)
         if tree {
             await showFileTree(in: try projectURL.absolutePath, with: out)
         }
 
-        if build == true {
-            await run(with: out, "Resolving \(projectName)", ["swift", "package", "resolve", "-v", "--package-path", projectURL.path])
+        if build == true || assemble == true {
+            await run(with: out, "Resolving dependencies", ["swift", "package", "resolve", "-v", "--package-path", projectURL.path])
             await run(with: out, "Building \(projectName)", ["swift", "build", "-v", "-c", configuration, "--package-path", projectURL.path])
+
+            if assemble == true {
+                let primaryModuleName = modules.first?.moduleName ?? "App"
+                // gradle assemble --project-dir .build/plugins/outputs/${PACKAGE}/${MODULE}Tests/skipstone -PbuildDir=.build/${MODULE}
+                await run(with: out, "Assembling \(primaryModuleName).apk", ["gradle", "assemble", "--console=plain", "--info", "--project-dir", projectURL.path + "/.build/plugins/outputs/\(projectName)/\(primaryModuleName)/skipstone", "-PbuildDir=.build/\(projectName)"])
+            }
         }
 
         if test == true {
@@ -64,7 +85,7 @@ extension ToolOptionsCommand {
         return projectURL
     }
 
-    func initSkipLibrary(projectName: String, moduleNames: [String], resourceFolder: String?, dir outputFolder: String, chain: Bool, app: Bool, with out: MessageQueue) async throws -> URL {
+    func initSkipLibrary(projectName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: String, chain: Bool, app: Bool, with out: MessageQueue) async throws -> URL {
         var isDir: Foundation.ObjCBool = false
         if !FileManager.default.fileExists(atPath: outputFolder, isDirectory: &isDir) {
             throw InitError(errorDescription: "Specified output folder does not exist: \(outputFolder)")
@@ -86,13 +107,6 @@ extension ToolOptionsCommand {
         let sourcesURL = try projectFolderURL.mkdir(path: "Sources")
         let testsURL = try projectFolderURL.mkdir(path: "Tests")
 
-        let dependencies = """
-            dependencies: [
-                .package(url: "https://source.skip.tools/skip.git", from: "\(skipVersion)"),
-                .package(url: "https://source.skip.tools/skip-foundation.git", from: "0.0.0"),
-            ]
-        """
-
         var products = """
             products: [
 
@@ -103,9 +117,21 @@ extension ToolOptionsCommand {
 
         """
 
-        for i in moduleNames.indices {
-            let moduleName = moduleNames[i]
-            let nextModuleName = i < moduleNames.endIndex - 1 ? moduleNames[i+1] : nil
+
+        var packageDependencies: [String] = [
+            ".package(url: \"https://source.skip.tools/skip.git\", from: \"\(skipVersion)\")"
+        ]
+
+        for i in modules.indices {
+            let module = modules[i]
+            let moduleName = module.moduleName
+
+            // the isAppModule is the initial module in the list when we specify we want to create an app module
+            let isAppModule = app && i == modules.startIndex ? true : false
+
+            // the subsequent module
+            let nextModule = i < modules.endIndex - 1 ? modules[i+1] : nil
+            let nextModuleName = nextModule?.moduleName
 
             //let moduleKtName = moduleName + "Kt"
 
@@ -136,7 +162,6 @@ extension ToolOptionsCommand {
             # App.xcconfig file, which in turn are used to generate both the
             # AndroidManifest.xml (for the Android apk) and the
             # Info.plist (for the iOS ipa).
-            #build:
             build:
               contents:
                 - block: 'plugins'
@@ -169,7 +194,7 @@ extension ToolOptionsCommand {
                             - 'proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")'
             """
 
-            try (app ? skipYamlApp : skipYamlGeneric).write(to: sourceSkipYamlFile, atomically: true, encoding: .utf8)
+            try (isAppModule ? skipYamlApp : skipYamlGeneric).write(to: sourceSkipYamlFile, atomically: true, encoding: .utf8)
 
             let sourceSwiftFile = sourceDir.appending(path: "\(moduleName).swift")
             try """
@@ -231,8 +256,19 @@ extension ToolOptionsCommand {
             #endif
             """.write(to: testSkipModuleFile, atomically: true, encoding: .utf8)
 
+            // app tests won't build if this is in place
+            let skipYamlAppTests = """
+            # Configuration file for https://skip.tools project
+            build:
+              contents:
+                - block: 'plugins'
+                  remove:
+                    - 'id("com.android.library") version "8.1.0"'
+            """
+
+
             let testSkipYamlFile = testSkipDir.appending(path: "skip.yml")
-            try skipYamlGeneric.write(to: testSkipYamlFile, atomically: true, encoding: .utf8)
+            try (isAppModule ? skipYamlAppTests : skipYamlGeneric).write(to: testSkipYamlFile, atomically: true, encoding: .utf8)
 
             products += """
                     .library(name: "\(moduleName)", targets: ["\(moduleName)"]),
@@ -262,7 +298,59 @@ extension ToolOptionsCommand {
                 resourcesAttribute = ", resources: [.process(\"\(resourceFolder)\")]"
             }
 
-            let moduleDep = chain == true && nextModuleName != nil ? ("\"" + nextModuleName! + "\"") : #".product(name: "SkipFoundation", package: "skip-foundation")"#
+            if isAppModule {
+                let androidManifestContents = """
+                <?xml version="1.0" encoding="utf-8"?>
+                <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+                    <!-- example permissions for using device location -->
+                    <!-- <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/> -->
+                    <!-- <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/> -->
+
+                    <!-- permissions needed for using the internet or an embedded WebKit browser -->
+                    <uses-permission android:name="android.permission.INTERNET" />
+                    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+                    <meta-data android:name="android.webkit.WebView.EnableSafeBrowsing" android:value="false" />
+
+                    <application
+                        android:label="${PRODUCT_NAME}"
+                        android:name="${PRODUCT_BUNDLE_IDENTIFIER}.AndroidAppMain"
+                        android:allowBackup="true">
+                        <activity
+                            android:name=".MainActivity"
+                            android:exported="true"
+                            android:theme="@style/Theme.AppCompat.DayNight.NoActionBar"
+                            android:windowSoftInputMode="adjustResize">
+                            <intent-filter>
+                                <action android:name="android.intent.action.MAIN" />
+                                <category android:name="android.intent.category.LAUNCHER" />
+                            </intent-filter>
+                        </activity>
+                    </application>
+                </manifest>
+
+                """
+                let androidManifestFile = sourceSkipDir.appending(path: "AndroidManifest.xml")
+                try androidManifestContents.write(to: androidManifestFile, atomically: true, encoding: .utf8)
+            }
+
+            var moduleDeps: [String] = []
+            if let nextModuleName = nextModuleName, chain == true {
+                moduleDeps.append("\"" + nextModuleName + "\"") // the internal module names are just referred to by string
+            }
+
+            for modDep in module.dependencies {
+                if let repoName = modDep.repositoryName {
+                    let depVersion = modDep.repositoryVersion ?? "0.0.0"
+                    let packDep = ".package(url: \"https://source.skip.tools/\(repoName).git\", from: \"\(depVersion)\")"
+                    if !packageDependencies.contains(packDep) {
+                        packageDependencies.append(packDep)
+                    }
+                    moduleDeps.append(".product(name: \"\(modDep.moduleName)\", package: \"\(repoName)\")")
+
+                }
+            }
+
+            let moduleDep = moduleDeps.joined(separator: ", ")
 
             targets += """
                     .target(name: "\(moduleName)", dependencies: [\(moduleDep)]\(resourcesAttribute), plugins: [.plugin(name: "skipstone", package: "skip")]),
@@ -277,6 +365,8 @@ extension ToolOptionsCommand {
         targets += """
             ]
         """
+
+        let dependencies = "    dependencies: [\n        " + packageDependencies.joined(separator: ",\n        ") + "\n]"
 
         let packageSource = """
         // swift-tools-version: 5.9
@@ -307,7 +397,7 @@ extension ToolOptionsCommand {
 
         This is a [Skip](https://skip.tools) Swift/Kotlin library project containing the following modules:
 
-        \(moduleNames.joined(separator: "\n"))
+        \(modules.map(\.moduleName).joined(separator: "\n"))
 
         """.write(to: readmeURL, atomically: true, encoding: .utf8)
 
@@ -324,6 +414,61 @@ extension ToolOptionsCommand {
         return projectFolderURL
     }
 }
+
+struct PackageModule {
+    var moduleName: String
+    var organizationName: String? = nil
+    var repositoryName: String? = nil
+    var repositoryVersion: String? = nil
+    var dependencies: [PackageModule] = []
+
+    init(moduleName: String) {
+        self.moduleName = moduleName
+    }
+
+    init(parse: String) throws {
+        let parts = parse.split(separator: ":").map(\.description)
+        self.moduleName = parts.first ?? parse
+        for dep in parts.dropFirst() {
+            // parse PlaygroundModel:skiptools/skip-model/SkipModel:skip-foundation@0.1.0/SkipFoundation
+            var depParts = dep.split(separator: "/").map(\.description)
+            let moduleName = depParts.last ?? dep // e.g., "SkipFoundation"
+            depParts.removeLast()
+
+            var depModule = PackageModule(moduleName: moduleName)
+            defer { self.dependencies.append(depModule) }
+
+            if !depParts.isEmpty {
+                let orgName: String
+                let repoPart: String
+                if depParts.count == 1 {
+                    orgName = "skiptools"
+                    repoPart = depParts[0]
+                } else {
+                    orgName = depParts[0]
+                    repoPart = depParts[1]
+                }
+
+                let repoName: String
+                let repoVersion: String?
+
+                let repoParts = repoPart.split(separator: "@")
+                if repoParts.count > 1 { // see if the version is specified
+                    repoName = repoParts.first?.description ?? repoPart
+                    repoVersion = repoParts.last?.description
+                } else { // no version specified
+                    repoName = repoPart
+                    repoVersion = nil
+                }
+
+                depModule.organizationName = orgName
+                depModule.repositoryName = repoName
+                depModule.repositoryVersion = repoVersion
+            }
+        }
+    }
+}
+
 
 struct InitError : LocalizedError {
     var errorDescription: String?

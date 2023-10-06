@@ -167,10 +167,10 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
             let allProjectFiles: [URL] = try FileManager.default.enumeratedURLs(of: projectFolderPath.asURL)
 
             let swiftPathExtensions: Set<String> = ["swift"]
-            let resourcePathExclusions: Set<String> = swiftPathExtensions // resource files are anything that isn't a swift file
+            let resourcePathExclusions: Set<String> = swiftPathExtensions.union(["kt"]) // resource files are anything that isn't a swift file or a kotlin file
 
             let sourceURLs: [URL] = allProjectFiles.filter({ swiftPathExtensions.contains($0.pathExtension) })
-            let resourceURLs: [URL] = allProjectFiles.filter({ !resourcePathExclusions.contains($0.pathExtension) })
+            let resourceURLs: [URL] = allProjectFiles.filter({ $0.lastPathComponent.hasPrefix(".") && !resourcePathExclusions.contains($0.pathExtension) })
 
             return (sources: sourceURLs, resources: resourceURLs)
         }
