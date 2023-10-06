@@ -9,6 +9,7 @@ final class NamingTests: XCTestCase {
         XCTAssertEqual("my.mmmmodule", KotlinTranslator.packageName(forModule: "MyMMMModule"))
         XCTAssertEqual("com.package.name.some.module", KotlinTranslator.packageName(forModule: "ComPackageNameSomeModule"))
         XCTAssertEqual("urlutility.library", KotlinTranslator.packageName(forModule: "URLUtilityLibrary"))
+        XCTAssertEqual("my.module", KotlinTranslator.packageName(forModule: "My"), "single-word modules should add package suffix")
     }
 
     /// Checks that Kotlin's "hard" keywords are escaped by appending an undescore to the end of the name.

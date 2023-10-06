@@ -14,7 +14,7 @@ public class KotlinTranslator {
     /// - Parameters:
     ///   - moduleName: The module name to convert.
     /// - Returns: The dot-separated package name.
-    public static func packageName(forModule moduleName: String, trimTests: Bool = true) -> String {
+    public static func packageName(forModule moduleName: String, withDefaultPackageSuffix: String? = "module", trimTests: Bool = true) -> String {
         // Map from e.g. Foundation to SkipFoundation
         let moduleName = CodebaseInfo.moduleNameMap[moduleName] ?? moduleName
 
@@ -32,6 +32,11 @@ public class KotlinTranslator {
                 lastLower = false
             }
             packageName += lower
+        }
+
+        // Android disallows single top-level package names
+        if let packageSuffix = withDefaultPackageSuffix, !packageName.contains(".") {
+            packageName += "." + packageSuffix
         }
 
         // the "Tests" module suffix is special: in Swift XXX and XXXTest are different modules (with a @testable import to allow the tests to access internal symbols), but in Kotlin, test cases need to be in the same package in order to be able to access the symbols

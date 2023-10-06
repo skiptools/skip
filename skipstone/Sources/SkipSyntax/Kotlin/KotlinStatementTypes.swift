@@ -1995,14 +1995,16 @@ class KotlinImportDeclaration: KotlinStatement {
         }
 
         // If equivalent package name is the same, assume this is a Kotlin import, otherwise treat as a Swift import
-        let packageName = KotlinTranslator.packageName(forModule: modulePath[0])
-        if packageName == modulePath[0] {
+        // Need to check against the unmodified translated package
+        let packageNameBare = KotlinTranslator.packageName(forModule: modulePath[0], withDefaultPackageSuffix: nil)
+        if packageNameBare == modulePath[0] {
             if modulePath.last == "__" {
                 return modulePath.dropLast().joined(separator: ".") + ".*"
             } else {
                 return modulePath.joined(separator: ".")
             }
         } else {
+            let packageName = KotlinTranslator.packageName(forModule: modulePath[0])
             if modulePath.count == 1 {
                 return packageName + ".*"
             } else {

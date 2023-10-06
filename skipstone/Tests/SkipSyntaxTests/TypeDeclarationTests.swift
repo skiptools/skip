@@ -91,7 +91,7 @@ final class TypeDeclarationTests: XCTestCase {
         struct S {
         }
         """, kotlin: """
-        import module1.*
+        import module1.module.*
         internal class S: I {
 
             internal fun f() = Unit
@@ -112,8 +112,8 @@ final class TypeDeclarationTests: XCTestCase {
         struct S {
         }
         """, kotlin: """
-        import module1.*
-        import module2.*
+        import module1.module.*
+        import module2.module.*
 
         internal class S: I {
 
@@ -132,7 +132,7 @@ final class TypeDeclarationTests: XCTestCase {
             }
         }
         """, kotlin: """
-        import module1.*
+        import module1.module.*
 
         private fun S.f() = Unit
         """)
@@ -147,7 +147,7 @@ final class TypeDeclarationTests: XCTestCase {
         struct S {
         }
         """, kotlin: """
-        import module1.*
+        import module1.module.*
         internal class S {
 
             private fun f() = Unit

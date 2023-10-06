@@ -28,6 +28,7 @@ set -o pipefail
 
 # get latest skip
 git pull
+swift package update
 
 SKIPCONFIG=${SKIPCONFIG:-"release"}
 

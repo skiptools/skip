@@ -457,7 +457,7 @@ final class ExpressionTests: XCTestCase {
         import func Foundation.x
         """, kotlin: """
         import skip.foundation.*
-        import foo.*
+        import foo.module.*
         import foo.bar.*
         import foo.bar.Baz
         import com.xyz.Bar
