@@ -84,10 +84,14 @@ public struct OutputOptions: ParsableArguments {
         @discardableResult func outputBuffer(add line: String? = nil, reset: Bool = false) -> [String] {
             _currentOutput.lock.lock()
             defer { _currentOutput.lock.unlock() }
-            if reset {
-                _currentOutput.lines.removeAll(keepingCapacity: true)
-            } else if let line = line {
+            if let line = line {
                 _currentOutput.lines.append(line)
+            }
+            defer {
+                if reset {
+                    // clear the output buffer after we have returned the current lines
+                    _currentOutput.lines.removeAll(keepingCapacity: true)
+                }
             }
             return _currentOutput.lines
         }
@@ -138,7 +142,7 @@ public struct OutputOptions: ParsableArguments {
     }
 
     /// Write the given message to the output streams buffer
-    private func writeOutput(_ value: String, error: Bool = false, terminator: String = "\n", flush: Bool = false) {
+    fileprivate func writeString(_ value: String, error: Bool = false, terminator: String = "\n", flush: Bool = false) {
         streams.writeStream(error: error, output: output, value, terminator: terminator)
         if flush {
             if error {
@@ -151,17 +155,17 @@ public struct OutputOptions: ParsableArguments {
 
     /// The output that comes at the beginning of a sequence of elements; an opening bracket, for JSON arrays
     internal func beginCommandOutput() {
-        if jsonArray { writeOutput("[") }
+        if jsonArray { writeString("[") }
     }
 
     /// The output that comes at the end of a sequence of elements; a closing bracket, for JSON arrays
     internal func endCommandOutput() {
-        if jsonArray { writeOutput("]") }
+        if jsonArray { writeString("]") }
     }
 
     /// The output that separates elements; a comma, for JSON arrays
     internal func writeOutputSeparator() {
-        if jsonArray { writeOutput(",") }
+        if jsonArray { writeString(",") }
     }
 
     /// Whether tool output should be emitted as JSON or not
@@ -208,6 +212,11 @@ extension ToolOptionsCommand {
         }
 
         let args = [cmd] + commandArgs.dropFirst()
+
+        // write the command output directly to stderr
+        if self.outputOptions.verbose {
+            self.outputOptions.writeString("executing command: \(args.joined(separator: " "))", error: true, flush: true)
+        }
 
         return await outputOptions.monitor(with: messenger, message, watch: watch, resultHandler: resultHandler) { outputHandler in
             //let result = try await Process.popen(arguments: args, environment: environment, loggingHandler: outputHandler)
@@ -297,7 +306,7 @@ extension OutputOptions {
     ///
     /// If we are using a rich terminal (and not specifying plain or JSON output), outputs a progress animation while waiting for the given process to complete
     @discardableResult func monitor<T>(with messenger: MessageQueue, _ message: String, watch: Bool = false, resultHandler: MessageResultHandler<T>?, block monitorAction: @escaping (_ outputHandler: @escaping (String) -> ()) async throws -> T) async -> Result<T, Error> {
-        self.streams.outputBuffer(reset: true) // reset the output line buffer
+        let flushedLines = self.streams.outputBuffer(reset: true) // reset the output line buffer
 
         let terminalWidth = TerminalController.terminalWidth()
 
@@ -327,8 +336,9 @@ extension OutputOptions {
                         // the messages are exactly the same, so don't clear the console and print the message again
                         return nil
                     } else {
+                        let outputBufferLines = self.streams.outputBuffer(reset: true) // reset the output line buffer
                         var msg = newMessage
-                        if watch == true, let statusLine = self.streams.outputBuffer().last, !statusLine.isEmpty {
+                        if watch == true, let statusLine = outputBufferLines.last, !statusLine.isEmpty {
                             var status = statusLine.trimmingCharacters(in: .whitespacesAndNewlines)
                             let msglen = stripANSIAttributes(from: msg).count // need to remove any ANSI characters in the prefix to match the terminal output width
 
@@ -346,7 +356,7 @@ extension OutputOptions {
                             }
                         }
                         // the last message is the truncated message, so we can erase it
-                        writeOutput(msg, terminator: "", flush: true)
+                        writeString(msg, terminator: "", flush: true)
                         lastMessage = msg
                         return msg
                     }
@@ -357,7 +367,7 @@ extension OutputOptions {
                     defer {
                         // clear the current line, as well as the line ahead
                         // this will happen one last time when we are cancelled with a CancellationError
-                        writeOutput(String(repeating: "\u{8}", count: printed) + "\u{001B}[2K", terminator: "", flush: false)
+                        writeString(String(repeating: "\u{8}", count: printed) + "\u{001B}[2K", terminator: "", flush: false)
                     }
                     try await Task.sleep(for: .milliseconds(50))
                 }
@@ -369,6 +379,10 @@ extension OutputOptions {
             await {
                 do {
                     let result = try await monitorAction({ line in
+                        if verbose {
+                            // write the command output directly to stderr
+                            writeString(line, error: true, flush: true)
+                        }
                         streams.outputBuffer(add: line) // remember the current output line
                     })
 
@@ -382,14 +396,12 @@ extension OutputOptions {
         let result = await resultTask.value
 
         if let progressMonitor = progressMonitor {
-
             // wait for the progress monitor to clear the final line, which it will do once cancelled
             progressMonitor.cancel()
             _ = try? await progressMonitor.value // wait for compltion
-            // send the final message to the output stream
-
-            //writeOutput(messageHandler(result), terminator: "\n", flush: true) // output the final result message
         }
+
+        streams.outputBuffer(reset: true) // clear the current output buffer
 
         // send the final message to the block
         if let msg = resultHandler?(result) {

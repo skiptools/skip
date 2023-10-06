@@ -230,10 +230,10 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
         }
 
         // the standard base name for Gradle Kotlin source files
-        let kotlinOutputFolder = AbsolutePath(outputFolderPath, "kotlin")
+        let kotlinOutputFolder = try AbsolutePath(outputFolderPath, validating: "kotlin")
 
         // the standard base name for resources, which will be linked from a path like: src/main/resources/package/name/resname.ext
-        let resourcesOutputFolder = AbsolutePath(outputFolderPath, "resources")
+        let resourcesOutputFolder = try AbsolutePath(outputFolderPath, validating: "resources")
 
         if !fs.isDirectory(kotlinOutputFolder) {
             // e.g.: ~Library/Developer/Xcode/DerivedData/PACKAGE-ID/SourcePackages/plugins/skiphub.output/SkipFoundationKotlinTests/skipstone/SkipFoundation/src/test/kotlin
@@ -256,7 +256,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
 
         // also add any Kotlin files in the skipFolderFile to the list of sources
         let skipFolderPathContents = try fs.getDirectoryContents(skipFolderPath)
-            .map { AbsolutePath(skipFolderPath, $0) }
+            .map { try AbsolutePath(skipFolderPath, validating: $0) }
 
         // validate licenses in all the Skip source files, as well as any custom Kotlin files in the Skip folder
         try await validateLicense(sourceURLs: sourceURLs + skipFolderPathContents.map(\.asURL).filter({ $0.pathExtension == "kt" }))
@@ -277,13 +277,13 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
         // MARK: Transpilation helper functions
 
         /// The relative path for completion mark file that is always output when the transpile completes
-        func skipCompletionMarkerPath(forModule moduleName: String) -> RelativePath {
-            RelativePath(moduleName + skipbuildMarkerExtension)
+        func skipCompletionMarkerPath(forModule moduleName: String) throws -> RelativePath {
+            try RelativePath(validating: moduleName + skipbuildMarkerExtension)
         }
 
         /// The relative path for cached codebase info JSON
-        func codebaseInfoPath(forModule moduleName: String) -> RelativePath {
-            RelativePath(moduleName + skipcodeExtension)
+        func codebaseInfoPath(forModule moduleName: String) throws -> RelativePath {
+            try RelativePath(validating: moduleName + skipcodeExtension)
         }
 
         func loadCodebaseInfo() async throws -> CodebaseInfo {
@@ -293,12 +293,12 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
             for (linkModuleName, relativeLinkPath) in linkNamePaths {
                 let linkModuleRoot = moduleRootPath
                     .parentDirectory
-                    .appending(RelativePath(relativeLinkPath))
+                    .appending(try RelativePath(validating: relativeLinkPath))
 
 
                 let dependencyCodebaseInfo = linkModuleRoot
                     .parentDirectory
-                    .appending(codebaseInfoPath(forModule: linkModuleName))
+                    .appending(try codebaseInfoPath(forModule: linkModuleName))
 
                 do {
                     let codebaseLoadStart = Date().timeIntervalSinceReferenceDate
@@ -340,12 +340,12 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
             }
 
             let marker = SkipMarkerContents(sourceFiles: sourceURLs.map(\.path), buildDate: .now)
-            let outputFilePath = moduleBasePath.appending(skipCompletionMarkerPath(forModule: primaryModuleName))
+            let outputFilePath = try moduleBasePath.appending(skipCompletionMarkerPath(forModule: primaryModuleName))
             try writeChanges(tag: "marker", to: outputFilePath, contents: try encoder.encode(marker), readOnly: false)
         }
 
         func saveCodebaseInfo() throws {
-            let outputFilePath = moduleBasePath.appending(codebaseInfoPath(forModule: primaryModuleName))
+            let outputFilePath = try moduleBasePath.appending(codebaseInfoPath(forModule: primaryModuleName))
             try writeChanges(tag: "codebase", to: outputFilePath, contents: encoder.encode(codebaseInfo), readOnly: true)
         }
 
@@ -558,7 +558,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
             return (currentModuleConfig, aggregateSkipConfig, configMap)
         }
 
-        func kotlinOutputPath(for baseSourceFileName: String, in basePath: AbsolutePath? = nil) -> AbsolutePath? {
+        func kotlinOutputPath(for baseSourceFileName: String, in basePath: AbsolutePath? = nil) throws -> AbsolutePath? {
             if baseSourceFileName == "skip.yml" {
                 // skip metadata files are excluded from copy
                 return nil
@@ -567,9 +567,9 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
             // the "AndroidManifest.xml" file is special: it needs to go in the root src/main/ folder
             let isManifest = baseSourceFileName == "AndroidManifest.xml"
             // if an empty basePath, treat as a source file and place in package-derived folders
-            return (basePath ?? kotlinOutputFolder
+            return try (basePath ?? kotlinOutputFolder
                 .appending(components: isManifest ? [".."] : packageName.split(separator: ".").map(\.description)))
-                .appending(RelativePath(baseSourceFileName))
+                .appending(RelativePath(validating: baseSourceFileName))
         }
 
         /// Copies over the overridden .kt files from `ModuleNameKotlin/Skip/*.kt` into the destination folder,
@@ -583,15 +583,15 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
                 if fileName.hasPrefix(".") {
                     continue // skip hidden files
                 }
-                let sourcePath = AbsolutePath(path, fileName)
-                let outputPath = AbsolutePath(outputFilePath, fileName)
+                let sourcePath = try AbsolutePath(path, validating: fileName)
+                let outputPath = try AbsolutePath(outputFilePath, validating: fileName)
 
                 if fs.isDirectory(sourcePath) {
                     // make recursive folders for sub-linked resources
                     let subPaths = try linkSkipFolder(sourcePath, to: outputPath, topLevel: false)
                     copiedFiles.formUnion(subPaths)
                 } else {
-                    if let outputFilePath = kotlinOutputPath(for: sourcePath.basename, in: topLevel ? nil : outputFilePath) {
+                    if let outputFilePath = try kotlinOutputPath(for: sourcePath.basename, in: topLevel ? nil : outputFilePath) {
                         copiedFiles.insert(outputFilePath)
                         try fs.createDirectory(outputFilePath.parentDirectory, recursive: true) // ensure parent exists
                         // we make links instead of copying so the file can be edited from the gradle project structure without needing to be manually synchronized
@@ -640,7 +640,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
                 trace("path: \(kotlinOutputFolder)")
 
                 let kotlinName = transpilation.kotlinFileName
-                guard let outputFilePath = kotlinOutputPath(for: kotlinName) else {
+                guard let outputFilePath = try kotlinOutputPath(for: kotlinName) else {
                     throw error("No output path for \(kotlinName)")
                 }
 
@@ -687,9 +687,9 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
                 let sourcePath = try AbsolutePath(validating: resourceSourceURL.path)
 
                 // all resources get put into a single "Resources/" folder in the jar, so drop the first item and replace it with "Resources/"
-                let components = RelativePath(resourceSourceURL.relativePath).components.dropFirst(1)
+                let components = try RelativePath(validating: resourceSourceURL.relativePath).components.dropFirst(1)
                 let resPath = components.joined(separator: "/")
-                let resourceSourcePath = RelativePath(resPath)
+                let resourceSourcePath = try RelativePath(validating: resPath)
                 resourcesIndex.append(resPath)
 
                 let destinationPath = destinationBasePath.appending(resourceSourcePath)
@@ -745,7 +745,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
                 // the folder is a directory; recurse into the destination paths in order to link to the local paths
                 if fs.isDirectory(fromPath) {
                     for fsEntry in try fs.getDirectoryContents(destPath) {
-                        let fromSubPath = fromPath.appending(RelativePath(fsEntry))
+                        let fromSubPath = fromPath.appending(try RelativePath(validating: fsEntry))
                         // bump up all the relative links to account for the folder we just recursed into.
                         // e.g.: ../SomeSharedRoot/OtherModule/
                         // becomes: ../../SomeSharedRoot/OtherModule/someFolder/
@@ -759,7 +759,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
             // for each of the specified link/path pairs, create symbol links, either to the base folders, or the the sub-folders that share a common root
             // this is the logic that allows us to merge two modules (like MyMod and MyModTests) into a single Kotlin module with the idiomatic src/main/kotlin/ and src/test/kotlin/ pair of folders
             for (linkModuleName, relativeLinkPath) in linkNamePaths {
-                let linkModulePath = moduleBasePath.appending(RelativePath(linkModuleName))
+                let linkModulePath = try moduleBasePath.appending(RelativePath(validating: linkModuleName))
                 trace("relativeLinkPath: \(relativeLinkPath) moduleBasePath: \(moduleBasePath) linkModuleName: \(linkModuleName) -> linkModulePath: \(linkModulePath)")
                 try createMergedLinkTree(from: linkModulePath, to: relativeLinkPath)
                 dependentModules.append(linkModuleName)

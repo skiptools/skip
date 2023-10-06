@@ -31,20 +31,23 @@ struct LibInitCommand: MessageCommand, CreateOptionsCommand, ToolOptionsCommand,
     @Argument(help: ArgumentHelp("The module name(s) to create"))
     var moduleNames: [String]
 
+    @Flag(help: ArgumentHelp("Create an App.xcodeproj and embed module as an app"))
+    var app: Bool = false
+
     func performCommand(with out: MessageQueue) async throws {
         await out.yield(MessageBlock(status: nil, "Initializing Skip library \(self.projectName)"))
 
         let dir = self.createOptions.dir ?? "."
 
-        let createdURL = try await buildSkipLibrary(projectName: self.projectName, moduleNames: moduleNames, resourceFolder: createOptions.resourcePath, dir: dir, configuration: createOptions.configuration, build: buildOptions.build, test: buildOptions.test, tree: self.createOptions.tree, chain: createOptions.chain, with: out)
+        let createdURL = try await buildSkipLibrary(projectName: self.projectName, moduleNames: moduleNames, resourceFolder: createOptions.resourcePath, dir: dir, configuration: createOptions.configuration, build: buildOptions.build, test: buildOptions.test, tree: self.createOptions.tree, chain: createOptions.chain, app: self.app, with: out)
 
         await out.yield(MessageBlock(status: .pass, "Created module \(moduleNames.joined(separator: ", ")) in \(createdURL.path)"))
     }
 }
 
 extension ToolOptionsCommand {
-    func buildSkipLibrary(projectName: String, moduleNames: [String], resourceFolder: String?, dir outputFolder: String, configuration: String, build: Bool, test: Bool, tree: Bool, chain: Bool, with out: MessageQueue) async throws -> URL {
-        let projectURL = try await initSkipLibrary(projectName: projectName, moduleNames: moduleNames, resourceFolder: resourceFolder, dir: outputFolder, chain: chain, with: out)
+    func buildSkipLibrary(projectName: String, moduleNames: [String], resourceFolder: String?, dir outputFolder: String, configuration: String, build: Bool, test: Bool, tree: Bool, chain: Bool, app: Bool, with out: MessageQueue) async throws -> URL {
+        let projectURL = try await initSkipLibrary(projectName: projectName, moduleNames: moduleNames, resourceFolder: resourceFolder, dir: outputFolder, chain: chain, app: app, with: out)
         if tree {
             await showFileTree(in: try projectURL.absolutePath, with: out)
         }
@@ -61,7 +64,7 @@ extension ToolOptionsCommand {
         return projectURL
     }
 
-    func initSkipLibrary(projectName: String, moduleNames: [String], resourceFolder: String?, dir outputFolder: String, chain: Bool, with out: MessageQueue) async throws -> URL {
+    func initSkipLibrary(projectName: String, moduleNames: [String], resourceFolder: String?, dir outputFolder: String, chain: Bool, app: Bool, with out: MessageQueue) async throws -> URL {
         var isDir: Foundation.ObjCBool = false
         if !FileManager.default.fileExists(atPath: outputFolder, isDirectory: &isDir) {
             throw InitError(errorDescription: "Specified output folder does not exist: \(outputFolder)")
@@ -110,10 +113,63 @@ extension ToolOptionsCommand {
             let sourceSkipDir = try sourceDir.mkdir(path: "Skip")
 
             let sourceSkipYamlFile = sourceSkipDir.appending(path: "skip.yml")
-            try """
-            # Configuration file for https://skip.tools project
 
-            """.write(to: sourceSkipYamlFile, atomically: true, encoding: .utf8)
+            let skipYamlGeneric = """
+            # Configuration file for https://skip.tools project
+            #
+            # Kotlin dependencies and Gradle build options for this module can be configured here
+            #build:
+            #  contents:
+            #    - block: 'dependencies'
+            #      contents:
+            #        - 'implementation("androidx.compose.runtime:runtime")'
+
+            """
+
+            let skipYamlApp = """
+            # Configuration file for https://skip.tools project
+            #
+            # This skip.yml file is associated with an Android App project,
+            # and buiding it will create an installable .apk file.
+            #
+            # The app's metadata is derived from the top-level
+            # App.xcconfig file, which in turn are used to generate both the
+            # AndroidManifest.xml (for the Android apk) and the
+            # Info.plist (for the iOS ipa).
+            #build:
+            build:
+              contents:
+                - block: 'plugins'
+                  contents:
+                    - 'id("com.android.application") version "8.1.0"'
+                  remove:
+                    - 'id("com.android.library") version "8.1.0"'
+                - block: 'android'
+                  contents:
+                    - 'namespace = System.getenv("PRODUCT_BUNDLE_IDENTIFIER") ?: "app.ui"'
+                    - block: 'defaultConfig'
+                      contents:
+                        # transfer App.xcconfig configuration over to the Android metadata
+                        - 'applicationId = System.getenv("PRODUCT_BUNDLE_IDENTIFIER") ?: "app.ui"'
+                        - 'versionCode = System.getenv("CURRENT_PROJECT_VERSION")?.toInt() ?: 1'
+                        - 'versionName = System.getenv("MARKETING_VERSION") ?: "0.0.0"'
+                        - 'manifestPlaceholders["PRODUCT_NAME"] = System.getenv("PRODUCT_NAME") ?: "Skip App"'
+                        - 'manifestPlaceholders["PRODUCT_BUNDLE_IDENTIFIER"] = System.getenv("PRODUCT_BUNDLE_IDENTIFIER") ?: "app.ui"'
+                    - block: 'buildFeatures'
+                      contents:
+                        - 'buildConfig = true'
+                    - block: 'buildTypes'
+                      contents:
+                        - block: 'release'
+                          contents:
+                            # by default we sign with the debug key; for publishing to an app store, the developer key will need to be supplied
+                            - 'signingConfig = signingConfigs.getByName("debug")'
+                            # enabling minification reduces compose dependency classe size ~85%
+                            - 'isMinifyEnabled = true'
+                            - 'proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")'
+            """
+
+            try (app ? skipYamlApp : skipYamlGeneric).write(to: sourceSkipYamlFile, atomically: true, encoding: .utf8)
 
             let sourceSwiftFile = sourceDir.appending(path: "\(moduleName).swift")
             try """
@@ -176,18 +232,7 @@ extension ToolOptionsCommand {
             """.write(to: testSkipModuleFile, atomically: true, encoding: .utf8)
 
             let testSkipYamlFile = testSkipDir.appending(path: "skip.yml")
-            try """
-            # Configuration file for https://skip.tools project
-            #
-            # Kotlin dependencies and Gradle build options for this module can be configured here
-            #build:
-            #  contents:
-            #    - block: 'dependencies'
-            #      contents:
-            #        - 'implementation("androidx.compose.runtime:runtime")'
-
-            """.write(to: testSkipYamlFile, atomically: true, encoding: .utf8)
-
+            try skipYamlGeneric.write(to: testSkipYamlFile, atomically: true, encoding: .utf8)
 
             products += """
                     .library(name: "\(moduleName)", targets: ["\(moduleName)"]),
