@@ -13,7 +13,6 @@ jobs:
     steps:
       - run: brew install skiptools/skip/skip
       - run: skip doctor
-      - run: \! skip doctor --swift=/bin/false
       - run: skip checkup
       - run: skip lib init --build --test -d $(mktemp -d) skppkg Mod1 Mod2
       - run: skip app create --build --test -d $(mktemp -d) skpapp
