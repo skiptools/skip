@@ -72,9 +72,28 @@ extension ToolOptionsCommand {
             await run(with: out, "Building \(projectName)", ["swift", "build", "-v", "-c", configuration, "--package-path", projectURL.path])
 
             if assemble == true {
+                var env = ProcessInfo.processInfo.environment
+
                 let primaryModuleName = modules.first?.moduleName ?? "App"
-                // gradle assemble --project-dir .build/plugins/outputs/${PACKAGE}/${MODULE}Tests/skipstone -PbuildDir=.build/${MODULE}
-                await run(with: out, "Assembling \(primaryModuleName).apk", ["gradle", "assemble", "--console=plain", "--info", "--project-dir", projectURL.path + "/.build/plugins/outputs/\(projectName)/\(primaryModuleName)/skipstone", "-PbuildDir=.build/\(projectName)"])
+                let gradleProjectDir = projectURL.path + "/.build/plugins/outputs/" + projectName + "/" + primaryModuleName + "/skipstone"
+                let relativeBuildDir = ".build/" + projectName
+
+                let action = "assemble" + configuration.capitalized // turn "debug" into "Debug" and "release" into "Release"
+                await run(with: out, "Assembling \(primaryModuleName).apk", ["gradle", action, "--console=plain", "--info", "--project-dir", gradleProjectDir, "-PbuildDir=" + relativeBuildDir], environment: env)
+                    //{ result in (result, nil) }
+
+                // the expected path for the gradle output folder of the assemble action
+                let outputsPath = gradleProjectDir + "/" + primaryModuleName  + "/" + relativeBuildDir + "/outputs"
+
+                // for example: skipapp-playground/.build/plugins/outputs/skipapp-playground/Playground/skipstone/Playground/.build/skipapp-playground/outputs/apk/release/Playground-release.apk
+                let apkPath = outputsPath + "/apk/" + configuration + "/" + primaryModuleName + "-" + configuration + ".apk"
+                let apkURL = URL(fileURLWithPath: apkPath, isDirectory: false)
+                await outputOptions.monitor(with: out, "Checking \(apkURL.lastPathComponent)", resultHandler: { result in
+                    let fileSize = try? result?.get().resourceValues(forKeys: [.fileSizeKey]).fileSize
+                    return (result, MessageBlock(status: result?.messageStatusAny, "Assembled \(apkURL.lastPathComponent) \(ByteCountFormatter.string(fromByteCount: Int64(fileSize ?? 0), countStyle: .file))"))
+                }) { loggingHandler in
+                    return apkURL
+                }
             }
         }
 

@@ -283,6 +283,7 @@ struct TranspilerInputOptions: ParsableArguments {
     var directory: String? = nil
 
     @Argument(help: ArgumentHelp("List of files to process"))
+    @available(*, deprecated, message: "unused since we no longer trust input file lists from plugin")
     var files: [String] = []
 }
 

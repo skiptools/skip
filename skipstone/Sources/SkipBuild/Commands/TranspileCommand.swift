@@ -70,37 +70,44 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
             return
         }
 
-        let sourceFiles = try inputOptions.files.map(AbsolutePath.init(validating:))
-
         // show the local time in the transpile output; this helps identify from the Xcode Navigator when an old log file is being replayed for a plugin re-execution
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "HH:mm:ss"
 
-        info("Skip \(v): transpile plugin to: \(transpileOptions.outputFolder ?? "nowhere") for: \(sourceFiles.map(\.basename)) at \(dateFormatter.string(from: .now))")
-        try await self.transpile(fs: localFileSystem, sourceFiles: Set(sourceFiles), with: out)
-    }
+        guard let moduleRoot = transpileOptions.moduleRoot else {
+            throw error("Must specify --module-root")
+        }
+        let moduleRootPath = try AbsolutePath(validating: moduleRoot)
 
-    private func transpile(fs: FileSystem, sourceFiles sourceFileSet: Set<AbsolutePath>, with out: MessageQueue) async throws {
-        // the path that will contain the `skip.yml`
         guard let skipFolder = transpileOptions.skipFolder else {
             throw error("Must specify --skip-folder")
         }
 
+        let fs = localFileSystem
         let baseOutputPath = try fs.currentWorkingDirectory ?? fs.tempDirectory
-
-        // the --project flag
-        let projectFolderPath = try AbsolutePath(validating: transpileOptions.projectFolder, relativeTo: baseOutputPath)
 
         // the --skip-folder flag
         let skipFolderPath = try AbsolutePath(validating: skipFolder, relativeTo: baseOutputPath)
-        if !fs.isDirectory(skipFolderPath) {
-            throw error("In order to transpile the module, a Skip/ folder must exist and contain a skip.yml file at: \(skipFolderPath)")
-        }
+
+        // the --project flag
+        let projectFolderPath = try AbsolutePath(validating: transpileOptions.projectFolder, relativeTo: baseOutputPath)
 
         guard let outputFolder = transpileOptions.outputFolder else {
             throw error("Must specify --output-folder")
         }
         let outputFolderPath = try AbsolutePath(validating: outputFolder, relativeTo: baseOutputPath)
+
+
+        info("Skip \(v): transpile plugin to: \(transpileOptions.outputFolder ?? "nowhere") at \(dateFormatter.string(from: .now))")
+        try await self.transpile(root: baseOutputPath, project: projectFolderPath, module: moduleRootPath, skip: skipFolderPath, output: outputFolderPath, fs: fs, with: out)
+    }
+
+    private func transpile(root rootPath: AbsolutePath, project projectFolderPath: AbsolutePath, module moduleRootPath: AbsolutePath, skip skipFolderPath: AbsolutePath, output outputFolderPath: AbsolutePath, fs: FileSystem, with out: MessageQueue) async throws {
+        // the path that will contain the `skip.yml`
+
+        if !fs.isDirectory(skipFolderPath) {
+            throw error("In order to transpile the module, a Skip/ folder must exist and contain a skip.yml file at: \(skipFolderPath)")
+        }
 
         // when renaming SomeClassA.swift to SomeClassB.swift, the stale SomeClassA.kt file from previous runs will be left behind, and will then cause a "Redeclaration:" error from the Kotlin compiler if they declare the same types
         // so keep a snapshot of the output folder files that existed at the start of the transpile operation, so we can then clean up any output files that are no longer being produced
@@ -144,10 +151,6 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
             return try fs.readFileContents(path)
         }
 
-        guard let moduleRoot = transpileOptions.moduleRoot else {
-            throw error("Must specify --module-root")
-        }
-        let moduleRootPath = try AbsolutePath(validating: moduleRoot)
 
         if !fs.isDirectory(moduleRootPath) {
             try fs.createDirectory(moduleRootPath, recursive: true)
@@ -353,7 +356,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
             if let gradleVersion = transpileOptions.gradleVersion as String? {
                 try generateGradleWrapperProperties(version: gradleVersion)
             }
-            //try generateProguardFile() // TODO: causing errors
+            try generateProguardFile()
             try generatePerModuleGradle()
             try generateGradleProperties()
             try generateSettingsGradle()
@@ -402,9 +405,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
 
             /// Create the proguard-rules.pro file, which configures the optimization settings for release buils
             func generateProguardFile() throws {
-                // NOTE: currently disabled
                 try writeChanges(tag: "proguard", to: moduleRootPath.appending(component: "proguard-rules.pro"), contents: """
-                    -dontobfuscate
                     -keep class skip.** { *; }
                     """.utf8Data, readOnly: true)
             }
@@ -526,25 +527,70 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
 
             // finally, merge with a manually constructed SkipConfig that contains references to the modules this module depends on
             do {
-                var contents: [GradleBlock.BlockOrCommand] = []
+                var moduleDependencyBlocks: [GradleBlock.BlockOrCommand] = []
 
                 for (moduleName, _) in moduleNamePaths {
                     // manually exclude our own module and tests names
                     if isTestModule(moduleName) {
                         if moduleName == "SkipUnit" {
-                            contents += [
+                            moduleDependencyBlocks += [
                                 .init("testImplementation(project(\":\(moduleName)\"))"),
                                 .init("androidTestImplementation(project(\":\(moduleName)\"))")
                             ]
                         } else {
-                            contents += [
+                            moduleDependencyBlocks += [
                                 .init("implementation(project(\":\(moduleName)\"))"),
                             ]
                         }
                     }
                 }
 
-                let localConfig = GradleBlock(contents: [.init(GradleBlock(block: "dependencies", contents: contents))])
+                var localConfig = GradleBlock(contents: [.init(GradleBlock(block: "dependencies", contents: moduleDependencyBlocks))])
+
+                // finally check for the existance of PrimaryModuleName.xcconfig, and if it exists, imports its settings into the manifestPlaceholders dictionary in the `android { defaultConfig { } }` block
+                let moduleXCConfig = rootPath.appending(component: primaryModuleName + ".xcconfig")
+                if fs.isFile(moduleXCConfig) {
+                    var manifestConfigLines: [String] = []
+
+                    // split the xcconfig by lines
+                    let lines = try String(contentsOf: moduleXCConfig.asURL, encoding: .utf8).components(separatedBy: .newlines)
+
+                    for line in lines {
+                        if line.hasPrefix("#") || line.hasPrefix("//") || line.isEmpty {
+                            continue
+                        }
+
+                        let components = line.components(separatedBy: "=")
+                        // note that we do not currently handle conditional lines like "PRODUCT_BUNDLE_IDENTIFIER[config=Debug][sdk=iphoneos*] = myorg.app.App-Name"
+                        if components.count == 2 {
+                            let key = components[0].trimmingCharacters(in: .whitespaces)
+                            let value = components[1].trimmingCharacters(in: .whitespaces)
+                            if !key.isEmpty && !value.isEmpty {
+                                manifestConfigLines += ["""
+                                manifestPlaceholders["\(key)"] = System.getenv("\(key)") ?: "\(value)"
+                                """]
+                            }
+                        }
+                    }
+
+                    // now do some manual configuration of the android properties
+                    manifestConfigLines += ["""
+                    applicationId = manifestPlaceholders["PRODUCT_BUNDLE_IDENTIFIER"] as String
+                    """]
+
+                    manifestConfigLines += ["""
+                    versionCode = (manifestPlaceholders["CURRENT_PROJECT_VERSION"] as String).toInt()
+                    """]
+
+                    manifestConfigLines += ["""
+                    versionName = manifestPlaceholders["MARKETING_VERSION"] as String
+                    """]
+
+                    localConfig.contents?.append(.init(GradleBlock(block: "android", contents: [
+                        .init(GradleBlock(block: "defaultConfig", contents: manifestConfigLines.map({ .a($0) })))
+                    ])))
+                }
+
                 aggregateJSON = try aggregateJSON.merged(with: JSON.object(["build": localConfig.json()]))
             }
 

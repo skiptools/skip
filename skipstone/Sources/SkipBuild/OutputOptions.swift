@@ -306,7 +306,7 @@ extension OutputOptions {
     ///
     /// If we are using a rich terminal (and not specifying plain or JSON output), outputs a progress animation while waiting for the given process to complete
     @discardableResult func monitor<T>(with messenger: MessageQueue, _ message: String, watch: Bool = false, resultHandler: MessageResultHandler<T>?, block monitorAction: @escaping (_ outputHandler: @escaping (String) -> ()) async throws -> T) async -> Result<T, Error> {
-        let flushedLines = self.streams.outputBuffer(reset: true) // reset the output line buffer
+        _ = self.streams.outputBuffer(reset: true) // reset the output line buffer
         let terminalWidth = TerminalController.terminalWidth()
 
         let startTime = Date.now
