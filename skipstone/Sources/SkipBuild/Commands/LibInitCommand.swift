@@ -293,7 +293,7 @@ extension ToolOptionsCommand {
             //CODE_SIGNING_REQUIRED = NO
             """
 
-            let xcconfigURL = projectURL.appending(component: primaryModuleName + ".xcconfig")
+            let xcconfigURL = projectURL.appending(path: primaryModuleName + ".xcconfig")
             try configContents.write(to: xcconfigURL, atomically: true, encoding: .utf8)
             let xcconfigFileName = xcconfigURL.lastPathComponent
 
@@ -783,15 +783,69 @@ extension ToolOptionsCommand {
 """
 
             let xcodeProjectFolder = try projectURL.append(path: primaryModuleName + ".xcodeproj", create: true)
-            let xcodeProjectPbxprojURL = xcodeProjectFolder.appending(component: "project.pbxproj")
+            let xcodeProjectPbxprojURL = xcodeProjectFolder.appending(path: "project.pbxproj")
             // change spaces to tabs in the pbxproj, since that is what Xcode will do when it saves it
             try xcodeProjectContents.replacingOccurrences(of: "    ", with: "\t").write(to: xcodeProjectPbxprojURL, atomically: true, encoding: .utf8)
 
             if archive == true {
                 // xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -archivePath "${ARCHIVE_PATH}" -configuration "${CONFIGURATION}" -scheme "${SKIP_MODULE}" -sdk "iphoneos" -destination "generic/platform=iOS" -jobs 1 archive CODE_SIGNING_ALLOWED=NO
-                let archivePath = ".build/Skip/artifacts/" + configuration.capitalized + "/" + primaryModuleAppTarget + ".xcarchive"
+                let archiveBasePath = ".build/Skip/artifacts/" + configuration.capitalized
 
-                await run(with: out, "Archiving iOS ipa", ["xcodebuild", "-project", xcodeProjectFolder.path, "-derivedDataPath", ".build/DerivedData", "-skipPackagePluginValidation", "-archivePath", archivePath, "-configuration", configuration.capitalized, "-scheme", primaryModuleAppTarget, "-sdk", "iphoneos", "-destination", "generic/platform=iOS", "archive",  "CODE_SIGNING_ALLOWED=NO", "SKIP_BUILD_APK=NO", "SKIP_LAUNCH_APK=NO"])
+                let archivePath = archiveBasePath + "/" + primaryModuleAppTarget + ".xcarchive"
+                let ipaPath = archiveBasePath + "/" + primaryModuleAppTarget + ".ipa"
+                let ipaURL = projectURL.appending(path: ipaPath)
+
+                // note that derivedDataPath and archivePath are relative to CWD rather than
+                let fullArchivePath = projectURL.path + "/" + archivePath
+                let fullDerivedDataPath = projectURL.path + "/.build/DerivedData"
+
+                await run(with: out, "Archiving iOS ipa", [
+                    "xcodebuild",
+                    "-project", xcodeProjectFolder.path,
+                    "-derivedDataPath", fullDerivedDataPath,
+                    "-skipPackagePluginValidation",
+                    "-archivePath", fullArchivePath,
+                    "-configuration", configuration.capitalized,
+                    "-scheme", primaryModuleAppTarget,
+                    "-sdk", "iphoneos",
+                    "-destination", "generic/platform=iOS",
+                    "archive",
+                    "CODE_SIGNING_ALLOWED=NO",
+                    "SKIP_BUILD_APK=NO",
+                    "SKIP_LAUNCH_APK=NO",
+                    "ZERO_AR_DATE=1",
+                ])
+
+                let archiveAppPath = archivePath + "/Products/Applications/" + primaryModuleAppTarget + ".app"
+                let archiveAppURL = projectURL.appending(path: archiveAppPath)
+
+                // TODO: eventually we will want to create the .ipa by the exportArchive mechanism, but that requires code signing and some means to specify the certificates in the tool…
+                // xcodebuild -exportArchive -archivePath /Path/To/Output/YourApp.xcarchive -exportPath /Path/To/ipa/Output/Folder -exportOptionsPlist /Path/To/ExportOptions.plist
+
+                // …so now, just run ditto to create the app zip
+
+                // need to first copy the contents over to a "Payload" folder, since the root of the .ipa needs to be "Payload"
+
+
+                let archiveAppPayloadURL = archiveAppURL
+                    .deletingLastPathComponent()
+                    .appendingPathComponent("Payload", isDirectory: true)
+                try FileManager.default.createDirectory(at: archiveAppPayloadURL, withIntermediateDirectories: false)
+                let archiveAppContentsURL = archiveAppPayloadURL
+                    .appendingPathComponent(archiveAppURL.lastPathComponent, isDirectory: true)
+
+                try FileManager.default.copyItem(at: archiveAppURL, to: archiveAppContentsURL)
+
+                // ditto -c -k --sequesterRsrc /path/to/source /path/to/destination/archive.zip
+                await run(with: out, "Assembing iOS ipa", ["ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", archiveAppPayloadURL.path, ipaURL.path])
+
+                await outputOptions.monitor(with: out, "Checking \(ipaURL.lastPathComponent)", resultHandler: { result in
+                    let fileSize = try? result?.get().resourceValues(forKeys: [.fileSizeKey]).fileSize
+                    return (result, MessageBlock(status: result?.messageStatusAny, "Created \(ipaURL.lastPathComponent) \(ByteCountFormatter.string(fromByteCount: Int64(fileSize ?? 0), countStyle: .file))"))
+                }) { loggingHandler in
+                    return ipaURL
+                }
+
             }
 
         }
