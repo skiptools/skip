@@ -17,8 +17,8 @@ final class SkipCommandTests: XCTestCase {
     }
 
     func testLibInitCommand() async throws {
-        let basicProject = try await libInitComand(projectName: "basicProject", moduleNames: "SomeModule")
-        XCTAssertEqual(basicProject ?? "", """
+        let (projectURL, projectTree) = try await libInitComand(projectName: "basicProject", moduleNames: "SomeModule")
+        XCTAssertEqual(projectTree ?? "", """
         .
         ├─ Package.swift
         ├─ README.md
@@ -39,48 +39,82 @@ final class SkipCommandTests: XCTestCase {
               └─ XCSkipTests.swift
 
         """)
+
+        let XCSkipTests = try String(contentsOf: URL(fileURLWithPath: "Tests/SomeModuleTests/XCSkipTests.swift", isDirectory: false, relativeTo: projectURL))
+        XCTAssertTrue(XCSkipTests.contains("testSkipModule()"))
     }
 
     func testLibInitAppCommand() async throws {
-        let basicProject = try await libInitComand(projectName: "cool-app", appid: "some.cool.app", moduleNames: "CoolApp", "CoolModel")
-        XCTAssertEqual(basicProject ?? "", """
+        let (projectURL, projectTree) = try await libInitComand(projectName: "cool-app", appid: "some.cool.app", moduleNames: "MODULE_NAME:skip-ui/SkipUI")
+        XCTAssertEqual(projectTree ?? "", """
         .
+        ├─ MODULE_NAME.xcconfig
+        ├─ MODULE_NAME.xcodeproj
+        │  └─ project.pbxproj
         ├─ Package.swift
         ├─ README.md
         ├─ Sources
-        │  ├─ CoolApp
-        │  │  ├─ CoolApp.swift
+        │  ├─ MODULE_NAME
+        │  │  ├─ ContentView.swift
+        │  │  ├─ MODULE_NAME.swift
+        │  │  ├─ MODULE_NAMEApp.swift
         │  │  ├─ Resources
         │  │  │  └─ Localizable.xcstrings
         │  │  └─ Skip
         │  │     ├─ AndroidManifest.xml
         │  │     └─ skip.yml
-        │  └─ CoolModel
-        │     ├─ CoolModel.swift
-        │     ├─ Resources
-        │     │  └─ Localizable.xcstrings
-        │     └─ Skip
-        │        └─ skip.yml
+        │  └─ MODULE_NAMEApp
+        │     ├─ Assets.xcassets
+        │     │  ├─ AccentColor.colorset
+        │     │  │  └─ Contents.json
+        │     │  ├─ AppIcon.appiconset
+        │     │  │  └─ Contents.json
+        │     │  └─ Contents.json
+        │     └─ MODULE_NAMEAppMain.swift
         └─ Tests
-           ├─ CoolAppTests
-           │  ├─ CoolAppTests.swift
-           │  ├─ Resources
-           │  │  └─ TestData.json
-           │  ├─ Skip
-           │  │  └─ skip.yml
-           │  └─ XCSkipTests.swift
-           └─ CoolModelTests
-              ├─ CoolModelTests.swift
+           └─ MODULE_NAMETests
+              ├─ MODULE_NAMETests.swift
               ├─ Resources
               │  └─ TestData.json
               ├─ Skip
               │  └─ skip.yml
               └─ XCSkipTests.swift
-        
+
+        """)
+
+        let load = { try String(contentsOf: URL(fileURLWithPath: $0, isDirectory: false, relativeTo: projectURL)) }
+        let AndroidManifest = try load("Sources/MODULE_NAME/Skip/AndroidManifest.xml")
+        XCTAssertTrue(AndroidManifest.contains("android.intent.category.LAUNCHER"))
+        let PackageSwift = try load("Package.swift")
+        XCTAssertEqual(PackageSwift, """
+        // swift-tools-version: 5.9
+        // This is a [Skip](https://skip.tools) package,
+        // containing Swift "ModuleName" library targets
+        // that will use the Skip plugin to transpile the
+        // Swift Package, Sources, and Tests into an
+        // Android Gradle Project with Kotlin sources and JUnit tests.
+        import PackageDescription
+
+        let package = Package(
+            name: "cool-app",
+            defaultLocalization: "en",
+            platforms: [.iOS(.v16), .macOS(.v13), .tvOS(.v16), .watchOS(.v9), .macCatalyst(.v16)],
+            products: [
+                .library(name: "MODULE_NAME", type: .dynamic, targets: ["MODULE_NAME"]),
+            ],
+            dependencies: [
+                .package(url: "https://source.skip.tools/skip.git", from: "0.0.0"),
+                .package(url: "https://source.skip.tools/skip-ui.git", from: "0.0.0")
+        ],
+            targets: [
+                .target(name: "MODULE_NAME", dependencies: [.product(name: "SkipUI", package: "skip-ui")], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                .testTarget(name: "MODULE_NAMETests", dependencies: ["MODULE_NAME", .product(name: "SkipTest", package: "skip")], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
+            ]
+        )
         """)
     }
 
-    func libInitComand(projectName: String, appid: String? = nil, resourcePath: String? = "Resources", moduleNames: String...) async throws -> String? {
+   func libInitComand(projectName: String, appid: String? = nil, resourcePath: String? = "Resources", moduleNames: String...) async throws -> (projectURL: URL, projectTree: String?) {
         let tmpDir = URL(fileURLWithPath: UUID().uuidString, isDirectory: true, relativeTo: URL(fileURLWithPath: NSTemporaryDirectory() + "/testLibInitCommand/", isDirectory: true))
         try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
         var cmd = ["lib", "init", "-jA", "--no-build", "--no-test", "--tree"]
@@ -98,7 +132,7 @@ final class SkipCommandTests: XCTestCase {
         let created = try await skipstone(cmd).json()
         XCTAssertEqual(created.array?.first, ["msg": .string("Initializing Skip library \(projectName)")])
         // return the tree output, which is in the 2nd-to-last message
-        return created.array?.dropLast().last?["msg"]?.string
+       return (projectURL: tmpDir.appending(path: projectName + "/"), projectTree: created.array?.dropLast().last?["msg"]?.string)
     }
 }
 
