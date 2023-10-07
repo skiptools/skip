@@ -42,7 +42,7 @@ final class SkipCommandTests: XCTestCase {
     }
 
     func testLibInitAppCommand() async throws {
-        let basicProject = try await libInitComand(projectName: "cool-app", app: true, moduleNames: "CoolApp", "CoolModel")
+        let basicProject = try await libInitComand(projectName: "cool-app", appid: "some.cool.app", moduleNames: "CoolApp", "CoolModel")
         XCTAssertEqual(basicProject ?? "", """
         .
         ├─ Package.swift
@@ -80,15 +80,15 @@ final class SkipCommandTests: XCTestCase {
         """)
     }
 
-    func libInitComand(projectName: String, app: Bool = false, resourcePath: String? = "Resources", moduleNames: String...) async throws -> String? {
+    func libInitComand(projectName: String, appid: String? = nil, resourcePath: String? = "Resources", moduleNames: String...) async throws -> String? {
         let tmpDir = URL(fileURLWithPath: UUID().uuidString, isDirectory: true, relativeTo: URL(fileURLWithPath: NSTemporaryDirectory() + "/testLibInitCommand/", isDirectory: true))
         try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
         var cmd = ["lib", "init", "-jA", "--no-build", "--no-test", "--tree"]
         if let resourcePath = resourcePath {
             cmd += ["--resource-path", resourcePath]
         }
-        if app {
-            cmd += ["--app"]
+        if let appid = appid {
+            cmd += ["--appid", appid]
         }
         cmd += ["-d", tmpDir.path]
 

@@ -31,8 +31,11 @@ struct LibInitCommand: MessageCommand, CreateOptionsCommand, ToolOptionsCommand,
     @Argument(help: ArgumentHelp("The module name(s) to create"))
     var moduleNames: [String]
 
-    @Flag(help: ArgumentHelp("Create an App.xcodeproj and embed module as an app"))
-    var app: Bool = false
+    @Option(help: ArgumentHelp("Embed the library as an app with the given bundle id"))
+    var appid: String? = nil
+
+    @Option(help: ArgumentHelp("Set the initial version to the given value"))
+    var version: String? = nil
 
     @Flag(help: ArgumentHelp("Build the Android .apk file"))
     var assemble: Bool = false
@@ -54,15 +57,17 @@ struct LibInitCommand: MessageCommand, CreateOptionsCommand, ToolOptionsCommand,
 
         let dir = self.createOptions.dir ?? "."
 
-        let createdURL = try await buildSkipProject(projectName: self.projectName, modules: self.modules, resourceFolder: createOptions.resourcePath, dir: dir, configuration: createOptions.configuration, build: buildOptions.build, test: buildOptions.test, tree: self.createOptions.tree, chain: createOptions.chain, app: self.app, assemble: assemble, archive: archive, with: out)
+        let createdURL = try await buildSkipProject(projectName: self.projectName, modules: self.modules, resourceFolder: createOptions.resourcePath, dir: dir, configuration: createOptions.configuration, build: buildOptions.build, test: buildOptions.test, tree: self.createOptions.tree, chain: createOptions.chain, appid: self.appid, version: self.version, assemble: assemble, archive: archive, with: out)
 
         await out.yield(MessageBlock(status: .pass, "Created module \(moduleNames.joined(separator: ", ")) in \(createdURL.path)"))
     }
 }
 
 extension ToolOptionsCommand {
-    func buildSkipProject(projectName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: String, configuration: String, build: Bool, test: Bool, tree: Bool, chain: Bool, app: Bool, assemble: Bool, archive: Bool, with out: MessageQueue) async throws -> URL {
-        let projectURL = try await initSkipLibrary(projectName: projectName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, chain: chain, app: app, with: out)
+    func buildSkipProject(projectName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: String, configuration: String, build: Bool, test: Bool, tree: Bool, chain: Bool, appid: String?, version: String?, assemble: Bool, archive: Bool, with out: MessageQueue) async throws -> URL {
+        let projectURL = try await initSkipLibrary(projectName: projectName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, chain: chain, app: appid != nil, with: out)
+
+        
         if tree {
             await showFileTree(in: try projectURL.absolutePath, with: out)
         }
