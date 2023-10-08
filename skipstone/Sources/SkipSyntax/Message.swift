@@ -76,7 +76,7 @@ public struct Message: Error, Codable {
 
 extension Message {
     static let deprecatedLabel = "This API is deprecated"
-    static let unavailableLabel = "This API is not available in Skip"
+    static let unavailableLabel = "This API is not yet available in Skip. Consider filing an issue against the owning library at https://github.com/skiptools, or see the library README for information on adding support"
     static let maybeUnavailableLabel = "Detected possible use of API that is not available in Skip. This may cause errors when converting to Kotlin"
 
     static func unsupportedSyntax(_ syntax: SyntaxProtocol, source: Source) -> Message {
