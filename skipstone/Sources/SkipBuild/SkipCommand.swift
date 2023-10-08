@@ -240,6 +240,20 @@ extension FileManager {
         URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
     }
 #endif
+
+    /// Sets the modification time of all the files and folders under the given directory (inclusive) to the epoch, which defaults to January 1970.
+    func zeroFileTimes(under directory: URL, epoch: Date = Date(timeIntervalSince1970: 0.0)) throws {
+        if let pathEnumerator = self.enumerator(at: directory, includingPropertiesForKeys: nil, options: []) {
+            for path in pathEnumerator {
+                if let url = path as? URL {
+                    try self.setAttributes([FileAttributeKey.modificationDate: epoch], ofItemAtPath: url.path)
+                }
+            }
+        }
+
+        // the parent directory itself is not included in the enumerator
+        try self.setAttributes([FileAttributeKey.modificationDate: epoch], ofItemAtPath: directory.path)
+    }
 }
 
 // MARK: Command Phases

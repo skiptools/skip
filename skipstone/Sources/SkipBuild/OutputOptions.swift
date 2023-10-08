@@ -196,7 +196,7 @@ extension ToolOptionsCommand {
 
     /// Executes a tool with the given arguments and prefix message, waits for the result while showing a progress animation,
     /// and then processes the result and outputs the given message block.
-    @discardableResult func run(with messenger: MessageQueue, _ message: String, _ commandArgs: [String], environment: [String: String] = ProcessInfo.processInfo.environment, watch: Bool = true, resultHandler finalResultHandler: MessageResultHandler<ProcessOutput>? = nil) async -> Result<ProcessOutput, Error> {
+    @discardableResult func run(with messenger: MessageQueue, _ message: String, _ commandArgs: [String], environment: [String: String] = ProcessInfo.processInfo.environment, in workingDirectory: URL? = nil, watch: Bool = true, resultHandler finalResultHandler: MessageResultHandler<ProcessOutput>? = nil) async -> Result<ProcessOutput, Error> {
 
         // default to a result handler that outputs the duration of the operation
         let resultHandler = finalResultHandler ?? Self.timingResultHandler(message: message)
@@ -259,7 +259,12 @@ extension ToolOptionsCommand {
                 }
             }
             
-            let process = Process(arguments: args, environment: environment, outputRedirection: .stream(stdout: addBuffer(err: false), stderr: addBuffer(err: true)), loggingHandler: nil)
+            // Process has a constructor with a non-optional working dirctory, and another constructor without one, but no constructor that acceps an optional, so we have to create it in one of two separate paths
+            let process = workingDirectory != nil
+                ? Process(arguments: args, environment: environment, workingDirectory: try workingDirectory!.absolutePath, outputRedirection: .stream(stdout: addBuffer(err: false), stderr: addBuffer(err: true)), loggingHandler: nil)
+                : Process(arguments: args, environment: environment, outputRedirection: .stream(stdout: addBuffer(err: false), stderr: addBuffer(err: true)), loggingHandler: nil)
+
+
             try process.launch()
             let result = try await process.waitUntilExit()
 

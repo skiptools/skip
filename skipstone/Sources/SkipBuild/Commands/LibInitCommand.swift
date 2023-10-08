@@ -38,10 +38,10 @@ struct LibInitCommand: MessageCommand, CreateOptionsCommand, ToolOptionsCommand,
     var version: String? = nil
 
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Build the Android .apk file"))
-    var assemble: Bool = false
+    var apk: Bool = false
 
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Build the iOS .ipa file"))
-    var archive: Bool = false
+    var ipa: Bool = false
 
     /// Attempts to parse module names like "skiptools/skip-ui/SkipUI" into a full repo and path
     var modules: [PackageModule] {
@@ -57,14 +57,14 @@ struct LibInitCommand: MessageCommand, CreateOptionsCommand, ToolOptionsCommand,
 
         let dir = self.createOptions.dir ?? "."
 
-        let createdURL = try await buildSkipProject(projectName: self.projectName, modules: self.modules, resourceFolder: createOptions.resourcePath, dir: dir, configuration: createOptions.configuration, build: buildOptions.build, test: buildOptions.test, tree: self.createOptions.tree, chain: createOptions.chain, appid: self.appid, version: self.version, assemble: assemble, archive: archive, with: out)
+        let createdURL = try await buildSkipProject(projectName: self.projectName, modules: self.modules, resourceFolder: createOptions.resourcePath, dir: dir, configuration: createOptions.configuration, build: buildOptions.build, test: buildOptions.test, tree: self.createOptions.tree, chain: createOptions.chain, appid: self.appid, version: self.version, apk: apk, ipa: ipa, with: out)
 
         await out.yield(MessageBlock(status: .pass, "Created module \(moduleNames.joined(separator: ", ")) in \(createdURL.path)"))
     }
 }
 
 extension ToolOptionsCommand {
-    func buildSkipProject(projectName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: String, configuration: String, build: Bool, test: Bool, tree: Bool, chain: Bool, appid: String?, version: String?, assemble: Bool, archive: Bool, with out: MessageQueue) async throws -> URL {
+    func buildSkipProject(projectName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: String, configuration: String, build: Bool, test: Bool, tree: Bool, chain: Bool, appid: String?, version: String?, apk: Bool, ipa: Bool, with out: MessageQueue) async throws -> URL {
         let projectURL = try await initSkipLibrary(projectName: projectName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, chain: chain, app: appid != nil, with: out)
 
         let projectPath = try projectURL.absolutePath
@@ -118,56 +118,58 @@ extension ToolOptionsCommand {
             }
 
             #else
-            import android.app.__
-            import android.Content.Context
-            import android.appcompat.app.__
-            import android.activity.compose.__
-            import android.compose.foundation.layout.__
-            import android.compose.runtime.__
-            import android.compose.material3.__
-            import android.compose.foundation.__
-            import android.compose.ui.__
-            import android.compose.ui.platform.__
+            import android.Manifest
+            import android.app.Application
+            import androidx.activity.compose.setContent
+            import androidx.appcompat.app.AppCompatActivity
+            import androidx.compose.foundation.isSystemInDarkTheme
+            import androidx.compose.material3.ExperimentalMaterial3Api
+            import androidx.compose.material3.MaterialTheme
+            import androidx.compose.material3.darkColorScheme
+            import androidx.compose.material3.dynamicDarkColorScheme
+            import androidx.compose.material3.dynamicLightColorScheme
+            import androidx.compose.material3.lightColorScheme
+            import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+            import androidx.compose.ui.platform.LocalContext
+            import androidx.core.app.ActivityCompat
 
-            /// AndroidAppMain is the `android.app.Application` entry point, and must match `application android:name` in the AndroidMainfest.xml file
+            /// AndroidAppMain is the `android.app.Application` entry point, and must match `application android:name` in the AndroidMainfest.xml file.
             public class AndroidAppMain : Application {
                 public init() {
                 }
 
                 public override func onCreate() {
                     super.onCreate()
+                    logger.info("starting app")
                     ProcessInfo.launch(applicationContext)
                 }
             }
 
+            /// AndroidAppMain is initial `androidx.appcompat.app.AppCompatActivity`, and must match `activity android:name` in the AndroidMainfest.xml file.
             @ExperimentalMaterial3Api
-            @Composable func RootView() {
-                let context: Context = LocalContext.current
-                let darkMode = isSystemInDarkTheme()
-                let dynamicColor = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
-                let typography = Typography()
-                let colorScheme = dynamicColor
-                    ? (darkMode ? dynamicDarkColorScheme(context) : dynamicLightColorScheme(context))
-                    : (darkMode ? darkColorScheme() : lightColorScheme())
-
-                MaterialTheme(colorScheme: colorScheme, typography: typography) {
-                    Box(modifier: Modifier.fillMaxSize(), contentAlignment: androidx.compose.ui.Alignment.Center) {
-                        ContentView().Compose()
-                    }
-                }
-            }
-
-            /// MainActivity is initial `androidx.appcompat.app.AppCompatActivity`, and must match `activity android:name` in the AndroidMainfest.xml file
             public class MainActivity : AppCompatActivity {
                 public init() {
                 }
 
-                @ExperimentalMaterial3Api
                 public override func onCreate(savedInstanceState: android.os.Bundle?) {
                     super.onCreate(savedInstanceState)
+
                     setContent {
-                        RootView()
+                        let saveableStateHolder = rememberSaveableStateHolder()
+                        saveableStateHolder.SaveableStateProvider(true) {
+                            MaterialThemedContentView()
+                        }
                     }
+
+                    let permissions = listOf(
+                        Manifest.permission.ACCESS_COARSE_LOCATION,
+                        Manifest.permission.ACCESS_FINE_LOCATION
+                        //Manifest.permission.CAMERA,
+                        //Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                    )
+
+                    let requestTag = 1 // TODO: handle with onRequestPermissionsResult
+                    ActivityCompat.requestPermissions(self, permissions.toTypedArray(), requestTag)
                 }
 
                 public override func onSaveInstanceState(bundle: android.os.Bundle) {
@@ -175,39 +177,62 @@ extension ToolOptionsCommand {
                 }
 
                 public override func onRestoreInstanceState(bundle: android.os.Bundle) {
+                    // Usually you restore your state in onCreate(). It is possible to restore it in onRestoreInstanceState() as well, but not very common. (onRestoreInstanceState() is called after onStart(), whereas onCreate() is called before onStart().
+                    logger.info("onRestoreInstanceState")
                     super.onRestoreInstanceState(bundle)
                 }
 
                 public override func onRestart() {
-                    logger.log("onRestart")
+                    logger.info("onRestart")
                     super.onRestart()
                 }
 
                 public override func onStart() {
-                    logger.log("onStart")
+                    logger.info("onStart")
                     super.onStart()
                 }
 
                 public override func onResume() {
-                    logger.log("onResume")
+                    logger.info("onResume")
                     super.onResume()
                 }
 
                 public override func onPause() {
-                    logger.log("onPause")
+                    logger.info("onPause")
                     super.onPause()
                 }
 
                 public override func onStop() {
-                    logger.log("onStop")
+                    logger.info("onStop")
                     super.onStop()
                 }
 
                 public override func onDestroy() {
-                    logger.log("onDestroy")
+                    logger.info("onDestroy")
                     super.onDestroy()
                 }
+
+                public override func onRequestPermissionsResult(requestCode: Int, permissions: kotlin.Array<String>, grantResults: IntArray) {
+                    logger.info("onRequestPermissionsResult: \\(requestCode)")
+                }
             }
+
+            @ExperimentalMaterial3Api
+            @Composable func MaterialThemedContentView() {
+                let context = LocalContext.current
+                let darkMode = isSystemInDarkTheme()
+                // Dynamic color is available on Android 12+
+                let dynamicColor = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
+
+                let colorScheme = dynamicColor
+                    ? (darkMode ? dynamicDarkColorScheme(context) : dynamicLightColorScheme(context))
+                    : (darkMode ? darkColorScheme() : lightColorScheme())
+
+                MaterialTheme(colorScheme: colorScheme) {
+                    ContentView().Compose()
+                }
+            }
+
             #endif
 
             """
@@ -787,7 +812,7 @@ extension ToolOptionsCommand {
             // change spaces to tabs in the pbxproj, since that is what Xcode will do when it saves it
             try xcodeProjectContents.replacingOccurrences(of: "    ", with: "\t").write(to: xcodeProjectPbxprojURL, atomically: true, encoding: .utf8)
 
-            if archive == true {
+            if ipa == true {
                 // xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -archivePath "${ARCHIVE_PATH}" -configuration "${CONFIGURATION}" -scheme "${SKIP_MODULE}" -sdk "iphoneos" -destination "generic/platform=iOS" -jobs 1 archive CODE_SIGNING_ALLOWED=NO
                 let archiveBasePath = ".build/Skip/artifacts/" + configuration.capitalized
 
@@ -833,18 +858,20 @@ extension ToolOptionsCommand {
                     .appendingPathComponent(archiveAppURL.lastPathComponent, isDirectory: true)
 
                 try FileManager.default.copyItem(at: archiveAppURL, to: archiveAppContentsURL)
-                try zeroFileTimes(under: archiveAppContentsURL)
+                try FileManager.default.zeroFileTimes(under: archiveAppPayloadURL)
 
                 // ditto -c -k --sequesterRsrc /path/to/source /path/to/destination/archive.zip
-                await run(with: out, "Assembing iOS ipa", ["ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", archiveAppPayloadURL.path, ipaURL.path])
+                // ditto does not create reproducible files
+                // await run(with: out, "Assembing \(ipaURL.lastPathComponent)", ["ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", archiveAppPayloadURL.path, ipaURL.path])
 
-                await outputOptions.monitor(with: out, "Checking \(ipaURL.lastPathComponent)", resultHandler: { result in
-                    let fileURL = try? result?.get()
-                    let fileSize = try? fileURL?.resourceValues(forKeys: [.fileSizeKey]).fileSize
-                    let fileHash = try? fileURL?.SHA256Hash()
-                    return (result, MessageBlock(status: result?.messageStatusAny, "Created \(ipaURL.lastPathComponent) \(ByteCountFormatter.string(fromByteCount: Int64(fileSize ?? 0), countStyle: .file)) \(fileHash ?? "")"))
-                }) { loggingHandler in
-                    return ipaURL
+                await run(with: out, "Assemble \(ipaURL.lastPathComponent)", ["zip", "-9", "-r", ipaURL.path, archiveAppPayloadURL.lastPathComponent], in: archiveAppPayloadURL.deletingLastPathComponent())
+
+                await checkFile(ipaURL, with: out, title: "Verify \(ipaURL.lastPathComponent)") { url in
+                    try "Verify \(ipaURL.lastPathComponent) \(ByteCountFormatter.string(fromByteCount: Int64(url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0), countStyle: .file))"
+                }
+
+                await checkFile(ipaURL, with: out, title: "Checksum Archive") { url in
+                    try "IPA SHA256: \(url.SHA256Hash())"
                 }
             }
         }
@@ -853,12 +880,13 @@ extension ToolOptionsCommand {
             await showFileTree(in: projectPath, with: out)
         }
 
-        if build == true || assemble == true {
+        if build == true || apk == true {
             await run(with: out, "Resolving dependencies", ["swift", "package", "resolve", "-v", "--package-path", projectURL.path])
 
+            // we need to build regardless of preference in order to build the apk
             await run(with: out, "Building \(projectName)", ["swift", "build", "-v", "-c", configuration, "--package-path", projectURL.path])
 
-            if assemble == true { // assemble the .apk
+            if apk == true { // assemble the .apk
                 let env = ProcessInfo.processInfo.environment
 
                 let gradleProjectDir = projectURL.path + "/.build/plugins/outputs/" + projectName + "/" + primaryModuleName + "/skipstone"
@@ -874,12 +902,15 @@ extension ToolOptionsCommand {
                 // for example: skipapp-playground/.build/plugins/outputs/skipapp-playground/Playground/skipstone/Playground/.build/skipapp-playground/outputs/apk/release/Playground-release.apk
                 let apkPath = outputsPath + "/apk/" + configuration + "/" + primaryModuleName + "-" + configuration + ".apk"
                 let apkURL = URL(fileURLWithPath: apkPath, isDirectory: false)
-                await outputOptions.monitor(with: out, "Checking \(apkURL.lastPathComponent)", resultHandler: { result in
-                    let fileSize = try? result?.get().resourceValues(forKeys: [.fileSizeKey]).fileSize
-                    return (result, MessageBlock(status: result?.messageStatusAny, "Created \(apkURL.lastPathComponent) \(ByteCountFormatter.string(fromByteCount: Int64(fileSize ?? 0), countStyle: .file))"))
-                }) { loggingHandler in
-                    return apkURL
+
+                await checkFile(apkURL, with: out, title: "Verify \(apkURL.lastPathComponent)") { url in
+                    try "Verify \(apkURL.lastPathComponent) \(ByteCountFormatter.string(fromByteCount: Int64(url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0), countStyle: .file))"
                 }
+
+                await checkFile(apkURL, with: out, title: "Checksum Archive") { url in
+                    try "APK SHA256: \(url.SHA256Hash())"
+                }
+
             }
         }
 
@@ -890,17 +921,6 @@ extension ToolOptionsCommand {
         return projectURL
     }
 
-    func zeroFileTimes(under directory: URL) throws {
-        let fm = FileManager.default
-        if let pathEnumerator = fm.enumerator(at: directory, includingPropertiesForKeys: nil) {
-            for path in pathEnumerator {
-                if let url = path as? URL {
-                    try fm.setAttributes([FileAttributeKey.modificationDate: Date(timeIntervalSince1970: 0.0)], ofItemAtPath: url.path)
-                }
-            }
-        }
-    }
-    
     func initSkipLibrary(projectName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: String, chain: Bool, app: Bool, with out: MessageQueue) async throws -> URL {
         var isDir: Foundation.ObjCBool = false
         if !FileManager.default.fileExists(atPath: outputFolder, isDirectory: &isDir) {
@@ -1229,6 +1249,27 @@ extension ToolOptionsCommand {
         _ = packageJSON
 
         return projectFolderURL
+    }
+}
+
+extension ToolOptionsCommand {
+
+    /// Perform a monitor check on the given URL
+    func checkFile(_ url: URL, with out: MessageQueue, title: String, handle: @escaping (URL) throws -> String) async {
+        await outputOptions.monitor(with: out, title, resultHandler: { result in
+            do {
+                if let resultURL = try result?.get() {
+                    let message = try handle(resultURL)
+                    return (result, MessageBlock(status: result?.messageStatusAny, message))
+                } else {
+                    return (result, nil)
+                }
+            } catch {
+                return (Result.failure(error), nil)
+            }
+        }) { loggingHandler in
+            return url
+        }
     }
 }
 
