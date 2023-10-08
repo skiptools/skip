@@ -114,7 +114,7 @@ final class SkipCommandTests: XCTestCase {
         """)
     }
 
-   func libInitComand(projectName: String, appid: String? = nil, resourcePath: String? = "Resources", moduleNames: String...) async throws -> (projectURL: URL, projectTree: String?) {
+    func libInitComand(projectName: String, appid: String? = nil, resourcePath: String? = "Resources", moduleNames: String...) async throws -> (projectURL: URL, projectTree: String?) {
         let tmpDir = URL(fileURLWithPath: UUID().uuidString, isDirectory: true, relativeTo: URL(fileURLWithPath: NSTemporaryDirectory() + "/testLibInitCommand/", isDirectory: true))
         try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
         var cmd = ["lib", "init", "-jA", "--no-build", "--no-test", "--tree"]
@@ -132,7 +132,7 @@ final class SkipCommandTests: XCTestCase {
         let created = try await skipstone(cmd).json()
         XCTAssertEqual(created.array?.first, ["msg": .string("Initializing Skip library \(projectName)")])
         // return the tree output, which is in the 2nd-to-last message
-       return (projectURL: tmpDir.appending(path: projectName + "/"), projectTree: created.array?.dropLast().last?["msg"]?.string)
+       return (projectURL: tmpDir.appendingPathComponent(projectName, isDirectory: true), projectTree: created.array?.dropLast().last?["msg"]?.string)
     }
 }
 

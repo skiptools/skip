@@ -825,8 +825,6 @@ extension ToolOptionsCommand {
                 // …so now, just run ditto to create the app zip
 
                 // need to first copy the contents over to a "Payload" folder, since the root of the .ipa needs to be "Payload"
-
-
                 let archiveAppPayloadURL = archiveAppURL
                     .deletingLastPathComponent()
                     .appendingPathComponent("Payload", isDirectory: true)
@@ -835,26 +833,25 @@ extension ToolOptionsCommand {
                     .appendingPathComponent(archiveAppURL.lastPathComponent, isDirectory: true)
 
                 try FileManager.default.copyItem(at: archiveAppURL, to: archiveAppContentsURL)
+                try zeroFileTimes(under: archiveAppContentsURL)
 
                 // ditto -c -k --sequesterRsrc /path/to/source /path/to/destination/archive.zip
                 await run(with: out, "Assembing iOS ipa", ["ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", archiveAppPayloadURL.path, ipaURL.path])
 
                 await outputOptions.monitor(with: out, "Checking \(ipaURL.lastPathComponent)", resultHandler: { result in
-                    let fileSize = try? result?.get().resourceValues(forKeys: [.fileSizeKey]).fileSize
-                    return (result, MessageBlock(status: result?.messageStatusAny, "Created \(ipaURL.lastPathComponent) \(ByteCountFormatter.string(fromByteCount: Int64(fileSize ?? 0), countStyle: .file))"))
+                    let fileURL = try? result?.get()
+                    let fileSize = try? fileURL?.resourceValues(forKeys: [.fileSizeKey]).fileSize
+                    let fileHash = try? fileURL?.SHA256Hash()
+                    return (result, MessageBlock(status: result?.messageStatusAny, "Created \(ipaURL.lastPathComponent) \(ByteCountFormatter.string(fromByteCount: Int64(fileSize ?? 0), countStyle: .file)) \(fileHash ?? "")"))
                 }) { loggingHandler in
                     return ipaURL
                 }
-
             }
-
         }
 
         if tree {
             await showFileTree(in: projectPath, with: out)
         }
-
-
 
         if build == true || assemble == true {
             await run(with: out, "Resolving dependencies", ["swift", "package", "resolve", "-v", "--package-path", projectURL.path])
@@ -893,6 +890,17 @@ extension ToolOptionsCommand {
         return projectURL
     }
 
+    func zeroFileTimes(under directory: URL) throws {
+        let fm = FileManager.default
+        if let pathEnumerator = fm.enumerator(at: directory, includingPropertiesForKeys: nil) {
+            for path in pathEnumerator {
+                if let url = path as? URL {
+                    try fm.setAttributes([FileAttributeKey.modificationDate: Date(timeIntervalSince1970: 0.0)], ofItemAtPath: url.path)
+                }
+            }
+        }
+    }
+    
     func initSkipLibrary(projectName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: String, chain: Bool, app: Bool, with out: MessageQueue) async throws -> URL {
         var isDir: Foundation.ObjCBool = false
         if !FileManager.default.fileExists(atPath: outputFolder, isDirectory: &isDir) {

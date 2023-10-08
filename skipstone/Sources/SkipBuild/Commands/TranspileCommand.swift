@@ -208,6 +208,9 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
             //.prettyPrinted, // compacting JSON significantly reduces the size of the codebase files
         ]
 
+        let buildCompletionMarkerPath = try moduleBasePath.appending(skipCompletionMarkerPath(forModule: primaryModuleName))
+        try? fs.removeFileTree(buildCompletionMarkerPath) // delete the build completion marker to force its re-creation
+
         // touch the build marker with the most recent file time from the complete build list
         // if we were to touch it afresh every time, the plugin would be re-executed every time
         defer {
@@ -337,14 +340,10 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
 
                 /// The ordered input paths for source files, in order to identify when input file lists have changed even if none of the contents have
                 let sourceFiles: [String]?
-
-                /// The date of the build; used to ensure the file changes and the transpiler is re-run for input file changes
-                let buildDate: Date
             }
 
-            let marker = SkipMarkerContents(sourceFiles: sourceURLs.map(\.path), buildDate: .now)
-            let outputFilePath = try moduleBasePath.appending(skipCompletionMarkerPath(forModule: primaryModuleName))
-            try writeChanges(tag: "marker", to: outputFilePath, contents: try encoder.encode(marker), readOnly: false)
+            let marker = SkipMarkerContents(sourceFiles: sourceURLs.map(\.path))
+            try writeChanges(tag: "marker", to: buildCompletionMarkerPath, contents: try encoder.encode(marker), readOnly: false)
         }
 
         func saveCodebaseInfo() throws {
