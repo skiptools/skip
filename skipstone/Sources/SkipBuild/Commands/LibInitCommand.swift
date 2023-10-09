@@ -65,6 +65,387 @@ struct LibInitCommand: MessageCommand, CreateOptionsCommand, ToolOptionsCommand,
 }
 
 extension ToolOptionsCommand {
+    fileprivate func createXcodeProj(_ appModuleName: String, _ appMainSwiftFileName: String, _ Assets_xcassets_name: String, _ xcconfigFileName: String, _ primaryModuleAppTarget: String, _ primaryModuleAppMainPath: String, _ Assets_xcassets_path: String) -> String {
+
+        let skipBuildAPKScript = """
+        if [ \\"${SKIP_BUILD_APK}\\" != \\"YES\\" ]; then\\n  echo \\"note: Not building apk due to SKIP_BUILD_APK setting\\"\\n  exit 0\\nfi\\n\\nPLUGIN=${BUILD_ROOT}/../../SourcePackages/artifacts/skip/skip/skip.artifactbundle/macos\\nPATH=${BUILD_ROOT}/Debug:${PLUGIN}:${PATH}:${HOMEBREW_PREFIX:-/opt/homebrew}/bin\\nPROJECT=$(basename ${PROJECT_DIR})\\nSRCPKG=${BUILD_ROOT}/../../SourcePackages\\necho \\"note: Building APK for: ${PROJECT}\\"\\nexport ANDROID_HOME=${ANDROID_HOME:-${HOME}/Library/Android/sdk}\\nwhich skip\\nmkdir -p Skip/build/artifacts/\\nskip gradle --package \\"${PROJECT}\\" --module ${PROJECT_NAME}UI assemble${CONFIGURATION}\\ncd Skip/build/\\nln -sfh ${SRCPKG}/plugins/*.output .\\ncd artifacts/\\n#ln -f ${SRCPKG}/plugins/*.output/*/skipstone/*/build/outputs/apk/*/*.apk .\\nln -f ${SRCPKG}/plugins/*.output/*/skipstone/*/.build/*/outputs/apk/*/*.apk .\\n\\n# this is the expected output file, so ensure that it exists\\nls -lah ${SRCROOT}/Skip/build/artifacts/${PROJECT_NAME}UI-${CONFIGURATION}.apk\\n
+        """
+
+        let skipLaunchAPKScript = """
+        if [ \\"${SKIP_LAUNCH_APK}\\" != \\"YES\\" ]; then\\n  echo \\"note: Not launching apk due to SKIP_LAUNCH_APK setting\\"\\n  exit 0\\nfi\\n\\nPLUGIN=${BUILD_ROOT}/../../SourcePackages/artifacts/skip/skip/skip.artifactbundle/macos\\nPATH=${BUILD_ROOT}/Debug:${PLUGIN}:${PATH}:${HOMEBREW_PREFIX:-/opt/homebrew}/bin\\necho \\"note: Running skip adb install\\"\\nskip adb install -t -r -d -g Skip/build/artifacts/${PROJECT_NAME}UI-${CONFIGURATION}.apk\\necho \\"note: Running skip adb am start-activity\\"\\nskip adb shell am start-activity -S -W -n ${PRODUCT_BUNDLE_IDENTIFIER}/.MainActivity\\n
+        """
+
+
+
+        return """
+            // !$*UTF8*$!
+{
+    archiveVersion = 1;
+    classes = {
+    };
+    objectVersion = 56;
+    objects = {
+
+/* Begin PBXBuildFile section */
+        49231BAC2AC5BCEF00F98ADF /* \(appModuleName) in Frameworks */ = {isa = PBXBuildFile; productRef = 49231BAB2AC5BCEF00F98ADF /* \(appModuleName) */; };
+        49231BAD2AC5BCEF00F98ADF /* \(appModuleName) in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 49231BAB2AC5BCEF00F98ADF /* \(appModuleName) */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+        499CD43B2AC5B799001AE8D8 /* \(appMainSwiftFileName) in Sources */ = {isa = PBXBuildFile; fileRef = 49F90C2B2A52156200F06D93 /* \(appMainSwiftFileName) */; };
+        499CD4402AC5B799001AE8D8 /* \(Assets_xcassets_name) in Resources */ = {isa = PBXBuildFile; fileRef = 49F90C2F2A52156300F06D93 /* \(Assets_xcassets_name) */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+        499CD44A2AC5B9C6001AE8D8 /* Embed Frameworks */ = {
+            isa = PBXCopyFilesBuildPhase;
+            buildActionMask = 2147483647;
+            dstPath = "";
+            dstSubfolderSpec = 10;
+            files = (
+                49231BAD2AC5BCEF00F98ADF /* \(appModuleName) in Embed Frameworks */,
+            );
+            name = "Embed Frameworks";
+            runOnlyForDeploymentPostprocessing = 0;
+        };
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+        493609562A6B7EAE00C401E2 /* \(appModuleName) */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = \(appModuleName); path = .; sourceTree = "<group>"; };
+        496EB72F2A6AE4DE00C1253B /* \(xcconfigFileName) */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = \(xcconfigFileName); sourceTree = "<group>"; };
+        4990AB3B2A91AFC5005777FD /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = Platforms/MacOSX.platform/Developer/Library/Frameworks/XCTest.framework; sourceTree = DEVELOPER_DIR; };
+        499CD4442AC5B799001AE8D8 /* \(primaryModuleAppTarget).app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = \(primaryModuleAppTarget).app; sourceTree = BUILT_PRODUCTS_DIR; };
+        49F90C2B2A52156200F06D93 /* \(appMainSwiftFileName) */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = \(appMainSwiftFileName); path = \(primaryModuleAppMainPath); sourceTree = SOURCE_ROOT; };
+        49F90C2F2A52156300F06D93 /* \(Assets_xcassets_name) */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = \(Assets_xcassets_name); path = \(Assets_xcassets_path); sourceTree = "<group>"; };
+        49F90C312A52156300F06D93 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = App.entitlements; path = Sources/App/App.entitlements; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+        499CD43C2AC5B799001AE8D8 /* Frameworks */ = {
+            isa = PBXFrameworksBuildPhase;
+            buildActionMask = 2147483647;
+            files = (
+                49231BAC2AC5BCEF00F98ADF /* \(appModuleName) in Frameworks */,
+            );
+            runOnlyForDeploymentPostprocessing = 0;
+        };
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+        49429E532A61E02A00AA21A8 /* Frameworks */ = {
+            isa = PBXGroup;
+            children = (
+                4990AB3B2A91AFC5005777FD /* XCTest.framework */,
+            );
+            name = Frameworks;
+            sourceTree = "<group>";
+        };
+        49F90C1F2A52156200F06D93 = {
+            isa = PBXGroup;
+            children = (
+                496EB72F2A6AE4DE00C1253B /* \(xcconfigFileName) */,
+                493609562A6B7EAE00C401E2 /* \(appModuleName) */,
+                49F90C2A2A52156200F06D93 /* App */,
+                49F90C292A52156200F06D93 /* Products */,
+                49429E532A61E02A00AA21A8 /* Frameworks */,
+            );
+            sourceTree = "<group>";
+        };
+        49F90C292A52156200F06D93 /* Products */ = {
+            isa = PBXGroup;
+            children = (
+                499CD4442AC5B799001AE8D8 /* \(primaryModuleAppTarget).app */,
+            );
+            name = Products;
+            sourceTree = "<group>";
+        };
+        49F90C2A2A52156200F06D93 /* App */ = {
+            isa = PBXGroup;
+            children = (
+                49F90C2B2A52156200F06D93 /* \(appMainSwiftFileName) */,
+                49F90C2F2A52156300F06D93 /* \(Assets_xcassets_name) */,
+                49F90C312A52156300F06D93 /* App.entitlements */,
+            );
+            name = App;
+            sourceTree = "<group>";
+        };
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+        499CD4382AC5B799001AE8D8 /* \(primaryModuleAppTarget) */ = {
+            isa = PBXNativeTarget;
+            buildConfigurationList = 499CD4412AC5B799001AE8D8 /* Build configuration list for PBXNativeTarget "\(primaryModuleAppTarget)" */;
+            buildPhases = (
+                499CD43A2AC5B799001AE8D8 /* Sources */,
+                499CD43C2AC5B799001AE8D8 /* Frameworks */,
+                499CD43E2AC5B799001AE8D8 /* Resources */,
+                499CD4452AC5B869001AE8D8 /* Build Android APK */,
+                499CD4462AC5B86B001AE8D8 /* Launch Android APK */,
+                499CD44A2AC5B9C6001AE8D8 /* Embed Frameworks */,
+            );
+            buildRules = (
+            );
+            dependencies = (
+            );
+            name = \(primaryModuleAppTarget);
+            packageProductDependencies = (
+                49231BAB2AC5BCEF00F98ADF /* \(appModuleName) */,
+            );
+            productName = App;
+            productReference = 499CD4442AC5B799001AE8D8 /* \(primaryModuleAppTarget).app */;
+            productType = "com.apple.product-type.application";
+        };
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+        49F90C202A52156200F06D93 /* Project object */ = {
+            isa = PBXProject;
+            attributes = {
+                BuildIndependentTargetsInParallel = 1;
+                LastSwiftUpdateCheck = 1430;
+                LastUpgradeCheck = 1500;
+            };
+            buildConfigurationList = 49F90C232A52156200F06D93 /* Build configuration list for PBXProject "\(primaryModuleAppTarget)" */;
+            compatibilityVersion = "Xcode 14.0";
+            developmentRegion = en;
+            hasScannedForEncodings = 0;
+            knownRegions = (
+                en,
+                Base,
+            );
+            mainGroup = 49F90C1F2A52156200F06D93;
+            packageReferences = (
+            );
+            productRefGroup = 49F90C292A52156200F06D93 /* Products */;
+            projectDirPath = "";
+            projectRoot = "";
+            targets = (
+                499CD4382AC5B799001AE8D8 /* \(primaryModuleAppTarget) */,
+            );
+        };
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+        499CD43E2AC5B799001AE8D8 /* Resources */ = {
+            isa = PBXResourcesBuildPhase;
+            buildActionMask = 2147483647;
+            files = (
+                499CD4402AC5B799001AE8D8 /* \(Assets_xcassets_name) in Resources */,
+            );
+            runOnlyForDeploymentPostprocessing = 0;
+        };
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+        499CD4452AC5B869001AE8D8 /* Build Android APK */ = {
+            isa = PBXShellScriptBuildPhase;
+            alwaysOutOfDate = 1;
+            buildActionMask = 2147483647;
+            files = (
+            );
+            inputFileListPaths = (
+            );
+            inputPaths = (
+            );
+            name = "Build Android APK";
+            outputFileListPaths = (
+            );
+            outputPaths = (
+            );
+            runOnlyForDeploymentPostprocessing = 0;
+            shellPath = "/bin/sh -e";
+            shellScript = "\(skipBuildAPKScript)";
+        };
+        499CD4462AC5B86B001AE8D8 /* Launch Android APK */ = {
+            isa = PBXShellScriptBuildPhase;
+            alwaysOutOfDate = 1;
+            buildActionMask = 2147483647;
+            files = (
+            );
+            inputFileListPaths = (
+            );
+            inputPaths = (
+            );
+            name = "Launch Android APK";
+            outputFileListPaths = (
+            );
+            outputPaths = (
+            );
+            runOnlyForDeploymentPostprocessing = 0;
+            shellPath = "/bin/sh -e";
+            shellScript = "\(skipLaunchAPKScript)";
+        };
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+        499CD43A2AC5B799001AE8D8 /* Sources */ = {
+            isa = PBXSourcesBuildPhase;
+            buildActionMask = 2147483647;
+            files = (
+                499CD43B2AC5B799001AE8D8 /* \(appMainSwiftFileName) in Sources */,
+            );
+            runOnlyForDeploymentPostprocessing = 0;
+        };
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+        491FCC8E2AD18D38002FB1E1 /* Skippy */ = {
+            isa = XCBuildConfiguration;
+            baseConfigurationReference = 496EB72F2A6AE4DE00C1253B /* \(xcconfigFileName) */;
+            buildSettings = {
+                ALWAYS_SEARCH_USER_PATHS = NO;
+                ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+                COPY_PHASE_STRIP = NO;
+                DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+                ENABLE_NS_ASSERTIONS = NO;
+                ENABLE_STRICT_OBJC_MSGSEND = YES;
+                ENABLE_USER_SCRIPT_SANDBOXING = NO;
+                LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+                MTL_ENABLE_DEBUG_INFO = NO;
+                MTL_FAST_MATH = YES;
+                SWIFT_COMPILATION_MODE = wholemodule;
+            };
+            name = Skippy;
+        };
+        491FCC8F2AD18D38002FB1E1 /* Skippy */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+                ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+                CODE_SIGN_ENTITLEMENTS = Sources/App/App.entitlements;
+                CODE_SIGN_STYLE = Automatic;
+                ENABLE_PREVIEWS = YES;
+                GENERATE_INFOPLIST_FILE = YES;
+                IPHONEOS_DEPLOYMENT_TARGET = 16.4;
+                LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+                "LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+                MACOSX_DEPLOYMENT_TARGET = 13.4;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                SDKROOT = auto;
+                SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+                SWIFT_EMIT_LOC_STRINGS = YES;
+                SWIFT_VERSION = 5.0;
+                TARGETED_DEVICE_FAMILY = "1,2";
+            };
+            name = Skippy;
+        };
+        499CD4422AC5B799001AE8D8 /* Debug */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+                ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+                CODE_SIGN_ENTITLEMENTS = Sources/App/App.entitlements;
+                CODE_SIGN_STYLE = Automatic;
+                ENABLE_PREVIEWS = YES;
+                GENERATE_INFOPLIST_FILE = YES;
+                IPHONEOS_DEPLOYMENT_TARGET = 16.4;
+                LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+                "LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+                MACOSX_DEPLOYMENT_TARGET = 13.4;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                SDKROOT = auto;
+                SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+                SWIFT_EMIT_LOC_STRINGS = YES;
+                SWIFT_VERSION = 5.0;
+                TARGETED_DEVICE_FAMILY = "1,2";
+            };
+            name = Debug;
+        };
+        499CD4432AC5B799001AE8D8 /* Release */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+                ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+                CODE_SIGN_ENTITLEMENTS = Sources/App/App.entitlements;
+                CODE_SIGN_STYLE = Automatic;
+                ENABLE_PREVIEWS = YES;
+                GENERATE_INFOPLIST_FILE = YES;
+                IPHONEOS_DEPLOYMENT_TARGET = 16.4;
+                LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+                "LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+                MACOSX_DEPLOYMENT_TARGET = 13.4;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                SDKROOT = auto;
+                SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+                SWIFT_EMIT_LOC_STRINGS = YES;
+                SWIFT_VERSION = 5.0;
+                TARGETED_DEVICE_FAMILY = "1,2";
+            };
+            name = Release;
+        };
+        49F90C4B2A52156300F06D93 /* Debug */ = {
+            isa = XCBuildConfiguration;
+            baseConfigurationReference = 496EB72F2A6AE4DE00C1253B /* \(xcconfigFileName) */;
+            buildSettings = {
+                ALWAYS_SEARCH_USER_PATHS = NO;
+                ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+                COPY_PHASE_STRIP = NO;
+                DEBUG_INFORMATION_FORMAT = dwarf;
+                ENABLE_STRICT_OBJC_MSGSEND = YES;
+                ENABLE_TESTABILITY = YES;
+                ENABLE_USER_SCRIPT_SANDBOXING = NO;
+                LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+                MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+                MTL_FAST_MATH = YES;
+                ONLY_ACTIVE_ARCH = YES;
+                SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+                SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+            };
+            name = Debug;
+        };
+        49F90C4C2A52156300F06D93 /* Release */ = {
+            isa = XCBuildConfiguration;
+            baseConfigurationReference = 496EB72F2A6AE4DE00C1253B /* \(xcconfigFileName) */;
+            buildSettings = {
+                ALWAYS_SEARCH_USER_PATHS = NO;
+                ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+                COPY_PHASE_STRIP = NO;
+                DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+                ENABLE_NS_ASSERTIONS = NO;
+                ENABLE_STRICT_OBJC_MSGSEND = YES;
+                ENABLE_USER_SCRIPT_SANDBOXING = NO;
+                LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+                MTL_ENABLE_DEBUG_INFO = NO;
+                MTL_FAST_MATH = YES;
+                SWIFT_COMPILATION_MODE = wholemodule;
+            };
+            name = Release;
+        };
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+        499CD4412AC5B799001AE8D8 /* Build configuration list for PBXNativeTarget "\(primaryModuleAppTarget)" */ = {
+            isa = XCConfigurationList;
+            buildConfigurations = (
+                499CD4422AC5B799001AE8D8 /* Debug */,
+                499CD4432AC5B799001AE8D8 /* Release */,
+                491FCC8F2AD18D38002FB1E1 /* Skippy */,
+            );
+            defaultConfigurationIsVisible = 0;
+            defaultConfigurationName = Release;
+        };
+        49F90C232A52156200F06D93 /* Build configuration list for PBXProject "\(primaryModuleAppTarget)" */ = {
+            isa = XCConfigurationList;
+            buildConfigurations = (
+                49F90C4B2A52156300F06D93 /* Debug */,
+                49F90C4C2A52156300F06D93 /* Release */,
+                491FCC8E2AD18D38002FB1E1 /* Skippy */,
+            );
+            defaultConfigurationIsVisible = 0;
+            defaultConfigurationName = Release;
+        };
+/* End XCConfigurationList section */
+
+/* Begin XCSwiftPackageProductDependency section */
+        49231BAB2AC5BCEF00F98ADF /* \(appModuleName) */ = {
+            isa = XCSwiftPackageProductDependency;
+            productName = \(appModuleName);
+        };
+/* End XCSwiftPackageProductDependency section */
+    };
+    rootObject = 49F90C202A52156200F06D93 /* Project object */;
+}
+
+"""
+    }
+
     func buildSkipProject(projectName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: String, configuration: String, build: Bool, test: Bool, tree: Bool, chain: Bool, appid: String?, version: String?, apk: Bool, ipa: Bool, with out: MessageQueue) async throws -> URL {
         let projectURL = try await initSkipLibrary(projectName: projectName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, chain: chain, app: appid != nil, with: out)
 
@@ -220,15 +601,15 @@ extension ToolOptionsCommand {
                         }
                     }
 
-                    let permissions = listOf(
-                        Manifest.permission.ACCESS_COARSE_LOCATION,
-                        Manifest.permission.ACCESS_FINE_LOCATION
-                        //Manifest.permission.CAMERA,
-                        //Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                    )
-
-                    let requestTag = 1 // TODO: handle with onRequestPermissionsResult
-                    ActivityCompat.requestPermissions(self, permissions.toTypedArray(), requestTag)
+                    // example of requesting permissions on startup:
+                    //let permissions = listOf(
+                    //    Manifest.permission.ACCESS_COARSE_LOCATION,
+                    //    Manifest.permission.ACCESS_FINE_LOCATION
+                    //    Manifest.permission.CAMERA,
+                    //    Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                    //)
+                    //let requestTag = 1
+                    //ActivityCompat.requestPermissions(self, permissions.toTypedArray(), requestTag)
                 }
 
                 public override func onSaveInstanceState(bundle: android.os.Bundle) {
@@ -366,7 +747,7 @@ extension ToolOptionsCommand {
             }
             """
 
-            
+
             let Assets_xcassets_AccentColor_ContentsURL = Assets_xcassets_AccentColor.appending(path: "Contents.json")
             try Assets_xcassets_AccentColor_Contents.write(to: Assets_xcassets_AccentColor_ContentsURL, atomically: true, encoding: .utf8)
 
@@ -391,382 +772,7 @@ extension ToolOptionsCommand {
             try Assets_xcassets_AppIcon_Cotntents.write(to: Assets_xcassets_AppIcon_CotntentsURL, atomically: true, encoding: .utf8)
 
 
-            let skipBuildAPKScript = """
-            if [ \\"${SKIP_BUILD_APK}\\" != \\"YES\\" ]; then\\n  echo \\"note: Not building apk due to SKIP_BUILD_APK setting\\"\\n  exit 0\\nfi\\n\\nPLUGIN=${BUILD_ROOT}/../../SourcePackages/artifacts/skip/skip/skip.artifactbundle/macos\\nPATH=${BUILD_ROOT}/Debug:${PLUGIN}:${PATH}:${HOMEBREW_PREFIX:-/opt/homebrew}/bin\\nPROJECT=$(basename ${PROJECT_DIR})\\nSRCPKG=${BUILD_ROOT}/../../SourcePackages\\necho \\"note: Building APK for: ${PROJECT}\\"\\nexport ANDROID_HOME=${ANDROID_HOME:-${HOME}/Library/Android/sdk}\\nwhich skip\\nmkdir -p Skip/build/artifacts/\\nskip gradle --package \\"${PROJECT}\\" --module ${PROJECT_NAME}UI assemble${CONFIGURATION}\\ncd Skip/build/\\nln -sfh ${SRCPKG}/plugins/*.output .\\ncd artifacts/\\n#ln -f ${SRCPKG}/plugins/*.output/*/skipstone/*/build/outputs/apk/*/*.apk .\\nln -f ${SRCPKG}/plugins/*.output/*/skipstone/*/.build/*/outputs/apk/*/*.apk .\\n\\n# this is the expected output file, so ensure that it exists\\nls -lah ${SRCROOT}/Skip/build/artifacts/${PROJECT_NAME}UI-${CONFIGURATION}.apk\\n
-            """
-
-            let skipLaunchAPKScript = """
-            if [ \\"${SKIP_LAUNCH_APK}\\" != \\"YES\\" ]; then\\n  echo \\"note: Not launching apk due to SKIP_LAUNCH_APK setting\\"\\n  exit 0\\nfi\\n\\nPLUGIN=${BUILD_ROOT}/../../SourcePackages/artifacts/skip/skip/skip.artifactbundle/macos\\nPATH=${BUILD_ROOT}/Debug:${PLUGIN}:${PATH}:${HOMEBREW_PREFIX:-/opt/homebrew}/bin\\necho \\"note: Running skip adb install\\"\\nskip adb install -t -r -d -g Skip/build/artifacts/${PROJECT_NAME}UI-${CONFIGURATION}.apk\\necho \\"note: Running skip adb am start-activity\\"\\nskip adb shell am start-activity -S -W -n ${PRODUCT_BUNDLE_IDENTIFIER}/.MainActivity\\n
-            """
-
-            let xcodeProjectContents = """
-            // !$*UTF8*$!
-{
-	archiveVersion = 1;
-	classes = {
-	};
-	objectVersion = 56;
-	objects = {
-
-/* Begin PBXBuildFile section */
-		49231BAC2AC5BCEF00F98ADF /* \(appModuleName) in Frameworks */ = {isa = PBXBuildFile; productRef = 49231BAB2AC5BCEF00F98ADF /* \(appModuleName) */; };
-		49231BAD2AC5BCEF00F98ADF /* \(appModuleName) in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 49231BAB2AC5BCEF00F98ADF /* \(appModuleName) */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
-		499CD43B2AC5B799001AE8D8 /* \(appMainSwiftFileName) in Sources */ = {isa = PBXBuildFile; fileRef = 49F90C2B2A52156200F06D93 /* \(appMainSwiftFileName) */; };
-		499CD4402AC5B799001AE8D8 /* \(Assets_xcassets_name) in Resources */ = {isa = PBXBuildFile; fileRef = 49F90C2F2A52156300F06D93 /* \(Assets_xcassets_name) */; };
-/* End PBXBuildFile section */
-
-/* Begin PBXCopyFilesBuildPhase section */
-		499CD44A2AC5B9C6001AE8D8 /* Embed Frameworks */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 10;
-			files = (
-				49231BAD2AC5BCEF00F98ADF /* \(appModuleName) in Embed Frameworks */,
-			);
-			name = "Embed Frameworks";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXCopyFilesBuildPhase section */
-
-/* Begin PBXFileReference section */
-		493609562A6B7EAE00C401E2 /* \(appModuleName) */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = \(appModuleName); path = .; sourceTree = "<group>"; };
-		496EB72F2A6AE4DE00C1253B /* \(xcconfigFileName) */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = \(xcconfigFileName); sourceTree = "<group>"; };
-		4990AB3B2A91AFC5005777FD /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = Platforms/MacOSX.platform/Developer/Library/Frameworks/XCTest.framework; sourceTree = DEVELOPER_DIR; };
-		499CD4442AC5B799001AE8D8 /* \(primaryModuleAppTarget).app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = \(primaryModuleAppTarget).app; sourceTree = BUILT_PRODUCTS_DIR; };
-		49F90C2B2A52156200F06D93 /* \(appMainSwiftFileName) */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = \(appMainSwiftFileName); path = \(primaryModuleAppMainPath); sourceTree = SOURCE_ROOT; };
-		49F90C2F2A52156300F06D93 /* \(Assets_xcassets_name) */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = \(Assets_xcassets_name); path = \(Assets_xcassets_path); sourceTree = "<group>"; };
-		49F90C312A52156300F06D93 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = App.entitlements; path = Sources/App/App.entitlements; sourceTree = "<group>"; };
-/* End PBXFileReference section */
-
-/* Begin PBXFrameworksBuildPhase section */
-		499CD43C2AC5B799001AE8D8 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				49231BAC2AC5BCEF00F98ADF /* \(appModuleName) in Frameworks */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXFrameworksBuildPhase section */
-
-/* Begin PBXGroup section */
-		49429E532A61E02A00AA21A8 /* Frameworks */ = {
-			isa = PBXGroup;
-			children = (
-				4990AB3B2A91AFC5005777FD /* XCTest.framework */,
-			);
-			name = Frameworks;
-			sourceTree = "<group>";
-		};
-		49F90C1F2A52156200F06D93 = {
-			isa = PBXGroup;
-			children = (
-				496EB72F2A6AE4DE00C1253B /* \(xcconfigFileName) */,
-				493609562A6B7EAE00C401E2 /* \(appModuleName) */,
-				49F90C2A2A52156200F06D93 /* App */,
-				49F90C292A52156200F06D93 /* Products */,
-				49429E532A61E02A00AA21A8 /* Frameworks */,
-			);
-			sourceTree = "<group>";
-		};
-		49F90C292A52156200F06D93 /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				499CD4442AC5B799001AE8D8 /* \(primaryModuleAppTarget).app */,
-			);
-			name = Products;
-			sourceTree = "<group>";
-		};
-		49F90C2A2A52156200F06D93 /* App */ = {
-			isa = PBXGroup;
-			children = (
-				49F90C2B2A52156200F06D93 /* \(appMainSwiftFileName) */,
-				49F90C2F2A52156300F06D93 /* \(Assets_xcassets_name) */,
-				49F90C312A52156300F06D93 /* App.entitlements */,
-			);
-			name = App;
-			sourceTree = "<group>";
-		};
-/* End PBXGroup section */
-
-/* Begin PBXNativeTarget section */
-		499CD4382AC5B799001AE8D8 /* \(primaryModuleAppTarget) */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 499CD4412AC5B799001AE8D8 /* Build configuration list for PBXNativeTarget "\(primaryModuleAppTarget)" */;
-			buildPhases = (
-				499CD43A2AC5B799001AE8D8 /* Sources */,
-				499CD43C2AC5B799001AE8D8 /* Frameworks */,
-				499CD43E2AC5B799001AE8D8 /* Resources */,
-				499CD4452AC5B869001AE8D8 /* Build Android APK */,
-				499CD4462AC5B86B001AE8D8 /* Launch Android APK */,
-				499CD44A2AC5B9C6001AE8D8 /* Embed Frameworks */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			name = \(primaryModuleAppTarget);
-			packageProductDependencies = (
-				49231BAB2AC5BCEF00F98ADF /* \(appModuleName) */,
-			);
-			productName = App;
-			productReference = 499CD4442AC5B799001AE8D8 /* \(primaryModuleAppTarget).app */;
-			productType = "com.apple.product-type.application";
-		};
-/* End PBXNativeTarget section */
-
-/* Begin PBXProject section */
-		49F90C202A52156200F06D93 /* Project object */ = {
-			isa = PBXProject;
-			attributes = {
-				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 1430;
-				LastUpgradeCheck = 1500;
-			};
-			buildConfigurationList = 49F90C232A52156200F06D93 /* Build configuration list for PBXProject "\(primaryModuleAppTarget)" */;
-			compatibilityVersion = "Xcode 14.0";
-			developmentRegion = en;
-			hasScannedForEncodings = 0;
-			knownRegions = (
-				en,
-				Base,
-			);
-			mainGroup = 49F90C1F2A52156200F06D93;
-			packageReferences = (
-			);
-			productRefGroup = 49F90C292A52156200F06D93 /* Products */;
-			projectDirPath = "";
-			projectRoot = "";
-			targets = (
-				499CD4382AC5B799001AE8D8 /* \(primaryModuleAppTarget) */,
-			);
-		};
-/* End PBXProject section */
-
-/* Begin PBXResourcesBuildPhase section */
-		499CD43E2AC5B799001AE8D8 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				499CD4402AC5B799001AE8D8 /* \(Assets_xcassets_name) in Resources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXResourcesBuildPhase section */
-
-/* Begin PBXShellScriptBuildPhase section */
-		499CD4452AC5B869001AE8D8 /* Build Android APK */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "Build Android APK";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = "/bin/sh -e";
-			shellScript = "\(skipBuildAPKScript)";
-		};
-		499CD4462AC5B86B001AE8D8 /* Launch Android APK */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "Launch Android APK";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = "/bin/sh -e";
-			shellScript = "\(skipLaunchAPKScript)";
-		};
-/* End PBXShellScriptBuildPhase section */
-
-/* Begin PBXSourcesBuildPhase section */
-		499CD43A2AC5B799001AE8D8 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				499CD43B2AC5B799001AE8D8 /* \(appMainSwiftFileName) in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXSourcesBuildPhase section */
-
-/* Begin XCBuildConfiguration section */
-		491FCC8E2AD18D38002FB1E1 /* Skippy */ = {
-			isa = XCBuildConfiguration;
-			baseConfigurationReference = 496EB72F2A6AE4DE00C1253B /* \(xcconfigFileName) */;
-			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
-				COPY_PHASE_STRIP = NO;
-				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				ENABLE_NS_ASSERTIONS = NO;
-				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = NO;
-				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MTL_ENABLE_DEBUG_INFO = NO;
-				MTL_FAST_MATH = YES;
-				SWIFT_COMPILATION_MODE = wholemodule;
-			};
-			name = Skippy;
-		};
-		491FCC8F2AD18D38002FB1E1 /* Skippy */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = Sources/App/App.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.4;
-				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-				MACOSX_DEPLOYMENT_TARGET = 13.4;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = auto;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Skippy;
-		};
-		499CD4422AC5B799001AE8D8 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = Sources/App/App.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.4;
-				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-				MACOSX_DEPLOYMENT_TARGET = 13.4;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = auto;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Debug;
-		};
-		499CD4432AC5B799001AE8D8 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = Sources/App/App.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.4;
-				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-				MACOSX_DEPLOYMENT_TARGET = 13.4;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = auto;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Release;
-		};
-		49F90C4B2A52156300F06D93 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			baseConfigurationReference = 496EB72F2A6AE4DE00C1253B /* \(xcconfigFileName) */;
-			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
-				COPY_PHASE_STRIP = NO;
-				DEBUG_INFORMATION_FORMAT = dwarf;
-				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = NO;
-				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
-				MTL_FAST_MATH = YES;
-				ONLY_ACTIVE_ARCH = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
-				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
-			};
-			name = Debug;
-		};
-		49F90C4C2A52156300F06D93 /* Release */ = {
-			isa = XCBuildConfiguration;
-			baseConfigurationReference = 496EB72F2A6AE4DE00C1253B /* \(xcconfigFileName) */;
-			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
-				COPY_PHASE_STRIP = NO;
-				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				ENABLE_NS_ASSERTIONS = NO;
-				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = NO;
-				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MTL_ENABLE_DEBUG_INFO = NO;
-				MTL_FAST_MATH = YES;
-				SWIFT_COMPILATION_MODE = wholemodule;
-			};
-			name = Release;
-		};
-/* End XCBuildConfiguration section */
-
-/* Begin XCConfigurationList section */
-		499CD4412AC5B799001AE8D8 /* Build configuration list for PBXNativeTarget "\(primaryModuleAppTarget)" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				499CD4422AC5B799001AE8D8 /* Debug */,
-				499CD4432AC5B799001AE8D8 /* Release */,
-				491FCC8F2AD18D38002FB1E1 /* Skippy */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		49F90C232A52156200F06D93 /* Build configuration list for PBXProject "\(primaryModuleAppTarget)" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				49F90C4B2A52156300F06D93 /* Debug */,
-				49F90C4C2A52156300F06D93 /* Release */,
-				491FCC8E2AD18D38002FB1E1 /* Skippy */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-/* End XCConfigurationList section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		49231BAB2AC5BCEF00F98ADF /* \(appModuleName) */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = \(appModuleName);
-		};
-/* End XCSwiftPackageProductDependency section */
-	};
-	rootObject = 49F90C202A52156200F06D93 /* Project object */;
-}
-
-"""
-
+            let xcodeProjectContents = createXcodeProj(appModuleName, appMainSwiftFileName, Assets_xcassets_name, xcconfigFileName, primaryModuleAppTarget, primaryModuleAppMainPath, Assets_xcassets_path)
             let xcodeProjectPbxprojURL = xcodeProjectFolder.appending(path: "project.pbxproj")
             // change spaces to tabs in the pbxproj, since that is what Xcode will do when it saves it
             try xcodeProjectContents.replacingOccurrences(of: "    ", with: "\t").write(to: xcodeProjectPbxprojURL, atomically: true, encoding: .utf8)
@@ -914,11 +920,11 @@ extension ToolOptionsCommand {
         """
 
 
-        #if DEBUG
+#if DEBUG
         let skipPackageVersion = "0.0.0"
-        #else
+#else
         let skipPackageVersion = skipVersion
-        #endif
+#endif
         var packageDependencies: [String] = [
             ".package(url: \"https://source.skip.tools/skip.git\", from: \"\(skipPackageVersion)\")"
         ]

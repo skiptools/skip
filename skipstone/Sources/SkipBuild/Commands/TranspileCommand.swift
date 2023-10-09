@@ -547,30 +547,18 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
                 var localConfig = GradleBlock(contents: [.init(GradleBlock(block: "dependencies", contents: moduleDependencyBlocks))])
 
                 // finally check for the existance of PrimaryModuleName.xcconfig, and if it exists, imports its settings into the manifestPlaceholders dictionary in the `android { defaultConfig { } }` block
-                let moduleXCConfig = rootPath.appending(component: primaryModuleName + ".xcconfig")
+                let configModuleName = primaryModuleName.hasSuffix("Tests") ? String(primaryModuleName.dropLast("Tests".count)) : primaryModuleName
+                let moduleXCConfig = rootPath.appending(component: configModuleName + ".xcconfig")
                 if fs.isFile(moduleXCConfig) {
                     var manifestConfigLines: [String] = []
 
-                    // split the xcconfig by lines
-                    let lines = try String(contentsOf: moduleXCConfig.asURL, encoding: .utf8).components(separatedBy: .newlines)
-
-                    for line in lines {
-                        if line.hasPrefix("#") || line.hasPrefix("//") || line.isEmpty {
-                            continue
-                        }
-
-                        let components = line.components(separatedBy: "=")
-                        // note that we do not currently handle conditional lines like "PRODUCT_BUNDLE_IDENTIFIER[config=Debug][sdk=iphoneos*] = myorg.app.App-Name"
-                        if components.count == 2 {
-                            let key = components[0].trimmingCharacters(in: .whitespaces)
-                            let value = components[1].trimmingCharacters(in: .whitespaces)
-                            if !key.isEmpty && !value.isEmpty {
-                                manifestConfigLines += ["""
-                                manifestPlaceholders["\(key)"] = System.getenv("\(key)") ?: "\(value)"
-                                """]
-                            }
-                        }
+                    let moduleXCConfigContents = try String(contentsOf: moduleXCConfig.asURL, encoding: .utf8)
+                    for (key, value) in parseXCConfig(contents: moduleXCConfigContents) {
+                        manifestConfigLines += ["""
+                        manifestPlaceholders["\(key)"] = System.getenv("\(key)") ?: "\(value)"
+                        """]
                     }
+
 
                     // now do some manual configuration of the android properties
                     manifestConfigLines += ["""
@@ -912,4 +900,26 @@ extension FileManager {
 
         return childFileURLs
     }
+}
+
+/// Parse the simple .xcconfig file format
+func parseXCConfig(contents: String) -> [(key: String, value: String)] {
+    var keyValues: [(key: String, value: String)] = []
+    let lines = contents.components(separatedBy: .newlines)
+    for line in lines {
+        if line.hasPrefix("#") || line.hasPrefix("//") || line.isEmpty {
+            continue
+        }
+
+        let components = line.components(separatedBy: "=")
+        // note that we do not currently handle conditional lines like "PRODUCT_BUNDLE_IDENTIFIER[config=Debug][sdk=iphoneos*] = myorg.app.App-Name"
+        if components.count == 2 {
+            let key = components[0].trimmingCharacters(in: .whitespaces)
+            let value = components[1].trimmingCharacters(in: .whitespaces)
+            if !key.isEmpty && !value.isEmpty {
+                keyValues.append((key, value))
+            }
+        }
+    }
+    return keyValues
 }
