@@ -42,7 +42,7 @@ struct SnippetCommand: SnippetOptionsCommand, StreamingCommand {
 
         // snippets are hardwired to not exceed the default codebase threshold size
         if let codebaseThresholdSize = Self.codebaseThresholdSize, totalSize > codebaseThresholdSize {
-            await out.yield(Output(kotlin: nil, messages: [Message(kind: .error, message: "Snippet too large \(byteCount(for: .init(totalSize)))")], duration: 0))
+            await out.yield(Output(kotlin: nil, messages: [Message(kind: .error, message: "Snippet too large \(totalSize.byteCount)")], duration: 0))
             await out.finish()
             return
         }

@@ -128,19 +128,6 @@ public struct OutputOptions: ParsableArguments {
         }
     }
 
-    public func stripANSIAttributes(from text: String) -> String {
-        guard !text.isEmpty else { return text }
-
-        // ANSI attribute is always started with ESC and ended by `m`
-        var txt = text.split(separator: Term.Color.esc)
-        for (i, sub) in txt.enumerated() {
-            if let end = sub.firstIndex(of: "m") {
-                txt[i] = sub[sub.index(after: end)...]
-            }
-        }
-        return txt.joined()
-    }
-
     /// Write the given message to the output streams buffer
     fileprivate func writeString(_ value: String, error: Bool = false, terminator: String = "\n", flush: Bool = false) {
         streams.writeStream(error: error, output: output, value, terminator: terminator)
@@ -344,7 +331,7 @@ extension OutputOptions {
                         var msg = newMessage
                         if watch == true, let statusLine = outputBufferLines.last, !statusLine.isEmpty {
                             var status = statusLine.trimmingCharacters(in: .whitespacesAndNewlines)
-                            let msglen = stripANSIAttributes(from: msg).count // need to remove any ANSI characters in the prefix to match the terminal output width
+                            let msglen = Term.stripANSIAttributes(from: msg).count // need to remove any ANSI characters in the prefix to match the terminal output width
 
                             if let width = terminalWidth, width > 0, msglen > width {
                                 let swidth = Int(floor(Double(width) - Double(msglen) - 2.0) / 2.0)
@@ -408,8 +395,16 @@ extension OutputOptions {
         streams.outputBuffer(reset: true) // clear the current output buffer
 
         // send the final message to the block
-        if let msg = resultHandler?(result) {
-            await messenger.yield(msg.message)
+        if let resultHandled = resultHandler?(result) {
+            if let msgmsg = resultHandled.message { // the result handler spcifies a message to issue
+                await messenger.yield(msgmsg)
+            } else { // otherwise translate the result
+                var messageWithError = message
+                if case .failure(let error) = resultHandled.result {
+                    messageWithError += ": " + error.localizedDescription
+                }
+                await messenger.yield(MessageBlock(status: resultHandled.result?.messageStatusAny ?? result.messageStatusAny, messageWithError))
+            }
         } else {
             await messenger.yield(MessageBlock(status: .pass, message))
         }

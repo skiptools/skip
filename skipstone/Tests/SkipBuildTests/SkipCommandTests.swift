@@ -22,6 +22,7 @@ final class SkipCommandTests: XCTestCase {
         .
         ├─ Package.swift
         ├─ README.md
+        ├─ SomeModule.xcodeproj
         ├─ Sources
         │  └─ SomeModule
         │     ├─ Resources

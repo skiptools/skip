@@ -313,7 +313,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
                     let cbinfo = try decoder.decode(CodebaseInfo.self, from: cbdata)
                     dependentCodebaseInfos.append(cbinfo)
                     let codebaseLoadEnd = Date().timeIntervalSinceReferenceDate
-                    info("\(dependencyCodebaseInfo.basename) codebase (\(byteCount(for: .init(cbdata.count)))) loaded (\(Int64((codebaseLoadEnd - codebaseLoadStart) * 1000)) ms) for \(linkModuleName)", sourceFile: dependencyCodebaseInfo.sourceFile)
+                    info("\(dependencyCodebaseInfo.basename) codebase (\(cbdata.count.byteCount)) loaded (\(Int64((codebaseLoadEnd - codebaseLoadStart) * 1000)) ms) for \(linkModuleName)", sourceFile: dependencyCodebaseInfo.sourceFile)
                 } catch let e {
                     throw error("Skip: error loading codebase for \(linkModuleName): \(e.localizedDescription)", sourceFile: dependencyCodebaseInfo.sourceFile)
                 }
@@ -326,7 +326,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
 
         func writeChanges(tag: String, to outputFilePath: AbsolutePath, contents: any DataProtocol, readOnly: Bool) throws {
             let changed = try fs.writeChanges(path: addOutputFile(outputFilePath), makeReadOnly: readOnly, bytes: ByteString(contents))
-            info("\(outputFilePath.relative(to: moduleBasePath).pathString) (\(byteCount(for: .init(contents.count)))) \(tag) \(!changed ? "unchanged" : "written")", sourceFile: outputFilePath.sourceFile)
+            info("\(outputFilePath.relative(to: moduleBasePath).pathString) (\(contents.count.byteCount)) \(tag) \(!changed ? "unchanged" : "written")", sourceFile: outputFilePath.sourceFile)
         }
 
         func touchBuildCompletionMarker(at dateOfLastFileChange: Date) throws {
@@ -666,7 +666,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
             //    info("\(sourcePath.basename) (\(byteCount(for: .init(sourceSize)))) transpiling to \(outputFile.basename)", sourceFile: transpilation.sourceFile)
             //}
 
-            info("\(outputFile.relative(to: moduleBasePath).pathString) (\(byteCount(for: transpilation.output.content.lengthOfBytes(using: .utf8)))) transpilation \(overridden ? "overridden" : !changed ? "unchanged" : "saved") from \(sourcePath.basename) (\(byteCount(for: .init(sourceSize)))) in \(Int64(transpilation.duration * 1000)) ms", sourceFile: overridden ? transpilation.sourceFile : outputFile.sourceFile)
+            info("\(outputFile.relative(to: moduleBasePath).pathString) (\(transpilation.output.content.lengthOfBytes(using: .utf8).byteCount)) transpilation \(overridden ? "overridden" : !changed ? "unchanged" : "saved") from \(sourcePath.basename) (\(sourceSize.byteCount)) in \(Int64(transpilation.duration * 1000)) ms", sourceFile: overridden ? transpilation.sourceFile : outputFile.sourceFile)
 
             for message in transpilation.messages {
                 //writeMessage(message)

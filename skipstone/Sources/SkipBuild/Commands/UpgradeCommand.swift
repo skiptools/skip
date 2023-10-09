@@ -37,20 +37,11 @@ struct UpgradeCommand: MessageCommand, ToolOptionsCommand {
 extension SkipCommand {
     /// Checks the https://source.skip.tools/skip/releases.atom page and returns the semantic version contained in the title of the first entry (i.e., the latest release of Skip)
     func checkSkipUpdates(with out: MessageQueue) async throws -> String? {
-        let msg = "Check Skip Updates"
-        let latestVersion: String? = try await outputOptions.monitor(with: out, msg, resultHandler: { result in
-            (result, nil)
+        try await outputOptions.monitor(with: out, "Check Skip Updates", resultHandler: { result in
+            (result, MessageBlock(status: result?.messageStatusAny, "Check Skip Updates: \((try? result?.get()) ?? "?")"))
         }) { loggingHandler in
             try await fetchLatestRelease(from: URL(string: "https://source.skip.tools/skip/releases.atom")!)
         }.get()
-
-        if let version = try? latestVersion?.extract(pattern: "([0-9.]+)") {
-            await out.yield(MessageBlock(status: .pass, "\(msg): \(version)"))
-            return version
-        } else {
-            await out.yield(MessageBlock(status: .fail, "\(msg): unknown version: \(latestVersion ?? "")"))
-            return nil
-        }
     }
 
     /// Grabs an Atom XML feed of releases and returns the first title.

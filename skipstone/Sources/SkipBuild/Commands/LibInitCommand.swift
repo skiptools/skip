@@ -57,9 +57,10 @@ struct LibInitCommand: MessageCommand, CreateOptionsCommand, ToolOptionsCommand,
 
         let dir = self.createOptions.dir ?? "."
 
-        let createdURL = try await buildSkipProject(projectName: self.projectName, modules: self.modules, resourceFolder: createOptions.resourcePath, dir: dir, configuration: createOptions.configuration, build: buildOptions.build, test: buildOptions.test, tree: self.createOptions.tree, chain: createOptions.chain, appid: self.appid, version: self.version, apk: apk, ipa: ipa, with: out)
+        let modules = try self.modules
+        let createdURL = try await buildSkipProject(projectName: self.projectName, modules: modules, resourceFolder: createOptions.resourcePath, dir: dir, configuration: createOptions.configuration, build: buildOptions.build, test: buildOptions.test, tree: self.createOptions.tree, chain: createOptions.chain, appid: self.appid, version: self.version, apk: apk, ipa: ipa, with: out)
 
-        await out.yield(MessageBlock(status: .pass, "Created module \(moduleNames.joined(separator: ", ")) in \(createdURL.path)"))
+        await out.yield(MessageBlock(status: .pass, "Created module \(modules.map(\.moduleName).joined(separator: ", ")) in \(createdURL.path)"))
     }
 }
 
@@ -70,15 +71,73 @@ extension ToolOptionsCommand {
         let projectPath = try projectURL.absolutePath
         let primaryModuleName = modules.first?.moduleName ?? "Module"
 
-        if let appid = appid {
-            let appModuleName = primaryModuleName
-            let primaryModuleAppTarget = appModuleName + "App"
+        let sourcesFolderName = "Sources"
+        let buildFolderName = ".build"
 
-            let sourcesFolderName = "Sources"
+        // the suffix for build artifacts
+        // TODO: include version number from xcconfig
+        // let cfgSuffix = "-" + (version ?? "0.0.1") + "-" + configuration
+        let cfgSuffix = "-" + configuration
 
+        let appModuleName = primaryModuleName
+        let primaryModuleAppTarget = appModuleName + "App"
+        let xcodeProjectFolder = try projectURL.append(path: primaryModuleName + ".xcodeproj", create: true)
+
+        if let appid = appid { // we have specified that an app should be created
             let primaryModuleAppSourcesPath = sourcesFolderName + "/" + primaryModuleAppTarget
             let appMainSwiftFileName = primaryModuleAppTarget + "Main.swift"
             let primaryModuleAppMainPath = primaryModuleAppSourcesPath + "/" + appMainSwiftFileName
+
+            // create the top-level ModuleName.xcconfig which is the source or truth for the iOS and Android builds
+            let configContents = """
+            // The configuration file for your Skip App (https://skip.tools)
+
+            // PRODUCT_NAME is the default title of the app
+            PRODUCT_NAME = \(appModuleName)
+
+            // PRODUCT_BUNDLE_IDENTIFIER is the unique id for both the iOS and Android app
+            PRODUCT_BUNDLE_IDENTIFIER = \(appid)
+
+            // The user-visible name of the app (localizable)
+            //INFOPLIST_KEY_CFBundleDisplayName = App Name
+            //INFOPLIST_KEY_LSApplicationCategoryType = public.app-category.utilities
+
+            // The semantic version for the app matching the git tag for the release
+            MARKETING_VERSION = \(version ?? "0.0.1")
+
+            // The build number specifying the internal app version
+            CURRENT_PROJECT_VERSION = 1
+
+            IPHONEOS_DEPLOYMENT_TARGET = 16.0
+            MACOSX_DEPLOYMENT_TARGET = 13.0
+
+            // On-device testing may need to override the bundle ID
+            // PRODUCT_BUNDLE_IDENTIFIER[config=Debug][sdk=iphoneos*] = \(appid)
+
+            // Assemble the APK as part of the build process
+            SKIP_BUILD_APK = YES
+
+            // Building the target will lauch the app for iphone* targets
+            SKIP_LAUNCH_APK[sdk=iphone*] = YES
+
+            // iOS-specific Info.plist property keys
+            INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphone*] = YES
+            INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphone*] = YES
+            INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphone*] = YES
+            INFOPLIST_KEY_UIStatusBarStyle[sdk=iphone*] = UIStatusBarStyleDefault
+            INFOPLIST_KEY_UISupportedInterfaceOrientations[sdk=iphone*] = UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown
+
+            // Development team ID for on-device testing
+            //DEVELOPMENT_TEAM =
+            //CODE_SIGNING_IDENTITY = -
+            //CODE_SIGNING_REQUIRED = NO
+            """
+
+            let xcconfigURL = projectURL.appending(path: primaryModuleName + ".xcconfig")
+            try configContents.write(to: xcconfigURL, atomically: true, encoding: .utf8)
+            let xcconfigFileName = xcconfigURL.lastPathComponent
+
+
             // Sources/PlaygroundApp/PlaygroundAppMain.swift
             let appMainContents = """
             import SwiftUI
@@ -273,55 +332,6 @@ extension ToolOptionsCommand {
             try FileManager.default.createDirectory(at: contentViewURL.deletingLastPathComponent(), withIntermediateDirectories: true)
             try contentViewContents.write(to: contentViewURL, atomically: true, encoding: .utf8)
 
-            // create a top-level ModuleName.xcconfig
-            let configContents = """
-            // The configuration file for your Skip App (https://skip.tools)
-
-            // PRODUCT_NAME is the default title of the app
-            PRODUCT_NAME = \(appModuleName)
-
-            // PRODUCT_BUNDLE_IDENTIFIER is the unique id for both the iOS and Android app
-            PRODUCT_BUNDLE_IDENTIFIER = \(appid)
-
-            // The user-visible name of the app (localizable)
-            //INFOPLIST_KEY_CFBundleDisplayName = App Name
-            //INFOPLIST_KEY_LSApplicationCategoryType = public.app-category.utilities
-
-            // The semantic version for the app matching the git tag for the release
-            MARKETING_VERSION = \(version ?? "0.0.1")
-
-            // The build number specifying the internal app version
-            CURRENT_PROJECT_VERSION = 1
-
-            IPHONEOS_DEPLOYMENT_TARGET = 16.0
-            MACOSX_DEPLOYMENT_TARGET = 13.0
-
-            // On-device testing may need to override the bundle ID
-            // PRODUCT_BUNDLE_IDENTIFIER[config=Debug][sdk=iphoneos*] = \(appid)
-
-            // Assemble the APK as part of the build process
-            SKIP_BUILD_APK = YES
-
-            // Building the target will lauch the app for iphone* targets
-            SKIP_LAUNCH_APK[sdk=iphone*] = YES
-
-            // iOS-specific Info.plist property keys
-            INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphone*] = YES
-            INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphone*] = YES
-            INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphone*] = YES
-            INFOPLIST_KEY_UIStatusBarStyle[sdk=iphone*] = UIStatusBarStyleDefault
-            INFOPLIST_KEY_UISupportedInterfaceOrientations[sdk=iphone*] = UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown
-
-            // Development team ID for on-device testing
-            //DEVELOPMENT_TEAM =
-            //CODE_SIGNING_IDENTITY = -
-            //CODE_SIGNING_REQUIRED = NO
-            """
-
-            let xcconfigURL = projectURL.appending(path: primaryModuleName + ".xcconfig")
-            try configContents.write(to: xcconfigURL, atomically: true, encoding: .utf8)
-            let xcconfigFileName = xcconfigURL.lastPathComponent
-
 
             // the Sources/MODULE_NAMEApp/ folder for iOS metadata
             let appModule_Sources_Path = sourcesFolderName + "/" + primaryModuleAppTarget
@@ -368,56 +378,6 @@ extension ToolOptionsCommand {
                   "idiom" : "universal",
                   "platform" : "ios",
                   "size" : "1024x1024"
-                },
-                {
-                  "idiom" : "mac",
-                  "scale" : "1x",
-                  "size" : "16x16"
-                },
-                {
-                  "idiom" : "mac",
-                  "scale" : "2x",
-                  "size" : "16x16"
-                },
-                {
-                  "idiom" : "mac",
-                  "scale" : "1x",
-                  "size" : "32x32"
-                },
-                {
-                  "idiom" : "mac",
-                  "scale" : "2x",
-                  "size" : "32x32"
-                },
-                {
-                  "idiom" : "mac",
-                  "scale" : "1x",
-                  "size" : "128x128"
-                },
-                {
-                  "idiom" : "mac",
-                  "scale" : "2x",
-                  "size" : "128x128"
-                },
-                {
-                  "idiom" : "mac",
-                  "scale" : "1x",
-                  "size" : "256x256"
-                },
-                {
-                  "idiom" : "mac",
-                  "scale" : "2x",
-                  "size" : "256x256"
-                },
-                {
-                  "idiom" : "mac",
-                  "scale" : "1x",
-                  "size" : "512x512"
-                },
-                {
-                  "idiom" : "mac",
-                  "scale" : "2x",
-                  "size" : "512x512"
                 }
               ],
               "info" : {
@@ -807,115 +767,115 @@ extension ToolOptionsCommand {
 
 """
 
-            let xcodeProjectFolder = try projectURL.append(path: primaryModuleName + ".xcodeproj", create: true)
             let xcodeProjectPbxprojURL = xcodeProjectFolder.appending(path: "project.pbxproj")
             // change spaces to tabs in the pbxproj, since that is what Xcode will do when it saves it
             try xcodeProjectContents.replacingOccurrences(of: "    ", with: "\t").write(to: xcodeProjectPbxprojURL, atomically: true, encoding: .utf8)
-
-            if ipa == true {
-                // xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -archivePath "${ARCHIVE_PATH}" -configuration "${CONFIGURATION}" -scheme "${SKIP_MODULE}" -sdk "iphoneos" -destination "generic/platform=iOS" -jobs 1 archive CODE_SIGNING_ALLOWED=NO
-                let archiveBasePath = ".build/Skip/artifacts/" + configuration.capitalized
-
-                let archivePath = archiveBasePath + "/" + primaryModuleAppTarget + ".xcarchive"
-                let ipaPath = archiveBasePath + "/" + primaryModuleAppTarget + ".ipa"
-                let ipaURL = projectURL.appending(path: ipaPath)
-
-                // note that derivedDataPath and archivePath are relative to CWD rather than
-                let fullArchivePath = projectURL.path + "/" + archivePath
-                let fullDerivedDataPath = projectURL.path + "/.build/DerivedData"
-
-                await run(with: out, "Archiving iOS ipa", [
-                    "xcodebuild",
-                    "-project", xcodeProjectFolder.path,
-                    "-derivedDataPath", fullDerivedDataPath,
-                    "-skipPackagePluginValidation",
-                    "-archivePath", fullArchivePath,
-                    "-configuration", configuration.capitalized,
-                    "-scheme", primaryModuleAppTarget,
-                    "-sdk", "iphoneos",
-                    "-destination", "generic/platform=iOS",
-                    "archive",
-                    "CODE_SIGNING_ALLOWED=NO",
-                    "SKIP_BUILD_APK=NO",
-                    "SKIP_LAUNCH_APK=NO",
-                    "ZERO_AR_DATE=1",
-                ])
-
-                let archiveAppPath = archivePath + "/Products/Applications/" + primaryModuleAppTarget + ".app"
-                let archiveAppURL = projectURL.appending(path: archiveAppPath)
-
-                // TODO: eventually we will want to create the .ipa by the exportArchive mechanism, but that requires code signing and some means to specify the certificates in the tool…
-                // xcodebuild -exportArchive -archivePath /Path/To/Output/YourApp.xcarchive -exportPath /Path/To/ipa/Output/Folder -exportOptionsPlist /Path/To/ExportOptions.plist
-
-                // …so now, just run ditto to create the app zip
-
-                // need to first copy the contents over to a "Payload" folder, since the root of the .ipa needs to be "Payload"
-                let archiveAppPayloadURL = archiveAppURL
-                    .deletingLastPathComponent()
-                    .appendingPathComponent("Payload", isDirectory: true)
-                try FileManager.default.createDirectory(at: archiveAppPayloadURL, withIntermediateDirectories: false)
-                let archiveAppContentsURL = archiveAppPayloadURL
-                    .appendingPathComponent(archiveAppURL.lastPathComponent, isDirectory: true)
-
-                try FileManager.default.copyItem(at: archiveAppURL, to: archiveAppContentsURL)
-                try FileManager.default.zeroFileTimes(under: archiveAppPayloadURL)
-
-                // ditto -c -k --sequesterRsrc /path/to/source /path/to/destination/archive.zip
-                // ditto does not create reproducible files
-                // await run(with: out, "Assembing \(ipaURL.lastPathComponent)", ["ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", archiveAppPayloadURL.path, ipaURL.path])
-
-                await run(with: out, "Assemble \(ipaURL.lastPathComponent)", ["zip", "-9", "-r", ipaURL.path, archiveAppPayloadURL.lastPathComponent], in: archiveAppPayloadURL.deletingLastPathComponent())
-
-                await checkFile(ipaURL, with: out, title: "Verify \(ipaURL.lastPathComponent)") { url in
-                    try "Verify \(ipaURL.lastPathComponent) \(ByteCountFormatter.string(fromByteCount: Int64(url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0), countStyle: .file))"
-                }
-
-                await checkFile(ipaURL, with: out, title: "Checksum Archive") { url in
-                    try "IPA SHA256: \(url.SHA256Hash())"
-                }
-            }
         }
 
-        if tree {
-            await showFileTree(in: projectPath, with: out)
-        }
 
         if build == true || apk == true {
             await run(with: out, "Resolving dependencies", ["swift", "package", "resolve", "-v", "--package-path", projectURL.path])
 
             // we need to build regardless of preference in order to build the apk
             await run(with: out, "Building \(projectName)", ["swift", "build", "-v", "-c", configuration, "--package-path", projectURL.path])
-
-            if apk == true { // assemble the .apk
-                let env = ProcessInfo.processInfo.environment
-
-                let gradleProjectDir = projectURL.path + "/.build/plugins/outputs/" + projectName + "/" + primaryModuleName + "/skipstone"
-                let relativeBuildDir = ".build/" + projectName
-
-                let action = "assemble" + configuration.capitalized // turn "debug" into "Debug" and "release" into "Release"
-                await run(with: out, "Assembling Android apk", ["gradle", action, "--console=plain", "--info", "--project-dir", gradleProjectDir, "-PbuildDir=" + relativeBuildDir], environment: env)
-                //{ result in (result, nil) }
-
-                // the expected path for the gradle output folder of the assemble action
-                let outputsPath = gradleProjectDir + "/" + primaryModuleName  + "/" + relativeBuildDir + "/outputs"
-
-                // for example: skipapp-playground/.build/plugins/outputs/skipapp-playground/Playground/skipstone/Playground/.build/skipapp-playground/outputs/apk/release/Playground-release.apk
-                let apkPath = outputsPath + "/apk/" + configuration + "/" + primaryModuleName + "-" + configuration + ".apk"
-                let apkURL = URL(fileURLWithPath: apkPath, isDirectory: false)
-
-                await checkFile(apkURL, with: out, title: "Verify \(apkURL.lastPathComponent)") { url in
-                    try "Verify \(apkURL.lastPathComponent) \(ByteCountFormatter.string(fromByteCount: Int64(url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0), countStyle: .file))"
-                }
-
-                await checkFile(apkURL, with: out, title: "Checksum Archive") { url in
-                    try "APK SHA256: \(url.SHA256Hash())"
-                }
-
-            }
         }
 
         if test == true {
             try await runSkipTests(in: projectURL, configuration: configuration, swift: true, kotlin: true, with: out)
+        }
+
+
+        if ipa == true {
+            // xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -archivePath "${ARCHIVE_PATH}" -configuration "${CONFIGURATION}" -scheme "${SKIP_MODULE}" -sdk "iphoneos" -destination "generic/platform=iOS" -jobs 1 archive CODE_SIGNING_ALLOWED=NO
+            let archiveBasePath = buildFolderName + "/Skip/artifacts/" + configuration.capitalized
+
+            let archivePath = archiveBasePath + "/" + primaryModuleAppTarget + ".xcarchive"
+            let ipaPath = archiveBasePath + "/" + primaryModuleName + cfgSuffix + ".ipa"
+            let ipaURL = projectURL.appending(path: ipaPath)
+
+            // note that derivedDataPath and archivePath are relative to CWD rather than
+            let fullArchivePath = projectURL.path + "/" + archivePath
+            let fullDerivedDataPath = projectURL.path + "/" + buildFolderName + "/DerivedData"
+
+            await run(with: out, "Archiving iOS ipa", [
+                "xcodebuild",
+                "-project", xcodeProjectFolder.path,
+                "-derivedDataPath", fullDerivedDataPath,
+                "-skipPackagePluginValidation",
+                "-archivePath", fullArchivePath,
+                "-configuration", configuration.capitalized,
+                "-scheme", primaryModuleAppTarget,
+                "-sdk", "iphoneos",
+                "-destination", "generic/platform=iOS",
+                "archive",
+                "CODE_SIGNING_ALLOWED=NO",
+                "SKIP_BUILD_APK=NO",
+                "SKIP_LAUNCH_APK=NO",
+                "ZERO_AR_DATE=1",
+            ])
+
+            let archiveAppPath = archivePath + "/Products/Applications/" + primaryModuleAppTarget + ".app"
+            let archiveAppURL = projectURL.appending(path: archiveAppPath)
+
+            // TODO: eventually we will want to create the .ipa by the exportArchive mechanism, but that requires code signing and some means to specify the certificates in the tool…
+            // xcodebuild -exportArchive -archivePath /Path/To/Output/YourApp.xcarchive -exportPath /Path/To/ipa/Output/Folder -exportOptionsPlist /Path/To/ExportOptions.plist
+
+            // …so now, just run ditto to create the app zip
+
+            // need to first copy the contents over to a "Payload" folder, since the root of the .ipa needs to be "Payload"
+            let archiveAppPayloadURL = archiveAppURL
+                .deletingLastPathComponent()
+                .appendingPathComponent("Payload", isDirectory: true)
+            try FileManager.default.createDirectory(at: archiveAppPayloadURL, withIntermediateDirectories: false)
+            let archiveAppContentsURL = archiveAppPayloadURL
+                .appendingPathComponent(archiveAppURL.lastPathComponent, isDirectory: true)
+
+            try FileManager.default.copyItem(at: archiveAppURL, to: archiveAppContentsURL)
+            try FileManager.default.zeroFileTimes(under: archiveAppPayloadURL)
+
+            // ditto -c -k --sequesterRsrc /path/to/source /path/to/destination/archive.zip
+            // ditto does not create reproducible files
+            // await run(with: out, "Assembing \(ipaURL.lastPathComponent)", ["ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", archiveAppPayloadURL.path, ipaURL.path])
+
+            await run(with: out, "Assemble \(ipaURL.lastPathComponent)", ["zip", "-9", "-r", ipaURL.path, archiveAppPayloadURL.lastPathComponent], in: archiveAppPayloadURL.deletingLastPathComponent())
+
+            await checkFile(ipaURL, with: out, title: "Verify \(ipaURL.lastPathComponent)") { url in
+                try "Verify \(ipaURL.lastPathComponent) \(ByteCountFormatter.string(fromByteCount: Int64(url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0), countStyle: .file))"
+            }
+
+            await checkFile(ipaURL, with: out, title: "Checksum Archive") { url in
+                try "IPA SHA256: \(url.SHA256Hash())"
+            }
+        }
+
+        if apk == true { // assemble the .apk
+            let env = ProcessInfo.processInfo.environment
+
+            let gradleProjectDir = projectURL.path + "/" + buildFolderName + "/plugins/outputs/" + projectName + "/" + primaryModuleName + "/skipstone"
+            let relativeBuildDir = buildFolderName + "/" + projectName
+
+            let action = "assemble" + configuration.capitalized // turn "debug" into "Debug" and "release" into "Release"
+            await run(with: out, "Assembling Android apk", ["gradle", action, "--console=plain", "--info", "--project-dir", gradleProjectDir, "-PbuildDir=" + relativeBuildDir], environment: env)
+            //{ result in (result, nil) }
+
+            // the expected path for the gradle output folder of the assemble action
+            let outputsPath = gradleProjectDir + "/" + primaryModuleName  + "/" + relativeBuildDir + "/outputs"
+
+            // for example: skipapp-playground/.build/plugins/outputs/skipapp-playground/Playground/skipstone/Playground/.build/skipapp-playground/outputs/apk/release/Playground-release.apk
+            let apkPath = outputsPath + "/apk/" + configuration + "/" + primaryModuleName + cfgSuffix + ".apk"
+            let apkURL = URL(fileURLWithPath: apkPath, isDirectory: false)
+
+            await checkFile(apkURL, with: out, title: "Verify \(apkURL.lastPathComponent)") { url in
+                try "Verify \(apkURL.lastPathComponent) \(ByteCountFormatter.string(fromByteCount: Int64(url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0), countStyle: .file))"
+            }
+
+            await checkFile(apkURL, with: out, title: "Checksum Archive") { url in
+                try "APK SHA256: \(url.SHA256Hash())"
+            }
+        }
+
+        if tree {
+            await showFileTree(in: projectPath, with: out)
         }
 
         return projectURL
@@ -968,7 +928,7 @@ extension ToolOptionsCommand {
             let moduleName = module.moduleName
 
             // the isAppModule is the initial module in the list when we specify we want to create an app module
-            let isAppModule = app && i == modules.startIndex ? true : false
+            let isAppModule = app == true && i == modules.startIndex
 
             // the subsequent module
             let nextModule = i < modules.endIndex - 1 ? modules[i+1] : nil
@@ -1253,7 +1213,6 @@ extension ToolOptionsCommand {
 }
 
 extension ToolOptionsCommand {
-
     /// Perform a monitor check on the given URL
     func checkFile(_ url: URL, with out: MessageQueue, title: String, handle: @escaping (URL) throws -> String) async {
         await outputOptions.monitor(with: out, title, resultHandler: { result in
