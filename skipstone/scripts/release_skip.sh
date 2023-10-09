@@ -213,5 +213,4 @@ git push --follow-tags
 
 # check that homebrew can install/upgrade and run the tool
 HOMEBREW_AUTO_UPDATE_SECS=0 brew upgrade skiptools/skip/skip || brew install skiptools/skip/skip
-skip version
-
+skip welcome 

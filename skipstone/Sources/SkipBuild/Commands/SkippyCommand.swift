@@ -64,6 +64,6 @@ struct SkippyCommand: TranspilerInputOptionsCommand {
             outputFileName = String(outputFileName.dropLast(".swift".count))
         }
         outputFileName += outputSuffix
-        return outputDir.appendingPathComponent(outputFileName)
+        return outputDir.appendingPathComponent("." + outputFileName, isDirectory: false)
     }
 }

@@ -145,7 +145,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
             return path
         }
 
-        /// Load the given source file, tracking its last modified date for the timestamp on the `.skipbuild.docc` marker file
+        /// Load the given source file, tracking its last modified date for the timestamp on the `.skipbuild` marker file
         func inputSource(_ path: AbsolutePath) throws -> ByteString {
             _ = addInputFile(path)
             return try fs.readFileContents(path)
@@ -200,7 +200,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
         }
 
 
-        // the shared JSON encoder for serializing .skipcode.json codebase and .skipbuild.docc marker contents
+        // the shared JSON encoder for serializing .skipcode.json codebase and .skipbuild marker contents
         let encoder = JSONEncoder()
         encoder.outputFormatting = [
             .sortedKeys, // needed for deterministic output
@@ -226,7 +226,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
 
         let env = ProcessInfo.processInfo.environment
 
-        // at this point, check for the conditional environment and halt transpilation on unsupported (i.e., non-macOS) platforms; this will still output the .skipbuild.docc file, because the plugin needs to have it created for evey plugin invocation (since we don't know in SkipPlugin.swift what the target platform is).
+        // at this point, check for the conditional environment and halt transpilation on unsupported (i.e., non-macOS) platforms; this will still output the .skipbuild file, because the plugin needs to have it created for evey plugin invocation (since we don't know in SkipPlugin.swift what the target platform is).
         let explicitlyEnabled = envEnable.contains(where: { env[$0] != nil })
         let explicitlyDisabled = envDisable.contains(where: { env[$0] != nil })
 
