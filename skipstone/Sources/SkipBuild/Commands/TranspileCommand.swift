@@ -12,7 +12,8 @@ protocol TranspilePhase: TranspilerInputOptionsCommand {
 let skipcodeExtension = ".skipcode.json"
 
 /// The skip transpile marker that is always output regardless of whether the transpile was successful or not
-let skipbuildMarkerExtension = ".skipbuild"
+/// Needs to have the extension .docc to prevent including the file in the output bundle
+let skipbuildMarkerExtension = ".skipbuild.docc"
 
 struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
     static var configuration = CommandConfiguration(commandName: "transpile", abstract: "Transpile Swift to Kotlin", shouldDisplay: false)
@@ -208,7 +209,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
             //.prettyPrinted, // compacting JSON significantly reduces the size of the codebase files
         ]
 
-        let buildCompletionMarkerPath = try moduleBasePath.appending(skipCompletionMarkerPath(forModule: primaryModuleName))
+        let buildCompletionMarkerPath = moduleBasePath.appending(components: ["." + primaryModuleName + skipbuildMarkerExtension])
         try? fs.removeFileTree(buildCompletionMarkerPath) // delete the build completion marker to force its re-creation
 
         // touch the build marker with the most recent file time from the complete build list
@@ -281,11 +282,6 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
         return // done
 
         // MARK: Transpilation helper functions
-
-        /// The relative path for completion mark file that is always output when the transpile completes
-        func skipCompletionMarkerPath(forModule moduleName: String) throws -> RelativePath {
-            try RelativePath(validating: "." + moduleName + skipbuildMarkerExtension)
-        }
 
         /// The relative path for cached codebase info JSON
         func codebaseInfoPath(forModule moduleName: String) throws -> RelativePath {
