@@ -224,6 +224,21 @@ final class AttributeAndModifierTests: XCTestCase {
         """)
     }
 
+    func testUnavailableAttributeReportedFunctionCallLine() async throws {
+        try await checkProducesMessage(swift: """
+        class C {
+            @available(*, unavailable)
+            func someOldFunction() -> String {
+                return ""
+            }
+        }
+        {
+            C()
+                .someOldFunction()
+        }
+        """)
+    }
+
     func testDeprecatedAttribute() async throws {
         try await check(swiftCode: {
             @available(*, deprecated, message: "this function is deprecated")

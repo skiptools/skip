@@ -99,6 +99,10 @@ class SyntaxNode: SourceDerived, PrettyPrintable {
         return messages + children.flatMap { $0.subtreeMessages }
     }
 
+    public var messageSourceRange: Source.Range? {
+        return nil
+    }
+
     /// Find the nearest type declaration by traversing up the syntax tree.
     final var owningTypeDeclaration: TypeDeclaration? {
         var current: SyntaxNode? = self

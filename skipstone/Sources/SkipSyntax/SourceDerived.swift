@@ -5,5 +5,7 @@ protocol SourceDerived {
 
     /// Messages for this derivation.
     var messages: [Message] { get set }
-}
 
+    /// A more specific range to use for messages for this derivation.
+    var messageSourceRange: Source.Range? { get }
+}

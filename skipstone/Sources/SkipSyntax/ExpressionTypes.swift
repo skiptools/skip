@@ -844,6 +844,10 @@ class FunctionCall: Expression, APICallExpression {
     override var children: [SyntaxNode] {
         return [function] + arguments.map { $0.value }
     }
+
+    override var messageSourceRange: Source.Range? {
+        return function.messageSourceRange
+    }
 }
 
 /// `x`, also `self` or `super`
@@ -1213,13 +1217,15 @@ class MemberAccess: Expression, APICallExpression {
     var base: Expression?
     private(set) var baseType: TypeSignature // Will be .module(name, .none) for module qualifier
     let member: String
+    let memberSourceRange: Source.Range?
     private(set) var generics: [TypeSignature]?
     let useMultilineFormatting: Bool
 
-    init(base: Expression?, baseType: TypeSignature = .none, member: String, generics: [TypeSignature]? = nil, useMultilineFormatting: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
+    init(base: Expression?, baseType: TypeSignature = .none, member: String, memberSourceRange: Source.Range? = nil, generics: [TypeSignature]? = nil, useMultilineFormatting: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.base = base
         self.baseType = baseType
         self.member = member
+        self.memberSourceRange = memberSourceRange
         self.generics = generics
         self.useMultilineFormatting = useMultilineFormatting
         super.init(type: .memberAccess, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
@@ -1240,6 +1246,7 @@ class MemberAccess: Expression, APICallExpression {
             base = ExpressionDecoder.decode(syntax: baseSyntax, in: syntaxTree)
         }
         let member = memberAccessExpr.declName.baseName.text
+        let memberSourceRange = memberAccessExpr.declName.range(in: syntaxTree.source)
         let useMultilineFormatting = base != nil && memberAccessExpr.period.leadingTrivia.contains {
             switch $0 {
             case .newlines:
@@ -1248,7 +1255,7 @@ class MemberAccess: Expression, APICallExpression {
                 return false
             }
         }
-        return MemberAccess(base: base, member: member, generics: generics, useMultilineFormatting: useMultilineFormatting, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+        return MemberAccess(base: base, member: member, memberSourceRange: memberSourceRange, generics: generics, useMultilineFormatting: useMultilineFormatting, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
     override func resolveAttributes(in syntaxTree: SyntaxTree, context: TypeResolutionContext) {
@@ -1304,6 +1311,10 @@ class MemberAccess: Expression, APICallExpression {
 
     override var prettyPrintAttributes: [PrettyPrintTree] {
         return [PrettyPrintTree(root: member)]
+    }
+
+    override var messageSourceRange: Source.Range? {
+        return memberSourceRange
     }
 }
 

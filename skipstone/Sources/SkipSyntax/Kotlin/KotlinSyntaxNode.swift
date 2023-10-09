@@ -51,6 +51,10 @@ class KotlinSyntaxNode: SourceDerived, OutputNode {
         return messages + children.flatMap { $0.subtreeMessages }
     }
 
+    public var messageSourceRange: Source.Range? {
+        return nil
+    }
+
     func leadingTrivia(indentation: Indentation) -> String {
         return ""
     }

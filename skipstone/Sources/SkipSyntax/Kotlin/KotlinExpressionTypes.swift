@@ -1022,6 +1022,10 @@ class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting, APICallExp
             output.append(" } catch (_: NullReturnException) { null })")
         }
     }
+
+    override var messageSourceRange: Source.Range? {
+        return function.messageSourceRange
+    }
 }
 
 class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTarget, KotlinSwiftUIBindable, APICallExpression {
@@ -1616,6 +1620,7 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
     var base: KotlinExpression?
     var baseKClass: TypeSignature?
     var member: String
+    var memberSourceRange: Source.Range?
     var apiMatch: APIMatch?
     var useMultilineFormatting = false
     var baseType: TypeSignature = .none
@@ -1762,6 +1767,7 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
 
     private init(expression: MemberAccess) {
         self.member = expression.member
+        self.memberSourceRange = expression.memberSourceRange
         super.init(type: .memberAccess, expression: expression)
     }
 
@@ -1938,6 +1944,10 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
             // If this isn't a function reference that will be invoked with () or [], end the main actor closure
             output.append(" }")
         }
+    }
+
+    override var messageSourceRange: Source.Range? {
+        return memberSourceRange
     }
 }
 

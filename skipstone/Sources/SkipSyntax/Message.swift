@@ -31,9 +31,9 @@ public struct Message: Error, Codable {
 
     init(kind: Kind, message: String, sourceDerived: SourceDerived, source: Source? = nil) {
         self.kind = kind
-        self.message = Self.messageWithSource(for: message, in: source, range: sourceDerived.sourceRange)
+        self.message = Self.messageWithSource(for: message, in: source, range: sourceDerived.messageSourceRange)
         self.sourceFile = sourceDerived.sourceFile ?? source?.file
-        self.sourceRange = sourceDerived.sourceRange
+        self.sourceRange = sourceDerived.messageSourceRange ?? sourceDerived.sourceRange
     }
 
     /// The message with the source path and line number in a way that when output to the Xcode console it will be handled in the report navigator
