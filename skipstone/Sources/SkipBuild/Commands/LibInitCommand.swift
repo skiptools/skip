@@ -867,7 +867,7 @@ extension ToolOptionsCommand {
             let outputsPath = gradleProjectDir + "/" + primaryModuleName  + "/" + relativeBuildDir + "/outputs"
 
             // for example: skipapp-playground/.build/plugins/outputs/skipapp-playground/Playground/skipstone/Playground/.build/skipapp-playground/outputs/apk/release/Playground-release.apk
-            let apkPath = outputsPath + "/apk/" + configuration + "/" + primaryModuleName + cfgSuffix + ".apk"
+            let apkPath = outputsPath + "/apk/" + configuration.lowercased() + "/" + primaryModuleName + cfgSuffix + ".apk"
             let apkURL = URL(fileURLWithPath: apkPath, isDirectory: false)
 
             await checkFile(apkURL, with: out, title: "Verify \(apkURL.lastPathComponent)") { url in

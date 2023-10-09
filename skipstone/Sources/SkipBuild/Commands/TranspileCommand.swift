@@ -11,9 +11,11 @@ protocol TranspilePhase: TranspilerInputOptionsCommand {
 /// The file extension for the metadata about skipcode
 let skipcodeExtension = ".skipcode.json"
 
+/// The output folder in which to place Skippy files
+let skipOutputFolder = ".skip"
+
 /// The skip transpile marker that is always output regardless of whether the transpile was successful or not
-/// Needs to have the extension .docc to prevent including the file in the output bundle
-let skipbuildMarkerExtension = ".skipbuild.docc"
+let skipbuildMarkerExtension = ".skipbuild"
 
 struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
     static var configuration = CommandConfiguration(commandName: "transpile", abstract: "Transpile Swift to Kotlin", shouldDisplay: false)
@@ -209,7 +211,10 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
             //.prettyPrinted, // compacting JSON significantly reduces the size of the codebase files
         ]
 
-        let buildCompletionMarkerPath = moduleBasePath.appending(components: ["." + primaryModuleName + skipbuildMarkerExtension])
+        let skipBuildOutputPath = moduleBasePath.appending(component: skipOutputFolder)
+        try? fs.createDirectory(skipBuildOutputPath, recursive: true) // ensure the .skip output folder exists
+
+        let buildCompletionMarkerPath = skipBuildOutputPath.appending(component: "." + primaryModuleName + skipbuildMarkerExtension)
         try? fs.removeFileTree(buildCompletionMarkerPath) // delete the build completion marker to force its re-creation
 
         // touch the build marker with the most recent file time from the complete build list
@@ -326,8 +331,8 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
         }
 
         func touchBuildCompletionMarker(at dateOfLastFileChange: Date) throws {
-            if !fs.isDirectory(moduleBasePath) {
-                try fs.createDirectory(moduleBasePath, recursive: true)
+            if !fs.isDirectory(buildCompletionMarkerPath.parentDirectory) {
+                try fs.createDirectory(buildCompletionMarkerPath.parentDirectory, recursive: true)
             }
 
             struct SkipMarkerContents : Encodable {
