@@ -26,7 +26,7 @@ import PackagePlugin
     let skipbuildMarkerExtension = ".skipbuild"
 
     /// The extension to add to the skippy output; these have the `docc` extension merely because that is the only extension of generated files that is not copied as a resource when a package is built: https://github.com/apple/swift-package-manager/blob/0147f7122a2c66eef55dcf17a0e4812320d5c7e6/Sources/PackageLoading/TargetSourcesBuilder.swift#L665
-    let skippyOuptputExtension = ".docc" // ".skippy"
+    let skippyOuptputExtension = ".skippy"
 
     func createBuildCommands(context: PluginContext, target: Target) async throws -> [Command] {
         if skipRootTargetNames.contains(target.name) {
@@ -206,11 +206,13 @@ import PackagePlugin
                 // until the dependent modules have all been transpiled and their skipcode JSON files emitted
                 //let skipcodeInputFile = outputFolder.appending(subpath: moduleLinkTarget + skipcodeExtension)
 
-                // output a .skipbuild file contains all the input files, so the transpile will be re-run when any of the input sources have changed
-                let markerFile = outputFolder.appending(subpath: "." + moduleLinkTarget + skipbuildMarkerExtension)
                 // need to standardize the path to remove ../../ elements form the symlinks, otherwise the input and output paths don't match and Xcode will re-build everything each time
-                let markerFileStandardized = Path(URL(fileURLWithPath: markerFile.string, isDirectory: false).standardized.path)
-                inputFiles.append(markerFileStandardized)
+                let outputFolderStandardized = Path(URL(fileURLWithPath: outputFolder.string, isDirectory: false).standardized.path)
+
+                // output a .skipbuild file contains all the input files, so the transpile will be re-run when any of the input sources have changed
+                let markerFile = outputFolderStandardized.appending(["." + moduleLinkTarget + skipbuildMarkerExtension])
+
+                inputFiles.append(markerFile)
 
                 //Diagnostics.remark("add skipbuild input for \(depTarget.name): \(buildMarkerInputFilePath.path)", file: buildMarkerInputFile.string)
                 //Diagnostics.remark("add build marker input to \(depTarget.name): \(buildMarkerStandardizedPath)", file: buildMarkerStandardizedPath.string)
@@ -253,7 +255,7 @@ extension Path {
             outputFileName = String(lastComponent.dropLast(".swift".count))
         }
         outputFileName += suffix
-        return outputDir.appending(subpath: outputFileName)
+        return outputDir.appending(subpath: "." + outputFileName)
     }
 }
 
