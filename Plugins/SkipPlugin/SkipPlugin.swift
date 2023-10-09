@@ -13,8 +13,8 @@ import PackagePlugin
     /// The name of the plug-in's output folder is the same as the target name for the transpiler, which matches the ".plugin(name)" in the Package.swift
     let pluginFolderName = "skipstone"
 
-    /// The output folder in which to place Skippy files
-    let skippyOutputFolder = ".skippy"
+    /// The output folder in which to place .skippy and .skipbuild files
+    let skipOutputFolder = ".skip"
 
     /// The executable command forked by the plugin; this is the build artifact whose name matches the built `skip` binary
     let skipPluginCommandName = "skip"
@@ -23,11 +23,10 @@ import PackagePlugin
     //let skipcodeExtension = ".skipcode.json"
 
     /// The skip transpile marker that is always output regardless of whether the transpile was successful or not
-    /// Needs to have the extension .docc to prevent including the file in the output bundle
-    let skipbuildMarkerExtension = ".skipbuild.docc"
+    let skipbuildMarkerExtension = ".skipbuild"
 
     /// The extension to add to the skippy output; these have the `docc` extension merely because that is the only extension of generated files that is not copied as a resource when a package is built: https://github.com/apple/swift-package-manager/blob/0147f7122a2c66eef55dcf17a0e4812320d5c7e6/Sources/PackageLoading/TargetSourcesBuilder.swift#L665
-    let skippyOuptputExtension = ".skippy.docc"
+    let skippyOuptputExtension = ".skippy"
 
     func createBuildCommands(context: PluginContext, target: Target) async throws -> [Command] {
         if skipRootTargetNames.contains(target.name) {
@@ -51,7 +50,7 @@ import PackagePlugin
     func createPreflightBuildCommands(context: PluginContext, target: SourceModuleTarget) async throws -> [Command] {
         let runner = try context.tool(named: skipPluginCommandName).path
         let inputPaths = target.sourceFiles(withSuffix: ".swift").map { $0.path }
-        let outputDir = context.pluginWorkDirectory.appending(subpath: skippyOutputFolder)
+        let outputDir = context.pluginWorkDirectory.appending(subpath: skipOutputFolder)
         return inputPaths.map { Command.buildCommand(displayName: "Skippy \(target.name): \($0.lastComponent)", executable: runner, arguments: ["skippy", "--output-suffix", skippyOuptputExtension, "-O", outputDir.string, $0.string], inputFiles: [$0], outputFiles: [$0.outputPath(in: outputDir, suffix: skippyOuptputExtension)]) }
     }
 
@@ -209,8 +208,10 @@ import PackagePlugin
                 var markerFile = URL(fileURLWithPath: outputFolder.string, isDirectory: true).appendingPathComponent(moduleLinkTarget + skipbuildMarkerExtension, isDirectory: false)
                 // turn the module name into a marker file name
                 // need to standardize the path to remove ../../ elements form the symlinks, otherwise the input and output paths don't match and Xcode will re-build everything each time
+                // also put it under a ".skip" folder in order to prevent it from being included in the output bundle
                 markerFile = markerFile.standardized
                     .deletingLastPathComponent()
+                    .appendingPathComponent(skipOutputFolder, isDirectory: true)
                     .appendingPathComponent("." + markerFile.lastPathComponent, isDirectory: false)
 
                 // output a .skipbuild file contains all the input files, so the transpile will be re-run when any of the input sources have changed
