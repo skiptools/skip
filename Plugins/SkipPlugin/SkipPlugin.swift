@@ -204,17 +204,20 @@ import PackagePlugin
                 // adds an input file dependency on all the .skipcode.json files output from the dependent targets
                 // this should block the invocation of the transpiler plugin for this module
                 // until the dependent modules have all been transpiled and their skipcode JSON files emitted
-                //let skipcodeInputFile = outputFolder.appending(subpath: moduleLinkTarget + skipcodeExtension)
 
+                var markerFile = URL(fileURLWithPath: outputFolder.string, isDirectory: true).appendingPathComponent(moduleLinkTarget + skipbuildMarkerExtension, isDirectory: false)
+                // turn the module name into a marker file name
                 // need to standardize the path to remove ../../ elements form the symlinks, otherwise the input and output paths don't match and Xcode will re-build everything each time
-                let outputFolderStandardized = Path(URL(fileURLWithPath: outputFolder.string, isDirectory: false).standardized.path)
+                markerFile = markerFile.standardized
+                    .deletingLastPathComponent()
+                    .appendingPathComponent("." + markerFile.lastPathComponent, isDirectory: false)
 
                 // output a .skipbuild file contains all the input files, so the transpile will be re-run when any of the input sources have changed
-                let markerFile = outputFolderStandardized.appending(["." + moduleLinkTarget + skipbuildMarkerExtension])
+                let markerFilePath = Path(markerFile.path)
 
-                inputFiles.append(markerFile)
+                inputFiles.append(markerFilePath)
 
-                Diagnostics.remark("add skipbuild input for \(depTarget.name): \(markerFile.string)", file: markerFile.string)
+                //Diagnostics.remark("add skipbuild input for \(depTarget.name): \(markerFilePath.string)", file: markerFilePath.string)
             }
         }
 
