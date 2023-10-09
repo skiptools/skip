@@ -125,7 +125,7 @@ import PackagePlugin
         // the output files contains the .skipcode.json, and the input files contains all the dependent .skipcode.json files
         let outputURL = URL(fileURLWithPath: outputFolder.string, isDirectory: true)
         //let skipcodeOutputPath = Path(outputURL.appendingPathComponent(peerTarget.name + skipcodeExtension).path)
-        let skipbuildMarkerOutputPath = Path(outputURL.appendingPathComponent(peerTarget.name + skipbuildMarkerExtension).path)
+        let skipbuildMarkerOutputPath = Path(outputURL.appendingPathComponent("." + peerTarget.name + skipbuildMarkerExtension).path)
         //Diagnostics.remark("add skipbuild output for \(target.name): \(skipbuildMarkerOutputPath)", file: skipbuildMarkerOutputPath.string)
 
         struct Dep : Identifiable {
@@ -207,7 +207,7 @@ import PackagePlugin
                 //let skipcodeInputFile = outputFolder.appending(subpath: moduleLinkTarget + skipcodeExtension)
 
                 // output a .skipbuild file contains all the input files, so the transpile will be re-run when any of the input sources have changed
-                let markerFile = outputFolder.appending(subpath: moduleLinkTarget + skipbuildMarkerExtension)
+                let markerFile = outputFolder.appending(subpath: "." + moduleLinkTarget + skipbuildMarkerExtension)
                 // need to standardize the path to remove ../../ elements form the symlinks, otherwise the input and output paths don't match and Xcode will re-build everything each time
                 let markerFileStandardized = Path(URL(fileURLWithPath: markerFile.string, isDirectory: false).standardized.path)
                 inputFiles.append(markerFileStandardized)
