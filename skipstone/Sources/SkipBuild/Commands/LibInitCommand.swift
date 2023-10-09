@@ -293,7 +293,8 @@ extension ToolOptionsCommand {
                 ALWAYS_SEARCH_USER_PATHS = NO;
                 ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
                 COPY_PHASE_STRIP = NO;
-                DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+                DEBUG_INFORMATION_FORMAT = dwarf;
+                ENABLE_BITCODE = NO;
                 ENABLE_NS_ASSERTIONS = NO;
                 ENABLE_STRICT_OBJC_MSGSEND = YES;
                 ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -378,6 +379,7 @@ extension ToolOptionsCommand {
                 ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
                 COPY_PHASE_STRIP = NO;
                 DEBUG_INFORMATION_FORMAT = dwarf;
+                ENABLE_BITCODE = NO;
                 ENABLE_STRICT_OBJC_MSGSEND = YES;
                 ENABLE_TESTABILITY = YES;
                 ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -397,7 +399,8 @@ extension ToolOptionsCommand {
                 ALWAYS_SEARCH_USER_PATHS = NO;
                 ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
                 COPY_PHASE_STRIP = NO;
-                DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+                DEBUG_INFORMATION_FORMAT = dwarf;
+                ENABLE_BITCODE = NO;
                 ENABLE_NS_ASSERTIONS = NO;
                 ENABLE_STRICT_OBJC_MSGSEND = YES;
                 ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -838,10 +841,6 @@ extension ToolOptionsCommand {
 
             try FileManager.default.copyItem(at: archiveAppURL, to: archiveAppContentsURL)
             try FileManager.default.zeroFileTimes(under: archiveAppPayloadURL)
-
-            // ditto -c -k --sequesterRsrc /path/to/source /path/to/destination/archive.zip
-            // ditto does not create reproducible files
-            // await run(with: out, "Assembing \(ipaURL.lastPathComponent)", ["ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", archiveAppPayloadURL.path, ipaURL.path])
 
             await run(with: out, "Assemble \(ipaURL.lastPathComponent)", ["zip", "-9", "-r", ipaURL.path, archiveAppPayloadURL.lastPathComponent], in: archiveAppPayloadURL.deletingLastPathComponent())
 
