@@ -15,7 +15,8 @@ let skipcodeExtension = ".skipcode.json"
 let skipOutputFolder = ".skip"
 
 /// The skip transpile marker that is always output regardless of whether the transpile was successful or not
-let skipbuildMarkerExtension = ".skipbuild"
+/// `.docc` extension is needed to prevent file from being included in the build output folder
+let skipbuildMarkerExtension = ".skipbuild.docc"
 
 struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
     static var configuration = CommandConfiguration(commandName: "transpile", abstract: "Transpile Swift to Kotlin", shouldDisplay: false)

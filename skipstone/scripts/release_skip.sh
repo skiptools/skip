@@ -73,6 +73,10 @@ sed -I '' 's;public let skipVersion = .*;public let skipVersion = "'${SKIP_VERSI
 cd -
 
 
+# make sure checkup passes
+# TODO: need a way to have `skip` forked from checkup use the local build
+#swift run SkipRunner checkup
+
 # make sure both private skipstone/ and public skip/ tests pass
 SKIPLOCAL=1 swift test --configuration debug --parallel --package-path ../skip/ 
 swift test --configuration debug --parallel
