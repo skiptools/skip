@@ -224,7 +224,7 @@ import PackagePlugin
 
                 inputFiles.append(markerFilePath)
 
-                //Diagnostics.remark("add skipbuild input for \(depTarget.name): \(markerFilePath.string)", file: markerFilePath.string)
+                Diagnostics.remark("add skipbuild input for \(depTarget.name): \(markerFilePath.string)", file: markerFilePath.string)
             }
         }
 
