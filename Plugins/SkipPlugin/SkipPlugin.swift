@@ -124,8 +124,9 @@ import PackagePlugin
 
         // the output files contains the .skipcode.json, and the input files contains all the dependent .skipcode.json files
         let outputURL = URL(fileURLWithPath: outputFolder.string, isDirectory: true)
+        let skipBuildOutputURL = outputURL.appendingPathComponent(skipOutputFolder, isDirectory: true)
         //let skipcodeOutputPath = Path(outputURL.appendingPathComponent(peerTarget.name + skipcodeExtension).path)
-        let skipbuildMarkerOutputPath = Path(outputURL.appendingPathComponent("." + peerTarget.name + skipbuildMarkerExtension, isDirectory: false).path)
+        let skipbuildMarkerOutputPath = Path(skipBuildOutputURL.appendingPathComponent("." + peerTarget.name + skipbuildMarkerExtension, isDirectory: false).path)
         Diagnostics.remark("add skipbuild output for \(target.name): \(skipbuildMarkerOutputPath)", file: skipbuildMarkerOutputPath.string)
 
         struct Dep : Identifiable {
