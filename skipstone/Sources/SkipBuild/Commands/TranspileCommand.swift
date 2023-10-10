@@ -11,11 +11,8 @@ protocol TranspilePhase: TranspilerInputOptionsCommand {
 /// The file extension for the metadata about skipcode
 let skipcodeExtension = ".skipcode.json"
 
-/// The output folder in which to place Skippy files
-let skipOutputFolder = ".skip"
-
 /// The skip transpile marker that is always output regardless of whether the transpile was successful or not
-/// `.docc` extension is needed to prevent file from being included in the build output folder
+/// Needs to have the extension .docc to prevent including the file in the output bundle
 let skipbuildMarkerExtension = ".skipbuild.docc"
 
 struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
@@ -212,18 +209,17 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
             //.prettyPrinted, // compacting JSON significantly reduces the size of the codebase files
         ]
 
-        let skipBuildOutputPath = moduleBasePath.appending(component: skipOutputFolder)
-        try? fs.createDirectory(skipBuildOutputPath, recursive: true) // ensure the .skip output folder exists
-
-        let buildCompletionMarkerPath = skipBuildOutputPath.appending(component: "." + primaryModuleName + skipbuildMarkerExtension)
-
+        let buildCompletionMarkerPath = moduleBasePath.appending(components: ["." + primaryModuleName + skipbuildMarkerExtension])
         try? fs.removeFileTree(buildCompletionMarkerPath) // delete the build completion marker to force its re-creation
 
         // touch the build marker with the most recent file time from the complete build list
         // if we were to touch it afresh every time, the plugin would be re-executed every time
         defer {
             do {
-                try createBuildCompletionMarker()
+                // get the modification times for all the files we have written and which were used as inputs
+                let fileDates = try (outputFiles + inputFiles).map({ try fs.getFileInfo($0).modTime })
+                // touch the build marker with the max file time of all the inputs and outputs
+                try touchBuildCompletionMarker(at: fileDates.max() ?? Date.now)
             } catch {
                 msg(.warning, "could not create build completion marker: \(error)")
             }
@@ -329,9 +325,9 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
             info("\(outputFilePath.relative(to: moduleBasePath).pathString) (\(contents.count.byteCount)) \(tag) \(!changed ? "unchanged" : "written")", sourceFile: outputFilePath.sourceFile)
         }
 
-        func createBuildCompletionMarker() throws {
-            if !fs.isDirectory(buildCompletionMarkerPath.parentDirectory) {
-                try fs.createDirectory(buildCompletionMarkerPath.parentDirectory, recursive: true)
+        func touchBuildCompletionMarker(at dateOfLastFileChange: Date) throws {
+            if !fs.isDirectory(moduleBasePath) {
+                try fs.createDirectory(moduleBasePath, recursive: true)
             }
 
             struct SkipMarkerContents : Encodable {
