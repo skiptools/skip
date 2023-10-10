@@ -216,16 +216,14 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
         try? fs.createDirectory(skipBuildOutputPath, recursive: true) // ensure the .skip output folder exists
 
         let buildCompletionMarkerPath = skipBuildOutputPath.appending(component: "." + primaryModuleName + skipbuildMarkerExtension)
+
         try? fs.removeFileTree(buildCompletionMarkerPath) // delete the build completion marker to force its re-creation
 
         // touch the build marker with the most recent file time from the complete build list
         // if we were to touch it afresh every time, the plugin would be re-executed every time
         defer {
             do {
-                // get the modification times for all the files we have written and which were used as inputs
-                let fileDates = try (outputFiles + inputFiles).map({ try fs.getFileInfo($0).modTime })
-                // touch the build marker with the max file time of all the inputs and outputs
-                try touchBuildCompletionMarker(at: fileDates.max() ?? Date.now)
+                try createBuildCompletionMarker()
             } catch {
                 msg(.warning, "could not create build completion marker: \(error)")
             }
@@ -331,7 +329,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
             info("\(outputFilePath.relative(to: moduleBasePath).pathString) (\(contents.count.byteCount)) \(tag) \(!changed ? "unchanged" : "written")", sourceFile: outputFilePath.sourceFile)
         }
 
-        func touchBuildCompletionMarker(at dateOfLastFileChange: Date) throws {
+        func createBuildCompletionMarker() throws {
             if !fs.isDirectory(buildCompletionMarkerPath.parentDirectory) {
                 try fs.createDirectory(buildCompletionMarkerPath.parentDirectory, recursive: true)
             }
