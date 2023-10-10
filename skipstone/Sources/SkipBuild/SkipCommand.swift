@@ -258,12 +258,6 @@ extension FileManager {
 
 // MARK: Command Phases
 
-extension SkipCommand {
-    /// The total size of all input source files, below which we will not enforce either license key or valid header comments
-    /// this is meant to be large enough to accomodate simple demos and experiments without requiring any license
-    static var codebaseThresholdSize: Int? { nil }
-}
-
 /// The condition under which the phase should be run
 enum PhaseGuard : String, Decodable, CaseIterable {
     case no
@@ -331,7 +325,7 @@ extension Source.FilePath {
 extension Transpilation {
     /// The base name for the transpilation's input source file
     var outputFileBaseName: String {
-        sourceFile.name.hasSuffix(".swift") ? sourceFile.name.dropLast(".swift".count).description : sourceFile.name
+        input.file.name.hasSuffix(".swift") ? input.file.name.dropLast(".swift".count).description : input.file.name
     }
 
     /// Returns the expected Kotlin file name for this transpilation

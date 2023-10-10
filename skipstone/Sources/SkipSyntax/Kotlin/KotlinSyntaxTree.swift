@@ -1,11 +1,11 @@
 /// Representation of the Kotlin syntax tree.
 public class KotlinSyntaxTree {
-    let sourceFile: Source.FilePath
+    let source: Source
     let root: KotlinCodeBlock
     var dependencies: KotlinDependencies
 
-    init(sourceFile: Source.FilePath, root: KotlinCodeBlock, dependencies: KotlinDependencies = KotlinDependencies()) {
-        self.sourceFile = sourceFile
+    init(source: Source, root: KotlinCodeBlock, dependencies: KotlinDependencies = KotlinDependencies()) {
+        self.source = source
         self.root = root
         self.dependencies = dependencies
     }

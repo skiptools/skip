@@ -4,6 +4,9 @@ import TSCBasic
 import SkipSyntax
 
 struct SkippyCommand: TranspilerInputOptionsCommand {
+    /// The "CONFIGURATION" parameter specifies whether we are to run in Skippy mode or full-transpile mode
+    static let skippyOnly = ProcessInfo.processInfo.environment["CONFIGURATION"] == "Skippy"
+
     static var configuration = CommandConfiguration(commandName: "skippy", abstract: "Perform transpilation preflight checks", shouldDisplay: false)
 
     @OptionGroup(title: "Check Options")

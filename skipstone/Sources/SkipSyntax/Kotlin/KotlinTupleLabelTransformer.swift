@@ -34,7 +34,7 @@ final class KotlinTupleLabelTransformer: KotlinTransformer {
         guard !tupleLabels.isEmpty else {
             return false
         }
-        sourceFile = syntaxTree.sourceFile
+        sourceFile = syntaxTree.source.file
 
         for tupleArity in 0..<KotlinTupleLiteral.maximumArity {
             guard let elementLabels = tupleLabels[tupleArity] else {
@@ -50,7 +50,7 @@ final class KotlinTupleLabelTransformer: KotlinTransformer {
                 usedLabels.formUnion(labels)
                 labels.sorted().forEach { addLabel($0, forElement: tupleElement, ofArity: tupleArity, in: syntaxTree) }
             }
-            duplicateLabels.forEach { messages.append(.kotlinTupleConflictingLabel(label: $0, arity: tupleArity, sourceFile: syntaxTree.sourceFile)) }
+            duplicateLabels.forEach { messages.append(.kotlinTupleConflictingLabel(label: $0, arity: tupleArity, sourceFile: syntaxTree.source.file)) }
         }
         return true
     }

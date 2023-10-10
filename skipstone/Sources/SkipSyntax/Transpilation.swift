@@ -1,7 +1,6 @@
 /// A transpilation result.
 public struct Transpilation : Encodable {
-    public var sourceFile: Source.FilePath
-    public var isSourceFileSynthetic = false
+    public var input: Source
     public var output: Source
     public var outputMap: OutputMap = OutputMap(entries: [])
     public var messages: [Message] = []

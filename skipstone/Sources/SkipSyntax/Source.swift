@@ -1,7 +1,7 @@
 import Foundation
 import SwiftSyntax
 
-/// Swift source.
+/// Swift or Kotlin source code file.
 public struct Source : Encodable {
     public let file: FilePath
     public let content: String

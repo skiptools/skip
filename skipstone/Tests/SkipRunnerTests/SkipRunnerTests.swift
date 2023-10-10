@@ -109,10 +109,10 @@ public class SkipRunnerTests : XCTestCase {
 
 
         // check maximum snippet size errors
-        try await snippet(swift: String(repeating: " ", count: (1024 * 25)), kotlin: "")
-//        try await snippet(swift: String(repeating: " ", count: (1024 * 25) + 1), kotlin: nil, messages: [
-//            "Snippet too large 26 KB"
-//        ])
+        //try await snippet(swift: String(repeating: " ", count: 1024), kotlin: "")
+        try await snippet(swift: String(repeating: " ", count: 1024 + 1), kotlin: nil, messages: [
+            "Snippet too large 1 KB"
+        ])
     }
 
     /// Creates a temporary file with the given name and optional contents.

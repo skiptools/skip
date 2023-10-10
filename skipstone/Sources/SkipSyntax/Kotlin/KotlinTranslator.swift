@@ -79,8 +79,7 @@ public class KotlinTranslator {
         }
         translator.addPackageAndRequiredImportStatements(to: kotlinSyntaxTree)
 
-        var transpilation = translator.transpilation(for: kotlinSyntaxTree, codebaseInfo: codebaseInfo, transformers: transformers, startTime: startTime)
-        transpilation.isSourceFileSynthetic = true
+        let transpilation = translator.transpilation(for: kotlinSyntaxTree, codebaseInfo: codebaseInfo, transformers: transformers, startTime: startTime)
         return transpilation
     }
 
@@ -91,7 +90,7 @@ public class KotlinTranslator {
         let dependencies = gatherDependencies(from: importsFirstStatements)
         let kotlinRoot = KotlinCodeBlock(statements: importsFirstStatements)
         kotlinRoot.messages = syntaxTree.root.messages
-        let kotlinSyntaxTree = KotlinSyntaxTree(sourceFile: syntaxTree.source.file, root: kotlinRoot, dependencies: dependencies)
+        let kotlinSyntaxTree = KotlinSyntaxTree(source: syntaxTree.source, root: kotlinRoot, dependencies: dependencies)
         kotlinSyntaxTree.root.assignParentReferences()
         return kotlinSyntaxTree
     }
@@ -267,7 +266,7 @@ public class KotlinTranslator {
         let outputGenerator = OutputGenerator(root: kotlinSyntaxTree.root)
         let (output, outputMap) = outputGenerator.generateOutput(file: outputFile)
         let endTime = Date().timeIntervalSinceReferenceDate // track the duration for logging
-        return Transpilation(sourceFile: kotlinSyntaxTree.sourceFile, output: output, outputMap: outputMap, messages: messages, duration: endTime - startTime)
+        return Transpilation(input: kotlinSyntaxTree.source, output: output, outputMap: outputMap, messages: messages, duration: endTime - startTime)
     }
 
     private func moveImportsToTop(statements: [KotlinStatement]) -> [KotlinStatement] {

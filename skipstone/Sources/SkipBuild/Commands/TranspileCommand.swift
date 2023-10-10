@@ -5,15 +5,11 @@ import SkipSyntax
 import TSCBasic
 
 protocol TranspilePhase: TranspilerInputOptionsCommand {
-    var transpileOptions: TranspilePhaseOptions { get }
+    var transpileOptions: TranspileCommandOptions { get }
 }
 
 /// The file extension for the metadata about skipcode
 let skipcodeExtension = ".skipcode.json"
-
-/// The skip transpile marker that is always output regardless of whether the transpile was successful or not
-/// Needs to have the extension .docc to prevent including the file in the output bundle
-let skipbuildMarkerExtension = ".skipbuild.docc"
 
 struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
     static var configuration = CommandConfiguration(commandName: "transpile", abstract: "Transpile Swift to Kotlin", shouldDisplay: false)
@@ -22,7 +18,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
     var inputOptions: TranspilerInputOptions
 
     @OptionGroup(title: "Transpile Options")
-    var transpileOptions: TranspilePhaseOptions
+    var transpileOptions: TranspileCommandOptions
 
     @OptionGroup(title: "Output Options")
     var outputOptions: OutputOptions
@@ -66,7 +62,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
         let v = skipVersion
         #endif
 
-        if ProcessInfo.processInfo.environment["CONFIGURATION"] == "Skippy" {
+        if SkippyCommand.skippyOnly == true {
             info("Skip \(v): transpile plugin not running for CONFIGURATION=Skippy")
             return
         }
@@ -146,7 +142,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
             return path
         }
 
-        /// Load the given source file, tracking its last modified date for the timestamp on the `.skipbuild` marker file
+        /// Load the given source file, tracking its last modified date for the timestamp on the `.sourcehash` marker file
         func inputSource(_ path: AbsolutePath) throws -> ByteString {
             _ = addInputFile(path)
             return try fs.readFileContents(path)
@@ -183,7 +179,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
 
         let moduleBasePath = moduleRootPath.parentDirectory
 
-        // always touch the build completion marker with the most recent file mod time
+        // always touch the sourcehash file with the most recent source hashes in order to update the output file time
         /// Create a link from the source to the destination; this is used for resources and custom Kotlin files in order to permit edits to target file and have them reflected in the original source
         func addLink(at linkSource: AbsolutePath, pointingAt destPath: AbsolutePath, relative: Bool) throws {
             let modTime = try? fs.getFileInfo(destPath).modTime
@@ -201,7 +197,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
         }
 
 
-        // the shared JSON encoder for serializing .skipcode.json codebase and .skipbuild marker contents
+        // the shared JSON encoder for serializing .skipcode.json codebase and .sourcehash marker contents
         let encoder = JSONEncoder()
         encoder.outputFormatting = [
             .sortedKeys, // needed for deterministic output
@@ -209,25 +205,12 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
             //.prettyPrinted, // compacting JSON significantly reduces the size of the codebase files
         ]
 
-        let buildCompletionMarkerPath = moduleBasePath.appending(components: ["." + primaryModuleName + skipbuildMarkerExtension])
-        try? fs.removeFileTree(buildCompletionMarkerPath) // delete the build completion marker to force its re-creation
-
-        // touch the build marker with the most recent file time from the complete build list
-        // if we were to touch it afresh every time, the plugin would be re-executed every time
-        defer {
-            do {
-                // get the modification times for all the files we have written and which were used as inputs
-                let fileDates = try (outputFiles + inputFiles).map({ try fs.getFileInfo($0).modTime })
-                // touch the build marker with the max file time of all the inputs and outputs
-                try touchBuildCompletionMarker(at: fileDates.max() ?? Date.now)
-            } catch {
-                msg(.warning, "could not create build completion marker: \(error)")
-            }
-        }
+        let sourcehashOutputPath = try AbsolutePath(validating: transpileOptions.sourcehash)
+        try fs.removeFileTree(sourcehashOutputPath) // delete the build completion marker to force its re-creation (removeFileTree doesn't throw when the file doesn't exist)
 
         let env = ProcessInfo.processInfo.environment
 
-        // at this point, check for the conditional environment and halt transpilation on unsupported (i.e., non-macOS) platforms; this will still output the .skipbuild file, because the plugin needs to have it created for evey plugin invocation (since we don't know in SkipPlugin.swift what the target platform is).
+        // at this point, check for the conditional environment and halt transpilation on unsupported (i.e., non-macOS) platforms; this will still output the .sourcehash file, because the plugin needs to have it created for evey plugin invocation (since we don't know in SkipPlugin.swift what the target platform is).
         let explicitlyEnabled = envEnable.contains(where: { env[$0] != nil })
         let explicitlyDisabled = envDisable.contains(where: { env[$0] != nil })
 
@@ -266,7 +249,17 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
             .map { try AbsolutePath(skipFolderPath, validating: $0) }
 
         // validate licenses in all the Skip source files, as well as any custom Kotlin files in the Skip folder
-        try await validateLicense(sourceURLs: sourceURLs + skipFolderPathContents.map(\.asURL).filter({ $0.pathExtension == "kt" }))
+        let sourcehashes = try await createSourceHashes(validateLicense: true, sourceURLs: sourceURLs + skipFolderPathContents.map(\.asURL).filter({ $0.pathExtension == "kt" }))
+        // touch the build marker with the most recent file time from the complete build list
+        // if we were to touch it afresh every time, the plugin would be re-executed every time
+        defer {
+            do {
+                // touch the source hash file with a new timestamp to signal to the plugin host that our output file has been written
+                try saveSourcehashFile()
+            } catch {
+                msg(.warning, "could not create build completion marker: \(error)")
+            }
+        }
 
         let transpiler = Transpiler(packageName: packageName, sourceFiles: sourceURLs.map(\.path).sorted().map(Source.FilePath.init(path:)), codebaseInfo: codebaseInfo, preprocessorSymbols: Set(inputOptions.symbols), transformers: transformers)
 
@@ -325,21 +318,32 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
             info("\(outputFilePath.relative(to: moduleBasePath).pathString) (\(contents.count.byteCount)) \(tag) \(!changed ? "unchanged" : "written")", sourceFile: outputFilePath.sourceFile)
         }
 
-        func touchBuildCompletionMarker(at dateOfLastFileChange: Date) throws {
+        func saveSourcehashFile() throws {
             if !fs.isDirectory(moduleBasePath) {
                 try fs.createDirectory(moduleBasePath, recursive: true)
             }
 
-            struct SkipMarkerContents : Encodable {
+            struct SourcehashContents : Encodable {
                 /// The version of Skip that generates this marker file
                 let skipstone: String = skipVersion
 
-                /// The ordered input paths for source files, in order to identify when input file lists have changed even if none of the contents have
-                let sourceFiles: [String]?
+                /// The relative input paths and hashes for source files, in order to identify when input contents or file lists have changed
+                let sourcehashes: [String: String]
             }
 
-            let marker = SkipMarkerContents(sourceFiles: sourceURLs.map(\.path))
-            try writeChanges(tag: "marker", to: buildCompletionMarkerPath, contents: try encoder.encode(marker), readOnly: false)
+            // create relative source paths so we do not encode full paths in the output
+            let sourcePathHashes: [(String, String)] = sourcehashes.compactMap { url, sourcehash in
+                let absolutePath = url.path
+                if !absolutePath.hasPrefix(projectFolderPath.pathString) {
+                    return .none
+                }
+
+                let relativePath = absolutePath.dropFirst(projectFolderPath.pathString.count).trimmingPrefix(while: { $0 == "/" })
+                return (relativePath.description, sourcehash)
+            }
+
+            let sourcehash = SourcehashContents(sourcehashes: Dictionary(sourcePathHashes, uniquingKeysWith: { $1 }))
+            try writeChanges(tag: "sourcehash", to: sourcehashOutputPath, contents: try encoder.encode(sourcehash), readOnly: false)
         }
 
         func saveCodebaseInfo() throws {
@@ -637,10 +641,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
                 await out.yield(message)
             }
 
-            trace(transpilation.output.content)
-
-            let sourcePath = try AbsolutePath(validating: transpilation.sourceFile.path)
-            let sourceSize = transpilation.isSourceFileSynthetic ? 0 : try fs.getFileInfo(sourcePath).size
+            let sourcePath = try AbsolutePath(validating: transpilation.input.file.path)
 
             let (outputFile, changed, overridden) = try saveTranspilation()
 
@@ -650,7 +651,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
             //    info("\(sourcePath.basename) (\(byteCount(for: .init(sourceSize)))) transpiling to \(outputFile.basename)", sourceFile: transpilation.sourceFile)
             //}
 
-            info("\(outputFile.relative(to: moduleBasePath).pathString) (\(transpilation.output.content.lengthOfBytes(using: .utf8).byteCount)) transpilation \(overridden ? "overridden" : !changed ? "unchanged" : "saved") from \(sourcePath.basename) (\(sourceSize.byteCount)) in \(Int64(transpilation.duration * 1000)) ms", sourceFile: overridden ? transpilation.sourceFile : outputFile.sourceFile)
+            info("\(outputFile.relative(to: moduleBasePath).pathString) (\(transpilation.output.content.lengthOfBytes(using: .utf8).byteCount)) transpilation \(overridden ? "overridden" : !changed ? "unchanged" : "saved") from \(sourcePath.basename) (\(transpilation.input.content.lengthOfBytes(using: .utf8).byteCount)) in \(Int64(transpilation.duration * 1000)) ms", sourceFile: overridden ? transpilation.input.file : outputFile.sourceFile)
 
             for message in transpilation.messages {
                 //writeMessage(message)
@@ -811,9 +812,12 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
 
 }
 
-struct TranspilePhaseOptions: ParsableArguments {
+struct TranspileCommandOptions: ParsableArguments {
     @Option(name: [.customLong("project"), .long], help: ArgumentHelp("The project folder to transpile", valueName: "folder"))
     var projectFolder: String // --project
+
+    @Option(name: [.long], help: ArgumentHelp("The path to the source hash file to output", valueName: "path"))
+    var sourcehash: String // --sourcehash
 
     @Option(help: ArgumentHelp("Condition for transpile phase", valueName: "force/no"))
     var transpile: PhaseGuard = .onDemand // --transpile
