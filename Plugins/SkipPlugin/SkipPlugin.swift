@@ -23,7 +23,8 @@ import PackagePlugin
     //let skipcodeExtension = ".skipcode.json"
 
     /// The skip transpile marker that is always output regardless of whether the transpile was successful or not
-    let skipbuildMarkerExtension = ".skipbuild"
+    /// `.docc` extension is needed to prevent file from being included in the build output folder
+    let skipbuildMarkerExtension = ".skipbuild.docc"
 
     /// The extension to add to the skippy output; these have the `docc` extension merely because that is the only extension of generated files that is not copied as a resource when a package is built: https://github.com/apple/swift-package-manager/blob/0147f7122a2c66eef55dcf17a0e4812320d5c7e6/Sources/PackageLoading/TargetSourcesBuilder.swift#L665
     let skippyOuptputExtension = ".skippy"
