@@ -215,7 +215,7 @@ import PackagePlugin
                 markerFile = markerFile.standardized
                     .deletingLastPathComponent()
                     .appendingPathComponent(skipOutputFolder, isDirectory: true)
-                    .appendingPathComponent("." + markerFile.lastPathComponent, isDirectory: false)
+                    .appendingPathComponent(markerFile.lastPathComponent, isDirectory: false)
 
                 // output a .skipbuild file contains all the input files, so the transpile will be re-run when any of the input sources have changed
                 let markerFilePath = Path(markerFile.path)
