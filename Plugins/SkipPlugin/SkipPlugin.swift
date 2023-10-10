@@ -13,9 +13,6 @@ import PackagePlugin
     /// The name of the plug-in's output folder is the same as the target name for the transpiler, which matches the ".plugin(name)" in the Package.swift
     let pluginFolderName = "skipstone"
 
-    /// The output folder in which to place .skippy and .skipbuild files
-    let skipOutputFolder = ".skip"
-
     /// The executable command forked by the plugin; this is the build artifact whose name matches the built `skip` binary
     let skipPluginCommandName = "skip"
 
@@ -52,7 +49,7 @@ import PackagePlugin
     func createPreflightBuildCommands(context: PluginContext, target: SourceModuleTarget) async throws -> [Command] {
         let runner = try context.tool(named: skipPluginCommandName).path
         let inputPaths = target.sourceFiles(withSuffix: ".swift").map { $0.path }
-        let outputDir = context.pluginWorkDirectory.appending(subpath: skipOutputFolder)
+        let outputDir = context.pluginWorkDirectory
         return inputPaths.map { Command.buildCommand(displayName: "Skippy \(target.name): \($0.lastComponent)", executable: runner, arguments: ["skippy", "--output-suffix", skippyOuptputExtension, "-O", outputDir.string, $0.string], inputFiles: [$0], outputFiles: [$0.outputPath(in: outputDir, suffix: skippyOuptputExtension)]) }
     }
 
@@ -126,7 +123,7 @@ import PackagePlugin
 
         // the output files contains the .skipcode.json, and the input files contains all the dependent .skipcode.json files
         let outputURL = URL(fileURLWithPath: outputFolder.string, isDirectory: true)
-        let skipBuildOutputURL = outputURL.appendingPathComponent(skipOutputFolder, isDirectory: true)
+        let skipBuildOutputURL = outputURL
         //let skipcodeOutputPath = Path(outputURL.appendingPathComponent(peerTarget.name + skipcodeExtension).path)
         let skipbuildMarkerOutputPath = Path(skipBuildOutputURL.appendingPathComponent("." + peerTarget.name + skipbuildMarkerExtension, isDirectory: false).path)
         Diagnostics.remark("add skipbuild output for \(target.name): \(skipbuildMarkerOutputPath)", file: skipbuildMarkerOutputPath.string)
@@ -216,7 +213,6 @@ import PackagePlugin
                 // also put it under a ".skip" folder in order to prevent it from being included in the output bundle
                 markerFile = markerFile.standardized
                     .deletingLastPathComponent()
-                    .appendingPathComponent(skipOutputFolder, isDirectory: true)
                     .appendingPathComponent("." + markerFile.lastPathComponent, isDirectory: false)
 
                 // output a .skipbuild file contains all the input files, so the transpile will be re-run when any of the input sources have changed
