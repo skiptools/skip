@@ -14,9 +14,12 @@ jobs:
       - run: brew install skiptools/skip/skip
       - run: skip doctor
       - run: skip checkup
-      - run: skip lib init --build --test -d $(mktemp -d) skppkg Mod1 Mod2
+      - run: skip lib init --build --test -d $(mktemp -d) skppkg Mod1
+      #- run: skip lib init --build --test -d $(mktemp -d) skppkg Mod1 Mod2
       - run: skip lib init -c debug --build --test --version=1.0.0 --appid=world.Hello --ipa --apk -d $(mktemp -d) hello-world Hello:skip-ui/SkipUI
-      - run: skip lib init -c release --build --no-test --version=1.0.1 --appid=world.Hello --ipa --apk -d $(mktemp -d) hello-world Hello:skip-ui/SkipUI
+      - run: skip lib init -c debug --build --no-test --version=1.0.1 --appid=world.Hello --ipa --apk --chain -d $(mktemp -d) hello-world Hello:skip-ui/SkipUI HelloModel:skip-model/SkipModel:skip-foundation/SkipFoundation
+      - run: skip lib init -c release --build --no-test --version=1.0.2 --appid=world.Hello --ipa --apk -d $(mktemp -d) hello-world Hello:skip-ui/SkipUI
+
       #- run: skip app create --build --test -d $(mktemp -d) skpapp
       #- run: skip app create --template skipapp-weather --build --test -d $(mktemp -d) skpapp
       #- run: skip app create --template skipapp-playground --build --test -d $(mktemp -d) skpapp
