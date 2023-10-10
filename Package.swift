@@ -29,6 +29,6 @@ let package = Package(
 
 import Foundation
 if (ProcessInfo.processInfo.environment["PWD"]?.hasSuffix("skipstone") == true || ProcessInfo.processInfo.environment["SKIPLOCAL"] != nil) && ProcessInfo.processInfo.environment["NOSKIP"] == nil {
-    package.dependencies += [.package(path: "../skipstone")]
+    package.dependencies = package.dependencies.dropLast() + [.package(path: "../skipstone")]
     package.targets = package.targets.dropLast() + [.executableTarget(name: "skip", dependencies: [.product(name: "SkipBuild", package: "skipstone")])]
 }

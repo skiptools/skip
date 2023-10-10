@@ -22,11 +22,14 @@ import PackagePlugin
     /// The file extension for the metadata about skipcode
     //let skipcodeExtension = ".skipcode.json"
 
-    /// The skip transpile marker that is always output regardless of whether the transpile was successful or not
-    let skipbuildMarkerExtension = ".skipbuild"
+    /// The skip transpile output containing the input source hashes to check for changes
+    let sourcehashExtension = ".sourcehash"
 
     /// The extension to add to the skippy output; these have the `docc` extension merely because that is the only extension of generated files that is not copied as a resource when a package is built: https://github.com/apple/swift-package-manager/blob/0147f7122a2c66eef55dcf17a0e4812320d5c7e6/Sources/PackageLoading/TargetSourcesBuilder.swift#L665
     let skippyOuptputExtension = ".skippy"
+
+    /// Whether we should run in Skippy or full-transpile mode
+    let skippyOnly = ProcessInfo.processInfo.environment["CONFIGURATION"] == "Skippy"
 
     func createBuildCommands(context: PluginContext, target: Target) async throws -> [Command] {
         if skipRootTargetNames.contains(target.name) {
@@ -39,10 +42,12 @@ import PackagePlugin
         }
 
         var cmds: [Command] = []
-        cmds += try await createPreflightBuildCommands(context: context, target: sourceTarget)
-
-        // We only want to run the transpiler when targeting macOS and not iOS, but there doesn't appear to by any way to identify that from this phase of the plugin execution; so the transpiler will check the envrionment (e.g., "SUPPORTED_DEVICE_FAMILIES") and only run conditionally
-        cmds += try await createTranspileBuildCommands(context: context, target: sourceTarget)
+        if skippyOnly {
+            cmds += try await createPreflightBuildCommands(context: context, target: sourceTarget)
+        } else {
+            // We only want to run the transpiler when targeting macOS and not iOS, but there doesn't appear to by any way to identify that from this phase of the plugin execution; so the transpiler will check the envrionment (e.g., "SUPPORTED_DEVICE_FAMILIES") and only run conditionally
+            cmds += try await createTranspileBuildCommands(context: context, target: sourceTarget)
+        }
 
         return cmds
     }
@@ -124,9 +129,9 @@ import PackagePlugin
 
         // the output files contains the .skipcode.json, and the input files contains all the dependent .skipcode.json files
         let outputURL = URL(fileURLWithPath: outputFolder.string, isDirectory: true)
-        //let skipcodeOutputPath = Path(outputURL.appendingPathComponent(peerTarget.name + skipcodeExtension).path)
-        let skipbuildMarkerOutputPath = Path(outputURL.appendingPathComponent("." + peerTarget.name + skipbuildMarkerExtension, isDirectory: false).path)
-        Diagnostics.remark("add skipbuild output for \(target.name): \(skipbuildMarkerOutputPath)", file: skipbuildMarkerOutputPath.string)
+        let sourceHashDot = "."
+        let sourcehashOutputPath = Path(outputURL.appendingPathComponent(sourceHashDot + peerTarget.name + sourcehashExtension, isDirectory: false).path)
+        Diagnostics.remark("add sourcehash output for \(target.name): \(sourcehashOutputPath)", file: sourcehashOutputPath.string)
 
         struct Dep : Identifiable {
             let package: Package
@@ -185,8 +190,8 @@ import PackagePlugin
         var deps = dependencies(for: target.dependencies, in: context.package)
         deps = makeUniqueById(deps)
 
-        let outputFiles: [Path] = [skipbuildMarkerOutputPath]
-        // input files consist of the source folder itself (we can't rely on individual files due to ), as well as all the dependent module output build marker files, which will be modified whenever a transpiled module changes
+        let outputFiles: [Path] = [sourcehashOutputPath]
+        // input files consist of the source folder itself (we can't rely on individual files due to ), as well as all the dependent module output source hash directory files, which will be modified whenever a transpiled module changes
         // note that using the directory as the input will cause the transpile to re-run for any sub-folder change, although this behavior is not explicitly documented
         var inputFiles: [Path] = [target.directory]
 
@@ -205,19 +210,17 @@ import PackagePlugin
                 // this should block the invocation of the transpiler plugin for this module
                 // until the dependent modules have all been transpiled and their skipcode JSON files emitted
 
-                var markerFile = URL(fileURLWithPath: outputFolder.string, isDirectory: true).appendingPathComponent(moduleLinkTarget + skipbuildMarkerExtension, isDirectory: false)
-                // turn the module name into a marker file name
+                var sourceHashFile = URL(fileURLWithPath: outputFolder.string, isDirectory: true).appendingPathComponent(moduleLinkTarget + sourcehashExtension, isDirectory: false)
+                // turn the module name into a sourcehash file name
                 // need to standardize the path to remove ../../ elements form the symlinks, otherwise the input and output paths don't match and Xcode will re-build everything each time
-                markerFile = markerFile.standardized
+                sourceHashFile = sourceHashFile.standardized
                     .deletingLastPathComponent()
-                    .appendingPathComponent("." + markerFile.lastPathComponent, isDirectory: false)
+                    .appendingPathComponent(sourceHashDot + sourceHashFile.lastPathComponent, isDirectory: false)
 
-                // output a .skipbuild file contains all the input files, so the transpile will be re-run when any of the input sources have changed
-                let markerFilePath = Path(markerFile.path)
-
-                inputFiles.append(markerFilePath)
-
-                //Diagnostics.remark("add skipbuild input for \(depTarget.name): \(markerFilePath.string)", file: markerFilePath.string)
+                // output a .sourcehash file contains all the input files, so the transpile will be re-run when any of the input sources have changed
+                let sourceHashFilePath = Path(sourceHashFile.path)
+                inputFiles.append(sourceHashFilePath)
+                //Diagnostics.remark("add sourcehash input for \(depTarget.name): \(sourceHashFilePath.string)", file: sourceHashFilePath.string)
             }
         }
 
@@ -233,6 +236,7 @@ import PackagePlugin
                 "transpile",
                 "--project", swiftSourceTarget.directory.string,
                 "--skip-folder", skipFolder.string,
+                "--sourcehash", sourcehashOutputPath.string,
                 "--output-folder", sourceBase.path,
                 "--module-root", outputBase.path,
                 ]
