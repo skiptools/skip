@@ -1669,7 +1669,8 @@ class StringLiteral: Expression {
                 expression.inferTypes(context: context, expecting: .none)
             }
         }
-        if expecting == .character && segments.count == 1, case .string(let string) = segments[0], string.count == 1 || (string.count == 2 && string.first == "\\")  {
+        // A character can be an escaped value or \u{...} unicode sequence
+        if expecting == .character && segments.count == 1, case .string(let string) = segments[0], string.count == 1 || string.first == "\\" {
             literalType = .character
         }
         return context
