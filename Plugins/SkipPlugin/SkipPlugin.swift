@@ -13,15 +13,20 @@ import PackagePlugin
     /// The name of the plug-in's output folder is the same as the target name for the transpiler, which matches the ".plugin(name)" in the Package.swift
     let pluginFolderName = "skipstone"
 
+    /// The output folder in which to place Skippy files
+    let skippyOutputFolder = ".skippy"
+
     /// The executable command forked by the plugin; this is the build artifact whose name matches the built `skip` binary
     let skipPluginCommandName = "skip"
 
+    /// The file extension for the metadata about skipcode
+    //let skipcodeExtension = ".skipcode.json"
+
     /// The skip transpile marker that is always output regardless of whether the transpile was successful or not
-    /// `.docc` extension is needed to prevent file from being included in the build output folder
+    /// Needs to have the extension .docc to prevent including the file in the output bundle
     let skipbuildMarkerExtension = ".skipbuild.docc"
 
     /// The extension to add to the skippy output; these have the `docc` extension merely because that is the only extension of generated files that is not copied as a resource when a package is built: https://github.com/apple/swift-package-manager/blob/0147f7122a2c66eef55dcf17a0e4812320d5c7e6/Sources/PackageLoading/TargetSourcesBuilder.swift#L665
-    /// `.docc` extension is needed to prevent file from being included in the build output folder
     let skippyOuptputExtension = ".skippy.docc"
 
     func createBuildCommands(context: PluginContext, target: Target) async throws -> [Command] {
@@ -46,7 +51,7 @@ import PackagePlugin
     func createPreflightBuildCommands(context: PluginContext, target: SourceModuleTarget) async throws -> [Command] {
         let runner = try context.tool(named: skipPluginCommandName).path
         let inputPaths = target.sourceFiles(withSuffix: ".swift").map { $0.path }
-        let outputDir = context.pluginWorkDirectory
+        let outputDir = context.pluginWorkDirectory.appending(subpath: skippyOutputFolder)
         return inputPaths.map { Command.buildCommand(displayName: "Skippy \(target.name): \($0.lastComponent)", executable: runner, arguments: ["skippy", "--output-suffix", skippyOuptputExtension, "-O", outputDir.string, $0.string], inputFiles: [$0], outputFiles: [$0.outputPath(in: outputDir, suffix: skippyOuptputExtension)]) }
     }
 
@@ -120,6 +125,7 @@ import PackagePlugin
 
         // the output files contains the .skipcode.json, and the input files contains all the dependent .skipcode.json files
         let outputURL = URL(fileURLWithPath: outputFolder.string, isDirectory: true)
+        //let skipcodeOutputPath = Path(outputURL.appendingPathComponent(peerTarget.name + skipcodeExtension).path)
         let skipbuildMarkerOutputPath = Path(outputURL.appendingPathComponent("." + peerTarget.name + skipbuildMarkerExtension, isDirectory: false).path)
         Diagnostics.remark("add skipbuild output for \(target.name): \(skipbuildMarkerOutputPath)", file: skipbuildMarkerOutputPath.string)
 
@@ -195,17 +201,14 @@ import PackagePlugin
                 continue
             }
 
-            if let moduleLinkTargetPath = try addModuleLinkFlag(depTarget, packageID: dep.package.id) {
+            if let moduleLinkTarget = try addModuleLinkFlag(depTarget, packageID: dep.package.id) {
                 // adds an input file dependency on all the .skipcode.json files output from the dependent targets
                 // this should block the invocation of the transpiler plugin for this module
                 // until the dependent modules have all been transpiled and their skipcode JSON files emitted
 
-                var markerFile = URL(fileURLWithPath: outputFolder.string, isDirectory: true)
-                    .appendingPathComponent(moduleLinkTargetPath + skipbuildMarkerExtension, isDirectory: false)
-
+                var markerFile = URL(fileURLWithPath: outputFolder.string, isDirectory: true).appendingPathComponent(moduleLinkTarget + skipbuildMarkerExtension, isDirectory: false)
                 // turn the module name into a marker file name
                 // need to standardize the path to remove ../../ elements form the symlinks, otherwise the input and output paths don't match and Xcode will re-build everything each time
-                // also put it under a ".skip" folder in order to prevent it from being included in the output bundle
                 markerFile = markerFile.standardized
                     .deletingLastPathComponent()
                     .appendingPathComponent("." + markerFile.lastPathComponent, isDirectory: false)
@@ -215,7 +218,7 @@ import PackagePlugin
 
                 inputFiles.append(markerFilePath)
 
-                Diagnostics.remark("add skipbuild input for \(target.name)->\(depTarget.name): \(markerFilePath.string)", file: markerFilePath.string)
+                //Diagnostics.remark("add skipbuild input for \(depTarget.name): \(markerFilePath.string)", file: markerFilePath.string)
             }
         }
 
