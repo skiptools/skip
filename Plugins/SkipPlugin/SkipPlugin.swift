@@ -208,7 +208,7 @@ import PackagePlugin
                 // this should block the invocation of the transpiler plugin for this module
                 // until the dependent modules have all been transpiled and their skipcode JSON files emitted
 
-                var markerFile = URL(fileURLWithPath: outputFolder.string, isDirectory: true).appendingPathComponent(moduleLinkTarget + skipbuildMarkerExtension, isDirectory: false)
+                var markerFile = URL(fileURLWithPath: outputFolder.string, isDirectory: true).appendingPathComponent("." + moduleLinkTarget + skipbuildMarkerExtension, isDirectory: false)
                 // turn the module name into a marker file name
                 // need to standardize the path to remove ../../ elements form the symlinks, otherwise the input and output paths don't match and Xcode will re-build everything each time
                 // also put it under a ".skip" folder in order to prevent it from being included in the output bundle
