@@ -27,7 +27,8 @@ import PackagePlugin
     let skipbuildMarkerExtension = ".skipbuild.docc"
 
     /// The extension to add to the skippy output; these have the `docc` extension merely because that is the only extension of generated files that is not copied as a resource when a package is built: https://github.com/apple/swift-package-manager/blob/0147f7122a2c66eef55dcf17a0e4812320d5c7e6/Sources/PackageLoading/TargetSourcesBuilder.swift#L665
-    let skippyOuptputExtension = ".skippy"
+    /// `.docc` extension is needed to prevent file from being included in the build output folder
+    let skippyOuptputExtension = ".skippy.docc"
 
     func createBuildCommands(context: PluginContext, target: Target) async throws -> [Command] {
         if skipRootTargetNames.contains(target.name) {
