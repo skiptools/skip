@@ -19,9 +19,6 @@ import PackagePlugin
     /// The executable command forked by the plugin; this is the build artifact whose name matches the built `skip` binary
     let skipPluginCommandName = "skip"
 
-    /// The file extension for the metadata about skipcode
-    //let skipcodeExtension = ".skipcode.json"
-
     /// The skip transpile marker that is always output regardless of whether the transpile was successful or not
     /// `.docc` extension is needed to prevent file from being included in the build output folder
     let skipbuildMarkerExtension = ".skipbuild.docc"
@@ -127,7 +124,6 @@ import PackagePlugin
         // the output files contains the .skipcode.json, and the input files contains all the dependent .skipcode.json files
         let outputURL = URL(fileURLWithPath: outputFolder.string, isDirectory: true)
         let skipBuildOutputURL = outputURL.appendingPathComponent(skipOutputFolder, isDirectory: true)
-        //let skipcodeOutputPath = Path(outputURL.appendingPathComponent(peerTarget.name + skipcodeExtension).path)
         let skipbuildMarkerOutputPath = Path(skipBuildOutputURL.appendingPathComponent("." + peerTarget.name + skipbuildMarkerExtension, isDirectory: false).path)
         Diagnostics.remark("add skipbuild output for \(target.name): \(skipbuildMarkerOutputPath)", file: skipbuildMarkerOutputPath.string)
 
@@ -224,7 +220,7 @@ import PackagePlugin
 
                 inputFiles.append(markerFilePath)
 
-                Diagnostics.remark("add skipbuild input for \(depTarget.name): \(markerFilePath.string)", file: markerFilePath.string)
+                Diagnostics.remark("add skipbuild input for \(target.name)->\(depTarget.name): \(markerFilePath.string)", file: markerFilePath.string)
             }
         }
 
@@ -234,6 +230,8 @@ import PackagePlugin
 
         let outputBase = URL(fileURLWithPath: kotlinModule, isDirectory: true, relativeTo: outputURL)
         let sourceBase = URL(fileURLWithPath: isTest ? "src/test" : "src/main", isDirectory: true, relativeTo: outputBase)
+
+        Diagnostics.remark("skip transpile command: \([ "transpile", "--project", swiftSourceTarget.directory.string, "--skip-folder", skipFolder.string, "--output-folder", sourceBase.path, "--module-root", outputBase.path ])")
 
         return [
             .buildCommand(displayName: "Skip \(target.name)", executable: skip.path, arguments: [
