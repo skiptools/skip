@@ -103,8 +103,7 @@ public class SkipRunnerTests : XCTestCase {
             }
         }
         """, messages: [
-            "A Kotlin constructor can only include a single top-level call to another \'this\' or \'super\' constructor\n            self.init(i: -1)\n            ^~~~~~~~~~~~~~~~",
-            "A Kotlin constructor can only include a single top-level call to another \'this\' or \'super\' constructor\n            self.init(i: Int(x))\n            ^~~~~~~~~~~~~~~~~~~~"
+            "A Kotlin constructor can only include a single top-level call to another \'this\' or \'super\' constructor", "A Kotlin constructor can only include a single top-level call to another \'this\' or \'super\' constructor"
         ])
 
 

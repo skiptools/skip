@@ -58,7 +58,7 @@ struct LibInitCommand: MessageCommand, CreateOptionsCommand, ToolOptionsCommand,
         let dir = self.createOptions.dir ?? "."
 
         let modules = try self.modules
-        let createdURL = try await buildSkipProject(projectName: self.projectName, modules: modules, resourceFolder: createOptions.resourcePath, dir: dir, configuration: createOptions.configuration, build: buildOptions.build, test: buildOptions.test, tree: self.createOptions.tree, chain: createOptions.chain, appid: self.appid, version: self.version, apk: apk, ipa: ipa, with: out)
+        let createdURL = try await buildSkipProject(projectName: self.projectName, modules: modules, resourceFolder: createOptions.resourcePath, dir: dir, configuration: createOptions.configuration, build: buildOptions.build, test: buildOptions.test, tree: self.createOptions.tree, chain: createOptions.chain, zero: createOptions.zero, appid: self.appid, version: self.version, apk: apk, ipa: ipa, with: out)
 
         await out.yield(MessageBlock(status: .pass, "Created module \(modules.map(\.moduleName).joined(separator: ", ")) in \(createdURL.path)"))
     }
@@ -68,12 +68,49 @@ extension ToolOptionsCommand {
     fileprivate func createXcodeProj(_ appModuleName: String, _ appMainSwiftFileName: String, _ Assets_xcassets_name: String, _ xcconfigFileName: String, _ primaryModuleAppTarget: String, _ primaryModuleAppMainPath: String, _ Assets_xcassets_path: String) -> String {
 
         let skipBuildAPKScript = """
-        if [ \\"${SKIP_BUILD_APK}\\" != \\"YES\\" ]; then\\n  echo \\"note: Not building apk due to SKIP_BUILD_APK setting\\"\\n  exit 0\\nfi\\n\\nPLUGIN=${BUILD_ROOT}/../../SourcePackages/artifacts/skip/skip/skip.artifactbundle/macos\\nPATH=${BUILD_ROOT}/Debug:${PLUGIN}:${PATH}:${HOMEBREW_PREFIX:-/opt/homebrew}/bin\\nPROJECT=$(basename ${PROJECT_DIR})\\nSRCPKG=${BUILD_ROOT}/../../SourcePackages\\necho \\"note: Building APK for: ${PROJECT}\\"\\nexport ANDROID_HOME=${ANDROID_HOME:-${HOME}/Library/Android/sdk}\\nwhich skip\\nmkdir -p Skip/build/artifacts/\\nskip gradle --package \\"${PROJECT}\\" --module ${PROJECT_NAME}UI assemble${CONFIGURATION}\\ncd Skip/build/\\nln -sfh ${SRCPKG}/plugins/*.output .\\ncd artifacts/\\n#ln -f ${SRCPKG}/plugins/*.output/*/skipstone/*/build/outputs/apk/*/*.apk .\\nln -f ${SRCPKG}/plugins/*.output/*/skipstone/*/.build/*/outputs/apk/*/*.apk .\\n\\n# this is the expected output file, so ensure that it exists\\nls -lah ${SRCROOT}/Skip/build/artifacts/${PROJECT_NAME}UI-${CONFIGURATION}.apk\\n
+        if [ "${SKIP_BUILD_APK}" != "YES" -o "${SKIP_ZERO}" != "" ]; then
+          echo "note: Not building apk due to SKIP_BUILD_APK setting"
+          exit 0
+        fi
+
+        PLUGIN=${BUILD_ROOT}/../../SourcePackages/artifacts/skip/skip/skip.artifactbundle/macos
+        PATH=${BUILD_ROOT}/Debug:${PLUGIN}:${PATH}:${HOMEBREW_PREFIX:-/opt/homebrew}/bin
+        PROJECT=$(basename ${PROJECT_DIR})
+        SRCPKG=${BUILD_ROOT}/../../SourcePackages
+        echo "note: Building APK for: ${PROJECT}"
+        export ANDROID_HOME=${ANDROID_HOME:-${HOME}/Library/Android/sdk}
+        which skip
+        mkdir -p Skip/build/artifacts/
+        skip gradle --package "${PROJECT}" --module ${PROJECT_NAME}UI assemble${CONFIGURATION}
+        cd Skip/build/
+        ln -sfh ${SRCPKG}/plugins/*.output .
+        cd artifacts/
+        #ln -f ${SRCPKG}/plugins/*.output/*/skipstone/*/build/outputs/apk/*/*.apk .
+        ln -f ${SRCPKG}/plugins/*.output/*/skipstone/*/.build/*/outputs/apk/*/*.apk .
+
+        # this is the expected output file, so ensure that it exists
+        ls -lah ${SRCROOT}/Skip/build/artifacts/${PROJECT_NAME}UI-${CONFIGURATION}.apk
+
         """
+            .replacingOccurrences(of: "\n", with: "\\n")
+            .replacingOccurrences(of: "\"", with: "\\\"")
 
         let skipLaunchAPKScript = """
-        if [ \\"${SKIP_LAUNCH_APK}\\" != \\"YES\\" ]; then\\n  echo \\"note: Not launching apk due to SKIP_LAUNCH_APK setting\\"\\n  exit 0\\nfi\\n\\nPLUGIN=${BUILD_ROOT}/../../SourcePackages/artifacts/skip/skip/skip.artifactbundle/macos\\nPATH=${BUILD_ROOT}/Debug:${PLUGIN}:${PATH}:${HOMEBREW_PREFIX:-/opt/homebrew}/bin\\necho \\"note: Running skip adb install\\"\\nskip adb install -t -r -d -g Skip/build/artifacts/${PROJECT_NAME}UI-${CONFIGURATION}.apk\\necho \\"note: Running skip adb am start-activity\\"\\nskip adb shell am start-activity -S -W -n ${PRODUCT_BUNDLE_IDENTIFIER}/.MainActivity\\n
+        if [ "${SKIP_LAUNCH_APK}" != "YES" -o "${SKIP_ZERO}" != "" ]; then
+          echo "note: Not launching apk due to SKIP_LAUNCH_APK setting"
+          exit 0
+        fi
+
+        PLUGIN=${BUILD_ROOT}/../../SourcePackages/artifacts/skip/skip/skip.artifactbundle/macos
+        PATH=${BUILD_ROOT}/Debug:${PLUGIN}:${PATH}:${HOMEBREW_PREFIX:-/opt/homebrew}/bin
+        echo "note: Running skip adb install"
+        skip adb install -t -r -d -g Skip/build/artifacts/${PROJECT_NAME}UI-${CONFIGURATION}.apk
+        echo "note: Running skip adb am start-activity
+        skip adb shell am start-activity -S -W -n ${PRODUCT_BUNDLE_IDENTIFIER}/.MainActivity
+
         """
+            .replacingOccurrences(of: "\n", with: "\\n")
+            .replacingOccurrences(of: "\"", with: "\\\"")
 
 
 
@@ -449,8 +486,8 @@ extension ToolOptionsCommand {
 """
     }
 
-    func buildSkipProject(projectName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: String, configuration: String, build: Bool, test: Bool, tree: Bool, chain: Bool, appid: String?, version: String?, apk: Bool, ipa: Bool, with out: MessageQueue) async throws -> URL {
-        let projectURL = try await initSkipLibrary(projectName: projectName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, chain: chain, app: appid != nil, with: out)
+    func buildSkipProject(projectName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: String, configuration: String, build: Bool, test: Bool, tree: Bool, chain: Bool, zero: Bool, appid: String?, version: String?, apk: Bool, ipa: Bool, with out: MessageQueue) async throws -> URL {
+        let projectURL = try await initSkipLibrary(projectName: projectName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, chain: chain, zero: zero, app: appid != nil, with: out)
 
         let projectPath = try projectURL.absolutePath
         let primaryModuleName = modules.first?.moduleName ?? "Module"
@@ -465,7 +502,7 @@ extension ToolOptionsCommand {
 
         let appModuleName = primaryModuleName
         let primaryModuleAppTarget = appModuleName + "App"
-        let xcodeProjectFolder = try projectURL.append(path: primaryModuleName + ".xcodeproj", create: true)
+        let xcodeProjectFolder = try projectURL.append(path: primaryModuleName + ".xcodeproj", create: appid != nil)
 
         if let appid = appid { // we have specified that an app should be created
             let primaryModuleAppSourcesPath = sourcesFolderName + "/" + primaryModuleAppTarget
@@ -818,18 +855,14 @@ extension ToolOptionsCommand {
                 "-destination", "generic/platform=iOS",
                 "archive",
                 "CODE_SIGNING_ALLOWED=NO",
-                "SKIP_BUILD_APK=NO",
-                "SKIP_LAUNCH_APK=NO",
-                "ZERO_AR_DATE=1",
-            ])
+                "ZERO_AR_DATE=1", // excludes timestamps from archives for build reproducibility
+            ], additionalEnvrionment: ["SKIP_ZERO": "1"]) // SKIP_ZERO builds without Skip dependency libraries
+
 
             let archiveAppPath = archivePath + "/Products/Applications/" + primaryModuleAppTarget + ".app"
             let archiveAppURL = projectURL.appending(path: archiveAppPath)
 
-            // TODO: eventually we will want to create the .ipa by the exportArchive mechanism, but that requires code signing and some means to specify the certificates in the tool…
-            // xcodebuild -exportArchive -archivePath /Path/To/Output/YourApp.xcarchive -exportPath /Path/To/ipa/Output/Folder -exportOptionsPlist /Path/To/ExportOptions.plist
-
-            // …so now, just run ditto to create the app zip
+            // Create an ipa (zip) file of the app contents
 
             // need to first copy the contents over to a "Payload" folder, since the root of the .ipa needs to be "Payload"
             let archiveAppPayloadURL = archiveAppURL
@@ -886,7 +919,7 @@ extension ToolOptionsCommand {
         return projectURL
     }
 
-    func initSkipLibrary(projectName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: String, chain: Bool, app: Bool, with out: MessageQueue) async throws -> URL {
+    func initSkipLibrary(projectName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: String, chain: Bool, zero: Bool, app: Bool, with out: MessageQueue) async throws -> URL {
         var isDir: Foundation.ObjCBool = false
         if !FileManager.default.fileExists(atPath: outputFolder, isDirectory: &isDir) {
             throw InitError(errorDescription: "Specified output folder does not exist: \(outputFolder)")
@@ -908,6 +941,10 @@ extension ToolOptionsCommand {
         let sourcesURL = try projectFolderURL.append(path: "Sources", create: true)
         let testsURL = try projectFolderURL.append(path: "Tests", create: true)
 
+        // the part of a target parameter that will only include skip when zero is not set
+        //let skipCondition = zero ? ", condition: skip" : "" // we don't use the condition parameter of target because it excludes
+        let skipPluginArray = zero ? "skipstone" : #"[.plugin(name: "skipstone", package: "skip")]"#
+
         var products = """
             products: [
 
@@ -928,18 +965,34 @@ extension ToolOptionsCommand {
             ".package(url: \"https://source.skip.tools/skip.git\", from: \"\(skipPackageVersion)\")"
         ]
 
-        for i in modules.indices {
-            let module = modules[i]
+        let packageHeader = """
+        // swift-tools-version: 5.9
+        // This is a Skip (https://skip.tools) package,
+        // containing a Swift Package Manager project
+        // that will use the Skip build plugin to transpile the
+        // Swift Package, Sources, and Tests into an
+        // Android Gradle Project with Kotlin sources and JUnit tests.
+        import PackageDescription
+        \(zero ? """
+        import Foundation
+
+        // Set SKIP_ZERO=1 to build without Skip libraries
+        let zero = ProcessInfo.processInfo.environment["SKIP_ZERO"] != nil
+        let skipstone = !zero ? [Target.PluginUsage.plugin(name: "skipstone", package: "skip")] : []
+        
+        """ : "")
+        """
+
+        for moduleIndex in modules.indices {
+            let module = modules[moduleIndex]
             let moduleName = module.moduleName
 
             // the isAppModule is the initial module in the list when we specify we want to create an app module
-            let isAppModule = app == true && i == modules.startIndex
+            let isAppModule = app == true && moduleIndex == modules.startIndex
 
             // the subsequent module
-            let nextModule = i < modules.endIndex - 1 ? modules[i+1] : nil
+            let nextModule = moduleIndex < modules.endIndex - 1 ? modules[moduleIndex+1] : nil
             let nextModuleName = nextModule?.moduleName
-
-            //let moduleKtName = moduleName + "Kt"
 
             let sourceDir = try sourcesURL.append(path: moduleName, create: true)
             let sourceSkipDir = try sourceDir.append(path: "Skip", create: true)
@@ -1024,13 +1077,13 @@ extension ToolOptionsCommand {
                     logger.log("running test\(moduleName)")
                     XCTAssertEqual(1 + 2, 3, "basic test")
                     \(resourceFolder.flatMap { folderName in
-                    """
+            """
 
                     // load the TestData.json file from the \(folderName) folder and decode it into a struct
                     let resourceURL: URL = try XCTUnwrap(Bundle.module.url(forResource: "TestData", withExtension: "json"))
                     let testData = try JSONDecoder().decode(TestData.self, from: Data(contentsOf: resourceURL))
                     XCTAssertEqual("\(moduleName)", testData.testModuleName)
-                    """
+            """
                     } ?? "")
                 }
             }
@@ -1140,23 +1193,47 @@ extension ToolOptionsCommand {
                 moduleDeps.append("\"" + nextModuleName + "\"") // the internal module names are just referred to by string
             }
 
-            for modDep in module.dependencies {
+            var modDeps = module.dependencies
+            if modDeps.isEmpty {
+                // implicit dependency on SkipFoundation (or SkipUI if we are the primary app target)
+                if isAppModule {
+                    modDeps.append(PackageModule(repositoryName: "skip-ui", moduleName: "SkipUI"))
+                } else {
+                    modDeps.append(PackageModule(repositoryName: "skip-foundation", moduleName: "SkipFoundation"))
+                }
+            }
+            var skipModuleDeps: [String] = []
+            for modDep in modDeps {
                 if let repoName = modDep.repositoryName {
                     let depVersion = modDep.repositoryVersion ?? "0.0.0"
                     let packDep = ".package(url: \"https://source.skip.tools/\(repoName).git\", from: \"\(depVersion)\")"
                     if !packageDependencies.contains(packDep) {
                         packageDependencies.append(packDep)
                     }
-                    moduleDeps.append(".product(name: \"\(modDep.moduleName)\", package: \"\(repoName)\")")
-
+                    let dep = ".product(name: \"\(modDep.moduleName)\", package: \"\(repoName)\")"
+                    if !skipModuleDeps.contains(dep) {
+                        skipModuleDeps.append(dep)
+                    }
                 }
             }
 
-            let moduleDep = moduleDeps.joined(separator: ", ")
+            // if we are using the SKIP_ZERO conditional, then split up the dependencies and only include the skip dependencies conditionally
+            let interModuleDep = "[" + moduleDeps.joined(separator: ", ") + "]"
+            let skipModuleDep = (zero && !skipModuleDeps.isEmpty ? "(zero ? [] : [" : "[")
+                + skipModuleDeps.joined(separator: ", ")
+                + (zero && !skipModuleDeps.isEmpty ? "])" : "]")
+            let ifZero = zero ? "] + (zero ? [] : [" : ", "
+            let endifZero = zero ? ")" : ""
+
+            // join the modules together
+            var moduleDep = [interModuleDep, skipModuleDep].filter({ $0.count > 2 }).joined(separator: " + ")
+            if moduleDep.isEmpty {
+                moduleDep = "[]"
+            }
 
             targets += """
-                    .target(name: "\(moduleName)", dependencies: [\(moduleDep)]\(resourcesAttribute), plugins: [.plugin(name: "skipstone", package: "skip")]),
-                    .testTarget(name: "\(moduleName)Tests", dependencies: ["\(moduleName)", .product(name: "SkipTest", package: "skip")]\(resourcesAttribute), plugins: [.plugin(name: "skipstone", package: "skip")]),
+                    .target(name: "\(moduleName)", dependencies: \(moduleDep)\(resourcesAttribute), plugins: \(skipPluginArray)),
+                    .testTarget(name: "\(moduleName)Tests", dependencies: ["\(moduleName)"\(ifZero).product(name: "SkipTest", package: "skip")]\(endifZero)\(resourcesAttribute), plugins: \(skipPluginArray)),
 
             """
         }
@@ -1168,17 +1245,10 @@ extension ToolOptionsCommand {
             ]
         """
 
-        let dependencies = "    dependencies: [\n        " + packageDependencies.joined(separator: ",\n        ") + "\n]"
+        let dependencies = "    dependencies: [\n        " + packageDependencies.joined(separator: ",\n        ") + "\n    ]"
 
         let packageSource = """
-        // swift-tools-version: 5.9
-        // This is a [Skip](https://skip.tools) package,
-        // containing Swift "ModuleName" library targets
-        // that will use the Skip plugin to transpile the
-        // Swift Package, Sources, and Tests into an
-        // Android Gradle Project with Kotlin sources and JUnit tests.
-        import PackageDescription
-
+        \(packageHeader)
         let package = Package(
             name: "\(projectName)",
             defaultLocalization: "en",
@@ -1191,7 +1261,6 @@ extension ToolOptionsCommand {
 
         try packageSource.write(to: packageURL, atomically: true, encoding: .utf8)
 
-
         let readmeURL = projectFolderURL.appending(path: "README.md")
 
         try """
@@ -1202,11 +1271,6 @@ extension ToolOptionsCommand {
         \(modules.map(\.moduleName).joined(separator: "\n"))
 
         """.write(to: readmeURL, atomically: true, encoding: .utf8)
-
-        //        let packageJSONString = try await outputOptions.exec("Checking project \(projectName)", [toolOptions.swift, "package", "dump-package", "--package-path", projectFolderURL.path], resultHandler: { result in
-        //            guard let stdout = try result?.get().out else { return nil }
-        //            return try JSONDecoder().decode(PackageManifest.self, from: Data(stdout.utf8))
-        //        })
 
         let packageJSONString = try await run(with: out, "Checking project \(projectName)", ["swift", "package", "dump-package", "--package-path", projectFolderURL.path]).get().stdout
 
@@ -1243,6 +1307,11 @@ struct PackageModule {
     var repositoryName: String? = nil
     var repositoryVersion: String? = nil
     var dependencies: [PackageModule] = []
+
+    init(repositoryName: String, moduleName: String) {
+        self.repositoryName = repositoryName
+        self.moduleName = moduleName
+    }
 
     init(moduleName: String) {
         self.moduleName = moduleName

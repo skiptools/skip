@@ -65,6 +65,9 @@ struct CreateOptions : ParsableArguments {
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Create library dependencies between modules", valueName: "show"))
     var chain: Bool = true
 
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Add SKIP_ZERO environment check to Package.swift", valueName: "zero"))
+    var zero: Bool = true
+
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Display a file system tree summary of the new files", valueName: "show"))
     var tree: Bool = false
 

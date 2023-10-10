@@ -170,7 +170,8 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
             let resourcePathExclusions: Set<String> = swiftPathExtensions.union(["kt"]) // resource files are anything that isn't a swift file or a kotlin file
 
             let sourceURLs: [URL] = allProjectFiles.filter({ swiftPathExtensions.contains($0.pathExtension) })
-            let resourceURLs: [URL] = allProjectFiles.filter({ !$0.lastPathComponent.hasPrefix(".") && !resourcePathExclusions.contains($0.pathExtension) })
+            // also exclude files starting with dot and `skip.yml`
+            let resourceURLs: [URL] = allProjectFiles.filter({ !$0.lastPathComponent.hasPrefix(".") && !resourcePathExclusions.contains($0.pathExtension) && $0.lastPathComponent != "skip.yml" })
 
             return (sources: sourceURLs, resources: resourceURLs)
         }
@@ -538,7 +539,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
                             ]
                         } else {
                             moduleDependencyBlocks += [
-                                .init("api(project(\":\(moduleName)\"))"),
+                                .init("implementation(project(\":\(moduleName)\"))"),
                             ]
                         }
                     }

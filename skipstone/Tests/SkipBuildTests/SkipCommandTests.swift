@@ -16,13 +16,12 @@ final class SkipCommandTests: XCTestCase {
         try await XCTAssertEqualAsync(["msg": "Skip Doctor"], skipstone(["doctor", "-jA"]).json().array?.first)
     }
 
-    func testLibInitCommand() async throws {
-        let (projectURL, projectTree) = try await libInitComand(projectName: "basicProject", moduleNames: "SomeModule")
+    func testLibInitZeroCommand() async throws {
+        let (projectURL, projectTree) = try await libInitComand(projectName: "basicProject", zero: true, moduleNames: "SomeModule")
         XCTAssertEqual(projectTree ?? "", """
         .
         ├─ Package.swift
         ├─ README.md
-        ├─ SomeModule.xcodeproj
         ├─ Sources
         │  └─ SomeModule
         │     ├─ Resources
@@ -41,12 +40,105 @@ final class SkipCommandTests: XCTestCase {
 
         """)
 
-        let XCSkipTests = try String(contentsOf: URL(fileURLWithPath: "Tests/SomeModuleTests/XCSkipTests.swift", isDirectory: false, relativeTo: projectURL))
+        let load = { try String(contentsOf: URL(fileURLWithPath: $0, isDirectory: false, relativeTo: projectURL)) }
+
+        let XCSkipTests = try load("Tests/SomeModuleTests/XCSkipTests.swift")
         XCTAssertTrue(XCSkipTests.contains("testSkipModule()"))
+
+        let PackageSwift = try load("Package.swift")
+        XCTAssertEqual(PackageSwift, """
+        // swift-tools-version: 5.9
+        // This is a Skip (https://skip.tools) package,
+        // containing a Swift Package Manager project
+        // that will use the Skip build plugin to transpile the
+        // Swift Package, Sources, and Tests into an
+        // Android Gradle Project with Kotlin sources and JUnit tests.
+        import PackageDescription
+        import Foundation
+
+        // Set SKIP_ZERO=1 to build without Skip libraries
+        let zero = ProcessInfo.processInfo.environment["SKIP_ZERO"] != nil
+        let skipstone = !zero ? [Target.PluginUsage.plugin(name: "skipstone", package: "skip")] : []
+
+        let package = Package(
+            name: "basicProject",
+            defaultLocalization: "en",
+            platforms: [.iOS(.v16), .macOS(.v13), .tvOS(.v16), .watchOS(.v9), .macCatalyst(.v16)],
+            products: [
+                .library(name: "SomeModule", type: .dynamic, targets: ["SomeModule"]),
+            ],
+            dependencies: [
+                .package(url: "https://source.skip.tools/skip.git", from: "0.0.0"),
+                .package(url: "https://source.skip.tools/skip-foundation.git", from: "0.0.0")
+            ],
+            targets: [
+                .target(name: "SomeModule", dependencies: (zero ? [] : [.product(name: "SkipFoundation", package: "skip-foundation")]), resources: [.process("Resources")], plugins: skipstone),
+                .testTarget(name: "SomeModuleTests", dependencies: ["SomeModule"] + (zero ? [] : [.product(name: "SkipTest", package: "skip")]), resources: [.process("Resources")], plugins: skipstone),
+            ]
+        )
+        """)
+    }
+
+    func testLibInitNoZeroCommand() async throws {
+        let (projectURL, projectTree) = try await libInitComand(projectName: "basicProject", zero: false, moduleNames: "SomeModule")
+        XCTAssertEqual(projectTree ?? "", """
+        .
+        ├─ Package.swift
+        ├─ README.md
+        ├─ Sources
+        │  └─ SomeModule
+        │     ├─ Resources
+        │     │  └─ Localizable.xcstrings
+        │     ├─ Skip
+        │     │  └─ skip.yml
+        │     └─ SomeModule.swift
+        └─ Tests
+           └─ SomeModuleTests
+              ├─ Resources
+              │  └─ TestData.json
+              ├─ Skip
+              │  └─ skip.yml
+              ├─ SomeModuleTests.swift
+              └─ XCSkipTests.swift
+
+        """)
+
+        let load = { try String(contentsOf: URL(fileURLWithPath: $0, isDirectory: false, relativeTo: projectURL)) }
+
+        let XCSkipTests = try load("Tests/SomeModuleTests/XCSkipTests.swift")
+        XCTAssertTrue(XCSkipTests.contains("testSkipModule()"))
+
+        let PackageSwift = try load("Package.swift")
+        XCTAssertEqual(PackageSwift, """
+        // swift-tools-version: 5.9
+        // This is a Skip (https://skip.tools) package,
+        // containing a Swift Package Manager project
+        // that will use the Skip build plugin to transpile the
+        // Swift Package, Sources, and Tests into an
+        // Android Gradle Project with Kotlin sources and JUnit tests.
+        import PackageDescription
+
+        let package = Package(
+            name: "basicProject",
+            defaultLocalization: "en",
+            platforms: [.iOS(.v16), .macOS(.v13), .tvOS(.v16), .watchOS(.v9), .macCatalyst(.v16)],
+            products: [
+                .library(name: "SomeModule", type: .dynamic, targets: ["SomeModule"]),
+            ],
+            dependencies: [
+                .package(url: "https://source.skip.tools/skip.git", from: "0.0.0"),
+                .package(url: "https://source.skip.tools/skip-foundation.git", from: "0.0.0")
+            ],
+            targets: [
+                .target(name: "SomeModule", dependencies: [.product(name: "SkipFoundation", package: "skip-foundation")], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                .testTarget(name: "SomeModuleTests", dependencies: ["SomeModule", .product(name: "SkipTest", package: "skip")], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
+            ]
+        )
+        """)
     }
 
     func testLibInitAppCommand() async throws {
-        let (projectURL, projectTree) = try await libInitComand(projectName: "cool-app", appid: "some.cool.app", moduleNames: "MODULE_NAME:skip-ui/SkipUI")
+        let (projectURL, projectTree) = try await libInitComand(projectName: "cool-app", appid: "some.cool.app", moduleNames: "MODULE_NAME")
         XCTAssertEqual(projectTree ?? "", """
         .
         ├─ MODULE_NAME.xcconfig
@@ -89,12 +181,17 @@ final class SkipCommandTests: XCTestCase {
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
         // swift-tools-version: 5.9
-        // This is a [Skip](https://skip.tools) package,
-        // containing Swift "ModuleName" library targets
-        // that will use the Skip plugin to transpile the
+        // This is a Skip (https://skip.tools) package,
+        // containing a Swift Package Manager project
+        // that will use the Skip build plugin to transpile the
         // Swift Package, Sources, and Tests into an
         // Android Gradle Project with Kotlin sources and JUnit tests.
         import PackageDescription
+        import Foundation
+
+        // Set SKIP_ZERO=1 to build without Skip libraries
+        let zero = ProcessInfo.processInfo.environment["SKIP_ZERO"] != nil
+        let skipstone = !zero ? [Target.PluginUsage.plugin(name: "skipstone", package: "skip")] : []
 
         let package = Package(
             name: "cool-app",
@@ -106,22 +203,28 @@ final class SkipCommandTests: XCTestCase {
             dependencies: [
                 .package(url: "https://source.skip.tools/skip.git", from: "0.0.0"),
                 .package(url: "https://source.skip.tools/skip-ui.git", from: "0.0.0")
-        ],
+            ],
             targets: [
-                .target(name: "MODULE_NAME", dependencies: [.product(name: "SkipUI", package: "skip-ui")], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
-                .testTarget(name: "MODULE_NAMETests", dependencies: ["MODULE_NAME", .product(name: "SkipTest", package: "skip")], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                .target(name: "MODULE_NAME", dependencies: (zero ? [] : [.product(name: "SkipUI", package: "skip-ui")]), resources: [.process("Resources")], plugins: skipstone),
+                .testTarget(name: "MODULE_NAMETests", dependencies: ["MODULE_NAME"] + (zero ? [] : [.product(name: "SkipTest", package: "skip")]), resources: [.process("Resources")], plugins: skipstone),
             ]
         )
         """)
     }
 
-    func libInitComand(projectName: String, appid: String? = nil, resourcePath: String? = "Resources", moduleNames: String...) async throws -> (projectURL: URL, projectTree: String?) {
+    func libInitComand(projectName: String, zero: Bool? = nil, appid: String? = nil, resourcePath: String? = "Resources", moduleNames: String...) async throws -> (projectURL: URL, projectTree: String?) {
         let tmpDir = URL(fileURLWithPath: UUID().uuidString, isDirectory: true, relativeTo: URL(fileURLWithPath: NSTemporaryDirectory() + "/testLibInitCommand/", isDirectory: true))
         try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
         var cmd = ["lib", "init", "-jA", "--no-build", "--no-test", "--tree"]
         if let resourcePath = resourcePath {
             cmd += ["--resource-path", resourcePath]
         }
+        if zero == true {
+            cmd += ["--zero"]
+        } else if zero == false {
+            cmd += ["--no-zero"]
+        }
+
         if let appid = appid {
             cmd += ["--appid", appid]
         }

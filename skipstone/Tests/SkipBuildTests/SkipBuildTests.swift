@@ -61,4 +61,12 @@ final class SkipBuildTests: XCTestCase {
             "Some Key": "__somevalue;;;"
         ])
     }
+
+    func testParseModule() throws {
+        let pmod = try PackageModule(parse: "Foo:skip-model/SkipModel")
+        XCTAssertEqual("Foo", pmod.moduleName)
+        XCTAssertEqual(1, pmod.dependencies.count)
+        XCTAssertEqual("skip-model", pmod.dependencies.first?.repositoryName)
+        XCTAssertEqual("SkipModel", pmod.dependencies.first?.moduleName)
+    }
 }
