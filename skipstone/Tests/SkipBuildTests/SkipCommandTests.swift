@@ -17,7 +17,7 @@ final class SkipCommandTests: XCTestCase {
     }
 
     func testLibInitZeroCommand() async throws {
-        let (projectURL, projectTree) = try await libInitComand(projectName: "basicProject", zero: true, moduleNames: "SomeModule")
+        let (projectURL, projectTree) = try await libInitComand(projectName: "zero-project", zero: true, moduleNames: "SomeModule")
         XCTAssertEqual(projectTree ?? "", """
         .
         ├─ Package.swift
@@ -61,7 +61,7 @@ final class SkipCommandTests: XCTestCase {
         let skipstone = !zero ? [Target.PluginUsage.plugin(name: "skipstone", package: "skip")] : []
 
         let package = Package(
-            name: "basicProject",
+            name: "zero-project",
             defaultLocalization: "en",
             platforms: [.iOS(.v16), .macOS(.v13), .tvOS(.v16), .watchOS(.v9), .macCatalyst(.v16)],
             products: [
@@ -80,7 +80,7 @@ final class SkipCommandTests: XCTestCase {
     }
 
     func testLibInitNoZeroCommand() async throws {
-        let (projectURL, projectTree) = try await libInitComand(projectName: "basicProject", zero: false, moduleNames: "SomeModule")
+        let (projectURL, projectTree) = try await libInitComand(projectName: "basic-project", zero: false, moduleNames: "SomeModule")
         XCTAssertEqual(projectTree ?? "", """
         .
         ├─ Package.swift
@@ -119,7 +119,7 @@ final class SkipCommandTests: XCTestCase {
         import PackageDescription
 
         let package = Package(
-            name: "basicProject",
+            name: "basic-project",
             defaultLocalization: "en",
             platforms: [.iOS(.v16), .macOS(.v13), .tvOS(.v16), .watchOS(.v9), .macCatalyst(.v16)],
             products: [
@@ -132,6 +132,71 @@ final class SkipCommandTests: XCTestCase {
             targets: [
                 .target(name: "SomeModule", dependencies: [.product(name: "SkipFoundation", package: "skip-foundation")], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
                 .testTarget(name: "SomeModuleTests", dependencies: ["SomeModule", .product(name: "SkipTest", package: "skip")], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
+            ]
+        )
+        """)
+    }
+
+    func testLibInitFreeCommand() async throws {
+        let (projectURL, projectTree) = try await libInitComand(projectName: "free-project", free: true, zero: false, moduleNames: "FreeModule")
+        XCTAssertEqual(projectTree ?? "", """
+        .
+        ├─ LICENSE.LGPL
+        ├─ Package.swift
+        ├─ README.md
+        ├─ Sources
+        │  └─ FreeModule
+        │     ├─ FreeModule.swift
+        │     ├─ Resources
+        │     │  └─ Localizable.xcstrings
+        │     └─ Skip
+        │        └─ skip.yml
+        └─ Tests
+           └─ FreeModuleTests
+              ├─ FreeModuleTests.swift
+              ├─ Resources
+              │  └─ TestData.json
+              ├─ Skip
+              │  └─ skip.yml
+              └─ XCSkipTests.swift
+
+        """)
+
+        let load = { try String(contentsOf: URL(fileURLWithPath: $0, isDirectory: false, relativeTo: projectURL)) }
+
+        let XCSkipTests = try load("Tests/FreeModuleTests/XCSkipTests.swift")
+        XCTAssertTrue(XCSkipTests.contains("testSkipModule()"))
+        XCTAssertTrue(XCSkipTests.contains("This is free software"))
+
+        let FreeModuleTests = try load("Tests/FreeModuleTests/FreeModuleTests.swift")
+        XCTAssertTrue(FreeModuleTests.contains("This is free software"))
+
+        let FreeModule = try load("Sources/FreeModule/FreeModule.swift")
+        XCTAssertTrue(FreeModule.contains("This is free software"))
+
+        let PackageSwift = try load("Package.swift")
+        XCTAssertEqual(PackageSwift, """
+        // swift-tools-version: 5.9
+        // This is free software: you can redistribute and/or modify it
+        // under the terms of the GNU Lesser General Public License 3.0
+        // as published by the Free Software Foundation https://fsf.org
+        
+        import PackageDescription
+
+        let package = Package(
+            name: "free-project",
+            defaultLocalization: "en",
+            platforms: [.iOS(.v16), .macOS(.v13), .tvOS(.v16), .watchOS(.v9), .macCatalyst(.v16)],
+            products: [
+                .library(name: "FreeModule", type: .dynamic, targets: ["FreeModule"]),
+            ],
+            dependencies: [
+                .package(url: "https://source.skip.tools/skip.git", from: "0.0.0"),
+                .package(url: "https://source.skip.tools/skip-foundation.git", from: "0.0.0")
+            ],
+            targets: [
+                .target(name: "FreeModule", dependencies: [.product(name: "SkipFoundation", package: "skip-foundation")], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                .testTarget(name: "FreeModuleTests", dependencies: ["FreeModule", .product(name: "SkipTest", package: "skip")], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
             ]
         )
         """)
@@ -212,7 +277,7 @@ final class SkipCommandTests: XCTestCase {
         """)
     }
 
-    func libInitComand(projectName: String, zero: Bool? = nil, appid: String? = nil, resourcePath: String? = "Resources", moduleNames: String...) async throws -> (projectURL: URL, projectTree: String?) {
+    func libInitComand(projectName: String, free: Bool? = nil, zero: Bool? = nil, appid: String? = nil, resourcePath: String? = "Resources", moduleNames: String...) async throws -> (projectURL: URL, projectTree: String?) {
         let tmpDir = URL(fileURLWithPath: UUID().uuidString, isDirectory: true, relativeTo: URL(fileURLWithPath: NSTemporaryDirectory() + "/testLibInitCommand/", isDirectory: true))
         try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
         var cmd = ["lib", "init", "-jA", "--no-build", "--no-test", "--tree"]
@@ -223,6 +288,10 @@ final class SkipCommandTests: XCTestCase {
             cmd += ["--zero"]
         } else if zero == false {
             cmd += ["--no-zero"]
+        }
+
+        if free == true {
+            cmd += ["--free"]
         }
 
         if let appid = appid {

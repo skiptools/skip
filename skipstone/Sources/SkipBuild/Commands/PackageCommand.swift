@@ -68,6 +68,9 @@ struct CreateOptions : ParsableArguments {
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Add SKIP_ZERO environment check to Package.swift", valueName: "zero"))
     var zero: Bool = true
 
+    @Flag(help: ArgumentHelp("Create package in free mode", valueName: "free"))
+    var free: Bool = false
+
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Display a file system tree summary of the new files", valueName: "show"))
     var tree: Bool = false
 

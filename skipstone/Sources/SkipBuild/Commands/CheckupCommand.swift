@@ -24,7 +24,7 @@ struct CheckupCommand: MessageCommand, ToolOptionsCommand  {
         let tmpdir = NSTemporaryDirectory() + "/" + UUID().uuidString
         try FileManager.default.createDirectory(atPath: tmpdir, withIntermediateDirectories: true)
 
-        _ = try await buildSkipProject(projectName: "checkup-app", modules: [PackageModule(parse: "CheckupApp:skip-ui/SkipUI"), PackageModule(parse: "CheckupModel:skip-foundation/SkipFoundation:skip-model/SkipModel")], resourceFolder: "Resources", dir: tmpdir, configuration: self.configuration, build: true, test: true, tree: false, chain: true, zero: true, appid: "tools.skip.checkupapp", version: "1.0.0", apk: true, ipa: true, with: out)
+        _ = try await buildSkipProject(projectName: "hello-skip", modules: [PackageModule(parse: "HelloSkip"), PackageModule(parse: "HelloModel")], resourceFolder: "Resources", dir: tmpdir, configuration: self.configuration, build: true, test: true, tree: false, chain: true, free: true, zero: true, appid: "skip.hello.App", version: "1.0.0", apk: true, ipa: true, with: out)
 
         await out.write(status: .pass, "Skip \(skipVersion) self-test passed!")
     }
