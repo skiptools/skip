@@ -209,7 +209,7 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
         let sourcehashOutputPath = try AbsolutePath(validating: transpileOptions.sourcehash)
         try fs.removeFileTree(sourcehashOutputPath) // delete the build completion marker to force its re-creation (removeFileTree doesn't throw when the file doesn't exist)
 
-        let env = ProcessInfo.processInfo.environment
+        let env = ProcessInfo.processInfo.environmentWithDefaultToolPaths
 
         // at this point, check for the conditional environment and halt transpilation on unsupported (i.e., non-macOS) platforms; this will still output the .sourcehash file, because the plugin needs to have it created for evey plugin invocation (since we don't know in SkipPlugin.swift what the target platform is).
         let explicitlyEnabled = envEnable.contains(where: { env[$0] != nil })

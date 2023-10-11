@@ -40,8 +40,25 @@ public struct OutputOptions: ParsableArguments {
 
     static var isTerminal: Bool { isatty(fileno(stdout)) != 0 }
 
-    /// progress animation sequences
-    static let progressAimations = [
+    /// Returns the sprite string that should be used to display progress, only if not emitting JSON, plain output, or in verbose mode.
+    ///
+    /// The chosen string will be picked based on a stable hash of the key, which can be anything (like a header message). In that way, the progress sequence will be random, but will be stable between runs.
+    func progressSprites(for key: String) -> String? {
+        if emitJSON == true || verbose == true || plain == true {
+            return nil
+        }
+
+        /// A basic stable hash function
+        func simpleHash(_ input: String) -> UInt32 {
+            input.unicodeScalars.reduce(0) { hash, char in 31 &* hash &+ char.value }
+        }
+
+        let hash = Int(simpleHash(key))
+        return Self.progressSprites[hash % Self.progressSprites.count]
+    }
+
+    /// Progress animation sprite sequences to entertain patient developers.
+    private static let progressSprites = [
         "⡀⣄⣦⢷⠻⠙⠈⠀⠁⠋⠟⡾⣴⣠⢀⠀", // slide up and down
         "⠙⠚⠖⠦⢤⣠⣄⡤⠴⠲⠓⠋", // crawl up and down, small
         "⠁⠋⠞⡴⣠⢀⠀⠈⠙⠻⢷⣦⣄⡀⠀⠉⠛⠲⢤⢀⠀", // falling water
@@ -183,7 +200,7 @@ extension ToolOptionsCommand {
 
     /// Executes a tool with the given arguments and prefix message, waits for the result while showing a progress animation,
     /// and then processes the result and outputs the given message block.
-    @discardableResult func run(with messenger: MessageQueue, _ message: String, _ commandArgs: [String], environment: [String: String] = ProcessInfo.processInfo.environment, additionalEnvrionment: [String: String] = [:], in workingDirectory: URL? = nil, watch: Bool = true, resultHandler finalResultHandler: MessageResultHandler<ProcessOutput>? = nil) async -> Result<ProcessOutput, Error> {
+    @discardableResult func run(with messenger: MessageQueue, _ message: String, _ commandArgs: [String], environment: [String: String] = ProcessInfo.processInfo.environmentWithDefaultToolPaths, additionalEnvrionment: [String: String] = [:], in workingDirectory: URL? = nil, watch: Bool = true, resultHandler finalResultHandler: MessageResultHandler<ProcessOutput>? = nil) async -> Result<ProcessOutput, Error> {
 
         // default to a result handler that outputs the duration of the operation
         let resultHandler = finalResultHandler ?? Self.timingResultHandler(message: message)
@@ -308,27 +325,25 @@ extension OutputOptions {
         let terminalWidth = TerminalController.terminalWidth()
 
         let startTime = Date.now
-        let progress = (self.emitJSON == false && self.messagePlain == false && self.plain == false) ? Self.progressAimations.first : nil
 
-        /// The default implementation of the message handler cycles through the default progress animation and then outputs the result
-        let messageHandler: ((Result<T, Error>?) -> String) = { result in
-            let prefix = monitorPrefix(progress, for: result?.messageStatusAny, startTime: startTime)
-            if let result = result, let msg = resultHandler?(result) {
-                return msg.message.message(term: term) ?? ((prefix ?? "") + message)
-            } else {
-                // the progress index is based on the current time index
-                return (prefix ?? "") + message
-            }
-        }
-
-        let progressMonitor: Task<(), Error>?
-        if progress == nil {
-            progressMonitor = nil
-        } else {
-            progressMonitor = Task {
+        var progressMonitor: Task<(), Error>? = nil
+        if let progressSprites = self.progressSprites(for: message) {
+            progressMonitor = Task.detached {
                 var lastMessage: String? = nil
+
+                /// The default implementation of the message handler cycles through the default progress animation and then outputs the result
+                func animatingMessageHandler(_ result: Result<T, Error>?) -> String {
+                    let prefix = monitorPrefix(progressSprites, for: result?.messageStatusAny, startTime: startTime)
+                    if let result = result, let msg = resultHandler?(result) {
+                        return msg.message.message(term: term) ?? ((prefix ?? "") + message)
+                    } else {
+                        // the progress index is based on the current time index
+                        return (prefix ?? "") + message
+                    }
+                }
+
                 func printMessage() -> String? {
-                    let newMessage = messageHandler(nil)
+                    let newMessage = animatingMessageHandler(nil)
                     if newMessage == lastMessage {
                         // the messages are exactly the same, so don't clear the console and print the message again
                         return nil

@@ -887,7 +887,7 @@ extension ToolOptionsCommand {
         }
 
         if apk == true { // assemble the .apk
-            let env = ProcessInfo.processInfo.environment
+            let env = ProcessInfo.processInfo.environmentWithDefaultToolPaths // environment that includes a default ANDROID_HOME
 
             let gradleProjectDir = projectURL.path + "/" + buildFolderName + "/plugins/outputs/" + projectName + "/" + primaryModuleName + "/skipstone"
             let relativeBuildDir = buildFolderName + "/" + projectName

@@ -59,7 +59,7 @@ struct ADBCommand: MessageCommand {
         #endif
 
         // transfer process environment along with the additional environment
-        var penv = ProcessInfo.processInfo.environment
+        var penv = ProcessInfo.processInfo.environmentWithDefaultToolPaths
         for (key, value) in env {
             penv[key] = value
         }
