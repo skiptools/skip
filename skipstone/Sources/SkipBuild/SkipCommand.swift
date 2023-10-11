@@ -752,6 +752,22 @@ extension ProcessInfo {
         #endif
     }()
 
+    /// The current process environment along with the default paths to various tools set
+    public var environmentWithDefaultToolPaths: [String: String] {
+        var env = self.environment
+        let ANDROID_HOME = "ANDROID_HOME"
+        if env[ANDROID_HOME] == nil {
+            #if os(macOS)
+            env[ANDROID_HOME] = ("~/Library/Android/sdk" as NSString).expandingTildeInPath
+            #elseif os(Windows)
+            env[ANDROID_HOME] = ("~/AppData/Local/Android/Sdk" as NSString).expandingTildeInPath
+            #elseif os(Linux)
+            env[ANDROID_HOME] = ("~/Android/Sdk" as NSString).expandingTildeInPath
+            #endif
+        }
+        return env
+    }
+
         /// The unique host identifier as returned from `IOPlatformExpertDevice` on Darwin and the contents of "/etc/machine-id" on Linux
     public var hostIdentifier: String? {
         #if canImport(IOKit)
