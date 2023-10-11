@@ -818,16 +818,18 @@ extension ToolOptionsCommand {
             try xcodeProjectContents.replacingOccurrences(of: "    ", with: "\t").write(to: xcodeProjectPbxprojURL, atomically: true, encoding: .utf8)
         }
 
+        // the initial build/test is done with debug configuration regardless of the configuration setting; this is because unit tests don't always run correctly in release mode
+        let debugConfiguration = "debug"
 
         if build == true || apk == true {
             await run(with: out, "Resolving dependencies", ["swift", "package", "resolve", "-v", "--package-path", projectURL.path])
 
             // we need to build regardless of preference in order to build the apk
-            await run(with: out, "Building \(projectName)", ["swift", "build", "-v", "-c", configuration, "--package-path", projectURL.path])
+            await run(with: out, "Building \(projectName)", ["swift", "build", "-v", "-c", debugConfiguration, "--package-path", projectURL.path])
         }
 
         if test == true {
-            try await runSkipTests(in: projectURL, configuration: configuration, swift: true, kotlin: true, with: out)
+            try await runSkipTests(in: projectURL, configuration: debugConfiguration, swift: true, kotlin: true, with: out)
         }
 
 
