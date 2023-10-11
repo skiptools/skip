@@ -104,22 +104,6 @@ extension ProcessInfo {
         return false
         #endif
     }()
-
-    /// The current process envrionment along with the default paths to various tools set
-    public var environmentWithDefaultToolPaths: [String: String] {
-        var env = self.environment
-        let ANDROID_HOME = "ANDROID_HOME"
-        if env[ANDROID_HOME] == nil {
-            #if os(macOS)
-            env[ANDROID_HOME] = ("~/Library/Android/sdk" as NSString).expandingTildeInPath
-            #elseif os(Windows)
-            env[ANDROID_HOME] = ("~/AppData/Local/Android/Sdk" as NSString).expandingTildeInPath
-            #elseif os(Linux)
-            env[ANDROID_HOME] = ("~/Android/Sdk" as NSString).expandingTildeInPath
-            #endif
-        }
-        return env
-    }
 }
 
 extension URL {
