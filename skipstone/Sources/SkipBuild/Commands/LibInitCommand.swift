@@ -58,7 +58,7 @@ struct LibInitCommand: MessageCommand, CreateOptionsCommand, ToolOptionsCommand,
         let dir = self.createOptions.dir ?? "."
 
         let modules = try self.modules
-        let createdURL = try await buildSkipProject(projectName: self.projectName, modules: modules, resourceFolder: createOptions.resourcePath, dir: dir, configuration: createOptions.configuration, build: buildOptions.build, test: buildOptions.test, tree: self.createOptions.tree, chain: createOptions.chain, free: createOptions.free, zero: createOptions.zero, appid: self.appid, version: self.version, apk: apk, ipa: ipa, with: out)
+        let createdURL = try await buildSkipProject(projectName: self.projectName, modules: modules, resourceFolder: createOptions.resourcePath, dir: dir, configuration: createOptions.configuration, build: buildOptions.build, test: buildOptions.test, doubleCheck: false, tree: self.createOptions.tree, chain: createOptions.chain, free: createOptions.free, zero: createOptions.zero, appid: self.appid, version: self.version, apk: apk, ipa: ipa, with: out)
 
         await out.yield(MessageBlock(status: .pass, "Created module \(modules.map(\.moduleName).joined(separator: ", ")) in \(createdURL.path)"))
     }
@@ -486,7 +486,8 @@ extension ToolOptionsCommand {
 """
     }
 
-    func buildSkipProject(projectName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: String, configuration: String, build: Bool, test: Bool, tree: Bool, chain: Bool, free: Bool, zero: Bool, appid: String?, version: String?, apk: Bool, ipa: Bool, with out: MessageQueue) async throws -> URL {
+    func buildSkipProject(projectName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: String, configuration: String, build: Bool, test: Bool, doubleCheck: Bool, tree: Bool, chain: Bool, free: Bool, zero: Bool, appid: String?, version: String?, apk: Bool, ipa: Bool, with out: MessageQueue) async throws -> URL {
+        let sourceHeader = free ? licenseLGPLHeader : ""
         let projectURL = try await initSkipLibrary(projectName: projectName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, chain: chain, free: free, zero: zero, app: appid != nil, with: out)
 
         let projectPath = try projectURL.absolutePath
@@ -575,7 +576,7 @@ extension ToolOptionsCommand {
 
             // Sources/Playground/PlaygroundApp.swift
             let appExtContents = """
-            import Foundation
+            \(sourceHeader)import Foundation
             import OSLog
             import SwiftUI
 
@@ -729,7 +730,7 @@ extension ToolOptionsCommand {
 
             // Sources/Playground/PlaygroundApp.swift
             let contentViewContents = """
-            import SwiftUI
+            \(sourceHeader)import SwiftUI
             import OSLog
 
             struct ContentView: View {
@@ -883,8 +884,10 @@ extension ToolOptionsCommand {
                 try "Verify \(ipaURL.lastPathComponent) \(ByteCountFormatter.string(fromByteCount: Int64(url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0), countStyle: .file))"
             }
 
-            await checkFile(ipaURL, with: out, title: "Checksum Archive") { url in
-                try "IPA SHA256: \(url.SHA256Hash())"
+            if doubleCheck {
+                await checkFile(ipaURL, with: out, title: "Checksum Archive") { url in
+                    try "IPA SHA256: \(url.SHA256Hash())"
+                }
             }
         }
 
@@ -909,8 +912,10 @@ extension ToolOptionsCommand {
                 try "Verify \(apkURL.lastPathComponent) \(ByteCountFormatter.string(fromByteCount: Int64(url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0), countStyle: .file))"
             }
 
-            await checkFile(apkURL, with: out, title: "Checksum Archive") { url in
-                try "APK SHA256: \(url.SHA256Hash())"
+            if doubleCheck {
+                await checkFile(apkURL, with: out, title: "Checksum Archive") { url in
+                    try "APK SHA256: \(url.SHA256Hash())"
+                }
             }
         }
 
@@ -1070,8 +1075,7 @@ extension ToolOptionsCommand {
 
             let sourceSwiftFile = sourceDir.appending(path: "\(moduleName).swift")
             try """
-            \(sourceHeader)
-            public class \(moduleName)Module {
+            \(sourceHeader)public class \(moduleName)Module {
             }
 
             """.write(to: sourceSwiftFile, atomically: true, encoding: .utf8)
@@ -1083,8 +1087,7 @@ extension ToolOptionsCommand {
             let testSwiftFile = testDir.appending(path: "\(moduleName)Tests.swift")
 
             try """
-            \(sourceHeader)
-            import XCTest
+            \(sourceHeader)import XCTest
             import OSLog
             import Foundation
 
@@ -1117,8 +1120,7 @@ extension ToolOptionsCommand {
 
             let testSkipModuleFile = testDir.appending(path: "XCSkipTests.swift")
             try """
-            \(sourceHeader)
-            #if os(macOS) // Skip transpiled tests only run on macOS targets
+            \(sourceHeader)#if os(macOS) // Skip transpiled tests only run on macOS targets
             import SkipTest
 
             /// This test case will run the transpiled tests for the Skip module.

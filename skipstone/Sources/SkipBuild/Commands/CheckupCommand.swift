@@ -18,13 +18,16 @@ struct CheckupCommand: MessageCommand, ToolOptionsCommand  {
     @Option(name: [.customShort("c"), .long], help: ArgumentHelp("Configuration debug/release", valueName: "c"))
     var configuration: String = "release"
 
+    @Flag(help: ArgumentHelp("Check twice that sample build outputs produce identical artifacts", valueName: "verify"))
+    var doubleCheck: Bool = false
+
     func performCommand(with out: MessageQueue) async throws {
         try await runDoctor(with: out)
 
         let tmpdir = NSTemporaryDirectory() + "/" + UUID().uuidString
         try FileManager.default.createDirectory(atPath: tmpdir, withIntermediateDirectories: true)
 
-        _ = try await buildSkipProject(projectName: "hello-skip", modules: [PackageModule(parse: "HelloSkip"), PackageModule(parse: "HelloModel")], resourceFolder: "Resources", dir: tmpdir, configuration: self.configuration, build: true, test: true, tree: false, chain: true, free: true, zero: true, appid: "skip.hello.App", version: "1.0.0", apk: true, ipa: true, with: out)
+        _ = try await buildSkipProject(projectName: "hello-skip", modules: [PackageModule(parse: "HelloSkip"), PackageModule(parse: "HelloModel")], resourceFolder: "Resources", dir: tmpdir, configuration: self.configuration, build: true, test: true, doubleCheck: doubleCheck, tree: false, chain: true, free: true, zero: true, appid: "skip.hello.App", version: "1.0.0", apk: true, ipa: true, with: out)
 
         await out.write(status: .pass, "Skip \(skipVersion) self-test passed!")
     }
