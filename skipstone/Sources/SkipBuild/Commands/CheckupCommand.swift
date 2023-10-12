@@ -24,10 +24,19 @@ struct CheckupCommand: MessageCommand, ToolOptionsCommand  {
     func performCommand(with out: MessageQueue) async throws {
         try await runDoctor(with: out)
 
-        let tmpdir = NSTemporaryDirectory() + "/" + UUID().uuidString
-        try FileManager.default.createDirectory(atPath: tmpdir, withIntermediateDirectories: true)
+        @Sendable func buildSampleProject(_ index: Int) async throws -> (ipaHash: String?, apkHash: String?) {
+            let tmpdir = NSTemporaryDirectory() + "/" + UUID().uuidString
+            try FileManager.default.createDirectory(atPath: tmpdir, withIntermediateDirectories: true)
+            let (_, ipaHash, apkHash) = try await buildSkipProject(projectName: "hello-skip", modules: [PackageModule(parse: "HelloSkip"), PackageModule(parse: "HelloModel")], resourceFolder: "Resources", dir: tmpdir, configuration: self.configuration, build: true, test: true, returnHashes: true, checkIndex: index, showTree: false, chain: true, free: true, zero: true, appid: "skip.hello.App", version: "1.0.0", moduleTests: true, validatePackage: true, apk: true, ipa: true, with: out)
+            return (ipaHash, apkHash)
+        }
 
-        _ = try await buildSkipProject(projectName: "hello-skip", modules: [PackageModule(parse: "HelloSkip"), PackageModule(parse: "HelloModel")], resourceFolder: "Resources", dir: tmpdir, configuration: self.configuration, build: true, test: true, doubleCheck: doubleCheck, tree: false, chain: true, free: true, zero: true, appid: "skip.hello.App", version: "1.0.0", apk: true, ipa: true, with: out)
+        let p1 = try await buildSampleProject(0)
+        if doubleCheck {
+            let p2 = try await buildSampleProject(1)
+            await out.write(status: p1.ipaHash == p2.ipaHash ? .pass : .fail, "Double-check IPA file hashes")
+            await out.write(status: p1.apkHash == p2.apkHash ? .pass : .fail, "Double-check APK file hashes")
+        }
 
         await out.write(status: .pass, "Skip \(skipVersion) self-test passed!")
     }

@@ -334,20 +334,6 @@ extension Transpilation {
     }
 }
 
-protocol LicenseOptionsCommand : ParsableArguments {
-    /// This command's output options
-    var licenseOptions: LicenseOptions { get }
-}
-
-struct LicenseOptions: ParsableArguments {
-    @Option(help: ArgumentHelp("The license key for transpiling non-free sources", valueName: "SKIPKEY"))
-    var skipKey: String? = nil // --skip-key SKP657AB7680CA6789F76ABB65975678CDCA34PKS
-
-    /// A license flag that lets someone with an expired license add a few more days in order to confinue developing while the license is being renewed.
-    @Option(help: ArgumentHelp("Grace period", valueName: "days"))
-    var skipGracePeriod: Int? = nil // --skip-grace-period 7
-}
-
 extension AbsolutePath {
     /// Converts this FileSystem `AbsolutePath` into a `Source.FilePath` that the transpiler can use.
     var sourceFile: Source.FilePath {

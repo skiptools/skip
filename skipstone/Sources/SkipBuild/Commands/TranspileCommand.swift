@@ -11,7 +11,7 @@ protocol TranspilePhase: TranspilerInputOptionsCommand {
 /// The file extension for the metadata about skipcode
 let skipcodeExtension = ".skipcode.json"
 
-struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
+struct TranspileCommand: TranspilePhase, StreamingCommand {
     static var configuration = CommandConfiguration(commandName: "transpile", abstract: "Transpile Swift to Kotlin", shouldDisplay: false)
 
     @OptionGroup(title: "Check Options")
@@ -22,9 +22,6 @@ struct TranspileCommand: TranspilePhase, LicenseValidator, StreamingCommand {
 
     @OptionGroup(title: "Output Options")
     var outputOptions: OutputOptions
-
-    @OptionGroup(title: "License Options")
-    var licenseOptions: LicenseOptions
 
     @Option(help: ArgumentHelp("Only run if the given environment is unset", valueName: "envkey"))
     var envDisable: [String] = []

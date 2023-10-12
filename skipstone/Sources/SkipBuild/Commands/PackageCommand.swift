@@ -72,7 +72,13 @@ struct CreateOptions : ParsableArguments {
     var free: Bool = false
 
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Display a file system tree summary of the new files", valueName: "show"))
-    var tree: Bool = false
+    var showTree: Bool = false
+
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Whether to create test modules", valueName: "tests"))
+    var moduleTests: Bool = true
+
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Validate generated Package.swift files", valueName: "validate"))
+    var validatePackage: Bool = true
 
     var projectTemplateURL: URL {
         get throws {
