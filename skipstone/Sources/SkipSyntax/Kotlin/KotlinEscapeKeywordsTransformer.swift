@@ -26,35 +26,46 @@ private class EscapeKeywordsVisitor {
         return name
     }
 
-    func fixParameter(param: Parameter<KotlinExpression>) -> Parameter<KotlinExpression> {
+    func fixParameter<T>(param: Parameter<T>) -> Parameter<T> {
         var p = param
         p.externalLabel = p.externalLabel.map(fixKeyword)
         p._internalLabel = p._internalLabel.map(fixKeyword)
         return p
     }
 
-    func fixArgument(arg: LabeledValue<KotlinExpression>) -> LabeledValue<KotlinExpression> {
+    func fixLabeledArgument<T>(arg: LabeledValue<T>) -> LabeledValue<T> {
         var a = arg
         a.label = a.label.map(fixKeyword)
         return a
     }
 
+    func fixIdentifierPattern(pattern: IdentifierPattern) -> IdentifierPattern {
+        var p = pattern
+        p.name = p.name.map(fixKeyword)
+        return p
+    }
+
     func visit(_ node: KotlinSyntaxNode) -> VisitResult<KotlinSyntaxNode> {
-        if let node = node as? KotlinEnumCaseDeclaration {
-            node.caseName = fixKeyword(name: node.name)
-            node.associatedValues = node.associatedValues.map(fixParameter)
-        } else if let node = node as? KotlinIdentifier {
+        if let node = node as? KotlinIdentifier {
             node.name = fixKeyword(name: node.name)
         } else if let node = node as? KotlinMemberAccess {
             node.member = fixKeyword(name: node.member)
         } else if let node = node as? KotlinFunctionDeclaration {
             node.parameters = node.parameters.map(fixParameter)
         } else if let node = node as? KotlinFunctionCall {
-            node.arguments = node.arguments.map(fixArgument)
+            node.arguments = node.arguments.map(fixLabeledArgument)
         } else if let node = node as? KotlinVariableDeclaration {
             node.names = node.names.map {
                 $0.map(fixKeyword)
             }
+        } else if let node = node as? KotlinEnumCaseDeclaration {
+            node.caseName = fixKeyword(name: node.name)
+            node.associatedValues = node.associatedValues.map(fixParameter)
+        } else if let node = node as? KotlinForLoop {
+            node.identifierPatterns = node.identifierPatterns.map(fixIdentifierPattern)
+        } else if let node = node as? KotlinClosure {
+            node.labeledCaptureList = node.labeledCaptureList.map(fixLabeledArgument)
+            node.parameters = node.parameters.map(fixParameter)
         }
         return .recurse(nil)
     }
