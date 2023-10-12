@@ -39,7 +39,7 @@ struct DoctorCommand: SkipCommand, StreamingCommand, ToolOptionsCommand {
         var msg = "Skip (\(skipVersion)) checks complete"
         if warnings > 0 || errors > 0 {
             if errors > 0 {
-                msg += " with \(errors) errors\(warnings == 1 ? "" : "s")"
+                msg += " with \(errors) error\(warnings == 1 ? "" : "s")"
             }
             if warnings > 0 {
                 msg += " \(errors > 0 ? "and" : "with") \(warnings) warning\(warnings == 1 ? "" : "s")"

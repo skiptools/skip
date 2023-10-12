@@ -189,12 +189,19 @@ public struct OutputOptions: ParsableArguments {
 /// The result of a process, with a code, standard out, and standard error
 typealias ProcessOutput = (exitCode: Int32, stdout: String, stderr: String)
 
+extension Date {
+    /// The number of seconds since the given date
+    var timingSecondsSinceNow: String {
+        "\(round(-timeIntervalSinceNow * 100.0) / 100.0)s"
+    }
+}
+
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 extension ToolOptionsCommand {
     
     static func timingResultHandler<T>(message: String, time: Date = .now) -> (_ result: Result<T, Error>?) -> (result: Result<T, Error>?, message: MessageBlock?) {
         return { result in
-            (result, MessageBlock(status: result?.messageStatusAny, message + " (\(round(-time.timeIntervalSinceNow * 100.0) / 100.0)s)"))
+            (result, MessageBlock(status: result?.messageStatusAny, message + " (\(time.timingSecondsSinceNow))"))
         }
     }
 

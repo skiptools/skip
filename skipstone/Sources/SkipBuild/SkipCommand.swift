@@ -434,6 +434,7 @@ protocol StreamingCommand: AsyncParsableCommand {
     //associatedtype Output : MessageConvertible
     //typealias OutputMessage = Either<Output>.Or<Message>
 
+    /// Perform the command, which will write messages to the output queue
     func performCommand(with out: MessageQueue) async throws
 }
 
@@ -443,23 +444,38 @@ extension StreamingCommand {
     }
 
     mutating func run() async throws {
-        var totalErrors: [any MessageEncodable] = []
+
+        var messages: [any MessageEncodable] = []
         outputOptions.beginCommandOutput()
-        var elements = self.startCommand().makeAsyncIterator()
+
+        let stream = AsyncThrowingStream { continuation in
+            let out = MessageQueue(retain: true, continuation: continuation)
+            self.outputOptions.streams.yield = { messageConvertibleOrMessage in
+                switch messageConvertibleOrMessage {
+                case .a(let messageConvertible): continuation.yield(messageConvertible)
+                case .b(let message): continuation.yield(message)
+                }
+            }
+            doCommand(with: out)
+        }
+
+        var elements = stream.makeAsyncIterator()
         if let message = try await elements.next() {
             try writeOutput(message: message) // the initial element
             while let element = try await elements.next() {
                 outputOptions.writeOutputSeparator()
-                try writeOutput(message: element) // subsequent elements after the first separator
-                if element.status == .fail {
-                    totalErrors.append(element)
-                }
+                try writeOutput(message: element) // subsequent elements after the first separator (e.g., a JSON comma)
+                messages.append(element)
             }
         }
         outputOptions.endCommandOutput()
 
-        if totalErrors.count > 0 {
-            throw StreamCommandError(errorDescription: "\(totalErrors.count) \(totalErrors.count == 1 ? "error" : "errors")")
+        let messageTypes = Dictionary(grouping: messages, by: \.status)
+
+        // in the end, throw an error if there are any failures; otherwise pass
+        // TODO: a --warnings-as-errors flag could be useful for running in strict mode
+        if let failCount = messageTypes[.fail]?.count, failCount > 0 {
+            throw StreamCommandError(errorDescription: "\(failCount) \(failCount == 1 ? "error" : "errors")")
         }
     }
 }
@@ -474,23 +490,7 @@ struct StreamCommandError : LocalizedError {
 
 extension StreamingCommand {
 
-    mutating func startCommand() -> MessageStream {
-        AsyncThrowingStream { continuation in
-            self.outputOptions.streams.yield = {
-                switch $0 {
-                case .a(let a): continuation.yield(a)
-                case .b(let b): continuation.yield(b)
-                }
-
-            }
-            // defer { self.output.streams.yield = { _ in } } // clears output
-            let messenger = MessageQueue(retain: true, continuation: continuation)
-            doCommand(with: messenger)
-            //doCommand(with: continuation)
-        }
-    }
-
-    func doCommand(with out: MessageQueue) {
+    fileprivate func doCommand(with out: MessageQueue) {
         Task.detached {
             do {
                 try await performCommand(with: out)
