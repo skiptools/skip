@@ -92,6 +92,11 @@ extension Message {
         return Message(kind: .error, message: "A Kotlin constructor can only include a single top-level call to another 'this' or 'super' constructor", sourceDerived: sourceDerived, source: source)
     }
 
+    // Idea: automatically re-map uses of this case
+    static func kotlinEnumCaseName(_ sourceDervied: SourceDerived, source: Source) -> Message {
+        return Message(kind: .warning, message: "This enum case name may case compilation errors in Kotlin. Consider using another name", sourceDerived: sourceDervied, source: source)
+    }
+
     // Idea: generate an internal ordinal member var and synthesize code to use it and associated values to conform
     static func kotlinEnumSealedClassComparableConformance(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Skip does not support automatic Comparable conformance for enums that translate into Kotlin sealed classes. Consider writing your own < operator function", sourceDerived: sourceDerived, source: source)

@@ -964,7 +964,7 @@ class KotlinClassDeclaration: KotlinStatement {
         }
         kstatement.members = kmembers
         if statement.type == .enumDeclaration {
-            kstatement.processEnumCaseDeclarations()
+            kstatement.processEnumCaseDeclarations(messagesSource: translator.syntaxTree.source)
         }
 
         kstatement.inherits.forEach { $0.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
@@ -989,13 +989,14 @@ class KotlinClassDeclaration: KotlinStatement {
     }
 
     /// Assign raw values and other attributes to enum case members.
-    func processEnumCaseDeclarations() {
+    func processEnumCaseDeclarations(messagesSource: Source? = nil) {
         guard declarationType == .enumDeclaration else {
             return
         }
 
         let caseDeclarations = members.compactMap { $0 as? KotlinEnumCaseDeclaration }
         let rawValueType = enumInheritedRawValueType
+        let isSealed = isSealedClassesEnum
         var lastRawValueInt = -1
         for (index, caseDeclaration) in caseDeclarations.enumerated() {
             if rawValueType != .none {
@@ -1013,6 +1014,12 @@ class KotlinClassDeclaration: KotlinStatement {
                 }
             }
             caseDeclaration.isLastDeclaration = index == caseDeclarations.count - 1
+
+            // Note that a transformer may force this enum into a sealed enum later, so we can only warn on the likelihood that
+            // this will turn into an enum case and cause an error
+            if let messagesSource, !isSealed && KotlinEnumCaseDeclaration.disallowedCaseNames.contains(caseDeclaration.name) {
+                caseDeclaration.messages.append(.kotlinEnumCaseName(caseDeclaration, source: messagesSource))
+            }
         }
     }
 
@@ -1156,6 +1163,9 @@ class KotlinClassDeclaration: KotlinStatement {
 }
 
 class KotlinEnumCaseDeclaration: KotlinStatement {
+    /// Names that aren't hard reserved words but cause errors as enum cases.
+    static let disallowedCaseNames: Set<String> = ["segmented", "name", "ordinal"]
+
     var name: String
     /// The case name if different from `name`, such as when a keyword is escaped
     var caseName: String?

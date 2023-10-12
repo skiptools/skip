@@ -623,4 +623,27 @@ final class EnumTests: XCTestCase {
         internal val b = E.x.rawValue == String.empty
         """)
     }
+
+    func testDisallowedCaseNames() async throws {
+        try await checkProducesMessage(preflight: true, swift: """
+        enum E {
+            case name
+        }
+        """)
+
+        try await check(swift: """
+        enum E {
+            case name(String)
+        }
+        """, kotlin: """
+        internal sealed class E {
+            class NameCase(val associated0: String): E() {
+            }
+
+            companion object {
+                fun name(associated0: String): E = NameCase(associated0)
+            }
+        }
+        """)
+    }
 }
