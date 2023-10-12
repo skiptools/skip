@@ -62,7 +62,7 @@ class SkipCommandTests : XCTestCase {
     func testSkipInit() async throws {
         let tempDir = try mktmp()
         let name = "cool-lib"
-        let out = try await skip("lib", "init", "-jA", "--tree", "--no-build", "--no-test", "-d", tempDir, name, "CoolA", "CoolB", "CoolC", "CoolD", "CoolE").parseJSONArray()
+        let out = try await skip("lib", "init", "-jA", "--show-tree", "--no-build", "--no-test", "-d", tempDir, name, "CoolA", "CoolB", "CoolC", "CoolD", "CoolE").parseJSONArray()
 
         XCTAssertEqual("Initializing Skip library \(name)", (out.first as? JSONObject)?["msg"] as? String)
 
