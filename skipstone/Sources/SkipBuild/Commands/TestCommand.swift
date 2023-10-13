@@ -71,7 +71,7 @@ extension TestCommand {
 
         var testResult: Result<ProcessOutput, Error>? = nil
         if test == true {
-            testResult = await run(with: out, "Testing project", ["swift", "test", "--parallel", "-c", configuration, "--enable-code-coverage", "--xunit-output", xunit, "--package-path", project])
+            testResult = await run(with: out, "Test project", ["swift", "test", "--parallel", "-c", configuration, "--enable-code-coverage", "--xunit-output", xunit, "--package-path", project])
         } else if self.xunit == nil {
             // we can only use the generated xunit if we are running the tests
             throw SkipDriveError(errorDescription: "Must either specify --xunit path or run tests with --test")
@@ -315,12 +315,12 @@ extension ToolOptionsCommand where Self : OutputOptionsCommand {
 
     func runSkipTests(in projectFolderURL: URL, configuration: String, swift: Bool, kotlin: Bool, separateModule: String? = "testSkipModule", with out: MessageQueue) async throws {
         if let separateModule = separateModule {
-            await run(with: out, "Testing Swift", ["swift", "test", "--verbose", "--configuration", configuration, "--skip", separateModule, "--package-path", projectFolderURL.path])
+            await run(with: out, "Test Swift", ["swift", "test", "--verbose", "--configuration", configuration, "--skip", separateModule, "--package-path", projectFolderURL.path])
 
-            await run(with: out, "Testing Kotlin", ["swift", "test", "--verbose", "--configuration", configuration, "--filter", "testSkipModule", "--package-path", projectFolderURL.path])
+            await run(with: out, "Test Kotlin", ["swift", "test", "--verbose", "--configuration", configuration, "--filter", "testSkipModule", "--package-path", projectFolderURL.path])
         } else {
             // run Swift and Kotlin tests at the same time
-             await run(with: out, "Testing Project", ["swift", "test", "--verbose", "--configuration", configuration, "--package-path", projectFolderURL.path])
+             await run(with: out, "Test Project", ["swift", "test", "--verbose", "--configuration", configuration, "--package-path", projectFolderURL.path])
         }
     }
 }

@@ -32,7 +32,7 @@ struct AppCreateCommand: MessageCommand, ToolOptionsCommand {
     func performCommand(with out: MessageQueue) async throws {
         let pname = projectName.split(separator: "/").last?.description ?? projectName
 
-        await out.write(status: nil, "Creating project \(pname) from template \(createOptions.template)")
+        await out.write(status: nil, "Create project \(pname) from template \(createOptions.template)")
 
         let outputFolder = createOptions.dir ?? "."
         var isDir: Foundation.ObjCBool = false
@@ -79,7 +79,7 @@ struct AppCreateCommand: MessageCommand, ToolOptionsCommand {
         }
 
         if buildOptions.test == true {
-            await run(with: out, "Testing \(pname)/\(appName)", ["swift", "test", "-j", "1", "--verbose", "-c", createOptions.configuration, "--package-path", projectFolderURL.path])
+            await run(with: out, "Test \(pname)/\(appName)", ["swift", "test", "-j", "1", "--verbose", "-c", createOptions.configuration, "--package-path", projectFolderURL.path])
         }
 
         // TODO: make code project match project name

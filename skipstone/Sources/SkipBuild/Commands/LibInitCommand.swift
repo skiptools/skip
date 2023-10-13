@@ -859,10 +859,10 @@ extension ToolOptionsCommand {
         let debugConfiguration = "debug"
 
         if build == true || apk == true {
-            await run(with: out, "\(re)Resolving dependencies", ["swift", "package", "resolve", "-v", "--package-path", projectURL.path])
+            await run(with: out, "\(re)Resolve dependencies", ["swift", "package", "resolve", "-v", "--package-path", projectURL.path])
 
             // we need to build regardless of preference in order to build the apk
-            await run(with: out, "\(re)Building \(projectName)", ["swift", "build", "-v", "-c", debugConfiguration, "--package-path", projectURL.path])
+            await run(with: out, "\(re)Build \(projectName)", ["swift", "build", "-v", "-c", debugConfiguration, "--package-path", projectURL.path])
         }
 
         if test == true {
@@ -884,7 +884,7 @@ extension ToolOptionsCommand {
             let fullArchivePath = projectURL.path + "/" + archivePath
             let fullDerivedDataPath = projectURL.path + "/" + buildFolderName + "/DerivedData"
 
-            await run(with: out, "\(re)Archiving iOS ipa", [
+            await run(with: out, "\(re)Archive iOS ipa", [
                 "xcodebuild",
                 "-project", xcodeProjectFolder.path,
                 "-derivedDataPath", fullDerivedDataPath,
@@ -916,7 +916,7 @@ extension ToolOptionsCommand {
             try FileManager.default.copyItem(at: archiveAppURL, to: archiveAppContentsURL)
             try FileManager.default.zeroFileTimes(under: archiveAppPayloadURL)
 
-            await run(with: out, "\(re)Assembling \(ipaURL.lastPathComponent)", ["zip", "-9", "-r", ipaURL.path, archiveAppPayloadURL.lastPathComponent], in: archiveAppPayloadURL.deletingLastPathComponent())
+            await run(with: out, "\(re)Assemble \(ipaURL.lastPathComponent)", ["zip", "-9", "-r", ipaURL.path, archiveAppPayloadURL.lastPathComponent], in: archiveAppPayloadURL.deletingLastPathComponent())
 
             await checkFile(ipaURL, with: out, title: "\(re)Verifying \(ipaURL.lastPathComponent)") { url in
                 try "Verify \(ipaURL.lastPathComponent) \(ByteCountFormatter.string(fromByteCount: Int64(url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0), countStyle: .file))"
@@ -1370,7 +1370,7 @@ extension ToolOptionsCommand {
         }
 
         if validatePackage {
-            let packageJSONString = try await run(with: out, "Creating project \(projectName)", ["swift", "package", "dump-package", "--package-path", projectFolderURL.path]).get().stdout
+            let packageJSONString = try await run(with: out, "Create project \(projectName)", ["swift", "package", "dump-package", "--package-path", projectFolderURL.path]).get().stdout
 
             let packageJSON = try JSONDecoder().decode(PackageManifest.self, from: Data(packageJSONString.utf8))
             _ = packageJSON
