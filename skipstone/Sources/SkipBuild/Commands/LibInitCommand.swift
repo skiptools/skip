@@ -120,7 +120,7 @@ extension ToolOptionsCommand {
         echo "note: Running skip adb install"
         skip adb install -t -r -d -g Skip/build/artifacts/${PROJECT_NAME}-${CONFIGURATION}.apk
         echo "note: Running skip adb am start-activity"
-        skip adb shell am start-activity -S -W -n ${PRODUCT_BUNDLE_IDENTIFIER}/.MainActivity
+        skip adb shell am start-activity -S -W -n ${ANDROID_PACKAGE_NAME}/.MainActivity
 
         """
             .replacingOccurrences(of: "\n", with: "\\n")
@@ -516,6 +516,8 @@ extension ToolOptionsCommand {
 
         let appModuleName = primaryModuleName
         let primaryModuleAppTarget = appModuleName + "App"
+        let appModulePackage = KotlinTranslator.packageName(forModule: appModuleName)
+
         let xcodeProjectFolder = try projectURL.append(path: primaryModuleName + ".xcodeproj", create: appid != nil)
 
         if let appid = appid { // we have specified that an app should be created
@@ -570,6 +572,9 @@ extension ToolOptionsCommand {
             // On-device testing may need to override the bundle ID
             // PRODUCT_BUNDLE_IDENTIFIER[config=Debug][sdk=iphoneos*] = \(appid)
 
+            // The package name for the Android entry point, referenced by the AndroidManifest.xml
+            ANDROID_PACKAGE_NAME = \(appModulePackage)
+
             // Assemble the APK as part of the build process
             SKIP_BUILD_APK = YES
 
@@ -621,15 +626,29 @@ extension ToolOptionsCommand {
             /// The Android SDK number we are running against, or `nil` if not running on Android
             let androidSDK = ProcessInfo.processInfo.environment["android.os.Build.VERSION.SDK_INT"].flatMap({ Int($0) })
 
+            /// The shared top-level view for the app, loaded from the platform-specific App delegates below.
+            ///
+            /// The default implementation merely loads the `ContentView` for the app and logs a message.
+            struct RootView : View {
+                var body: some View {
+                    ContentView()
+                        .task {
+                            logger.log("Welcome to Skip on \\(androidSDK != nil ? "Android" : "Darwin")!")
+                            logger.warning("Skip app logs are viewable in the Xcode console for iOS; Android logs can be viewed in Studio or using adb logcat")
+                        }
+                }
+            }
+
             #if !SKIP
             public protocol \(primaryModuleAppTarget) : App {
             }
 
-            /// The entry point to the app, which simply loads the `ContentView` from the `AppUI` module.
+            /// The entry point to the \(primaryModuleName) app.
+            /// The concrete implementation is in the \(primaryModuleName)App module.
             public extension \(primaryModuleAppTarget) {
                 var body: some Scene {
                     WindowGroup {
-                        ContentView()
+                        RootView()
                     }
                 }
             }
@@ -674,11 +693,12 @@ extension ToolOptionsCommand {
                     setContent {
                         let saveableStateHolder = rememberSaveableStateHolder()
                         saveableStateHolder.SaveableStateProvider(true) {
-                            MaterialThemedContentView()
+                            MaterialThemedRootView()
                         }
                     }
 
-                    // example of requesting permissions on startup:
+                    // Example of requesting permissions on startup. 
+                    // These must match the permissions in the AndroidManifest.xml file.
                     //let permissions = listOf(
                     //    Manifest.permission.ACCESS_COARSE_LOCATION,
                     //    Manifest.permission.ACCESS_FINE_LOCATION
@@ -735,7 +755,7 @@ extension ToolOptionsCommand {
             }
 
             @ExperimentalMaterial3Api
-            @Composable func MaterialThemedContentView() {
+            @Composable func MaterialThemedRootView() {
                 let context = LocalContext.current
                 let darkMode = isSystemInDarkTheme()
                 // Dynamic color is available on Android 12+
@@ -746,7 +766,7 @@ extension ToolOptionsCommand {
                     : (darkMode ? darkColorScheme() : lightColorScheme())
 
                 MaterialTheme(colorScheme: colorScheme) {
-                    ContentView().Compose()
+                    RootView().Compose()
                 }
             }
 
@@ -767,7 +787,6 @@ extension ToolOptionsCommand {
             // Sources/Playground/PlaygroundApp.swift
             let contentViewContents = """
             \(sourceHeader)import SwiftUI
-            import OSLog
 
             struct ContentView: View {
                 var body: some View {
@@ -776,7 +795,7 @@ extension ToolOptionsCommand {
                         VStack {
                             Spacer()
                             Image(systemName: "heart.fill")
-                                .foregroundStyle(androidSDK != nil ? .green : .blue)
+                                .foregroundStyle(Color.accentColor)
                             Text("Greetings Skipper!")
                             Spacer()
                         }
@@ -785,7 +804,6 @@ extension ToolOptionsCommand {
                     .font(.largeTitle)
                 }
             }
-
 
             """
 
@@ -1053,6 +1071,8 @@ extension ToolOptionsCommand {
         for moduleIndex in modules.indices {
             let module = modules[moduleIndex]
             let moduleName = module.moduleName
+            // determine the package name of the app module to reference the .MainActivity class; we simply de-camel-case and hyphenate the module name, but in the future we may permit customization in the skip.yml file
+            let modulePackageName = KotlinTranslator.packageName(forModule: moduleName)
 
             // the isAppModule is the initial module in the list when we specify we want to create an app module
             let isAppModule = app == true && moduleIndex == modules.startIndex
@@ -1231,22 +1251,22 @@ extension ToolOptionsCommand {
             if isAppModule {
                 let androidManifestContents = """
                 <?xml version="1.0" encoding="utf-8"?>
+                <!-- This AndroidManifest.xml template was generated for the Skip module \(moduleName) -->
                 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
                     <!-- example permissions for using device location -->
                     <!-- <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/> -->
                     <!-- <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/> -->
 
                     <!-- permissions needed for using the internet or an embedded WebKit browser -->
-                    <uses-permission android:name="android.permission.INTERNET" />
-                    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-                    <meta-data android:name="android.webkit.WebView.EnableSafeBrowsing" android:value="false" />
+                    <!-- <uses-permission android:name="android.permission.INTERNET" /> -->
+                    <!-- <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" /> -->
 
                     <application
                         android:label="${PRODUCT_NAME}"
-                        android:name="${PRODUCT_BUNDLE_IDENTIFIER}.AndroidAppMain"
+                        android:name="\(modulePackageName).AndroidAppMain"
                         android:allowBackup="true">
                         <activity
-                            android:name=".MainActivity"
+                            android:name="\(modulePackageName).MainActivity"
                             android:exported="true"
                             android:theme="@style/Theme.AppCompat.DayNight.NoActionBar"
                             android:windowSoftInputMode="adjustResize">
