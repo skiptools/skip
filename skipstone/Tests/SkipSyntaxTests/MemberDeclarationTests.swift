@@ -1929,6 +1929,28 @@ final class MemberDeclarationTests: XCTestCase {
         internal inline fun <reified T> P.f(p: T) = Unit
         """)
     }
+
+    func testDoNotUseSingleStatementForIgnoredFunctionCallReturn() async throws {
+        try await check(supportingSwift: """
+        func intReturn() -> Int {
+            return 1
+        }
+        func voidReturn() {
+        }
+        """, swift: """
+        func f() {
+            intReturn()
+        }
+        func g() {
+            voidReturn()
+        }
+        """, kotlin: """
+        internal fun f() {
+            intReturn()
+        }
+        internal fun g(): Unit = voidReturn()
+        """)
+    }
 }
 
 var sideEffectOrdering: [String] = []

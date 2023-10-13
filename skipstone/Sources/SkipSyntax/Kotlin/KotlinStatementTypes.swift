@@ -1692,15 +1692,21 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
 
         kstatement.body = KotlinCodeBlock.translate(statement: body, translator: translator)
         // Note: we leave optional init handling to our transformers because we handle them differently for different types
-        if statement.type != .initDeclaration {
-            if returnType != .void {
+        if let body = kstatement.body, statement.type != .initDeclaration {
+            if returnType == .void {
+                // Guard against using single-statement format for a void function whose only statement returns a value, e.g.:
+                // fun f(): Unit = somethingThatReturnsAValueThatShouldBeIgnored()
+                if body.statements.count == 1, let expressionStatement = body.statements[0] as? KotlinExpressionStatement, let apiCall = expressionStatement.expression as? APICallExpression, let apiMatch = apiCall.apiMatch, apiMatch.signature.returnType != .none && apiMatch.signature.returnType != .void {
+                    body.disallowSingleStatementAppend = true
+                }
+            } else {
                 // We sref() all values from functions. While this is not strictly necessary given that function return
                 // values must be assigned to a var before mutating them, it produces cleaner code than calling sref() at
                 // function call sites. This is particularly true when calling Kotlin native functions for which we do not
                 // have symbols. It also makes functions symmetrical with the behavior of arrays and of mutable properties
-                kstatement.body?.updateWithExpectedReturn(.sref(nil))
+                body.updateWithExpectedReturn(.sref(nil))
             }
-            if isAsync && kstatement.body?.updateWithExpectedReturn(.labelIfPresent(KotlinClosure.returnLabel)) == true {
+            if isAsync && body.updateWithExpectedReturn(.labelIfPresent(KotlinClosure.returnLabel)) {
                 kstatement.hasAsyncExplicitReturn = true
             }
         }
