@@ -95,7 +95,7 @@ extension ToolOptionsCommand {
         export ANDROID_HOME=${ANDROID_HOME:-${HOME}/Library/Android/sdk}
         which skip
         mkdir -p Skip/build/artifacts/
-        skip gradle --package "${PROJECT}" --module ${PROJECT_NAME}UI assemble${CONFIGURATION}
+        skip gradle --package "${PROJECT}" --module ${PROJECT_NAME} assemble${CONFIGURATION}
         cd Skip/build/
         ln -sfh ${SRCPKG}/plugins/*.output .
         cd artifacts/
@@ -103,7 +103,7 @@ extension ToolOptionsCommand {
         ln -f ${SRCPKG}/plugins/*.output/*/skipstone/*/.build/*/outputs/apk/*/*.apk .
 
         # this is the expected output file, so ensure that it exists
-        ls -lah ${SRCROOT}/Skip/build/artifacts/${PROJECT_NAME}UI-${CONFIGURATION}.apk
+        ls -lah ${SRCROOT}/Skip/build/artifacts/${PROJECT_NAME}-${CONFIGURATION}.apk
 
         """
             .replacingOccurrences(of: "\n", with: "\\n")
@@ -118,8 +118,8 @@ extension ToolOptionsCommand {
         PLUGIN=${BUILD_ROOT}/../../SourcePackages/artifacts/skip/skip/skip.artifactbundle/macos
         PATH=${BUILD_ROOT}/Debug:${PLUGIN}:${PATH}:${HOMEBREW_PREFIX:-/opt/homebrew}/bin
         echo "note: Running skip adb install"
-        skip adb install -t -r -d -g Skip/build/artifacts/${PROJECT_NAME}UI-${CONFIGURATION}.apk
-        echo "note: Running skip adb am start-activity
+        skip adb install -t -r -d -g Skip/build/artifacts/${PROJECT_NAME}-${CONFIGURATION}.apk
+        echo "note: Running skip adb am start-activity"
         skip adb shell am start-activity -S -W -n ${PRODUCT_BUNDLE_IDENTIFIER}/.MainActivity
 
         """
@@ -771,15 +771,21 @@ extension ToolOptionsCommand {
 
             struct ContentView: View {
                 var body: some View {
-                    VStack {
-                        Image(systemName: "heart")
-                            .foregroundStyle(.red)
-                        Text("Hello, Skip!")
-                            .font(.largeTitle)
+                    HStack {
+                        Spacer()
+                        VStack {
+                            Spacer()
+                            Image(systemName: "heart.fill")
+                                .foregroundStyle(androidSDK != nil ? .green : .blue)
+                            Text("Greetings Skipper!")
+                            Spacer()
+                        }
+                        Spacer()
                     }
-                    .padding()
+                    .font(.largeTitle)
                 }
             }
+
 
             """
 
