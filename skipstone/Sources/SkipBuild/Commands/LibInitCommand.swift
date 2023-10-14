@@ -64,7 +64,7 @@ struct LibInitCommand: MessageCommand, CreateOptionsCommand, ToolOptionsCommand,
         let dir = self.createOptions.dir ?? "."
 
         let modules = try self.modules
-        let (createdURL, _) = try await buildSkipProject(projectName: self.projectName, modules: modules, resourceFolder: createOptions.resourcePath, dir: dir, configuration: createOptions.configuration, build: buildOptions.build, test: buildOptions.test, returnHashes: false, showTree: self.createOptions.showTree, chain: createOptions.chain, free: createOptions.free, zero: createOptions.zero, appid: self.appid, version: self.version, moduleTests: self.createOptions.moduleTests, validatePackage: self.createOptions.validatePackage, apk: apk, ipa: ipa, with: out)
+        let (createdURL, _) = try await buildSkipProject(projectName: self.projectName, modules: modules, resourceFolder: createOptions.resourcePath, dir: dir, configuration: createOptions.configuration, build: buildOptions.build, test: buildOptions.test, returnHashes: false, showTree: self.createOptions.showTree, chain: createOptions.chain, gitRepo: createOptions.gitRepo, free: createOptions.free, zero: createOptions.zero, appid: self.appid, version: self.version, moduleTests: self.createOptions.moduleTests, validatePackage: self.createOptions.validatePackage, apk: apk, ipa: ipa, with: out)
 
         await out.yield(MessageBlock(status: .pass, "Created module \(modules.map(\.moduleName).joined(separator: ", ")) in \(createdURL.path)"))
 
@@ -120,7 +120,7 @@ extension ToolOptionsCommand {
         echo "note: Running skip adb install"
         skip adb install -t -r -d -g Skip/build/artifacts/${PROJECT_NAME}-${CONFIGURATION}.apk
         echo "note: Running skip adb am start-activity"
-        skip adb shell am start-activity -S -W -n ${ANDROID_PACKAGE_NAME}/.MainActivity
+        skip adb shell am start-activity -S -W -n ${PRODUCT_BUNDLE_IDENTIFIER}/${ANDROID_PACKAGE_NAME}.MainActivity
 
         """
             .replacingOccurrences(of: "\n", with: "\\n")
@@ -359,11 +359,7 @@ extension ToolOptionsCommand {
         491FCC8F2AD18D38002FB1E1 /* Skippy */ = {
             isa = XCBuildConfiguration;
             buildSettings = {
-                ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-                ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-                CODE_SIGN_STYLE = Automatic;
                 ENABLE_PREVIEWS = YES;
-                GENERATE_INFOPLIST_FILE = YES;
                 IPHONEOS_DEPLOYMENT_TARGET = 16.4;
                 LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
                 "LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
@@ -380,11 +376,7 @@ extension ToolOptionsCommand {
         499CD4422AC5B799001AE8D8 /* Debug */ = {
             isa = XCBuildConfiguration;
             buildSettings = {
-                ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-                ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-                CODE_SIGN_STYLE = Automatic;
                 ENABLE_PREVIEWS = YES;
-                GENERATE_INFOPLIST_FILE = YES;
                 IPHONEOS_DEPLOYMENT_TARGET = 16.4;
                 LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
                 "LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
@@ -401,11 +393,7 @@ extension ToolOptionsCommand {
         499CD4432AC5B799001AE8D8 /* Release */ = {
             isa = XCBuildConfiguration;
             buildSettings = {
-                ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-                ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-                CODE_SIGN_STYLE = Automatic;
                 ENABLE_PREVIEWS = YES;
-                GENERATE_INFOPLIST_FILE = YES;
                 IPHONEOS_DEPLOYMENT_TARGET = 16.4;
                 LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
                 "LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
@@ -497,9 +485,9 @@ extension ToolOptionsCommand {
 """
     }
 
-    func buildSkipProject(projectName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: String, configuration: String, build: Bool, test: Bool, returnHashes: Bool, messagePrefix: String? = nil, showTree: Bool, chain: Bool, free: Bool, zero skipZeroSupport: Bool, appid: String?, version: String?, moduleTests: Bool, validatePackage: Bool, packageResolved packageResolvedURL: URL? = nil, apk: Bool, ipa: Bool, with out: MessageQueue) async throws -> (projectURL: URL, artifacts: [URL: String?]) {
+    func buildSkipProject(projectName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: String, configuration: String, build: Bool, test: Bool, returnHashes: Bool, messagePrefix: String? = nil, showTree: Bool, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, appid: String?, version: String?, moduleTests: Bool, validatePackage: Bool, packageResolved packageResolvedURL: URL? = nil, apk: Bool, ipa: Bool, with out: MessageQueue) async throws -> (projectURL: URL, artifacts: [URL: String?]) {
         let sourceHeader = free ? licenseLGPLHeader : ""
-        let projectURL = try await initSkipLibrary(projectName: projectName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, chain: chain, free: free, zero: skipZeroSupport, app: appid != nil, moduleTests: moduleTests, validatePackage: validatePackage, packageResolved: packageResolvedURL, with: out)
+        let projectURL = try await initSkipLibrary(projectName: projectName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, chain: chain, gitRepo: gitRepo, free: free, zero: skipZeroSupport, app: appid != nil, moduleTests: moduleTests, validatePackage: validatePackage, packageResolved: packageResolvedURL, with: out)
 
         let projectPath = try projectURL.absolutePath
         let primaryModuleName = modules.first?.moduleName ?? "Module"
@@ -522,11 +510,16 @@ extension ToolOptionsCommand {
 
         if let appid = appid { // we have specified that an app should be created
             let primaryModuleAppSourcesPath = sourcesFolderName + "/" + primaryModuleAppTarget
-            let appMainSwiftFileName = primaryModuleAppTarget + "Main.swift"
+            let appMainSwiftFileName = primaryModuleAppTarget + "Main.swift" // the main entry point to the app, as compiled by Xcode
             let primaryModuleAppMainPath = primaryModuleAppSourcesPath + "/" + appMainSwiftFileName
+            let primaryModuleSources = sourcesFolderName + "/" + primaryModuleName
+
+            // the Sources/MODULE_NAMEApp/ folder for iOS metadata
+            //let appModule_Sources_Path = sourcesFolderName + "/" + primaryModuleAppTarget
+            let appModule_Metadata_Path = primaryModuleSources + "/Skip"
 
             let Capabilities_entitlements_name = "Capabilities.entitlements"
-            let Capabilities_entitlements_path = primaryModuleAppSourcesPath + "/" + Capabilities_entitlements_name
+            let Capabilities_entitlements_path = appModule_Metadata_Path + "/" + Capabilities_entitlements_name
 
             let primaryModuleAppEntitlementsURL = projectURL.appending(path: Capabilities_entitlements_path)
             try FileManager.default.createDirectory(at: primaryModuleAppEntitlementsURL.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -556,10 +549,6 @@ extension ToolOptionsCommand {
             // PRODUCT_BUNDLE_IDENTIFIER is the unique id for both the iOS and Android app
             PRODUCT_BUNDLE_IDENTIFIER = \(appid)
 
-            // The user-visible name of the app (localizable)
-            //INFOPLIST_KEY_CFBundleDisplayName = App Name
-            //INFOPLIST_KEY_LSApplicationCategoryType = public.app-category.utilities
-
             // The semantic version for the app matching the git tag for the release
             MARKETING_VERSION = \(version ?? "0.0.1")
 
@@ -581,6 +570,14 @@ extension ToolOptionsCommand {
             // Building the target will lauch the app for iphone* targets
             SKIP_LAUNCH_APK[sdk=iphone*] = YES
 
+            ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon
+            ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor
+
+            GENERATE_INFOPLIST_FILE = YES
+            // The user-visible name of the app (localizable)
+            //INFOPLIST_KEY_CFBundleDisplayName = App Name
+            //INFOPLIST_KEY_LSApplicationCategoryType = public.app-category.utilities
+
             // iOS-specific Info.plist property keys
             INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphone*] = YES
             INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphone*] = YES
@@ -589,10 +586,11 @@ extension ToolOptionsCommand {
             INFOPLIST_KEY_UISupportedInterfaceOrientations[sdk=iphone*] = UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown
 
             // Development team ID for on-device testing
-            //DEVELOPMENT_TEAM =
+            CODE_SIGNING_REQUIRED = NO
+            CODE_SIGN_STYLE = Automatic
+            CODE_SIGN_ENTITLEMENTS = \(Capabilities_entitlements_path)
             //CODE_SIGNING_IDENTITY = -
-            //CODE_SIGNING_REQUIRED = NO
-            CODE_SIGN_ENTITLEMENTS = \(Capabilities_entitlements_path);
+            //DEVELOPMENT_TEAM =
 
             """
 
@@ -659,13 +657,16 @@ extension ToolOptionsCommand {
             import androidx.activity.compose.setContent
             import androidx.appcompat.app.AppCompatActivity
             import androidx.compose.foundation.isSystemInDarkTheme
-            import androidx.compose.material3.ExperimentalMaterial3Api
+            import androidx.compose.foundation.layout.fillMaxSize
+            import androidx.compose.foundation.layout.Box
             import androidx.compose.material3.MaterialTheme
             import androidx.compose.material3.darkColorScheme
             import androidx.compose.material3.dynamicDarkColorScheme
             import androidx.compose.material3.dynamicLightColorScheme
             import androidx.compose.material3.lightColorScheme
             import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+            import androidx.compose.ui.Alignment
+            import androidx.compose.ui.Modifier
             import androidx.compose.ui.platform.LocalContext
             import androidx.core.app.ActivityCompat
 
@@ -682,7 +683,6 @@ extension ToolOptionsCommand {
             }
 
             /// AndroidAppMain is initial `androidx.appcompat.app.AppCompatActivity`, and must match `activity android:name` in the AndroidMainfest.xml file.
-            @ExperimentalMaterial3Api
             public class MainActivity : AppCompatActivity {
                 public init() {
                 }
@@ -693,7 +693,9 @@ extension ToolOptionsCommand {
                     setContent {
                         let saveableStateHolder = rememberSaveableStateHolder()
                         saveableStateHolder.SaveableStateProvider(true) {
-                            MaterialThemedRootView()
+                            Box(modifier: Modifier.fillMaxSize(), contentAlignment: Alignment.Center) {
+                                MaterialThemedRootView()
+                            }
                         }
                     }
 
@@ -754,8 +756,7 @@ extension ToolOptionsCommand {
                 }
             }
 
-            @ExperimentalMaterial3Api
-            @Composable func MaterialThemedRootView() {
+             @Composable func MaterialThemedRootView() {
                 let context = LocalContext.current
                 let darkMode = isSystemInDarkTheme()
                 // Dynamic color is available on Android 12+
@@ -774,8 +775,6 @@ extension ToolOptionsCommand {
 
             """
 
-            let primaryModuleSources = sourcesFolderName + "/" + primaryModuleName
-
             let appModuleApplicationStubFileBase = primaryModuleAppTarget + ".swift"
             let appModuleApplicationStubFilePath = primaryModuleSources + "/" + appModuleApplicationStubFileBase
 
@@ -790,16 +789,10 @@ extension ToolOptionsCommand {
 
             struct ContentView: View {
                 var body: some View {
-                    HStack {
-                        Spacer()
-                        VStack {
-                            Spacer()
-                            Image(systemName: "heart.fill")
-                                .foregroundStyle(Color.accentColor)
-                            Text("Greetings Skipper!")
-                            Spacer()
-                        }
-                        Spacer()
+                    VStack {
+                        Image(systemName: "heart.fill")
+                            .foregroundStyle(Color.red)
+                        Text("Greetings Skipper!")
                     }
                     .font(.largeTitle)
                 }
@@ -815,11 +808,8 @@ extension ToolOptionsCommand {
             try contentViewContents.write(to: contentViewURL, atomically: true, encoding: .utf8)
 
 
-            // the Sources/MODULE_NAMEApp/ folder for iOS metadata
-            let appModule_Sources_Path = sourcesFolderName + "/" + primaryModuleAppTarget
-
             let Assets_xcassets_name = "Assets.xcassets"
-            let Assets_xcassets_path = appModule_Sources_Path + "/" + Assets_xcassets_name
+            let Assets_xcassets_path = appModule_Metadata_Path + "/" + Assets_xcassets_name
             let Assets_xcassets_URL = try projectURL.append(path: Assets_xcassets_path, create: true)
 
             let Assets_xcassets_Contents_URL = Assets_xcassets_URL.appendingPathComponent("Contents.json", isDirectory: false)
@@ -986,6 +976,14 @@ extension ToolOptionsCommand {
             }
         }
 
+        if gitRepo == true {
+            func cretateGitRepo(_ url: URL) throws -> String{
+                return "Create git repository"
+            }
+
+            await checkFile(projectURL, with: out, title: "Create git repository", handle: cretateGitRepo)
+        }
+
         if showTree {
             await showFileTree(in: projectPath, with: out)
         }
@@ -993,7 +991,7 @@ extension ToolOptionsCommand {
         return (appid != nil ? xcodeProjectFolder : projectURL.appendingPathComponent("Package.swift", isDirectory: false), artifactHashes)
     }
 
-    func initSkipLibrary(projectName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: String, chain: Bool, free: Bool, zero skipZeroSupport: Bool, app: Bool, moduleTests: Bool, validatePackage: Bool, packageResolved packageResolvedURL: URL?, with out: MessageQueue) async throws -> URL {
+    func initSkipLibrary(projectName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: String, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, app: Bool, moduleTests: Bool, validatePackage: Bool, packageResolved packageResolvedURL: URL?, with out: MessageQueue) async throws -> URL {
         var isDir: Foundation.ObjCBool = false
         if !FileManager.default.fileExists(atPath: outputFolder, isDirectory: &isDir) {
             throw InitError(errorDescription: "Specified output folder does not exist: \(outputFolder)")
@@ -1120,12 +1118,14 @@ extension ToolOptionsCommand {
                   remove:
                     - 'id("com.android.library") version "8.1.0"'
                 - block: 'android'
+                  remove:
+                    - 'namespace = group as String'
                   contents:
-                    - 'namespace = System.getenv("PRODUCT_BUNDLE_IDENTIFIER") ?: "app.ui"'
+                    - 'namespace = "\(modulePackageName)"'
                     - block: 'defaultConfig'
                       contents:
                         # Android app config and AndroidManifest.xml metadata can be specified here
-                        # - 'applicationId = System.getenv("PRODUCT_BUNDLE_IDENTIFIER") ?: "app.ui"'
+                        - 'applicationId = System.getenv("PRODUCT_BUNDLE_IDENTIFIER") ?: "\(modulePackageName)"'
                     - block: 'buildFeatures'
                       contents:
                         - 'buildConfig = true'
@@ -1263,10 +1263,10 @@ extension ToolOptionsCommand {
 
                     <application
                         android:label="${PRODUCT_NAME}"
-                        android:name="\(modulePackageName).AndroidAppMain"
+                        android:name=".AndroidAppMain"
                         android:allowBackup="true">
                         <activity
-                            android:name="\(modulePackageName).MainActivity"
+                            android:name=".MainActivity"
                             android:exported="true"
                             android:theme="@style/Theme.AppCompat.DayNight.NoActionBar"
                             android:windowSoftInputMode="adjustResize">
@@ -1375,21 +1375,99 @@ extension ToolOptionsCommand {
         let packageSwiftURL = projectFolderURL.appending(path: "Package.swift")
         try packageSource.write(to: packageSwiftURL, atomically: true, encoding: .utf8)
 
+        // now snapshot the file tree for inclusion in the README
+        let fileTree = try localFileSystem.treeASCIIRepresentation(at: AbsolutePath(validating: projectFolder), hideHiddenFiles: true)
+
         // if we've specified a Package.resolved source file, simply copy it over
         if let packageResolvedURL = packageResolvedURL {
             try FileManager.default.copyItem(at: packageResolvedURL, to: projectFolderURL.appending(path: "Package.resolved"))
         }
 
         let readmeURL = projectFolderURL.appending(path: "README.md")
+        let primaryModuleName = modules.first?.moduleName ?? "Module"
 
-        try """
-        # \(projectName)
+        let libREADME = """
+        # \(primaryModuleName)
 
-        This is a \(free ? "free " : "")[Skip](https://skip.tools) Swift/Kotlin library project containing the following modules:
+        This is a \(free ? "free " : "")[Skip](https://skip.tools) Swift/Kotlin liobrary project containing the following modules:
 
         \(modules.map(\.moduleName).joined(separator: "\n"))
 
-        """.write(to: readmeURL, atomically: true, encoding: .utf8)
+        ```
+        \(fileTree)
+        ```
+
+
+        ## Building
+
+        This project is a Swift Package Manager module that uses the
+        [Skip](https://skip.tools) plugin to transpile Swift into Kotlin.
+
+        Building the module requires that Skip be installed using 
+        [Homebrew](https://brew.sh) with `brew install skiptools/skip/skip`.
+        This will also install the necessary build prerequisites:
+        Kotlin, Gradle, and the Android build tools.
+
+        ## Testing
+
+        The module can be tested using the standard `swift test` command
+        or by running the test target for the macOS desintation in Xcode,
+        which will run the Swift tests as well as the transpiled 
+        Kotlin JUnit tests in the Robolectric Android simulation environment.
+
+        Parity testing can be performed with `skip test`,
+        which will outpout a table of the test results for both platforms.
+
+        """
+
+
+        let appREADME = """
+        # \(primaryModuleName)
+
+        This is a \(free ? "free " : "")[Skip](https://skip.tools) dual-platform app project.
+        It builds a native app for both iOS and Android.
+
+        ## Building
+
+        This project is both a stand-alone Swift Package Manager module,
+        as well as an Xcode project that builds and transpiles the project
+        into a Kotlin Gradle project for Android using the Skip plugin.
+
+        Building the module requires that Skip be installed using
+        [Homebrew](https://brew.sh) with `brew install skiptools/skip/skip`.
+
+        This will also install the necessary transpiler prerequisites:
+        Kotlin, Gradle, and the Android build tools.
+
+        Installation prerequsities can be confirmed by running `skip checkup`.
+
+        ## Testing
+
+        The module can be tested using the standard `swift test` command
+        or by running the test target for the macOS desintation in Xcode,
+        which will run the Swift tests as well as the transpiled
+        Kotlin JUnit tests in the Robolectric Android simulation environment.
+
+        Parity testing can be performed with `skip test`,
+        which will outpout a table of the test results for both platforms.
+
+        ## Running
+
+        Xcode and Android Studio must be downloaded and installed in order to
+        run the app in the iOS simulator / Android emulator.
+        An Android emulator must already be running, which can be launched from 
+        Android Stuido's Device Manager.
+
+        To run both the Swift and Kotlin apps simultaneously, 
+        launch the \(primaryModuleName)App target from Xcode.
+        A build phases runs the "Launch Android APK" script that
+        will deploy the transpiled app a running Android emulator or connected device.
+        Logging output for the iOS app can be viewed in the Xcode console, and in
+        Android Studio's logcat tab for the transpiled Kotlin app.
+
+        """
+
+        try (app ? appREADME : libREADME).write(to: readmeURL, atomically: true, encoding: .utf8)
 
         if free == true {
             try licenseLGPL.write(to: projectFolderURL.appending(path: "LICENSE.LGPL"), atomically: true, encoding: .utf8)

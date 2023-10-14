@@ -691,7 +691,8 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             for resourceFile in resourceURLs.map(\.path).sorted() {
                 guard let resourceSourceURL = moduleNamePaths.compactMap({ (_, folder) in
                     resourceFile.hasPrefix(folder) ? URL(fileURLWithPath: resourceFile.dropFirst(folder.count).trimmingCharacters(in: CharacterSet(charactersIn: "/")).description, relativeTo: URL(fileURLWithPath: folder, isDirectory: true)) : nil }).first else {
-                    msg(.warning, "no module root parent for \(resourceFile)")
+                    // skip over resources that are no contained within the Resources/ folder (such as files in the Skip/ folder, which contain metadata that should not be copied)
+                    msg(.trace, "no module root parent for \(resourceFile)")
                     continue
                 }
 

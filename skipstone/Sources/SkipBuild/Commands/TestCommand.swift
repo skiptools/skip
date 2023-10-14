@@ -314,13 +314,14 @@ extension TestCommand {
 extension ToolOptionsCommand where Self : OutputOptionsCommand {
 
     func runSkipTests(in projectFolderURL: URL, configuration: String, swift: Bool, kotlin: Bool, separateModule: String? = "testSkipModule", with out: MessageQueue) async throws {
+        let env = ProcessInfo.processInfo.environmentWithDefaultToolPaths // an envrionment with a default ANDROID_HOME
         if let separateModule = separateModule {
-            await run(with: out, "Test Swift", ["swift", "test", "--verbose", "--configuration", configuration, "--skip", separateModule, "--package-path", projectFolderURL.path])
+            await run(with: out, "Test Swift", ["swift", "test", "--verbose", "--configuration", configuration, "--skip", separateModule, "--package-path", projectFolderURL.path], environment: env)
 
-            await run(with: out, "Test Kotlin", ["swift", "test", "--verbose", "--configuration", configuration, "--filter", "testSkipModule", "--package-path", projectFolderURL.path])
+            await run(with: out, "Test Kotlin", ["swift", "test", "--verbose", "--configuration", configuration, "--filter", "testSkipModule", "--package-path", projectFolderURL.path], environment: env)
         } else {
             // run Swift and Kotlin tests at the same time
-             await run(with: out, "Test Project", ["swift", "test", "--verbose", "--configuration", configuration, "--package-path", projectFolderURL.path])
+             await run(with: out, "Test Project", ["swift", "test", "--verbose", "--configuration", configuration, "--package-path", projectFolderURL.path], environment: env)
         }
     }
 }

@@ -270,16 +270,16 @@ final class SkipCommandTests: XCTestCase {
         │  │  │  └─ Localizable.xcstrings
         │  │  └─ Skip
         │  │     ├─ AndroidManifest.xml
+        │  │     ├─ Assets.xcassets
+        │  │     │  ├─ AccentColor.colorset
+        │  │     │  │  └─ Contents.json
+        │  │     │  ├─ AppIcon.appiconset
+        │  │     │  │  └─ Contents.json
+        │  │     │  └─ Contents.json
+        │  │     ├─ Capabilities.entitlements
         │  │     └─ skip.yml
         │  └─ APPNAMEApp
-        │     ├─ APPNAMEAppMain.swift
-        │     ├─ Assets.xcassets
-        │     │  ├─ AccentColor.colorset
-        │     │  │  └─ Contents.json
-        │     │  ├─ AppIcon.appiconset
-        │     │  │  └─ Contents.json
-        │     │  └─ Contents.json
-        │     └─ Capabilities.entitlements
+        │     └─ APPNAMEAppMain.swift
         └─ Tests
            └─ APPNAMETests
               ├─ APPNAMETests.swift
@@ -354,17 +354,17 @@ final class SkipCommandTests: XCTestCase {
         │  │  │  └─ Localizable.xcstrings
         │  │  ├─ Skip
         │  │  │  ├─ AndroidManifest.xml
+        │  │  │  ├─ Assets.xcassets
+        │  │  │  │  ├─ AccentColor.colorset
+        │  │  │  │  │  └─ Contents.json
+        │  │  │  │  ├─ AppIcon.appiconset
+        │  │  │  │  │  └─ Contents.json
+        │  │  │  │  └─ Contents.json
+        │  │  │  ├─ Capabilities.entitlements
         │  │  │  └─ skip.yml
         │  │  ├─ TOP_MODULE.swift
         │  │  └─ TOP_MODULEApp.swift
         │  └─ TOP_MODULEApp
-        │     ├─ Assets.xcassets
-        │     │  ├─ AccentColor.colorset
-        │     │  │  └─ Contents.json
-        │     │  ├─ AppIcon.appiconset
-        │     │  │  └─ Contents.json
-        │     │  └─ Contents.json
-        │     ├─ Capabilities.entitlements
         │     └─ TOP_MODULEAppMain.swift
         ├─ TOP_MODULE.xcconfig
         ├─ TOP_MODULE.xcodeproj
@@ -458,15 +458,15 @@ final class SkipCommandTests: XCTestCase {
            │  │  └─ Localizable.xcstrings
            │  └─ Skip
            │     ├─ AndroidManifest.xml
+           │     ├─ Assets.xcassets
+           │     │  ├─ AccentColor.colorset
+           │     │  │  └─ Contents.json
+           │     │  ├─ AppIcon.appiconset
+           │     │  │  └─ Contents.json
+           │     │  └─ Contents.json
+           │     ├─ Capabilities.entitlements
            │     └─ skip.yml
            ├─ M1App
-           │  ├─ Assets.xcassets
-           │  │  ├─ AccentColor.colorset
-           │  │  │  └─ Contents.json
-           │  │  ├─ AppIcon.appiconset
-           │  │  │  └─ Contents.json
-           │  │  └─ Contents.json
-           │  ├─ Capabilities.entitlements
            │  └─ M1AppMain.swift
            ├─ M2
            │  ├─ M2.swift

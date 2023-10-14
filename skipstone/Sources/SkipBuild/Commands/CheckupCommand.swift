@@ -32,7 +32,7 @@ struct CheckupCommand: MessageCommand, ToolOptionsCommand  {
             try FileManager.default.createDirectory(atPath: tmpdir, withIntermediateDirectories: true)
 
             // create a project differently based on the index, but the ultimate binary output should be identical
-            return try await buildSkipProject(projectName: "hello-skip", modules: [PackageModule(parse: "HelloSkip"), PackageModule(parse: "HelloModel"), PackageModule(parse: "HelloCore")], resourceFolder: "Resources", dir: tmpdir, configuration: self.configuration, build: primary, test: primary, returnHashes: doubleCheck, messagePrefix: !primary ? "Re-" : "", showTree: false, chain: true, free: true, zero: true, appid: "skip.hello.App", version: "1.0.0", moduleTests: primary, validatePackage: true, packageResolved: packageResolvedURL, apk: true, ipa: true, with: out)
+            return try await buildSkipProject(projectName: "hello-skip", modules: [PackageModule(parse: "HelloSkip"), PackageModule(parse: "HelloModel"), PackageModule(parse: "HelloCore")], resourceFolder: "Resources", dir: tmpdir, configuration: self.configuration, build: primary, test: primary, returnHashes: doubleCheck, messagePrefix: !primary ? "Re-" : "", showTree: false, chain: true, gitRepo: false, free: true, zero: true, appid: "skip.hello.App", version: "1.0.0", moduleTests: primary, validatePackage: true, packageResolved: packageResolvedURL, apk: true, ipa: true, with: out)
         }
 
         // build a sample project (twice when performing a double-check)

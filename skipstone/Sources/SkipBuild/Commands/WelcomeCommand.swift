@@ -41,8 +41,7 @@ struct WelcomeCommand: SkipCommand, SingleStreamingCommand {
 
             Run "skip doctor" to check system requirements.
             Run "skip checkup" to perform a full system evaluation.
-            Run "skip lib init lib-name ModuleName" to create a new Skip library.
-            Run "skip app init --open AppName" to create a new Skip Xcode project.
+            Start with "skip init --open-xcode --appid=bundle.id project-name HelloSkip"
 
             Visit https://skip.tools for documentation, samples, and FAQs.
 

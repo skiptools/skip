@@ -68,6 +68,9 @@ struct CreateOptions : ParsableArguments {
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Add SKIP_ZERO environment check to Package.swift", valueName: "zero"))
     var zero: Bool = true
 
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Create a local git repository for the app", valueName: "create"))
+    var gitRepo: Bool = false
+
     @Flag(help: ArgumentHelp("Create package in free mode", valueName: "free"))
     var free: Bool = false
 
