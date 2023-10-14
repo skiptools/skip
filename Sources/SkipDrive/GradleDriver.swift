@@ -80,7 +80,7 @@ public struct GradleDriver {
     }
 
     /// Executes `gradle` with the current default arguments and the additional args and returns an async stream of the lines from the combined standard err and standard out.
-    public func execGradle(in workingDirectory: URL, args: [String], env: [String: String] = [:], onExit: @escaping (ProcessResult) throws -> ()) async throws -> Process.AsyncLineOutput {
+    public func execGradle(in workingDirectory: URL, args: [String], env: [String: String] = ProcessInfo.processInfo.environmentWithDefaultToolPaths, onExit: @escaping (ProcessResult) throws -> ()) async throws -> Process.AsyncLineOutput {
         // the resulting command will be something like:
         // java -Xmx64m -Xms64m -Dorg.gradle.appname=gradle -classpath /opt/homebrew/Cellar/gradle/8.0.2/libexec/lib/gradle-launcher-8.0.2.jar org.gradle.launcher.GradleMain info
         #if DEBUG
@@ -88,12 +88,7 @@ public struct GradleDriver {
         print("execGradle:", env.keys.sorted().map { $0 + "=\"" + env[$0, default: ""] + "\"" }.joined(separator: " "), (gradleArgs + args).joined(separator: " "))
         #endif
 
-        // transfer process environment along with the additional environment
-        var penv = ProcessInfo.processInfo.environment
-        for (key, value) in env {
-            penv[key] = value
-        }
-        return Process.streamLines(command: gradleArgs + args, environment: penv, workingDirectory: workingDirectory, onExit: onExit)
+        return Process.streamLines(command: gradleArgs + args, environment: env, workingDirectory: workingDirectory, onExit: onExit)
     }
 
     /// Invokes the given target for a gradle project.
@@ -594,4 +589,24 @@ public enum GradleDriverError : Error, LocalizedError {
         }
     }
 }
+
+extension ProcessInfo {
+    /// The current process environment along with the default paths to various tools set
+    public var environmentWithDefaultToolPaths: [String: String] {
+        var env = self.environment
+        let ANDROID_HOME = "ANDROID_HOME"
+        if env[ANDROID_HOME] == nil {
+            #if os(macOS)
+            env[ANDROID_HOME] = ("~/Library/Android/sdk" as NSString).expandingTildeInPath
+            #elseif os(Windows)
+            env[ANDROID_HOME] = ("~/AppData/Local/Android/Sdk" as NSString).expandingTildeInPath
+            #elseif os(Linux)
+            env[ANDROID_HOME] = ("~/Android/Sdk" as NSString).expandingTildeInPath
+            #endif
+        }
+        return env
+    }
+}
+
+
 #endif
