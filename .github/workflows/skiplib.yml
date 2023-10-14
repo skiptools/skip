@@ -15,7 +15,7 @@ jobs:
         run: |
           xcodebuild test -jobs 1 -sdk iphonesimulator -destination "platform=iOS Simulator,name=iPhone 14" -skipPackagePluginValidation -configuration debug -scheme $(basename $PWD)
       - name: Test Local
-        run: skip test --plain
+        run: skip test || skip test --verbose
       - name: Setup Android
         run: |
           PACKAGE=$(swift package dump-package | jq -r '.name')
