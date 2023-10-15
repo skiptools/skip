@@ -245,6 +245,10 @@ struct Modifiers: PrettyPrintable, Codable {
     var isOverride: Bool
     var isLazy: Bool
     var isNonisolated: Bool
+    
+    private enum CodingKeys: String, CodingKey {
+        case visibility = "v", setVisibility = "sv", isStatic = "s", isMutating = "m", isFinal = "f", isOverride = "o", isLazy = "l", isNonisolated = "n"
+    }
 
     init(visibility: Visibility = .default, setVisibility: Visibility = .default, isStatic: Bool = false, isMutating: Bool = false, isFinal: Bool = false, isOverride: Bool = false, isLazy: Bool = false, isNonisolated: Bool = false) {
         self.visibility = visibility
@@ -367,6 +371,10 @@ struct Attributes: Hashable, PrettyPrintable, Codable {
         self.attributes = attributes
     }
 
+    private enum CodingKeys: String, CodingKey {
+        case attributes = "a"
+    }
+
     /// Decode the attribute information in the given syntax.
     static func `for`(syntax: AttributeListSyntax?, in syntaxTree: SyntaxTree) -> Attributes {
         guard let syntax else {
@@ -464,6 +472,10 @@ struct Attributes: Hashable, PrettyPrintable, Codable {
 struct Attribute: Hashable, Codable {
     let signature: TypeSignature
     var tokens: [String] = []
+
+    private enum CodingKeys: String, CodingKey {
+        case signature = "s", tokens = "t"
+    }
 
     /// Decode the attribute information in the given syntax.
     static func `for`(syntax: AttributeSyntax, in syntaxTree: SyntaxTree) -> Attribute? {
@@ -672,6 +684,10 @@ struct Generics: Equatable, Codable {
         self.entries = entries
     }
 
+    private enum CodingKeys: String, CodingKey {
+        case entries = "e"
+    }
+
     init(_ names: [TypeSignature], whereEqual: [TypeSignature]? = nil) {
         if let whereEqual {
             self.entries = zip(names, whereEqual).map { Generic(name: $0.0.name, whereEqual: $0.1) }
@@ -859,6 +875,10 @@ struct Generic: Equatable, Codable {
     var name: String
     var inherits: [TypeSignature] = []
     var whereEqual: TypeSignature?
+
+    private enum CodingKeys: String, CodingKey {
+        case name = "n", inherits = "i", whereEqual = "w"
+    }
 
     /// Return this generic as a named type, e.g. `.named(T, [])`.
     var namedType: TypeSignature {

@@ -1,11 +1,9 @@
-/// Codable information about the codebase used in type inference and translation.
-public class CodebaseInfo: Codable {
+/// Information about the codebase used in type inference and translation.
+public class CodebaseInfo {
     /// The current module name.
     public let moduleName: String?
 
     /// Target language helper.
-    ///
-    /// - Note: Language additions are not coded.
     var languageAdditions: CodebaseInfoLanguageAdditions?
     
     /// Supply the current module name.
@@ -13,10 +11,10 @@ public class CodebaseInfo: Codable {
         self.moduleName = moduleName
     }
     
-    /// Set dependct modules codebase info.
+    /// Exported information from dependent modules.
     ///
-    /// - Note: Dependency codebase info is not encoded.
-    public var dependentModules: [CodebaseInfo] = [] {
+    /// - Seealso: `ModuleExport`
+    public var dependentModules: [ModuleExport] = [] {
         didSet {
             assert(!isInUse)
         }
@@ -88,17 +86,9 @@ public class CodebaseInfo: Codable {
     ///
     /// - Warning: Codebase info should not be used until this has been called. After calling this function, do not mutate info.
     func prepareForUse() {
-        // We may have had `gather` called in any order as source files were processed. We want to always produce the same encoded output
-        // for the same input, because new output from one module might be a signal that modules depending on it have to re-transpile. Sort
-        // as if the files were processed in alphabetical order
-        let sortBy: (CodebaseInfoItem, CodebaseInfoItem) -> Bool = { ($0.sourceFile?.path ?? "") < ($1.sourceFile?.path ?? "") }
-        rootTypes = rootTypes.sorted(by: sortBy)
-        rootTypealiases = rootTypealiases.sorted(by: sortBy)
-        rootVariables = rootVariables.sorted(by: sortBy)
-        rootFunctions = rootFunctions.sorted(by: sortBy)
-        rootExtensions = rootExtensions.sorted(by: sortBy)
-
         isInUse = true
+        dependentModules.forEach { $0.prepareForUse() }
+
         buildItemsByName() // We use this for lookups in subsequent steps
         inferVariableTypes() // May need variable types to match signatures to protocol generics
         resolveTypeSignatures()
@@ -107,6 +97,7 @@ public class CodebaseInfo: Codable {
         addGeneratedRawValues()
         addMainActorFlags()
         buildItemsByName() // Final mappings after updates
+
         languageAdditions?.prepareForUse(codebaseInfo: self)
     }
     
@@ -922,49 +913,35 @@ public class CodebaseInfo: Codable {
     private var isInUse = false
     private var typeInferenceTrees: [Source.FilePath: SyntaxTree] = [:]
     
-    private enum CodingKeys: String, CodingKey {
-        // Only encode moduleName and root infos
-        case moduleName, rootTypes, rootTypealiases, rootVariables, rootFunctions, rootExtensions
-    }
-    
     private func buildItemsByName() {
         var itemsByName: [String: [CodebaseInfoItem]] = [:]
-        Self.addCodebaseInfo(self, to: &itemsByName)
-        dependentModules.forEach { Self.addCodebaseInfo($0, to: &itemsByName, publicOnly: true) }
+        rootTypes.forEach { Self.addTypeInfo($0, to: &itemsByName) }
+        rootExtensions.forEach { Self.addTypeInfo($0, to: &itemsByName) }
+        rootTypealiases.forEach { Self.addItem($0, to: &itemsByName) }
+        rootVariables.forEach { Self.addItem($0, to: &itemsByName) }
+        rootFunctions.forEach { Self.addItem($0, to: &itemsByName) }
+        dependentModules.forEach { Self.addModuleExport($0, to: &itemsByName) }
         self.itemsByName = itemsByName
     }
     
-    private static func addCodebaseInfo(_ info: CodebaseInfo, to itemsByName: inout [String: [CodebaseInfoItem]], publicOnly: Bool = false) {
-        info.rootTypes.forEach { addTypeInfo($0, to: &itemsByName, publicOnly: publicOnly) }
-        info.rootExtensions.forEach { addTypeInfo($0, to: &itemsByName, publicOnly: publicOnly) }
-        let rootItems: [CodebaseInfoItem] = info.rootTypealiases + info.rootVariables + info.rootFunctions
-        rootItems.forEach { addItem($0, to: &itemsByName, publicOnly: publicOnly) }
+    private static func addModuleExport(_ export: ModuleExport, to itemsByName: inout [String: [CodebaseInfoItem]]) {
+        export.rootTypes.forEach { Self.addTypeInfo($0, to: &itemsByName) }
+        export.rootExtensions.forEach { Self.addTypeInfo($0, to: &itemsByName) }
+        export.rootTypealiases.forEach { Self.addItem($0, to: &itemsByName) }
+        export.rootVariables.forEach { Self.addItem($0, to: &itemsByName) }
+        export.rootFunctions.forEach { Self.addItem($0, to: &itemsByName) }
     }
     
-    private static func addTypeInfo(_ typeInfo: TypeInfo, to itemsByName: inout [String: [CodebaseInfoItem]], publicOnly: Bool) {
-        if publicOnly {
-            guard typeInfo.modifiers.visibility == .public || typeInfo.modifiers.visibility == .open || typeInfo.declarationType == .extensionDeclaration else {
-                return
-            }
-            typeInfo.types = typeInfo.types.filter { $0.modifiers.visibility == .public || $0.modifiers.visibility == .open }
-            typeInfo.typealiases = typeInfo.typealiases.filter { $0.modifiers.visibility == .public || $0.modifiers.visibility == .open }
-            typeInfo.variables = typeInfo.variables.filter { $0.modifiers.visibility == .public || $0.modifiers.visibility == .open }
-            typeInfo.functions = typeInfo.functions.filter { $0.modifiers.visibility == .public || $0.modifiers.visibility == .open }
-            // If this was an extension that is now empty, don't add it
-            guard typeInfo.declarationType != .extensionDeclaration || !typeInfo.types.isEmpty || !typeInfo.typealiases.isEmpty || !typeInfo.variables.isEmpty || !typeInfo.functions.isEmpty else {
-                return
-            }
-        }
-        addItem(typeInfo, to: &itemsByName, publicOnly: false) // Already filtered
-        typeInfo.types.forEach { addTypeInfo($0, to: &itemsByName, publicOnly: publicOnly) }
-        let items: [CodebaseInfoItem] = typeInfo.typealiases + typeInfo.cases + typeInfo.variables + typeInfo.functions
-        items.forEach { addItem($0, to: &itemsByName, publicOnly: false) } // Already filtered
+    fileprivate static func addTypeInfo(_ typeInfo: TypeInfo, to itemsByName: inout [String: [CodebaseInfoItem]]) {
+        addItem(typeInfo, to: &itemsByName) // Already filtered
+        typeInfo.types.forEach { addTypeInfo($0, to: &itemsByName) }
+        typeInfo.typealiases.forEach { addItem($0, to: &itemsByName) }
+        typeInfo.cases.forEach { addItem($0, to: &itemsByName) }
+        typeInfo.variables.forEach { addItem($0, to: &itemsByName) }
+        typeInfo.functions.forEach { addItem($0, to: &itemsByName) }
     }
     
-    private static func addItem(_ item: CodebaseInfoItem, to itemsByName: inout [String: [CodebaseInfoItem]], publicOnly: Bool) {
-        guard !publicOnly || item.modifiers.visibility == .public || item.modifiers.visibility == .open else {
-            return
-        }
+    fileprivate static func addItem(_ item: CodebaseInfoItem, to itemsByName: inout [String: [CodebaseInfoItem]]) {
         var itemsWithName = itemsByName[item.name, default: []]
         itemsWithName.append(item)
         itemsByName[item.name] = itemsWithName
@@ -1226,6 +1203,102 @@ public class CodebaseInfo: Codable {
         for i in 0..<rootExtensions.count { rootExtensions[i].addMainActorMemberFlags(codebaseInfo: self) }
     }
 
+    public class ModuleExport: Codable {
+        public let moduleName: String?
+
+        // Default visibility for testing
+        var rootTypes: [TypeInfo] = []
+        var rootTypealiases: [TypealiasInfo] = []
+        var rootVariables: [VariableInfo] = []
+        var rootFunctions: [FunctionInfo] = []
+        var rootExtensions: [TypeInfo] = []
+
+        private var sourceFileTable: [String] = []
+        private var sourceFileMapping: [String: Int] = [:]
+        private var isPrepared = false
+
+        private enum CodingKeys: String, CodingKey {
+            case moduleName = "m", rootTypes = "t", rootTypealiases = "a", rootVariables = "v", rootFunctions = "f", rootExtensions = "e", sourceFileTable = "stable"
+        }
+
+        public init(of codebaseInfo: CodebaseInfo) {
+            self.moduleName = codebaseInfo.moduleName
+
+            // We want to always produce the same encoded output for the same input, because new output from one module might be a signal
+            // that modules depending on it have to re-transpile. Sort for stability. API within a file will always have been added in the
+            // same order, so we only need to sort by file
+            let sortBy: (CodebaseInfoItem, CodebaseInfoItem) -> Bool = { ($0.sourceFile?.path ?? "") < ($1.sourceFile?.path ?? "") }
+            let filter: (CodebaseInfoItem) -> Bool = { $0.modifiers.visibility == .public || $0.modifiers.visibility == .open || $0.declarationType == .extensionDeclaration }
+            
+            // Sort types before applying `export` so that the source file table that export builds is in stable order
+            self.rootTypes = codebaseInfo.rootTypes.sorted(by: sortBy).compactMap { export(typeInfo: $0, filter: filter) }
+            self.rootTypealiases = codebaseInfo.rootTypealiases.sorted(by: sortBy).filter(filter).map { replaceSourceFile(for: $0) }
+            self.rootVariables = codebaseInfo.rootVariables.sorted(by: sortBy).filter(filter).map { replaceSourceFile(for: $0) }
+            self.rootFunctions = codebaseInfo.rootFunctions.sorted(by: sortBy).filter(filter).map { replaceSourceFile(for: $0) }
+            self.rootExtensions = codebaseInfo.rootExtensions.sorted(by: sortBy).compactMap { export(typeInfo: $0, filter: filter) }
+        }
+
+        private func export(typeInfo: TypeInfo, filter: (CodebaseInfoItem) -> Bool) -> TypeInfo? {
+            guard filter(typeInfo) else {
+                return nil
+            }
+            
+            let copy = replaceSourceFile(for: TypeInfo(copy: typeInfo))
+            copy.types = copy.types.compactMap { export(typeInfo: $0, filter: filter) }
+            copy.typealiases = copy.typealiases.filter(filter).map { replaceSourceFile(for: $0) }
+            copy.variables = copy.variables.filter(filter).map { replaceSourceFile(for: $0) }
+            copy.functions = copy.functions.filter(filter).map { replaceSourceFile(for: $0) }
+            // If this was an extension that is now empty, don't add it
+            guard copy.declarationType != .extensionDeclaration || !copy.types.isEmpty || !copy.typealiases.isEmpty || !copy.variables.isEmpty || !copy.functions.isEmpty else {
+                return nil
+            }
+            return copy
+        }
+
+        func prepareForUse() {
+            rootTypes.forEach { prepareForUse(typeInfo: $0) }
+            rootTypealiases = rootTypealiases.map { repopulateSourceFile(for: $0) }
+            rootVariables = rootVariables.map { repopulateSourceFile(for: $0) }
+            rootFunctions = rootFunctions.map { repopulateSourceFile(for: $0) }
+            rootExtensions.forEach { prepareForUse(typeInfo: $0) }
+        }
+
+        private func prepareForUse(typeInfo: TypeInfo) {
+            let typeInfo = repopulateSourceFile(for: typeInfo)
+            typeInfo.types.forEach { prepareForUse(typeInfo: $0) }
+            typeInfo.typealiases = typeInfo.typealiases.map { repopulateSourceFile(for: $0) }
+            typeInfo.variables = typeInfo.variables.map { repopulateSourceFile(for: $0) }
+            typeInfo.functions = typeInfo.functions.map { repopulateSourceFile(for: $0) }
+        }
+
+        private func replaceSourceFile<T>(for item: T) -> T where T: CodebaseInfoItem {
+            guard item.sourceFileID == nil, let sourceFile = item.sourceFile else {
+                return item
+            }
+            var item = item
+            if let sid = sourceFileMapping[sourceFile.path] {
+                item.sourceFileID = sid
+            } else {
+                let sid = sourceFileTable.count
+                sourceFileTable.append(sourceFile.path)
+
+                sourceFileMapping[sourceFile.path] = sid
+                item.sourceFileID = sid
+            }
+            return item
+        }
+
+        private func repopulateSourceFile<T>(for item: T) -> T where T: CodebaseInfoItem {
+            guard item.sourceFile == nil, let sid = item.sourceFileID, sid >= 0 && sid < sourceFileTable.count else {
+                return item
+            }
+
+            var populatedItem = item
+            populatedItem.sourceFile = Source.FilePath(path: sourceFileTable[sid])
+            return populatedItem
+        }
+    }
+
     /// Information about a declared type.
     ///
     /// - Note: Unlike the other `CodebaseInfoItem` datastructures, types are modeled as `class` instances so that we can mutate them in place.
@@ -1234,7 +1307,8 @@ public class CodebaseInfo: Codable {
         let declarationType: StatementType
         var signature: TypeSignature
         let moduleName: String?
-        let sourceFile: Source.FilePath?
+        var sourceFile: Source.FilePath?
+        var sourceFileID: Int?
         let declaringType: TypeSignature?
         let modifiers: Modifiers
         let attributes: Attributes
@@ -1306,7 +1380,7 @@ public class CodebaseInfo: Codable {
 
         private enum CodingKeys: String, CodingKey {
             // Exclude language additions, importedModuleNames
-            case name, declarationType, signature, moduleName, sourceFile, declaringType, modifiers, attributes, availability, apiFlags, generics, inherits, types, typealiases, cases, variables, functions, subscripts
+            case name = "n", declarationType = "t", signature = "s", moduleName = "m", sourceFileID = "sid", declaringType = "d", modifiers = "z", attributes = "a", availability = "v", apiFlags = "f", generics = "g", inherits = "i", types = "mt", typealiases = "ma", cases = "mc", variables = "mv", functions = "mf", subscripts = "ms"
         }
 
         fileprivate init(statement: TypeDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo, syntaxTree: SyntaxTree) {
@@ -1345,6 +1419,28 @@ public class CodebaseInfo: Codable {
             self.inherits = statement.inherits
             addMembers(statement.members, codebaseInfo: codebaseInfo, syntaxTree: syntaxTree)
             (codebaseInfo.languageAdditions as? CodebaseInfoLanguageAdditionsGatherDelegate)?.codebaseInfo(codebaseInfo, didGather: self, from: statement, syntaxTree: syntaxTree)
+        }
+
+        fileprivate init(copy: TypeInfo) {
+            self.name = copy.name
+            self.declarationType = copy.declarationType
+            self.signature = copy.signature
+            self.moduleName = copy.moduleName
+            self.sourceFile = copy.sourceFile
+            self.declaringType = copy.declaringType
+            self.modifiers = copy.modifiers
+            self.attributes = copy.attributes
+            self.availability = copy.availability
+            self.apiFlags = copy.apiFlags
+            self.importedModuleNames = copy.importedModuleNames
+            self.generics = copy.generics
+            self.inherits = copy.inherits
+            self.types = copy.types
+            self.typealiases = copy.typealiases
+            self.cases = copy.cases
+            self.variables = copy.variables
+            self.functions = copy.functions
+            self.subscripts = copy.subscripts
         }
 
         fileprivate var needsVariableTypeInference: Bool {
@@ -1518,7 +1614,8 @@ public class CodebaseInfo: Codable {
         }
         var signature: TypeSignature
         let moduleName: String?
-        let sourceFile: Source.FilePath?
+        var sourceFile: Source.FilePath?
+        var sourceFileID: Int?
         let declaringType: TypeSignature?
         let modifiers: Modifiers
         let attributes: Attributes
@@ -1537,7 +1634,7 @@ public class CodebaseInfo: Codable {
 
         private enum CodingKeys: String, CodingKey {
             // Exclude value expression, language additions, importedModuleNames
-            case name, signature, moduleName, sourceFile, declaringType, modifiers, attributes, availability, apiFlags, isInitializable, hasValue, isGenerated
+            case name = "n", signature = "s", moduleName = "m", sourceFileID = "sid", declaringType = "d", modifiers = "z", attributes = "a", availability = "v", apiFlags = "f", isInitializable = "init", hasValue = "val", isGenerated = "gen"
         }
 
         fileprivate init(statement: VariableDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo, syntaxTree: SyntaxTree) {
@@ -1623,6 +1720,7 @@ public class CodebaseInfo: Codable {
         var signature: TypeSignature
         var moduleName: String?
         var sourceFile: Source.FilePath?
+        var sourceFileID: Int?
         var declaringType: TypeSignature?
         let modifiers: Modifiers
         let attributes: Attributes
@@ -1642,7 +1740,7 @@ public class CodebaseInfo: Codable {
 
         private enum CodingKeys: String, CodingKey {
             // Exclude language additions, importedModuleNames
-            case name, declarationType, signature, moduleName, sourceFile, declaringType, modifiers, attributes, availability, generics, isMutating, isGenerated
+            case name = "n", declarationType = "t", signature = "s", moduleName = "m", sourceFileID = "sid", declaringType = "d", modifiers = "z", attributes = "a", availability = "v", generics = "g", isMutating = "mut", isGenerated = "gen"
         }
 
         fileprivate init(statement: FunctionDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo, syntaxTree: SyntaxTree) {
@@ -1700,6 +1798,7 @@ public class CodebaseInfo: Codable {
         var signature: TypeSignature
         var moduleName: String?
         var sourceFile: Source.FilePath?
+        var sourceFileID: Int?
         var declaringType: TypeSignature?
         let modifiers: Modifiers
         let attributes: Attributes
@@ -1718,7 +1817,7 @@ public class CodebaseInfo: Codable {
 
         private enum CodingKeys: String, CodingKey {
             // Exclude language additions, importedModuleNames
-            case signature, moduleName, sourceFile, declaringType, modifiers, attributes, availability, generics, isReadOnly
+            case signature = "s", moduleName = "m", sourceFileID = "sid", declaringType = "d", modifiers = "z", attributes = "a", availability = "v", generics = "g", isReadOnly = "ro"
         }
 
         fileprivate init(statement: SubscriptDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo, syntaxTree: SyntaxTree) {
@@ -1757,7 +1856,8 @@ public class CodebaseInfo: Codable {
         }
         var signature: TypeSignature
         let moduleName: String?
-        let sourceFile: Source.FilePath?
+        var sourceFile: Source.FilePath?
+        var sourceFileID: Int?
         let declaringType: TypeSignature?
         let modifiers: Modifiers
         let attributes: Attributes
@@ -1776,7 +1876,7 @@ public class CodebaseInfo: Codable {
 
         private enum CodingKeys: String, CodingKey {
             // Exclude language additions, importedModuleNames
-            case name, signature, moduleName, sourceFile, declaringType, modifiers, attributes, availability, generics, targetSignature
+            case name = "n", signature = "s", moduleName = "m", sourceFileID = "sid", declaringType = "d", modifiers = "z", attributes = "a", availability = "v", generics = "g", targetSignature = "tar"
         }
 
         fileprivate init(statement: TypealiasDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo, syntaxTree: SyntaxTree) {
@@ -1808,7 +1908,8 @@ public class CodebaseInfo: Codable {
         }
         var signature: TypeSignature // Owning enum or a function returning the owning enum
         let moduleName: String?
-        let sourceFile: Source.FilePath?
+        var sourceFile: Source.FilePath?
+        var sourceFileID: Int?
         let declaringType: TypeSignature?
         let modifiers: Modifiers
         let attributes: Attributes
@@ -1824,7 +1925,7 @@ public class CodebaseInfo: Codable {
 
         private enum CodingKeys: String, CodingKey {
             // Exclude language additions, importedModuleNames
-            case name, signature, moduleName, sourceFile, declaringType, modifiers, attributes, availability
+            case name = "n", signature = "s", moduleName = "m", sourceFileID = "sid", declaringType = "d", modifiers = "z", attributes = "a", availability = "v"
         }
 
         fileprivate init(statement: EnumCaseDeclaration, in declaringType: TypeSignature? = nil, codebaseInfo: CodebaseInfo, syntaxTree: SyntaxTree) {
@@ -1852,7 +1953,8 @@ protocol CodebaseInfoItem {
     var declarationType: StatementType { get }
     var signature: TypeSignature { get }
     var moduleName: String? { get }
-    var sourceFile: Source.FilePath? { get }
+    var sourceFile: Source.FilePath? { get set }
+    var sourceFileID: Int? { get set }
     var declaringType: TypeSignature? { get }
     var modifiers: Modifiers { get }
     var attributes: Attributes { get }

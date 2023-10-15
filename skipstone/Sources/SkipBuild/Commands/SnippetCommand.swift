@@ -62,8 +62,8 @@ struct SnippetCommand: SnippetOptionsCommand, StreamingCommand {
             // load each of the specified codebases
             let cbdata = try Data(contentsOf: URL(fileURLWithPath: codebasePath))
             let decoder = JSONDecoder()
-            let cbinfo = try decoder.decode(CodebaseInfo.self, from: cbdata)
-            codebaseInfo.dependentModules.append(cbinfo)
+            let export = try decoder.decode(CodebaseInfo.ModuleExport.self, from: cbdata)
+            codebaseInfo.dependentModules.append(export)
         }
 
         let transpiler = Transpiler(packageName: nil, sourceFiles: sourceFiles, codebaseInfo: codebaseInfo, transformers: builtinKotlinTransformers())

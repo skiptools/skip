@@ -218,7 +218,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         let (baseSkipConfig, mergedSkipConfig, configMap) = try loadSkipConfig(merge: true)
         let transformers: [KotlinTransformer] = try createTransformers(for: baseSkipConfig, with: configMap)
 
-        var dependentCodebaseInfos: [CodebaseInfo] = []
+        var dependentModuleExports: [CodebaseInfo.ModuleExport] = []
 
         let codebaseInfo = try await loadCodebaseInfo() // initialize the codebaseinfo and load DependentModuleName.skipcode.json
 
@@ -258,7 +258,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         // MARK: Transpilation helper functions
 
         /// The relative path for cached codebase info JSON
-        func codebaseInfoPath(forModule moduleName: String) throws -> RelativePath {
+        func moduleExportPath(forModule moduleName: String) throws -> RelativePath {
             try RelativePath(validating: moduleName + skipcodeExtension)
         }
 
@@ -272,25 +272,25 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                     .appending(try RelativePath(validating: relativeLinkPath))
 
 
-                let dependencyCodebaseInfo = linkModuleRoot
+                let dependencyModuleExport = linkModuleRoot
                     .parentDirectory
-                    .appending(try codebaseInfoPath(forModule: linkModuleName))
+                    .appending(try moduleExportPath(forModule: linkModuleName))
 
                 do {
-                    let codebaseLoadStart = Date().timeIntervalSinceReferenceDate
-                    trace("dependencyCodebaseInfo \(dependencyCodebaseInfo): exists \(fs.exists(dependencyCodebaseInfo))")
-                    let cbdata = try inputSource(dependencyCodebaseInfo).withData { Data($0) }
-                    let cbinfo = try decoder.decode(CodebaseInfo.self, from: cbdata)
-                    dependentCodebaseInfos.append(cbinfo)
-                    let codebaseLoadEnd = Date().timeIntervalSinceReferenceDate
-                    info("\(dependencyCodebaseInfo.basename) codebase (\(cbdata.count.byteCount)) loaded (\(Int64((codebaseLoadEnd - codebaseLoadStart) * 1000)) ms) for \(linkModuleName)", sourceFile: dependencyCodebaseInfo.sourceFile)
+                    let exportLoadStart = Date().timeIntervalSinceReferenceDate
+                    trace("dependencyModuleExport \(dependencyModuleExport): exists \(fs.exists(dependencyModuleExport))")
+                    let exportData = try inputSource(dependencyModuleExport).withData { Data($0) }
+                    let export = try decoder.decode(CodebaseInfo.ModuleExport.self, from: exportData)
+                    dependentModuleExports.append(export)
+                    let exportLoadEnd = Date().timeIntervalSinceReferenceDate
+                    info("\(dependencyModuleExport.basename) codebase (\(exportData.count.byteCount)) loaded (\(Int64((exportLoadEnd - exportLoadStart) * 1000)) ms) for \(linkModuleName)", sourceFile: dependencyModuleExport.sourceFile)
                 } catch let e {
-                    throw error("Skip: error loading codebase for \(linkModuleName): \(e.localizedDescription)", sourceFile: dependencyCodebaseInfo.sourceFile)
+                    throw error("Skip: error loading codebase for \(linkModuleName): \(e.localizedDescription)", sourceFile: dependencyModuleExport.sourceFile)
                 }
             }
 
             let codebaseInfo = CodebaseInfo(moduleName: primaryModuleName)
-            codebaseInfo.dependentModules = dependentCodebaseInfos
+            codebaseInfo.dependentModules = dependentModuleExports
             return codebaseInfo
         }
 
@@ -328,8 +328,9 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         }
 
         func saveCodebaseInfo() throws {
-            let outputFilePath = try moduleBasePath.appending(codebaseInfoPath(forModule: primaryModuleName))
-            try writeChanges(tag: "codebase", to: outputFilePath, contents: encoder.encode(codebaseInfo), readOnly: true)
+            let outputFilePath = try moduleBasePath.appending(moduleExportPath(forModule: primaryModuleName))
+            let moduleExport = CodebaseInfo.ModuleExport(of: codebaseInfo)
+            try writeChanges(tag: "codebase", to: outputFilePath, contents: encoder.encode(moduleExport), readOnly: true)
         }
 
         func generateGradle(for sourceModules: [String], with skipConfig: SkipConfig) throws {

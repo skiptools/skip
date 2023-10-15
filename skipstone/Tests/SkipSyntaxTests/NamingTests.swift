@@ -113,7 +113,7 @@ final class NamingTests: XCTestCase {
     }
 
     func testModuleQualifiedNames() async throws {
-        let moduleOne = try codebaseInfo(moduleName: "ModuleOne", swift: """
+        let moduleOne = try CodebaseInfo.ModuleExport(of: codebaseInfo(moduleName: "ModuleOne", swift: """
         public class A {
             public func f() -> Swift.Int {
                 return 0
@@ -122,8 +122,8 @@ final class NamingTests: XCTestCase {
         public func g(i: Swift.Int) -> Swift.Int {
             return 0
         }
-        """)
-        let moduleTwo = try codebaseInfo(moduleName: "ModuleTwo", swift: """
+        """))
+        let moduleTwo = try CodebaseInfo.ModuleExport(of: codebaseInfo(moduleName: "ModuleTwo", swift: """
         public class B {
             public func f() -> Swift.String {
                 return ""
@@ -132,7 +132,7 @@ final class NamingTests: XCTestCase {
         public func g(i: Swift.Int) -> Swift.String {
             return ""
         }
-        """)
+        """))
 
         try await check(dependentModules: [moduleOne, moduleTwo], supportingSwift: """
         extension Int {

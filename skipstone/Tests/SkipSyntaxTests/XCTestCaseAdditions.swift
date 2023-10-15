@@ -25,7 +25,7 @@ extension XCTestCase {
     ///   - packageSupportKotlin: the expected kotlin in the generated package support source file
     ///   - file: the file of the call site, expected to be `#file`
     ///   - line: the line of the call site, expected to be `#line`
-    public func check(expectFailure: Bool = false, expectMessages: Bool = false, compiler: String? = ProcessInfo.processInfo.environment["KOTLINC"], replaceInlineSKIPME: Int? = 1, dependentModules: [CodebaseInfo] = [], supportingSwift: String? = nil, swift: StaticString? = nil, swiftCode: (() throws -> String?)? = nil, kotlin: String, fixup fixupKotlinBlock: ((String) -> (String)) = { $0 }, packageSupportKotlin: String? = nil, transformers: [KotlinTransformer] = builtinKotlinTransformers(), file: StaticString = #file, line: UInt = #line) async throws {
+    public func check(expectFailure: Bool = false, expectMessages: Bool = false, compiler: String? = ProcessInfo.processInfo.environment["KOTLINC"], replaceInlineSKIPME: Int? = 1, dependentModules: [CodebaseInfo.ModuleExport] = [], supportingSwift: String? = nil, swift: StaticString? = nil, swiftCode: (() throws -> String?)? = nil, kotlin: String, fixup fixupKotlinBlock: ((String) -> (String)) = { $0 }, packageSupportKotlin: String? = nil, transformers: [KotlinTransformer] = builtinKotlinTransformers(), file: StaticString = #file, line: UInt = #line) async throws {
 
         func fixup(code: String) -> String {
             var code = fixupKotlinBlock(code)
