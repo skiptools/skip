@@ -87,12 +87,12 @@ extension ToolOptionsCommand {
           exit 0
         fi
 
+        PROJECT=$(basename ${PROJECT_DIR})
         PLUGIN=${BUILD_ROOT}/../../SourcePackages/artifacts/skip/skip/skip.artifactbundle/macos
         PATH=${BUILD_ROOT}/Debug:${PLUGIN}:${PATH}:${HOMEBREW_PREFIX:-/opt/homebrew}/bin
-        PROJECT=$(basename ${PROJECT_DIR})
+        ANDROID_HOME=${ANDROID_HOME:-${HOME}/Library/Android/sdk}
         SRCPKG=${BUILD_ROOT}/../../SourcePackages
         echo "note: Building APK for: ${PROJECT}"
-        export ANDROID_HOME=${ANDROID_HOME:-${HOME}/Library/Android/sdk}
         which skip
         mkdir -p Skip/build/artifacts/
         skip gradle --package "${PROJECT}" --module ${PROJECT_NAME} assemble${CONFIGURATION}
@@ -115,8 +115,11 @@ extension ToolOptionsCommand {
           exit 0
         fi
 
+        PROJECT=$(basename ${PROJECT_DIR})
         PLUGIN=${BUILD_ROOT}/../../SourcePackages/artifacts/skip/skip/skip.artifactbundle/macos
         PATH=${BUILD_ROOT}/Debug:${PLUGIN}:${PATH}:${HOMEBREW_PREFIX:-/opt/homebrew}/bin
+        ANDROID_HOME=${ANDROID_HOME:-${HOME}/Library/Android/sdk}
+
         echo "note: Running skip adb install"
         skip adb install -t -r -d -g Skip/build/artifacts/${PROJECT_NAME}-${CONFIGURATION}.apk
         echo "note: Running skip adb am start-activity"
