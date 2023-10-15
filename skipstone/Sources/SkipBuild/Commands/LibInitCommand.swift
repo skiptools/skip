@@ -552,7 +552,7 @@ extension ToolOptionsCommand {
             // PRODUCT_BUNDLE_IDENTIFIER is the unique id for both the iOS and Android app
             PRODUCT_BUNDLE_IDENTIFIER = \(appid)
 
-            // The semantic version for the app matching the git tag for the release
+            // The semantic version of the app
             MARKETING_VERSION = \(version ?? "0.0.1")
 
             // The build number specifying the internal app version
@@ -940,11 +940,13 @@ extension ToolOptionsCommand {
             }
 
             if returnHashes {
-                await checkFile(ipaURL, with: out, title: "\(re)Checksum Archive") { url in
+                func checkArtifactHash(url: URL) throws -> String {
                     let ipaHash = try url.SHA256Hash()
                     artifactHashes[ipaURL] = ipaHash
                     return "IPA SHA256: \(ipaHash)"
                 }
+
+                await checkFile(ipaURL, with: out, title: "\(re)Checksum Archive", handle: checkArtifactHash)
             }
         }
 
@@ -971,16 +973,34 @@ extension ToolOptionsCommand {
             }
 
             if returnHashes {
-                await checkFile(apkURL, with: out, title: "\(re)Checksum Archive") { url in
+                func checkArtifactHash(url: URL) throws -> String {
                     let apkHash = try url.SHA256Hash()
                     artifactHashes[apkURL] = apkHash
                     return "APK SHA256: \(apkHash)"
                 }
+
+                await checkFile(apkURL, with: out, title: "\(re)Checksum Archive", handle: checkArtifactHash)
             }
         }
 
         if gitRepo == true {
-            func cretateGitRepo(_ url: URL) throws -> String{
+            func cretateGitRepo(url: URL) throws -> String {
+                // create the .gitignore file
+                let gitignore = """
+                .*.swp
+                .DS_Store
+                .build
+                build
+                /Packages
+                xcuserdata/
+                DerivedData/
+                .swiftpm/configuration/registries.json
+                .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
+                .netrc
+
+                """
+
+                try gitignore.write(to: projectURL.appending(path: ".gitignore"), atomically: true, encoding: .utf8)
                 return "Create git repository"
             }
 
