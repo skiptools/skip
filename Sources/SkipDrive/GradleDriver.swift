@@ -80,12 +80,12 @@ public struct GradleDriver {
     }
 
     /// Executes `gradle` with the current default arguments and the additional args and returns an async stream of the lines from the combined standard err and standard out.
-    public func execGradle(in workingDirectory: URL, args: [String], env: [String: String] = ProcessInfo.processInfo.environmentWithDefaultToolPaths, onExit: @escaping (ProcessResult) throws -> ()) async throws -> Process.AsyncLineOutput {
+    public func execGradle(in workingDirectory: URL, args: [String], env: [String: String], onExit: @escaping (ProcessResult) throws -> ()) async throws -> Process.AsyncLineOutput {
         // the resulting command will be something like:
         // java -Xmx64m -Xms64m -Dorg.gradle.appname=gradle -classpath /opt/homebrew/Cellar/gradle/8.0.2/libexec/lib/gradle-launcher-8.0.2.jar org.gradle.launcher.GradleMain info
         #if DEBUG
         // output the launch message in a format that makes it easy to copy and paste the result into the terminal
-        print("execGradle:", env.keys.sorted().map { $0 + "=\"" + env[$0, default: ""] + "\"" }.joined(separator: " "), (gradleArgs + args).joined(separator: " "))
+        print("execGradle:", (gradleArgs + args).joined(separator: " "))
         #endif
 
         return Process.streamLines(command: gradleArgs + args, environment: env, workingDirectory: workingDirectory, onExit: onExit)
@@ -107,7 +107,7 @@ public struct GradleDriver {
     ///   - exitHandler: the exit handler, which may want to permit a process failure in order to have time to parse the tests
     /// - Returns: an array of parsed test suites containing information about the test run
     @available(macOS 13, macCatalyst 16, iOS 16, tvOS 16, watchOS 8, *)
-    public func launchGradleProcess(in workingDirectory: URL, buildFolder: String = ".build", module: String, actions: [String], arguments: [String], environment: [String: String] = ProcessInfo.processInfo.environmentWithDefaultToolPaths, daemon enableDaemon: Bool = true, info infoFlag: Bool = false, quiet quietFlag: Bool = false, plain plainFlag: Bool = true, maxMemory: UInt64? = nil, failFast failFastFlag: Bool = false, noBuildCache noBuildCacheFlag: Bool = false, continue continueFlag: Bool = false, offline offlineFlag: Bool = false, rerunTasks rerunTasksFlag: Bool = true, exitHandler: @escaping (ProcessResult) throws -> ()) async throws -> (output: Process.AsyncLineOutput, result: () throws -> [TestSuite]) {
+    public func launchGradleProcess(in workingDirectory: URL, buildFolder: String = ".build", module: String, actions: [String], arguments: [String], environment: [String: String], daemon enableDaemon: Bool = true, info infoFlag: Bool = false, quiet quietFlag: Bool = false, plain plainFlag: Bool = true, maxMemory: UInt64? = nil, failFast failFastFlag: Bool = false, noBuildCache noBuildCacheFlag: Bool = false, continue continueFlag: Bool = false, offline offlineFlag: Bool = false, rerunTasks rerunTasksFlag: Bool = true, exitHandler: @escaping (ProcessResult) throws -> ()) async throws -> (output: Process.AsyncLineOutput, result: () throws -> [TestSuite]) {
 
         let moduleURL = URL(fileURLWithPath: module, isDirectory: true, relativeTo: workingDirectory)
         if !FileManager.default.fileExists(atPath: moduleURL.path) {

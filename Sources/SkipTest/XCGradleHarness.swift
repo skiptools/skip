@@ -86,7 +86,7 @@ extension XCGradleHarness where Self : XCTestCase {
 
                 var testProcessResult: ProcessResult? = nil
 
-                var env: [String: String] = [:]
+                var env: [String: String] = ProcessInfo.processInfo.environmentWithDefaultToolPaths
                 let quiet: Bool
                 if let deviceID = deviceID {
                     quiet = true // needed for some tests with large output to avoid gRPC max packet size errors
