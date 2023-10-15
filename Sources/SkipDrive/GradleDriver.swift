@@ -80,7 +80,7 @@ public struct GradleDriver {
     }
 
     /// Executes `gradle` with the current default arguments and the additional args and returns an async stream of the lines from the combined standard err and standard out.
-    public func execGradle(in workingDirectory: URL, args: [String], env: [String: String], onExit: @escaping (ProcessResult) throws -> ()) async throws -> Process.AsyncLineOutput {
+    public func execGradle(in workingDirectory: URL, args: [String], env: [String: String] = ProcessInfo.processInfo.environmentWithDefaultToolPaths, onExit: @escaping (ProcessResult) throws -> ()) async throws -> Process.AsyncLineOutput {
         // the resulting command will be something like:
         // java -Xmx64m -Xms64m -Dorg.gradle.appname=gradle -classpath /opt/homebrew/Cellar/gradle/8.0.2/libexec/lib/gradle-launcher-8.0.2.jar org.gradle.launcher.GradleMain info
         #if DEBUG
