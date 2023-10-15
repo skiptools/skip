@@ -14,15 +14,18 @@ extension CodebaseInfo.Context {
     /// Return all extensions of a given type that can move into its definition.
     func moveableExtensions(of type: TypeSignature, in syntaxTree: SyntaxTree) -> [(CodebaseInfo.TypeInfo, ExtensionDeclaration, [[String]])] {
         assert(global.kotlin != nil)
-        return typeInfos(forNamed: type).compactMap { typeInfo in
-            guard let extensionAdditions = typeInfo.languageAdditions as? ExtensionAdditions else {
-                return nil
+        // Sort to always output added extensions in a stable order
+        return typeInfos(forNamed: type)
+            .compactMap { typeInfo in
+                guard let extensionAdditions = typeInfo.languageAdditions as? ExtensionAdditions else {
+                    return nil
+                }
+                guard let extensionDeclaration = extensionAdditions.moveableExtensionDeclaration(codebaseInfo: self, in: syntaxTree) else {
+                    return nil
+                }
+                return (typeInfo, extensionDeclaration, extensionAdditions.importedModulePaths)
             }
-            guard let extensionDeclaration = extensionAdditions.moveableExtensionDeclaration(codebaseInfo: self, in: syntaxTree) else {
-                return nil
-            }
-            return (typeInfo, extensionDeclaration, extensionAdditions.importedModulePaths)
-        }
+            .sorted { ($0.0.sourceFile?.path ?? "") < ($1.0.sourceFile?.path ?? "") }
     }
 
     /// The signatures of all visible constructors of the given type.
