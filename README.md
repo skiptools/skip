@@ -1,30 +1,49 @@
 # Skip
 
-[Skip](https://skip.tools) is a technology for creating dual-platform mobile apps in Swift and SwiftUI. This repository houses the `skip` tool for creating, managing, testing, and packaging Skip projects.
+Skip is a technology for creating dual-platform mobile apps in SwiftUI for both iOS and Android. It consists of two halves:
+
+* **skipstone**: a plugin for Xcode that transpiles Swift source code into Kotlin source code, and SwiftPM projects into Gradle projects
+* **skipstack**: a free and open-source stack of modules that bridges the Foundation and SwiftUI APIs for iOS into their equivalent Kotlin and Compose APIs for Android
+
+Skip facilitates the creation of dual-platform apps for both iPhone and Android devices by transpiling Swift Package Manager modules into equivalent Gradle projects and Kotlin source code. A single project, in a single language (Swift), can be used to create genuinely native Android and iOS apps.
+
+Skip is a work in progress, and currently handles only a subset of the SwiftUI and Foundation APIs. An introductory video can be seen [here](https://www.youtube.com/watch?v=8u4KWvsfOtk), and a showcase of the available components can be previewed [here](https://source.skip.tools/skipapp-playground).  Experimentation with this early technology is welcome – we have forums for both general [discussions](https://source.skip.tools/skip/discussions) as well as specific [issues and bug reports](https://source.skip.tools/skip/issues).
 
 ## Installation
 
-See the Skip product's [Getting Started](https://skip.tools/docs/#getting-started) documentation for system requirements and installation instructions.
+Skip requires a macOS 14 development machine with [Xcode 15](https://developer.apple.com/xcode), [Android Studio 2023](https://developer.android.com/studio), and [Homebrew](https://brew.sh) installed. Install Skip by running the Terminal command:
 
-## Guide
-
-Once installed, the `skip` tool is self-documenting. Use the `help` command to see a full list of other available commands:
-
-```shell
-% skip help
+```
+brew install skiptools/skip/skip
 ```
 
-You can also get help on a particular command. For example, to see details and available options for the `skip doctor` command:
+Ensure that the development prerequisites are satisfied by running:
 
-```shell
-% skip help doctor
+```
+skip checkup
 ```
 
-See the Skip product [documentation](https://skip.tools/docs) for common use cases, including how to use `skip` to [start a Skip app](https://skip.tools/docs/#start-new-app) and [start a dual-platform Skip library](http://skip.tools/docs/#start-new-library).
+If the checkup passes, create a new app project with the command:
+
+```
+skip init --open-xcode --appid=bundle.id project-name HelloSkip
+```
+
+This will create a `project-name/` folder and open the new project in Xcode.
+
+Before the transpiled app can be run, an Android emulator need to be run from `Android Studio.app` by opening the `Virtual Device Manager` from the ellipsis menu of the "Welcome" dialog. From there, "Create Device" (e.g., "Pixel 6") and then "Launch" the emulator. 
+
+Once an Android emulator is running, select and run the `HelloSkipApp` target in Xcode. The SwiftUI app will open in the selected iOS simulator, and at the same time the transpiled app will launch in the currently-running Android emulator. Open the `ContentView.swift` file and make a change and re-run: the app will be re-built and re-run on both platforms simultaneously with your changes. This is the way.
+
+See the Skip product [documentation](https://skip.tools/docs) for further information on the tools and available modules.
 
 ## Known Issues
 
 This section lists known issues with the `skip` tool and associated Xcode plugins.
+
+Skip's architecture relies on recent advances in Xcode and Swift Package Manager. When unexpected issues arise, often the best first step is to clean your Xcode build (Product -> Clean Build Folder) and reset packages (File -> Packages -> Reset Package Caches), 
+
+Common known error conditions are listed below. See the [issues](https://source.skip.tools/skip/issues) list for more details.
 
 - Xcode sometimes reports error messages like the following:
 
