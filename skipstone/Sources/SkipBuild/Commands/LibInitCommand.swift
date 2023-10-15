@@ -791,13 +791,40 @@ extension ToolOptionsCommand {
             \(sourceHeader)import SwiftUI
 
             struct ContentView: View {
+                @AppStorage("setting") var setting = true
+
                 var body: some View {
-                    VStack {
-                        Image(systemName: "heart.fill")
-                            .foregroundStyle(Color.red)
-                        Text("Greetings Skipper!")
+                    TabView {
+                        VStack {
+                            Text("Welcome Skipper!")
+                            Image(systemName: "heart.fill")
+                                .foregroundColor(.red)
+                        }
+                        .font(.largeTitle)
+                        .tabItem { Label("Welcome", systemImage: "heart.fill") }
+
+                        NavigationStack {
+                            List {
+                                ForEach(1..<1_000) { i in
+                                    NavigationLink("Home \\(i)", value: i)
+                                }
+                            }
+                            .navigationTitle("Navigation")
+                            .navigationDestination(for: Int.self) { i in
+                                Text("Destination \\(i)")
+                                    .font(.title)
+                                    .navigationTitle("Navigation \\(i)")
+                            }
+                        }
+                        .tabItem { Label("Home", systemImage: "house.fill") }
+
+                        Form {
+                            Text("Settings")
+                                .font(.largeTitle)
+                            Toggle("Option", isOn: $setting)
+                        }
+                        .tabItem { Label("Settings", systemImage: "gearshape.fill") }
                     }
-                    .font(.largeTitle)
                 }
             }
 
@@ -1399,7 +1426,7 @@ extension ToolOptionsCommand {
         try packageSource.write(to: packageSwiftURL, atomically: true, encoding: .utf8)
 
         // now snapshot the file tree for inclusion in the README
-        let fileTree = try localFileSystem.treeASCIIRepresentation(at: AbsolutePath(validating: projectFolder), hideHiddenFiles: true)
+        let fileTree = try localFileSystem.treeASCIIRepresentation(at: projectFolderURL.absolutePath, hideHiddenFiles: true)
 
         // if we've specified a Package.resolved source file, simply copy it over
         if let packageResolvedURL = packageResolvedURL {
@@ -1412,14 +1439,9 @@ extension ToolOptionsCommand {
         let libREADME = """
         # \(primaryModuleName)
 
-        This is a \(free ? "free " : "")[Skip](https://skip.tools) Swift/Kotlin liobrary project containing the following modules:
+        This is a \(free ? "free " : "")[Skip](https://skip.tools) Swift/Kotlin library project containing the following modules:
 
         \(modules.map(\.moduleName).joined(separator: "\n"))
-
-        ```
-        \(fileTree)
-        ```
-
 
         ## Building
 
