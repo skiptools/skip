@@ -916,4 +916,18 @@ final class TypeInferenceTests: XCTestCase {
         }
         """)
     }
+
+    func testDefaultedClosureFollowedByRequiredClosureParameters() async throws {
+        try await check(supportingSwift: """
+        extension Int {
+            static let zero = 0
+        }
+        func f(a: Int, b: (() -> Void)? = nil, c: () -> Void) -> Int {
+        }
+        """, swift: """
+        let b = f(a: 1) { } == .zero
+        """, kotlin: """
+        internal val b = f(a = 1) {  } == Int.zero
+        """)
+    }
 }

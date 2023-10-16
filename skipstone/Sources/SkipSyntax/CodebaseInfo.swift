@@ -745,11 +745,11 @@ public class CodebaseInfo {
             var argumentIndex = 0
             var totalScore = 0.0
             while argumentIndex < arguments.count {
-                let argument = arguments[argumentIndex]
-                guard let (matchingIndex, score) = matchArgument(argument, to: constrainedParameters, isSubscript: isSubscript, startIndex: parameterIndex) else {
+                guard let (matchingIndex, score) = matchArgument(at: argumentIndex, in: arguments, to: constrainedParameters, isSubscript: isSubscript, startIndex: parameterIndex) else {
                     return nil
                 }
                 // If the parameter type was constrained (i.e. is generic), the argument value will likely be more specific
+                let argument = arguments[argumentIndex]
                 let parameterType: TypeSignature
                 if parameters[matchingIndex].type != constrainedParameters[matchingIndex].type && argument.value != .any {
                     parameterType = argument.value.or(constrainedParameters[matchingIndex].type)
@@ -764,8 +764,7 @@ public class CodebaseInfo {
                 // Greedily consume any variadic arguments
                 if matchingParameter.isVariadic {
                     while argumentIndex < arguments.count {
-                        let argument = arguments[argumentIndex]
-                        if matchArgument(argument, isVariadicContinuation: true, to: constrainedParameters, isSubscript: isSubscript, startIndex: parameterIndex) != nil {
+                        if matchArgument(at: argumentIndex, in: arguments, isVariadicContinuation: true, to: constrainedParameters, isSubscript: isSubscript, startIndex: parameterIndex) != nil {
                             argumentIndex += 1
                             // Model variadic continuation arguments as additional unlabeled parameters
                             var continuationOriginalParameter = parameters[matchingIndex]
@@ -803,9 +802,10 @@ public class CodebaseInfo {
             return FunctionCandidate(match: match, score: totalScore, level: level)
         }
 
-        private func matchArgument(_ argument: LabeledValue<TypeSignature>, isVariadicContinuation: Bool = false, to parameters: [TypeSignature.Parameter], isSubscript: Bool = false, startIndex: Int) -> (index: Int, score: Double)? {
+        private func matchArgument(at argumentIndex: Int, in arguments: [LabeledValue<TypeSignature>], isVariadicContinuation: Bool = false, to parameters: [TypeSignature.Parameter], isSubscript: Bool = false, startIndex: Int) -> (index: Int, score: Double)? {
             // Note: in the algorith below we give an extra point for matching a label (or absence of one), as opposed to
             // being a trailing closure that omits the label
+            let argument = arguments[argumentIndex]
             for (index, parameter) in parameters[startIndex...].enumerated() {
                 if let label = argument.label {
                     if isVariadicContinuation {
@@ -822,7 +822,13 @@ public class CodebaseInfo {
                     if (isVariadicContinuation || parameter.label == nil || isSubscript), let score = argument.value.compatibilityScore(target: parameter.type, codebaseInfo: self) {
                         return (startIndex + index, 1.0 + score)
                     } else if parameter.type.isFunction, let score = argument.value.compatibilityScore(target: parameter.type, codebaseInfo: self) {
-                        return (startIndex + index, score)
+                        if argumentIndex == arguments.count - 1 && startIndex + index < parameters.count - 1 && parameter.hasDefaultValue && parameters[(startIndex + index + 1)...].contains(where: { !$0.hasDefaultValue }) {
+                            // If this trailing closure is the last supplied argument, save it for the next required parameter
+                            // even if it matches this defaulted parameter. Handles the case of a defaulted closure parameter
+                            // followed by a required closure parameter
+                        } else {
+                            return (startIndex + index, score)
+                        }
                     } else if !parameter.hasDefaultValue {
                         return nil
                     }
