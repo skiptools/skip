@@ -1426,7 +1426,7 @@ extension ToolOptionsCommand {
         try packageSource.write(to: packageSwiftURL, atomically: true, encoding: .utf8)
 
         // now snapshot the file tree for inclusion in the README
-        let fileTree = try localFileSystem.treeASCIIRepresentation(at: projectFolderURL.absolutePath, hideHiddenFiles: true)
+        // let fileTree = try localFileSystem.treeASCIIRepresentation(at: projectFolderURL.absolutePath, hideHiddenFiles: true)
 
         // if we've specified a Package.resolved source file, simply copy it over
         if let packageResolvedURL = packageResolvedURL {
