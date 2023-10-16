@@ -177,7 +177,7 @@ sed -I '' 's;.binaryTarget(name: "'${ARTIFACT}'", url:.*);.binaryTarget(name: "'
 git add Package.swift ${README_PATH} ${SKIPDRIVE_VERSION_PATH}
 git add .
 git commit --allow-empty --allow-empty-message -m "Release ${SKIP_VERSION}"
-git tag --sign "${SKIP_VERSION}" -m "Release ${SKIP_VERSION}"
+git tag "${SKIP_VERSION}" -m "Release ${SKIP_VERSION}"
 git push --follow-tags
 
 sed -I '' 's;.package(url: "https://.*/skip.git", from: ".*");.package(url: "https://source.skip.tools/skip.git", from: "'${SKIP_VERSION}'");g' "README.md"
@@ -221,7 +221,7 @@ cd ${SKIPSTONEDIR}
 
 git add "${SKIPSTONE_VERSION_PATH}"
 git commit --allow-empty --allow-empty-message -m "Release ${SKIP_VERSION}"
-git tag --sign "${SKIP_VERSION}" -m "Release ${SKIP_VERSION}"
+git tag "${SKIP_VERSION}" -m "Release ${SKIP_VERSION}"
 git push --follow-tags
 
 # update the homebrew cask with the updated skip command
@@ -234,7 +234,7 @@ sed -I '' "s;sha256 \".*\";sha256 \"${PLUGIN_CHECKSUM}\";g" Casks/skip.rb
 
 git add Casks/skip.rb
 git commit -m "Release ${SKIP_VERSION}" 
-git tag --sign "${SKIP_VERSION}" -m "Release ${SKIP_VERSION}"
+git tag "${SKIP_VERSION}" -m "Release ${SKIP_VERSION}"
 git push --follow-tags
 
 # check that mint can build/install and run the tool
