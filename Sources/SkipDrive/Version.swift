@@ -1,4 +1,4 @@
 // Copyright 2023 Skip
 
 /// The current version of SkipDrive.
-public let skipVersion = "0.6.138"
+public let skipVersion = "0.6.139"
