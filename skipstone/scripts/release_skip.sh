@@ -55,7 +55,33 @@ SKIPBREWDIR="../homebrew-skip"
 # once we get this repo sync'd, we can rely on both tags being the same
 cd ${SKIPPKGDIR}
 SKIP_VERSION_OLD=$(git tag -l --sort=-version:refname | grep '[0-9]*\.[0-9]*\.[0-9]*' | head -n 1)
-SKIP_VERSION=$(semver bump "${SEMVER_BUMP:-patch}" "${SKIP_VERSION_OLD}")
+
+#SKIP_VERSION=$(semver bump "${SEMVER_BUMP:-patch}" "${SKIP_VERSION_OLD}")
+
+major=$(echo "${SKIP_VERSION_OLD}" | tr '.' '\n' | head -n 1 | tail -n 1)
+minor=$(echo "${SKIP_VERSION_OLD}" | tr '.' '\n' | head -n 2 | tail -n 1)
+patch=$(echo "${SKIP_VERSION_OLD}" | tr '.' '\n' | head -n 3 | tail -n 1)
+
+case "${SEMVER_BUMP:-patch}" in
+    patch)
+        patch=$((patch+1))
+    ;;
+    minor)
+        patch=0
+        minor=$((minor+1))
+    ;;
+    major)
+        patch=0
+        minor=0
+        major=$((major+1))
+    ;;
+    *)
+        echo "Invalid SEMVER_BUMP component: ${SEMVER_BUMP}"
+        return 2
+esac
+
+SKIP_VERSION="${major}.${minor}.${patch}"
+
 cd '-'
 
 echo "Creating release and tagging new skip version: ${SKIP_VERSION}"

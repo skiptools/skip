@@ -963,14 +963,14 @@ extension ToolOptionsCommand {
             await run(with: out, "\(re)Assemble \(ipaURL.lastPathComponent)", ["zip", "-9", "-r", ipaURL.path, archiveAppPayloadURL.lastPathComponent], in: archiveAppPayloadURL.deletingLastPathComponent())
 
             await checkFile(ipaURL, with: out, title: "\(re)Verifying \(ipaURL.lastPathComponent)") { url in
-                try "Verify \(ipaURL.lastPathComponent) \(ByteCountFormatter.string(fromByteCount: Int64(url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0), countStyle: .file))"
+                CheckStatus(status: .pass, message: try "Verify \(ipaURL.lastPathComponent) \(url.fileSizeString)")
             }
 
             if returnHashes {
-                func checkArtifactHash(url: URL) throws -> String {
+                func checkArtifactHash(url: URL) throws -> CheckStatus {
                     let ipaHash = try url.SHA256Hash()
                     artifactHashes[ipaURL] = ipaHash
-                    return "IPA SHA256: \(ipaHash)"
+                    return CheckStatus(status: .pass, message: "IPA SHA256: \(ipaHash)")
                 }
 
                 await checkFile(ipaURL, with: out, title: "\(re)Checksum Archive", handle: checkArtifactHash)
@@ -991,19 +991,21 @@ extension ToolOptionsCommand {
             let outputsPath = gradleProjectDir + "/" + primaryModuleName  + "/" + relativeBuildDir + "/outputs"
 
             // for example: skipapp-playground/.build/plugins/outputs/skipapp-playground/Playground/skipstone/Playground/.build/skipapp-playground/outputs/apk/release/Playground-release.apk
-            let unsigned = "-unsigned" // we do not sign the release builds for reprodocibility, which leads to them having the "-unsigned" suffix
+            let unsigned = configuration == "release" ? "-unsigned" : "" // we do not sign the release builds for reproducibility, which leads to them having the "-unsigned" suffix
+
+            let apkTitle = primaryModuleName + cfgSuffix + ".apk" // the name of the .apk for reporting purposes (don't include the -unsigned)
             let apkPath = outputsPath + "/apk/" + configuration + "/" + primaryModuleName + cfgSuffix + unsigned + ".apk"
             let apkURL = URL(fileURLWithPath: apkPath, isDirectory: false)
 
-            await checkFile(apkURL, with: out, title: "Verify \(apkURL.lastPathComponent)") { url in
-                try "Verify \(apkURL.lastPathComponent) \(ByteCountFormatter.string(fromByteCount: Int64(url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0), countStyle: .file))"
+            await checkFile(apkURL, with: out, title: "Verify \(apkTitle)") { url in
+                return CheckStatus(status: .pass, message: try "Verify \(apkTitle) \(url.fileSizeString)")
             }
 
             if returnHashes {
-                func checkArtifactHash(url: URL) throws -> String {
+                func checkArtifactHash(url: URL) throws -> CheckStatus {
                     let apkHash = try url.SHA256Hash()
                     artifactHashes[apkURL] = apkHash
-                    return "APK SHA256: \(apkHash)"
+                    return CheckStatus(status: .pass, message: "APK SHA256: \(apkHash)")
                 }
 
                 await checkFile(apkURL, with: out, title: "\(re)Checksum Archive", handle: checkArtifactHash)
@@ -1011,7 +1013,7 @@ extension ToolOptionsCommand {
         }
 
         if gitRepo == true {
-            func cretateGitRepo(url: URL) throws -> String {
+            func createGitRepo(url: URL) throws -> CheckStatus {
                 // create the .gitignore file
                 let gitignore = """
                 .*.swp
@@ -1028,10 +1030,10 @@ extension ToolOptionsCommand {
                 """
 
                 try gitignore.write(to: projectURL.appending(path: ".gitignore"), atomically: true, encoding: .utf8)
-                return "Create git repository"
+                return CheckStatus(status: .pass, message: "Create git repository")
             }
 
-            await checkFile(projectURL, with: out, title: "Create git repository", handle: cretateGitRepo)
+            await checkFile(projectURL, with: out, title: "Create git repository", handle: createGitRepo)
         }
 
         if showTree {
@@ -1445,7 +1447,7 @@ extension ToolOptionsCommand {
 
         ## Building
 
-        This project is a Swift Package Manager module that uses the
+        This project is a \(free ? "free " : "")Swift Package Manager module that uses the
         [Skip](https://skip.tools) plugin to transpile Swift into Kotlin.
 
         Building the module requires that Skip be installed using 
@@ -1456,8 +1458,8 @@ extension ToolOptionsCommand {
         ## Testing
 
         The module can be tested using the standard `swift test` command
-        or by running the test target for the macOS desintation in Xcode,
-        which will run the Swift tests as well as the transpiled 
+        or by running the test target for the macOS destination in Xcode,
+        which will run the Swift tests as well as the transpiled
         Kotlin JUnit tests in the Robolectric Android simulation environment.
 
         Parity testing can be performed with `skip test`,
@@ -1531,12 +1533,12 @@ extension ToolOptionsCommand {
 
 extension ToolOptionsCommand {
     /// Perform a monitor check on the given URL
-    func checkFile(_ url: URL, with out: MessageQueue, title: String, handle: @escaping (URL) throws -> String) async {
+    func checkFile(_ url: URL, with out: MessageQueue, title: String, handle: @escaping (URL) throws -> CheckStatus) async {
         await outputOptions.monitor(with: out, title, resultHandler: { result in
             do {
                 if let resultURL = try result?.get() {
-                    let message = try handle(resultURL)
-                    return (result, MessageBlock(status: result?.messageStatusAny, message))
+                    let handleResult = try handle(resultURL)
+                    return (result, MessageBlock(status: handleResult.status, handleResult.message))
                 } else {
                     return (result, nil)
                 }
@@ -1547,6 +1549,12 @@ extension ToolOptionsCommand {
             return url
         }
     }
+
+}
+
+struct CheckStatus {
+    let status: MessageBlock.Status
+    let message: String
 }
 
 struct PackageModule {
@@ -1614,6 +1622,13 @@ struct InitError : LocalizedError {
 }
 
 extension URL {
+    /// Returns a human-readable description of the size of the underlying file for this URL, throwing an error if the file doesn't exist or cannot be accessed
+    var fileSizeString: String {
+        get throws {
+            try ByteCountFormatter.string(fromByteCount: Int64(resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0), countStyle: .file)
+        }
+    }
+
     /// Create the child directory of the given parent
     func append(path: String, create directory: Bool = false) throws -> URL {
         let path = appendingPathComponent(path, isDirectory: directory)
