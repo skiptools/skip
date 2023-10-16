@@ -7,6 +7,8 @@ Skip is a technology for creating dual-platform mobile apps in SwiftUI for both 
 
 Skip facilitates the creation of dual-platform apps for both iPhone and Android devices by transpiling Swift Package Manager modules into equivalent Gradle projects and Kotlin source code. A single project, in a single language (Swift), can be used to create genuinely native apps for both Android and iOS.
 
+![Screenshot](https://assets.skip.tools/skipdev.png)
+
 Skip is a work in progress, and currently handles only a subset of the SwiftUI and Foundation APIs. An introductory video can be seen [here](https://www.youtube.com/watch?v=8u4KWvsfOtk), and a showcase of the available components can be previewed [here](https://source.skip.tools/skipapp-playground).  Experimentation with this early technology is welcome – we have forums for both general [discussions](https://source.skip.tools/skip/discussions) as well as specific [issues and bug reports](https://source.skip.tools/skip/issues).
 
 ## Getting Started
@@ -34,10 +36,6 @@ This will create a `project-name/` folder with a new SwiftPM package containing 
 Xcode will open the new project, but before the transpiled app can be built and launched, an Android emulator needs to be running. Launch `Android Studio.app` and open the `Virtual Device Manager` from the ellipsis menu of the "Welcome" dialog. From there, "Create Device" (e.g., "Pixel 6") and then "Launch" the emulator.
 
 Once the Android emulator is running, select and run the `HelloSkipApp` target in Xcode. You may be prompted by a dialog to affirm that you trust the Skip plugin. Once the build and run action completes, the SwiftUI app will open in the selected iOS simulator, and at the same time the transpiled app will launch in the currently-running Android emulator.
-
-Successfully running the app in both the iOS simulator and Android emulator should look like this:
-
-![Screenshot](https://assets.skip.tools/skipdev.png)
 
 Browse to the `ContentView.swift` file and make a small change and re-run the target: the app will be re-built and re-run on both platforms simultaneously with your changes.
 
