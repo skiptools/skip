@@ -37,9 +37,11 @@ This will create a `project-name/` folder and open the new project in Xcode. For
 skip init --open-xcode --appid=com.xyz.HelloSkip hello-skip HelloSkip
 ```
 
-Before you can build and run the `HelloSkip` app on Android, you must launch an Android emulator. You can launch an emulator from `Android Studio.app` by opening the `Virtual Device Manager` from the ellipsis menu of the "Welcome" dialog. From there, `Create Device` (e.g., "Pixel 6") and then `Launch` the emulator. 
+Before you can build and run the transpiled app on Android, you must launch an Android emulator. You can launch an emulator from `Android Studio.app` by opening the `Virtual Device Manager` from the ellipsis menu of the "Welcome" dialog. From there, `Create Device` (e.g., "Pixel 6") and then `Launch` the emulator. 
 
-Once the Android emulator is running, use Xcode to select your preferred iOS simulator and run the `<AppName>App` target. You may be prompted to affirm that you trust the Skip plugin. Once the build and run action completes, your SwiftUI app will open in the selected iOS simulator, and at the same time the transpiled Android app will launch in the currently-running Android emulator. Browse to the `ContentView.swift` file in Xcode, make a change, and re-run the target: the app will be re-built and re-run on both platforms simultaneously with your changes.
+Once the Android emulator is running, use Xcode to select your preferred iOS simulator and run the `<AppName>App` target. You may be prompted to affirm that you trust the Skip plugin. 
+
+The first build will take some time as it compiles the *skipstack* open source libraries. Once the build and run action completes, your SwiftUI app will open in the selected iOS simulator, and at the same time the transpiled Android app will launch in the currently-running Android emulator. Browse to the `ContentView.swift` file in Xcode, make a change, and re-run the target: the app will be re-built and re-run on both platforms simultaneously with your changes.
 
 See the Skip product [documentation](https://skip.tools/docs) for further information on the tools and available modules.
 
