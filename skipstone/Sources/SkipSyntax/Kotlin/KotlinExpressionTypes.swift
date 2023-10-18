@@ -186,17 +186,7 @@ class KotlinBinaryOperator: KotlinExpression, KotlinSingleStatementVetoing {
         default:
             break
         }
-        if expression.op.precedence == .cast, var castTarget = krhs as? KotlinCastTarget {
-            // Kotlin type erases generics at runtime, so we typically can't use them in casts
-            if let castGenerics = castTarget.generics, !castGenerics.isEmpty {
-                if expression.op.symbol == "is" {
-                    krhs.messages.append(.kotlinGenericCheck(krhs, source: translator.syntaxTree.source))
-                } else if expression.op.symbol != "as!" {
-                    krhs.messages.append(.kotlinGenericCast(krhs, source: translator.syntaxTree.source))
-                }
-            }
-            castTarget.castTargetType = expression.op.symbol == "is" ? .typeErasedTarget : .target
-        }
+        kexpression.processGenericCast(source: translator.syntaxTree.source)
         return kexpression
     }
 
@@ -237,6 +227,29 @@ class KotlinBinaryOperator: KotlinExpression, KotlinSingleStatementVetoing {
         self.lhs = lhs
         self.rhs = rhs
         super.init(type: .binaryOperator, expression: expression)
+    }
+
+    /// Add messages and perform required transformations for attempts to cast to a generic type.
+    ///
+    /// This is automatically called from `decode`, so does not typically have to be invoked explicitly unless
+    /// manually constructing a `KotlinBinaryOperator`.
+    func processGenericCast(source: Source) {
+        guard op.precedence == .cast, var castTarget = rhs as? KotlinCastTarget else {
+            return
+        }
+        castTarget.castTargetType = op.symbol == "is" ? .typeErasedTarget : .target
+        // Kotlin type erases generics at runtime, so we typically can't use them in casts
+        guard let castGenerics = castTarget.generics else {
+            return
+        }
+        guard !castGenerics.allSatisfy({ $0.asOptional(false) == .any || $0.asOptional(false) == .named("AnyHashable", []) }) else {
+            return
+        }
+        if op.symbol == "is" {
+            rhs.messages.append(.kotlinGenericCheck(rhs, source: source))
+        } else if op.symbol != "as!" {
+            rhs.messages.append(.kotlinGenericCast(rhs, source: source))
+        }
     }
 
     override func logicalNegated() -> KotlinExpression {
@@ -506,6 +519,7 @@ struct KotlinCasePattern {
             return (targetVariable, bindingVariables, nil, messages)
         }
         let condition = KotlinBinaryOperator(op: op, lhs: targetVariable?.identifier ?? target, rhs: value, sourceFile: expression.sourceFile, sourceRange: expression.sourceRange)
+        condition.processGenericCast(source: translator.syntaxTree.source)
         return (targetVariable, bindingVariables, condition, messages)
     }
 }
@@ -1933,7 +1947,7 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
                 generics = generics.map { _ in TypeSignature.named("*", []) }
             }
             output.append("<\(generics.map(\.kotlin).joined(separator: ", "))>")
-        } else if castTargetType != .none, let apiMatch, !apiMatch.signature.generics.isEmpty {
+        } else if castTargetType != .none, let apiMatch, apiMatch.declarationType != .enumCaseDeclaration && !apiMatch.signature.generics.isEmpty {
             output.append("<\(Array(repeating: "*", count: apiMatch.signature.generics.count).joined(separator: ", "))>")
         }
         if let apiMatch, apiMatch.declarationType == .variableDeclaration, apiMatch.apiFlags.contains(.viewBuilder) || apiMatch.apiFlags.contains(.async) {

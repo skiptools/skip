@@ -314,6 +314,55 @@ final class SwitchTests: XCTestCase {
         """)
     }
 
+    func testIsAsBindingToTypeErased() async throws {
+        try await check(swift: """
+        {
+            let a: Any
+            switch a {
+            case is Array<Any>:
+                print("Array")
+            default:
+                print("default")
+            }
+        }
+        """, kotlin: """
+        import skip.lib.Array
+
+        {
+            val a: Any
+            when (a) {
+                is Array<*> -> print("Array")
+                else -> print("default")
+            }
+        }
+        """)
+
+        try await check(swift: """
+        {
+            let a: Any
+            switch a {
+            case let arr as Array<Any>:
+                print("Array")
+            default:
+                print("default")
+            }
+        }
+        """, kotlin: """
+        import skip.lib.Array
+
+        {
+            val a: Any
+            when (a) {
+                is Array<*> -> {
+                    val arr = a.sref()
+                    print("Array")
+                }
+                else -> print("default")
+            }
+        }
+        """)
+    }
+
     func testLetBinding() async throws {
         try await check(swift: """
         let i: Int
