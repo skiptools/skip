@@ -429,8 +429,10 @@ final class ErrorHandlingTests: XCTestCase {
             }
 
             companion object {
-                fun error1(): E = Error1Case()
-                fun error2(): E = Error2Case()
+                val error1: E
+                    get() = Error1Case()
+                val error2: E
+                    get() = Error2Case()
             }
         }
         """)
@@ -452,15 +454,17 @@ final class ErrorHandlingTests: XCTestCase {
             }
 
             companion object {
-                fun error1(): E = Error1Case()
-                fun error2(): E = Error2Case()
+                val error1: E
+                    get() = Error1Case()
+                val error2: E
+                    get() = Error2Case()
             }
         }
 
         internal fun E(rawValue: Int): E? {
             return when (rawValue) {
-                2 -> E.error1()
-                3 -> E.error2()
+                2 -> E.error1
+                3 -> E.error2
                 else -> null
             }
         }
@@ -485,8 +489,10 @@ final class ErrorHandlingTests: XCTestCase {
             }
 
             companion object {
-                fun error1(): E = Error1Case()
-                fun error2(): E = Error2Case()
+                val error1: E
+                    get() = Error1Case()
+                val error2: E
+                    get() = Error2Case()
             }
         }
         """)
@@ -508,15 +514,17 @@ final class ErrorHandlingTests: XCTestCase {
             }
 
             companion object {
-                fun error1(): E = Error1Case()
-                fun error2(): E = Error2Case()
+                val error1: E
+                    get() = Error1Case()
+                val error2: E
+                    get() = Error2Case()
             }
         }
 
         internal fun E(rawValue: Int): E? {
             return when (rawValue) {
-                2 -> E.error1()
-                3 -> E.error2()
+                2 -> E.error1
+                3 -> E.error2
                 else -> null
             }
         }

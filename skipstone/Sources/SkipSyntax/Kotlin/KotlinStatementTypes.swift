@@ -1284,12 +1284,20 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
 
     func appendSealedClassFactory(to output: OutputGenerator, forEnum: String, alwaysCreateNewInstances: Bool, indentation: Indentation) {
         output.append(indentation)
-        if associatedValues.isEmpty && !alwaysCreateNewInstances {
+        if associatedValues.isEmpty {
             output.append("val \(caseName ?? name): \(forEnum)")
             enumGenerics.append(to: output, indentation: indentation)
-            output.append(" = \(Self.sealedClassName(for: name))")
-            generics.appendWhere(to: output, indentation: indentation)
-            output.append("()\n")
+            if alwaysCreateNewInstances {
+                output.append("\n")
+                let getterIndentation = indentation.inc()
+                output.append(getterIndentation).append("get() = \(Self.sealedClassName(for: name))")
+                generics.appendWhere(to: output, indentation: getterIndentation)
+                output.append("()\n")
+            } else {
+                output.append(" = \(Self.sealedClassName(for: name))")
+                generics.appendWhere(to: output, indentation: indentation)
+                output.append("()\n")
+            }
         } else {
             output.append("fun ")
             if !generics.isEmpty {

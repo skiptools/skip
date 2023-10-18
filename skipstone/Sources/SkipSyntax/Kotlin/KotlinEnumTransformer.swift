@@ -61,10 +61,9 @@ final class KotlinEnumTransformer: KotlinTransformer {
         allCasesVar.declaredType = .array(classDeclaration.signature)
         allCasesVar.isGenerated = true
 
-        let caseSuffix = classDeclaration.alwaysCreateNewSealedClassInstances ? "()" : ""
         let allCasesList = classDeclaration.members
             .compactMap { $0 as? KotlinEnumCaseDeclaration }
-            .map { $0.name + caseSuffix }
+            .map { $0.name }
             .joined(separator: ", ")
         let statement = KotlinRawStatement(sourceCode: "return arrayOf(\(allCasesList))")
         allCasesVar.getter = Accessor(body: KotlinCodeBlock(statements: [statement]))

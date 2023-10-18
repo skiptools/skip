@@ -568,11 +568,13 @@ final class EnumTests: XCTestCase {
             }
 
             companion object {
-                fun one(): E = OneCase()
-                fun two(): E = TwoCase()
+                val one: E
+                    get() = OneCase()
+                val two: E
+                    get() = TwoCase()
 
                 val allCases: Array<E>
-                    get() = arrayOf(one(), two())
+                    get() = arrayOf(one, two)
             }
         }
         """)

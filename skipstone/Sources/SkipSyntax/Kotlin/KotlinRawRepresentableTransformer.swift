@@ -44,7 +44,6 @@ final class KotlinRawRepresentableTransformer: KotlinTransformer {
         factory.parameters = [Parameter<KotlinExpression>(externalLabel: "rawValue", declaredType: classDeclaration.enumInheritedRawValueType)]
 
         // We create structured expressions rather than raw source because our enum case raw values are stored as expressions
-        let callString = classDeclaration.alwaysCreateNewSealedClassInstances ? "()" : ""
         var cases = classDeclaration.members
             .compactMap { $0 as? KotlinEnumCaseDeclaration }
             .compactMap { (enumCase: KotlinEnumCaseDeclaration) -> KotlinCase? in
@@ -56,7 +55,7 @@ final class KotlinRawRepresentableTransformer: KotlinTransformer {
                     let identifier = KotlinIdentifier(name: classDeclaration.enumInheritedRawValueType.kotlin)
                     rawValue = KotlinFunctionCall(function: identifier, arguments: [LabeledValue(value: rawValue)])
                 }
-                let statement = KotlinRawStatement(sourceCode: "\(classDeclaration.name).\(enumCase.name)\(callString)")
+                let statement = KotlinRawStatement(sourceCode: "\(classDeclaration.name).\(enumCase.name)")
                 return KotlinCase(patterns: [rawValue], body: KotlinCodeBlock(statements: [statement]))
             }
         cases.append(KotlinCase(patterns: [KotlinRawExpression(sourceCode: "else")], body: KotlinCodeBlock(statements: [KotlinRawStatement(sourceCode: "null")])))
