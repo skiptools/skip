@@ -93,10 +93,3 @@ Specific known error conditions are listed below. Search the [documentation](htt
 - Skip may highlight the wrong line in build errors. When Skip surfaces the wrong line number, it is typically only one line off.
 
 
-## Customizing Kotlin
-- #if SKIP blocks
-- // SKIP INSERT statements
-- Including raw Kotlin files in the module's Skip/ folder 
-
-
-
