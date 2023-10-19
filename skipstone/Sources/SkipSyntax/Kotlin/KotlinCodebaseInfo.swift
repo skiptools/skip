@@ -87,25 +87,25 @@ extension CodebaseInfo.Context {
             guard !variableDeclaration.names.isEmpty, let name = variableDeclaration.names[0] else {
                 return false
             }
-            return isKotlinInterfaceMember(name: name, parameters: nil, isStatic: variableDeclaration.modifiers.isStatic, in: type)
+            return isKotlinInterfaceMember(name: name, parameters: nil, isStatic: variableDeclaration.modifiers.isStatic, in: type, includeDeclaringType: false)
         } else if let functionDeclaration = declaration as? FunctionDeclaration {
-            return isKotlinInterfaceMember(name: functionDeclaration.name, parameters: functionDeclaration.functionType.parameters, isStatic: functionDeclaration.modifiers.isStatic, in: type)
+            return isKotlinInterfaceMember(name: functionDeclaration.name, parameters: functionDeclaration.functionType.parameters, isStatic: functionDeclaration.modifiers.isStatic, in: type, includeDeclaringType: false)
         } else if let subscriptDeclaration = declaration as? SubscriptDeclaration {
-            return isKotlinInterfaceMember(name: "subscript", parameters: subscriptDeclaration.getterType.parameters, isStatic: subscriptDeclaration.modifiers.isStatic, in: type)
+            return isKotlinInterfaceMember(name: "subscript", parameters: subscriptDeclaration.getterType.parameters, isStatic: subscriptDeclaration.modifiers.isStatic, in: type, includeDeclaringType: false)
         } else {
             return false
         }
     }
 
     /// Whether the given member is declared by a protocol of the given type.
-    func isKotlinInterfaceMember(name: String, parameters: [TypeSignature.Parameter]?, isStatic: Bool, in owningType: TypeSignature) -> Bool {
+    func isKotlinInterfaceMember(name: String, parameters: [TypeSignature.Parameter]?, isStatic: Bool, in owningType: TypeSignature, includeDeclaringType: Bool = true) -> Bool {
         assert(global.kotlin != nil)
         let protocolSignatures = global.protocolSignatures(forNamed: owningType)
         let parameterLabels = parameters?.map(\.label) ?? []
         let parameterTypes = parameters?.map(\.type) ?? []
         for protocolSignature in protocolSignatures {
             // Exclude protocols that do not translate into Kotlin interfaces
-            guard !protocolSignature.isCustomStringConvertible && !protocolSignature.isEquatable && !protocolSignature.isHashable else {
+            guard (includeDeclaringType || protocolSignature.name != owningType.name), !protocolSignature.isCustomStringConvertible && !protocolSignature.isEquatable && !protocolSignature.isHashable else {
                 continue
             }
             for protocolInfo in typeInfos(forNamed: protocolSignature) {

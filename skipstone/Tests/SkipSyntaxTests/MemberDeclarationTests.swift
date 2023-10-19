@@ -1004,6 +1004,37 @@ final class MemberDeclarationTests: XCTestCase {
         """)
     }
 
+    func testProtocolExtensionOverrideProtocolMember() async throws {
+        try await check(swift: """
+        protocol P {
+            var i: Int { get }
+            func f()
+        }
+        protocol Q: P {
+        }
+        extension Q {
+            var i: Int {
+                return 0
+            }
+
+            func f() {
+            }
+        }
+        """, kotlin: """
+        internal interface P {
+            val i: Int
+            fun f()
+        }
+        internal interface Q: P {
+
+            override val i: Int
+                get() = 0
+
+            override fun f() = Unit
+        }
+        """)
+    }
+
     func testSubscript() async throws {
         try await check(swift: """
         class C {

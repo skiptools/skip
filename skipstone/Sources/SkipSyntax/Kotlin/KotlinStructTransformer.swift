@@ -217,7 +217,7 @@ final class KotlinStructTransformer: KotlinTransformer {
         constructor.isGenerated = true
 
         var bodyStatements: [KotlinStatement] = []
-        bodyStatements.append(KotlinRawStatement(sourceCode: "@Suppress(\"NAME_SHADOWING\") val copy = copy as \(classDeclaration.signature.kotlin)"))
+        bodyStatements.append(KotlinRawStatement(sourceCode: "@Suppress(\"NAME_SHADOWING\", \"UNCHECKED_CAST\") val copy = copy as \(classDeclaration.signature.kotlin)"))
         bodyStatements += variableDeclarations.map { variableDeclaration in
             if variableDeclaration.attributes.contains(.state) || variableDeclaration.attributes.contains(.stateObject) {
                 return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = skip.ui.State(copy.\(variableDeclaration.propertyName))")

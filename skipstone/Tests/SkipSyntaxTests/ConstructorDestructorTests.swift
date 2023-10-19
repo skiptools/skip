@@ -199,7 +199,7 @@ final class ConstructorDestructorTests: XCTestCase {
             }
 
             private constructor(copy: MutableStruct) {
-                @Suppress("NAME_SHADOWING") val copy = copy as B
+                @Suppress("NAME_SHADOWING", "UNCHECKED_CAST") val copy = copy as B
                 this.i = copy.i
             }
 
@@ -757,7 +757,7 @@ final class ConstructorDestructorTests: XCTestCase {
             private constructor(copy: MutableStruct) {
                 suppresssideeffects = true
                 try {
-                    @Suppress("NAME_SHADOWING") val copy = copy as S
+                    @Suppress("NAME_SHADOWING", "UNCHECKED_CAST") val copy = copy as S
                     this.i = copy.i
                     this.a = copy.a
                 } finally {

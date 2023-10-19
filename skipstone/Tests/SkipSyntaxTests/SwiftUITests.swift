@@ -1281,7 +1281,7 @@ final class SwiftUITests: XCTestCase {
             }
 
             private constructor(copy: MutableStruct) {
-                @Suppress("NAME_SHADOWING") val copy = copy as V
+                @Suppress("NAME_SHADOWING", "UNCHECKED_CAST") val copy = copy as V
                 this._count = skip.ui.State(copy.count)
                 this._text = copy._text
                 this.i = copy.i

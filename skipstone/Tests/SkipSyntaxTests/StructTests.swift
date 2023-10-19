@@ -71,7 +71,7 @@ final class StructTests: XCTestCase {
             }
 
             private constructor(copy: MutableStruct) {
-                @Suppress("NAME_SHADOWING") val copy = copy as A
+                @Suppress("NAME_SHADOWING", "UNCHECKED_CAST") val copy = copy as A
                 this.i = copy.i
             }
 
@@ -312,7 +312,7 @@ final class StructTests: XCTestCase {
             }
 
             private constructor(copy: MutableStruct) {
-                @Suppress("NAME_SHADOWING") val copy = copy as Gen<T>
+                @Suppress("NAME_SHADOWING", "UNCHECKED_CAST") val copy = copy as Gen<T>
                 this.name = copy.name
             }
 
@@ -482,7 +482,7 @@ final class StructTests: XCTestCase {
             }
 
             private constructor(copy: MutableStruct) {
-                @Suppress("NAME_SHADOWING") val copy = copy as S
+                @Suppress("NAME_SHADOWING", "UNCHECKED_CAST") val copy = copy as S
                 this.letms = copy.letms
                 this.varms = copy.varms
                 this.letarr = copy.letarr

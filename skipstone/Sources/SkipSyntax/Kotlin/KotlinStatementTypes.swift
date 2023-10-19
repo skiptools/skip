@@ -1653,10 +1653,11 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 if let owningDeclarationPrimaryTypeInfo, modifiers.visibility < owningDeclarationPrimaryTypeInfo.modifiers.visibility {
                     kstatement.messages.append(.kotlinProtocolMemberVisibility(statement, source: translator.syntaxTree.source))
                 }
-            } else {
-                if !kstatement.modifiers.isOverride && translator.codebaseInfo?.isImplementingKotlinInterfaceMember(declaration: statement, in: owningSignature) == true {
-                    kstatement.modifiers.isOverride = true
-                }
+            }
+            if !kstatement.modifiers.isOverride && translator.codebaseInfo?.isImplementingKotlinInterfaceMember(declaration: statement, in: owningSignature) == true {
+                kstatement.modifiers.isOverride = true
+            }
+            if owningDeclarationType != .protocolDeclaration {
                 kstatement.isOpen = !kstatement.modifiers.isOverride && !modifiers.isFinal && modifiers.visibility != .private && owningDeclarationType == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
             }
             // Kotlin does not all you to decrease visibility when overriding a member, so we simply make all overrides public to prevent errors
@@ -2359,6 +2360,9 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 // Kotlin uses default public visibility on all interface members
                 kstatement.modifiers.visibility = .public
                 kstatement.modifiers.setVisibility = .public
+                if !kstatement.modifiers.isOverride && translator.codebaseInfo?.isImplementingKotlinInterfaceMember(declaration: statement, in: owningSignature) == true {
+                    kstatement.modifiers.isOverride = true
+                }
             } else {
                 if kstatement.modifiers.isOverride {
                     kstatement.role = .superclassOverrideProperty
