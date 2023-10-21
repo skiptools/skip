@@ -269,24 +269,39 @@ final class CodableTests: XCTestCase {
         try await check(swift: """
         struct S: Codable {
             let a: [Int]
+            let d: [String: S]
+            let na: [[Int]]
+            let nd: [String: [S]]
         }
         """, kotlin: """
         import skip.lib.Array
 
         internal class S: Codable {
             internal val a: Array<Int>
+            internal val d: Dictionary<String, S>
+            internal val na: Array<Array<Int>>
+            internal val nd: Dictionary<String, Array<S>>
 
-            constructor(a: Array<Int>) {
+            constructor(a: Array<Int>, d: Dictionary<String, S>, na: Array<Array<Int>>, nd: Dictionary<String, Array<S>>) {
                 this.a = a.sref()
+                this.d = d.sref()
+                this.na = na.sref()
+                this.nd = nd.sref()
             }
 
             private enum class CodingKeys(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
-                a("a");
+                a("a"),
+                d("d"),
+                na("na"),
+                nd("nd");
             }
 
             private fun CodingKeys(rawValue: String): CodingKeys? {
                 return when (rawValue) {
                     "a" -> CodingKeys.a
+                    "d" -> CodingKeys.d
+                    "na" -> CodingKeys.na
+                    "nd" -> CodingKeys.nd
                     else -> null
                 }
             }
@@ -294,11 +309,17 @@ final class CodableTests: XCTestCase {
             override fun encode(to: Encoder) {
                 val container = to.container(keyedBy = CodingKeys::class)
                 container.encode(a, forKey = CodingKeys.a)
+                container.encode(d, forKey = CodingKeys.d)
+                container.encode(na, forKey = CodingKeys.na)
+                container.encode(nd, forKey = CodingKeys.nd)
             }
 
             constructor(from: Decoder) {
                 val container = from.container(keyedBy = CodingKeys::class)
-                this.a = container.decode(Array::class, forKey = CodingKeys.a)
+                this.a = container.decode(Array::class, elementType = Int::class, forKey = CodingKeys.a)
+                this.d = container.decode(Dictionary::class, keyType = String::class, valueType = S::class, forKey = CodingKeys.d)
+                this.na = container.decode(Array::class, elementType = Array::class, nestedElementType = Int::class, forKey = CodingKeys.na)
+                this.nd = container.decode(Dictionary::class, keyType = String::class, valueType = Array::class, nestedElementType = S::class, forKey = CodingKeys.nd)
             }
 
             companion object: DecodableCompanion<S> {
@@ -586,7 +607,7 @@ final class CodableTests: XCTestCase {
             constructor(from: Decoder) {
                 val container = from.container(keyedBy = CodingKeys::class)
                 this.i = container.decode(Int::class, forKey = CodingKeys.i)
-                this.a = container.decode(Array::class, forKey = CodingKeys.a)
+                this.a = container.decode(Array::class, elementType = String::class, forKey = CodingKeys.a)
             }
 
             companion object: DecodableCompanion<S> {

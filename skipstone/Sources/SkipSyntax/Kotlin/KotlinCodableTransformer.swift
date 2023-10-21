@@ -165,12 +165,7 @@ final class KotlinCodableTransformer: KotlinTransformer {
             if !codingKeys.isEmpty {
                 statements.append(KotlinRawStatement(sourceCode: "val container = from.container(keyedBy = CodingKeys::class)"))
             }
-            statements += codingKeys.map {
-                let type = $0.1
-                let decodeFunction = type.isOptional ? "decodeIfPresent" : "decode"
-                let decodeType = type.asOptional(false).withGenerics([])
-                return KotlinRawStatement(sourceCode: "this.\($0.0.name) = container.\(decodeFunction)(\(decodeType.kotlin)::class, forKey = CodingKeys.\($0.0.name))")
-            }
+            statements += codingKeys.map { synthesizeDecodeStatement(for: $0) }
             decode.body = KotlinCodeBlock(statements: statements)
 
             classDeclaration.members.append(decode)
@@ -194,6 +189,33 @@ final class KotlinCodableTransformer: KotlinTransformer {
             return
         }
         decode.assignParentReferences()
+    }
+
+    private func synthesizeDecodeStatement(for codingKey: (KotlinEnumCaseDeclaration, TypeSignature)) -> KotlinStatement {
+        let name = codingKey.0.name
+        let type = codingKey.1
+        let decodeFunction = type.isOptional ? "decodeIfPresent" : "decode"
+        let decodeType = type.asOptional(false)
+        let typeArguments: String
+        switch decodeType {
+        case .array(let elementType):
+            if case .array(let nestedElementType) = elementType {
+                typeArguments = "Array::class, elementType = Array::class, nestedElementType = \(nestedElementType.withGenerics([]).kotlin)::class"
+            } else {
+                typeArguments = "Array::class, elementType = \(elementType.withGenerics([]).kotlin)::class"
+            }
+        case .dictionary(let keyType, let valueType):
+            if case .array(let nestedElementType) = valueType {
+                typeArguments = "Dictionary::class, keyType = \(keyType.withGenerics([]).kotlin)::class, valueType = Array::class, nestedElementType = \(nestedElementType.withGenerics([]).kotlin)::class"
+            } else {
+                typeArguments = "Dictionary::class, keyType = \(keyType.withGenerics([]).kotlin)::class, valueType = \(valueType.withGenerics([]).kotlin)::class"
+            }
+        case .set(let elementType):
+            typeArguments = "Set::class, elementType = \(elementType.withGenerics([]).kotlin)::class"
+        default:
+            typeArguments = "\(decodeType.withGenerics([]).kotlin)::class"
+        }
+        return KotlinRawStatement(sourceCode: "this.\(name) = container.\(decodeFunction)(\(typeArguments), forKey = CodingKeys.\(name))")
     }
 
     private func synthesizeDecodableCompanion(for classDeclaration: KotlinClassDeclaration) {
