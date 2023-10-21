@@ -1702,8 +1702,8 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
             }
         }
 
-        // Kotlin member access never includes generics on the owning type unless we're referencing the class or a function
-        if !kexpression.isFunctionReference && kexpression.member != "self" {
+        // Kotlin member access never includes generics on the owning type unless we're referencing a function
+        if !kexpression.isFunctionReference {
             kexpression.baseType = kexpression.baseType.withGenerics([])
             if let baseIdentifier = kexpression.base as? KotlinIdentifier {
                 baseIdentifier.generics = []
