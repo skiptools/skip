@@ -530,6 +530,7 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
     var labeledCaptureList: [LabeledValue<KotlinExpression>] = []
     var returnType: TypeSignature = .none
     var parameters: [Parameter<Void>] = []
+    var isDestructuredParameters = false
     var attributes = Attributes()
     var apiFlags: APIFlags? = []
     var inferredReturnType: TypeSignature = .none
@@ -555,7 +556,7 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
         // If there is an explicit return type we'll use an anonymous function rather than a closure, as Kotlin
         // closures cannot declare a return type. Kotlin does not support anonymous suspend functions, though
         let kbody = KotlinCodeBlock.translate(statement: expression.body, translator: translator)
-        let isAnonymousFunction = expression.returnType != .none && !expression.apiFlags.contains(.async) && !expression.apiFlags.contains(.mainActor)
+        let isAnonymousFunction = expression.returnType != .none && !expression.isDestructuredParameters && !expression.apiFlags.contains(.async) && !expression.apiFlags.contains(.mainActor)
         var implicitParameterLabels: [String] = []
         var hasReturnLabel = false
         if isAnonymousFunction {
@@ -589,6 +590,7 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
         kexpression.returnType.appendKotlinMessages(to: kexpression, source: translator.syntaxTree.source)
         kexpression.parameters = expression.parameters.map { $0.resolvingSelf(in: expression) }
         kexpression.parameters.forEach { $0.appendKotlinMessages(to: kexpression, source: translator.syntaxTree.source) }
+        kexpression.isDestructuredParameters = expression.isDestructuredParameters
         kexpression.attributes = expression.attributes
         // Combine inferred flags because most closures aren't declared with explicit info
         kexpression.apiFlags = expression.apiFlags.union(expression.inferredType.apiFlags)
@@ -714,9 +716,12 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
             }
             output.append(isSingleStatement ? " " : "\n")
         } else {
+            if isDestructuredParameters {
+                output.append(" (")
+            }
             // We never have both explicit and implicit parameters
             for (index, parameter) in parameters.enumerated() {
-                if index == 0 {
+                if !isDestructuredParameters && index == 0 {
                     output.append(" ")
                 }
                 output.append(parameter.internalLabel)
@@ -729,6 +734,9 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
             }
             if !implicitParameterLabels.isEmpty {
                 output.append(" ").append(implicitParameterLabels.joined(separator: ", "))
+            }
+            if isDestructuredParameters {
+                output.append(")")
             }
             output.append(" ->")
             if isMainActor {
@@ -1639,6 +1647,7 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
     var useMultilineFormatting = false
     var baseType: TypeSignature = .none
     var mayBeSharedMutableStruct = false
+    var classReferenceGenerics: [KotlinIdentifier]?
     var isFunctionReference = false
     var isStaticReferenceOrTypeName = false
     var isTypealiasFor: TypeSignature = .none
@@ -1706,7 +1715,18 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
         if !kexpression.isFunctionReference {
             kexpression.baseType = kexpression.baseType.withGenerics([])
             if let baseIdentifier = kexpression.base as? KotlinIdentifier {
+                if kexpression.member == "self" {
+                    kexpression.classReferenceGenerics = baseIdentifier.generics?.map { KotlinIdentifier(name: $0.kotlin) }
+                }
                 baseIdentifier.generics = []
+            } else if kexpression.member == "self" {
+                if let baseArrayLiteral = kexpression.base as? KotlinArrayLiteral, baseArrayLiteral.elements.count == 1 {
+                    // [Int].self
+                    kexpression.classReferenceGenerics = baseArrayLiteral.elements.compactMap { $0 as? KotlinIdentifier }
+                } else if let baseDictionaryLiteral = kexpression.base as? KotlinDictionaryLiteral, baseDictionaryLiteral.entries.count == 1 {
+                    // [Int: String].self
+                    kexpression.classReferenceGenerics = baseDictionaryLiteral.entries.flatMap { [$0.key, $0.value] }.compactMap { $0 as? KotlinIdentifier }
+                }
             }
         }
         return kexpression
@@ -1898,7 +1918,13 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
             if baseKClass != nil {
                 output.append("(")
             }
-            appendBase(output, indentation)
+            if member == "self", (base as? KotlinArrayLiteral)?.elements.count == 1 {
+                output.append("Array") // Array::class
+            } else if member == "self", (base as? KotlinDictionaryLiteral)?.entries.count == 1 {
+                output.append("Dictionary") // Dictionary::class
+            } else {
+                appendBase(output, indentation)
+            }
             if base.optionalChain == .implicit {
                 output.append("?")
             }

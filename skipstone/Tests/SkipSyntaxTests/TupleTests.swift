@@ -220,6 +220,36 @@ final class TupleTests: XCTestCase {
         """)
     }
 
+    func testDictionaryForeachDestructuring() async throws {
+        try await check(supportingSwift: """
+        struct Dictionary<Key, Value>: Collection {
+            typealias Index = Int
+            typealias Element = (key: Key, value: Value)
+        }
+        protocol Collection {
+            associatedtype Element
+            func forEach(_ body: (Element) throws -> Void) rethrows {
+            }
+        }
+        """, swift: """
+        {
+            let dict = ["a": 1, "b": 2]
+            dict.forEach { (key, value) in
+                print(key)
+                print(value)
+            }
+        }
+        """, kotlin: """
+        {
+            val dict = dictionaryOf(Tuple2("a", 1), Tuple2("b", 2))
+            dict.forEach { (key, value) ->
+                print(key)
+                print(value)
+            }
+        }
+        """)
+    }
+
     func testMemberAccess() async throws {
         try await check(swift: """
         {

@@ -995,6 +995,9 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                     resolvedParameters = parameters2
                 } else if parameters.count == parameters2.count {
                     resolvedParameters = zip(parameters, parameters2).map { $0.0.or($0.1, replaceAny: replaceAny) }
+                } else if parameters2.count == 1, case .tuple(let labels, let types) = parameters2[0].type, parameters.count == labels.count {
+                    // Closure whose parameters deconstruct the expected tuple argument, e.g. dict.forEach { key, value in ... }
+                    resolvedParameters = zip(parameters, types).map { $0.0.or(Parameter(type: $0.1), replaceAny: replaceAny) }
                 }
                 return .function(resolvedParameters, returnType.or(returnType2, replaceAny: replaceAny), apiFlags.union(apiFlags2), attributes)
             }

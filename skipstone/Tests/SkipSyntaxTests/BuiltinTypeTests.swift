@@ -430,4 +430,20 @@ final class BuiltinTypeTests: XCTestCase {
         }
         """)
     }
+
+    func testContainerLiteralClassReference() async throws {
+        try await check(swift: """
+        {
+            let atype = [Int].self
+            let dtype = [String: Int].self
+        }
+        """, kotlin: """
+        import skip.lib.Array
+
+        {
+            val atype = Array::class
+            val dtype = Dictionary::class
+        }
+        """)
+    }
 }

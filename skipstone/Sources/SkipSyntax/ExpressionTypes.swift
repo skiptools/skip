@@ -569,6 +569,10 @@ class Closure: Expression {
             TypeSignature.Parameter(label: parameter.externalLabel, type: parameter.declaredType, isInOut: parameter.isInOut, isVariadic: parameter.isVariadic, hasDefaultValue: parameter.defaultValue != nil )
         }
         functionType = attributes.apply(toFunction: .function(parameterSignatures, returnType, apiFlags, nil)).or(expecting)
+        if case .function(let expectingParameters, _, _, _) = expecting, expectingParameters.count == 1, case .tuple(let tupleLabels, _) = expectingParameters[0].type, tupleLabels.count == functionType.parameters.count {
+            // Detect when the closure parameters are a destructuring of a tuple parameter, e.g. dict.forEach { key, value in ... }
+            isDestructuredParameters = true
+        }
 
         let bodyContext = context.pushing(self)
         let _ = body.inferTypes(context: bodyContext, expecting: body.statements.count == 1 && bodyContext.expectedReturn != .void ? bodyContext.expectedReturn : .none)
@@ -578,6 +582,7 @@ class Closure: Expression {
     }
 
     var functionType: TypeSignature = .function([], .none, [], nil)
+    var isDestructuredParameters = false
 
     override var inferredType: TypeSignature {
         return functionType
