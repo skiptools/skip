@@ -1716,7 +1716,11 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
             kexpression.baseType = kexpression.baseType.withGenerics([])
             if let baseIdentifier = kexpression.base as? KotlinIdentifier {
                 if kexpression.member == "self" {
-                    kexpression.classReferenceGenerics = baseIdentifier.generics?.map { KotlinIdentifier(name: $0.kotlin) }
+                    kexpression.classReferenceGenerics = baseIdentifier.generics?.map {
+                        let identifier = KotlinIdentifier(name: $0.name)
+                        identifier.generics = $0.generics
+                        return identifier
+                    }
                 }
                 baseIdentifier.generics = []
             } else if kexpression.member == "self" {

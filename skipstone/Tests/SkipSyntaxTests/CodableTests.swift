@@ -520,6 +520,85 @@ final class CodableTests: XCTestCase {
         """)
     }
 
+    func testCustomCodableGenerics() async throws {
+        try await check(swift: """
+        struct S: Codable {
+            let a: [Int]
+            let d: [String: S]
+            let na: [[Int]]
+            let nd: [String: [S]]
+
+            private enum CK: CodingKey {
+                case a, d, na, nd
+            }
+
+            func encode(to encoder: Encoder) {
+                let container = encoder.container(keyedBy: CK.self)
+                container.encode(a, forKey: CK.a)
+                container.encode(d, forKey: CK.d)
+                container.encode(na, forKey: CK.na)
+                container.encode(nd, forKey: CK.nd)
+            }
+
+            init(from decoder: Decoder) {
+                let container = decoder.container(keyedBy: CK.self)
+                self.a = container.decode([Int].self, forKey: CK.a)
+                self.d = container.decode(Dictionary<String, S>.self, forKey: CK.d)
+                self.na = container.decode(Array<[Int]>.self, forKey: CK.na)
+                self.nd = container.decode([String: Array<S>].self, forKey: CK.nd)
+            }
+        }
+        """, kotlin: """
+        import skip.lib.Array
+
+        internal class S: Codable {
+            internal val a: Array<Int>
+            internal val d: Dictionary<String, S>
+            internal val na: Array<Array<Int>>
+            internal val nd: Dictionary<String, Array<S>>
+
+            private enum class CK(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
+                a("a"),
+                d("d"),
+                na("na"),
+                nd("nd");
+            }
+
+            private fun CK(rawValue: String): S.CK? {
+                return when (rawValue) {
+                    "a" -> CK.a
+                    "d" -> CK.d
+                    "na" -> CK.na
+                    "nd" -> CK.nd
+                    else -> null
+                }
+            }
+
+            override fun encode(to: Encoder) {
+                val encoder = to
+                val container = encoder.container(keyedBy = CK::class)
+                container.encode(a, forKey = CK.a)
+                container.encode(d, forKey = CK.d)
+                container.encode(na, forKey = CK.na)
+                container.encode(nd, forKey = CK.nd)
+            }
+
+            constructor(from: Decoder) {
+                val decoder = from
+                val container = decoder.container(keyedBy = CK::class)
+                this.a = container.decode(Array::class, elementType = Int::class, forKey = CK.a)
+                this.d = container.decode(Dictionary::class, keyType = String::class, valueType = S::class, forKey = CK.d)
+                this.na = container.decode(Array::class, elementType = Array::class, nestedElementType = Int::class, forKey = CK.na)
+                this.nd = container.decode(Dictionary::class, keyType = String::class, valueType = Array::class, nestedElementType = S::class, forKey = CK.nd)
+            }
+
+            companion object: DecodableCompanion<S> {
+                override fun init(from: Decoder): S = S(from = from)
+            }
+        }
+        """)
+    }
+
     func testOptional() async throws {
         try await check(swift: """
         struct S: Codable {

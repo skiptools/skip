@@ -8,6 +8,8 @@ final class KotlinCodableTransformer: KotlinTransformer {
                 } else {
                     synthesizeCodable(for: classDeclaration, source: translator.syntaxTree.source)
                 }
+            } else if let functionCall = $0 as? KotlinFunctionCall {
+                fixupDecode(functionCall: functionCall)
             }
             return .recurse(nil)
         }
@@ -250,6 +252,52 @@ final class KotlinCodableTransformer: KotlinTransformer {
             return .any
         }
         return variableDeclaration.propertyType
+    }
+
+    private func fixupDecode(functionCall: KotlinFunctionCall) {
+        guard let function = functionCall.function as? KotlinMemberAccess, function.member == "decode" else {
+            return
+        }
+        // .decode(_, from:) for e.g. JSONDecoder or .decode(_, forKey:) for KeyedDecodingContainer
+        guard functionCall.arguments.count == 2, functionCall.arguments[0].label == nil, functionCall.arguments[1].label == "from" || functionCall.arguments[1].label == "forKey" else {
+            return
+        }
+        // Type.self
+        guard let typeMember = functionCall.arguments[0].value as? KotlinMemberAccess, typeMember.member == "self", let type = typeMember.base else {
+            return
+        }
+        // For array and dictionary decoding, call the appropriate decode overload to pass in the generic types
+        var genericArguments: [LabeledValue<KotlinExpression>] = []
+        if (type as? KotlinIdentifier)?.name == "Array" || type is KotlinArrayLiteral, let generics = typeMember.classReferenceGenerics, generics.count == 1 {
+            if generics[0].name == "Array", let nestedElementType = generics[0].generics?.first {
+                genericArguments = [arrayArgument(label: "elementType"), elementArgument(label: "nestedElementType", type: nestedElementType)]
+            } else {
+                genericArguments = [elementArgument(label: "elementType", type: generics[0])]
+            }
+        } else if (type as? KotlinIdentifier)?.name == "Dictionary" || type is KotlinDictionaryLiteral, let generics = typeMember.classReferenceGenerics, generics.count == 2 {
+            let keyArgument = elementArgument(label: "keyType", type: generics[0])
+            if generics[1].name == "Array", let nestedElementType = generics[1].generics?.first {
+                genericArguments = [keyArgument, arrayArgument(label: "valueType"), elementArgument(label: "nestedElementType", type: nestedElementType)]
+            } else {
+                genericArguments = [keyArgument, elementArgument(label: "valueType", type: generics[1])]
+            }
+        }
+        if !genericArguments.isEmpty {
+            functionCall.arguments.insert(contentsOf: genericArguments, at: 1)
+        }
+    }
+
+    private func arrayArgument(label: String) -> LabeledValue<KotlinExpression> {
+        return LabeledValue(label: label, value: KotlinRawExpression(sourceCode: "Array::class"))
+    }
+
+    private func elementArgument(label: String, type: KotlinIdentifier) -> LabeledValue<KotlinExpression> {
+        let signature = TypeSignature.for(name: type.name, genericTypes: [])
+        return elementArgument(label: label, type: signature)
+    }
+
+    private func elementArgument(label: String, type: TypeSignature) -> LabeledValue<KotlinExpression> {
+        return LabeledValue(label: label, value: KotlinRawExpression(sourceCode: "\(type.kotlin)::class"))
     }
 }
 
