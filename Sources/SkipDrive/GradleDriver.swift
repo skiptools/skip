@@ -125,8 +125,8 @@ public struct GradleDriver {
         // add in the project dir for explicitness (even though it is assumed from the current working directory as well)
         args += ["--project-dir", workingDirectory.path]
 
-        // this enables fairly verbose warnings
-        //args += ["--warning-mode", "all"]
+        // this enables reporting on deprecated features
+        args += ["--warning-mode", "all"]
 
         args += ["-PbuildDir=\(buildDir)"]
 
