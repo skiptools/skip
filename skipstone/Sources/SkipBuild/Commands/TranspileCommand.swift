@@ -152,6 +152,10 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             throw error("Must specify at least one --module")
         }
 
+        func isTestModule(_ moduleName: String) -> Bool {
+            primaryModuleName != moduleName && primaryModuleName != moduleName + "Tests"
+        }
+
         let _ = primaryModulePath
 
         func buildSourceList() throws -> (sources: [URL], resources: [URL]) {
@@ -210,6 +214,13 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             // e.g.: ~Library/Developer/Xcode/DerivedData/PACKAGE-ID/SourcePackages/plugins/skiphub.output/SkipFoundationKotlinTests/skipstone/SkipFoundation/src/test/kotlin
             //throw error("Folder specified by --output-folder did not exist: \(outputFolder)")
             try fs.createDirectory(kotlinOutputFolder, recursive: true)
+        }
+
+        // now make a link from src/androidTest/kotlin to src/test/kotlin so the same tests will run against an Android emulator/device with the ANDROID_SERIAL environment
+        if primaryModuleName.hasSuffix("Tests") {
+            let androidTestOutputFolder = try AbsolutePath(outputFolderPath, validating: "../androidTest")
+            try? fs.removeFileTree(androidTestOutputFolder) // remove any existing link in order to re-create it
+            try fs.createSymbolicLink(addOutputFile(androidTestOutputFolder), pointingAt: outputFolderPath, relative: true)
         }
 
         let packageName = KotlinTranslator.packageName(forModule: primaryModuleName)
@@ -474,10 +485,6 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
             // build up a merged YAML from the base dependenices to the current module
             var aggregateJSON: Universal.JSON = [:]
-
-            func isTestModule(_ moduleName: String) -> Bool {
-                primaryModuleName != moduleName && primaryModuleName != moduleName + "Tests"
-            }
 
             for (moduleName, modulePath) in moduleNamePaths {
                 trace("moduleName: \(moduleName) modulePath: \(modulePath) primaryModuleName: \(primaryModuleName)")
