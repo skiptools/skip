@@ -1,4 +1,4 @@
-name: "Skip Framework Workflow"
+name: "Skip Framework CI"
 on:
   workflow_call:
 jobs:
@@ -15,7 +15,7 @@ jobs:
         run: skip test || skip test --verbose
       - name: Connected iOS Simulator Tests
         run: |
-          # attempt twice due to flaky "cannot locate test framework" errors
+          # attempt twice due to flaky errors: "Failed to create a bundle instance representing '~/Library/Developer/Xcode/DerivedData/skip-lib-eptgwklaklbhhcgdbdcwrvnjxzhm/Build/Products/debug/SkipLibTests.xctest'. Check that the bundle exists on disk."
           xcodebuild test -jobs 1 -sdk iphonesimulator -destination "platform=iOS Simulator,name=iPhone 14" -skipPackagePluginValidation -configuration debug -scheme $(basename $PWD) || xcodebuild test -jobs 1 -sdk iphonesimulator -destination "platform=iOS Simulator,name=iPhone 14" -skipPackagePluginValidation -configuration debug -scheme $(basename $PWD)
       - name: Setup Android
         run: |

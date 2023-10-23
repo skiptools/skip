@@ -26,7 +26,7 @@
 #   call-workflow:
 #     uses: skiptools/skip/.github/workflows/skipapp.yml@main
 # 
-name: "Skip App Workflow"
+name: "Skip App CI"
 on:
   workflow_call:
 jobs:
