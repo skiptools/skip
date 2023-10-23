@@ -1,8 +1,8 @@
-name: "Skip Library Workflow"
+name: "Skip Framework Workflow"
 on:
   workflow_call:
 jobs:
-  skiplib:
+  skip-framework:
     runs-on: macos-13
     timeout-minutes: 60
     env:     
@@ -11,11 +11,12 @@ jobs:
       - run: brew update
       - run: brew install skiptools/skip/skip
       - uses: actions/checkout@v3
-      - name: Test iOS
-        run: |
-          xcodebuild test -jobs 1 -sdk iphonesimulator -destination "platform=iOS Simulator,name=iPhone 14" -skipPackagePluginValidation -configuration debug -scheme $(basename $PWD)
-      - name: Test Local
+      - name: Local Skip Tests
         run: skip test || skip test --verbose
+      - name: Connected iOS Simulator Tests
+        run: |
+          # attempt twice due to flaky "cannot locate test framework" errors
+          xcodebuild test -jobs 1 -sdk iphonesimulator -destination "platform=iOS Simulator,name=iPhone 14" -skipPackagePluginValidation -configuration debug -scheme $(basename $PWD) || xcodebuild test -jobs 1 -sdk iphonesimulator -destination "platform=iOS Simulator,name=iPhone 14" -skipPackagePluginValidation -configuration debug -scheme $(basename $PWD)
       - name: Setup Android
         run: |
           PACKAGE=$(swift package dump-package | jq -r '.name')
@@ -27,7 +28,7 @@ jobs:
           chmod -Rf +w .
           # create the "gradlew" wrapper if it does not already exist
           gradle wrapper
-      - name: Test Android
+      - name: Connected Android Emulator Tests
         uses: ReactiveCircus/android-emulator-runner@v2
         with:
           api-level: 31
@@ -35,7 +36,7 @@ jobs:
           emulator-boot-timeout: 6000
           script: ./gradlew connectedCheck
           working-directory: .build/android-tests
-      - name: Release
+      - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ github.token }}

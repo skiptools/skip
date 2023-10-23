@@ -123,7 +123,7 @@ class SkipCommandTests : XCTestCase {
             ".build/plugins/tools/debug/skip",
         ]
 
-        // when running tests from Xcode, we need to use the tool download folder, which seems to be placed in one of the envrionment property `__XCODE_BUILT_PRODUCTS_DIR_PATHS`, so check those folders and override if skip is found
+        // when running tests from Xcode, we need to use the tool download folder, which seems to be placed in one of the environment property `__XCODE_BUILT_PRODUCTS_DIR_PATHS`, so check those folders and override if skip is found
         for checkFolder in (ProcessInfo.processInfo.environment["__XCODE_BUILT_PRODUCTS_DIR_PATHS"] ?? "").split(separator: ":") {
             let xcodeSkipPath = checkFolder.description + "/skip"
             if FileManager.default.isExecutableFile(atPath: xcodeSkipPath) {

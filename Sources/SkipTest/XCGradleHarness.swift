@@ -22,17 +22,21 @@ public protocol XCGradleHarness : GradleHarness {
 extension XCGradleHarness where Self : XCTestCase {
 
     /// Invoke the Gradle tests using the Robolectric simulator, or the specified device emulator/device ID (or blank string to use the first one)
-    public func runGradleTests(device: String?, file: StaticString = #file, line: UInt = #line) async throws {
+    ///
+    /// - Parameters:
+    ///   - device: the device ID to test against, defaulting to the `ANDROID_SERIAL` environment property.
+    ///
+    /// - SeeAlso: https://developer.android.com/studio/test/command-line
+    /// - SeeAlso: https://docs.gradle.org/current/userguide/java_testing.html#test_filtering
+    public func runGradleTests(device: String? = ProcessInfo.processInfo.environment["ANDROID_SERIAL"], file: StaticString = #file, line: UInt = #line) async throws {
         do {
-            if let device = device {
-                try await gradle(actions: ["connectedCheck"], deviceID: device.isEmpty ? nil : device)
-            } else {
-                #if DEBUG
-                try await gradle(actions: ["testDebug"])
-                #else
-                try await gradle(actions: ["testRelease"])
-                #endif
-            }
+            #if DEBUG
+            let testAction = device == nil ? "testDebug" : "connectedDebugAndroidTest"
+            #else
+            // there is no "connectedReleaseAndroidTest" target for some reason, so release tests against an Android emulator/simulator do not work
+            let testAction = device == nil ? "testRelease" : "connectedAndroidTest"
+            #endif
+            try await invokeGradle(actions: [testAction], deviceID: device)
         } catch {
             XCTFail("\((error as? LocalizedError)?.localizedDescription ?? error.localizedDescription)", file: file, line: line)
         }
@@ -49,10 +53,13 @@ extension XCGradleHarness where Self : XCTestCase {
     ///   - moduleSuffix: the expected module name for automatic test determination
     ///   - sourcePath: the full path to the test case call site, which is used to determine the package root
     @available(macOS 13, macCatalyst 16, iOS 16, tvOS 16, watchOS 8, *)
-    public func gradle(actions: [String], arguments: [String] = [], pluginFolderName: String = "skipstone", outputPrefix: String? = "GRADLE>", deviceID: String? = nil, moduleName: String? = nil, maxMemory: UInt64? = ProcessInfo.processInfo.physicalMemory, fromSourceFileRelativeToPackageRoot sourcePath: StaticString? = #file) async throws {
+    func invokeGradle(actions: [String], arguments: [String] = [], pluginFolderName: String = "skipstone", outputPrefix: String? = "GRADLE>", deviceID: String? = nil, testFilter: String? = nil, moduleName: String? = nil, maxMemory: UInt64? = ProcessInfo.processInfo.physicalMemory, fromSourceFileRelativeToPackageRoot sourcePath: StaticString? = #file) async throws {
+
+        // the filters should be passed through to the --tests argument, but they don't seem to work for Android unit tests, neighter for Robolectric nor connected tests
+        precondition(testFilter == nil, "test filtering does not yet work")
 
         var actions = actions
-        let isTestAction = actions.contains(where: { $0.hasPrefix("test") })
+        let isTestAction = testFilter != nil
 
         // override test targets so we can specify "SKIP_GRADLE_TEST_TARGET=connectedDebugAndroidTest" and have the tests run against the Android emulator (e.g., using reactivecircus/android-emulator-runner@v2 with CI)
         let override = ProcessInfo.processInfo.environment["SKIP_GRADLE_TEST_TARGET"]
@@ -87,17 +94,17 @@ extension XCGradleHarness where Self : XCTestCase {
                 var testProcessResult: ProcessResult? = nil
 
                 var env: [String: String] = ProcessInfo.processInfo.environmentWithDefaultToolPaths
-                let quiet: Bool
-                if let deviceID = deviceID {
-                    quiet = true // needed for some tests with large output to avoid gRPC max packet size errors
-                    if !deviceID.isEmpty {
-                        env["ANDROID_SERIAL"] = deviceID
-                    }
-                } else {
-                    quiet = false
+                if let deviceID = deviceID, !deviceID.isEmpty {
+                    env["ANDROID_SERIAL"] = deviceID
                 }
 
-                let (output, parseResults) = try await driver.launchGradleProcess(in: dir, module: baseModuleName, actions: actions, arguments: arguments, environment: env, quiet: quiet, maxMemory: maxMemory, exitHandler: { result in
+                var args = arguments
+                if let testFilter = testFilter {
+                    // NOTE: test filtering does not seem to work; no patterns are matched,
+                    args += ["--tests", testFilter]
+                }
+
+                let (output, parseResults) = try await driver.launchGradleProcess(in: dir, module: baseModuleName, actions: actions, arguments: args, environment: env, maxMemory: maxMemory, exitHandler: { result in
                     // do not fail on non-zero exit code because we want to be able to parse the test results first
                     testProcessResult = result
                 })

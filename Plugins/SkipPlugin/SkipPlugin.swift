@@ -45,7 +45,7 @@ import PackagePlugin
         if skippyOnly {
             cmds += try await createPreflightBuildCommands(context: context, target: sourceTarget)
         } else {
-            // We only want to run the transpiler when targeting macOS and not iOS, but there doesn't appear to by any way to identify that from this phase of the plugin execution; so the transpiler will check the envrionment (e.g., "SUPPORTED_DEVICE_FAMILIES") and only run conditionally
+            // We only want to run the transpiler when targeting macOS and not iOS, but there doesn't appear to by any way to identify that from this phase of the plugin execution; so the transpiler will check the environment (e.g., "SUPPORTED_DEVICE_FAMILIES") and only run conditionally
             cmds += try await createTranspileBuildCommands(context: context, target: sourceTarget)
         }
 
