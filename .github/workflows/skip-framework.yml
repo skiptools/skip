@@ -31,10 +31,9 @@ jobs:
       - name: Connected Android Emulator Tests
         uses: ReactiveCircus/android-emulator-runner@v2
         with:
-          api-level: 31
-          arch: x86_64
-          emulator-boot-timeout: 6000
-          script: ./gradlew connectedCheck
+          api-level: 29
+          arch: x86
+          script: ./gradlew connectedCheck --stacktrace
           working-directory: .build/android-tests
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
