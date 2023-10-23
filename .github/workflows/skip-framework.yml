@@ -31,16 +31,15 @@ jobs:
       - name: Connected Android Emulator Tests
         uses: ReactiveCircus/android-emulator-runner@v2
         with:
+          working-directory: .build/android-tests
           api-level: 29
           target: default
           arch: x86_64
           profile: Galaxy Nexus
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          disable-animations: true
           force-avd-creation: false
+          disable-animations: true
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: adb logcat *:S TestRunner:V & ./gradlew connectedCheck --stacktrace
-          profile: Galaxy Nexus
-          working-directory: .build/android-tests
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
         env:
