@@ -52,7 +52,7 @@ Browse to the `ContentView.swift` file and make a small change and re-run the ta
 
 See the product [documentation](https://skip.tools/docs) for further information developing with Skip. Happy Skipping!
 
-### Creating a Multi-Module App {#creating-a-multi-module-app}
+### Creating a Multi-Module App
 
 Skip is designed to accommodate and encourage using multi-module projects. The default `skip init` command creates a single-module app for simplicity, but you can create a modularized project by specifying additional module names at the end of the chain. For example: 
 
@@ -63,12 +63,6 @@ skip init --open-xcode --appid=com.xyz.HelloSkip multi-project HelloSkip HelloMo
 This command will create a SwiftPM project with three modules: `HelloSkip`, `HelloModel`, and `HelloCore`. The heuristics of such module creation is that the modules will all be dependent on their subsequent peer module, with the first module (`HelloSkip`) having an initial dependency on `SkipUI`, the second module depending on `SkipModel`, and the final module in the chain depending on `SkipFoundation`. The `Package.swift` file can be manually edited to shuffle around dependencies, or to add new dependencies on external Skip frameworks such as the nascent [SkipSQL](https://source.skip.tools/skip-sql) or [SkipXML](https://source.skip.tools/skip-xml) libraries.
 
 ## Creating a Dual-Platform Library
-
-Documentation in progress.
-
-{% comment %}
-
-Copied from previous documentation drafts:
 
 Skip library projects are pure SwiftPM packages that encapsulate common functionality. Each of the core Skip compatibility frameworks ([skip-lib](https://source.skip.tools/skip-lib), [skip-unit](https://source.skip.tools/skip-unit), [skip-foundation](https://source.skip.tools/skip-foundation), and [skip-ui](https://source.skip.tools/skip-ui)) are Skip library projects. Other commonly-used projects include [skip-sql](https://source.skip.tools/skip-sql), [skip-script](https://source.skip.tools/skip-script), and [skip-zip](https://source.skip.tools/skip-zip).
 
@@ -130,8 +124,6 @@ let package = Package(
     ]
 )
 ```
-
-{% endcomment %}
 
 ## Troubleshooting
 
