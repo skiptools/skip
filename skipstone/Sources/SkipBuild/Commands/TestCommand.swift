@@ -314,7 +314,7 @@ extension TestCommand {
 extension ToolOptionsCommand where Self : OutputOptionsCommand {
 
     func runSkipTests(in projectFolderURL: URL, configuration: String, swift: Bool, kotlin: Bool, separateModule: String? = "testSkipModule", with out: MessageQueue) async throws {
-        let env = ProcessInfo.processInfo.environmentWithDefaultToolPaths // an envrionment with a default ANDROID_HOME
+        let env = ProcessInfo.processInfo.environmentWithDefaultToolPaths // an environment with a default ANDROID_HOME
         if let separateModule = separateModule {
             await run(with: out, "Test Swift", ["swift", "test", "--verbose", "--configuration", configuration, "--skip", separateModule, "--package-path", projectFolderURL.path], environment: env)
 

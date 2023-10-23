@@ -23,6 +23,9 @@
       location = "group:../skip-ui">
    </FileRef>
    <FileRef
+      location = "group:../skip-ffi">
+   </FileRef>
+   <FileRef
       location = "group:../skip-sql">
    </FileRef>
    <FileRef

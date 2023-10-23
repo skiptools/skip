@@ -207,7 +207,7 @@ extension ToolOptionsCommand {
 
     /// Executes a tool with the given arguments and prefix message, waits for the result while showing a progress animation,
     /// and then processes the result and outputs the given message block.
-    @discardableResult func run(with messenger: MessageQueue, _ message: String, _ commandArgs: [String], environment: [String: String] = ProcessInfo.processInfo.environmentWithDefaultToolPaths, additionalEnvrionment: [String: String] = [:], in workingDirectory: URL? = nil, watch: Bool = true, resultHandler finalResultHandler: MessageResultHandler<ProcessOutput>? = nil) async -> Result<ProcessOutput, Error> {
+    @discardableResult func run(with messenger: MessageQueue, _ message: String, _ commandArgs: [String], environment: [String: String] = ProcessInfo.processInfo.environmentWithDefaultToolPaths, additionalEnvironment: [String: String] = [:], in workingDirectory: URL? = nil, watch: Bool = true, resultHandler finalResultHandler: MessageResultHandler<ProcessOutput>? = nil) async -> Result<ProcessOutput, Error> {
 
         // default to a result handler that outputs the duration of the operation
         let resultHandler = finalResultHandler ?? Self.timingResultHandler(message: message)
@@ -272,7 +272,7 @@ extension ToolOptionsCommand {
             
             // add all the additional environment settings to the dictionary
             var env = environment
-            for (key, value) in additionalEnvrionment {
+            for (key, value) in additionalEnvironment {
                 env[key] = value
             }
 

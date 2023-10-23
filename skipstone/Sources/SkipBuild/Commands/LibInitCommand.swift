@@ -941,7 +941,7 @@ extension ToolOptionsCommand {
                 "archive",
                 "CODE_SIGNING_ALLOWED=NO",
                 "ZERO_AR_DATE=1", // excludes timestamps from archives for build reproducibility
-            ], additionalEnvrionment: ["SKIP_ZERO": "1"]) // SKIP_ZERO builds without Skip dependency libraries
+            ], additionalEnvironment: ["SKIP_ZERO": "1"]) // SKIP_ZERO builds without Skip dependency libraries
 
 
             let archiveAppPath = archivePath + "/Products/Applications/" + primaryModuleAppTarget + ".app"
@@ -1261,10 +1261,16 @@ extension ToolOptionsCommand {
                 import SkipTest
 
                 /// This test case will run the transpiled tests for the Skip module.
-                @available(macOS 13, *)
+                @available(macOS 13, macCatalyst 16, *)
                 final class XCSkipTests: XCTestCase, XCGradleHarness {
                     public func testSkipModule() async throws {
-                        try await runGradleTests(device: .none) // set device ID to run in Android emulator vs. robolectric
+                        // Run the transpiled tests for the current test module.
+                        // The tests will run in the Robolectric Android simulation environment.
+                        // Device or emulator tests be run against an `adb devices` identifier
+                        // by specifying it in the `device` parameter or the
+                        // `ANDROID_SERIAL` environment variable in the scheme's Run settings.
+                        // Note that it isn't currently possible to filter the tests to run.
+                        try await runGradleTests()
                     }
                 }
                 #endif
@@ -1463,7 +1469,7 @@ extension ToolOptionsCommand {
         Kotlin JUnit tests in the Robolectric Android simulation environment.
 
         Parity testing can be performed with `skip test`,
-        which will outpout a table of the test results for both platforms.
+        which will output a table of the test results for both platforms.
 
         """
 
@@ -1496,7 +1502,7 @@ extension ToolOptionsCommand {
         Kotlin JUnit tests in the Robolectric Android simulation environment.
 
         Parity testing can be performed with `skip test`,
-        which will outpout a table of the test results for both platforms.
+        which will output a table of the test results for both platforms.
 
         ## Running
 
