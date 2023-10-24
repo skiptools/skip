@@ -15,7 +15,7 @@ jobs:
     runs-on: macos-13
     steps:
       - name: Checkout skip
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Test Skip
         run: swift test
