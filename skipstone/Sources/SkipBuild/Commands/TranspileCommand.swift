@@ -555,7 +555,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                     """]
 
                     manifestConfigLines += ["""
-                    versionCode = (manifestPlaceholders["CURRENT_PROJECT_VERSION"] as String).toInt()
+                    versionCode = ((manifestPlaceholders["CURRENT_PROJECT_VERSION"] as? String))?.toInt()
                     """]
 
                     manifestConfigLines += ["""
