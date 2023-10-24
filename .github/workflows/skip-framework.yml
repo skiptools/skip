@@ -9,14 +9,19 @@ jobs:
       DEVELOPER_DIR: /Applications/Xcode_15.0.app/Contents/Developer
     steps:
       - run: brew update
+
       - run: brew install skiptools/skip/skip
+
       - uses: actions/checkout@v3
+
       - name: Local Skip Tests
         run: skip test || skip test --verbose
+
       - name: Connected iOS Simulator Tests
         run: |
           # attempt twice due to flaky errors: "Failed to create a bundle instance representing '~/Library/Developer/Xcode/DerivedData/skip-lib-eptgwklaklbhhcgdbdcwrvnjxzhm/Build/Products/debug/SkipLibTests.xctest'. Check that the bundle exists on disk."
           xcodebuild test -jobs 1 -sdk iphonesimulator -destination "platform=iOS Simulator,name=iPhone 14" -skipPackagePluginValidation -configuration debug -scheme $(basename $PWD) || xcodebuild test -jobs 1 -sdk iphonesimulator -destination "platform=iOS Simulator,name=iPhone 14" -skipPackagePluginValidation -configuration debug -scheme $(basename $PWD)
+
       - name: Setup Android
         run: |
           PACKAGE=$(swift package dump-package | jq -r '.name')
@@ -28,11 +33,52 @@ jobs:
           chmod -Rf +w .
           # create the "gradlew" wrapper if it does not already exist
           gradle wrapper
+
+      - name: Cache Android snapshot
+        uses: actions/cache@v3
+        id: avd-cache
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-30-aosp-atd
+
+      - name: Create Android snapshot
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          target: aosp_atd
+          api-level: 30
+          arch: x86
+          channel: canary
+          profile: pixel
+          avd-name: Pixel_3a_API_30
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: false
+          script: echo "Generated AVD snapshot for caching"
+
       - name: Connected Android Emulator Tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          target: aosp_atd
+          api-level: 30
+          arch: x86
+          channel: canary
+          profile: pixel
+          #profile: Galaxy Nexus
+          avd-name: Pixel_3a_API_30
+          script: adb logcat *:S TestRunner:V & ./gradlew connectedCheck --stacktrace
+
+      # disabled while testing cached AVD
+      - name: Connected Android Emulator Tests OLD
+        if: false
         uses: ReactiveCircus/android-emulator-runner@v2
         with:
           working-directory: .build/android-tests
-          api-level: 29
+          # times out frequently
+          #api-level: 29
+          api-level: 31
           target: default
           arch: x86_64
           profile: Galaxy Nexus
