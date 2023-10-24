@@ -551,15 +551,15 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
                     // now do some manual configuration of the android properties
                     manifestConfigLines += ["""
-                    applicationId = manifestPlaceholders["PRODUCT_BUNDLE_IDENTIFIER"] as String
+                    applicationId = manifestPlaceholders["PRODUCT_BUNDLE_IDENTIFIER"]?.toString()
                     """]
 
                     manifestConfigLines += ["""
-                    versionCode = ((manifestPlaceholders["CURRENT_PROJECT_VERSION"] as? String))?.toInt()
+                    versionCode = (manifestPlaceholders["CURRENT_PROJECT_VERSION"]?.toString())?.toInt()
                     """]
 
                     manifestConfigLines += ["""
-                    versionName = manifestPlaceholders["MARKETING_VERSION"] as String
+                    versionName = manifestPlaceholders["MARKETING_VERSION"]?.toString()
                     """]
 
                     localConfig.contents?.append(.init(GradleBlock(block: "android", contents: [
