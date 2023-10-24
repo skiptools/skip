@@ -67,6 +67,7 @@ jobs:
           sed -i '' "s;PRODUCT_VERSION = .*;PRODUCT_VERSION = $(git rev-list --count HEAD);g" ${SKIP_MODULE}.xcconfig
 
       - name: Run Tests
+        # "null cannot be cast to non-null type kotlin.String"
         run: test ! -d Tests || swift test
 
       - name: Build ipa
