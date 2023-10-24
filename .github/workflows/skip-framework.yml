@@ -70,7 +70,7 @@ jobs:
           profile: pixel
           #profile: Galaxy Nexus
           avd-name: Pixel_3a_API_30
-          script: adb logcat *:S TestRunner:V & gradlew connectedCheck --stacktrace
+          script: adb logcat *:S TestRunner:V & ./gradlew connectedCheck --stacktrace
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
