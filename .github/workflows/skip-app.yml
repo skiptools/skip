@@ -78,6 +78,8 @@ jobs:
           for CONFIGURATION in "Debug" "Release"; do
             ARCHIVE_PATH=".build/Skip/artifacts/${CONFIGURATION}/${APPARTIFACT}.xcarchive"
             xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -archivePath "${ARCHIVE_PATH}" -configuration "${CONFIGURATION}" -scheme "${SKIP_MODULE}" -sdk "iphoneos" -destination "generic/platform=iOS" -jobs 1 archive CODE_SIGNING_ALLOWED=NO
+            brew install tree
+            tree "${ARCHIVE_PATH}"
             cd "${ARCHIVE_PATH}"/Products/
             find . -type f
             mv "Applications" "Payload"
