@@ -273,6 +273,16 @@ final class BuiltinTypeTests: XCTestCase {
         """)
     }
 
+    func testCharacterLiteral() async throws {
+        try await check(swift: """
+        let c1: Character = "a"
+        let c2: Character = "'"
+        """, kotlin: """
+        internal val c1: Char = 'a'
+        internal val c2: Char = '\\''
+        """)
+    }
+
     func testArrayLiteral() async throws {
         try await check(swift: """
         {

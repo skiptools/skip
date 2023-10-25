@@ -2448,6 +2448,9 @@ class KotlinStringLiteral: KotlinExpression {
         for segment in segments {
             switch segment {
             case .string(let string):
+                if isCharacter && string == "'" {
+                    output.append("\\")
+                }
                 output.append(string)
             case .expression(let expression):
                 output.append("${").append(expression, indentation: indentation).append("}")
