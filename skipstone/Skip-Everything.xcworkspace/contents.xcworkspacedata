@@ -35,12 +35,18 @@
       location = "group:../skip-xml">
    </FileRef>
    <FileRef
+      location = "group:../skip-yaml">
+   </FileRef>
+   <FileRef
       location = "group:../skip-zip">
    </FileRef>
    <FileRef
-      location = "group:/opt/src/github/skiptools/skipapp-weather/WeatherApp.xcodeproj">
+      location = "group:../skipapp-hello/HelloSkip.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:/opt/src/github/skiptools/skipapp-playground/PlaygroundApp.xcodeproj">
+      location = "group:../skipapp-weather/WeatherApp.xcodeproj">
+   </FileRef>
+   <FileRef
+      location = "group:../skipapp-playground/PlaygroundApp.xcodeproj">
    </FileRef>
 </Workspace>
