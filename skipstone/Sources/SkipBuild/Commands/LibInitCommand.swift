@@ -99,12 +99,7 @@ extension ToolOptionsCommand {
         cd Skip/build/
         ln -sfh ${SRCPKG}/plugins/*.output .
         cd artifacts/
-        #ln -f ${SRCPKG}/plugins/*.output/*/skipstone/*/build/outputs/apk/*/*.apk .
         ln -f ${SRCPKG}/plugins/*.output/*/skipstone/*/.build/*/outputs/apk/*/*.apk .
-
-        # this is the expected output file, so ensure that it exists
-        ls -lah ${SRCROOT}/Skip/build/artifacts/${PROJECT_NAME}-${CONFIGURATION}*.apk
-
         """
             .replacingOccurrences(of: "\n", with: "\\n")
             .replacingOccurrences(of: "\"", with: "\\\"")
