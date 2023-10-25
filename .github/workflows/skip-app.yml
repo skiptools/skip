@@ -36,8 +36,11 @@ jobs:
       DEVELOPER_DIR: /Applications/Xcode_15.0.app/Contents/Developer
     steps:
       - run: brew update
+
       - run: brew install skiptools/skip/skip
+
       - uses: actions/checkout@v4
+
       - name: Setup
         run: |
           TAG=${GITHUB_REF#refs/tags/}
@@ -66,9 +69,12 @@ jobs:
           # update App.xcconfig to set build number to the git commit count
           sed -i '' "s;PRODUCT_VERSION = .*;PRODUCT_VERSION = $(git rev-list --count HEAD);g" ${SKIP_MODULE}.xcconfig
 
+      - name: Verify Skip App
+        run: skip verify
+
       - name: Run Tests
         # "null cannot be cast to non-null type kotlin.String"
-        run: test ! -d Tests || swift test
+        run: test ! -d Tests || skip test
 
       - name: Build ipa
         run: |
@@ -172,10 +178,6 @@ jobs:
 
           # finally create the checksums file for everything remaining
           shasum -a 256 *.* > checksums.txt
-
-      - name: "Verify skipapp template"
-        if: false
-        run: skip app create --template-file ${RELDIR}/skip-template-source.zip --verify --build --test --archive -c release SomeApp
 
       - name: "Release"
         if: startsWith(github.ref, 'refs/tags/')
