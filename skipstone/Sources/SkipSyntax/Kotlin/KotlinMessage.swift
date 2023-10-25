@@ -302,7 +302,7 @@ extension Message {
     }
 
     static func kotlinVariableMirrorInternalParameter(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "Declaring a viarable that mirrors an internal parameter label of its enclosing function will cause an error in Kotlin. Consider renaming this variable", sourceDerived: sourceDerived, source: source)
+        return Message(kind: .error, message: "Declaring a variable that mirrors an internal parameter label of its enclosing function will cause an error in Kotlin. Consider renaming this variable", sourceDerived: sourceDerived, source: source)
     }
 
     static func kotlinVariableNeedsTypeDeclaration(_ sourceDerived: SourceDerived, source: Source) -> Message {
