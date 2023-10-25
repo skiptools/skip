@@ -130,6 +130,7 @@ class SkipCommandTests : XCTestCase {
         │  │     └─ skip.yml
         │  ├─ CoolB
         │  │  ├─ CoolB.swift
+
         │  │  ├─ Resources
         │  │  │  └─ Localizable.xcstrings
         │  │  └─ Skip
@@ -188,7 +189,7 @@ class SkipCommandTests : XCTestCase {
               ├─ Skip
               │  └─ skip.yml
               └─ XCSkipTests.swift
-        
+
         """)
 
         try await skip("verify", "--project", tempDir)
