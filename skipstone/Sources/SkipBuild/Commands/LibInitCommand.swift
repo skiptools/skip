@@ -103,7 +103,7 @@ extension ToolOptionsCommand {
         ln -f ${SRCPKG}/plugins/*.output/*/skipstone/*/.build/*/outputs/apk/*/*.apk .
 
         # this is the expected output file, so ensure that it exists
-        ls -lah ${SRCROOT}/Skip/build/artifacts/${PROJECT_NAME}-${CONFIGURATION}.apk
+        ls -lah ${SRCROOT}/Skip/build/artifacts/${PROJECT_NAME}-${CONFIGURATION}*.apk
 
         """
             .replacingOccurrences(of: "\n", with: "\\n")
