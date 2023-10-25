@@ -26,6 +26,9 @@ Ensure that the development prerequisites are satisfied by running:
 skip checkup
 ```
 
+<img alt="Screenshot of terminal skip checkup command output" src="https://assets.skip.tools/intro/skip_checkup.png" style="width: 100%;" />
+
+
 If the checkup passes, you're ready to start developing with Skip!
 
 ## Creating an App
@@ -42,11 +45,15 @@ For example:
 skip init --open-xcode --appid=com.xyz.HelloSkip hello-skip HelloSkip
 ```
 
+<img alt="Screenshot of terminal skip init command output" src="https://assets.skip.tools/intro/skip_init.png" style="width: 100%;" />
+
 This will create a `hello-skip/` folder with a new SwiftPM package containing a single module named `HelloSkip`, along with a `HelloSkip.xcodeproj` project with a `HelloSkipApp` target and an `.xcconfig` file specifying the app's name, bundle identifier, and other customizable metadata.
 
 Xcode will open the new project, but before you can build and launch the transpiled app, an Android emulator needs to be running. Launch `Android Studio.app` and open the `Virtual Device Manager` from the ellipsis menu of the Welcome dialog. From there, `Create Device` (e.g., "Pixel 6") and then `Launch` the emulator.
 
 Once the Android emulator is running, select and run the `HelloSkipApp` target in Xcode. The first build will take some time to compile the Skip libraries, and you may be prompted with a dialog to affirm that you trust the Skip plugin. Once the build and run action completes, the SwiftUI app will open in the selected iOS simulator, and at the same time the transpiled app will launch in the currently-running Android emulator.
+
+<img alt="Screenshot of Skip running in both the iOS Simulator and Android Emulator" src="https://assets.skip.tools/intro/skip_xcode.png" style="width: 100%;" />
 
 Browse to the `ContentView.swift` file and make a small change and re-run the target: the app will be re-built and re-run on both platforms simultaneously with your changes.
 
