@@ -9,7 +9,7 @@ struct AppCreateCommand: MessageCommand, ToolOptionsCommand {
     static var configuration = CommandConfiguration(
         commandName: "create",
         abstract: "Create a new Skip app project from a template",
-        shouldDisplay: true)
+        shouldDisplay: false)
 
     @OptionGroup(title: "Output Options")
     var outputOptions: OutputOptions
