@@ -155,5 +155,6 @@ Specific known error conditions are listed below. Search the [documentation](htt
 
     You can read more about this Xcode error on the [Swift.org forums](https://forums.swift.org/t/internal-inconsistency-error-didstarttask/61194).
 - Skip may highlight the wrong line in build errors. When Skip surfaces the wrong line number, it is typically only one line off.
+- When working with multiple modules, we have occasionally seen situations in which changed files do not re-transpile. This issue is discussed in the local library development [documentation](https://skip.tools/docs/contributing/), because those are the conditions under which we've run across the error.
 
 
