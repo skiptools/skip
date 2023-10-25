@@ -94,7 +94,7 @@ jobs:
       - name: Build apk
         run: |
           for CONFIGURATION in "Release" "Debug"; do
-            BUILT_PRODUCTS_DIR=".build" xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -configuration "${CONFIGURATION}" -destination "platform=macosx" -scheme "${SKIP_MODULE_APP}" build SKIP_LAUNCH_APK="NO"
+            BUILT_PRODUCTS_DIR=".build" xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -configuration "${CONFIGURATION}" -destination "platform=macosx" -scheme "${SKIP_MODULE_APP}" build SKIP_BUILD_APK=NO SKIP_LAUNCH_APK=NO
           done
 
           ls -la ${RELDIR}/

@@ -36,39 +36,78 @@ class SkipCommandTests : XCTestCase {
         XCTAssertGreaterThan(doctor.count, 5, "doctor output should have contained some lines")
     }
 
-    func NOtestSkipCreate() async throws {
+    func testSkipCreate() async throws {
         let tempDir = try mktmp()
-        let templateModuleName = "WeatherApp"
-        let name = "cool_app"
-        let stdout = try await skip("app", "create", "--no-build", "--no-test", "-d", tempDir, name)
+        let projectName = "hello-skip"
+        let appName = "HelloSkip"
+        let appScheme = appName + "App"
+        let stdout = try await skip("init", "--show-tree", "--no-build", "--no-test", "-d", tempDir, "--appid", "com.company.HelloSkip", projectName, appName)
         //print("skip create stdout: \(stdout)")
         let out = stdout.split(separator: "\n")
-        XCTAssertEqual("Creating project \(name) from template skipapp", out.first)
-        let dir = tempDir + "/" + name + "/"
-        for path in ["Package.swift", templateModuleName + ".xcodeproj", "App.xcconfig", "Sources", "Tests"] {
+        XCTAssertEqual("Initializing Skip library \(projectName)", out.first)
+        let dir = tempDir + "/" + projectName + "/"
+
+        let xcodeproj = appName + ".xcodeproj"
+        let xcconfig = appName + ".xcconfig"
+        for path in ["Package.swift", xcodeproj, xcconfig, "Sources", "Tests"] {
             XCTAssertTrue(FileManager.default.fileExists(atPath: dir + path), "missing file at: \(path)")
         }
 
         let project = try await loadProjectPackage(dir)
-        XCTAssertEqual(templateModuleName, project.name)
+        XCTAssertEqual(projectName, project.name)
 
-        let config = try await loadProjectConfig(dir + "/\(templateModuleName).xcodeproj", scheme: "App")
-        XCTAssertEqual(templateModuleName, config.first?.buildSettings["PROJECT_NAME"])
+        let config = try await loadProjectConfig(dir + "/" + xcodeproj, scheme: appScheme)
+        XCTAssertEqual(appName, config.first?.buildSettings["PROJECT_NAME"])
 
         // run the app checks and verify JSON output
         //let checkResults = try await skip("app", "check", "--json", "-d", tempDir).parseJSONArray()
+
+        XCTAssertEqual(out.dropFirst(2).dropLast(1).joined(separator: "\n"), """
+        .
+        ├─ HelloSkip.xcconfig
+        ├─ HelloSkip.xcodeproj
+        │  └─ project.pbxproj
+        ├─ Package.swift
+        ├─ README.md
+        ├─ Sources
+        │  ├─ HelloSkip
+        │  │  ├─ ContentView.swift
+        │  │  ├─ HelloSkip.swift
+        │  │  ├─ HelloSkipApp.swift
+        │  │  ├─ Resources
+        │  │  │  └─ Localizable.xcstrings
+        │  │  └─ Skip
+        │  │     ├─ AndroidManifest.xml
+        │  │     ├─ Assets.xcassets
+        │  │     │  ├─ AccentColor.colorset
+        │  │     │  │  └─ Contents.json
+        │  │     │  ├─ AppIcon.appiconset
+        │  │     │  │  └─ Contents.json
+        │  │     │  └─ Contents.json
+        │  │     ├─ Capabilities.entitlements
+        │  │     └─ skip.yml
+        │  └─ HelloSkipApp
+        │     └─ HelloSkipAppMain.swift
+        └─ Tests
+           └─ HelloSkipTests
+              ├─ HelloSkipTests.swift
+              ├─ Resources
+              │  └─ TestData.json
+              ├─ Skip
+              │  └─ skip.yml
+              └─ XCSkipTests.swift
+        """)
+
+        try await skip("verify", "--project", tempDir)
     }
 
     func testSkipInit() async throws {
         let tempDir = try mktmp()
         let name = "cool-lib"
-        let out = try await skip("lib", "init", "-jA", "--show-tree", "--no-build", "--no-test", "-d", tempDir, name, "CoolA", "CoolB", "CoolC", "CoolD", "CoolE").parseJSONArray()
+        let out = try await skip("lib", "init", "-jA", "--show-tree", "--no-build", "--no-test", "-d", tempDir, name, "CoolA", "CoolB", "CoolC", "CoolD", "CoolE")
+        let json = try out.parseJSONArray()
 
-        XCTAssertEqual("Initializing Skip library \(name)", (out.first as? JSONObject)?["msg"] as? String)
-
-//        XCTAssertEqual((out.dropLast(1).last as? JSONObject)?["msg"] as? String, """
-//        FILE TREE
-//        """)
+        XCTAssertEqual("Initializing Skip library \(name)", (json.first as? JSONObject)?["msg"] as? String)
 
         let dir = tempDir + "/" + name + "/"
         for path in ["Package.swift", "Sources/CoolA", "Sources/CoolA", "Sources/CoolE", "Tests", "Tests/CoolATests/Skip/skip.yml"] {
@@ -78,11 +117,81 @@ class SkipCommandTests : XCTestCase {
         let project = try await loadProjectPackage(dir)
         XCTAssertEqual(name, project.name)
 
-        //try await skip("check", "-d", tempDir)
+        XCTAssertEqual((json.dropLast(1).last as? JSONObject)?["msg"] as? String ?? "", """
+        .
+        ├─ Package.swift
+        ├─ README.md
+        ├─ Sources
+        │  ├─ CoolA
+        │  │  ├─ CoolA.swift
+        │  │  ├─ Resources
+        │  │  │  └─ Localizable.xcstrings
+        │  │  └─ Skip
+        │  │     └─ skip.yml
+        │  ├─ CoolB
+        │  │  ├─ CoolB.swift
+        │  │  ├─ Resources
+        │  │  │  └─ Localizable.xcstrings
+        │  │  └─ Skip
+        │  │     └─ skip.yml
+        │  ├─ CoolC
+        │  │  ├─ CoolC.swift
+        │  │  ├─ Resources
+        │  │  │  └─ Localizable.xcstrings
+        │  │  └─ Skip
+        │  │     └─ skip.yml
+        │  ├─ CoolD
+        │  │  ├─ CoolD.swift
+        │  │  ├─ Resources
+        │  │  │  └─ Localizable.xcstrings
+        │  │  └─ Skip
+        │  │     └─ skip.yml
+        │  └─ CoolE
+        │     ├─ CoolE.swift
+        │     ├─ Resources
+        │     │  └─ Localizable.xcstrings
+        │     └─ Skip
+        │        └─ skip.yml
+        └─ Tests
+           ├─ CoolATests
+           │  ├─ CoolATests.swift
+           │  ├─ Resources
+           │  │  └─ TestData.json
+           │  ├─ Skip
+           │  │  └─ skip.yml
+           │  └─ XCSkipTests.swift
+           ├─ CoolBTests
+           │  ├─ CoolBTests.swift
+           │  ├─ Resources
+           │  │  └─ TestData.json
+           │  ├─ Skip
+           │  │  └─ skip.yml
+           │  └─ XCSkipTests.swift
+           ├─ CoolCTests
+           │  ├─ CoolCTests.swift
+           │  ├─ Resources
+           │  │  └─ TestData.json
+           │  ├─ Skip
+           │  │  └─ skip.yml
+           │  └─ XCSkipTests.swift
+           ├─ CoolDTests
+           │  ├─ CoolDTests.swift
+           │  ├─ Resources
+           │  │  └─ TestData.json
+           │  ├─ Skip
+           │  │  └─ skip.yml
+           │  └─ XCSkipTests.swift
+           └─ CoolETests
+              ├─ CoolETests.swift
+              ├─ Resources
+              │  └─ TestData.json
+              ├─ Skip
+              │  └─ skip.yml
+              └─ XCSkipTests.swift
+        
+        """)
 
-//        XCTAssertEqualAsync(try await skip("test", "--project", tempDir + "/" + name), """
-//        """)
-
+        try await skip("verify", "--project", tempDir)
     }
 
     func NOtestSkipTestReport() async throws {
