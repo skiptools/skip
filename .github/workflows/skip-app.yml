@@ -145,8 +145,8 @@ jobs:
           IPA="${APPNAME}-Release.ipa"
 
           # the .apk name will default to the name of the enclosing module
-          # (e.g., "SkipWeatherUI-release.apk" rather than "SkipWeather-")
-          APPMODULE="${APPNAME}UI"
+          # (e.g., "SkipWeather-release.apk" rather than "SkipWeather-")
+          APPMODULE="${APPNAME}"
           APK="${APPMODULE}-release.apk"
 
           TMPDIR=$(mktemp -d)
