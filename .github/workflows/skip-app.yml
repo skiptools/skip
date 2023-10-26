@@ -180,7 +180,7 @@ jobs:
           shasum -a 256 *.* > checksums.txt
 
           # sign the checksums file
-          echo -n "$SKIP_SIGNING_KEY" | base64 --decode | gpg --import
+          echo "$SKIP_SIGNING_KEY" | gpg --import
           gpg --clearsign --yes --output checksums.txt.asc checksums.txt
 
         env:
