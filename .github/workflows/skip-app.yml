@@ -148,6 +148,7 @@ jobs:
           # (e.g., "SkipWeather-release.apk" rather than "SkipWeather-")
           APPMODULE="${APPNAME}"
           APK="${APPMODULE}-release.apk"
+          APK_UNSIGNED="${APPMODULE}-release-unsigned.apk"
 
           TMPDIR=$(mktemp -d)
           unzip -q "$IPA" -d "$TMPDIR"
@@ -160,6 +161,8 @@ jobs:
           shasum -a 256 ${APK} ${IPA} ${APPZ}
           ls -lah ${APK} ${IPA} ${APPZ}
 
+          # in case the APK has the -unsigned suffix, move it to the APK
+          mv -v ${APK_UNSIGNED} ${APK} || true
           mv -v ${APK} ${APPNAME}-android-${RELTAG}.apk
           #mv -v ${APPNAME}-debug.apk ${APPNAME}-android-${RELTAG}-debug.apk
           mv -v ${APPNAME}-Release.ipa ${APPNAME}-ios-${RELTAG}.ipa
