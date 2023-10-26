@@ -179,6 +179,14 @@ jobs:
           # finally create the checksums file for everything remaining
           shasum -a 256 *.* > checksums.txt
 
+          # sign the checksums file
+          echo -n "$SKIP_SIGNING_KEY" | base64 --decode | gpg --import
+          gpg --clearsign --yes --output checksums.txt.asc checksums.txt
+
+        env:
+          SKIP_SIGNING_KEY: ${{ secrets.SKIP_SIGNING_KEY }}
+
+
       - name: "Release"
         if: startsWith(github.ref, 'refs/tags/')
         env:
