@@ -44,6 +44,10 @@ extension Process {
             var buffer: [UInt8] = []
             func handleProcessOutput(err: Bool) -> (_ data: [UInt8]) -> Void {
                 { outputBytes in
+                    if err {
+                        // we ignore stderr for streaming
+                        return
+                    }
                     var data: ArraySlice<UInt8> = outputBytes[outputBytes.startIndex...] // turn array into slice
                     while let nl = data.firstIndex(of: separatorCharacter.utf8.first!) {
                         let line = buffer + data[data.startIndex..<nl]
@@ -55,7 +59,7 @@ extension Process {
                 }
             }
 
-            let p = Process(arguments: arguments, environment: environment, workingDirectory: workingDirectory, outputRedirection: .stream(stdout: handleProcessOutput(err: false), stderr: handleProcessOutput(err: true), redirectStderr: true), loggingHandler: nil)
+            let p = Process(arguments: arguments, environment: environment, workingDirectory: workingDirectory, outputRedirection: .stream(stdout: handleProcessOutput(err: false), stderr: handleProcessOutput(err: true), redirectStderr: false), loggingHandler: nil)
 
             do {
                 try p.launch()

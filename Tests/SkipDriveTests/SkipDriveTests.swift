@@ -99,7 +99,9 @@ class SkipCommandTests : XCTestCase {
               └─ XCSkipTests.swift
         """)
 
-        try await skip("verify", "--project", tempDir)
+        let verify = try await skip("verify", "-jA", "--project", tempDir).parseJSONArray()
+        //XCTAssertGreaterThan(verify.count, 1, "verify output should have contained some lines")
+
     }
 
     func testSkipInit() async throws {
