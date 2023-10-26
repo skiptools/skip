@@ -183,8 +183,8 @@ jobs:
           shasum -a 256 *.* > checksums.txt
 
           # sign the checksums file
-          echo "$SKIP_SIGNING_KEY" | gpg --import
-          gpg --clearsign --yes --output checksums.txt.asc checksums.txt
+          #echo "$SKIP_SIGNING_KEY" | gpg --import
+          #gpg --clearsign --yes --output checksums.txt.asc checksums.txt
 
         env:
           SKIP_SIGNING_KEY: ${{ secrets.SKIP_SIGNING_KEY }}
