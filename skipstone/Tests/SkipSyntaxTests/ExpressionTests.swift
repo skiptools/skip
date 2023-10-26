@@ -439,9 +439,11 @@ final class ExpressionTests: XCTestCase {
         """, swift: """
         f(s: "") { _ in 1 }
         f(s: "", b: { 2 })
+        f(s: "") { i in print(i) } b: { 2 }
         """, kotlin: """
         f(s = "") { _ -> 1 }
         f(s = "", b = { 2 })
+        f(s = "", a = { i -> print(i) }, b = { 2 })
         """)
     }
 

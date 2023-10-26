@@ -680,15 +680,15 @@ class DictionaryLiteral: Expression {
 class FunctionCall: Expression, APICallExpression {
     let function: Expression
     let arguments: [LabeledValue<Expression>]
-    let hasTrailingClosures: Bool
+    let trailingClosureCount: Int
     private(set) var isInit = false
     /// Whether this is a call on the `Optional` type, e.g. `Optional<T>.map`.
     private(set) var isCallOnOptional = false
 
-    init(function: Expression, arguments: [LabeledValue<Expression>], hasTrailingClosures: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
+    init(function: Expression, arguments: [LabeledValue<Expression>], trailingClosureCount: Int = 0, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.function = function
         self.arguments = arguments
-        self.hasTrailingClosures = hasTrailingClosures
+        self.trailingClosureCount = trailingClosureCount
         super.init(type: .functionCall, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
@@ -702,18 +702,19 @@ class FunctionCall: Expression, APICallExpression {
             let expression = ExpressionDecoder.decode(syntax: $0.expression, in: syntaxTree)
             return LabeledValue(label: label, value: expression)
         }
-        var hasTrailingClosures = false
+        var trailingClosureCount = 0
         if let trailingClosure = functionCallExpr.trailingClosure {
             let expression = ExpressionDecoder.decode(syntax: trailingClosure, in: syntaxTree)
             labeledExpressions.append(LabeledValue(value: expression))
-            hasTrailingClosures = true
+            trailingClosureCount += 1
         }
+        trailingClosureCount += functionCallExpr.additionalTrailingClosures.count
         labeledExpressions += functionCallExpr.additionalTrailingClosures.map {
             let label = $0.label.text
             let expression = ExpressionDecoder.decode(syntax: $0.closure, in: syntaxTree)
             return LabeledValue(label: label, value: expression)
         }
-        return FunctionCall(function: function, arguments: labeledExpressions, hasTrailingClosures: hasTrailingClosures, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+        return FunctionCall(function: function, arguments: labeledExpressions, trailingClosureCount: trailingClosureCount, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {

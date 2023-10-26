@@ -845,9 +845,17 @@ class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting, APICallExp
     }
 
     static func translate(expression: FunctionCall, translator: KotlinTranslator) -> KotlinExpression {
-        let karguments = expression.arguments.map {
+        var karguments = expression.arguments.map {
             let kargumentExpression = translator.translateExpression($0.value)
             return LabeledValue(label: $0.label, value: kargumentExpression)
+        }
+        // If our first trailing closure is missing a label but subsequent closures have one, add the label to help the Kotlin compiler
+        let firstTrailingClosureIndex = karguments.count - expression.trailingClosureCount
+        if expression.trailingClosureCount > 1 && firstTrailingClosureIndex >= 0 && karguments[firstTrailingClosureIndex].label == nil, let apiMatch = expression.apiMatch {
+            let parameters = apiMatch.signature.parameters
+            if parameters.count == karguments.count {
+                karguments[firstTrailingClosureIndex].label = parameters[firstTrailingClosureIndex].label
+            }
         }
         if let numberLiteral = numberConstructorToLiteral(expression: expression, arguments: karguments) {
             return numberLiteral
@@ -856,11 +864,12 @@ class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting, APICallExp
         let kfunction = translator.translateExpression(expression.function)
         let kexpression = KotlinFunctionCall(expression: expression, function: kfunction)
         kexpression.arguments = karguments
-        kexpression.hasTrailingClosures = expression.hasTrailingClosures
+        kexpression.hasTrailingClosures = expression.trailingClosureCount > 0
         kexpression.isOptionalInit = expression.isInit && expression.inferredType.isOptional
         kexpression.inferredType = expression.inferredType.resolvingSelf(in: expression)
         kexpression.apiMatch = expression.apiMatch
         kexpression.mayBeSharedMutableStructType = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
+
         // If we resolved our function to a type but this function call is not a type constructor, it must be a free function with a
         // type or typealias's name. Turn off typealias mapping so that we use the function name as-is
         if !expression.isInit {
