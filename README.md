@@ -18,7 +18,7 @@ Install Skip by running the Terminal command:
 brew install skiptools/skip/skip
 ```
 
-This will download and install the `skip` tool itself, as well as `gradle` and JDK dependencies that are necessary for building and testing the Kotlin/Android side of your apps.
+This will download and install the `skip` tool itself, as well as the `gradle` and JDK dependencies that are necessary for building and testing the Kotlin/Android side of your apps. Note: If you don't already have a compatible JDK+ installed on your machine, you may need to enter an administrator password to complete the installation.
 
 Ensure that the development prerequisites are satisfied by running:
 
@@ -30,8 +30,6 @@ skip checkup
 
 
 If the checkup passes, you're ready to start developing with Skip!
-
-**NOTE:** Skip currently requires JDK20 to be installed. If `skip checkup` fails any of the build checks, try installing running `brew install temurin` to ensure a valid JDK is installed.
 
 ## Creating an App {#app_development}
 
