@@ -12,9 +12,11 @@ jobs:
 
       - run: brew install skiptools/skip/skip
 
-      - uses: actions/checkout@v4
+      - run: java -version
 
       - run: skip doctor
+
+      - uses: actions/checkout@v4
 
       - name: Verify Skip Framework
         run: skip verify
