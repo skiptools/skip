@@ -175,13 +175,13 @@ cd ${SKIPPKGDIR}
 # package.targets += [.binaryTarget(name: "${PRODUCT}", url: "${ARTIFACT_URL}", checksum: "${PLUGIN_CHECKSUM}")]
 sed -I '' 's;.binaryTarget(name: "'${ARTIFACT}'", url:.*);.binaryTarget(name: "'${ARTIFACT}'", url: "'${ARTIFACT_URL}'", checksum: "'${PLUGIN_CHECKSUM}'");g' ${SKIPPKG}
 
+sed -I '' 's;.package(url: "https://.*/skip.git", from: ".*");.package(url: "https://source.skip.tools/skip.git", from: "'${SKIP_VERSION}'");g' "README.md"
+
 git add Package.swift ${README_PATH} ${SKIPDRIVE_VERSION_PATH}
 git add .
 git commit --allow-empty --allow-empty-message -m "Release ${SKIP_VERSION}"
 git tag "${SKIP_VERSION}" -m "Release ${SKIP_VERSION}"
 git push --follow-tags
-
-sed -I '' 's;.package(url: "https://.*/skip.git", from: ".*");.package(url: "https://source.skip.tools/skip.git", from: "'${SKIP_VERSION}'");g' "README.md"
 
 # also grab the latest skiphub version and update it in the README
 SKIPHUB_VERSION=`git ls-remote --tags https://github.com/skiptools/skiphub | awk -F/ '$NF ~ /^v?[0-9]+\.[0-9]+\.[0-9]+$/ {print $NF}' | sort -V | tail -n1`
