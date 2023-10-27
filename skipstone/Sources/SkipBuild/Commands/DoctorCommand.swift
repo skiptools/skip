@@ -75,7 +75,7 @@ extension ToolOptionsCommand {
                 }
                 while versionString.split(separator: ".").count > 3 {
                     // handle too many numbers, like: openjdk version "17.0.8.1" 2023-08-24
-                    versionString = versionString.split(separator: ".").dropLast().joined()
+                    versionString = versionString.split(separator: ".").dropLast().joined(separator: ".")
                 }
 
                 // the ToolSupport `Version` constructor only accepts three-part versions,
