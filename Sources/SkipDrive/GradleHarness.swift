@@ -134,7 +134,7 @@ extension GradleHarness {
             "devices",
         ]
 
-        for try await outputLine in Process.streamLines(command: adbDevices, environment: env, onExit: { result in
+        for try await outputLine in Process.streamLines(command: adbDevices, environment: env, includeStdErr: true, onExit: { result in
             guard case .terminated(0) = result.exitStatus else {
                 // we failed, but did not expect an error
                 throw ADBError(errorDescription: "error listing devices: \(result)")
@@ -155,7 +155,7 @@ extension GradleHarness {
 
         print("running:", adbInstall.joined(separator: " "))
 
-        for try await outputLine in Process.streamLines(command: adbInstall, environment: env, onExit: { result in
+        for try await outputLine in Process.streamLines(command: adbInstall, environment: env, includeStdErr: true, onExit: { result in
             guard case .terminated(0) = result.exitStatus else {
                 // we failed, but did not expect an error
                 throw ADBError(errorDescription: "error installing APK: \(result)")
@@ -174,7 +174,7 @@ extension GradleHarness {
             "-n", appid,
         ]
 
-        for try await outputLine in Process.streamLines(command: adbStart, environment: env, onExit: { result in
+        for try await outputLine in Process.streamLines(command: adbStart, environment: env, includeStdErr: true, onExit: { result in
             guard case .terminated(0) = result.exitStatus else {
                 throw ADBError(errorDescription: "error launching APK: \(result)")
             }
@@ -200,7 +200,7 @@ extension GradleHarness {
             + log // e.g., ["*:W"] or ["app.demo*:E"],
 
 
-            for try await outputLine in Process.streamLines(command: logcat, environment: env, onExit: { result in
+            for try await outputLine in Process.streamLines(command: logcat, environment: env, includeStdErr: true, onExit: { result in
                 guard case .terminated(0) = result.exitStatus else {
                     throw ADBError(errorDescription: "error watching log: \(result)")
                 }

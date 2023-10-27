@@ -24,14 +24,14 @@ extension Process {
     }
 
     /// Forks the given command and returns an async stream of lines of output
-    public static func streamLines(command arguments: [String], environment: [String: String] = ProcessInfo.processInfo.environment, workingDirectory: URL? = nil, onExit: @escaping (_ result: ProcessResult) throws -> ()) -> AsyncLineOutput {
-        streamSeparator(command: arguments, environment: environment, workingDirectory: workingDirectory, onExit: onExit)
+    public static func streamLines(command arguments: [String], environment: [String: String] = ProcessInfo.processInfo.environment, workingDirectory: URL? = nil, includeStdErr: Bool, onExit: @escaping (_ result: ProcessResult) throws -> ()) -> AsyncLineOutput {
+        streamSeparator(command: arguments, environment: environment, workingDirectory: workingDirectory, includeStdErr: includeStdErr, onExit: onExit)
             .compactMap({ String(data: $0, encoding: .utf8) })
     }
 
     /// Forks the given command and returns an async stream of parsed JSON messages, one dictionary for each line of output.
     public static func streamJSON(command arguments: [String], environment: [String: String] = ProcessInfo.processInfo.environment, workingDirectory: URL? = nil, onExit: @escaping (_ result: ProcessResult) throws -> ()) -> AsyncThrowingCompactMapSequence<AsyncDataOutput, NSDictionary> {
-        streamSeparator(command: arguments, environment: environment, workingDirectory: workingDirectory, onExit: onExit)
+        streamSeparator(command: arguments, environment: environment, workingDirectory: workingDirectory, includeStdErr: false, onExit: onExit)
             .compactMap({ line in
                 try JSONSerialization.jsonObject(with: line) as? NSDictionary
             })
@@ -39,12 +39,12 @@ extension Process {
 
 
     /// Invokes the given command arguments and returns an async stream of output chunks delimited by the given separator (typically a newline).
-    private static func streamSeparator(character separatorCharacter: UnicodeScalar = Character("\n").unicodeScalars.first!, command arguments: [String], environment: [String: String], workingDirectory: URL?, onExit: @escaping (_ result: ProcessResult) throws -> ()) -> AsyncDataOutput {
+    private static func streamSeparator(character separatorCharacter: UnicodeScalar = Character("\n").unicodeScalars.first!, command arguments: [String], environment: [String: String], workingDirectory: URL?, includeStdErr: Bool, onExit: @escaping (_ result: ProcessResult) throws -> ()) -> AsyncDataOutput {
         AsyncThrowingStream { continuation in
             var buffer: [UInt8] = []
             func handleProcessOutput(err: Bool) -> (_ data: [UInt8]) -> Void {
                 { outputBytes in
-                    if err {
+                    if err && !includeStdErr {
                         // we ignore stderr for streaming
                         return
                     }

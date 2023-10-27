@@ -88,7 +88,7 @@ public struct GradleDriver {
         print("execGradle:", (gradleArgs + args).joined(separator: " "))
         #endif
 
-        return Process.streamLines(command: gradleArgs + args, environment: env, workingDirectory: workingDirectory, onExit: onExit)
+        return Process.streamLines(command: gradleArgs + args, environment: env, workingDirectory: workingDirectory, includeStdErr: true, onExit: onExit)
     }
 
     /// Invokes the given target for a gradle project.
@@ -236,7 +236,7 @@ public struct GradleDriver {
          OS:           Mac OS X 13.3.1 x86_64
          */
 
-        let lines = try await Process.streamLines(command: gradleArgs + ["--version"], onExit: Process.expectZeroExitCode).reduce([]) { $0 + [$1] }
+        let lines = try await Process.streamLines(command: gradleArgs + ["--version"], includeStdErr: true, onExit: Process.expectZeroExitCode).reduce([]) { $0 + [$1] }
         //print("gradle info", lines.joined(separator: "\n"))
         var lineMap: [String: String] = [:]
         let gradlePrefix = "Gradle"
