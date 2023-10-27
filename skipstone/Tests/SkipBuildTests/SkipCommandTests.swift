@@ -11,7 +11,8 @@ final class SkipCommandTests: XCTestCase {
         _ = try await skipstone(["info", "-jA"]).json()
     }
 
-    func testDoctorCommand() async throws {
+    // disabled because on CI, the doctor command doesn't locate the `skip` tool itself
+    func XXXtestDoctorCommand() async throws {
         // run skip doctor with JSON array output and make sure we can parse the result
         try await XCTAssertEqualAsync(["msg": "Skip Doctor"], skipstone(["doctor", "-jA"]).json().array?.first)
     }

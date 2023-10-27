@@ -63,7 +63,7 @@ struct ADBCommand: MessageCommand {
         for (key, value) in env {
             penv[key] = value
         }
-        return Process.streamLines(command: [try toolOptions.toolPath(for: "adb")] + arguments, environment: penv, workingDirectory: workingDirectory, onExit: onExit)
+        return Process.streamLines(command: [try toolOptions.toolPath(for: "adb")] + arguments, environment: penv, workingDirectory: workingDirectory, includeStdErr: true, onExit: onExit)
     }
     #endif
 
