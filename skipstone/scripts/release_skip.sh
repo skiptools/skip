@@ -93,6 +93,7 @@ sed -I '' 's;public let skipVersion = .*;public let skipVersion = "'${SKIP_VERSI
 
 # also sync the plugin version in skip/Sources/SkipDrive/Version.swift
 cd ${SKIPPKGDIR}
+git pull
 SKIPDRIVE_VERSION_PATH="Sources/SkipDrive/Version.swift"
 sed -I '' 's;public let skipVersion = .*;public let skipVersion = "'${SKIP_VERSION}'";g' "${SKIPDRIVE_VERSION_PATH}"
 #git diff "${SKIPSTONE_VERSION_PATH}" || true
@@ -226,6 +227,7 @@ git push --follow-tags
 
 # update the homebrew cask with the updated skip command
 cd ${SKIPBREWDIR}
+git pull
 
 sed -I '' "s;version \".*\";version \"${SKIP_VERSION}\";g" Casks/skip.rb
 sed -I '' "s;sha256 \".*\";sha256 \"${PLUGIN_CHECKSUM}\";g" Casks/skip.rb

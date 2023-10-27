@@ -145,7 +145,13 @@ extension TestCommand {
                 // .build/plugins/outputs/skip-zip/SkipZipTests/skipstone/SkipZip/.build/SkipZip/test-results/testDebugUnitTest/TEST-skip.zip.SkipZipTests.xml
                 junitFolder = URL(fileURLWithPath: junit, isDirectory: true)
             } else {
-                let packageName = try await packageName()
+                var packageName = try await packageName()
+                // FIXME: the "name" attribute in the Package.swift file does not seem to dictate the name of the local outputs folder in CLI SPM like it does in Xcode; rather, the outputs seem to go to the enclosing directory name for the package
+                let folderName = URL(fileURLWithPath: project).standardizedFileURL.lastPathComponent
+                if packageName != folderName {
+                    await out.yield(MessageBlock(status: .warn, "Folder name does not match package name in Package.swift"))
+                    packageName = folderName
+                }
                 let testOutput = ".build/plugins/outputs/\(packageName)/\(skipModule)Tests/skipstone/\(skipModule)/.build/\(skipModule)/test-results/test\(configuration.capitalized)UnitTest/"
                 junitFolder = URL(fileURLWithPath: testOutput, isDirectory: true)
             }
