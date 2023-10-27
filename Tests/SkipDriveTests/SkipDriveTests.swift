@@ -40,7 +40,7 @@ class SkipCommandTests : XCTestCase {
         let tempDir = try mktmp()
         let projectName = "hello-skip"
         let appName = "HelloSkip"
-        let appScheme = appName + "App"
+        //let appScheme = appName + "App"
         let stdout = try await skip("init", "--show-tree", "--no-build", "--no-test", "-d", tempDir, "--appid", "com.company.HelloSkip", projectName, appName)
         //print("skip create stdout: \(stdout)")
         let out = stdout.split(separator: "\n")
@@ -100,6 +100,7 @@ class SkipCommandTests : XCTestCase {
         """)
 
         let verify = try await skip("verify", "-jA", "--project", tempDir).parseJSONArray()
+        _ = verify
         //print("#### verify: \(verify)")
         //XCTAssertGreaterThan(verify.count, 1, "verify output should have contained some lines")
 
@@ -259,7 +260,7 @@ class SkipCommandTests : XCTestCase {
         var result: ProcessResult? = nil
         var env = ProcessInfo.processInfo.environment
         env["TERM"] = "dumb" // override TERM to prevent skip from using ANSI colors or progress animations
-        for try await outputLine in Process.streamLines(command: cmd, environment: env, onExit: { result = $0 }) {
+        for try await outputLine in Process.streamLines(command: cmd, environment: env, includeStdErr: true, onExit: { result = $0 }) {
             print("\(testName)> \(outputLine)")
             outputLines.append(outputLine)
         }
@@ -299,6 +300,13 @@ private extension String {
 
     /// Attempts to parse the given String as a JSON object
     func parseJSONArray(file: StaticString = #file, line: UInt = #line) throws -> [Any] {
+        var str = self
+
+        // workround for test failures: sometimes stderr has a line line: "2023-10-27 17:04:18.587523-0400 skip[91666:2692850] [client] No error handler for XPC error: Connection invalid"; this seems to be a side effect of running `skip doctor` from within Xcode
+        if str.hasSuffix("No error handler for XPC error: Connection invalid\n") {
+            str = str.split(separator: "\n").dropLast().joined(separator: "\n")
+        }
+
         do {
             let json = try JSONSerialization.jsonObject(with: Data(utf8), options: [])
             if let arr = json as? [Any] {
