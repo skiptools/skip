@@ -100,6 +100,7 @@ class SkipCommandTests : XCTestCase {
         """)
 
         let verify = try await skip("verify", "-jA", "--project", tempDir).parseJSONArray()
+        //print("#### verify: \(verify)")
         //XCTAssertGreaterThan(verify.count, 1, "verify output should have contained some lines")
 
     }
