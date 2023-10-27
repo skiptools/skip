@@ -64,18 +64,28 @@ extension ToolOptionsCommand {
 
                 let output = res.stdout.trimmingCharacters(in: .newlines) + res.stderr.trimmingCharacters(in: .newlines)
 
-                guard let v = try? output.extract(pattern: pattern) else {
+                guard let outputVersion = try? output.extract(pattern: pattern) else {
                     return (result: result, message: MessageBlock(status: .fail, title + " could not extract version from \(cmd.first ?? "")"))
+                }
+
+                var versionString = outputVersion
+                while versionString.split(separator: ".").count < 3 {
+                    // handle too few numbers, like: gradle 8.4
+                    versionString += ".0"
+                }
+                while versionString.split(separator: ".").count > 3 {
+                    // handle too many numbers, like: openjdk version "17.0.8.1" 2023-08-24
+                    versionString = versionString.split(separator: ".").dropLast().joined()
                 }
 
                 // the ToolSupport `Version` constructor only accepts three-part versions,
                 // so we need to augment versions like "8.3" and "2022.3" with an extra ".0"
-                guard let semver = Version(v) ?? Version(v + ".0") ?? Version(v + ".0.0") else {
-                    return (result: result, message: MessageBlock(status: .fail, title + " could not parse version"))
+                guard let semver = Version(versionString) else {
+                    return (result: result, message: MessageBlock(status: .fail, title + " could not parse version: \(versionString)"))
                 }
 
                 if let min = min {
-                    return (result: result, message: MessageBlock(status: semver < min ? .warn : .pass, "\(title) \(semver) (\(semver < min ? "<" : semver > min ? ">" : "=") \(min))"))
+                    return (result: result, message: MessageBlock(status: semver < min ? .warn : .pass, "\(title) \(outputVersion) (\(semver < min ? "<" : semver > min ? ">" : "=") \(min))"))
                 } else {
                     return (result: result, message: MessageBlock(status: .pass, "\(title) \(semver)"))
                 }
