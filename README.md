@@ -33,7 +33,7 @@ If the checkup passes, you're ready to start developing with Skip!
 
 **NOTE:** Skip currently requires JDK20 to be installed. If `skip checkup` fails any of the build checks, try installing running `brew install temurin` to ensure a valid JDK is installed.
 
-## Creating an App
+## Creating an App {#app_development}
 
 Create a new app project with the command:
 
@@ -73,7 +73,7 @@ skip init --open-xcode --appid=com.xyz.HelloSkip multi-project HelloSkip HelloMo
 
 This command will create a SwiftPM project with three modules: `HelloSkip`, `HelloModel`, and `HelloCore`. The heuristics of such module creation is that the modules will all be dependent on their subsequent peer module, with the first module (`HelloSkip`) having an initial dependency on `SkipUI`, the second module depending on `SkipModel`, and the final module in the chain depending on `SkipFoundation`. The `Package.swift` file can be manually edited to shuffle around dependencies, or to add new dependencies on external Skip frameworks such as the nascent [SkipSQL](https://source.skip.tools/skip-sql) or [SkipXML](https://source.skip.tools/skip-xml) libraries.
 
-## Creating a Dual-Platform Library
+## Creating a Dual-Platform Framework {#framework_development}
 
 Skip library projects are pure SwiftPM packages that encapsulate common functionality. Each of the core Skip compatibility frameworks ([skip-lib](https://source.skip.tools/skip-lib), [skip-unit](https://source.skip.tools/skip-unit), [skip-foundation](https://source.skip.tools/skip-foundation), and [skip-ui](https://source.skip.tools/skip-ui)) are Skip library projects. Other commonly-used projects include [skip-sql](https://source.skip.tools/skip-sql), [skip-script](https://source.skip.tools/skip-script), and [skip-zip](https://source.skip.tools/skip-zip).
 
