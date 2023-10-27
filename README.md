@@ -31,7 +31,7 @@ skip checkup
 
 If the checkup passes, you're ready to start developing with Skip!
 
-**NOTE:** Skip currently requires JDK17 to be installed. If `skip checkup` fails any of the build checks, try installing running `brew install openjdk@17` to ensure a valid JDK is installed.
+**NOTE:** Skip currently requires JDK20 to be installed. If `skip checkup` fails any of the build checks, try installing running `brew install temurin` to ensure a valid JDK is installed.
 
 ## Creating an App
 
