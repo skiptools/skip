@@ -205,6 +205,11 @@ import PackagePlugin
                 continue
             }
 
+            // ignore non-Skip-enabled dependency modules, based on the existance of the SRC/MODULE/Skip/skip.yml file
+            if !FileManager.default.isReadableFile(atPath: depTarget.directory.appending("Skip", "skip.yml").string) {
+                continue
+            }
+
             if let moduleLinkTarget = try addModuleLinkFlag(depTarget, packageID: dep.package.id) {
                 // adds an input file dependency on all the .skipcode.json files output from the dependent targets
                 // this should block the invocation of the transpiler plugin for this module
