@@ -74,7 +74,7 @@ jobs:
 
       - name: Run Tests
         # "null cannot be cast to non-null type kotlin.String"
-        run: test ! -d Tests || skip test
+        run: test ! -d Tests || skip test || skip test -v
 
       - name: Build ipa
         run: |
