@@ -64,6 +64,7 @@ public let builtinKotlinTransformerTypes: [KotlinTransformer.Type] = [
     KotlinSwiftUITransformer.self,
     KotlinImportsTransformer.self,
     KotlinUnitTestTransformer.self,
+    KotlinModuleBundleTransformer.self,
 ]
 
 /// The builtin transformers can implement this protocol to modify how type signatures are output.

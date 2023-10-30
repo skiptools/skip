@@ -1829,6 +1829,21 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
         return isStaticReferenceOrTypeName || isBaseSelfOrSuper || base == nil
     }
 
+    func isBaseType(named: String, moduleName: String) -> Bool {
+        guard baseType == .none else {
+            return baseType.isNamed(named, moduleName: moduleName)
+        }
+        
+        // Try to work even without codebase info
+        if let identifier = base as? KotlinIdentifier {
+            return identifier.name == named
+        } else if let memberAccess = base as? KotlinMemberAccess {
+            return memberAccess.member == named && (memberAccess.base as? KotlinIdentifier)?.name == moduleName
+        } else {
+            return false
+        }
+    }
+
     var isInAwait = false
     var isInMainActorContext = false
     var apiFlags: APIFlags? {

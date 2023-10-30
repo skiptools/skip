@@ -67,4 +67,51 @@ final class TransformerTests: XCTestCase {
         }
         """)
     }
+
+    func testModuleBundleTransformer() async throws {
+        try await check(swift: """
+        import Foundation
+        func f() {
+            let path = Bundle.module.path()
+        }
+        """, kotlin: """
+        import skip.foundation.*
+        internal fun f() {
+            val path = Bundle.module.path()
+        }
+        """, packageSupportKotlin: """
+        internal val skip.foundation.Bundle.Companion.module: skip.foundation.Bundle
+            get() = skip.foundation.Bundle(_ModuleBundleLocator::class)
+        internal class _ModuleBundleLocator {}
+        """)
+
+        try await check(swift: """
+        import Foundation
+        func f() {
+            let path = Foundation.Bundle.module.path()
+        }
+        """, kotlin: """
+        import skip.foundation.*
+        internal fun f() {
+            val path = Foundation.Bundle.module.path()
+        }
+        """, packageSupportKotlin: """
+        internal val skip.foundation.Bundle.Companion.module: skip.foundation.Bundle
+            get() = skip.foundation.Bundle(_ModuleBundleLocator::class)
+        internal class _ModuleBundleLocator {}
+        """)
+
+        try await check(swift: """
+        import Foundation
+        func f() {
+            let path = Local.Bundle.module.path()
+        }
+        """, kotlin: """
+        import skip.foundation.*
+        internal fun f() {
+            val path = Local.Bundle.module.path()
+        }
+        """, packageSupportKotlin: """
+        """)
+    }
 }

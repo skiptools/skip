@@ -75,7 +75,7 @@ class KotlinStatement: KotlinSyntaxNode {
         if extras == nil {
             extras = StatementExtras(directives: [], leadingTrivia: newlines, trailingTrivia: [])
         } else {
-            extras?.leadingTrivia += newlines
+            extras!.leadingTrivia = newlines + extras!.leadingTrivia
         }
     }
 }
