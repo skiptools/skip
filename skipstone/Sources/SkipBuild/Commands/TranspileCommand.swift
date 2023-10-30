@@ -236,12 +236,12 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         let overridden = try linkSkipFolder(skipFolderPath, to: kotlinOutputFolder, topLevel: true)
         let overriddenKotlinFiles = overridden.map({ $0.basename })
 
-        // also add any Kotlin files in the skipFolderFile to the list of sources
-        let skipFolderPathContents = try fs.getDirectoryContents(skipFolderPath)
-            .map { try AbsolutePath(skipFolderPath, validating: $0) }
+        // also add any files in the skipFolderFile to the list of sources (including the skip.yml and other metadata files)
+        let skipFolderPathContents = try FileManager.default.enumeratedURLs(of: skipFolderPath.asURL)
+            .filter({ (try? $0.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true })
 
         // validate licenses in all the Skip source files, as well as any custom Kotlin files in the Skip folder
-        let sourcehashes = try await createSourceHashes(validateLicense: true, sourceURLs: sourceURLs + skipFolderPathContents.map(\.asURL))
+        let sourcehashes = try await createSourceHashes(validateLicense: ["swift", "kt"], sourceURLs: sourceURLs + skipFolderPathContents)
         // touch the build marker with the most recent file time from the complete build list
         // if we were to touch it afresh every time, the plugin would be re-executed every time
         defer {

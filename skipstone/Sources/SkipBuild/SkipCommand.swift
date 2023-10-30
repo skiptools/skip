@@ -6,6 +6,7 @@ import ArgumentParser
 import TSCBasic
 import Universal
 import struct Universal.JSON
+import SkipDriveExternal
 
 /// The version of Skip, via `SkipSyntax`
 public let skipVersion = SkipSyntax.skipVersion // we don't want to have to import SkipSyntax just to get the version, so re-export it
@@ -21,7 +22,7 @@ protocol SkipCommand : AsyncParsableCommand, OutputOptionsCommand {
 
 extension SkipCommand {
     /// Initialize a Skip command to run with the given fixed streams.
-    func setup(out: WritableByteStream? = nil, err: WritableByteStream? = nil) throws -> Self {
+    func setup(out: TSCBasic.WritableByteStream? = nil, err: TSCBasic.WritableByteStream? = nil) throws -> Self {
         if let outputFile = outputOptions.output {
             let path = URL(fileURLWithPath: outputFile)
             outputOptions.streams.out = try LocalFileOutputByteStream(AbsolutePath(validating: path.path))
@@ -180,7 +181,7 @@ public struct SkipKeyExecutor: SkipCommandExecutor {
 
 extension SkipCommandExecutor {
     /// Run the given command on the given arguments.
-    public static func run(_ arguments: [String], basePath: AbsolutePath = localFileSystem.currentWorkingDirectory!, out: WritableByteStream? = nil, err: WritableByteStream? = nil) async throws {
+    public static func run(_ arguments: [String], basePath: AbsolutePath = localFileSystem.currentWorkingDirectory!, out: TSCBasic.WritableByteStream? = nil, err: TSCBasic.WritableByteStream? = nil) async throws {
         var cmd: ParsableCommand = try parseAsRoot(arguments)
         if var cmd = cmd as? any StreamingCommand {
             if let outputFile = cmd.outputOptions.output {
@@ -718,43 +719,6 @@ private extension AbsolutePath {
 }
 
 extension ProcessInfo {
-    /// True when the current architecture is ARM
-    public static let isARM = {
-        #if os(macOS)
-        var size: size_t = 0
-        sysctlbyname("hw.machine", nil, &size, nil, 0)
-        var machine = [CChar](repeating: 0, count: size)
-        sysctlbyname("hw.machine", &machine, &size, nil, 0)
-        let platform = String(cString: machine)
-        return platform.lowercased().contains("arm")
-
-        #elseif os(Linux)
-        if let cpuInfo = try? String(contentsOfFile: "/proc/cpuinfo") {
-            return cpuInfo.lowercased().contains("arm")
-        }
-        return false
-
-        #else
-        return false
-        #endif
-    }()
-
-    /// The current process environment along with the default paths to various tools set
-    public var environmentWithDefaultToolPaths: [String: String] {
-        var env = self.environment
-        let ANDROID_HOME = "ANDROID_HOME"
-        if env[ANDROID_HOME] == nil {
-            #if os(macOS)
-            env[ANDROID_HOME] = ("~/Library/Android/sdk" as NSString).expandingTildeInPath
-            #elseif os(Windows)
-            env[ANDROID_HOME] = ("~/AppData/Local/Android/Sdk" as NSString).expandingTildeInPath
-            #elseif os(Linux)
-            env[ANDROID_HOME] = ("~/Android/Sdk" as NSString).expandingTildeInPath
-            #endif
-        }
-        return env
-    }
-
         /// The unique host identifier as returned from `IOPlatformExpertDevice` on Darwin and the contents of "/etc/machine-id" on Linux
     public var hostIdentifier: String? {
         #if canImport(IOKit)
@@ -851,11 +815,6 @@ struct ToolOptions: ParsableArguments {
     @Option(help: ArgumentHelp("Path to the Android SDK (ANDROID_HOME)", valueName: "path"))
     var androidHome: String? = nil
 
-    private static var homebrewRoot: String {
-        ProcessInfo.processInfo.environment["HOMEBREW_PREFIX"]
-            ?? (ProcessInfo.isARM ? "/opt/homebrew" : "/usr/local")
-    }
-
     /// Returns the path for the given tool, or throws an error if no executable tool was found.
     ///
     /// Note that some tools can be overridden by name
@@ -873,7 +832,7 @@ struct ToolOptions: ParsableArguments {
         if let toolPath = customTool() {
             return toolPath
         }
-        return try URL.findCommandInPath(toolName: tool, withAdditionalPaths: ProcessInfo.isARM ? ["/opt/homebrew/bin"] : ["/usr/local/bin"]).path
+        return try URL.findCommandInPath(toolName: tool, withAdditionalPaths: [ProcessInfo.homebrewRoot + "/bin"]).path
     }
 }
 
@@ -1037,7 +996,7 @@ extension FileSystem {
     }
 
     /// A version of `FileSystem.writeIfChanged` that allows control over permissions and size check optimizations.
-    @discardableResult func writeChanges(path: AbsolutePath, checkSize: Bool = true, makeWritable: Bool = true, makeReadOnly: Bool = false, bytes: ByteString) throws -> Bool {
+    @discardableResult func writeChanges(path: AbsolutePath, checkSize: Bool = true, makeWritable: Bool = true, makeReadOnly: Bool = false, bytes: TSCBasic.ByteString) throws -> Bool {
         if !isFile(path) {
             return try save()
         }
