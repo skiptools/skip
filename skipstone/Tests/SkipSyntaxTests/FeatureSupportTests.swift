@@ -319,11 +319,11 @@ final class FeatureSupportTests: XCTestCase {
             
             fun KeywordsEnum(rawValue: Int): KeywordsEnum? {
                 return when (rawValue) {
-                    0 -> KeywordsEnum.null
+                    0 -> KeywordsEnum.null_
                     1 -> KeywordsEnum.string
                     2 -> KeywordsEnum.boolean
-                    3 -> KeywordsEnum.object
-                    4 -> KeywordsEnum.`case`
+                    3 -> KeywordsEnum.object_
+                    4 -> KeywordsEnum.case
                     else -> null
                 }
             }

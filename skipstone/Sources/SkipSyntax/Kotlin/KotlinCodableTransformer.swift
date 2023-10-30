@@ -100,7 +100,11 @@ final class KotlinCodableTransformer: KotlinTransformer {
         enumDeclaration.extras = .singleNewline
         enumDeclaration.isGenerated = true
         let caseDeclarations = storedVariableDeclarations.map {
-            KotlinEnumCaseDeclaration(name: $0.propertyName)
+            let caseDeclaration = KotlinEnumCaseDeclaration(forPropertyName: $0.propertyName)
+            if let preEscapePropertyName = $0.preEscapePropertyName {
+                caseDeclaration.rawValue = KotlinStringLiteral(literal: preEscapePropertyName)
+            }
+            return caseDeclaration
         }
         enumDeclaration.members = caseDeclarations
         enumDeclaration.processEnumCaseDeclarations()
@@ -131,8 +135,10 @@ final class KotlinCodableTransformer: KotlinTransformer {
         if let codingKeys {
             statements.append(KotlinRawStatement(sourceCode: "val container = to.container(keyedBy = CodingKeys::class)"))
             statements += codingKeys.map {
+                let name = $0.0.forPropertyName
+                let caseName = $0.0.name
                 let encodeFunction = $0.1.isOptional ? "encodeIfPresent" : "encode"
-                return KotlinRawStatement(sourceCode: "container.\(encodeFunction)(\($0.0.name), forKey = CodingKeys.\($0.0.name))")
+                return KotlinRawStatement(sourceCode: "container.\(encodeFunction)(\(name), forKey = CodingKeys.\(caseName))")
             }
         } else if rawValueType != .none {
             statements.append(KotlinRawStatement(sourceCode: "val container = to.singleValueContainer()"))
@@ -194,7 +200,8 @@ final class KotlinCodableTransformer: KotlinTransformer {
     }
 
     private func synthesizeDecodeStatement(for codingKey: (KotlinEnumCaseDeclaration, TypeSignature)) -> KotlinStatement {
-        let name = codingKey.0.name
+        let name = codingKey.0.forPropertyName
+        let caseName = codingKey.0.name
         let type = codingKey.1
         let decodeFunction = type.isOptional ? "decodeIfPresent" : "decode"
         let decodeType = type.asOptional(false)
@@ -217,7 +224,7 @@ final class KotlinCodableTransformer: KotlinTransformer {
         default:
             typeArguments = "\(decodeType.withGenerics([]).kotlin)::class"
         }
-        return KotlinRawStatement(sourceCode: "this.\(name) = container.\(decodeFunction)(\(typeArguments), forKey = CodingKeys.\(name))")
+        return KotlinRawStatement(sourceCode: "this.\(name) = container.\(decodeFunction)(\(typeArguments), forKey = CodingKeys.\(caseName))")
     }
 
     private func synthesizeDecodableCompanion(for classDeclaration: KotlinClassDeclaration) {
@@ -243,7 +250,7 @@ final class KotlinCodableTransformer: KotlinTransformer {
     }
 
     private func propertyType(for codingKey: KotlinEnumCaseDeclaration, in classDeclaration: KotlinClassDeclaration, source: Source) -> TypeSignature {
-        guard let variableDeclaration = classDeclaration.members.first(where: { ($0 as? KotlinVariableDeclaration)?.propertyName == codingKey.name }) as? KotlinVariableDeclaration else {
+        guard let variableDeclaration = classDeclaration.members.first(where: { ($0 as? KotlinVariableDeclaration)?.propertyName == codingKey.forPropertyName }) as? KotlinVariableDeclaration else {
             codingKey.messages.append(.kotlinCodablePropertyForKey(codingKey, source: source))
             return .any
         }
@@ -298,6 +305,26 @@ final class KotlinCodableTransformer: KotlinTransformer {
 
     private func elementArgument(label: String, type: TypeSignature) -> LabeledValue<KotlinExpression> {
         return LabeledValue(label: label, value: KotlinRawExpression(sourceCode: "\(type.kotlin)::class"))
+    }
+}
+
+extension KotlinEnumCaseDeclaration {
+    private static let disallowedCaseNameCodingKeySuffix = "codingkey"
+
+    fileprivate convenience init(forPropertyName name: String) {
+        if Self.disallowedCaseNames.contains(name) {
+            self.init(name: name + Self.disallowedCaseNameCodingKeySuffix)
+            self.rawValue = KotlinStringLiteral(literal: name)
+        } else {
+            self.init(name: name)
+        }
+    }
+
+    fileprivate var forPropertyName: String {
+        guard name.count > Self.disallowedCaseNameCodingKeySuffix.count && name.hasSuffix(Self.disallowedCaseNameCodingKeySuffix) else {
+            return name
+        }
+        return String(name.dropLast(Self.disallowedCaseNameCodingKeySuffix.count))
     }
 }
 

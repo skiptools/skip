@@ -881,4 +881,52 @@ final class CodableTests: XCTestCase {
         internal fun E(from: Decoder): E = E.a(100)
         """)
     }
+
+    func testDisallowedEnumCaseNames() async throws {
+        try await check(swift: """
+        struct S: Codable {
+            let name: String
+            let package: String
+        }
+        """, kotlin: """
+        internal class S: Codable {
+            internal val name: String
+            internal val package_: String
+
+            constructor(name: String, package_: String) {
+                this.name = name
+                this.package_ = package_
+            }
+
+            private enum class CodingKeys(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
+                namecodingkey("name"),
+                package_("package");
+            }
+
+            private fun CodingKeys(rawValue: String): CodingKeys? {
+                return when (rawValue) {
+                    "name" -> CodingKeys.namecodingkey
+                    "package" -> CodingKeys.package_
+                    else -> null
+                }
+            }
+
+            override fun encode(to: Encoder) {
+                val container = to.container(keyedBy = CodingKeys::class)
+                container.encode(name, forKey = CodingKeys.namecodingkey)
+                container.encode(package_, forKey = CodingKeys.package_)
+            }
+
+            constructor(from: Decoder) {
+                val container = from.container(keyedBy = CodingKeys::class)
+                this.name = container.decode(String::class, forKey = CodingKeys.namecodingkey)
+                this.package_ = container.decode(String::class, forKey = CodingKeys.package_)
+            }
+
+            companion object: DecodableCompanion<S> {
+                override fun init(from: Decoder): S = S(from = from)
+            }
+        }
+        """)
+    }
 }

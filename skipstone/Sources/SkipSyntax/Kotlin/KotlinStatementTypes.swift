@@ -1010,14 +1010,14 @@ class KotlinClassDeclaration: KotlinStatement {
                         caseDeclaration.rawValue = KotlinNumericLiteral(literal: String(lastRawValueInt))
                     }
                 } else if caseDeclaration.rawValue == nil {
-                    caseDeclaration.rawValue = KotlinStringLiteral(literal: caseDeclaration.name)
+                    caseDeclaration.rawValue = KotlinStringLiteral(literal: caseDeclaration.preEscapedName ?? caseDeclaration.name)
                 }
             }
             caseDeclaration.isLastDeclaration = index == caseDeclarations.count - 1
 
             // Note that a transformer may force this enum into a sealed enum later, so we can only warn on the likelihood that
             // this will turn into an enum case and cause an error
-            if let messagesSource, !isSealed && KotlinEnumCaseDeclaration.disallowedCaseNames.contains(caseDeclaration.name) {
+            if let messagesSource, !isSealed && KotlinEnumCaseDeclaration.disallowedCaseNames.contains(caseDeclaration.preEscapedName ?? caseDeclaration.name) {
                 caseDeclaration.messages.append(.kotlinEnumCaseName(caseDeclaration, source: messagesSource))
             }
         }
@@ -1167,8 +1167,7 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
     static let disallowedCaseNames: Set<String> = ["segmented", "name", "ordinal"]
 
     var name: String
-    /// The case name if different from `name`, such as when a keyword is escaped
-    var caseName: String?
+    var preEscapedName: String?
     var generics: Generics = Generics()
     var enumGenerics: Generics = Generics()
     var associatedValues: [Parameter<KotlinExpression>] = []
@@ -1185,6 +1184,11 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
             return first.uppercased() + cname.dropFirst() + "Case"
         }
         return cname + "Case"
+    }
+
+    /// Return the name of the sealed class we create for the given enum case name in an enum with associated values.
+    static func sealedClassName(for enumCase: KotlinEnumCaseDeclaration) -> String {
+        return sealedClassName(for: enumCase.preEscapedName ?? enumCase.name)
     }
 
     static func translate(statement: EnumCaseDeclaration, translator: KotlinTranslator) -> KotlinEnumCaseDeclaration {
@@ -1236,7 +1240,7 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
         if let declaration = extras?.declaration {
             output.append(declaration)
         } else if let owningClassDeclaration = owningClassDeclaration, owningClassDeclaration.isSealedClassesEnum {
-            output.append("class \(Self.sealedClassName(for: name))")
+            output.append("class \(Self.sealedClassName(for: self))")
             generics.append(to: output, indentation: indentation)
             if !associatedValues.isEmpty {
                 appendAssociatedValueArguments(to: output, asConstructor: true, indentation: indentation)
@@ -1265,7 +1269,7 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
             }
             output.append(indentation).append("}\n")
         } else {
-            output.append(caseName ?? name)
+            output.append(name)
             if let rawValue {
                 if let rawValueType = owningClassDeclaration?.enumInheritedRawValueType, rawValueType == .float || rawValueType.isUnsigned {
                     // Explicitly cast to expected type to avoid Kotlin errors
@@ -1285,16 +1289,16 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
     func appendSealedClassFactory(to output: OutputGenerator, forEnum: String, alwaysCreateNewInstances: Bool, indentation: Indentation) {
         output.append(indentation)
         if associatedValues.isEmpty {
-            output.append("val \(caseName ?? name): \(forEnum)")
+            output.append("val \(name): \(forEnum)")
             enumGenerics.append(to: output, indentation: indentation)
             if alwaysCreateNewInstances {
                 output.append("\n")
                 let getterIndentation = indentation.inc()
-                output.append(getterIndentation).append("get() = \(Self.sealedClassName(for: name))")
+                output.append(getterIndentation).append("get() = \(Self.sealedClassName(for: self))")
                 generics.appendWhere(to: output, indentation: getterIndentation)
                 output.append("()\n")
             } else {
-                output.append(" = \(Self.sealedClassName(for: name))")
+                output.append(" = \(Self.sealedClassName(for: self))")
                 generics.appendWhere(to: output, indentation: indentation)
                 output.append("()\n")
             }
@@ -1304,13 +1308,13 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
                 generics.append(to: output, indentation: indentation)
                 output.append(" ")
             }
-            output.append(caseName ?? name)
+            output.append(name)
             appendAssociatedValueArguments(to: output, asConstructor: false, indentation: indentation)
             output.append(": \(forEnum)")
             enumGenerics.append(to: output, indentation: indentation)
             generics.appendWhere(to: output, indentation: indentation)
             output.append(" = ")
-            output.append("\(Self.sealedClassName(for: name))(")
+            output.append("\(Self.sealedClassName(for: self))(")
             for (index, value) in associatedValues.enumerated() {
                 if let label = value.externalLabel {
                     output.append(label)
@@ -2273,6 +2277,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             names = [newValue]
         }
     }
+    var preEscapePropertyName: String?
     var propertyType: TypeSignature {
         get {
             return variableTypes.first ?? .none

@@ -94,7 +94,7 @@ extension Message {
 
     // Idea: automatically re-map uses of this case
     static func kotlinEnumCaseName(_ sourceDervied: SourceDerived, source: Source) -> Message {
-        return Message(kind: .warning, message: "This enum case name may case compilation errors in Kotlin. Consider using another name", sourceDerived: sourceDervied, source: source)
+        return Message(kind: .warning, message: "This enum case name may cause compilation errors in Kotlin. Consider using another name. If this is a CodingKey, you can append 'codingkey' and Skip will strip that suffix to find the matching property", sourceDerived: sourceDervied, source: source)
     }
 
     // Idea: generate an internal ordinal member var and synthesize code to use it and associated values to conform

@@ -55,11 +55,19 @@ private class EscapeKeywordsVisitor {
         } else if let node = node as? KotlinFunctionCall {
             node.arguments = node.arguments.map(fixLabeledArgument)
         } else if let node = node as? KotlinVariableDeclaration {
+            let propertyName = node.propertyName
             node.names = node.names.map {
                 $0.map(fixKeyword)
             }
+            if node.propertyName != propertyName {
+                node.preEscapePropertyName = propertyName
+            }
         } else if let node = node as? KotlinEnumCaseDeclaration {
-            node.caseName = fixKeyword(name: node.name)
+            let name = node.name
+            node.name = fixKeyword(name: name)
+            if node.name != name {
+                node.preEscapedName = name
+            }
             node.associatedValues = node.associatedValues.map(fixParameter)
         } else if let node = node as? KotlinForLoop {
             node.identifierPatterns = node.identifierPatterns.map(fixIdentifierPattern)

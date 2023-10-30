@@ -132,7 +132,7 @@ final class KotlinCommonProtocolsTransformer: KotlinTransformer {
                 guard classDeclaration.alwaysCreateNewSealedClassInstances || !enumCase.associatedValues.isEmpty else {
                     continue
                 }
-                let equalsFunction = equalsFunction(for: KotlinEnumCaseDeclaration.sealedClassName(for: enumCase.name), generics: enumCase.generics, properties: (0..<enumCase.associatedValues.count).map { "associated\($0)" })
+                let equalsFunction = equalsFunction(for: KotlinEnumCaseDeclaration.sealedClassName(for: enumCase), generics: enumCase.generics, properties: (0..<enumCase.associatedValues.count).map { "associated\($0)" })
                 enumCase.members.append(equalsFunction)
                 equalsFunction.parent = enumCase
                 equalsFunction.assignParentReferences()
@@ -158,7 +158,7 @@ final class KotlinCommonProtocolsTransformer: KotlinTransformer {
                 guard classDeclaration.alwaysCreateNewSealedClassInstances || !enumCase.associatedValues.isEmpty else {
                     continue
                 }
-                let hashCodeFunction = hashCodeFunction(for: KotlinEnumCaseDeclaration.sealedClassName(for: enumCase.name), properties: (0..<enumCase.associatedValues.count).map { "associated\($0)" })
+                let hashCodeFunction = hashCodeFunction(for: KotlinEnumCaseDeclaration.sealedClassName(for: enumCase), properties: (0..<enumCase.associatedValues.count).map { "associated\($0)" })
                 enumCase.members.append(hashCodeFunction)
                 hashCodeFunction.parent = enumCase
                 hashCodeFunction.assignParentReferences()
