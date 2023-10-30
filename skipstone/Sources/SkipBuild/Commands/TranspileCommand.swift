@@ -241,7 +241,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             .map { try AbsolutePath(skipFolderPath, validating: $0) }
 
         // validate licenses in all the Skip source files, as well as any custom Kotlin files in the Skip folder
-        let sourcehashes = try await createSourceHashes(validateLicense: true, sourceURLs: sourceURLs + skipFolderPathContents.map(\.asURL).filter({ $0.pathExtension == "kt" }))
+        let sourcehashes = try await createSourceHashes(validateLicense: true, sourceURLs: sourceURLs + skipFolderPathContents.map(\.asURL))
         // touch the build marker with the most recent file time from the complete build list
         // if we were to touch it afresh every time, the plugin would be re-executed every time
         defer {

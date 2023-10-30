@@ -68,7 +68,7 @@ extension ToolOptionsCommand {
                     return (result: result, message: MessageBlock(status: .fail, title + " could not extract version from \(cmd.first ?? "")"))
                 }
 
-                var versionString = outputVersion
+                var versionString = outputVersion.replacing("_", with: ".") // fix up, e.g., Java 1.8.0_32
                 while versionString.split(separator: ".").count < 3 {
                     // handle too few numbers, like: gradle 8.4
                     versionString += ".0"
@@ -102,7 +102,7 @@ extension ToolOptionsCommand {
         await checkVersion(title: "Xcode version", cmd: ["xcodebuild", "-version"], min: Version("15.0.0"), pattern: "Xcode ([0-9.]+)")
         await checkVersion(title: "Homebrew version", cmd: ["brew", "--version"], min: Version("4.1.0"), pattern: "Homebrew ([0-9.]+)")
         await checkVersion(title: "Gradle version", cmd: ["gradle", "-version"], min: Version("8.3.0"), pattern: "Gradle ([0-9.]+)")
-        await checkVersion(title: "Java version", cmd: ["java", "-version"], min: Version("17.0.0"), pattern: "version \"([0-9.]+)\"") // we don't necessarily need java in the path (which it doesn't seem to be by default with Homebrew)
+        await checkVersion(title: "Java version", cmd: ["java", "-version"], min: Version("17.0.0"), pattern: "version \"([0-9._]+)\"") // we don't necessarily need java in the path (which it doesn't seem to be by default with Homebrew)
         await checkVersion(title: "Android Debug Bridge version", cmd: ["adb", "version"], min: Version("1.0.40"), pattern: "version ([0-9.]+)")
 
         await checkAndroidStudioVersion(with: out)

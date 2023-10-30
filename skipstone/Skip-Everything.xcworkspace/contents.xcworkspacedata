@@ -26,6 +26,9 @@
       location = "group:../skip-ffi">
    </FileRef>
    <FileRef
+      location = "group:../skip-motion">
+   </FileRef>
+   <FileRef
       location = "group:../skip-sql">
    </FileRef>
    <FileRef
@@ -47,6 +50,9 @@
       location = "group:../skipapp-showcase/Showcase.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:../skipapp-weather/WeatherApp.xcodeproj">
+      location = "group:../skipapp-weather/SkipWeather.xcodeproj">
+   </FileRef>
+   <FileRef
+      location = "group:../skipapp-lottiedemo/LottieDemo.xcodeproj">
    </FileRef>
 </Workspace>
