@@ -258,8 +258,7 @@ public struct GradleDriver {
     /// Finds the given tool in the current process' `PATH`.
     private static func findGradle() throws -> URL {
         // add in standard Homebrew paths, in case they aren't in the user's PATH
-        let homeBrewPaths = ProcessInfo.isARM ? ["/opt/homebrew/bin"] : ["/usr/local/bin"]
-        return try URL.findCommandInPath(toolName: "gradle", withAdditionalPaths: homeBrewPaths)
+        return try URL.findCommandInPath(toolName: "gradle", withAdditionalPaths: [ProcessInfo.homebrewRoot + "/bin"])
     }
 
     /* The contents of the JUnit test case XML result files look a bit like this:
@@ -592,6 +591,12 @@ public enum GradleDriverError : Error, LocalizedError {
 }
 
 extension ProcessInfo {
+    /// The root path for Homebrew on this macOS
+    public static let homebrewRoot: String = {
+        ProcessInfo.processInfo.environment["HOMEBREW_PREFIX"]
+            ?? (ProcessInfo.isARM ? "/opt/homebrew" : "/usr/local")
+    }()
+
     /// The current process environment along with the default paths to various tools set
     public var environmentWithDefaultToolPaths: [String: String] {
         var env = self.environment
@@ -605,9 +610,16 @@ extension ProcessInfo {
             env[ANDROID_HOME] = ("~/Android/Sdk" as NSString).expandingTildeInPath
             #endif
         }
+
+        let JAVA_HOME = "JAVA_HOME"
+        if env[JAVA_HOME] == nil {
+            #if os(macOS)
+            env[JAVA_HOME] = "\(Self.homebrewRoot)/opt/openjdk@17"
+            #endif
+        }
+
         return env
     }
 }
-
 
 #endif
