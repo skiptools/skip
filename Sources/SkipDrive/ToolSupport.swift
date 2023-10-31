@@ -2720,7 +2720,6 @@ extension FileSystemError: CustomNSError {
     }
 }
 
-#if canImport(Darwin)
 
 public extension FileSystemError {
     init(errno: Int32, _ path: URL) {
@@ -2743,13 +2742,21 @@ public extension FileSystemError {
 
 /// Public stdout stream instance.
 public var stdoutStream: ThreadSafeOutputByteStream = try! ThreadSafeOutputByteStream(LocalFileOutputByteStream(
-    filePointer: Darwin.stdout,
+    filePointer: stdout,
     closeOnDeinit: false))
 
 /// Public stderr stream instance.
 public var stderrStream: ThreadSafeOutputByteStream = try! ThreadSafeOutputByteStream(LocalFileOutputByteStream(
-    filePointer: Darwin.stderr,
+    filePointer: stderr,
     closeOnDeinit: false))
-#endif
+
+
+extension NSLock {
+    internal func withLock<T> (_ body: () throws -> T) rethrows -> T {
+        self.lock()
+        defer { self.unlock() }
+        return try body()
+    }
+}
 
 #endif

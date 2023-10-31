@@ -213,7 +213,11 @@ public struct GradleDriver {
         }
 
         let testResultFolder = URL(fileURLWithPath: testResultPath, isDirectory: true, relativeTo: moduleURL)
+        #if os(macOS)
         try? FileManager.default.trashItem(at: testResultFolder, resultingItemURL: nil) // remove the test folder, since a build failure won't clear it and it will appear as if the tests ran successfully
+        #else
+        try? FileManager.default.removeItem(atPath: testResultPath)
+        #endif
 
         let output = try await execGradle(in: workingDirectory, args: args, env: env, onExit: exitHandler)
         return (output, { try Self.parseTestResults(in: testResultFolder) })
@@ -601,7 +605,7 @@ extension ProcessInfo {
     public var environmentWithDefaultToolPaths: [String: String] {
         var env = self.environment
         let ANDROID_HOME = "ANDROID_HOME"
-        if env[ANDROID_HOME] == nil {
+        if (env[ANDROID_HOME] ?? "").isEmpty {
             #if os(macOS)
             env[ANDROID_HOME] = ("~/Library/Android/sdk" as NSString).expandingTildeInPath
             #elseif os(Windows)
@@ -612,8 +616,9 @@ extension ProcessInfo {
         }
 
         let JAVA_HOME = "JAVA_HOME"
-        if env[JAVA_HOME] == nil {
+        if (env[JAVA_HOME] ?? "").isEmpty {
             #if os(macOS)
+            // default to openjdk@17 if JAVA_HOME is unset
             env[JAVA_HOME] = "\(Self.homebrewRoot)/opt/openjdk@17"
             #endif
         }
