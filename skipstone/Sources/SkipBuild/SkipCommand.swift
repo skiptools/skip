@@ -724,6 +724,9 @@ extension ProcessInfo {
             ?? (ProcessInfo.isARM ? "/opt/homebrew" : "/usr/local")
     }()
 
+    /// The default `JAVA_HOME`
+    public static let defaultJavaHome: String = homebrewRoot + "/opt/openjdk@17"
+
     /// True when the current architecture is ARM
     public static let isARM = {
         #if os(macOS)
@@ -763,7 +766,7 @@ extension ProcessInfo {
         if (env[JAVA_HOME] ?? "").isEmpty {
             #if os(macOS)
             // default to openjdk@17 if JAVA_HOME is unset
-            env[JAVA_HOME] = "\(Self.homebrewRoot)/opt/openjdk@17"
+            env[JAVA_HOME] = Self.defaultJavaHome
             #endif
         }
 
@@ -877,6 +880,7 @@ struct ToolOptions: ParsableArguments {
             case "gradle": return self.gradle ?? ProcessInfo.processInfo.environment["SKIP_GRADLE_PATH"]
             case "adb": return self.adb ?? ProcessInfo.processInfo.environment["SKIP_ADB_PATH"]
             case "emulator": return self.emulator ?? ProcessInfo.processInfo.environment["SKIP_EMULATOR_PATH"]
+            case "java": return ProcessInfo.processInfo.environment["JAVA_HOME"]?.appending("/bin/java") ?? ProcessInfo.defaultJavaHome.appending("/bin/java")
             default: return nil
             }
         }
