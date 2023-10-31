@@ -1488,7 +1488,7 @@ extension ToolOptionsCommand {
         This will also install the necessary transpiler prerequisites:
         Kotlin, Gradle, and the Android build tools.
 
-        Installation prerequsities can be confirmed by running `skip checkup`.
+        Installation prerequisites can be confirmed by running `skip checkup`.
 
         ## Testing
 
