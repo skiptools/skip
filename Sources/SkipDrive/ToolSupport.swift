@@ -1689,6 +1689,16 @@ public struct ProcessResult: CustomStringConvertible, Sendable {
             >
             """
     }
+
+    public var resultDescription: String {
+        if case .terminated(0) = exitStatus {
+            return "SUCCESSFUL"
+        } else {
+            let output = try? utf8Output().trimmingCharacters(in: .whitespacesAndNewlines)
+            return "FAILED: \(output ?? "")"
+        }
+    }
+
 }
 
 // MARK: - Private helpers

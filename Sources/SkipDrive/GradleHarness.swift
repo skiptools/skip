@@ -320,7 +320,7 @@ extension GradleHarness {
             ?? ProcessInfo.processInfo.environment["BUILT_PRODUCTS_DIR"]
     }
 
-    public func projectRoot(forModule moduleName: String, packageName: String) throws -> URL {
+    public func projectRoot(forModule moduleName: String, packageName: String, projectFolder: String? = nil) throws -> URL {
         let env = ProcessInfo.processInfo.environment
 
         //for (key, value) in env.sorted(by: { $0.0 < $1.0 }) {
@@ -329,14 +329,20 @@ extension GradleHarness {
 
         let isXcode = env["__CFBundleIdentifier"] == "com.apple.dt.Xcode" || xcodeBuildFolder != nil
 
-        // Diagnostics.warning("ENVIRONMENT: \(env)")
-        let packageFolderExtension = isXcode ? ".output" : ""
+        if isXcode || xcodeBuildFolder != nil {
+            // Diagnostics.warning("ENVIRONMENT: \(env)")
+            let packageFolderExtension = isXcode ? ".output" : ""
 
-        guard let buildFolder = xcodeBuildFolder else {
-            throw AppLaunchError(errorDescription: "The BUILT_PRODUCTS_DIR environment variable must be set to the output of the build process")
+            guard let buildFolder = xcodeBuildFolder else {
+                throw AppLaunchError(errorDescription: "The BUILT_PRODUCTS_DIR environment variable must be set to the output of the build process")
+            }
+
+            return URL(fileURLWithPath: "../../../SourcePackages/plugins/\(packageName)\(packageFolderExtension)/\(moduleName)/\(pluginFolderName)/", isDirectory: true, relativeTo: URL(fileURLWithPath: buildFolder, isDirectory: true))
+        } else {
+            // SPM-derived project: .build/plugins/outputs/hello-skip/HelloSkip/skipstone
+            // TODO: make it relative to project path
+            return URL(fileURLWithPath: (projectFolder ?? ".") + "/.build/plugins/outputs/\(packageName)/\(moduleName)/skipstone", isDirectory: true)
         }
-
-        return URL(fileURLWithPath: "../../../SourcePackages/plugins/\(packageName)\(packageFolderExtension)/\(moduleName)/\(pluginFolderName)/", isDirectory: true, relativeTo: URL(fileURLWithPath: buildFolder, isDirectory: true))
     }
 
     public func launch(appName: String, appId: String, packageName: String, deviceID: String? = ProcessInfo.processInfo.environment["SKIP_TEST_DEVICE"]) async throws {
@@ -351,11 +357,21 @@ extension GradleHarness {
         let moduleName = appName
 
         let path = "\(appName)/.build/\(appName)/outputs/apk/"
-        let artifact = releaseBuild ? "release/\(appName)-release.apk" : "debug/\(appName)-debug.apk"
-        let apk = try URL(fileURLWithPath: path + artifact, isDirectory: false, relativeTo: projectRoot(forModule: moduleName, packageName: packageName))
+        let artifactBase = releaseBuild ? "release/\(appName)-release" : "debug/\(appName)-debug"
 
-        guard let fileSize = try? apk.resourceValues(forKeys: [.fileSizeKey]).fileSize else {
-            throw AppLaunchError(errorDescription: "APK did not exist at path: \(apk.path)")
+        let artifact = artifactBase + ".apk"
+        var apk = try URL(fileURLWithPath: path + artifact, isDirectory: false, relativeTo: projectRoot(forModule: moduleName, packageName: packageName))
+
+        let fileSize: Int
+        if let apkFileSize = try? apk.resourceValues(forKeys: [.fileSizeKey]).fileSize {
+            fileSize = apkFileSize
+        } else {
+            // try again with the "-unsigned.apk" variant that some gradle projects produce
+            apk = apk.deletingLastPathComponent().appendingPathComponent(artifactBase + "-unsigned.apk", isDirectory: false)
+            guard let apkFileSize = try? apk.resourceValues(forKeys: [.fileSizeKey]).fileSize else {
+                throw AppLaunchError(errorDescription: "APK did not exist at path: \(apk.path)")
+            }
+            fileSize = apkFileSize
         }
 
         print("launching APK (\(ByteCountFormatter.string(fromByteCount: Int64(fileSize), countStyle: .file))): \(apk.path)")
@@ -365,15 +381,15 @@ extension GradleHarness {
         try await launchAPK(device: deviceID, appid: "\(appId)/.MainActivity", log: logLevel, apk: apk.path)
     }
 
-    public func gradleExec(appName: String, packageName: String, arguments: [String], outputPrefix: String? = "GRADLE>") async throws {
+    public func gradleExec(projectFolder: String? = nil, appName: String, packageName: String, arguments: [String], outputPrefix: String? = "GRADLE>") async throws {
         let driver = try await GradleDriver()
 
         let moduleName = appName
         let acts: [String] = [] // releaseBuild ? ["assembleRelease"] : ["assembleDebug"] // expected in the arguments to the command
 
         var exitCode: ProcessResult.ExitStatus? = nil
-        let (output, _) = try await driver.launchGradleProcess(in: projectRoot(forModule: moduleName, packageName: packageName), module: appName, actions: acts, arguments: arguments, environment: ProcessInfo.processInfo.environmentWithDefaultToolPaths, info: false, rerunTasks: false, exitHandler: { result in
-            print("note: Gradle command result: \(result)")
+        let (output, _) = try await driver.launchGradleProcess(in: projectRoot(forModule: moduleName, packageName: packageName, projectFolder: projectFolder), module: appName, actions: acts, arguments: arguments, environment: ProcessInfo.processInfo.environmentWithDefaultToolPaths, info: false, rerunTasks: false, exitHandler: { result in
+            print("note: Gradle \(result.resultDescription)")
             exitCode = result.exitStatus
         })
 
