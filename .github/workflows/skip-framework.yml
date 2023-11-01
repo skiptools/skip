@@ -79,7 +79,7 @@ jobs:
           (SKIP_ZERO=1 xcodebuild build -sdk iphonesimulator -destination "platform=iOS Simulator,name=iPhone 14" -skipPackagePluginValidation -configuration debug -scheme $(basename $PWD) && xcodebuild test -sdk iphonesimulator -destination "platform=iOS Simulator,name=iPhone 14" -skipPackagePluginValidation -configuration debug -scheme $(basename $PWD)) || echo FAILED
 
           brew install tree
-          tree ~/Library/Developer/Xcode/DerivedData/*/Build/Products/debug-iphonesimulator/
+          tree ~/Library/Developer/Xcode/DerivedData/*/Build/Products/ || true
 
 
       - name: Create Release
