@@ -76,10 +76,7 @@ jobs:
 
       - name: Connected iOS Simulator Build
         run: |
-          # TODO: fix flaky errors: "Failed to create a bundle instance representing '~/Library/Developer/Xcode/DerivedData/skip-lib-eptgwklaklbhhcgdbdcwrvnjxzhm/Build/Products/debug/SkipLibTests.xctest'. Check that the bundle exists on disk."
-
-          # until then, we just tolerate errors
-          xcodebuild test -derivedDataPath .build/DerivedData -jobs 1 -sdk iphonesimulator -destination "platform=iOS Simulator,name=iPhone 14" -skipPackagePluginValidation -configuration debug -scheme $(basename $PWD) || echo "iOS TEST FAILED"
+          SKIP_ZERO=1 xcodebuild test -sdk iphonesimulator -destination "platform=iOS Simulator,name=iPhone 14" -skipPackagePluginValidation -configuration debug -scheme $(basename $PWD)
 
 
       - name: Create Release
