@@ -620,12 +620,18 @@ interface P2_1 {
     fun p2_4() = Unit
     val p2_1: Int
     val p2_2: Int
+
+    companion object {
+    }
 }
 interface P2_2 {
     val p2_3: Int
     val p2_4: Int
     fun p2_5() = Unit
     fun p2_6() = Unit
+
+    companion object {
+    }
 }
 
 package tmp.test
@@ -722,12 +728,18 @@ interface P1 {
     fun p4() = Unit
     val p1: Int
     val p2: Int
+
+    companion object {
+    }
 }
 interface P2 {
     val p3: Int
     val p4: Int
     fun p5() = Unit
     fun p6() = Unit
+
+    companion object {
+    }
 }
 
 package tmp.test
@@ -812,12 +824,18 @@ interface P3_1 {
     fun p3_4() = Unit
     val p3_1: Int
     val p3_2: Int
+
+    companion object {
+    }
 }
 interface P3_2 {
     val p3_3: Int
     val p3_4: Int
     fun p3_5() = Unit
     fun p3_6() = Unit
+
+    companion object {
+    }
 }
 """
 

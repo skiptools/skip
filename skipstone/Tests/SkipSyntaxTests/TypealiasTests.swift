@@ -175,6 +175,9 @@ final class TypealiasTests: XCTestCase {
         typealias MessageDigest = java.security.MessageDigest
         interface NamedHashFunction {
             val digest: java.security.MessageDigest
+
+            companion object {
+            }
         }
         """)
     }

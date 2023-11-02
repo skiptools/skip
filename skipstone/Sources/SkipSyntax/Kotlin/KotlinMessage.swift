@@ -269,7 +269,11 @@ extension Message {
     }
 
     static func kotlinProtocolStaticMember(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "Kotlin does not support static members in protocols", sourceDerived: sourceDerived, source: source)
+        return Message(kind: .error, message: "Kotlin does not support static requirements in protocols", sourceDerived: sourceDerived, source: source)
+    }
+
+    static func kotlinProtocolExtensionStaticMember(protocolName: String, memberName: String, sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .warning, message: "Your code must only access this static protocol member as \(protocolName).\(memberName). If some class C implements \(protocolName), C.\(memberName) is not valid in Kotlin", sourceDerived: sourceDerived, source: source)
     }
 
     // Idea: convert string mutation to re-assigning the string value

@@ -1035,6 +1035,30 @@ final class MemberDeclarationTests: XCTestCase {
         """)
     }
 
+    func testProtocolExtensionStaticMembers() async throws {
+        try await check(expectMessages: true, swift: """
+        protocol P {
+        }
+        extension P {
+            static var x: Int {
+                return 1
+            }
+            static func f() {
+            }
+        }
+        """, kotlin: """
+        internal interface P {
+
+            companion object {
+
+                val x: Int
+                    get() = 1
+                fun f() = Unit
+            }
+        }
+        """)
+    }
+
     func testSubscript() async throws {
         try await check(swift: """
         class C {

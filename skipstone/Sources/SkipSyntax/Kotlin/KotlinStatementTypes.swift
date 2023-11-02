@@ -1692,6 +1692,10 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             } else if modifiers.isStatic {
                 kstatement.messages.append(.kotlinProtocolStaticMember(statement, source: translator.syntaxTree.source))
             }
+        } else if owningTypeDeclaration.type == .extensionDeclaration {
+            if modifiers.isStatic && owningDeclarationType == .protocolDeclaration {
+                kstatement.messages.append(.kotlinProtocolExtensionStaticMember(protocolName: owningTypeDeclaration.name, memberName: kstatement.name, sourceDerived: statement, source: translator.syntaxTree.source))
+            }
         }
         return true
     }
@@ -2132,13 +2136,13 @@ class KotlinInterfaceDeclaration: KotlinStatement {
                 continue
             }
             if let originalVariableDeclaration = originalMembers[i] as? KotlinVariableDeclaration, let variableDeclaration = member as? KotlinVariableDeclaration {
-                if originalVariableDeclaration.names == variableDeclaration.names {
+                if originalVariableDeclaration.isStatic == variableDeclaration.isStatic && originalVariableDeclaration.names == variableDeclaration.names {
                     member.ensureLeadingNewlines(originalMembers[i].leadingNewlines)
                     originalMembers[i] = member
                     return true
                 }
             } else if let originalFunctionDeclaration = originalMembers[i] as? KotlinFunctionDeclaration, let functionDeclaration = member as? KotlinFunctionDeclaration {
-                if originalFunctionDeclaration.name == functionDeclaration.name && originalFunctionDeclaration.functionType == functionDeclaration.functionType {
+                if originalFunctionDeclaration.isStatic == functionDeclaration.isStatic && originalFunctionDeclaration.name == functionDeclaration.name && originalFunctionDeclaration.functionType == functionDeclaration.functionType {
                     member.ensureLeadingNewlines(originalMembers[i].leadingNewlines)
                     originalMembers[i] = member
                     return true
@@ -2209,7 +2213,25 @@ class KotlinInterfaceDeclaration: KotlinStatement {
             generics.appendWhere(to: output, indentation: indentation)
         }
         output.append(" {\n")
-        children.forEach { output.append($0, indentation: indentation.inc()) }
+
+        var staticMembers: [KotlinStatement] = []
+        let memberIndentation = indentation.inc()
+        for member in members {
+            if (member as? KotlinMemberDeclaration)?.isStatic == true {
+                staticMembers.append(member)
+            } else {
+                output.append(member, indentation: memberIndentation)
+            }
+        }
+
+        // Always add a companion object to public types in case another module extends it with static members
+        if !staticMembers.isEmpty || modifiers.visibility == .public || modifiers.visibility == .open {
+            output.append("\n")
+            output.append(memberIndentation).append("companion object {\n")
+            let companionMemberIndentation = memberIndentation.inc()
+            staticMembers.forEach { output.append($0, indentation: companionMemberIndentation) }
+            output.append(memberIndentation).append("}\n")
+        }
         output.append(indentation).append("}\n")
     }
 }
@@ -2353,8 +2375,9 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         kstatement.isLet = statement.isLet
         kstatement.modifiers = statement.modifiers
         kstatement.declaredType = statement.declaredType.resolvingSelf(in: statement)
+        let owningTypeDeclaration = statement.parent as? TypeDeclaration
         var owningDeclarationType: StatementType? = nil
-        if let owningTypeDeclaration = statement.parent as? TypeDeclaration {
+        if let owningTypeDeclaration {
             // Use codebaseInfo rather than .type directly so that extension API is also handled correctly
             owningDeclarationType = translator.codebaseInfo?.declarationType(forNamed: owningTypeDeclaration.signature) ?? owningTypeDeclaration.type
             let owningSignature = translator.codebaseInfo?.primaryTypeInfo(forNamed: owningTypeDeclaration.signature)?.signature ?? owningTypeDeclaration.signature
@@ -2461,9 +2484,16 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if kstatement.declaredType == .none && kstatement.propertyType == .none && kstatement.initializeStorage() != nil {
             kstatement.messages.append(.kotlinVariableNeedsTypeDeclaration(kstatement, source: translator.syntaxTree.source))
         }
+        if statement.modifiers.isStatic && owningDeclarationType == .protocolDeclaration {
+            if let owningTypeDeclaration, owningTypeDeclaration.type == .extensionDeclaration {
+                kstatement.messages.append(.kotlinProtocolExtensionStaticMember(protocolName: owningTypeDeclaration.name, memberName: statement.propertyName, sourceDerived: statement, source: translator.syntaxTree.source))
+            } else {
+                kstatement.messages.append(.kotlinProtocolStaticMember(statement, source: translator.syntaxTree.source))
+            }
+        }
         if owningDeclarationType == .protocolDeclaration {
             if statement.modifiers.isStatic {
-                kstatement.messages.append(.kotlinProtocolStaticMember(statement, source: translator.syntaxTree.source))
+
             }
         }
         return kstatement
