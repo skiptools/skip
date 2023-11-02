@@ -127,7 +127,7 @@ extension ToolOptionsCommand {
 
 
         return """
-            // !$*UTF8*$!
+// !$*UTF8*$!
 {
     archiveVersion = 1;
     classes = {
@@ -251,7 +251,7 @@ extension ToolOptionsCommand {
                 LastSwiftUpdateCheck = 1430;
                 LastUpgradeCheck = 1500;
             };
-            buildConfigurationList = 49F90C232A52156200F06D93 /* Build configuration list for PBXProject "\(primaryModuleAppTarget)" */;
+            buildConfigurationList = 49F90C232A52156200F06D93 /* Build configuration list for PBXProject "\(appModuleName)" */;
             compatibilityVersion = "Xcode 14.0";
             developmentRegion = en;
             hasScannedForEncodings = 0;
@@ -458,7 +458,7 @@ extension ToolOptionsCommand {
             defaultConfigurationIsVisible = 0;
             defaultConfigurationName = Release;
         };
-        49F90C232A52156200F06D93 /* Build configuration list for PBXProject "\(primaryModuleAppTarget)" */ = {
+        49F90C232A52156200F06D93 /* Build configuration list for PBXProject "\(appModuleName)" */ = {
             isa = XCConfigurationList;
             buildConfigurations = (
                 49F90C4B2A52156300F06D93 /* Debug */,
