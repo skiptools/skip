@@ -272,6 +272,7 @@ extension Message {
         return Message(kind: .error, message: "Kotlin does not support static requirements in protocols", sourceDerived: sourceDerived, source: source)
     }
 
+    // Idea: have the transpiler change C.member to P.member so it appears that you can access through C
     static func kotlinProtocolExtensionStaticMember(protocolName: String, memberName: String, sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .warning, message: "Your code must only access this static protocol member as \(protocolName).\(memberName). If some class C implements \(protocolName), C.\(memberName) is not valid in Kotlin", sourceDerived: sourceDerived, source: source)
     }
