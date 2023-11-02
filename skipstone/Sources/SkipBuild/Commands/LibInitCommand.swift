@@ -785,10 +785,13 @@ extension ToolOptionsCommand {
             let contentViewContents = """
             \(sourceHeader)import SwiftUI
 
-            struct ContentView: View {
+            public struct ContentView: View {
                 @AppStorage("setting") var setting = true
 
-                var body: some View {
+                public init() {
+                }
+
+                public var body: some View {
                     TabView {
                         VStack {
                             Text("Welcome Skipper!")
@@ -1159,11 +1162,6 @@ extension ToolOptionsCommand {
             # Info.plist (for the iOS ipa).
             build:
               contents:
-                - block: 'plugins'
-                  contents:
-                    - 'id("com.android.application") version "8.1.0"'
-                  remove:
-                    - 'id("com.android.library") version "8.1.0"'
                 - block: 'android'
                   remove:
                     - 'namespace = group as String'
@@ -1185,7 +1183,7 @@ extension ToolOptionsCommand {
                             # enabling minification reduces compose dependency classe size ~85%
                             - 'isMinifyEnabled = true'
                             - 'isShrinkResources = true'
-                            - 'isDebuggable = false'
+                            - 'isDebuggable = true'
                             - 'proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")'
             """
 
@@ -1272,14 +1270,10 @@ extension ToolOptionsCommand {
                 #endif
                 """.write(to: testSkipModuleFile, atomically: true, encoding: .utf8)
 
-                // app tests won't build if this is in place
                 let skipYamlAppTests = """
                 # Configuration file for https://skip.tools project
-                build:
-                  contents:
-                    - block: 'plugins'
-                      remove:
-                        - 'id("com.android.library") version "8.1.0"'
+                #build:
+                #  contents:
                 """
                 let testSkipYamlFile = testSkipDir.appending(path: "skip.yml")
                 try (isAppModule ? skipYamlAppTests : skipYamlGeneric).write(to: testSkipYamlFile, atomically: true, encoding: .utf8)

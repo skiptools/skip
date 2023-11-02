@@ -93,6 +93,9 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
     private func transpile(root rootPath: AbsolutePath, project projectFolderPath: AbsolutePath, module moduleRootPath: AbsolutePath, skip skipFolderPath: AbsolutePath, output outputFolderPath: AbsolutePath, fs: FileSystem, with out: MessageQueue) async throws {
         // the path that will contain the `skip.yml`
 
+        // the module will be treated differently if it is an app versus a library (it will use the "com.android.application" plugin instead of "com.android.library")
+        let AndroidManifestName = "AndroidManifest.xml"
+
         if !fs.isDirectory(skipFolderPath) {
             throw error("In order to transpile the module, a Skip/ folder must exist and contain a skip.yml file at: \(skipFolderPath)")
         }
@@ -240,6 +243,8 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         let skipFolderPathContents = try FileManager.default.enumeratedURLs(of: skipFolderPath.asURL)
             .filter({ (try? $0.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true })
 
+        let isApp = skipFolderPathContents.contains(where: { $0.lastPathComponent == AndroidManifestName })
+
         // validate licenses in all the Skip source files, as well as any custom Kotlin files in the Skip folder
         let sourcehashes = try await createSourceHashes(validateLicense: ["swift", "kt"], sourceURLs: sourceURLs + skipFolderPathContents)
         // touch the build marker with the most recent file time from the complete build list
@@ -260,7 +265,8 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
         let sourceModules = try linkDependentModuleSources()
         try linkResources()
-        try generateGradle(for: sourceModules, with: mergedSkipConfig)
+
+        try generateGradle(for: sourceModules, with: mergedSkipConfig, isApp: isApp)
 
         // finally, remove any "stale" files from the output folder that probably indicate a deleted or renamed file once all the known outputs have been written
         cleanupStaleOutputFiles()
@@ -344,7 +350,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             try writeChanges(tag: "codebase", to: outputFilePath, contents: encoder.encode(moduleExport), readOnly: true)
         }
 
-        func generateGradle(for sourceModules: [String], with skipConfig: SkipConfig) throws {
+        func generateGradle(for sourceModules: [String], with skipConfig: SkipConfig, isApp: Bool) throws {
             if let gradleVersion = transpileOptions.gradleVersion as String? {
                 try generateGradleWrapperProperties(version: gradleVersion)
             }
@@ -353,8 +359,15 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             try generateGradleProperties()
             try generateSettingsGradle()
 
+            /// Update `com.android.library` to be `com.android.application`
+            func lib2app(build: String, app: Bool) -> String {
+                !app ? build : build.replacing(#"id("com.android.library")"#, with: #"id("com.android.application")"#)
+            }
+
             func generatePerModuleGradle() throws {
-                let buildContents = (skipConfig.build ?? .init()).generate(context: .init(dsl: .kotlin))
+                let buildContentsBase = (skipConfig.build ?? .init()).generate(context: .init(dsl: .kotlin))
+                let buildContents = lib2app(build: buildContentsBase, app: isApp)
+
                 // we output as a joined string because there is a weird stdout bug with the tool or plugin executor somewhere that causes multi-line strings to be output in the wrong order
                 trace("created gradle: \(buildContents.split(separator: "\n").map({ $0.trimmingCharacters(in: .whitespaces) }).joined(separator: "; "))")
 
@@ -587,7 +600,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             }
 
             // the "AndroidManifest.xml" file is special: it needs to go in the root src/main/ folder
-            let isManifest = baseSourceFileName == "AndroidManifest.xml"
+            let isManifest = baseSourceFileName == AndroidManifestName
             // if an empty basePath, treat as a source file and place in package-derived folders
             return try (basePath ?? kotlinOutputFolder
                 .appending(components: isManifest ? [".."] : packageName.split(separator: ".").map(\.description)))
