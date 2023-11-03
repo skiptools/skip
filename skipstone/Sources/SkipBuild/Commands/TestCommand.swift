@@ -63,10 +63,7 @@ extension TestCommand {
         let xunit = xunit ?? ".build/xcunit-\(UUID().uuidString).xml"
 
         func packageName() async throws -> String {
-            let packageJSONString = try await run(with: out, "Checking project", ["swift", "package", "dump-package", "--package-path", project]).get().stdout
-            let packageJSON = try JSONDecoder().decode(PackageManifest.self, from: Data(packageJSONString.utf8))
-            let packageName = packageJSON.name
-            return packageName
+            try await parseSwiftPackage(with: out, at: project).name
         }
 
         var testResult: Result<ProcessOutput, Error>? = nil

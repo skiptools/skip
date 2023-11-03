@@ -19,49 +19,50 @@ struct VerifyCommand: SkipCommand, StreamingCommand, ToolOptionsCommand {
     @Option(help: ArgumentHelp("Project folder", valueName: "dir"))
     var project: String = "."
 
-
     func performCommand(with out: MessageQueue) async throws {
-        /// Invokes the given command and attempts to parse the output against the given regular expression pattern to validate that it is a semantic version string
-        func checkVersion(title: String, cmd: [String], min: Version? = nil, pattern: String, watch: Bool = false) async {
+        await performVerifyCommand(project: project, with: out)
+    }
+}
 
-            func parseVersion(_ result: Result<ProcessOutput, Error>?) -> (result: Result<ProcessOutput, Error>?, message: MessageBlock?) {
-                guard let res = try? result?.get() else {
-                    return (result: result, message: MessageBlock(status: .fail, title + ": error executing \(cmd.first ?? "")"))
-                }
+struct NoResultOutputError : LocalizedError {
+    var errorDescription: String?
+}
 
-                let output = res.stdout.trimmingCharacters(in: .newlines) + res.stderr.trimmingCharacters(in: .newlines)
+extension ToolOptionsCommand {
 
-                guard let v = try? output.extract(pattern: pattern) else {
-                    return (result: result, message: MessageBlock(status: .fail, title + " could not extract version from \(cmd.first ?? "")"))
-                }
+    /// Invokes the given command that launches an executable and is expected to output JSON, which we parse into the specified data structure
+    func decodeCommand<T: Decodable>(with out: MessageQueue, title: String, cmd: [String]) async -> Result<T, Error> {
 
-                // the ToolSupport `Version` constructor only accepts three-part versions,
-                // so we need to augment versions like "8.3" and "2022.3" with an extra ".0"
-                guard let semver = Version(v) ?? Version(v + ".0") ?? Version(v + ".0.0") else {
-                    return (result: result, message: MessageBlock(status: .fail, title + " could not parse version"))
-                }
-
-                if let min = min {
-                    return (result: result, message: MessageBlock(status: semver < min ? .warn : .pass, "\(title) \(semver) (\(semver < min ? "<" : semver > min ? ">" : "=") \(min))"))
-                } else {
-                    return (result: result, message: MessageBlock(status: .pass, "\(title) \(semver)"))
-                }
+        func decodeResult(_ result: Result<ProcessOutput, Error>) -> Result<T, Error> {
+            do {
+                let res = try result.get()
+                let decoder = JSONDecoder()
+                let decoded = try decoder.decode(T.self, from: res.stdout.utf8Data)
+                return .success(decoded) // (result: .success(decoded), message: nil)
+            } catch {
+                return .failure(error) // (result: .failure(error), message: MessageBlock(status: .fail, title + ": error executing \(cmd.joined(separator: " ")): \(error)"))
             }
-
-            
-            await run(with: out, title, cmd, watch: watch, resultHandler: parseVersion)
         }
 
-        //await checkVersion(title: "ECHO2 VERSION", cmd: ["sh", "-c", "echo ONE ; sleep 1; echo TWO ; sleep 1; echo THREE ; sleep 1; echo 3.2.1"], min: Version("1.2.3"), pattern: "([0-9.]+)", watch: true)
+        let output = await run(with: out, title, cmd)
+        return decodeResult(output)
+    }
 
-        await checkVersion(title: "Skip version", cmd: ["skip", "version"], min: Version(skipVersion), pattern: "Skip version ([0-9.]+)")
+    func parseSwiftPackage(with out: MessageQueue, at projectPath: String) async throws -> PackageManifest {
+        try await decodeCommand(with: out, title: "Check Swift Package", cmd: ["swift", "package", "dump-package", "--package-path", projectPath]).get()
+    }
 
+    func performVerifyCommand(project projectPath: String, with out: MessageQueue) async {
+
+        //await checkVersion(title: "Skip version", cmd: ["skip", "version"], min: Version(skipVersion), pattern: "Skip version ([0-9.]+)")
+
+        #if os(macOS)
         //await checkVersion(title: "macOS version", cmd: ["XXXX", "--productVersion"], min: Version("13.5.0"), pattern: "([0-9.]+)")
 
-        // TODO:
         // Run swift package dump-package
-        let packageJSONString = try await run(with: out, "Check Swift Package", ["swift", "package", "dump-package", "--package-path", project]).get().stdout
-        let _ = try JSONDecoder().decode(PackageManifest.self, from: Data(packageJSONString.utf8))
+        if let packageJSON: PackageManifest = try? await parseSwiftPackage(with: out, at: projectPath) {
+            let _ = packageJSON.name
+        }
 
         // -list for a pure SPM will look like: {"workspace":{"name":"skip-script","schemes":["skip-script"]}}
         // -list with a project will look like: {"project":{"configurations":["Debug","Release","Skippy"],"name":"DataBake","schemes":["DataBake","DataBakeApp","DataBakeModel"],"targets":["DataBakeApp"]}}
@@ -73,6 +74,7 @@ struct VerifyCommand: SkipCommand, StreamingCommand, ToolOptionsCommand {
         // Check xcode project config: xcodebuild -describeAllArchivableProducts -json
         //let _ = try await run(with: out, "Check Xcode Project", ["xcodebuild", "-describeAllArchivableProducts", "-json", project]).get().stdout
 
+        #endif
 
         let messages = await out.elements
 

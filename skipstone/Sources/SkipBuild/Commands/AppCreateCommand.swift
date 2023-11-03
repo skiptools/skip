@@ -67,9 +67,10 @@ struct AppCreateCommand: MessageCommand, ToolOptionsCommand {
 
         await run(with: out, "Unpacking template \(createOptions.template) (\(ByteCountFormatter().string(fromByteCount: Int64((try? downloadURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)))) for project \(pname)", ["unzip", downloadURL.path, "-d", projectFolderURL.path])
 
-        let packageJSONString = try await run(with: out, "Checking project \(pname)", ["swift", "package", "dump-package", "--package-path", projectFolderURL.path]).get().stdout
 
-        let packageJSON = try JSONDecoder().decode(PackageManifest.self, from: Data(packageJSONString.utf8))
+        let packageJSON = try await parseSwiftPackage(with: out, at: projectFolderURL.path)
+        //let packageJSONString = try await run(with: out, "Checking project \(pname)", ["swift", "package", "dump-package", "--package-path", projectFolderURL.path]).get().stdout
+        //let packageJSON = try JSONDecoder().decode(PackageManifest.self, from: Data(packageJSONString.utf8))
         let appName = packageJSON.products.first?.name ?? "App"
 
         await run(with: out, "Resolving \(pname)/\(appName)", ["swift", "package", "resolve", "--verbose", "--package-path", projectFolderURL.path])

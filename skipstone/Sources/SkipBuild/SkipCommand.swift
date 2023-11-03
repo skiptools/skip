@@ -924,6 +924,9 @@ struct BuildOptions: ParsableArguments {
 
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Run the project tests"))
     var test: Bool = false
+
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Verify the project output"))
+    var verify: Bool = true
 }
 
 struct ProjectTemplate : Codable {

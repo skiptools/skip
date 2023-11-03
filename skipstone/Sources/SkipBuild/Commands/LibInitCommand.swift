@@ -64,7 +64,7 @@ struct LibInitCommand: MessageCommand, CreateOptionsCommand, ToolOptionsCommand,
         let dir = self.createOptions.dir ?? "."
 
         let modules = try self.modules
-        let (createdURL, _) = try await buildSkipProject(projectName: self.projectName, modules: modules, resourceFolder: createOptions.resourcePath, dir: dir, configuration: createOptions.configuration, build: buildOptions.build, test: buildOptions.test, returnHashes: false, showTree: self.createOptions.showTree, chain: createOptions.chain, gitRepo: createOptions.gitRepo, free: createOptions.free, zero: createOptions.zero, appid: self.appid, version: self.version, moduleTests: self.createOptions.moduleTests, validatePackage: self.createOptions.validatePackage, apk: apk, ipa: ipa, with: out)
+        let (createdURL, _) = try await buildSkipProject(projectName: self.projectName, modules: modules, resourceFolder: createOptions.resourcePath, dir: dir, verify: buildOptions.verify, configuration: createOptions.configuration, build: buildOptions.build, test: buildOptions.test, returnHashes: false, showTree: self.createOptions.showTree, chain: createOptions.chain, gitRepo: createOptions.gitRepo, free: createOptions.free, zero: createOptions.zero, appid: self.appid, version: self.version, moduleTests: self.createOptions.moduleTests, validatePackage: self.createOptions.validatePackage, apk: apk, ipa: ipa, with: out)
 
         await out.yield(MessageBlock(status: .pass, "Created module \(modules.map(\.moduleName).joined(separator: ", ")) in \(createdURL.path)"))
 
@@ -483,9 +483,9 @@ extension ToolOptionsCommand {
 """
     }
 
-    func buildSkipProject(projectName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: String, configuration: String, build: Bool, test: Bool, returnHashes: Bool, messagePrefix: String? = nil, showTree: Bool, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, appid: String?, version: String?, moduleTests: Bool, validatePackage: Bool, packageResolved packageResolvedURL: URL? = nil, apk: Bool, ipa: Bool, with out: MessageQueue) async throws -> (projectURL: URL, artifacts: [URL: String?]) {
+    func buildSkipProject(projectName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: String, verify: Bool, configuration: String, build: Bool, test: Bool, returnHashes: Bool, messagePrefix: String? = nil, showTree: Bool, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, appid: String?, version: String?, moduleTests: Bool, validatePackage: Bool, packageResolved packageResolvedURL: URL? = nil, apk: Bool, ipa: Bool, with out: MessageQueue) async throws -> (projectURL: URL, artifacts: [URL: String?]) {
         let sourceHeader = free ? licenseLGPLHeader : ""
-        let projectURL = try await initSkipLibrary(projectName: projectName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, chain: chain, gitRepo: gitRepo, free: free, zero: skipZeroSupport, app: appid != nil, moduleTests: moduleTests, validatePackage: validatePackage, packageResolved: packageResolvedURL, with: out)
+        let projectURL = try await initSkipLibrary(projectName: projectName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, verify: verify, chain: chain, gitRepo: gitRepo, free: free, zero: skipZeroSupport, app: appid != nil, moduleTests: moduleTests, validatePackage: validatePackage, packageResolved: packageResolvedURL, with: out)
 
         let projectPath = try projectURL.absolutePath
         let primaryModuleName = modules.first?.moduleName ?? "Module"
@@ -1035,6 +1035,10 @@ extension ToolOptionsCommand {
             await checkFile(projectURL, with: out, title: "Create git repository", handle: createGitRepo)
         }
 
+        if verify {
+            await performVerifyCommand(project: projectPath.pathString, with: out)
+        }
+
         if showTree {
             await showFileTree(in: projectPath, with: out)
         }
@@ -1042,7 +1046,7 @@ extension ToolOptionsCommand {
         return (appid != nil ? xcodeProjectFolder : projectURL.appendingPathComponent("Package.swift", isDirectory: false), artifactHashes)
     }
 
-    func initSkipLibrary(projectName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: String, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, app: Bool, moduleTests: Bool, validatePackage: Bool, packageResolved packageResolvedURL: URL?, with out: MessageQueue) async throws -> URL {
+    func initSkipLibrary(projectName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: String, verify: Bool, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, app: Bool, moduleTests: Bool, validatePackage: Bool, packageResolved packageResolvedURL: URL?, with out: MessageQueue) async throws -> URL {
         var isDir: Foundation.ObjCBool = false
         if !FileManager.default.fileExists(atPath: outputFolder, isDirectory: &isDir) {
             throw InitError(errorDescription: "Specified output folder does not exist: \(outputFolder)")
