@@ -226,6 +226,12 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             try fs.createSymbolicLink(addOutputFile(androidTestOutputFolder), pointingAt: outputFolderPath, relative: true)
         }
 
+        // also add any files in the skipFolderFile to the list of sources (including the skip.yml and other metadata files)
+        let skipFolderPathContents = try FileManager.default.enumeratedURLs(of: skipFolderPath.asURL)
+            .filter({ (try? $0.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true })
+
+        let isAppProject = skipFolderPathContents.contains(where: { $0.lastPathComponent == AndroidManifestName })
+
         let packageName = KotlinTranslator.packageName(forModule: primaryModuleName)
 
         // load and merge each of the skip.yml files for the dependent modules
@@ -238,12 +244,6 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
         let overridden = try linkSkipFolder(skipFolderPath, to: kotlinOutputFolder, topLevel: true)
         let overriddenKotlinFiles = overridden.map({ $0.basename })
-
-        // also add any files in the skipFolderFile to the list of sources (including the skip.yml and other metadata files)
-        let skipFolderPathContents = try FileManager.default.enumeratedURLs(of: skipFolderPath.asURL)
-            .filter({ (try? $0.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true })
-
-        let isApp = skipFolderPathContents.contains(where: { $0.lastPathComponent == AndroidManifestName })
 
         // validate licenses in all the Skip source files, as well as any custom Kotlin files in the Skip folder
         let sourcehashes = try await createSourceHashes(validateLicense: ["swift", "kt"], sourceURLs: sourceURLs + skipFolderPathContents)
@@ -266,7 +266,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         let sourceModules = try linkDependentModuleSources()
         try linkResources()
 
-        try generateGradle(for: sourceModules, with: mergedSkipConfig, isApp: isApp)
+        try generateGradle(for: sourceModules, with: mergedSkipConfig, isApp: isAppProject)
 
         // finally, remove any "stale" files from the output folder that probably indicate a deleted or renamed file once all the known outputs have been written
         cleanupStaleOutputFiles()
@@ -551,7 +551,8 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                 // finally check for the existance of PrimaryModuleName.xcconfig, and if it exists, imports its settings into the manifestPlaceholders dictionary in the `android { defaultConfig { } }` block
                 let configModuleName = primaryModuleName.hasSuffix("Tests") ? String(primaryModuleName.dropLast("Tests".count)) : primaryModuleName
                 let moduleXCConfig = rootPath.appending(component: configModuleName + ".xcconfig")
-                if fs.isFile(moduleXCConfig) {
+                let isAppModule = fs.isFile(moduleXCConfig)
+                if isAppModule && isAppProject {
                     var manifestConfigLines: [String] = []
 
                     let moduleXCConfigContents = try String(contentsOf: moduleXCConfig.asURL, encoding: .utf8)

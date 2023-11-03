@@ -58,6 +58,21 @@ struct VerifyCommand: SkipCommand, StreamingCommand, ToolOptionsCommand {
 
         //await checkVersion(title: "macOS version", cmd: ["XXXX", "--productVersion"], min: Version("13.5.0"), pattern: "([0-9.]+)")
 
+        // TODO:
+        // Run swift package dump-package
+        let packageJSONString = try await run(with: out, "Check Swift Package", ["swift", "package", "dump-package", "--package-path", project]).get().stdout
+        let _ = try JSONDecoder().decode(PackageManifest.self, from: Data(packageJSONString.utf8))
+
+        // -list for a pure SPM will look like: {"workspace":{"name":"skip-script","schemes":["skip-script"]}}
+        // -list with a project will look like: {"project":{"configurations":["Debug","Release","Skippy"],"name":"DataBake","schemes":["DataBake","DataBakeApp","DataBakeModel"],"targets":["DataBakeApp"]}}
+        // with a workspace will give the error: xcodebuild: error: The directory /opt/src/github/skiptools/skipstone contains 3 workspaces. Specify the workspace to use with the -workspace option
+        //let _ = try await run(with: out, "Check schemes", ["xcodebuild", "-list", "-json", project]).get().stdout
+
+        //let _ = try await run(with: out, "Check xcconfig", ["xcodebuild", "-showBuildSettings", "-json", project]).get().stdout
+
+        // Check xcode project config: xcodebuild -describeAllArchivableProducts -json
+        //let _ = try await run(with: out, "Check Xcode Project", ["xcodebuild", "-describeAllArchivableProducts", "-json", project]).get().stdout
+
 
         let messages = await out.elements
 
