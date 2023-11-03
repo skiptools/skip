@@ -132,6 +132,12 @@ protocol BindingExpression {
     func bindAsVar()
 }
 
+/// An expression that may represent a member access.
+protocol MemberAccessExpression {
+    /// If this member access chain begins with an unqualified access, return it.
+    var unqualifiedRootMemberAccess: MemberAccess? { get }
+}
+
 /// Raw source code.
 class RawExpression: Expression {
     let sourceCode: String

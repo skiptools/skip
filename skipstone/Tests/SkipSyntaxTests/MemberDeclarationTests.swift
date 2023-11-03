@@ -1331,6 +1331,22 @@ final class MemberDeclarationTests: XCTestCase {
             }
         }
         """)
+
+        try await check(swift: """
+        class A {
+            func f(a: [Int]) {
+            }
+            func f(b: [String]) {
+            }
+        }
+        """, kotlin: """
+        import skip.lib.Array
+
+        internal open class A {
+            internal open fun f(a: Array<Int>, @Suppress("UNUSED_PARAMETER") unusedp_0: Nothing? = null) = Unit
+            internal open fun f(b: Array<String>) = Unit
+        }
+        """)
     }
 
     func testProtocolFunctionSignatureConflicts() async throws {

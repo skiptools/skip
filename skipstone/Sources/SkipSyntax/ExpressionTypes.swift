@@ -677,7 +677,7 @@ class DictionaryLiteral: Expression {
 }
 
 /// `function(...)`
-class FunctionCall: Expression, APICallExpression {
+class FunctionCall: Expression, APICallExpression, MemberAccessExpression {
     let function: Expression
     let arguments: [LabeledValue<Expression>]
     let trailingClosureCount: Int
@@ -718,6 +718,7 @@ class FunctionCall: Expression, APICallExpression {
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        unqualifiedRootMemberAccess?.inferUnqualifiedBaseType(expecting: expecting)
         let baseType: TypeSignature?
         let name: String?
         var isUnchainedOptional = false
@@ -756,12 +757,7 @@ class FunctionCall: Expression, APICallExpression {
             }
         case .memberAccess:
             let memberAccess = function as! MemberAccess
-            if memberAccess.base == nil {
-                // Supply expected result type as probable base type when base is missing
-                _ = memberAccess.inferTypes(context: context, expecting: expecting)
-            } else {
-                _ = memberAccess.inferTypes(context: context, expecting: .none)
-            }
+            _ = memberAccess.inferTypes(context: context, expecting: .none)
             if memberAccess.inferredType.isMetaType {
                 baseType = memberAccess.inferredType.asMetaType(false)
                 name = nil
@@ -838,6 +834,13 @@ class FunctionCall: Expression, APICallExpression {
             return false // Unknown defaults to false
         }
         return apiMatch.signature.isOptional || apiMatch.signature.returnType.isOptional
+    }
+
+    var unqualifiedRootMemberAccess: MemberAccess? {
+        guard let memberAcces = function as? MemberAccess else {
+            return nil
+        }
+        return memberAcces.unqualifiedRootMemberAccess
     }
 
     private var returnType: TypeSignature = .none
@@ -1219,7 +1222,7 @@ class MatchingCase: Expression, BindingExpression {
 }
 
 /// `person.name`
-class MemberAccess: Expression, APICallExpression {
+class MemberAccess: Expression, APICallExpression, MemberAccessExpression {
     var base: Expression?
     private(set) var baseType: TypeSignature // Will be .module(name, .none) for module qualifier
     let member: String
@@ -1270,12 +1273,10 @@ class MemberAccess: Expression, APICallExpression {
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        unqualifiedRootMemberAccess?.inferUnqualifiedBaseType(expecting: expecting)
         if let base {
             base.inferTypes(context: context, expecting: .none)
             baseType = baseType.or(base.inferredType)
-        } else {
-            // When the base is missing we assume it's the class of the expected result type
-            baseType = baseType.or(expecting.asMetaType(true).asOptional(false))
         }
         // If we don't recognize the base type, perhaps it's a module name. Treat it as a type name and
         // context.member(_:in:) will figure it out
@@ -1302,6 +1303,22 @@ class MemberAccess: Expression, APICallExpression {
         }
         memberType = memberType.or(expecting)
         return context
+    }
+
+    /// Infer our missing base type using the given expected type.
+    func inferUnqualifiedBaseType(expecting: TypeSignature) {
+        guard expecting != .none && base == nil else {
+            return
+        }
+        // When the base is missing we assume it's the class of the expected result type
+        baseType = baseType.or(expecting.asMetaType(true).asOptional(false))
+    }
+
+    var unqualifiedRootMemberAccess: MemberAccess? {
+        guard let base else {
+            return self
+        }
+        return (base as? MemberAccessExpression)?.unqualifiedRootMemberAccess
     }
 
     private var memberType: TypeSignature = .none

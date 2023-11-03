@@ -884,6 +884,41 @@ final class TypeInferenceTests: XCTestCase {
         """)
     }
 
+    func testUnqualifiedMemberChain() async throws {
+        try await check(supportingSwift: """
+        struct S {
+            static let s = S()
+            static func factory() -> S {
+                return S()
+            }
+
+            let is = S()
+            func ifactory() -> S {
+                return S()
+            }
+        }
+        """, swift: """
+        func f() {
+            let b1 = g(.s)
+            let b2 = g(.factory())
+            let b3 = g(.s.is.is)
+            let b4 = g(.factory().is.ifactory())
+            let b5 = g(.s.ifactory().ifactory().is)
+        }
+        func g(_ s: S) {
+        }
+        """, kotlin: """
+        internal fun f() {
+            val b1 = g(S.s)
+            val b2 = g(S.factory())
+            val b3 = g(S.s.is_.is_)
+            val b4 = g(S.factory().is_.ifactory())
+            val b5 = g(S.s.ifactory().ifactory().is_)
+        }
+        internal fun g(s: S) = Unit
+        """)
+    }
+
     func testInferUsingCollectionElementType() async throws {
         try await check(supportingSwift: """
         func s(_ s: String) {

@@ -132,7 +132,7 @@ final class KotlinDisambiguateFunctionsTransformer: KotlinTransformer {
         // Assign each conflict a unique count, which means that we may be adding higher counts than needed but simplifies things a little
         for i in 0..<labelDeclarers.count {
             // Have we already mapped this?
-            let labelKey = LabelKey(parameters: labelDeclarers[i].parameters, declaringType: labelDeclarers[i].type)
+            let labelKey = LabelKey(parameters: labelDeclarers[i].parameters.map { $0.erasingGenerics() }, declaringType: labelDeclarers[i].type)
             if labelCounts.keys.contains(labelKey) {
                 continue
             }
@@ -228,7 +228,7 @@ final class KotlinDisambiguateFunctionsTransformer: KotlinTransformer {
             guard let functionInfo = info as? CodebaseInfo.FunctionInfo else {
                 return nil
             }
-            return key.parameterTypes.isSameTypes(as: functionInfo.signature.parameters.map(\.type)) ? functionInfo: nil
+            return key.parameterTypes.isSameTypes(as: functionInfo.signature.parameters.map({ $0.type.withGenerics([]) })) ? functionInfo: nil
         }
     }
 }
@@ -241,13 +241,13 @@ private struct Key: Hashable {
     init(for functionInfo: CodebaseInfo.FunctionInfo) {
         self.isInit = functionInfo.declarationType == .initDeclaration
         self.name = self.isInit ? (functionInfo.declaringType?.name ?? "") : functionInfo.name
-        self.parameterTypes = functionInfo.signature.parameters.map(\.type)
+        self.parameterTypes = functionInfo.signature.parameters.map { $0.type.withGenerics([]) }
     }
 
     init(for functionDeclaration: KotlinFunctionDeclaration, in type: TypeSignature?) {
         self.isInit = functionDeclaration.type == .constructorDeclaration
         self.name = self.isInit ? (type?.name ?? "") : functionDeclaration.name
-        self.parameterTypes = functionDeclaration.functionType.parameters.map(\.type)
+        self.parameterTypes = functionDeclaration.functionType.parameters.map { $0.type.withGenerics([]) }
     }
 }
 
@@ -290,7 +290,7 @@ private struct LabelDeclarer {
     let sourceFile: Source.FilePath?
 
     init(for functionInfo: CodebaseInfo.FunctionInfo, codebaseInfo: CodebaseInfo) {
-        self.parameters = functionInfo.signature.parameters
+        self.parameters = functionInfo.signature.parameters.map { $0.erasingGenerics() }
         self.type = functionInfo.declaringType
         if let type {
             if functionInfo.declarationType == .initDeclaration {
@@ -318,5 +318,13 @@ private struct LabelDeclarer {
 
     var isImplementable: Bool {
         return visibility == .open || (visibility == .public && inheritanceChain.isEmpty && !protocols.isEmpty)
+    }
+}
+
+extension TypeSignature.Parameter {
+    fileprivate func erasingGenerics() -> TypeSignature.Parameter {
+        var parameter = self
+        parameter.type = parameter.type.withGenerics([])
+        return parameter
     }
 }
