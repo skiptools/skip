@@ -552,7 +552,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                 let configModuleName = primaryModuleName.hasSuffix("Tests") ? String(primaryModuleName.dropLast("Tests".count)) : primaryModuleName
                 let moduleXCConfig = rootPath.appending(component: configModuleName + ".xcconfig")
                 let isAppModule = fs.isFile(moduleXCConfig)
-                if isAppModule && isAppProject {
+                if isAppModule {
                     var manifestConfigLines: [String] = []
 
                     let moduleXCConfigContents = try String(contentsOf: moduleXCConfig.asURL, encoding: .utf8)
