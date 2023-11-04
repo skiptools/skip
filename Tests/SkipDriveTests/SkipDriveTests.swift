@@ -300,10 +300,10 @@ private extension String {
 
     /// Attempts to parse the given String as a JSON object
     func parseJSONArray(file: StaticString = #file, line: UInt = #line) throws -> [Any] {
-        var str = self
+        var str = self.trimmingCharacters(in: .whitespacesAndNewlines)
 
         // workround for test failures: sometimes stderr has a line line: "2023-10-27 17:04:18.587523-0400 skip[91666:2692850] [client] No error handler for XPC error: Connection invalid"; this seems to be a side effect of running `skip doctor` from within Xcode
-        if str.hasSuffix("No error handler for XPC error: Connection invalid\n") {
+        if str.hasSuffix("No error handler for XPC error: Connection invalid") {
             str = str.split(separator: "\n").dropLast().joined(separator: "\n")
         }
 
