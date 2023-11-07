@@ -895,7 +895,9 @@ class Identifier: Expression, APICallExpression {
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
-        if let (signature, match) = context.identifier(name, messagesNode: self) {
+        // Don't output availability messages here if this is part of a function call. There could be other
+        // identifier matches. The function call node will have more type information
+        if let (signature, match) = context.identifier(name, messagesNode: isCalledAsFunction ? nil : self) {
             identifierType = signature
             apiMatch = match
         }
