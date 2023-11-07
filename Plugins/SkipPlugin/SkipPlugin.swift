@@ -191,9 +191,9 @@ import PackagePlugin
         deps = makeUniqueById(deps)
 
         let outputFiles: [Path] = [sourcehashOutputPath]
-        // input files consist of the source folder itself (we can't rely on individual files due to ), as well as all the dependent module output source hash directory files, which will be modified whenever a transpiled module changes
+        // input files consist of the source files, as well as all the dependent module output source hash directory files, which will be modified whenever a transpiled module changes
         // note that using the directory as the input will cause the transpile to re-run for any sub-folder change, although this behavior is not explicitly documented
-        var inputFiles: [Path] = [target.directory]
+        var inputFiles: [Path] = [target.directory] + target.sourceFiles.map(\.path)
 
         for dep in deps {
             guard let depTarget = dep.target as? SourceModuleTarget else {
