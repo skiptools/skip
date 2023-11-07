@@ -159,6 +159,11 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             primaryModuleName != moduleName && primaryModuleName != moduleName + "Tests"
         }
 
+        // check for the existence of PrimaryModuleName.xcconfig, and if it exists, this is an app module
+        let configModuleName = primaryModuleName.hasSuffix("Tests") ? String(primaryModuleName.dropLast("Tests".count)) : primaryModuleName
+        let moduleXCConfig = rootPath.appending(component: configModuleName + ".xcconfig")
+        let isAppModule = fs.isFile(moduleXCConfig)
+
         let _ = primaryModulePath
 
         func buildSourceList() throws -> (sources: [URL], resources: [URL]) {
@@ -230,7 +235,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         let skipFolderPathContents = try FileManager.default.enumeratedURLs(of: skipFolderPath.asURL)
             .filter({ (try? $0.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true })
 
-        let isAppProject = skipFolderPathContents.contains(where: { $0.lastPathComponent == AndroidManifestName })
+        //let isAppProject = skipFolderPathContents.contains(where: { $0.lastPathComponent == AndroidManifestName })
 
         let packageName = KotlinTranslator.packageName(forModule: primaryModuleName)
 
@@ -266,7 +271,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         let sourceModules = try linkDependentModuleSources()
         try linkResources()
 
-        try generateGradle(for: sourceModules, with: mergedSkipConfig, isApp: isAppProject)
+        try generateGradle(for: sourceModules, with: mergedSkipConfig, isApp: isAppModule)
 
         // finally, remove any "stale" files from the output folder that probably indicate a deleted or renamed file once all the known outputs have been written
         cleanupStaleOutputFiles()
@@ -548,10 +553,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
                 var localConfig = GradleBlock(contents: [.init(GradleBlock(block: "dependencies", contents: moduleDependencyBlocks))])
 
-                // finally check for the existance of PrimaryModuleName.xcconfig, and if it exists, imports its settings into the manifestPlaceholders dictionary in the `android { defaultConfig { } }` block
-                let configModuleName = primaryModuleName.hasSuffix("Tests") ? String(primaryModuleName.dropLast("Tests".count)) : primaryModuleName
-                let moduleXCConfig = rootPath.appending(component: configModuleName + ".xcconfig")
-                let isAppModule = fs.isFile(moduleXCConfig)
+                // for app modules, import its settings into the manifestPlaceholders dictionary in the `android { defaultConfig { } }` block
                 if isAppModule {
                     var manifestConfigLines: [String] = []
 

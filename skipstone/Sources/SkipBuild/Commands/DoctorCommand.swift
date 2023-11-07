@@ -99,6 +99,7 @@ extension ToolOptionsCommand {
         await checkVersion(title: "Skip version", cmd: ["skip", "version"], min: Version(skipVersion), pattern: "Skip version ([0-9.]+)")
         await checkVersion(title: "macOS version", cmd: ["sw_vers", "--productVersion"], min: Version("13.5.0"), pattern: "([0-9.]+)")
         await checkVersion(title: "Swift version", cmd: ["swift", "-version"], min: Version("5.9.0"), pattern: "Swift version ([0-9.]+)")
+        // TODO: add advice to run `xcode-select -s /Applications/Xcode.app/Contents/Developer` to work around https://github.com/skiptools/skip/issues/18
         await checkVersion(title: "Xcode version", cmd: ["xcodebuild", "-version"], min: Version("15.0.0"), pattern: "Xcode ([0-9.]+)")
         await checkVersion(title: "Homebrew version", cmd: ["brew", "--version"], min: Version("4.1.0"), pattern: "Homebrew ([0-9.]+)")
         await checkVersion(title: "Gradle version", cmd: ["gradle", "-version"], min: Version("8.3.0"), pattern: "Gradle ([0-9.]+)")
@@ -127,7 +128,16 @@ extension ToolOptionsCommand {
 
     func androidInfoPlist() throws -> [String: Any]? {
         let appsFolder = FileManager.default.urls(for: .applicationDirectory, in: .localDomainMask).first?.path ?? "/Applications"
-        return try PropertyListSerialization.propertyList(from: Data(contentsOf: URL(fileURLWithPath: "\(appsFolder)/Android Studio.app/Contents/Info.plist")), format: nil) as? [String: Any]
-    }
 
+        do {
+            return try PropertyListSerialization.propertyList(from: Data(contentsOf: URL(fileURLWithPath: "\(appsFolder)/Android Studio.app/Contents/Info.plist")), format: nil) as? [String: Any]
+        } catch let e1 {
+            do {
+                // Check for /Applications/JetBrains Toolbox/Android Studio.app as well: https://github.com/skiptools/skip/issues/15
+                return try PropertyListSerialization.propertyList(from: Data(contentsOf: URL(fileURLWithPath: "\(appsFolder)/JetBrains Toolbox/Android Studio.app/Contents/Info.plist")), format: nil) as? [String: Any]
+            } catch {
+                throw e1
+            }
+        }
+    }
 }
