@@ -10,7 +10,7 @@ jobs:
     steps:
       - run: brew update
 
-      - run: brew install skiptools/skip/skip tree libsodium
+      - run: brew install skiptools/skip/skip tree
 
       - run: java -version
 
