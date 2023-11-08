@@ -1,6 +1,11 @@
 name: "Skip Framework CI"
 on:
   workflow_call:
+    inputs:
+      brew-install:
+        required: false
+        type: string
+
 jobs:
   skip-framework:
     runs-on: macos-13
@@ -10,7 +15,7 @@ jobs:
     steps:
       - run: brew update
 
-      - run: brew install skiptools/skip/skip tree
+      - run: brew install skiptools/skip/skip tree ${{ inputs.brew-install }}
 
       - run: java -version
 
