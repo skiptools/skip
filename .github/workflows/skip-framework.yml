@@ -10,7 +10,7 @@ jobs:
     steps:
       - run: brew update
 
-      - run: brew install skiptools/skip/skip
+      - run: brew install skiptools/skip/skip tree libsodium
 
       - run: java -version
 
@@ -78,7 +78,6 @@ jobs:
         run: |
           (SKIP_ZERO=1 xcodebuild build -sdk iphonesimulator -destination "platform=iOS Simulator,name=iPhone 14" -skipPackagePluginValidation -configuration debug -scheme $(basename $PWD) && xcodebuild test -sdk iphonesimulator -destination "platform=iOS Simulator,name=iPhone 14" -skipPackagePluginValidation -configuration debug -scheme $(basename $PWD)) || echo FAILED
 
-          brew install tree
           tree ~/Library/Developer/Xcode/DerivedData/*/Build/Products/ || true
 
 
@@ -105,7 +104,6 @@ jobs:
           mkdir -p Skip/build/artifacts/
           PKGDIR="../../../../../../Skip/build/artifacts/"
 
-          brew install tree
           tree ./.build/plugins/outputs/
 
           # create the release .aar
