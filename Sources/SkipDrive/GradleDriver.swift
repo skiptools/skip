@@ -80,7 +80,7 @@ public struct GradleDriver {
     }
 
     /// Executes `gradle` with the current default arguments and the additional args and returns an async stream of the lines from the combined standard err and standard out.
-    public func execGradle(in workingDirectory: URL, args: [String], env: [String: String] = ProcessInfo.processInfo.environmentWithDefaultToolPaths, onExit: @escaping (ProcessResult) throws -> ()) async throws -> Process.AsyncLineOutput {
+    public func execGradle(in workingDirectory: URL?, args: [String], env: [String: String] = ProcessInfo.processInfo.environmentWithDefaultToolPaths, onExit: @escaping (ProcessResult) throws -> ()) async throws -> Process.AsyncLineOutput {
         // the resulting command will be something like:
         // java -Xmx64m -Xms64m -Dorg.gradle.appname=gradle -classpath /opt/homebrew/Cellar/gradle/8.0.2/libexec/lib/gradle-launcher-8.0.2.jar org.gradle.launcher.GradleMain info
         #if DEBUG
@@ -107,28 +107,34 @@ public struct GradleDriver {
     ///   - exitHandler: the exit handler, which may want to permit a process failure in order to have time to parse the tests
     /// - Returns: an array of parsed test suites containing information about the test run
     @available(macOS 13, macCatalyst 16, iOS 16, tvOS 16, watchOS 8, *)
-    public func launchGradleProcess(in workingDirectory: URL, buildFolder: String = ".build", module: String, actions: [String], arguments: [String], environment: [String: String] = ProcessInfo.processInfo.environmentWithDefaultToolPaths, daemon enableDaemon: Bool = true, info infoFlag: Bool = false, quiet quietFlag: Bool = false, plain plainFlag: Bool = true, maxMemory: UInt64? = nil, failFast failFastFlag: Bool = false, noBuildCache noBuildCacheFlag: Bool = false, continue continueFlag: Bool = false, offline offlineFlag: Bool = false, rerunTasks rerunTasksFlag: Bool = true, exitHandler: @escaping (ProcessResult) throws -> ()) async throws -> (output: Process.AsyncLineOutput, result: () throws -> [TestSuite]) {
+    public func launchGradleProcess(in workingDirectory: URL?, buildFolder: String = ".build", module: String?, actions: [String], arguments: [String], environment: [String: String] = ProcessInfo.processInfo.environmentWithDefaultToolPaths, daemon enableDaemon: Bool = true, info infoFlag: Bool = false, quiet quietFlag: Bool = false, plain plainFlag: Bool = true, maxMemory: UInt64? = nil, failFast failFastFlag: Bool = false, noBuildCache noBuildCacheFlag: Bool = false, continue continueFlag: Bool = false, offline offlineFlag: Bool = false, rerunTasks rerunTasksFlag: Bool = true, exitHandler: @escaping (ProcessResult) throws -> ()) async throws -> (output: Process.AsyncLineOutput, result: () throws -> [TestSuite]) {
 
-        let moduleURL = URL(fileURLWithPath: module, isDirectory: true, relativeTo: workingDirectory)
-        if !FileManager.default.fileExists(atPath: moduleURL.path) {
-            throw GradleDriverError("The expected gradle folder did not exist, which may mean the Skip transpiler is not enabled or encountered errors. Try running `skip doctor` to diagnose and re-building the project. See https://skip.tools/docs/. Missing path: \(moduleURL.path)")
-        }
-
-        // rather than the top-level "build" folder, we place the module in per-module .build/ sub-folder in order to enable concurrent testing as well as placing generated files in a typically-gitignored
-        let buildDir = "\(buildFolder)/\(module)"
-        let testResultPath = "\(buildDir)/test-results"
 
         var args = actions + arguments
 
         var env: [String: String] = environment
 
         // add in the project dir for explicitness (even though it is assumed from the current working directory as well)
-        args += ["--project-dir", workingDirectory.path]
+        if let workingDirectory = workingDirectory {
+            args += ["--project-dir", workingDirectory.path]
+        }
 
         // this enables reporting on deprecated features
         args += ["--warning-mode", "all"]
 
-        args += ["-PbuildDir=\(buildDir)"]
+        var testResultFolder: URL? = nil
+
+        if let module = module {
+            let moduleURL = URL(fileURLWithPath: module, isDirectory: true, relativeTo: workingDirectory)
+            if !FileManager.default.fileExists(atPath: moduleURL.path) {
+                throw GradleDriverError("The expected gradle folder did not exist, which may mean the Skip transpiler is not enabled or encountered errors. Try running `skip doctor` to diagnose and re-building the project. See https://skip.tools/docs/. Missing path: \(moduleURL.path)")
+            }
+            // rather than the top-level "build" folder, we place the module in per-module .build/ sub-folder in order to enable concurrent testing as well as placing generated files in a typically-gitignored
+            let buildDir = "\(buildFolder)/\(module)"
+            let testResultPath = "\(buildDir)/test-results"
+            args += ["-PbuildDir=\(buildDir)"]
+            testResultFolder = URL(fileURLWithPath: testResultPath, isDirectory: true, relativeTo: moduleURL)
+        }
 
         // this allows multiple simultaneous gradle builds to take place
         // args += ["--parallel"]
@@ -212,12 +218,13 @@ public struct GradleDriver {
 
         }
 
-        let testResultFolder = URL(fileURLWithPath: testResultPath, isDirectory: true, relativeTo: moduleURL)
-        #if os(macOS)
-        try? FileManager.default.trashItem(at: testResultFolder, resultingItemURL: nil) // remove the test folder, since a build failure won't clear it and it will appear as if the tests ran successfully
-        #else
-        try? FileManager.default.removeItem(atPath: testResultPath)
-        #endif
+        if let testResultFolder = testResultFolder {
+            #if os(macOS)
+            try? FileManager.default.trashItem(at: testResultFolder, resultingItemURL: nil) // remove the test folder, since a build failure won't clear it and it will appear as if the tests ran successfully
+            #else
+            try? FileManager.default.removeItem(atPath: testResultPath)
+            #endif
+        }
 
         let output = try await execGradle(in: workingDirectory, args: args, env: env, onExit: exitHandler)
         return (output, { try Self.parseTestResults(in: testResultFolder) })
@@ -516,7 +523,10 @@ public struct GradleDriver {
         #endif
     }
 
-    private static func parseTestResults(in testFolder: URL) throws -> [TestSuite] {
+    private static func parseTestResults(in testFolder: URL?) throws -> [TestSuite] {
+        guard let testFolder = testFolder else {
+            return []
+        }
         let fm = FileManager.default
         if !fm.fileExists(atPath: testFolder.path) {
             // missing folder

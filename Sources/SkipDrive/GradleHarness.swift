@@ -320,7 +320,10 @@ extension GradleHarness {
             ?? ProcessInfo.processInfo.environment["BUILT_PRODUCTS_DIR"]
     }
 
-    public func projectRoot(forModule moduleName: String, packageName: String, projectFolder: String? = nil) throws -> URL {
+    public func projectRoot(forModule moduleName: String?, packageName: String?, projectFolder: String) throws -> URL? {
+        guard let moduleName = moduleName, let packageName = packageName else {
+            return nil
+        }
         let env = ProcessInfo.processInfo.environment
 
         //for (key, value) in env.sorted(by: { $0.0 < $1.0 }) {
@@ -341,54 +344,16 @@ extension GradleHarness {
         } else {
             // SPM-derived project: .build/plugins/outputs/hello-skip/HelloSkip/skipstone
             // TODO: make it relative to project path
-            return URL(fileURLWithPath: (projectFolder ?? ".") + "/.build/plugins/outputs/\(packageName)/\(moduleName)/skipstone", isDirectory: true)
+            return URL(fileURLWithPath: (projectFolder) + "/.build/plugins/outputs/\(packageName)/\(moduleName)/skipstone", isDirectory: true)
         }
     }
 
-    public func launch(appName: String, appId: String, packageName: String, deviceID: String? = ProcessInfo.processInfo.environment["SKIP_TEST_DEVICE"]) async throws {
-        /// The default log levels when launching the .apk
-        let logLevel = [
-                "\(appId):V", // all app log messages
-                "\(appId).\(appName):V", // all app log messages
-                "AndroidRuntime:V", // info from runtime
-                "*:S", // all other log messages are silenced
-        ]
-
-        let moduleName = appName
-
-        let path = "\(appName)/.build/\(appName)/outputs/apk/"
-        let artifactBase = releaseBuild ? "release/\(appName)-release" : "debug/\(appName)-debug"
-
-        let artifact = artifactBase + ".apk"
-        var apk = try URL(fileURLWithPath: path + artifact, isDirectory: false, relativeTo: projectRoot(forModule: moduleName, packageName: packageName))
-
-        let fileSize: Int
-        if let apkFileSize = try? apk.resourceValues(forKeys: [.fileSizeKey]).fileSize {
-            fileSize = apkFileSize
-        } else {
-            // try again with the "-unsigned.apk" variant that some gradle projects produce
-            apk = apk.deletingLastPathComponent().appendingPathComponent(artifactBase + "-unsigned.apk", isDirectory: false)
-            guard let apkFileSize = try? apk.resourceValues(forKeys: [.fileSizeKey]).fileSize else {
-                throw AppLaunchError(errorDescription: "APK did not exist at path: \(apk.path)")
-            }
-            fileSize = apkFileSize
-        }
-
-        print("launching APK (\(ByteCountFormatter.string(fromByteCount: Int64(fileSize), countStyle: .file))): \(apk.path)")
-
-        // select device with: SKIP_TEST_DEVICE=emulator-5554
-        // this avoids the error: adb: more than one device/emulator
-        try await launchAPK(device: deviceID, appid: "\(appId)/.MainActivity", log: logLevel, apk: apk.path)
-    }
-
-    public func gradleExec(projectFolder: String? = nil, appName: String, packageName: String, arguments: [String], outputPrefix: String? = "GRADLE>") async throws {
+    public func gradleExec(in projectFolder: URL?, moduleName: String?, packageName: String?, arguments: [String], outputPrefix: String? = "GRADLE>") async throws {
         let driver = try await GradleDriver()
-
-        let moduleName = appName
         let acts: [String] = [] // releaseBuild ? ["assembleRelease"] : ["assembleDebug"] // expected in the arguments to the command
 
         var exitCode: ProcessResult.ExitStatus? = nil
-        let (output, _) = try await driver.launchGradleProcess(in: projectRoot(forModule: moduleName, packageName: packageName, projectFolder: projectFolder), module: appName, actions: acts, arguments: arguments, environment: ProcessInfo.processInfo.environmentWithDefaultToolPaths, info: false, rerunTasks: false, exitHandler: { result in
+        let (output, _) = try await driver.launchGradleProcess(in: projectFolder, module: moduleName, actions: acts, arguments: arguments, environment: ProcessInfo.processInfo.environmentWithDefaultToolPaths, info: false, rerunTasks: false, exitHandler: { result in
             print("note: Gradle \(result.resultDescription)")
             exitCode = result.exitStatus
         })
