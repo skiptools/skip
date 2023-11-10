@@ -84,3 +84,111 @@ public struct Term {
         return txt.joined()
     }
 }
+
+
+extension FileManager {
+#if os(iOS)
+    var homeDirectoryForCurrentUser: URL {
+        URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+    }
+#endif
+
+    /// Sets the modification time of all the files and folders under the given directory (inclusive) to the epoch, which defaults to January 1970.
+    func zeroFileTimes(under directory: URL, epoch: Date = Date(timeIntervalSince1970: 0.0)) throws {
+        if let pathEnumerator = self.enumerator(at: directory, includingPropertiesForKeys: nil, options: []) {
+            for path in pathEnumerator {
+                if let url = path as? URL {
+                    try self.setAttributes([FileAttributeKey.modificationDate: epoch], ofItemAtPath: url.path)
+                }
+            }
+        }
+
+        // the parent directory itself is not included in the enumerator
+        try self.setAttributes([FileAttributeKey.modificationDate: epoch], ofItemAtPath: directory.path)
+    }
+
+    /// Creates a directory at the given URL, permitting the case where the directory already exists
+    func mkdir(_ fileURL: URL) throws -> URL {
+        do {
+            try createDirectory(at: fileURL, withIntermediateDirectories: false)
+        } catch let error as NSError {
+            // is we failed because the directory already exists, and the directory does exist, then pass
+            if !(error.domain == NSCocoaErrorDomain && error.code == NSFileWriteFileExistsError)
+                || (try? fileURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) != true {
+                throw error
+            }
+        }
+        return fileURL
+    }
+}
+
+
+
+extension URL {
+    /// Returns a human-readable description of the size of the underlying file for this URL, throwing an error if the file doesn't exist or cannot be accessed
+    var fileSizeString: String {
+        get throws {
+            try ByteCountFormatter.string(fromByteCount: Int64(resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0), countStyle: .file)
+        }
+    }
+
+    /// Create the child directory of the given parent
+    func append(path: String, create directory: Bool = false) throws -> URL {
+        let path = appendingPathComponent(path, isDirectory: directory)
+        return directory ? try FileManager.default.mkdir(path) : path
+    }
+
+    /// Returns true if the given file URL exists.
+    /// - Parameter isDirectory: if specified, this will fail is the URL's directory status does not match the argument
+    /// - Returns: true if the file exists (and, optionally, matches the isDirectory flag)
+    func fileExists(isDirectory: Bool? = nil) -> Bool {
+        guard let res = self.fileResources else {
+            return false
+        }
+        if let isDirectory = isDirectory {
+            return isDirectory == res.isDirectory
+        }
+        return true
+    }
+
+    var fileResources: URLResourceValues? {
+        try? self.resourceValues(forKeys: [.isReadableKey, .isWritableKey, .isExecutableKey, .isRegularFileKey, .isSymbolicLinkKey, .isDirectoryKey])
+    }
+
+    var isReadableFile: Bool? {
+        try? self.resourceValues(forKeys: [.isReadableKey]).isReadable
+    }
+
+    var isWritableFile: Bool? {
+        try? self.resourceValues(forKeys: [.isWritableKey]).isWritable
+    }
+
+    var isExecutableFile: Bool? {
+        try? self.resourceValues(forKeys: [.isExecutableKey]).isExecutable
+    }
+
+    var isDirectoryFile: Bool? {
+        try? self.resourceValues(forKeys: [.isDirectoryKey]).isDirectory
+    }
+
+    var isRegularFile: Bool? {
+        try? self.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile
+    }
+
+    var isSymbolicLink: Bool? {
+        try? self.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink
+    }
+
+    var fileSize: Int? {
+        try? self.resourceValues(forKeys: [.fileSizeKey]).fileSize
+    }
+
+    func resolve(_ relative: String, check: (URL, Bool) throws -> ()) rethrows -> URL {
+        let isDirectory = relative.hasSuffix("/")
+        let url = self.appendingPathComponent(relative, isDirectory: isDirectory)
+        try check(url, isDirectory)
+        return url
+    }
+}
+
+

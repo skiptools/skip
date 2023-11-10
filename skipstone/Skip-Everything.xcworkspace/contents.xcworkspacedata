@@ -26,16 +26,25 @@
       location = "group:../skip-ffi">
    </FileRef>
    <FileRef
-      location = "group:../skip-motion">
+      location = "group:../skip-salt">
    </FileRef>
    <FileRef
-      location = "group:../skip-proto">
+      location = "group:../skip-vault">
    </FileRef>
    <FileRef
       location = "group:../skip-sql">
    </FileRef>
    <FileRef
       location = "group:../skip-script">
+   </FileRef>
+   <FileRef
+      location = "group:../skip-motion">
+   </FileRef>
+   <FileRef
+      location = "group:../skip-web">
+   </FileRef>
+   <FileRef
+      location = "group:../skip-proto">
    </FileRef>
    <FileRef
       location = "group:../skip-xml">
@@ -47,7 +56,7 @@
       location = "group:../skip-zip">
    </FileRef>
    <FileRef
-      location = "group:../skipapp-hello/HelloSkip.xcodeproj">
+      location = "group:../skipapp-hello/Darwin/HelloSkip.xcodeproj">
    </FileRef>
    <FileRef
       location = "group:../skipapp-showcase/Showcase.xcodeproj">

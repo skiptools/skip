@@ -3,7 +3,7 @@ import ArgumentParser
 import SkipSyntax
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-struct CheckupCommand: MessageCommand, ToolOptionsCommand  {
+struct CheckupCommand: MessageCommand, ToolOptionsCommand {
     static var configuration = CommandConfiguration(
         commandName: "checkup",
         abstract: "Run tests to ensure Skip is in working order",
@@ -23,7 +23,7 @@ struct CheckupCommand: MessageCommand, ToolOptionsCommand  {
 
     func performCommand(with out: MessageQueue) async throws {
         let startTime = Date.now
-        try await runDoctor(with: out)
+        await runDoctor(with: out)
 
         @Sendable func buildSampleProject(packageResolvedURL: URL? = nil) async throws -> (projectURL: URL, artifacts: [URL: String?]) {
             let primary = packageResolvedURL == nil
@@ -35,7 +35,7 @@ struct CheckupCommand: MessageCommand, ToolOptionsCommand  {
             let checkupModules = try [PackageModule(parse: "HelloSkip")]
             
             // create a project differently based on the index, but the ultimate binary output should be identical
-            return try await buildSkipProject(projectName: "hello-skip", modules: checkupModules, resourceFolder: "Resources", dir: tmpdir, verify: true, configuration: self.configuration, build: primary, test: primary, returnHashes: doubleCheck, messagePrefix: !primary ? "Re-" : "", showTree: false, chain: true, gitRepo: false, free: true, zero: true, appid: "skip.hello.App", version: "1.0.0", moduleTests: primary, validatePackage: true, packageResolved: packageResolvedURL, apk: true, ipa: true, with: out)
+            return try await buildSkipProject(projectName: "hello-skip", modules: checkupModules, resourceFolder: "Resources", dir: URL(fileURLWithPath: tmpdir, isDirectory: true), verify: true, configuration: self.configuration, build: primary, test: primary, returnHashes: doubleCheck, messagePrefix: !primary ? "Re-" : "", showTree: false, chain: true, gitRepo: false, free: true, zero: true, appid: "skip.hello.App", version: "1.0.0", moduleTests: primary, validatePackage: true, packageResolved: packageResolvedURL, apk: true, ipa: true, with: out)
         }
 
         // build a sample project (twice when performing a double-check)

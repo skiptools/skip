@@ -20,39 +20,21 @@ struct DoctorCommand: SkipCommand, StreamingCommand, ToolOptionsCommand {
     @OptionGroup(title: "Tool Options")
     var toolOptions: ToolOptions
 
-    func performCommand(with out: MessageQueue) async throws {
+    func performCommand(with out: MessageQueue) async {
         await out.yield(MessageBlock(status: nil, "Skip Doctor"))
 
-        try await runDoctor(with: out)
-        let latestVersion = try await checkSkipUpdates(with: out)
-
-        let messages = await out.elements
-
-        //let total = messages.count
-        let warnings = messages.filter({ $0.messageStatus == .warn }).count
-        let errors = messages.filter({ $0.messageStatus == .fail }).count
-
+        await runDoctor(with: out)
+        let latestVersion = await checkSkipUpdates(with: out)
         if let latestVersion = latestVersion, latestVersion != skipVersion {
             await out.yield(MessageBlock(status: .warn, "A new version is Skip (\(latestVersion)) is available to update with: skip upgrade"))
         }
-
-        var msg = "Skip (\(skipVersion)) checks complete"
-        if warnings > 0 || errors > 0 {
-            if errors > 0 {
-                msg += " with \(errors) error\(warnings == 1 ? "" : "s")"
-            }
-            if warnings > 0 {
-                msg += " \(errors > 0 ? "and" : "with") \(warnings) warning\(warnings == 1 ? "" : "s")"
-            }
-        }
-
-        await out.yield(MessageBlock(status: errors > 0 ? .fail : warnings > 0 ? .warn : .pass, msg))
+        await reportMessageQueue(with: out, title: "Skip (\(skipVersion)) checks complete")
     }
 }
 
 extension ToolOptionsCommand {
     /// Runs the `skip doctor` command and stream the results to the messenger
-    func runDoctor(with out: MessageQueue) async throws {
+    func runDoctor(with out: MessageQueue) async {
 
         /// Invokes the given command and attempts to parse the output against the given regular expression pattern to validate that it is a semantic version string
         func checkVersion(title: String, cmd: [String], min: Version? = nil, pattern: String, watch: Bool = false) async {
@@ -120,7 +102,7 @@ extension ToolOptionsCommand {
             return (result, MessageBlock(status: studioVersion == nil ? .warn : .pass, studioVersion != nil 
                                          ? "Android Studio version: \(studioVersion!)"
                                          : "Android Studio not found: brew install android-studio"))
-        }, block: { _ in
+        }, monitorAction: { _ in
             try androidInfoPlist()?["CFBundleShortVersionString"] as? String
         })
         #endif

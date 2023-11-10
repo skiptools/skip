@@ -25,10 +25,10 @@ struct GradleCommand: SkipCommand {
     var toolOptions: ToolOptions
 
     @Option(help: ArgumentHelp("App package name", valueName: "package-name"))
-    var package: String
+    var package: String?
 
     @Option(help: ArgumentHelp("App module name", valueName: "ModuleName"))
-    var module: String
+    var module: String?
 
     @Option(help: ArgumentHelp("Project folder", valueName: "dir"))
     var project: String = "."
@@ -41,7 +41,7 @@ struct GradleCommand: SkipCommand {
             #if !canImport(SkipDriveExternal)
             throw SkipDriveError(errorDescription: "SkipDrive not linked")
             #else
-            try await self.gradleExec(projectFolder: project, appName: module, packageName: package, arguments: gradleArguments)
+            try await self.gradleExec(in: projectRoot(forModule: module, packageName: package, projectFolder: project), moduleName: module, packageName: package, arguments: gradleArguments)
             #endif
         } catch {
             // output error message in an xcode-friendly way

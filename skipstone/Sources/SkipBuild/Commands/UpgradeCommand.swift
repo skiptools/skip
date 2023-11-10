@@ -21,23 +21,20 @@ struct UpgradeCommand: MessageCommand, ToolOptionsCommand {
     @OptionGroup(title: "Tool Options")
     var toolOptions: ToolOptions
 
-    func performCommand(with out: MessageQueue) async throws {
-        //if try await checkSkipUpdates() == skipVersion {
-        //    outputOptions.write("Skip \(skipVersion) is up to date.")
-        //    return
-        //}
-
-        //try await outputOptions.run("Updating Homebew", ["brew", "update"])
-        let _ = await run(with: out, "Updating Skip", ["brew", "upgrade", "skip"])
-        //outputOptions.write(upgradeOutput.out)
-        //outputOptions.write(upgradeOutput.err)
+    func performCommand(with out: MessageQueue) async {
+        let latestSkipVersion = await checkSkipUpdates(with: out)
+        if latestSkipVersion == skipVersion {
+            await out.yield(MessageBlock(status: .pass, "Skip \(skipVersion) is up to date."))
+        } else if let latestSkipVersion = latestSkipVersion {
+            await run(with: out, "Upgrade Skip to \(latestSkipVersion)", ["brew", "upgrade", "skip"])
+        }
     }
 }
 
 extension SkipCommand {
     /// Checks the https://source.skip.tools/skip/releases.atom page and returns the semantic version contained in the title of the first entry (i.e., the latest release of Skip)
-    func checkSkipUpdates(with out: MessageQueue) async throws -> String? {
-        try await outputOptions.monitor(with: out, "Check Skip Updates", resultHandler: { result in
+    func checkSkipUpdates(with out: MessageQueue) async -> String? {
+        try? await outputOptions.monitor(with: out, "Check Skip Updates", resultHandler: { result in
             (result, MessageBlock(status: result?.messageStatusAny, "Check Skip Updates: \((try? result?.get()) ?? "?")"))
         }) { loggingHandler in
             try await fetchLatestRelease(from: URL(string: "https://source.skip.tools/skip/releases.atom")!)

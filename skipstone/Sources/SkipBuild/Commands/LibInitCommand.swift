@@ -7,7 +7,7 @@ import FoundationNetworking
 #endif
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-struct LibInitCommand: MessageCommand, CreateOptionsCommand, ToolOptionsCommand, BuildOptionsCommand, StreamingCommand {
+struct LibInitCommand: MessageCommand, CreateOptionsCommand, ProjectCommand, ToolOptionsCommand, BuildOptionsCommand, StreamingCommand {
     static var configuration = CommandConfiguration(
         commandName: "init",
         abstract: "Initialize a new Skip library project",
@@ -58,10 +58,14 @@ struct LibInitCommand: MessageCommand, CreateOptionsCommand, ToolOptionsCommand,
         }
     }
 
+    var project: String {
+        (self.createOptions.dir ?? ".")
+    }
+
     func performCommand(with out: MessageQueue) async throws {
         await out.yield(MessageBlock(status: nil, "Initializing Skip library \(self.projectName)"))
 
-        let dir = self.createOptions.dir ?? "."
+        let dir = URL(fileURLWithPath: self.createOptions.dir ?? ".", isDirectory: true)
 
         let modules = try self.modules
         let (createdURL, _) = try await buildSkipProject(projectName: self.projectName, modules: modules, resourceFolder: createOptions.resourcePath, dir: dir, verify: buildOptions.verify, configuration: createOptions.configuration, build: buildOptions.build, test: buildOptions.test, returnHashes: false, showTree: self.createOptions.showTree, chain: createOptions.chain, gitRepo: createOptions.gitRepo, free: createOptions.free, zero: createOptions.zero, appid: self.appid, version: self.version, moduleTests: self.createOptions.moduleTests, validatePackage: self.createOptions.validatePackage, apk: apk, ipa: ipa, with: out)
@@ -483,7 +487,7 @@ extension ToolOptionsCommand {
 """
     }
 
-    func buildSkipProject(projectName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: String, verify: Bool, configuration: String, build: Bool, test: Bool, returnHashes: Bool, messagePrefix: String? = nil, showTree: Bool, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, appid: String?, version: String?, moduleTests: Bool, validatePackage: Bool, packageResolved packageResolvedURL: URL? = nil, apk: Bool, ipa: Bool, with out: MessageQueue) async throws -> (projectURL: URL, artifacts: [URL: String?]) {
+    func buildSkipProject(projectName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, verify: Bool, configuration: String, build: Bool, test: Bool, returnHashes: Bool, messagePrefix: String? = nil, showTree: Bool, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, appid: String?, version: String?, moduleTests: Bool, validatePackage: Bool, packageResolved packageResolvedURL: URL? = nil, apk: Bool, ipa: Bool, with out: MessageQueue) async throws -> (projectURL: URL, artifacts: [URL: String?]) {
         let sourceHeader = free ? licenseLGPLHeader : ""
         let projectURL = try await initSkipLibrary(projectName: projectName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, verify: verify, chain: chain, gitRepo: gitRepo, free: free, zero: skipZeroSupport, app: appid != nil, moduleTests: moduleTests, validatePackage: validatePackage, packageResolved: packageResolvedURL, with: out)
 
@@ -517,13 +521,14 @@ extension ToolOptionsCommand {
             let appModule_Metadata_Path = primaryModuleSources + "/Skip"
 
             let Capabilities_entitlements_name = "Capabilities.entitlements"
+            // TODO: let Capabilities_entitlements_name = "Entitlements.plist"
             let Capabilities_entitlements_path = appModule_Metadata_Path + "/" + Capabilities_entitlements_name
 
             let primaryModuleAppEntitlementsURL = projectURL.appending(path: Capabilities_entitlements_path)
             try FileManager.default.createDirectory(at: primaryModuleAppEntitlementsURL.deletingLastPathComponent(), withIntermediateDirectories: true)
 
 
-            // Sources/PlaygroundApp/Permissions.entitlements
+            // Sources/PlaygroundApp/Entitlements.plist
             let appEntitlementsContents = """
             <?xml version="1.0" encoding="UTF-8"?>
             <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -1036,7 +1041,7 @@ extension ToolOptionsCommand {
         }
 
         if verify {
-            await performVerifyCommand(project: projectPath.pathString, with: out)
+            try await performVerifyCommand(project: projectPath.pathString, with: out)
         }
 
         if showTree {
@@ -1046,21 +1051,20 @@ extension ToolOptionsCommand {
         return (appid != nil ? xcodeProjectFolder : projectURL.appendingPathComponent("Package.swift", isDirectory: false), artifactHashes)
     }
 
-    func initSkipLibrary(projectName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: String, verify: Bool, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, app: Bool, moduleTests: Bool, validatePackage: Bool, packageResolved packageResolvedURL: URL?, with out: MessageQueue) async throws -> URL {
+    func initSkipLibrary(projectName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, verify: Bool, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, app: Bool, moduleTests: Bool, validatePackage: Bool, packageResolved packageResolvedURL: URL?, with out: MessageQueue) async throws -> URL {
         var isDir: Foundation.ObjCBool = false
-        if !FileManager.default.fileExists(atPath: outputFolder, isDirectory: &isDir) {
+        if !FileManager.default.fileExists(atPath: outputFolder.path, isDirectory: &isDir) {
             throw InitError(errorDescription: "Specified output folder does not exist: \(outputFolder)")
         }
         if isDir.boolValue == false {
             throw InitError(errorDescription: "Specified output folder is not a directory: \(outputFolder)")
         }
 
-        let projectFolder = outputFolder + "/" + projectName
-        if FileManager.default.fileExists(atPath: projectFolder) {
-            throw InitError(errorDescription: "Specified project path already exists: \(projectFolder)")
+        let projectFolderURL = outputFolder.appendingPathComponent(projectName, isDirectory: true)
+        if FileManager.default.fileExists(atPath: projectFolderURL.path) {
+            throw InitError(errorDescription: "Specified project path already exists: \(projectFolderURL.path)")
         }
 
-        let projectFolderURL = URL(fileURLWithPath: projectFolder, isDirectory: true)
         try FileManager.default.createDirectory(at: projectFolderURL, withIntermediateDirectories: true)
 
         let sourcesURL = try projectFolderURL.append(path: "Sources", create: true)
@@ -1225,6 +1229,7 @@ extension ToolOptionsCommand {
                 \(sourceHeader)import XCTest
                 import OSLog
                 import Foundation
+                @testable import \(moduleName)
 
                 let logger: Logger = Logger(subsystem: "\(moduleName)", category: "Tests")
 
@@ -1534,6 +1539,16 @@ extension ToolOptionsCommand {
 
 extension ToolOptionsCommand {
     /// Perform a monitor check on the given URL
+    func check<T, U>(_ item: T, with out: MessageQueue, title: String, handle: @escaping (T) throws -> U) async -> Result<U, Error> {
+        await outputOptions.monitor(with: out, title, resultHandler: { result in
+            return (nil, nil) as (result: Result<U, any Error>?, message: MessageBlock?)
+        }) { line in
+            try handle(item)
+        }
+    }
+
+
+    /// Perform a monitor check on the given URL
     func checkFile(_ url: URL, with out: MessageQueue, title: String, handle: @escaping (URL) throws -> CheckStatus) async {
         await outputOptions.monitor(with: out, title, resultHandler: { result in
             do {
@@ -1622,36 +1637,7 @@ struct InitError : LocalizedError {
     var errorDescription: String?
 }
 
-extension URL {
-    /// Returns a human-readable description of the size of the underlying file for this URL, throwing an error if the file doesn't exist or cannot be accessed
-    var fileSizeString: String {
-        get throws {
-            try ByteCountFormatter.string(fromByteCount: Int64(resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0), countStyle: .file)
-        }
-    }
 
-    /// Create the child directory of the given parent
-    func append(path: String, create directory: Bool = false) throws -> URL {
-        let path = appendingPathComponent(path, isDirectory: directory)
-        return directory ? try FileManager.default.mkdir(path) : path
-    }
-}
-
-extension FileManager {
-    /// Creates a directory at the given URL, permitting the case where the directory already exists
-    func mkdir(_ fileURL: URL) throws -> URL {
-        do {
-            try createDirectory(at: fileURL, withIntermediateDirectories: false)
-        } catch let error as NSError {
-            // is we failed because the directory already exists, and the directory does exist, then pass
-            if !(error.domain == NSCocoaErrorDomain && error.code == NSFileWriteFileExistsError)
-                || (try? fileURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) != true {
-                throw error
-            }
-        }
-        return fileURL
-    }
-}
 
 let licenseLGPL = """
                    GNU LESSER GENERAL PUBLIC LICENSE

@@ -35,6 +35,7 @@ extension SkipCommand {
     }
 }
 
+
 // MARK: Command Executor
 
 public protocol SkipCommandExecutor : AsyncParsableCommand {
@@ -235,28 +236,6 @@ struct VersionCommand: SingleStreamingCommand {
 }
 
 
-extension FileManager {
-#if os(iOS)
-    var homeDirectoryForCurrentUser: URL {
-        URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
-    }
-#endif
-
-    /// Sets the modification time of all the files and folders under the given directory (inclusive) to the epoch, which defaults to January 1970.
-    func zeroFileTimes(under directory: URL, epoch: Date = Date(timeIntervalSince1970: 0.0)) throws {
-        if let pathEnumerator = self.enumerator(at: directory, includingPropertiesForKeys: nil, options: []) {
-            for path in pathEnumerator {
-                if let url = path as? URL {
-                    try self.setAttributes([FileAttributeKey.modificationDate: epoch], ofItemAtPath: url.path)
-                }
-            }
-        }
-
-        // the parent directory itself is not included in the enumerator
-        try self.setAttributes([FileAttributeKey.modificationDate: epoch], ofItemAtPath: directory.path)
-    }
-}
-
 // MARK: Command Phases
 
 /// The condition under which the phase should be run
@@ -424,6 +403,33 @@ actor MessageQueue {
     /// Writes the given message to the continuation
     public func write(status: MessageBlock.Status?, _ message: String) {
         self.yield(MessageBlock(status: status, message))
+    }
+}
+
+extension StreamingCommand {
+    @discardableResult func reportMessageQueue(with out: MessageQueue, title: String) async -> [Result<MessageStream.Element, Error>] {
+        let messages = await out.elements
+
+        if messages.isEmpty {
+            await out.yield(MessageBlock(status: .fail, "No checks were performed"))
+        } else {
+            //let total = messages.count
+            let warnings = messages.filter({ $0.messageStatus == .warn }).count
+            let errors = messages.filter({ $0.messageStatus == .fail }).count
+
+            var msg = title
+            if warnings > 0 || errors > 0 {
+                if errors > 0 {
+                    msg += " with \(errors) error\(warnings == 1 ? "" : "s")"
+                }
+                if warnings > 0 {
+                    msg += " \(errors > 0 ? "and" : "with") \(warnings) warning\(warnings == 1 ? "" : "s")"
+                }
+            }
+
+            await out.yield(MessageBlock(status: errors > 0 ? .fail : warnings > 0 ? .warn : .pass, msg))
+        }
+        return messages
     }
 }
 
@@ -842,6 +848,15 @@ extension String {
             return String(self[..<self.index(self.startIndex, offsetBy: length)])
         }
     }
+}
+
+protocol ProjectCommand {
+    var project: String { get }
+}
+
+extension ProjectCommand {
+    var projectFolderURL: URL { URL(fileURLWithPath: project, isDirectory: true) }
+
 }
 
 /// A `ToolOptionsCommand` holds options that can be used to control the paths of commonly-used tools
