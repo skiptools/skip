@@ -432,6 +432,16 @@ final class ClosureTests: XCTestCase {
         """)
     }
 
+    func testSwiftUIBinding() async throws {
+        try await check(swift: """
+        List($items, id: \\.i) { $item in
+            Text(item.s)
+        }
+        """, kotlin: """
+        List(Binding({ items }, { it -> items = it }), id = { it.i }) { item -> Text(item.wrappedValue.s) }
+        """)
+    }
+
     func testModifierCallFormatting() async throws {
         try await check(swift: """
         Base()

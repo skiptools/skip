@@ -573,14 +573,15 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
                 implicitParameterLabels = handleImplicitParameters(in: kbody, inferredType: expression.inferredType)
             }
         }
-        // Inferred type parameters include explicit parameter info already, so use them for inout info
+        // Inferred type parameters include explicit parameter info already, so use them for parameter info
         let inferredParameters = expression.inferredType.parameters
         for (index, parameter) in inferredParameters.enumerated() {
-            guard parameter.isInOut else {
-                continue
+            if let label = parameter.label, KotlinIdentifier.isSwiftUIBinding(name: label) {
+                kbody.updateWithSwiftUIBindingParameter(name: String(label.dropFirst()), source: translator.syntaxTree.source)
+            } else if parameter.isInOut {
+                let name = index < implicitParameterLabels.count ? "$\(index)" : parameter.label ?? "$\(index)"
+                kbody.updateWithInOutParameter(name: name, source: translator.syntaxTree.source)
             }
-            let name = index < implicitParameterLabels.count ? "$\(index)" : parameter.label ?? "$\(index)"
-            kbody.updateWithInOutParameter(name: name, source: translator.syntaxTree.source)
         }
         handleSelfAssignments(in: kbody, source: translator.syntaxTree.source)
 
@@ -588,8 +589,14 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
         kexpression.labeledCaptureList = labeledCaptureList
         kexpression.returnType = expression.returnType.resolvingSelf(in: expression)
         kexpression.returnType.appendKotlinMessages(to: kexpression, source: translator.syntaxTree.source)
-        kexpression.parameters = expression.parameters.map { $0.resolvingSelf(in: expression) }
-        kexpression.parameters.forEach { $0.appendKotlinMessages(to: kexpression, source: translator.syntaxTree.source) }
+        kexpression.parameters = expression.parameters.map {
+            var parameter = $0.resolvingSelf(in: expression)
+            if let externalLabel = parameter.externalLabel, KotlinIdentifier.isSwiftUIBinding(name: externalLabel) {
+                parameter.externalLabel = String(externalLabel.dropFirst())
+            }
+            parameter.appendKotlinMessages(to: kexpression, source: translator.syntaxTree.source)
+            return parameter
+        }
         kexpression.isDestructuredParameters = expression.isDestructuredParameters
         kexpression.attributes = expression.attributes
         // Combine inferred flags because most closures aren't declared with explicit info
@@ -1114,7 +1121,11 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
     }
 
     var isSwiftUIBinding: Bool {
-        return name.hasPrefix("$") && Int(name.dropFirst()) == nil
+        return Self.isSwiftUIBinding(name: name)
+    }
+
+    static func isSwiftUIBinding(name: String) -> Bool {
+        name.hasPrefix("$") && Int(name.dropFirst()) == nil
     }
 
     func appendSwiftUIBindingPath(to output: OutputGenerator, indentation: Indentation, appendPath: @escaping (OutputGenerator, Indentation, KotlinBindableBase) -> Void) {

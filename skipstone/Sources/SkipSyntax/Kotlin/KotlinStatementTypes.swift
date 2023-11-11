@@ -272,6 +272,22 @@ class KotlinCodeBlock: KotlinStatement, KotlinSingleStatementAppendable {
         }
     }
 
+    /// Perform any updates to handle references to the given SwiftUI Binding.
+    func updateWithSwiftUIBindingParameter(name: String, source: Source) {
+        visit { node in
+            if let identifier = node as? KotlinIdentifier {
+                if identifier.name == name {
+                    identifier.valueSuffix = ".wrappedValue"
+                }
+            } else if let variableDeclaration = node as? KotlinVariableDeclaration {
+                if variableDeclaration.names.contains(name) {
+                    variableDeclaration.messages.append(.kotlinBindingParameterAssignment(variableDeclaration, source: source))
+                }
+            }
+            return .recurse(nil)
+        }
+    }
+
     /// Perform any updates to handle the given 'async let' declaration.
     ///
     /// - Note: The declaration should be a direct child of this code block.
