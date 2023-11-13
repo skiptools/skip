@@ -58,7 +58,7 @@ jobs:
           SKIP_MODULE_APP="${SKIP_MODULE}App"
           echo "SKIP_MODULE_APP=${SKIP_MODULE_APP}" >> $GITHUB_ENV
 
-          XCODE_SETTINGS=$(xcodebuild -showBuildSettings -json -project ${SKIP_MODULE}.xcodeproj -scheme "${SKIP_MODULE_APP}")
+          XCODE_SETTINGS=$(xcodebuild -showBuildSettings -json -project Darwin/${SKIP_MODULE}.xcodeproj -scheme "${SKIP_MODULE_APP}")
 
           # log the build settings
           echo "${XCODE_SETTINGS}" | jq .
@@ -83,7 +83,7 @@ jobs:
           #export NOSKIP=1
           for CONFIGURATION in "Debug" "Release"; do
             ARCHIVE_PATH=".build/Skip/artifacts/${CONFIGURATION}/${APPARTIFACT}.xcarchive"
-            SKIP_ZERO=YES xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -archivePath "${ARCHIVE_PATH}" -configuration "${CONFIGURATION}" -scheme "${SKIP_MODULE_APP}" -sdk "iphoneos" -destination "generic/platform=iOS" -jobs 1 archive CODE_SIGNING_ALLOWED=NO SKIP_BUILD_APK=NO SKIP_LAUNCH_APK=NO SKIP_ZERO=YES
+            SKIP_ZERO=YES xcodebuild -project Darwin/${SKIP_MODULE}.xcodeproj -derivedDataPath .build/DerivedData -skipPackagePluginValidation -archivePath "${ARCHIVE_PATH}" -configuration "${CONFIGURATION}" -scheme "${SKIP_MODULE_APP}" -sdk "iphoneos" -destination "generic/platform=iOS" -jobs 1 archive CODE_SIGNING_ALLOWED=NO SKIP_ACTION=build
             brew install tree
             tree "${ARCHIVE_PATH}"
             cd "${ARCHIVE_PATH}"/Products/
@@ -100,7 +100,7 @@ jobs:
       - name: Build apk
         run: |
           for CONFIGURATION in "Release" "Debug"; do
-            BUILT_PRODUCTS_DIR=".build" xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -configuration "${CONFIGURATION}" -destination "platform=macosx" -scheme "${SKIP_MODULE_APP}" build SKIP_BUILD_APK=YES SKIP_LAUNCH_APK=NO
+            BUILT_PRODUCTS_DIR=".build" xcodebuild -project Darwin/${SKIP_MODULE}.xcodeproj -derivedDataPath .build/DerivedData -skipPackagePluginValidation -configuration "${CONFIGURATION}" -destination "platform=macosx" -scheme "${SKIP_MODULE_APP}" build SKIP_ACTION=assemble
           done
 
           ls -la ${RELDIR}/
