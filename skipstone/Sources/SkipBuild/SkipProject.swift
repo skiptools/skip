@@ -1079,7 +1079,7 @@ class AppProjectLayout : FrameworkProjectLayout {
 
             let skipGradleLaunchScript = """
             if [ "${SKIP_ZERO}" != ""]; then
-                echo "note: skipping skip due to SKIP_ZERO
+                echo "note: skipping skip due to SKIP_ZERO"
                 exit 0
             fi
             PATH=${BUILD_ROOT}/Debug:${BUILD_ROOT}/../../SourcePackages/artifacts/skip/skip/skip.artifactbundle/macos:${PATH}:${HOMEBREW_PREFIX:-/opt/homebrew}/bin
