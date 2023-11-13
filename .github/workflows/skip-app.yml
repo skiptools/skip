@@ -60,11 +60,11 @@ jobs:
           # log the build settings
           echo "${XCODE_SETTINGS}" | jq .
 
-          # update App.xcconfig to set version string to the latest semver tag
-          sed -i '' "s;MARKETING_VERSION = .*;MARKETING_VERSION = $(git describe --tags --abbrev=0 --match '[0-9]*\.[0-9]*\.[0-9]*' --first-parent);g" ${SKIP_MODULE}.xcconfig
+          # update Skip.env to set version string to the latest semver tag
+          sed -i '' "s;MARKETING_VERSION = .*;MARKETING_VERSION = $(git describe --tags --abbrev=0 --match '[0-9]*\.[0-9]*\.[0-9]*' --first-parent);g" Skip.env
 
-          # update App.xcconfig to set build number to the git commit count
-          sed -i '' "s;PRODUCT_VERSION = .*;PRODUCT_VERSION = $(git rev-list --count HEAD);g" ${SKIP_MODULE}.xcconfig
+          # update Skip.env to set build number to the git commit count
+          sed -i '' "s;PRODUCT_VERSION = .*;PRODUCT_VERSION = $(git rev-list --count HEAD);g" Skip.env
 
       - name: Verify Skip App
         run: skip verify
