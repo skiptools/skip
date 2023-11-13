@@ -320,6 +320,7 @@ final class SkipCommandTests: XCTestCase {
         let moduleName = "APPNAME"
         let appid = "some.cool.app"
         let (projectURL, projectTree) = try await libInitComand(projectName: projectName, free: true, appid: appid, iconColor: "4994EC", moduleNames: moduleName)
+        #if os(macOS) // icons are not generated on Linux
         XCTAssertEqual(projectTree ?? "", """
         .
         ├─ Android
@@ -416,6 +417,8 @@ final class SkipCommandTests: XCTestCase {
 //        """)
 //
 //        try await Process.checkNonZeroExit(args: "open", "\(projectURL.path)/Darwin/\(moduleName).xcodeproj")
+
+        #endif
     }
 
     func OLDtestLibInitAppCommand() async throws {
