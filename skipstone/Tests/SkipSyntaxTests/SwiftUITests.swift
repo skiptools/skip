@@ -877,9 +877,9 @@ final class SwiftUITests: XCTestCase {
     func testBinding() async throws {
         try await check(supportingSwift: baseSupportingSwift, swift: """
         import SwiftUI
-        struct V: View {
-            @State var text = ""
-            var body: some View {
+        public struct V: View {
+            @State public var text = ""
+            public var body: some View {
                 TextField($text)
             }
         }
@@ -895,15 +895,15 @@ final class SwiftUITests: XCTestCase {
         import skip.model.*
 
         import skip.ui.*
-        internal class V: View {
-            internal var text: String
+        class V: View {
+            var text: String
                 get() = _text.wrappedValue
                 set(newValue) {
                     _text.wrappedValue = newValue
                 }
-            internal var _text: skip.ui.State<String>
+            var _text: skip.ui.State<String>
             override fun body(): View {
-                return ComposeView { composectx: ComposeContext -> TextField(Binding({ text }, { it -> text = it })).Compose(composectx) }
+                return ComposeView { composectx: ComposeContext -> TextField(Binding({ _text.wrappedValue }, { it -> _text.wrappedValue = it })).Compose(composectx) }
             }
 
             @Composable
@@ -918,6 +918,9 @@ final class SwiftUITests: XCTestCase {
 
             constructor(text: String = "") {
                 this._text = skip.ui.State(text)
+            }
+
+            companion object {
             }
         }
         """)
@@ -952,7 +955,7 @@ final class SwiftUITests: XCTestCase {
                 }
             internal var _text: skip.ui.State<String>
             override fun body(): View {
-                return ComposeView { composectx: ComposeContext -> TextField(Binding.instance(this, { it.text }, { it, newvalue -> it.text = newvalue })).Compose(composectx) }
+                return ComposeView { composectx: ComposeContext -> TextField(Binding.instance(this, { it._text.wrappedValue }, { it, newvalue -> it._text.wrappedValue = newvalue })).Compose(composectx) }
             }
 
             @Composable
@@ -973,12 +976,13 @@ final class SwiftUITests: XCTestCase {
     }
 
     func testBindable() async throws {
-        try await check(supportingSwift: baseSupportingSwift + """
+        try await check(supportingSwift: baseSupportingSwift, swift: """
+        import SwiftUI
+
         @Observable class O {
             var string = ""
         }
-        """, swift: """
-        import SwiftUI
+
         struct V: View {
             @Bindable var o: O
             var body: some View {
@@ -987,6 +991,7 @@ final class SwiftUITests: XCTestCase {
         }
         """, kotlin: """
         import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.Stable
         import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
         import androidx.compose.runtime.remember
@@ -997,6 +1002,16 @@ final class SwiftUITests: XCTestCase {
         import skip.model.*
 
         import skip.ui.*
+
+        internal open class O: Observable {
+            internal open var string: String
+                get() = stringstate
+                set(newValue) {
+                    stringstate = newValue
+                }
+            internal var stringstate: String by mutableStateOf("")
+        }
+
         internal class V: View {
             internal var o: O
             override fun body(): View {

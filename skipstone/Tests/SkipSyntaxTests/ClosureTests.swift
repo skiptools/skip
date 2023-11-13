@@ -438,7 +438,7 @@ final class ClosureTests: XCTestCase {
             Text(item.s)
         }
         """, kotlin: """
-        List(Binding({ items }, { it -> items = it }), id = { it.i }) { item -> Text(item.wrappedValue.s) }
+        List(Binding({ _items.wrappedValue }, { it -> _items.wrappedValue = it }), id = { it.i }) { item -> Text(item.wrappedValue.s) }
         """)
     }
 
