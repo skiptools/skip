@@ -1078,13 +1078,18 @@ class AppProjectLayout : FrameworkProjectLayout {
             let relativeSwiftPackageRoot = ".."
 
             let skipGradleLaunchScript = """
-            if [ "${SKIP_ZERO}" != ""]; then
+            if [ "${SKIP_ZERO}" != "" ]; then
                 echo "note: skipping skip due to SKIP_ZERO"
                 exit 0
             fi
+            if [ "${ACTION}" = "install" ]; then
+                SKIP_ACTION="build"
+            else
+                SKIP_ACTION="${SKIP_ACTION:-launch}"
+            fi
             PATH=${BUILD_ROOT}/Debug:${BUILD_ROOT}/../../SourcePackages/artifacts/skip/skip/skip.artifactbundle/macos:${PATH}:${HOMEBREW_PREFIX:-/opt/homebrew}/bin
             echo "note: running gradle build with: $(which skip) gradle -p ${PWD}/../Android ${SKIP_ACTION:-launch}Debug"
-            skip gradle -p ../Android ${SKIP_ACTION:-launch}Debug
+            skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
 
             """
                 .replacingOccurrences(of: "\n", with: "\\n")
