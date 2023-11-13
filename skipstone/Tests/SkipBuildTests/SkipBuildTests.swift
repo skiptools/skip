@@ -47,6 +47,12 @@ final class SkipBuildTests: XCTestCase {
         XCTAssertEqual([5, 6, 7, 8, 9], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].slice(5))
     }
 
+    func testCreatePNG() throws {
+        for size in [10, 100, 1024] {
+            let _ = createSolidColorPNG(width: size, height: size, hexString: "4994EC") // ?.write(to: URL(fileURLWithPath: "/\(NSTemporaryDirectory())/img_\(size).png"))
+        }
+    }
+
     func testParseXCConfig() {
         let keyValues = parseXCConfig(contents: """
         # Comment

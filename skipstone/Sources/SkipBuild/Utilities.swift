@@ -85,6 +85,66 @@ public struct Term {
     }
 }
 
+#if canImport(ImageIO)
+import ImageIO
+import struct UniformTypeIdentifiers.UTType
+#endif
+
+/// Creates a rectangular PNG filled with the specified
+func createSolidColorPNG(width: Int, height: Int, hexString: String?, alpha: Double = 1.0) -> Data? {
+    func hexStringToRGB(hexString: String) -> (red: UInt8, green: UInt8, blue: UInt8)? {
+        var formattedHex = hexString.trimmingCharacters(in: .whitespacesAndNewlines)
+        formattedHex = formattedHex.replacingOccurrences(of: "#", with: "")
+
+        var hexValue: UInt64 = 0
+
+        guard Scanner(string: formattedHex).scanHexInt64(&hexValue) else {
+            return nil
+        }
+
+        let red = UInt8((hexValue & 0xFF0000) >> 16)
+        let green = UInt8((hexValue & 0x00FF00) >> 8)
+        let blue = UInt8(hexValue & 0x0000FF)
+
+        return (red, green, blue)
+    }
+
+    guard let hexString = hexString, let (r, g, b) = hexStringToRGB(hexString: hexString) else {
+        return nil
+    }
+
+#if !canImport(ImageIO)
+    return nil
+#else
+    let bytesPerPixel = 4
+    let bitsPerComponent = 8
+    let colorSpace = CGColorSpaceCreateDeviceRGB()
+    let bitmapInfo: UInt32 = CGBitmapInfo.byteOrder32Big.rawValue | CGImageAlphaInfo.premultipliedLast.rawValue
+
+    guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: bitsPerComponent, bytesPerRow: bytesPerPixel * width, space: colorSpace, bitmapInfo: bitmapInfo) else {
+        return nil
+    }
+
+    context.setFillColor(red: CGFloat(r) / 255.0, green: CGFloat(g) / 255.0, blue: CGFloat(b) / 255.0, alpha: alpha)
+    context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+
+    guard let cgImage = context.makeImage() else {
+        return nil
+    }
+
+    let pngData = NSMutableData()
+    let options: [CFString: Any] = [kCGImageDestinationLossyCompressionQuality: 1.0] // Set compression quality to 1.0 (highest)
+    guard let destination = CGImageDestinationCreateWithData(pngData, UTType.png.identifier as CFString, 1, options as CFDictionary) else {
+        return nil
+    }
+
+    CGImageDestinationAddImage(destination, cgImage, nil)
+    CGImageDestinationFinalize(destination)
+
+    return pngData as Data
+#endif
+}
+
 
 extension FileManager {
 #if os(iOS)
@@ -149,6 +209,18 @@ extension URL {
             return isDirectory == res.isDirectory
         }
         return true
+    }
+
+    /// Creates this file URL directory and returns the URL itself
+    @discardableResult func createDirectory() throws -> URL {
+        try FileManager.default.createDirectory(at: self, withIntermediateDirectories: true)
+        return self
+    }
+
+    /// Creates this file's parent URL directory and returns the URL itself
+    @discardableResult func createParentDirectory() throws -> URL {
+        try deletingLastPathComponent().createDirectory()
+        return self
     }
 
     var fileResources: URLResourceValues? {

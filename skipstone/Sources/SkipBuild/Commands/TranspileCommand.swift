@@ -356,22 +356,14 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         }
 
         func generateGradle(for sourceModules: [String], with skipConfig: SkipConfig, isApp: Bool) throws {
-            if let gradleVersion = transpileOptions.gradleVersion as String? {
-                try generateGradleWrapperProperties(version: gradleVersion)
-            }
+            try generateGradleWrapperProperties()
             try generateProguardFile()
             try generatePerModuleGradle()
             try generateGradleProperties()
             try generateSettingsGradle()
 
-            /// Update `com.android.library` to be `com.android.application`
-            func lib2app(build: String, app: Bool) -> String {
-                !app ? build : build.replacing(#"id("com.android.library")"#, with: #"id("com.android.application")"#)
-            }
-
             func generatePerModuleGradle() throws {
-                let buildContentsBase = (skipConfig.build ?? .init()).generate(context: .init(dsl: .kotlin))
-                let buildContents = lib2app(build: buildContentsBase, app: isApp)
+                let buildContents = (skipConfig.build ?? .init()).generate(context: .init(dsl: .kotlin))
 
                 // we output as a joined string because there is a weird stdout bug with the tool or plugin executor somewhere that causes multi-line strings to be output in the wrong order
                 trace("created gradle: \(buildContents.split(separator: "\n").map({ $0.trimmingCharacters(in: .whitespaces) }).joined(separator: "; "))")
@@ -415,34 +407,23 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
             /// Create the proguard-rules.pro file, which configures the optimization settings for release buils
             func generateProguardFile() throws {
-                try writeChanges(tag: "proguard", to: moduleRootPath.appending(component: "proguard-rules.pro"), contents: """
-                    -keep class skip.** { *; }
-                    """.utf8Data, readOnly: true)
+                try writeChanges(tag: "proguard", to: moduleRootPath.appending(component: "proguard-rules.pro"), contents: FrameworkProjectLayout.defaultProguardContents().utf8Data, readOnly: true)
             }
 
 
             /// Create the gradle-wrapper.properties file, which will dictate which version of Gradle that Android Studio should use to build the project.
-            func generateGradleWrapperProperties(version: String) throws {
+            func generateGradleWrapperProperties() throws {
                 let gradleWrapperFolder = moduleRootPath.parentDirectory.appending(components: "gradle", "wrapper")
                 try fs.createDirectory(gradleWrapperFolder, recursive: true)
                 let gradleWrapperPath = gradleWrapperFolder.appending(component: "gradle-wrapper.properties")
-                let gradeWrapperContents = """
-                distributionUrl=https\\://services.gradle.org/distributions/gradle-\(version)-all.zip
-                """
-
+                let gradeWrapperContents = FrameworkProjectLayout.defaultGradleWrapperProperties()
                 try writeChanges(tag: "gradle wrapper", to: gradleWrapperPath, contents: gradeWrapperContents.utf8Data, readOnly: true)
             }
 
             func generateGradleProperties() throws {
                 // TODO: assemble these from skip.yml settings
                 let gradlePropertiesPath = moduleRootPath.parentDirectory.appending(component: "gradle.properties")
-                let gradePropertiesContents = """
-                org.gradle.jvmargs=-Xmx2048m
-                android.useAndroidX=true
-                kotlin.code.style=official
-                android.suppressUnsupportedCompileSdk=34
-                """
-
+                let gradePropertiesContents = FrameworkProjectLayout.defaultGradleProperties()
                 try writeChanges(tag: "gradle config", to: gradlePropertiesPath, contents: gradePropertiesContents.utf8Data, readOnly: true)
             }
         }
@@ -845,9 +826,6 @@ struct TranspileCommandOptions: ParsableArguments {
 
     @Option(name: [.long], help: ArgumentHelp("Output directory", valueName: "dir"))
     var outputFolder: String? = nil
-
-    @Option(name: [.long], help: ArgumentHelp("The Gradle wrapper version to generate", valueName: "version"))
-    var gradleVersion: String = "8.3" // note: this should not be higher than the pre-installed version on the active CI runner image: https://github.com/actions/runner-images/tree/main/images/macos
 }
 
 struct TranspileResult {
@@ -917,7 +895,7 @@ func parseXCConfig(contents: String) -> [(key: String, value: String)] {
             continue
         }
 
-        let components = line.components(separatedBy: "=")
+        let components = line.split(separator: "=", maxSplits: 2)
         // note that we do not currently handle conditional lines like "PRODUCT_BUNDLE_IDENTIFIER[config=Debug][sdk=iphoneos*] = myorg.app.App-Name"
         if components.count == 2 {
             let key = components[0].trimmingCharacters(in: .whitespaces)

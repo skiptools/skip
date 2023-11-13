@@ -25,7 +25,7 @@ struct CheckupCommand: MessageCommand, ToolOptionsCommand {
         let startTime = Date.now
         await runDoctor(with: out)
 
-        @Sendable func buildSampleProject(packageResolvedURL: URL? = nil) async throws -> (projectURL: URL, artifacts: [URL: String?]) {
+        @Sendable func buildSampleProject(packageResolvedURL: URL? = nil) async throws -> (projectURL: URL, project: AppProjectLayout, artifacts: [URL: String?]) {
             let primary = packageResolvedURL == nil
             // a random temporary folder for the project
             let tmpdir = NSTemporaryDirectory() + "/" + UUID().uuidString
@@ -35,16 +35,18 @@ struct CheckupCommand: MessageCommand, ToolOptionsCommand {
             let checkupModules = try [PackageModule(parse: "HelloSkip")]
             
             // create a project differently based on the index, but the ultimate binary output should be identical
-            return try await buildSkipProject(projectName: "hello-skip", modules: checkupModules, resourceFolder: "Resources", dir: URL(fileURLWithPath: tmpdir, isDirectory: true), verify: true, configuration: self.configuration, build: primary, test: primary, returnHashes: doubleCheck, messagePrefix: !primary ? "Re-" : "", showTree: false, chain: true, gitRepo: false, free: true, zero: true, appid: "skip.hello.App", version: "1.0.0", moduleTests: primary, validatePackage: true, packageResolved: packageResolvedURL, apk: true, ipa: true, with: out)
+            return try await initSkipProject(projectName: "hello-skip", modules: checkupModules, resourceFolder: "Resources", dir: URL(fileURLWithPath: tmpdir, isDirectory: true), verify: true, configuration: self.configuration, build: primary, test: primary, returnHashes: doubleCheck, messagePrefix: !primary ? "Re-" : "", showTree: false, chain: true, gitRepo: false, free: true, zero: true, appid: "skip.hello.App", iconColor: nil, version: "1.0.0", moduleTests: primary, validatePackage: true, packageResolved: packageResolvedURL, apk: true, ipa: true, with: out)
         }
 
         // build a sample project (twice when performing a double-check)
-        let (p1URL, p1) = try await buildSampleProject()
+        let (p1URL, project, p1) = try await buildSampleProject()
         if doubleCheck {
             // use the Package.resolved from the initial build to ensure that use double-check build uses the same dependency versions as the initial build
             // otherwise if a new version of a Skip library is tagged in between the two builds, the checksums won't match
-            let (_, p2) = try await buildSampleProject(packageResolvedURL: p1URL.deletingLastPathComponent().appendingPathComponent("Package.resolved", isDirectory: false))
+            let (_, project2, p2) = try await buildSampleProject(packageResolvedURL: p1URL.deletingLastPathComponent().appendingPathComponent("Package.resolved", isDirectory: false))
 
+            let (_, _) = (project, project2)
+            
             if let ipa1 = p1.filter({ $0.0.pathExtension == "ipa" }).first,
                let ipa2 = p2.filter({ $0.0.pathExtension == "ipa" }).first {
                 await out.write(status: ipa1.value == ipa2.value ? .pass : .fail, "Double-check IPA file hashes" + (ipa1.value == ipa2.value ? "" : " (diffoscope \(ipa1.key.path.replacingTmpDir) \(ipa2.key.path.replacingTmpDir))"))

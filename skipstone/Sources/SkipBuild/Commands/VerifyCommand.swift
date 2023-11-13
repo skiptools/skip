@@ -34,191 +34,6 @@ struct NoResultOutputError : LocalizedError {
     var errorDescription: String?
 }
 
-struct MissingProjectFileError : LocalizedError {
-    var errorDescription: String?
-}
-
-struct AppVerifyError : LocalizedError {
-    var errorDescription: String?
-}
-
-class FrameworkProjectLayout {
-    var packageSwift: URL
-
-    init(root: URL, check: (URL, Bool) throws -> () = checkURLExists) rethrows {
-        self.packageSwift = try root.resolve("Package.swift", check: check)
-    }
-
-    /// A check that passes every time
-    static func noURLChecks(url: URL, isDirectory: Bool) {
-    }
-
-    /// A check that verifies that the file URL exists
-    static func checkURLExists(url: URL, isDirectory: Bool) throws {
-        var isDir: ObjCBool = false
-        if !FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir) {
-            throw MissingProjectFileError(errorDescription: "Expected path at \(url.path) does not exist")
-        }
-        if isDir.boolValue != isDirectory {
-            throw MissingProjectFileError(errorDescription: "Expected path at \(url.path) should be a \(isDirectory ? "directory" : "file")")
-        }
-    }
-}
-
-/** Skip app project layout:
-
-```
- .
- ├── Android
- │   ├── README.md
- │   ├── app
- │   │   ├── build.gradle.kts
- │   │   └── src
- │   │       └── main
- │   │           ├── AndroidManifest.xml
- │   │           ├── kotlin
- │   │           │   └── hello
- │   │           │       └── skip
- │   │           │           └── Main.kt
- │   │           └── res
- │   │               ├── mipmap-anydpi-v26
- │   │               │   └── ic_launcher.xml
- │   │               ├── mipmap-mdpi
- │   │               │   ├── ic_launcher.png
- │   │               │   ├── ic_launcher_background.png
- │   │               │   ├── ic_launcher_foreground.png
- │   │               │   └── ic_launcher_monochrome.png
- │   ├── gradle
- │   │   └── wrapper
- │   │       └── gradle-wrapper.properties
- │   ├── gradle.properties
- │   ├── install_apk.sh
- │   ├── local.properties
- │   └── settings.gradle.kts
- ├── Darwin
- │   ├── Assets.xcassets
- │   │   ├── AccentColor.colorset
- │   │   │   └── Contents.json
- │   │   ├── AppIcon.appiconset
- │   │   │   ├── AppIcon-29@2x~ipad.png
- │   │   │   ├── AppIcon-29@3x.png
- │   │   │   └── Contents.json
- │   │   └── Contents.json
- │   ├── Entitlements.plist
- │   ├── HelloSkip.xcconfig
- │   ├── HelloSkip.xcodeproj
- │   │   └── project.pbxproj
- │   ├── README.md
- │   └── Sources
- │       └── HelloSkipAppMain.swift
- ├── Package.resolved
- ├── Package.swift
- ├── README.md
- ├── Sources
- │   └── HelloSkip
- │       ├── ContentView.swift
- │       ├── HelloSkip.swift
- │       ├── HelloSkipApp.swift
- │       ├── Resources
- │       │   └── Localizable.xcstrings
- │       └── Skip
- │           └── skip.yml
- └── Tests
-     └── HelloSkipTests
-         ├── HelloSkipTests.swift
-         ├── Resources
-         │   └── TestData.json
-         ├── Skip
-         │   └── skip.yml
-         └── XCSkipTests.swift
-```
- */
-class AppProjectLayout : FrameworkProjectLayout {
-    let moduleName: String
-
-    let skipEnv: URL
-
-    let sourcesFolder: URL
-    let moduleSourcesFolder: URL
-    let moduleSourcesSkipFolder: URL
-    let moduleSourcesSkipConfig: URL
-    let testsFolder: URL
-    let moduleTestsFolder: URL
-
-    let darwinFolder: URL
-    let darwinREADME: URL
-    let darwinAssetsFolder: URL
-    let darwinAccentColorFolder: URL
-    let darwinAccentColorContents: URL
-    let darwinAppIconFolder: URL
-    let darwinAppIconContents: URL
-    let darwinEntitlementsPlist: URL
-    let darwinProjectConfig: URL
-    let darwinProjectFolder: URL
-    let darwinProjectContents: URL
-    let darwinSourcesFolder: URL
-    let darwinMainAppSwift: URL
-
-    let androidFolder: URL
-    let androidREADME: URL
-
-    let androidGradleProperties: URL
-    let androidGradleSettings: URL
-    let androidAppFolder: URL
-    let androidAppBuild: URL
-    let androidAppSrc: URL
-    let androidAppSrcMain: URL
-    let androidManifest: URL
-    let androidAppSrcMainRes: URL
-    let androidAppSrcMainKotlin: URL
-
-
-    init(moduleName: String, root: URL, check: (URL, Bool) throws -> () = checkURLExists) rethrows {
-        self.moduleName = moduleName
-
-        self.skipEnv = try root.resolve("Skip.env", check: check)
-
-        self.sourcesFolder = try root.resolve("Sources/", check: check)
-        self.moduleSourcesFolder = try sourcesFolder.resolve(moduleName + "/", check: check)
-        self.moduleSourcesSkipFolder = try moduleSourcesFolder.resolve("Skip/", check: check)
-        self.moduleSourcesSkipConfig = try moduleSourcesSkipFolder.resolve("skip.yml", check: check)
-
-        self.testsFolder = root.resolve("Tests/", check: Self.noURLChecks) // Tests are optional
-        self.moduleTestsFolder = testsFolder.resolve(moduleName + "Tests/", check: Self.noURLChecks)
-
-        self.darwinFolder = try root.resolve("Darwin/", check: check)
-        self.darwinREADME = darwinFolder.resolve("README.md", check: Self.noURLChecks)
-        self.darwinSourcesFolder = try darwinFolder.resolve("Sources/", check: check)
-        self.darwinMainAppSwift = try darwinSourcesFolder.resolve(moduleName + "AppMain.swift", check: check)
-        self.darwinProjectConfig = try darwinFolder.resolve(moduleName + ".xcconfig", check: check)
-        self.darwinProjectFolder = try darwinFolder.resolve(moduleName + ".xcodeproj/", check: check)
-        self.darwinProjectContents = try darwinProjectFolder.resolve("project.pbxproj", check: check)
-        self.darwinEntitlementsPlist = try darwinFolder.resolve("Entitlements.plist", check: check)
-        self.darwinAssetsFolder = try darwinFolder.resolve("Assets.xcassets/", check: check)
-        self.darwinAccentColorFolder = try darwinAssetsFolder.resolve("AccentColor.colorset/", check: check)
-        self.darwinAccentColorContents = try darwinAccentColorFolder.resolve("Contents.json", check: check)
-        self.darwinAppIconFolder = try darwinAssetsFolder.resolve("AppIcon.appiconset/", check: check)
-        self.darwinAppIconContents = try darwinAppIconFolder.resolve("Contents.json", check: check)
-
-        self.androidFolder = try root.resolve("Android/", check: check)
-        self.androidREADME = androidFolder.resolve("README.md", check: Self.noURLChecks)
-        self.androidGradleProperties = try androidFolder.resolve("gradle.properties", check: check)
-        self.androidGradleSettings = try androidFolder.resolve("settings.gradle.kts", check: check)
-        self.androidAppFolder = try androidFolder.resolve("app/", check: check)
-        self.androidAppBuild = try androidAppFolder.resolve("build.gradle.kts", check: check)
-        self.androidAppSrc = try androidAppFolder.resolve("src/", check: check)
-        self.androidAppSrcMain = try androidAppSrc.resolve("main/", check: check)
-        self.androidManifest = try androidAppSrcMain.resolve("AndroidManifest.xml", check: check)
-        self.androidAppSrcMainRes = try androidAppSrcMain.resolve("res/", check: check)
-        //self.androidAppSrcIconMDPI = try androidAppSrcRes.resolve("mipmap-mdpi/", check: check)
-        self.androidAppSrcMainKotlin = try androidAppSrcMain.resolve("kotlin/", check: check)
-
-        //self.androidAppSrcMainKotlinModule = try androidAppSrcMainKotlin.resolve("src/", check: check)
-
-        try super.init(root: root, check: check)
-    }
-}
-
 extension ToolOptionsCommand {
 
     /// Invokes the given command that launches an executable and is expected to output JSON, which we parse into the specified data structure
@@ -249,8 +64,11 @@ extension ToolOptionsCommand {
 
         let packageJSON = try await parseSwiftPackage(with: out, at: projectPath)
         let packageName = packageJSON.name
-        guard let moduleName = packageJSON.products.first?.name else {
+        guard var moduleName = packageJSON.products.first?.name else {
             throw AppVerifyError(errorDescription: "No products declared in package \(packageName) at \(projectPath)")
+        }
+        if moduleName.hasSuffix("App") {
+            moduleName = moduleName.dropLast(3).description
         }
 
         let androidDir = projectFolderURL.appendingPathComponent("Android", isDirectory: true)
@@ -259,9 +77,10 @@ extension ToolOptionsCommand {
 
         if isAppProject {
             let project = try AppProjectLayout(moduleName: moduleName, root: projectFolderURL)
+            let _ = project
         } else {
             let project = try FrameworkProjectLayout(root: projectFolderURL)
-
+            let _ = project
         }
 
         #if os(macOS)

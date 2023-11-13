@@ -43,11 +43,14 @@ public protocol SkipCommandExecutor : AsyncParsableCommand {
 }
 
 
-/// Runs the tool with the given arguments, returning the entire output string as well as a function to parse it to `JSON`
+/// Runs the tool with the given arguments, returning the entire output string as well as a function to parse it to `JSON`.
+///
+/// The command interacts with the `skip` command in the same process, but the command is treated exactly as if it were forked.
+/// This enabled functional tool testing without the overhead of forking processes and parsing the output.
 public func skipstone(_ args: [String]) async throws -> (out: String, err: String, json: () throws -> JSON) {
     let out = BufferedOutputByteStream()
     let err = BufferedOutputByteStream()
-    try await SkipRunnerExecutor.run(args, out: out, err: err)
+    try await SkipRunnerExecutor.runInProcess(args, out: out, err: err)
     return (out.bytes.description.trimmingCharacters(in: .whitespacesAndNewlines), err.bytes.description.trimmingCharacters(in: .whitespacesAndNewlines), { try JSON.parse(out.bytes.description.utf8Data) })
 }
 
@@ -181,7 +184,7 @@ public struct SkipKeyExecutor: SkipCommandExecutor {
 
 extension SkipCommandExecutor {
     /// Run the given command on the given arguments.
-    public static func run(_ arguments: [String], basePath: AbsolutePath = localFileSystem.currentWorkingDirectory!, out: WritableByteStream? = nil, err: WritableByteStream? = nil) async throws {
+    static func runInProcess(_ arguments: [String], basePath: AbsolutePath = localFileSystem.currentWorkingDirectory!, out: WritableByteStream? = nil, err: WritableByteStream? = nil) async throws {
         var cmd: ParsableCommand = try parseAsRoot(arguments)
         if var cmd = cmd as? any StreamingCommand {
             if let outputFile = cmd.outputOptions.output {
