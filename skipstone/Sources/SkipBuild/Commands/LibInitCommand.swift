@@ -93,6 +93,10 @@ struct LibInitCommand: MessageCommand, CreateOptionsCommand, ProjectCommand, Too
     }
 }
 
+let buildFolderName = ".build"
+let darwinBuildFolder = buildFolderName + "/Darwin"
+let androidBuildFolder = buildFolderName + "/Android"
+
 extension ToolOptionsCommand {
 
     func initSkipProject(projectName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, verify: Bool, configuration: String, build: Bool, test: Bool, returnHashes: Bool, messagePrefix: String? = nil, showTree: Bool, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, appid: String?, appModuleName: String = "app", iconColor: String?, version: String?, moduleTests: Bool, validatePackage: Bool, packageResolved packageResolvedURL: URL? = nil, apk: Bool, ipa: Bool, with out: MessageQueue) async throws -> (projectURL: URL, project: AppProjectLayout, artifacts: [URL: String?]) {
@@ -101,7 +105,7 @@ extension ToolOptionsCommand {
         let debugConfiguration = "debug"
         let re = messagePrefix ?? ""
         let primaryModuleName = modules.first?.moduleName ?? "Module"
-        let primaryModuleAppTarget = primaryModuleName + "App"
+        let primaryModuleAppTarget = primaryModuleName // + "App"
 
         let (projectURL, project) = try AppProjectLayout.createSkipAppProject(projectName: projectName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, configuration: configuration, build: build, test: test, chain: chain, gitRepo: gitRepo, free: free, zero: skipZeroSupport, appid: appid, iconColor: iconColor, version: version, moduleTests: moduleTests, packageResolved: packageResolvedURL, apk: apk, ipa: ipa)
         let projectPath = try projectURL.absolutePath
@@ -125,12 +129,10 @@ extension ToolOptionsCommand {
         // let cfgSuffix = "-" + (version ?? "0.0.1") + "-" + configuration
         let cfgSuffix = "-" + configuration
 
-        let buildFolderName = ".build"
-
         let xcodeProjectURL = project.darwinProjectFolder
         if ipa == true  {
             // xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -archivePath "${ARCHIVE_PATH}" -configuration "${CONFIGURATION}" -scheme "${SKIP_MODULE}" -sdk "iphoneos" -destination "generic/platform=iOS" -jobs 1 archive CODE_SIGNING_ALLOWED=NO
-            let archiveBasePath = buildFolderName + "/Skip/artifacts/" + configuration.capitalized
+            let archiveBasePath = darwinBuildFolder + "/Archives/" + configuration.capitalized
 
             let archivePath = archiveBasePath + "/" + primaryModuleAppTarget + ".xcarchive"
             let ipaPath = archiveBasePath + "/" + primaryModuleName + cfgSuffix + ".ipa"
@@ -138,7 +140,7 @@ extension ToolOptionsCommand {
 
             // note that derivedDataPath and archivePath are relative to CWD rather than
             let fullArchivePath = projectURL.path + "/" + archivePath
-            let fullDerivedDataPath = projectURL.path + "/" + buildFolderName + "/DerivedData"
+            let fullDerivedDataPath = projectURL.path + "/" + darwinBuildFolder + "/DerivedData"
 
             await run(with: out, "\(re)Archive iOS ipa", [
                 "xcodebuild",
@@ -193,7 +195,7 @@ extension ToolOptionsCommand {
             let env = ProcessInfo.processInfo.environmentWithDefaultToolPaths // environment that includes a default ANDROID_HOME
 
             let gradleProjectDir = projectURL.path + "/Android"
-            let outputsPath = projectURL.path + "/.build/Android/\(appModuleName)/outputs"
+            let outputsPath = projectURL.path + "/" + androidBuildFolder + "/" + appModuleName + "/outputs"
 
             let action = "assemble" + configuration.capitalized // turn "debug" into "Debug" and "release" into "Release"
             await run(with: out, "Assembling Android apk", ["gradle", action, "--console=plain", "--project-dir", gradleProjectDir], environment: env)
