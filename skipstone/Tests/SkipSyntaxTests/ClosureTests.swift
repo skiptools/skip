@@ -440,6 +440,20 @@ final class ClosureTests: XCTestCase {
         """, kotlin: """
         List(Binding({ _items.wrappedValue }, { it -> _items.wrappedValue = it }), id = { it.i }) { item -> Text(item.wrappedValue.s) }
         """)
+
+        try await check(swift: """
+        List($items, id: \\.i) { $item in
+            Toggle(item.$value)
+            Toggle($item.value)
+            CustomView($item)
+        }
+        """, kotlin: """
+        List(Binding({ _items.wrappedValue }, { it -> _items.wrappedValue = it }), id = { it.i }) { item ->
+            Toggle(Binding.instance(item.wrappedValue, { it.value }, { it, newvalue -> it.value = newvalue }))
+            Toggle(Binding.boundInstance(item, { it.value }, { it, newvalue -> it.value = newvalue }))
+            CustomView(item)
+        }
+        """)
     }
 
     func testModifierCallFormatting() async throws {

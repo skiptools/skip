@@ -274,10 +274,13 @@ class KotlinCodeBlock: KotlinStatement, KotlinSingleStatementAppendable {
 
     /// Perform any updates to handle references to the given SwiftUI Binding.
     func updateWithSwiftUIBindingParameter(name: String, source: Source) {
+        let bindingName = "$" + name
         visit { node in
             if let identifier = node as? KotlinIdentifier {
                 if identifier.name == name {
                     identifier.valueSuffix = ".wrappedValue"
+                } else if identifier.name == bindingName {
+                    identifier.isSwiftUIBindingParameter = true
                 }
             } else if let variableDeclaration = node as? KotlinVariableDeclaration {
                 if variableDeclaration.names.contains(name) {

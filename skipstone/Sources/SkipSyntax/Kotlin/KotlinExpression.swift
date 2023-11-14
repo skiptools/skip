@@ -144,8 +144,8 @@ typealias KotlinBindableBase = (OutputGenerator, Indentation) -> Void
 
 extension KotlinSwiftUIBindable {
     /// Helper function for bindables to create an instance binding.
-    func appendInstanceBinding(to output: OutputGenerator, indentation: Indentation, appendPath: (OutputGenerator, Indentation, KotlinBindableBase) -> Void, appendInstance: () -> Void) {
-        output.append("Binding.instance(")
+    func appendInstanceBinding(to output: OutputGenerator, indentation: Indentation, isBoundInstance: Bool = false, appendPath: (OutputGenerator, Indentation, KotlinBindableBase) -> Void, appendInstance: () -> Void) {
+        output.append(isBoundInstance ? "Binding.boundInstance(" : "Binding.instance(")
         appendInstance()
         output.append(", { ")
         appendPath(output, indentation) { output, _ in output.append("it") }

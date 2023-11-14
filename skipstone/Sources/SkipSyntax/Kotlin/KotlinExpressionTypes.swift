@@ -1074,6 +1074,7 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
     var isOperatorIdentifier = false
     var valueSuffix: String? // Suffix to append to extract value, e.g. '.value()'
     var isFunctionReference = false
+    var isSwiftUIBindingParameter = false
     var isModuleNameFor: TypeSignature = .none
     var isTypealiasFor: TypeSignature = .none
 
@@ -1129,7 +1130,7 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
     }
 
     func appendSwiftUIBindingPath(to output: OutputGenerator, indentation: Indentation, appendPath: @escaping (OutputGenerator, Indentation, KotlinBindableBase) -> Void) {
-        appendInstanceBinding(to: output, indentation: indentation, appendPath: appendPath) {
+        appendInstanceBinding(to: output, indentation: indentation, isBoundInstance: isSwiftUIBindingParameter, appendPath: appendPath) {
             appendIdentifier(to: output, indentation: indentation, isSwiftUIState: false)
         }
     }
@@ -1149,7 +1150,7 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
-        if isSwiftUIBinding {
+        if isSwiftUIBinding && !isSwiftUIBindingParameter {
             appendBinding(to: output, indentation: indentation)
         } else {
             appendIdentifier(to: output, indentation: indentation, isSwiftUIState: false)
