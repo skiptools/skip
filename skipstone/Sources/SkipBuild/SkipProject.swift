@@ -423,7 +423,7 @@ class FrameworkProjectLayout {
         Xcode and Android Studio must be downloaded and installed in order to
         run the app in the iOS simulator / Android emulator.
         An Android emulator must already be running, which can be launched from 
-        Android Stuido's Device Manager.
+        Android Studio's Device Manager.
 
         To run both the Swift and Kotlin apps simultaneously, 
         launch the \(primaryModuleName)App target from Xcode.

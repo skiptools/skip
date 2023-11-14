@@ -71,7 +71,7 @@ struct CreateOptions : ParsableArguments {
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Create a local git repository for the app", valueName: "create"))
     var gitRepo: Bool = false
 
-    @Flag(help: ArgumentHelp("Create package in free mode", valueName: "free"))
+    @Flag(help: ArgumentHelp("Create package with free software license", valueName: "free"))
     var free: Bool = false
 
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Display a file system tree summary of the new files", valueName: "show"))

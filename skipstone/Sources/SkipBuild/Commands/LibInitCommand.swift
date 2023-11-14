@@ -31,10 +31,10 @@ struct LibInitCommand: MessageCommand, CreateOptionsCommand, ProjectCommand, Too
     @Argument(help: ArgumentHelp("The module name(s) to create"))
     var moduleNames: [String]
 
-    @Option(help: ArgumentHelp("Embed the library as an app with the given bundle id"))
+    @Option(help: ArgumentHelp("Embed the library as an app with the given bundle id", valueName: "bundleID"))
     var appid: String? = nil
 
-    @Option(help: ArgumentHelp("RGB hexadecimal color for icon background"))
+    @Option(help: ArgumentHelp("RGB hexadecimal color for icon background", valueName: "hex"))
     var iconColor: String = "4994EC"
 
     @Option(help: ArgumentHelp("Set the initial version to the given value"))
