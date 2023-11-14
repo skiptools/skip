@@ -43,7 +43,8 @@ struct CheckupCommand: MessageCommand, ToolOptionsCommand {
         if doubleCheck {
             // use the Package.resolved from the initial build to ensure that use double-check build uses the same dependency versions as the initial build
             // otherwise if a new version of a Skip library is tagged in between the two builds, the checksums won't match
-            let (_, project2, p2) = try await buildSampleProject(packageResolvedURL: p1URL.deletingLastPathComponent().appendingPathComponent("Package.resolved", isDirectory: false))
+            let packageResolvedURL = p1URL.appendingPathComponent("Package.resolved", isDirectory: false)
+            let (_, project2, p2) = try await buildSampleProject(packageResolvedURL: packageResolvedURL)
 
             let (_, _) = (project, project2)
             

@@ -350,7 +350,7 @@ class FrameworkProjectLayout {
         // now snapshot the file tree for inclusion in the README
         // let fileTree = try localFileSystem.treeASCIIRepresentation(at: projectFolderURL.absolutePath, hideHiddenFiles: true)
 
-        // if we've specified a Package.resolved source file, simply copy it over
+        // if we've specified a Package.resolved source file, simply copy it over in order to re-use the pinned dependencies
         if let packageResolvedURL = packageResolvedURL {
             try FileManager.default.copyItem(at: packageResolvedURL, to: projectFolderURL.appending(path: "Package.resolved"))
         }
