@@ -98,9 +98,10 @@ jobs:
       - name: Build apk
         run: |
           for CONFIGURATION in "Release" "Debug"; do
-            BUILT_PRODUCTS_DIR=".build" xcodebuild -project Darwin/${SKIP_MODULE}.xcodeproj -derivedDataPath .build/Darwin/DerivedData -skipPackagePluginValidation -configuration "${CONFIGURATION}" -destination "platform=macosx" -scheme "${SKIP_MODULE}" build SKIP_ACTION=assemble
+            xcodebuild -project Darwin/${SKIP_MODULE}.xcodeproj -derivedDataPath .build/Darwin/DerivedData -skipPackagePluginValidation -configuration "${CONFIGURATION}" -destination "platform=macosx" -scheme "${SKIP_MODULE}" build SKIP_ACTION=assemble
           done
 
+          cp -av .build/Android/app/outputs/apk/*/*.apk ${RELDIR}/
           ls -la ${RELDIR}/
           shasum -a 256 ${RELDIR}/*.apk
 
@@ -145,8 +146,9 @@ jobs:
           # the .apk name will default to the name of the enclosing module
           # (e.g., "SkipWeather-release.apk" rather than "SkipWeather-")
           APPMODULE="${APPNAME}"
-          APK="${APPMODULE}-release.apk"
-          APK_UNSIGNED="${APPMODULE}-release-unsigned.apk"
+          #APK="${APPMODULE}-release.apk"
+          APK="app-release.apk"
+          APK_UNSIGNED="app-release-unsigned.apk"
           # in case the APK has the -unsigned suffix, move it to the APK
           mv -v ${APK_UNSIGNED} ${APK} || true
 
