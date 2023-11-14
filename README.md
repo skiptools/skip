@@ -45,21 +45,20 @@ For example:
 skip init --open-xcode --appid=com.xyz.HelloSkip hello-skip HelloSkip
 ```
 
-<img alt="Screenshot of terminal skip init command output" src="https://assets.skip.tools/intro/skip_init.png" style="width: 100%;" />
-
-This will create a `hello-skip/` folder with a new SwiftPM package containing a single module named `HelloSkip`, along with a `HelloSkip.xcodeproj` project with a `HelloSkipApp` target and an `.xcconfig` file specifying the app's name, bundle identifier, and other customizable metadata.
+This will create a `hello-skip/` folder with a new SwiftPM package containing a single module named `HelloSkip`, along with folders named `Darwin` and `Android` and the shared `Skip.env` app configuration file. The `Darwin` folder will contain a `HelloSkip.xcodeproj` project with a `HelloSkip` target, which can be opened in Xcode.
 
 Xcode will open the new project, but before you can build and launch the transpiled app, an Android emulator needs to be running. Launch `Android Studio.app` and open the `Virtual Device Manager` from the ellipsis menu of the Welcome dialog. From there, `Create Device` (e.g., "Pixel 6") and then `Launch` the emulator.
 
 <img alt="Screenshot of the Android Studio Device Manager" src="https://assets.skip.tools/intro/device_manager.png" style="width: 100%;" />
 
-Once the Android emulator is running, select and run the `HelloSkipApp` target in Xcode. The first build will take some time to compile the Skip libraries, and you may be prompted with a dialog to affirm that you trust the Skip plugin. Once the build and run action completes, the SwiftUI app will open in the selected iOS simulator, and at the same time the transpiled app will launch in the currently-running Android emulator.
+Once the Android emulator is running, select and run the `HelloSkip` target in Xcode. The first build will take some time to compile the Skip libraries, and you may be prompted with a dialog to affirm that you trust the Skip plugin. Once the build and run action completes, the SwiftUI app will open in the selected iOS simulator, and at the same time the transpiled app will launch in the currently-running Android emulator.
 
 <img alt="Screenshot of Skip running in both the iOS Simulator and Android Emulator" src="https://assets.skip.tools/intro/skip_xcode.png" style="width: 100%;" />
 
 Browse to the `ContentView.swift` file and make a small change and re-run the target: the app will be re-built and re-run on both platforms simultaneously with your changes.
 
 See the product [documentation](https://skip.tools/docs) for further information developing with Skip. Happy Skipping!
+
 
 ### Creating a Multi-Module App
 
@@ -73,9 +72,11 @@ This command will create a SwiftPM project with three modules: `HelloSkip`, `Hel
 
 ## Creating a Dual-Platform Framework {#framework_development}
 
-Skip library projects are pure SwiftPM packages that encapsulate common functionality. Each of the core Skip compatibility frameworks ([skip-lib](https://source.skip.tools/skip-lib), [skip-unit](https://source.skip.tools/skip-unit), [skip-foundation](https://source.skip.tools/skip-foundation), and [skip-ui](https://source.skip.tools/skip-ui)) are Skip library projects. Other commonly-used projects include [skip-sql](https://source.skip.tools/skip-sql), [skip-script](https://source.skip.tools/skip-script), and [skip-zip](https://source.skip.tools/skip-zip).
+Skip framework projects are pure SwiftPM packages that encapsulate common functionality. They are simpler that app projects, as they do not need `Darwin/` and `Android/` folders.
 
-A new library can be created and opened with:
+Each of the core Skip compatibility frameworks ([skip-lib](https://source.skip.tools/skip-lib), [skip-unit](https://source.skip.tools/skip-unit), [skip-foundation](https://source.skip.tools/skip-foundation), and [skip-ui](https://source.skip.tools/skip-ui)) are Skip framework projects. Other commonly-used projects include [skip-sql](https://source.skip.tools/skip-sql), [skip-script](https://source.skip.tools/skip-script), and [skip-zip](https://source.skip.tools/skip-zip).
+
+A new framework project can be created and opened with:
 
 ```shell
 skip init --build --test lib-name ModuleName
@@ -132,6 +133,79 @@ let package = Package(
         .testTarget(name: "ModuleNameTests", dependencies: ["ModuleName"], plugins: [.plugin(name: "skipstone", package: "skip")]),
     ]
 )
+```
+
+
+## skip init options
+
+```plaintext
+zap /tmp % skip init --help
+OVERVIEW: Initialize a new Skip project
+
+USAGE: skip init [<options>] <project-name> <module-names> ...
+
+ARGUMENTS:
+  <project-name>          Project folder name
+  <module-names>          The module name(s) to create
+
+OUTPUT OPTIONS:
+  -o, --output <path>     Send output to the given file (stdout: -)
+  -E, --message-errout    Emit messages to the output rather than stderr
+  -v, --verbose           Whether to display verbose messages
+  -q, --quiet             Quiet mode: suppress output
+  -J, --json              Emit output as formatted JSON
+  -j, --json-compact      Emit output as compact JSON
+  -M, --message-plain     Show console messages as plain text rather than JSON
+  -A, --json-array        Wrap and delimit JSON output as an array
+  --plain/--no-plain      Show no colors or progress animations (default: --no-plain)
+
+CREATE OPTIONS:
+  --id <id>               Application identifier (default: net.example.MyApp)
+  -d, --dir <directory>   Base folder for project creation
+  -c, --configuration <c> Configuration debug/release (default: debug)
+  -t, --template <id>     Template name/ID for new project (default: skipapp)
+  -h, --template-host <host>
+                          The host name for the template repository (default: https://github.com)
+  -f, --template-file <zip>
+                          A path to the template zip file to use
+  --resource-path <resource-path>
+                          Resource folder name (default: Resources)
+  --chain/--no-chain      Create library dependencies between modules (default: --chain)
+  --zero/--no-zero        Add SKIP_ZERO environment check to Package.swift (default: --zero)
+  --git-repo/--no-git-repo
+                          Create a local git repository for the app (default: --no-git-repo)
+  --free                  Create package in free mode
+  --show-tree/--no-show-tree
+                          Display a file system tree summary of the new files (default: --no-show-tree)
+  --module-tests/--no-module-tests
+                          Whether to create test modules (default: --module-tests)
+  --validate-package/--no-validate-package
+                          Validate generated Package.swift files (default: --validate-package)
+
+TOOL OPTIONS:
+  --xcodebuild <path>     Xcode command path
+  --swift <path>          Swift command path
+  --gradle <path>         Gradle command path
+  --adb <path>            ADB command path
+  --emulator <path>       Android emulator path
+  --android-home <path>   Path to the Android SDK (ANDROID_HOME)
+
+BUILD OPTIONS:
+  --build/--no-build      Run the project build (default: --build)
+  --test/--no-test        Run the project tests (default: --no-test)
+  --verify/--no-verify    Verify the project output (default: --verify)
+
+OPTIONS:
+  --appid <appid>         Embed the library as an app with the given bundle id
+  --icon-color <icon-color>
+                          RGB hexadecimal color for icon background (default: 4994EC)
+  --version <version>     Set the initial version to the given value
+  --apk/--no-apk          Build the Android .apk file (default: --no-apk)
+  --ipa/--no-ipa          Build the iOS .ipa file (default: --no-ipa)
+  --open-xcode            Open the resulting Xcode project
+  --open-gradle           Open the resulting Gradle project
+  -h, --help              Show help information.
+
 ```
 
 ## Troubleshooting
