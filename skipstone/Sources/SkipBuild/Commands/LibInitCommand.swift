@@ -105,9 +105,10 @@ extension ToolOptionsCommand {
         let debugConfiguration = "debug"
         let re = messagePrefix ?? ""
         let primaryModuleName = modules.first?.moduleName ?? "Module"
-        let primaryModuleAppTarget = primaryModuleName // + "App"
+        // the embedded framework must have a different name from the app name, or else it will try to archive a framework instead of an app
+        let primaryModuleFrameworkName = primaryModuleName + "App"
 
-        let (projectURL, project) = try AppProjectLayout.createSkipAppProject(projectName: projectName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, configuration: configuration, build: build, test: test, chain: chain, gitRepo: gitRepo, free: free, zero: skipZeroSupport, appid: appid, iconColor: iconColor, version: version, moduleTests: moduleTests, packageResolved: packageResolvedURL, apk: apk, ipa: ipa)
+        let (projectURL, project) = try AppProjectLayout.createSkipAppProject(projectName: projectName, productName: primaryModuleFrameworkName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, configuration: configuration, build: build, test: test, chain: chain, gitRepo: gitRepo, free: free, zero: skipZeroSupport, appid: appid, iconColor: iconColor, version: version, moduleTests: moduleTests, packageResolved: packageResolvedURL, apk: apk, ipa: ipa)
         let projectPath = try projectURL.absolutePath
 
         if build == true || apk == true {
@@ -134,7 +135,7 @@ extension ToolOptionsCommand {
             // xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -archivePath "${ARCHIVE_PATH}" -configuration "${CONFIGURATION}" -scheme "${SKIP_MODULE}" -sdk "iphoneos" -destination "generic/platform=iOS" -jobs 1 archive CODE_SIGNING_ALLOWED=NO
             let archiveBasePath = darwinBuildFolder + "/Archives/" + configuration.capitalized
 
-            let archivePath = archiveBasePath + "/" + primaryModuleAppTarget + ".xcarchive"
+            let archivePath = archiveBasePath + "/" + primaryModuleName + ".xcarchive"
             let ipaPath = archiveBasePath + "/" + primaryModuleName + cfgSuffix + ".ipa"
             let ipaURL = projectURL.appending(path: ipaPath)
 
@@ -152,23 +153,20 @@ extension ToolOptionsCommand {
                 "-skipPackagePluginValidation",
                 "-archivePath", fullArchivePath,
                 "-configuration", cfg,
-                "-scheme", primaryModuleAppTarget,
+                "-scheme", primaryModuleName,
                 "-sdk", sdk,
                 "-destination", "generic/platform=iOS",
                 "archive",
                 "CODE_SIGNING_ALLOWED=NO",
                 "ZERO_AR_DATE=1", // excludes timestamps from archives for build reproducibility
-                "SKIP_INSTALL=1",
             ], additionalEnvironment: ["SKIP_ZERO": "1"]) // SKIP_ZERO builds without Skip dependency libraries
 
 
-            // the app is not being copied to the archive for some reason (possibly due to a the primary module framework being the same as the app name); so we copy it directly from the Build/Intermediates.noindex/ArchiveIntermediates/ folder instead, where it is left when SKIP_INSTALL=1
-
-            // let archiveAppPath = archivePath + "/Products/Applications/" + primaryModuleAppTarget + ".app"
-            //let archiveAppURL = projectURL.appending(path: archiveAppPath)
-
-            //let archiveAppURL = URL(fileURLWithPath: fullDerivedDataPath + "/Build/Intermediates.noindex/ArchiveIntermediates/\(primaryModuleAppTarget)/BuildProductsPath/\(cfg)-\(sdk)/\(primaryModuleAppTarget).app/", isDirectory: true)
-            let archiveAppURL = URL(fileURLWithPath: fullDerivedDataPath + "/Build/Intermediates.noindex/ArchiveIntermediates/\(primaryModuleAppTarget)/IntermediateBuildFilesPath/UninstalledProducts/\(sdk)/\(primaryModuleAppTarget).app/", isDirectory: true) // do not remove the trailing space
+            let archiveAppPath = archivePath + "/Products/Applications/" + primaryModuleName + ".app"
+            let archiveAppURL = projectURL.appendingPathComponent(archiveAppPath, isDirectory: true)
+            if archiveAppURL.isDirectoryFile == false {
+                throw MissingProjectFileError(errorDescription: "Expected archive does not exist at: \(archiveAppURL.path)")
+            }
 
             // Create an ipa (zip) file of the app contents
 
@@ -247,7 +245,7 @@ extension ToolOptionsCommand {
     }
 
     func initSkipLibrary(projectName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, verify: Bool, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, app: Bool, moduleTests: Bool, validatePackage: Bool, packageResolved packageResolvedURL: URL?, with out: MessageQueue) async throws -> URL {
-        let projectFolderURL = try FrameworkProjectLayout.createSkipLibrary(projectName: projectName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, chain: chain, gitRepo: gitRepo, free: free, zero: skipZeroSupport, app: app, moduleTests: moduleTests, packageResolved: packageResolvedURL)
+        let projectFolderURL = try FrameworkProjectLayout.createSkipLibrary(projectName: projectName, productName: nil, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, chain: chain, gitRepo: gitRepo, free: free, zero: skipZeroSupport, app: app, moduleTests: moduleTests, packageResolved: packageResolvedURL)
 
 
         if validatePackage {

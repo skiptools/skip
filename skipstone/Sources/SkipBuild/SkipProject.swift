@@ -32,7 +32,7 @@ class FrameworkProjectLayout {
     }
 
 
-    static func createSkipLibrary(projectName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, app: Bool, moduleTests: Bool, packageResolved packageResolvedURL: URL?) throws -> URL {
+    static func createSkipLibrary(projectName: String, productName: String?, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, app: Bool, moduleTests: Bool, packageResolved packageResolvedURL: URL?) throws -> URL {
         var isDir: Foundation.ObjCBool = false
         if !FileManager.default.fileExists(atPath: outputFolder.path, isDirectory: &isDir) {
             throw InitError(errorDescription: "Specified output folder does not exist: \(outputFolder)")
@@ -249,8 +249,9 @@ class FrameworkProjectLayout {
                 }
             }
 
+            // when we are an app module, override the module name with the product name, since we need a distinct name for importing into the project
             products += """
-                    .library(name: "\(moduleName)", type: .dynamic, targets: ["\(moduleName)"]),
+                    .library(name: "\(isAppModule ? productName ?? moduleName : moduleName)", type: .dynamic, targets: ["\(moduleName)"]),
 
             """
 
@@ -443,73 +444,6 @@ class FrameworkProjectLayout {
     }
 }
 
-/** Skip app project layout:
-
-```
- .
- ├── Android
- │   ├── README.md
- │   ├── app
- │   │   ├── build.gradle.kts
- │   │   └── src
- │   │       └── main
- │   │           ├── AndroidManifest.xml
- │   │           ├── kotlin
- │   │           │   └── hello
- │   │           │       └── skip
- │   │           │           └── Main.kt
- │   │           └── res
- │   │               ├── mipmap-anydpi-v26
- │   │               │   └── ic_launcher.xml
- │   │               ├── mipmap-mdpi
- │   │               │   ├── ic_launcher.png
- │   │               │   ├── ic_launcher_background.png
- │   │               │   ├── ic_launcher_foreground.png
- │   │               │   └── ic_launcher_monochrome.png
- │   ├── gradle
- │   │   └── wrapper
- │   │       └── gradle-wrapper.properties
- │   ├── gradle.properties
- │   ├── local.properties
- │   └── settings.gradle.kts
- ├── Darwin
- │   ├── Assets.xcassets
- │   │   ├── AccentColor.colorset
- │   │   │   └── Contents.json
- │   │   ├── AppIcon.appiconset
- │   │   │   ├── AppIcon-29@2x~ipad.png
- │   │   │   ├── AppIcon-29@3x.png
- │   │   │   └── Contents.json
- │   │   └── Contents.json
- │   ├── Entitlements.plist
- │   ├── HelloSkip.xcconfig
- │   ├── HelloSkip.xcodeproj
- │   │   └── project.pbxproj
- │   ├── README.md
- │   └── Sources
- │       └── HelloSkipAppMain.swift
- ├── Package.resolved
- ├── Package.swift
- ├── README.md
- ├── Sources
- │   └── HelloSkip
- │       ├── ContentView.swift
- │       ├── HelloSkip.swift
- │       ├── HelloSkipApp.swift
- │       ├── Resources
- │       │   └── Localizable.xcstrings
- │       └── Skip
- │           └── skip.yml
- └── Tests
-     └── HelloSkipTests
-         ├── HelloSkipTests.swift
-         ├── Resources
-         │   └── TestData.json
-         ├── Skip
-         │   └── skip.yml
-         └── XCSkipTests.swift
-```
- */
 class AppProjectLayout : FrameworkProjectLayout {
     let moduleName: String
 
@@ -604,10 +538,10 @@ class AppProjectLayout : FrameworkProjectLayout {
     }
 
 
-    static func createSkipAppProject(projectName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, configuration: String, build: Bool, test: Bool, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, appid: String?, iconColor: String?, version: String?, moduleTests: Bool, packageResolved packageResolvedURL: URL? = nil, apk: Bool, ipa: Bool) throws -> (baseURL: URL, project: AppProjectLayout) {
+    static func createSkipAppProject(projectName: String, productName: String?, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, configuration: String, build: Bool, test: Bool, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, appid: String?, iconColor: String?, version: String?, moduleTests: Bool, packageResolved packageResolvedURL: URL? = nil, apk: Bool, ipa: Bool) throws -> (baseURL: URL, project: AppProjectLayout) {
 
         let sourceHeader = free ? licenseLGPLHeader : ""
-        let projectURL = try createSkipLibrary(projectName: projectName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, chain: chain, gitRepo: gitRepo, free: free, zero: skipZeroSupport, app: appid != nil, moduleTests: moduleTests, packageResolved: packageResolvedURL)
+        let projectURL = try createSkipLibrary(projectName: projectName, productName: productName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, chain: chain, gitRepo: gitRepo, free: free, zero: skipZeroSupport, app: appid != nil, moduleTests: moduleTests, packageResolved: packageResolvedURL)
 
         let projectPath = try projectURL.absolutePath
 
@@ -1078,6 +1012,15 @@ class AppProjectLayout : FrameworkProjectLayout {
             let relativeSwiftPackageRoot = ".."
 
             let skipGradleLaunchScript = """
+            if [ "${SKIP_ZERO}" != "" -o "${ACTION}" = "install" ]; then
+                echo "note: skipping skip due to SKIP_ZERO"
+                exit 0
+            fi
+            SKIP_ACTION="${SKIP_ACTION:-launch}"
+            PATH=${BUILD_ROOT}/Debug:${BUILD_ROOT}/../../SourcePackages/artifacts/skip/skip/skip.artifactbundle/macos:${PATH}:/opt/homebrew/bin:/usr/local/bin
+            echo "note: running gradle build with: $(which skip) gradle -p ${PWD}/../Android ${SKIP_ACTION:-launch}Debug"
+            skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
+
             if [ "${SKIP_ZERO}" != "" ]; then
                 echo "note: skipping skip due to SKIP_ZERO"
                 exit 0
@@ -1106,8 +1049,8 @@ class AppProjectLayout : FrameworkProjectLayout {
         objects = {
 
     /* Begin PBXBuildFile section */
-            49231BAC2AC5BCEF00F98ADF /* \(appModuleName) in Frameworks */ = {isa = PBXBuildFile; productRef = 49231BAB2AC5BCEF00F98ADF /* \(appModuleName) */; };
-            49231BAD2AC5BCEF00F98ADF /* \(appModuleName) in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 49231BAB2AC5BCEF00F98ADF /* \(appModuleName) */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+            49231BAC2AC5BCEF00F98ADF /* \(primaryModuleAppTarget) in Frameworks */ = {isa = PBXBuildFile; productRef = 49231BAB2AC5BCEF00F98ADF /* \(primaryModuleAppTarget) */; };
+            49231BAD2AC5BCEF00F98ADF /* \(primaryModuleAppTarget) in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 49231BAB2AC5BCEF00F98ADF /* \(primaryModuleAppTarget) */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
             499CD43B2AC5B799001AE8D8 /* \(appMainSwiftFileName) in Sources */ = {isa = PBXBuildFile; fileRef = 49F90C2B2A52156200F06D93 /* \(appMainSwiftFileName) */; };
             499CD4402AC5B799001AE8D8 /* \(Assets_xcassets_name) in Resources */ = {isa = PBXBuildFile; fileRef = 49F90C2F2A52156300F06D93 /* \(Assets_xcassets_name) */; };
     /* End PBXBuildFile section */
@@ -1294,11 +1237,8 @@ class AppProjectLayout : FrameworkProjectLayout {
                 isa = XCBuildConfiguration;
                 buildSettings = {
                     ENABLE_PREVIEWS = YES;
-                    IPHONEOS_DEPLOYMENT_TARGET = 16.4;
                     LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
                     "LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-                    MACOSX_DEPLOYMENT_TARGET = 13.4;
-                    PRODUCT_NAME = "$(TARGET_NAME)";
                     SDKROOT = auto;
                     SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
                     SWIFT_EMIT_LOC_STRINGS = YES;
@@ -1311,11 +1251,8 @@ class AppProjectLayout : FrameworkProjectLayout {
                 isa = XCBuildConfiguration;
                 buildSettings = {
                     ENABLE_PREVIEWS = YES;
-                    IPHONEOS_DEPLOYMENT_TARGET = 16.4;
                     LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
                     "LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-                    MACOSX_DEPLOYMENT_TARGET = 13.4;
-                    PRODUCT_NAME = "$(TARGET_NAME)";
                     SDKROOT = auto;
                     SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
                     SWIFT_EMIT_LOC_STRINGS = YES;
@@ -1328,11 +1265,8 @@ class AppProjectLayout : FrameworkProjectLayout {
                 isa = XCBuildConfiguration;
                 buildSettings = {
                     ENABLE_PREVIEWS = YES;
-                    IPHONEOS_DEPLOYMENT_TARGET = 16.4;
                     LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
                     "LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-                    MACOSX_DEPLOYMENT_TARGET = 13.4;
-                    PRODUCT_NAME = "$(TARGET_NAME)";
                     SDKROOT = auto;
                     SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
                     SWIFT_EMIT_LOC_STRINGS = YES;
@@ -1407,9 +1341,9 @@ class AppProjectLayout : FrameworkProjectLayout {
     /* End XCConfigurationList section */
 
     /* Begin XCSwiftPackageProductDependency section */
-            49231BAB2AC5BCEF00F98ADF /* \(appModuleName) */ = {
+            49231BAB2AC5BCEF00F98ADF /* \(primaryModuleAppTarget) */ = {
                 isa = XCSwiftPackageProductDependency;
-                productName = \(appModuleName);
+                productName = \(primaryModuleAppTarget);
             };
     /* End XCSwiftPackageProductDependency section */
         };

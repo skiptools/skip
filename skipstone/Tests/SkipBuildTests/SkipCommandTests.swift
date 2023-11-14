@@ -603,7 +603,7 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v16), .macOS(.v13), .tvOS(.v16), .watchOS(.v9), .macCatalyst(.v16)],
             products: [
-                .library(name: "TOP_MODULE", type: .dynamic, targets: ["TOP_MODULE"]),
+                .library(name: "TOP_MODULEApp", type: .dynamic, targets: ["TOP_MODULE"]),
                 .library(name: "MIDDLE_MODULE", type: .dynamic, targets: ["MIDDLE_MODULE"]),
                 .library(name: "BOTTOM_MODULE", type: .dynamic, targets: ["BOTTOM_MODULE"]),
             ],
@@ -716,7 +716,7 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v16), .macOS(.v13), .tvOS(.v16), .watchOS(.v9), .macCatalyst(.v16)],
             products: [
-                .library(name: "M1", type: .dynamic, targets: ["M1"]),
+                .library(name: "M1App", type: .dynamic, targets: ["M1"]),
                 .library(name: "M2", type: .dynamic, targets: ["M2"]),
                 .library(name: "M3", type: .dynamic, targets: ["M3"]),
                 .library(name: "M4", type: .dynamic, targets: ["M4"]),
