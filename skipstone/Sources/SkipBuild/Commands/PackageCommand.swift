@@ -14,7 +14,7 @@ struct AppCommand: AsyncParsableCommand {
     static var configuration = CommandConfiguration(
         commandName: "app",
         abstract: "Commands to manage application projects",
-        shouldDisplay: true,
+        shouldDisplay: false,
         subcommands: [
             AppCreateCommand.self
         ])
@@ -26,7 +26,7 @@ struct LibCommand: AsyncParsableCommand {
     static var configuration = CommandConfiguration(
         commandName: "lib",
         abstract: "Commands to manage library projects",
-        shouldDisplay: true,
+        shouldDisplay: false,
         subcommands: [
             LibInitCommand.self
         ])

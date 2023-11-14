@@ -1683,7 +1683,9 @@ extension FrameworkProjectLayout {
                 // SKIP_DEPENDENCIES is set by the settings.gradle.kts as a list of the modules that were created as a result of the Skip build
                 var deps = prop(key = "DEPENDENCIES")
                 deps.split(":").filter { it.isNotEmpty() }.forEach { skipModuleName ->
-                    implementation(project(":" + skipModuleName))
+                    if (skipModuleName != "SkipUnit") {
+                        implementation(project(":" + skipModuleName))
+                    }
                 }
             }
         }

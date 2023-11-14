@@ -10,7 +10,7 @@ import FoundationNetworking
 struct LibInitCommand: MessageCommand, CreateOptionsCommand, ProjectCommand, ToolOptionsCommand, BuildOptionsCommand, StreamingCommand {
     static var configuration = CommandConfiguration(
         commandName: "init",
-        abstract: "Initialize a new Skip library project",
+        abstract: "Initialize a new Skip project",
         shouldDisplay: true)
 
     @OptionGroup(title: "Output Options")
@@ -142,24 +142,33 @@ extension ToolOptionsCommand {
             let fullArchivePath = projectURL.path + "/" + archivePath
             let fullDerivedDataPath = projectURL.path + "/" + darwinBuildFolder + "/DerivedData"
 
+            let cfg = configuration.capitalized
+            let sdk = "iphoneos"
+
             await run(with: out, "\(re)Archive iOS ipa", [
                 "xcodebuild",
                 "-project", xcodeProjectURL.path,
                 "-derivedDataPath", fullDerivedDataPath,
                 "-skipPackagePluginValidation",
                 "-archivePath", fullArchivePath,
-                "-configuration", configuration.capitalized,
+                "-configuration", cfg,
                 "-scheme", primaryModuleAppTarget,
-                "-sdk", "iphoneos",
+                "-sdk", sdk,
                 "-destination", "generic/platform=iOS",
                 "archive",
                 "CODE_SIGNING_ALLOWED=NO",
                 "ZERO_AR_DATE=1", // excludes timestamps from archives for build reproducibility
+                "SKIP_INSTALL=1",
             ], additionalEnvironment: ["SKIP_ZERO": "1"]) // SKIP_ZERO builds without Skip dependency libraries
 
 
-            let archiveAppPath = archivePath + "/Products/Applications/" + primaryModuleAppTarget + ".app"
-            let archiveAppURL = projectURL.appending(path: archiveAppPath)
+            // the app is not being copied to the archive for some reason (possibly due to a the primary module framework being the same as the app name); so we copy it directly from the Build/Intermediates.noindex/ArchiveIntermediates/ folder instead, where it is left when SKIP_INSTALL=1
+
+            // let archiveAppPath = archivePath + "/Products/Applications/" + primaryModuleAppTarget + ".app"
+            //let archiveAppURL = projectURL.appending(path: archiveAppPath)
+
+            //let archiveAppURL = URL(fileURLWithPath: fullDerivedDataPath + "/Build/Intermediates.noindex/ArchiveIntermediates/\(primaryModuleAppTarget)/BuildProductsPath/\(cfg)-\(sdk)/\(primaryModuleAppTarget).app/", isDirectory: true)
+            let archiveAppURL = URL(fileURLWithPath: fullDerivedDataPath + "/Build/Intermediates.noindex/ArchiveIntermediates/\(primaryModuleAppTarget)/IntermediateBuildFilesPath/UninstalledProducts/\(sdk)/\(primaryModuleAppTarget).app/", isDirectory: true) // do not remove the trailing space
 
             // Create an ipa (zip) file of the app contents
 
