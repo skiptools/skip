@@ -72,7 +72,7 @@ This command will create a SwiftPM project with three modules: `HelloSkip`, `Hel
 
 ## Creating a Dual-Platform Framework {#framework_development}
 
-Skip framework projects are pure SwiftPM packages that encapsulate common functionality. They are simpler that app projects, as they do not need `Darwin/` and `Android/` folders.
+Skip framework projects are pure SwiftPM packages that encapsulate common functionality. They are simpler than app projects, as they do not need `Darwin/` and `Android/` folders.
 
 Each of the core Skip compatibility frameworks ([skip-lib](https://source.skip.tools/skip-lib), [skip-unit](https://source.skip.tools/skip-unit), [skip-foundation](https://source.skip.tools/skip-foundation), and [skip-ui](https://source.skip.tools/skip-ui)) are Skip framework projects. Other commonly-used projects include [skip-sql](https://source.skip.tools/skip-sql), [skip-script](https://source.skip.tools/skip-script), and [skip-zip](https://source.skip.tools/skip-zip).
 
