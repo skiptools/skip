@@ -77,21 +77,13 @@ jobs:
         run: |
           mkdir -p ${RELDIR}
           APPARTIFACT="${SKIP_MODULE}"
-          #for CONFIGURATION in "Debug" "Release"; do
-          for CONFIGURATION in "Release"; do
+          #export NOSKIP=1
+          for CONFIGURATION in "Debug" "Release"; do
             ARCHIVE_PATH=".build/Darwin/Archives/${CONFIGURATION}/${APPARTIFACT}.xcarchive"
-            SKIP_ZERO=1 xcodebuild -project Darwin/${SKIP_MODULE}.xcodeproj -derivedDataPath .build/Darwin/DerivedData -skipPackagePluginValidation -archivePath "${ARCHIVE_PATH}" -configuration "${CONFIGURATION}" -scheme "${SKIP_MODULE}" -sdk "iphoneos" -destination "generic/platform=iOS" -jobs 1 archive CODE_SIGNING_ALLOWED=NO SKIP_ACTION=build ZERO_AR_DATE=1 SKIP_INSTALL=1
+            SKIP_ZERO=1 xcodebuild -project Darwin/${SKIP_MODULE}.xcodeproj -derivedDataPath .build/Darwin/DerivedData -skipPackagePluginValidation -archivePath "${ARCHIVE_PATH}" -configuration "${CONFIGURATION}" -scheme "${SKIP_MODULE}" -sdk "iphoneos" -destination "generic/platform=iOS" -jobs 1 archive CODE_SIGNING_ALLOWED=NO SKIP_ACTION=build ZERO_AR_DATE=1
             brew install tree
-
-            # because we are using SKIP_INSTALL=1, the archive needs
-            # to be manually copied over
-            mkdir -p "${ARCHIVE_PATH}"/Products/Applications/
-            tree ".build/Darwin/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates"
-            cp -a .build/Darwin/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/"${SKIP_MODULE}"/IntermediateBuildFilesPath/UninstalledProducts/iphoneos/HelloSkip.app "${ARCHIVE_PATH}"/Products/Applications/
-
             tree "${ARCHIVE_PATH}"
             cd "${ARCHIVE_PATH}"/Products/
-
             find . -type f
             mv "Applications" "Payload"
             # create zip file with reproducible timestamps
