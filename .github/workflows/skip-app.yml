@@ -52,7 +52,8 @@ jobs:
           echo "COMMIT_DATE=$(git log -1 --format=%ad --date=iso-strict ${GITHUB_REF#refs/tags/})" >> $GITHUB_ENV
 
           # the primary skip module is the first product name
-          SKIP_MODULE=$(swift package dump-package | jq -r '.products[0].name')
+          #SKIP_MODULE=$(swift package dump-package | jq -r '.products[0].name')
+          SKIP_MODULE=$(basename Darwin/*.xcodeproj .xcodeproj)
           echo "SKIP_MODULE=${SKIP_MODULE}" >> $GITHUB_ENV
 
           XCODE_SETTINGS=$(xcodebuild -showBuildSettings -json -project Darwin/${SKIP_MODULE}.xcodeproj -scheme "${SKIP_MODULE}")
