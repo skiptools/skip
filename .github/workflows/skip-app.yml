@@ -79,8 +79,8 @@ jobs:
           APPARTIFACT="${SKIP_MODULE}"
           #export NOSKIP=1
           for CONFIGURATION in "Debug" "Release"; do
-            ARCHIVE_PATH=".build/Skip/artifacts/${CONFIGURATION}/${APPARTIFACT}.xcarchive"
-            SKIP_ZERO=YES xcodebuild -project Darwin/${SKIP_MODULE}.xcodeproj -derivedDataPath .build/DerivedData -skipPackagePluginValidation -archivePath "${ARCHIVE_PATH}" -configuration "${CONFIGURATION}" -scheme "${SKIP_MODULE}" -sdk "iphoneos" -destination "generic/platform=iOS" -jobs 1 archive CODE_SIGNING_ALLOWED=NO SKIP_ACTION=build
+            ARCHIVE_PATH=".build/Darwin/Archives/${CONFIGURATION}/${APPARTIFACT}.xcarchive"
+            SKIP_ZERO=1 xcodebuild -project Darwin/${SKIP_MODULE}.xcodeproj -derivedDataPath .build/Darwin/DerivedData -skipPackagePluginValidation -archivePath "${ARCHIVE_PATH}" -configuration "${CONFIGURATION}" -scheme "${SKIP_MODULE}" -sdk "iphoneos" -destination "generic/platform=iOS" -jobs 1 archive CODE_SIGNING_ALLOWED=NO SKIP_ACTION=build ZERO_AR_DATE=1 SKIP_INSTALL=1
             brew install tree
             tree "${ARCHIVE_PATH}"
             cd "${ARCHIVE_PATH}"/Products/
@@ -97,7 +97,7 @@ jobs:
       - name: Build apk
         run: |
           for CONFIGURATION in "Release" "Debug"; do
-            BUILT_PRODUCTS_DIR=".build" xcodebuild -project Darwin/${SKIP_MODULE}.xcodeproj -derivedDataPath .build/DerivedData -skipPackagePluginValidation -configuration "${CONFIGURATION}" -destination "platform=macosx" -scheme "${SKIP_MODULE}" build SKIP_ACTION=assemble
+            BUILT_PRODUCTS_DIR=".build" xcodebuild -project Darwin/${SKIP_MODULE}.xcodeproj -derivedDataPath .build/Darwin/DerivedData -skipPackagePluginValidation -configuration "${CONFIGURATION}" -destination "platform=macosx" -scheme "${SKIP_MODULE}" build SKIP_ACTION=assemble
           done
 
           ls -la ${RELDIR}/
@@ -122,7 +122,7 @@ jobs:
 
       - name: Assemble Kotlin Source
         run: |
-          cd .build/DerivedData/SourcePackages/plugins/*.output/${SKIP_MODULE}*/skipstone/
+          cd .build/Darwin/DerivedData/SourcePackages/plugins/*.output/${SKIP_MODULE}*/skipstone/
           rm -rf .gradle .build */.build
           # create the zip file with predictable timestamps for reproducibility
           find . -exec touch -d "${COMMIT_DATE:0:19}" {} \;
