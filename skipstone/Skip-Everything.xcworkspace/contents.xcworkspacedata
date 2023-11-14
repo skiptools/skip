@@ -59,18 +59,18 @@
       location = "group:../skipapp-hello/Darwin/HelloSkip.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:../skipapp-showcase/Showcase.xcodeproj">
+      location = "group:../skipapp-showcase/Darwin/Showcase.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:../skipapp-weather/SkipWeather.xcodeproj">
+      location = "group:../skipapp-weather/Darwin/SkipWeather.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:../skipapp-databake/DataBake.xcodeproj">
+      location = "group:../skipapp-databake/Darwin/DataBake.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:../skipapp-lottiedemo/LottieDemo.xcodeproj">
+      location = "group:../skipapp-lottiedemo/Darwin/LottieDemo.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:../skipapp-everything/EveryThing.xcodeproj">
+      location = "group:../skipapp-everything/Darwin/EveryThing.xcodeproj">
    </FileRef>
 </Workspace>
