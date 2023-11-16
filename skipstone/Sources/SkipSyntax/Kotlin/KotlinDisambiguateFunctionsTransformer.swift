@@ -289,7 +289,7 @@ private struct LabelDeclarer {
     let inheritanceChain: [TypeSignature]
     let protocols: [TypeSignature]
     let isInModule: Bool
-    let visibility: Modifiers.Visibility
+    let modifiers: Modifiers
     let sourceFile: Source.FilePath?
 
     init(for functionInfo: CodebaseInfo.FunctionInfo, codebaseInfo: CodebaseInfo) {
@@ -308,7 +308,7 @@ private struct LabelDeclarer {
             self.protocols = []
         }
         self.isInModule = functionInfo.moduleName == codebaseInfo.moduleName
-        self.visibility = functionInfo.modifiers.visibility
+        self.modifiers = functionInfo.modifiers
         self.sourceFile = functionInfo.sourceFile
     }
 
@@ -320,7 +320,7 @@ private struct LabelDeclarer {
     }
 
     var isImplementable: Bool {
-        return visibility == .open || (visibility == .public && inheritanceChain.isEmpty && !protocols.isEmpty)
+        return modifiers.visibility == .open || (modifiers.visibility == .public && inheritanceChain.isEmpty && !protocols.isEmpty && !modifiers.isStatic)
     }
 }
 
