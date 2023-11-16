@@ -1466,6 +1466,22 @@ final class MemberDeclarationTests: XCTestCase {
         """)
     }
 
+    func testUnlabeledVsLabeledParameterSignatureConflicts() async throws {
+        try await check(swift: """
+        class A {
+            func f(_ a: Int) {
+            }
+            func f(b: Int) {
+            }
+        }
+        """, kotlin: """
+        internal open class A {
+            internal open fun f(a: Int) = Unit
+            internal open fun f(b: Int, @Suppress("UNUSED_PARAMETER") unusedp_0: Nothing? = null) = Unit
+        }
+        """)
+    }
+
     func testGenericFunction() async throws {
         try await check(swift: """
         func f<T, U>(a: T, b: U) -> T? {
@@ -1879,12 +1895,12 @@ final class MemberDeclarationTests: XCTestCase {
             return int
         }
         """, kotlin: """
-        internal fun f(int: Int): Int {
+        internal fun f(int: Int, @Suppress("UNUSED_PARAMETER") unusedp_0: Nothing? = null): Int {
             var int = int
             int += 1
             return int
         }
-        internal fun f(int: Int, @Suppress("UNUSED_PARAMETER") unusedp_0: Nothing? = null): Int {
+        internal fun f(int: Int): Int {
             var int = int
             int += 1
             return int

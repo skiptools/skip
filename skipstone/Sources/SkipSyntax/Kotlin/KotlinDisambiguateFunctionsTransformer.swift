@@ -167,7 +167,10 @@ final class KotlinDisambiguateFunctionsTransformer: KotlinTransformer {
                     continue
                 }
                 // Should we map the other side?
-                if !labelDeclarers[i].isInModule || (iProtocolMatch != nil && jProtocolMatch == nil) || (jProtocolMatch == nil && !labelDeclarers[j].isImplementable && labelDeclarers[i].isImplementable) {
+                if !labelDeclarers[i].parameters.contains(where: { $0.label != nil })
+                    || !labelDeclarers[i].isInModule
+                    || (iProtocolMatch != nil && jProtocolMatch == nil)
+                    || (jProtocolMatch == nil && !labelDeclarers[j].isImplementable && labelDeclarers[i].isImplementable) {
                     if !warn(key: key, for: labelDeclarers[j], protocolMatch: jProtocolMatch) {
                         labelCounts[LabelKey(parameters: labelDeclarers[j].parameters, declaringType: labelDeclarers[j].type)] = nextCount
                         nextCount += 1

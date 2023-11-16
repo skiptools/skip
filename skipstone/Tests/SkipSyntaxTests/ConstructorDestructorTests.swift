@@ -312,6 +312,80 @@ final class ConstructorDestructorTests: XCTestCase {
         """)
     }
 
+    func testMutableStructWithoutInitialableProperties() async throws {
+        try await check(swift: """
+        struct S {
+            let x = 1
+            mutating func f() {
+            }
+        }
+        """, kotlin: """
+        internal class S: MutableStruct {
+            internal val x = 1
+            internal fun f() = Unit
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct = S()
+        }
+        """)
+
+        try await check(swift: """
+        struct S {
+            let x = 1
+            init() {
+            }
+            mutating func f() {
+            }
+        }
+        """, kotlin: """
+        internal class S: MutableStruct {
+            internal val x = 1
+            internal constructor() {
+            }
+            internal fun f() = Unit
+
+            private constructor(copy: MutableStruct) {
+            }
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct = S(this as MutableStruct)
+        }
+        """)
+    }
+
+    func testStructWithCustomCopyConstructor() async throws {
+        try await check(swift: """
+        struct S {
+            let x: Int
+            init(x: Int = 1) {
+                self.x = x
+            }
+            init(copy: MutableStruct) {
+                self.x = (copy as! S).x
+            }
+            mutating func f() {
+            }
+        }
+        """, kotlin: """
+        internal class S: MutableStruct {
+            internal val x: Int
+            internal constructor(x: Int = 1) {
+                this.x = x
+            }
+            internal constructor(copy: MutableStruct) {
+                this.x = (copy as S).x
+            }
+            internal fun f() = Unit
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct = S(this as MutableStruct)
+        }
+        """)
+    }
+
     func testDelegatingConstructor() async throws {
         try await check(swift: """
         class C {
