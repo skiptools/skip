@@ -1012,15 +1012,6 @@ class AppProjectLayout : FrameworkProjectLayout {
             let relativeSwiftPackageRoot = ".."
 
             let skipGradleLaunchScript = """
-            if [ "${SKIP_ZERO}" != "" -o "${ACTION}" = "install" ]; then
-                echo "note: skipping skip due to SKIP_ZERO"
-                exit 0
-            fi
-            SKIP_ACTION="${SKIP_ACTION:-launch}"
-            PATH=${BUILD_ROOT}/Debug:${BUILD_ROOT}/../../SourcePackages/artifacts/skip/skip/skip.artifactbundle/macos:${PATH}:/opt/homebrew/bin:/usr/local/bin
-            echo "note: running gradle build with: $(which skip) gradle -p ${PWD}/../Android ${SKIP_ACTION:-launch}Debug"
-            skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
-
             if [ "${SKIP_ZERO}" != "" ]; then
                 echo "note: skipping skip due to SKIP_ZERO"
                 exit 0
@@ -1031,7 +1022,7 @@ class AppProjectLayout : FrameworkProjectLayout {
                 SKIP_ACTION="${SKIP_ACTION:-launch}"
             fi
             PATH=${BUILD_ROOT}/Debug:${BUILD_ROOT}/../../SourcePackages/artifacts/skip/skip/skip.artifactbundle/macos:${PATH}:${HOMEBREW_PREFIX:-/opt/homebrew}/bin
-            echo "note: running gradle build with: $(which skip) gradle -p ${PWD}/../Android ${SKIP_ACTION:-launch}Debug"
+            echo "note: running gradle build with: $(which skip) gradle -p ${PWD}/../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}"
             skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
 
             """
@@ -1076,6 +1067,7 @@ class AppProjectLayout : FrameworkProjectLayout {
             496EB72F2A6AE4DE00C1253C /* README.md */ = {isa = PBXFileReference; name = README.md; path = ../README.md; sourceTree = "<group>"; };
             4990AB3B2A91AFC5005777FD /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = Platforms/MacOSX.platform/Developer/Library/Frameworks/XCTest.framework; sourceTree = DEVELOPER_DIR; };
             499CD4442AC5B799001AE8D8 /* \(appModuleName).app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = \(appModuleName).app; sourceTree = BUILT_PRODUCTS_DIR; };
+            499AB9082B0581F4005E8330 /* plugins */ = {isa = PBXFileReference; lastKnownFileType = folder; name = plugins; path = ../../../SourcePackages/plugins; sourceTree = BUILT_PRODUCTS_DIR; };
             49F90C2B2A52156200F06D93 /* \(appMainSwiftFileName) */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = \(appMainSwiftFileName); path = \(primaryModuleAppMainPath); sourceTree = SOURCE_ROOT; };
             49F90C2F2A52156300F06D93 /* \(Assets_xcassets_name) */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = \(Assets_xcassets_name); path = \(Assets_xcassets_path); sourceTree = "<group>"; };
             49F90C312A52156300F06D93 /* \(entitlements_name) */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = \(entitlements_name); path = \(entitlements_path); sourceTree = "<group>"; };
@@ -1093,14 +1085,23 @@ class AppProjectLayout : FrameworkProjectLayout {
     /* End PBXFrameworksBuildPhase section */
 
     /* Begin PBXGroup section */
+            49AB54462B066A7E007B79B2 /* SkipStone */ = {
+                    isa = PBXGroup;
+                    children = (
+                            499AB9082B0581F4005E8330 /* plugins */,
+                    );
+                    name = SkipStone;
+                    sourceTree = "<group>";
+            };
             49F90C1F2A52156200F06D93 = {
                 isa = PBXGroup;
                 children = (
                     496EB72F2A6AE4DE00C1253C /* README.md */,
-                    496EB72F2A6AE4DE00C1253A /* \(skipEnvFileName) */,
+                    496EB72F2A6AE4DE00C1253A /* \(skipEnvBaseName) */,
                     496EB72F2A6AE4DE00C1253B /* \(xcconfigFileName) */,
                     493609562A6B7EAE00C401E2 /* \(appModuleName) */,
                     49F90C2A2A52156200F06D93 /* App */,
+                    49AB54462B066A7E007B79B2 /* SkipStone */,
                 );
                 sourceTree = "<group>";
             };
