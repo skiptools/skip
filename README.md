@@ -125,7 +125,7 @@ let package = Package(
         .library(name: "ModuleName", targets: ["ModuleName"]),
     ],
     dependencies: [
-        .package(url: "https://source.skip.tools/skip.git", from: "0.7.25"),
+        .package(url: "https://source.skip.tools/skip.git", from: "0.7.26"),
         .package(url: "https://source.skip.tools/skip-foundation.git", from: "0.0.0"),
     ],
     targets: [
@@ -197,11 +197,8 @@ BUILD OPTIONS:
 
 OPTIONS:
   --appid <appid>         Embed the library as an app with the given bundle id
-  --icon-color <icon-color>
-                          RGB hexadecimal color for icon background (default: 4994EC)
+  --icon-color <RGB>      RGB hexadecimal color for icon background (default: 4994EC)
   --version <version>     Set the initial version to the given value
-  --apk/--no-apk          Build the Android .apk file (default: --no-apk)
-  --ipa/--no-ipa          Build the iOS .ipa file (default: --no-ipa)
   --open-xcode            Open the resulting Xcode project
   --open-gradle           Open the resulting Gradle project
   -h, --help              Show help information.

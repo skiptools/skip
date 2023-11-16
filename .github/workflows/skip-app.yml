@@ -97,6 +97,7 @@ jobs:
 
       - name: Build apk
         run: |
+          #skip gradle -p Android assemble
           for CONFIGURATION in "Release" "Debug"; do
             xcodebuild -project Darwin/${SKIP_MODULE}.xcodeproj -derivedDataPath .build/Darwin/DerivedData -skipPackagePluginValidation -configuration "${CONFIGURATION}" -destination "platform=macosx" -scheme "${SKIP_MODULE}" build SKIP_ACTION=assemble
           done
