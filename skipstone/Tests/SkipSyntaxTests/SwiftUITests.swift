@@ -955,7 +955,7 @@ final class SwiftUITests: XCTestCase {
                 }
             internal var _text: skip.ui.State<String>
             override fun body(): View {
-                return ComposeView { composectx: ComposeContext -> TextField(Binding.instance(this, { it._text.wrappedValue }, { it, newvalue -> it._text.wrappedValue = newvalue })).Compose(composectx) }
+                return ComposeView { composectx: ComposeContext -> TextField(Binding({ this._text.wrappedValue }, { it -> this._text.wrappedValue = it })).Compose(composectx) }
             }
 
             @Composable
@@ -970,6 +970,77 @@ final class SwiftUITests: XCTestCase {
 
             constructor(text: String = "") {
                 this._text = skip.ui.State(text)
+            }
+        }
+        """)
+    }
+
+    //~~~ also test self.item
+    func testMutableStructPathBinding() async throws {
+        try await check(supportingSwift: baseSupportingSwift + """
+        struct Item {
+          let id: UUID
+          var s: String
+        }
+        struct BindingView: View {
+            @Binding var text: String
+            var body: some View {
+            }
+        }
+        """, swift: """
+        import SwiftUI
+        struct V: View {
+            @State var item = Item(id: UUID(), s: "New Item")
+            var body: some View {
+                VStack {
+                    Text(item.s)
+                    BindingView(text: $item.s)
+                }
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
+        import skip.foundation.*
+        import skip.model.*
+
+        import skip.ui.*
+        internal class V: View {
+            internal var item: Item
+                get() = _item.wrappedValue.sref({ this.item = it })
+                set(newValue) {
+                    _item.wrappedValue = newValue.sref()
+                }
+            internal var _item: skip.ui.State<Item>
+            override fun body(): View {
+                return ComposeView { composectx: ComposeContext ->
+                    VStack {
+                        ComposeView { composectx: ComposeContext ->
+                            Text(item.s).Compose(composectx)
+                            BindingView(text = Binding({ _item.wrappedValue.s }, { it -> _item.wrappedValue.s = it })).Compose(composectx)
+                            ComposeResult.ok
+                        }
+                    }.Compose(composectx)
+                }
+            }
+
+            @Composable
+            @Suppress("UNCHECKED_CAST")
+            override fun ComposeContent(composectx: ComposeContext) {
+                val initialitem = _item.wrappedValue
+                var composeitem by rememberSaveable(stateSaver = composectx.stateSaver as Saver<Item, Any>) { mutableStateOf(initialitem) }
+                _item.sync(composeitem, { composeitem = it })
+
+                body().Compose(composectx)
+            }
+
+            constructor(item: Item = Item(id = UUID(), s = "New Item")) {
+                this._item = skip.ui.State(item.sref())
             }
         }
         """)
@@ -1015,7 +1086,7 @@ final class SwiftUITests: XCTestCase {
         internal class V: View {
             internal var o: O
             override fun body(): View {
-                return ComposeView { composectx: ComposeContext -> TextField(Binding.instance(o, { it.string }, { it, newvalue -> it.string = newvalue })).Compose(composectx) }
+                return ComposeView { composectx: ComposeContext -> TextField(Binding({ o.string }, { it -> o.string = it })).Compose(composectx) }
             }
 
             constructor(o: O) {
@@ -1054,7 +1125,7 @@ final class SwiftUITests: XCTestCase {
         internal class V: View {
             internal var o: O
             override fun body(): View {
-                return ComposeView { composectx: ComposeContext -> TextField(Binding.instance(this.o, { it.s.string }, { it, newvalue -> it.s.string = newvalue })).Compose(composectx) }
+                return ComposeView { composectx: ComposeContext -> TextField(Binding({ this.o.s.string }, { it -> this.o.s.string = it })).Compose(composectx) }
             }
 
             constructor(o: O) {
@@ -1092,7 +1163,7 @@ final class SwiftUITests: XCTestCase {
         internal class V: View {
             internal var o: O
             override fun body(): View {
-                return ComposeView { composectx: ComposeContext -> TextField(Binding.instance(o, { it.strings[0] }, { it, newvalue -> it.strings[0] = newvalue })).Compose(composectx) }
+                return ComposeView { composectx: ComposeContext -> TextField(Binding({ o.strings[0] }, { it -> o.strings[0] = it })).Compose(composectx) }
             }
 
             constructor(o: O) {
@@ -1137,7 +1208,7 @@ final class SwiftUITests: XCTestCase {
                 return ComposeView { composectx: ComposeContext ->
                     for (o in os.sref()) {
                         var o = o
-                        TextField(Binding.instance(o, { it.string }, { it, newvalue -> it.string = newvalue })).Compose(composectx)
+                        TextField(Binding({ o.string }, { it -> o.string = it })).Compose(composectx)
                     }
                     ComposeResult.ok
                 }

@@ -1074,9 +1074,9 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
     var isOperatorIdentifier = false
     var valueSuffix: String? // Suffix to append to extract value, e.g. '.value()'
     var isFunctionReference = false
-    var isSwiftUIBindingParameter = false
     var isModuleNameFor: TypeSignature = .none
     var isTypealiasFor: TypeSignature = .none
+    var isSwiftUIBindingParameter = false
 
     static func translate(expression: Identifier, translator: KotlinTranslator) -> KotlinIdentifier {
         let kexpression = KotlinIdentifier(expression: expression)
@@ -1130,8 +1130,20 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
     }
 
     func appendSwiftUIBindingPath(to output: OutputGenerator, indentation: Indentation, appendPath: @escaping (OutputGenerator, Indentation, KotlinBindableBase) -> Void) {
-        appendInstanceBinding(to: output, indentation: indentation, isBoundInstance: isSwiftUIBindingParameter, appendPath: appendPath) {
+        if isSwiftUIBindingParameter {
+            output.append("Binding.fromBinding(")
             appendIdentifier(to: output, indentation: indentation, isSwiftUIState: false)
+            output.append(", { ")
+            appendPath(output, indentation) { output, _ in output.append("it") }
+            output.append(" }, { it, newvalue -> ")
+            appendPath(output, indentation) { output, _ in output.append("it") }
+            output.append(" = newvalue })")
+        } else {
+            appendBinding(to: output, indentation: indentation) { output, indentation in
+                appendPath(output, indentation) { output, indentation in
+                    appendIdentifier(to: output, indentation: indentation, isSwiftUIState: false)
+                }
+            }
         }
     }
 
@@ -1151,7 +1163,9 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
         if isSwiftUIBinding && !isSwiftUIBindingParameter {
-            appendBinding(to: output, indentation: indentation)
+            appendBinding(to: output, indentation: indentation) { output, indentation in
+                appendIdentifier(to: output, indentation: indentation, isSwiftUIState: true)
+            }
         } else {
             appendIdentifier(to: output, indentation: indentation, isSwiftUIState: false)
         }
@@ -1224,14 +1238,6 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
         if mainActorOutputMode == .isolated {
             output.append(" }")
         }
-    }
-
-    private func appendBinding(to output: OutputGenerator, indentation: Indentation) {
-        output.append("Binding({ ")
-        appendIdentifier(to: output, indentation: indentation, isSwiftUIState: true)
-        output.append(" }, { it -> ")
-        appendIdentifier(to: output, indentation: indentation, isSwiftUIState: true)
-        output.append(" = it })")
     }
 }
 
@@ -1876,16 +1882,17 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
 
     func appendSwiftUIBindingPath(to output: OutputGenerator, indentation: Indentation, appendPath: @escaping (OutputGenerator, Indentation, KotlinBindableBase) -> Void) {
         if member.hasPrefix("$") {
-            // Capture this member access as the base of an InstanceBinding
-            appendInstanceBinding(to: output, indentation: indentation, appendPath: appendPath) {
-                appendMemberAccess(to: output, indentation: indentation, isSwiftUIState: false) { output, indentation in
-                    if let base {
-                        output.append(base, indentation: indentation)
+            appendBinding(to: output, indentation: indentation) { output, indentation in
+                appendPath(output, indentation) { output, indentation in
+                    appendMemberAccess(to: output, indentation: indentation, isSwiftUIState: false) { output, indentation in
+                        if let base {
+                            output.append(base, indentation: indentation)
+                        }
                     }
                 }
             }
         } else {
-            // Tack this member access onto our base's existing InstanceBinding
+            // Tack this member access onto our base's existing binding
             (base as? KotlinSwiftUIBindable)?.appendSwiftUIBindingPath(to: output, indentation: indentation) { output, indentation, appendTo in
                 appendPath(output, indentation) { output, indentation in
                     self.appendMemberAccess(to: output, indentation: indentation, isSwiftUIState: false, appendBase: appendTo)
@@ -1927,14 +1934,13 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
         if member.hasPrefix("$") {
-            // Append an instance Binding where the base is our base and the path is our member
-            appendInstanceBinding(to: output, indentation: indentation) { output, indentation, appendTo in
+            appendBinding(to: output, indentation: indentation) { output, indentation in
                 // Treat self.$x as a @State binding
                 let isSwiftUIState = (base as? KotlinIdentifier)?.name == "self"
-                appendMemberAccess(to: output, indentation: indentation, isSwiftUIState: isSwiftUIState, appendBase: appendTo)
-            } appendInstance: {
-                if let base {
-                    output.append(base, indentation: indentation)
+                appendMemberAccess(to: output, indentation: indentation, isSwiftUIState: isSwiftUIState) { output, indentation in
+                    if let base {
+                        output.append(base, indentation: indentation)
+                    }
                 }
             }
         } else if let bindable = base as? KotlinSwiftUIBindable, bindable.isSwiftUIBinding {
