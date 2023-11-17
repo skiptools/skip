@@ -2510,11 +2510,6 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 kstatement.messages.append(.kotlinProtocolStaticMember(statement, source: translator.syntaxTree.source))
             }
         }
-        if owningDeclarationType == .protocolDeclaration {
-            if statement.modifiers.isStatic {
-
-            }
-        }
         return kstatement
     }
 
@@ -2575,6 +2570,12 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         storage?.appendStorage(self, output, indentation)
         if modifiers.isLazy {
             output.append(indentation).append("private var \(KotlinVariableStorage.lazyInitializedName(self)) = false\n")
+        }
+
+        // Create property wrapper-like access for local @Bindable variables. We use a Binding rather than Observable
+        // because its closures will keep it in sync with the local value
+        if role == .local && attributes.contains(.bindable) {
+            output.append(indentation).append("val _\(propertyName) = Binding({ \(propertyName) }, { it -> \(propertyName) = it })\n")
         }
     }
 

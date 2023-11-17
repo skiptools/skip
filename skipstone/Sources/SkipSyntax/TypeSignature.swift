@@ -1813,19 +1813,14 @@ extension TypeSignature {
         return false
     }
 
-    /// Return a SwiftUI Binding of this type.
+    /// Return this type as a binding.
     func asBinding() -> TypeSignature {
-        return .named("Binding", [self])
+        return asPropertyWrapper("Binding")
     }
 
-    /// Return a SwiftUI State of this type.
-    func asState() -> TypeSignature {
-        return .named("skip.ui.State", [self])
-    }
-
-    /// Return a SwiftUI AppStorage of this type.
-    func asAppStorage() -> TypeSignature {
-        return .named("skip.ui.AppStorage", [self])
+    /// Return this as a self-generic-typed property wrapper of the given type.
+    func asPropertyWrapper(_ typeName: String) -> TypeSignature {
+        return .named(typeName, [self])
     }
 }
 

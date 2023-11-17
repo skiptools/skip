@@ -196,6 +196,8 @@ final class KotlinStructTransformer: KotlinTransformer {
                 assignment = "this._\(variableDeclaration.propertyName) = skip.ui.AppStorage(wrappedValue = \(value), \(appStorageParameters))"
             } else if variableDeclaration.attributes.contains(.binding) {
                 assignment = "this._\(variableDeclaration.propertyName) = \(variableDeclaration.propertyName)"
+            } else if variableDeclaration.attributes.contains(.bindable) || variableDeclaration.attributes.contains(.observedObject) {
+                assignment = "this._\(variableDeclaration.propertyName) = skip.ui.Bindable(\(variableDeclaration.propertyName))"
             } else {
                 assignment = "this.\(variableDeclaration.propertyName) = \(variableDeclaration.propertyName)"
                 if !variableDeclaration.apiFlags.contains(.writeable) && variableDeclaration.mayBeSharedMutableStruct {
@@ -234,6 +236,8 @@ final class KotlinStructTransformer: KotlinTransformer {
                     return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = skip.ui.State(copy.\(variableDeclaration.propertyName))")
                 } else if variableDeclaration.attributes.contains(.appStorage) || variableDeclaration.attributes.contains(.binding) {
                     return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = copy._\(variableDeclaration.propertyName)")
+                } else if variableDeclaration.attributes.contains(.bindable) || variableDeclaration.attributes.contains(.observedObject) {
+                    return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = skip.ui.Bindable(copy.\(variableDeclaration.propertyName))")
                 } else {
                     return KotlinRawStatement(sourceCode: "this.\(variableDeclaration.propertyName) = copy.\(variableDeclaration.propertyName)")
                 }
@@ -344,10 +348,12 @@ final class KotlinStructTransformer: KotlinTransformer {
 
     private func selfAssignStatements(from copy: String, storedVariableDeclarations: [KotlinVariableDeclaration]) -> [KotlinStatement] {
         return storedVariableDeclarations.map { variableDeclaration in
-            if variableDeclaration.attributes.contains(.state) {
+            if variableDeclaration.attributes.contains(.state) || variableDeclaration.attributes.contains(.stateObject) {
                 return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = skip.ui.State(\(copy).\(variableDeclaration.propertyName))")
             } else if variableDeclaration.attributes.contains(.appStorage) || variableDeclaration.attributes.contains(.binding) {
                 return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = \(copy)._\(variableDeclaration.propertyName)")
+            } else if variableDeclaration.attributes.contains(.bindable) || variableDeclaration.attributes.contains(.observedObject) {
+                return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = skip.ui.Bindable(\(copy).\(variableDeclaration.propertyName))")
             } else {
                 return KotlinRawStatement(sourceCode: "this.\(variableDeclaration.propertyName) = \(copy).\(variableDeclaration.propertyName)")
             }

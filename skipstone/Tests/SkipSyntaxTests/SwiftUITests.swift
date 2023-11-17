@@ -1085,12 +1085,17 @@ final class SwiftUITests: XCTestCase {
 
         internal class V: View {
             internal var o: O
+                get() = _o.wrappedValue
+                set(newValue) {
+                    _o.wrappedValue = newValue
+                }
+            internal var _o: skip.ui.Bindable<O>
             override fun body(): View {
-                return ComposeView { composectx: ComposeContext -> TextField(Binding({ o.string }, { it -> o.string = it })).Compose(composectx) }
+                return ComposeView { composectx: ComposeContext -> TextField(Binding({ _o.wrappedValue.string }, { it -> _o.wrappedValue.string = it })).Compose(composectx) }
             }
 
             constructor(o: O) {
-                this.o = o
+                this._o = skip.ui.Bindable(o)
             }
         }
         """)
@@ -1124,12 +1129,17 @@ final class SwiftUITests: XCTestCase {
         import skip.ui.*
         internal class V: View {
             internal var o: O
+                get() = _o.wrappedValue
+                set(newValue) {
+                    _o.wrappedValue = newValue
+                }
+            internal var _o: skip.ui.Bindable<O>
             override fun body(): View {
-                return ComposeView { composectx: ComposeContext -> TextField(Binding({ this.o.s.string }, { it -> this.o.s.string = it })).Compose(composectx) }
+                return ComposeView { composectx: ComposeContext -> TextField(Binding({ this._o.wrappedValue.s.string }, { it -> this._o.wrappedValue.s.string = it })).Compose(composectx) }
             }
 
             constructor(o: O) {
-                this.o = o
+                this._o = skip.ui.Bindable(o)
             }
         }
         """)
@@ -1162,12 +1172,17 @@ final class SwiftUITests: XCTestCase {
         import skip.ui.*
         internal class V: View {
             internal var o: O
+                get() = _o.wrappedValue
+                set(newValue) {
+                    _o.wrappedValue = newValue
+                }
+            internal var _o: skip.ui.Bindable<O>
             override fun body(): View {
-                return ComposeView { composectx: ComposeContext -> TextField(Binding({ o.strings[0] }, { it -> o.strings[0] = it })).Compose(composectx) }
+                return ComposeView { composectx: ComposeContext -> TextField(Binding({ _o.wrappedValue.strings[0] }, { it -> _o.wrappedValue.strings[0] = it })).Compose(composectx) }
             }
 
             constructor(o: O) {
-                this.o = o
+                this._o = skip.ui.Bindable(o)
             }
         }
         """)
@@ -1208,7 +1223,8 @@ final class SwiftUITests: XCTestCase {
                 return ComposeView { composectx: ComposeContext ->
                     for (o in os.sref()) {
                         var o = o
-                        TextField(Binding({ o.string }, { it -> o.string = it })).Compose(composectx)
+                        val _o = Binding({ o }, { it -> o = it })
+                        TextField(Binding({ _o.wrappedValue.string }, { it -> _o.wrappedValue.string = it })).Compose(composectx)
                     }
                     ComposeResult.ok
                 }
@@ -1228,6 +1244,7 @@ final class SwiftUITests: XCTestCase {
             @Environment(\\.envvalue) var envvalue
             @State var count = 0
             @Binding var text: String
+            @Bindable var o: O
             var i = 0
 
             var body: some View {
@@ -1260,6 +1277,12 @@ final class SwiftUITests: XCTestCase {
                     _text.wrappedValue = newValue
                 }
             internal var _text: Binding<String>
+            internal var o: O
+                get() = _o.wrappedValue.sref({ this.o = it })
+                set(newValue) {
+                    _o.wrappedValue = newValue.sref()
+                }
+            internal var _o: skip.ui.Bindable<O>
             internal var i: Int
                 set(newValue) {
                     willmutate()
@@ -1270,9 +1293,9 @@ final class SwiftUITests: XCTestCase {
             override fun body(): View {
                 return ComposeView { composectx: ComposeContext -> Text("Hello").Compose(composectx) }
             }
-
+        
             @Composable
-            @Suppress(\"UNCHECKED_CAST\")
+            @Suppress("UNCHECKED_CAST")
             override fun ComposeContent(composectx: ComposeContext) {
                 val initialcount = _count.wrappedValue
                 var composecount by rememberSaveable(stateSaver = composectx.stateSaver as Saver<Int, Any>) { mutableStateOf(initialcount) }
@@ -1283,15 +1306,16 @@ final class SwiftUITests: XCTestCase {
                 body().Compose(composectx)
             }
 
-            constructor(count: Int = 0, text: Binding<String>, i: Int = 0) {
+            constructor(count: Int = 0, text: Binding<String>, o: O, i: Int = 0) {
                 this._count = skip.ui.State(count)
                 this._text = text
+                this._o = skip.ui.Bindable(o)
                 this.i = i
             }
 
             override var supdate: ((Any) -> Unit)? = null
             override var smutatingcount = 0
-            override fun scopy(): MutableStruct = V(count, _text, i)
+            override fun scopy(): MutableStruct = V(count, _text, o, i)
         }
         """)
     }
@@ -1303,10 +1327,12 @@ final class SwiftUITests: XCTestCase {
             @Environment(\\.envvalue) var envvalue
             @State var count = 0
             @Binding var text: String
+            @Bindable var o: O
             var i = 0
         
-            init(text: Binding<String>) {
+            init(text: Binding<String>, o: O) {
                 self._text = text
+                self.o = o
             }
         
             var body: some View {
@@ -1339,6 +1365,12 @@ final class SwiftUITests: XCTestCase {
                     _text.wrappedValue = newValue
                 }
             internal var _text: Binding<String>
+            internal var o: O
+                get() = _o.wrappedValue.sref({ this.o = it })
+                set(newValue) {
+                    _o.wrappedValue = newValue.sref()
+                }
+            internal var _o: skip.ui.Bindable<O>
             internal var i = 0
                 set(newValue) {
                     willmutate()
@@ -1346,8 +1378,9 @@ final class SwiftUITests: XCTestCase {
                     didmutate()
                 }
 
-            internal constructor(text: Binding<String>) {
+            internal constructor(text: Binding<String>, o: O) {
                 this._text = text.sref()
+                this._o = skip.ui.Bindable(o)
             }
 
             override fun body(): View {
@@ -1355,7 +1388,7 @@ final class SwiftUITests: XCTestCase {
             }
 
             @Composable
-            @Suppress(\"UNCHECKED_CAST\")
+            @Suppress("UNCHECKED_CAST")
             override fun ComposeContent(composectx: ComposeContext) {
                 val initialcount = _count.wrappedValue
                 var composecount by rememberSaveable(stateSaver = composectx.stateSaver as Saver<Int, Any>) { mutableStateOf(initialcount) }
@@ -1370,6 +1403,7 @@ final class SwiftUITests: XCTestCase {
                 @Suppress("NAME_SHADOWING", "UNCHECKED_CAST") val copy = copy as V
                 this._count = skip.ui.State(copy.count)
                 this._text = copy._text
+                this._o = skip.ui.Bindable(copy.o)
                 this.i = copy.i
             }
 

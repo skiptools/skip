@@ -1141,7 +1141,7 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
         } else {
             appendBinding(to: output, indentation: indentation) { output, indentation in
                 appendPath(output, indentation) { output, indentation in
-                    appendIdentifier(to: output, indentation: indentation, isSwiftUIState: false)
+                    appendIdentifier(to: output, indentation: indentation, isSwiftUIState: true)
                 }
             }
         }
@@ -1884,7 +1884,7 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
         if member.hasPrefix("$") {
             appendBinding(to: output, indentation: indentation) { output, indentation in
                 appendPath(output, indentation) { output, indentation in
-                    appendMemberAccess(to: output, indentation: indentation, isSwiftUIState: false) { output, indentation in
+                    appendMemberAccess(to: output, indentation: indentation, isSwiftUIState: true) { output, indentation in
                         if let base {
                             output.append(base, indentation: indentation)
                         }
@@ -1935,9 +1935,7 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
     override func append(to output: OutputGenerator, indentation: Indentation) {
         if member.hasPrefix("$") {
             appendBinding(to: output, indentation: indentation) { output, indentation in
-                // Treat self.$x as a @State binding
-                let isSwiftUIState = (base as? KotlinIdentifier)?.name == "self"
-                appendMemberAccess(to: output, indentation: indentation, isSwiftUIState: isSwiftUIState) { output, indentation in
+                appendMemberAccess(to: output, indentation: indentation, isSwiftUIState: true) { output, indentation in
                     if let base {
                         output.append(base, indentation: indentation)
                     }

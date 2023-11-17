@@ -451,7 +451,7 @@ struct Attributes: Hashable, PrettyPrintable, Codable {
 
     /// Some property wrappers are non-mutating.
     var isNonMutating: Bool {
-        return contains(.nonmutating) || contains(.state) || contains(.stateObject) || contains(.environment) || contains(.environmentObject) || contains(.bindable) || contains(.binding) || contains(.appStorage)
+        return contains(.appStorage) || contains(.bindable) || contains(.binding) || contains(.environment) || contains(.environmentObject) || contains(.nonmutating) || contains(.observedObject) || contains(.state) || contains(.stateObject)
     }
 
     func resolved(in node: SyntaxNode? = nil, context: TypeResolutionContext) -> Attributes {

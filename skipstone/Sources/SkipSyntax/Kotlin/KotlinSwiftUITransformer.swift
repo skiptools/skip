@@ -142,9 +142,9 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
                 return .skip
             } else if node is KotlinFunctionDeclaration {
                 return .skip
-            } else if let binaryOperator = node as? KotlinBinaryOperator, binaryOperator.op.symbol == "=", let statePropertyName = statePropertyName(for: binaryOperator.lhs, in: functionDeclaration.parent as? KotlinClassDeclaration) {
-                binaryOperator.lhs = KotlinMemberAccess(base: KotlinIdentifier(name: "self"), member: "_" + statePropertyName)
-                binaryOperator.rhs = KotlinFunctionCall(function: KotlinIdentifier(name: "skip.ui.State"), arguments: [LabeledValue(label: "initialValue", value: binaryOperator.rhs)])
+            } else if let binaryOperator = node as? KotlinBinaryOperator, binaryOperator.op.symbol == "=", let propertyWrapper = propertyWrapper(for: binaryOperator.lhs, in: functionDeclaration.parent as? KotlinClassDeclaration) {
+                binaryOperator.lhs = KotlinMemberAccess(base: KotlinIdentifier(name: "self"), member: propertyWrapper.name)
+                binaryOperator.rhs = KotlinFunctionCall(function: KotlinIdentifier(name: propertyWrapper.propertyWrapperTypeName), arguments: [LabeledValue(label: nil, value: binaryOperator.rhs)])
                 binaryOperator.assignParentReferences()
                 return .skip
             } else {
@@ -153,8 +153,8 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         }
     }
 
-    /// If the given expression is a reference to a @State or @StateObject or @AppStorage property, return the underlying State property name.
-    private func statePropertyName(for expression: KotlinExpression, in view: KotlinClassDeclaration?) -> String? {
+    /// If the given expression is a reference to a property wrapper type, return the underlying property name.
+    private func propertyWrapper(for expression: KotlinExpression, in view: KotlinClassDeclaration?) -> (name: String, propertyWrapperTypeName: String)? {
         guard let view else {
             return nil
         }
@@ -169,7 +169,13 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         }
         for member in view.members {
             if let variable = member as? KotlinVariableDeclaration, variable.propertyName == variableName {
-                return variable.attributes.contains(.state) || variable.attributes.contains(.stateObject) ? variableName : nil
+                if variable.attributes.contains(.state) || variable.attributes.contains(.stateObject) {
+                    return ("_" + variableName, "skip.ui.State")
+                } else if variable.attributes.contains(.bindable) || variable.attributes.contains(.observedObject) {
+                    return ("_" + variableName, "skip.ui.Bindable")
+                } else {
+                    return nil
+                }
             }
         }
         return nil
@@ -245,17 +251,21 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         let stateVariables = variableDeclarations.filter { $0.attributes.contains(.state) || $0.attributes.contains(.stateObject) }
         let environmentVariables = variableDeclarations.filter { $0.attributes.contains(.environment) || $0.attributes.contains(.environmentObject) }
         let bindingVariables = variableDeclarations.filter { $0.attributes.contains(.binding) }
+        let bindableVariables = variableDeclarations.filter { $0.attributes.contains(.bindable) || $0.attributes.contains(.observedObject) }
         let appStorageVariables = variableDeclarations.filter { $0.attributes.contains(.appStorage) }
         if !stateVariables.isEmpty || !environmentVariables.isEmpty || !appStorageVariables.isEmpty {
             let composeFunction = synthesizeComposeFunction(view: view, stateVariables: stateVariables, environmentVariables: environmentVariables, appStorageVariables: appStorageVariables, translator: translator)
             view.insert(statements: [composeFunction], after: body)
             
             for stateVariable in stateVariables {
-                synthesizeStateBacking(variable: stateVariable, in: view)
+                synthesizeStateBacking(variable: stateVariable, in: view, propertyWrapperTypeName: "skip.ui.State")
             }
         }
         for bindingVariable in bindingVariables {
             synthesizeBindingBacking(variable: bindingVariable, in: view, source: translator.syntaxTree.source)
+        }
+        for bindableVariable in bindableVariables {
+            synthesizeStateBacking(variable: bindableVariable, in: view, propertyWrapperTypeName: "skip.ui.Bindable")
         }
         for appStorageVariable in appStorageVariables {
             synthesizeAppStorageBacking(variable: appStorageVariable, in: view, source: translator.syntaxTree.source)
@@ -402,8 +412,8 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         }
     }
 
-    /// Create the additional property synthesized for `@State` variables.
-    private func synthesizeStateBacking(variable: KotlinVariableDeclaration, in view: KotlinClassDeclaration) {
+    /// Create the additional property synthesized for `@State` and similar variables.
+    private func synthesizeStateBacking(variable: KotlinVariableDeclaration, in view: KotlinClassDeclaration, propertyWrapperTypeName: String) {
         // Tell the @State variable to get and set its value using _variable of type State
         let storageName = "_\(variable.propertyName)"
         var storage = KotlinVariableStorage()
@@ -422,14 +432,14 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             output.append("\n")
         }
         storage.appendStorage = { variable, output, indentation in
-            let stateType = variable.propertyType.asState().kotlin
+            let stateType = variable.propertyType.asPropertyWrapper(propertyWrapperTypeName).kotlin
             output.append(indentation).append(variable.modifiers.kotlinMemberString(isGlobal: false, isOpen: false, suffix: " ")).append("var ").append(storageName).append(": ").append(stateType)
             if let value = variable.value {
-                output.append(" = skip.ui.State(")
+                output.append(" = \(propertyWrapperTypeName)(")
                 value.append(to: output, indentation: indentation)
                 output.append(")")
             } else if variable.propertyType.isOptional {
-                output.append(" = skip.ui.State(null)")
+                output.append(" = \(propertyWrapperTypeName)(null)")
             }
             output.append("\n")
         }
@@ -486,7 +496,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             output.append("\n")
         }
         storage.appendStorage = { variable, output, indentation in
-            let storageType = variable.propertyType.asAppStorage().kotlin
+            let storageType = variable.propertyType.asPropertyWrapper("skip.ui.AppStorage").kotlin
             output.append(indentation).append(variable.modifiers.kotlinMemberString(isGlobal: false, isOpen: false, suffix: " ")).append("var ").append(storageName).append(": ").append(storageType)
             if let value = variable.value {
                 output.append(" = skip.ui.AppStorage(")

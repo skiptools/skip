@@ -449,7 +449,7 @@ final class ClosureTests: XCTestCase {
         }
         """, kotlin: """
         List(Binding({ _items.wrappedValue }, { it -> _items.wrappedValue = it }), id = { it.i }) { item ->
-            Toggle(Binding({ item.wrappedValue.value }, { it -> item.wrappedValue.value = it }))
+            Toggle(Binding({ item.wrappedValue._value.wrappedValue }, { it -> item.wrappedValue._value.wrappedValue = it }))
             Toggle(Binding.fromBinding(item, { it.value }, { it, newvalue -> it.value = newvalue }))
             CustomView(item)
         }
