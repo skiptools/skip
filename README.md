@@ -86,7 +86,9 @@ This will create a new `lib-name` folder containing a `Package.swift` with targe
 
 This project can be opened in Xcode.app, which you can use to build and run the unit tests. Running `swift build` and `swift test` from the Terminal can also be used for headless testing as part of a continuous integration process.
 
-### Skip Project structure
+### Skip Framework Structure
+
+The structure of a Skip framework is exactly the same as any other SPM package:
 
 ```shell
 lib-name
@@ -111,7 +113,7 @@ lib-name
 
 ```
 
-### Skip Package.swift structure
+Skip frameworks use a standard `Package.swift` file, with the exception of an added dependency on `skip` and use of the `skipstone` plugin for transpilation:
 
 ```swift
 // swift-tools-version: 5.8
@@ -136,7 +138,7 @@ let package = Package(
 ```
 
 
-## skip init options
+## `skip init` Reference
 
 ```plaintext
 zap /tmp % skip init --help
@@ -221,6 +223,7 @@ Specific known error conditions are listed below. Search the [documentation](htt
     When these errors occur, the build appears to complete successfully although changes are not applied. Unfortunately, this is an Xcode bug. We have found the following workarounds:
 
     - Continue to retry the build. Eventually Xcode may complete successfully, although the errors often continue to become more frequent until you are forced to apply one of the other solutions below.
+    - Building a different target and then re-building your app target may clear the error.
     - Restart Xcode.
     - Clean and rebuild.
 
