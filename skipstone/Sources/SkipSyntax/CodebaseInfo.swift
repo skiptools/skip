@@ -495,8 +495,19 @@ public class CodebaseInfo {
             guard typeInfo.isApplicable(toConstrainedGenerics: constrainedGenerics, codebaseInfo: self) else {
                 return nil
             }
+            // Prefer non-function identifier matches, then function matches
+            if let match = matchIdentifier(name: name, in: typeInfo, constrainedGenerics: constrainedGenerics, isStatic: isStatic, functionMatch: false) {
+                return match
+            } else {
+                return matchIdentifier(name: name, in: typeInfo, constrainedGenerics: constrainedGenerics, isStatic: isStatic, functionMatch: true)
+            }
+        }
+
+        private func matchIdentifier(name: String, in typeInfo: TypeInfo, constrainedGenerics: [TypeSignature], isStatic: Bool, functionMatch: Bool) -> APIMatch? {
             // We allow .init to be used both as a static or instance member
-            if let memberInfo = typeInfo.visibleMembers(context: self).first(where: { $0.name == name && ($0.declarationType == .initDeclaration || $0.isStatic == isStatic) }) {
+            if let memberInfo = typeInfo.visibleMembers(context: self).first(where: { $0.name == name
+                && ($0.declarationType == .initDeclaration || $0.isStatic == isStatic)
+                && functionMatch == ($0.declarationType == .functionDeclaration) }) {
                 let availability = memberInfo.availability.least(typeInfo.availability)
                 // Enum cases with associated values are modeled as functions, but can also be used as identifiers
                 let signature: TypeSignature
