@@ -1470,17 +1470,18 @@ class VariableDeclaration: Statement {
         let isAsync = variableDecl.modifiers.contains(where: { $0.name.text == "async" })
 
         var statements: [Statement] = []
+        let lastTypeSyntax = variableDecl.bindings.last?.typeAnnotation?.type
         for (index, syntax) in variableDecl.bindings.enumerated() {
             let bindingExtras = index == 0 ? extras : nil
-            let statement = try decode(syntax: syntax, isLet: isLet, isAsync: isAsync, attributes: attributes, modifiers: modifiers, extras: bindingExtras, in: syntaxTree)
+            let statement = try decode(syntax: syntax, lastTypeSyntax: lastTypeSyntax, isLet: isLet, isAsync: isAsync, attributes: attributes, modifiers: modifiers, extras: bindingExtras, in: syntaxTree)
             statements.append(statement)
         }
         return statements
     }
 
-    private static func decode(syntax: PatternBindingSyntax, isLet: Bool, isAsync: Bool, attributes: Attributes, modifiers: Modifiers, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> Statement {
+    private static func decode(syntax: PatternBindingSyntax, lastTypeSyntax: TypeSyntax?, isLet: Bool, isAsync: Bool, attributes: Attributes, modifiers: Modifiers, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> Statement {
         var declaredType: TypeSignature = .none
-        if let typeSyntax = syntax.typeAnnotation?.type {
+        if let typeSyntax = syntax.typeAnnotation?.type ?? lastTypeSyntax {
             declaredType = TypeSignature.for(syntax: typeSyntax, in: syntaxTree)
         }
         var value: Expression? = nil

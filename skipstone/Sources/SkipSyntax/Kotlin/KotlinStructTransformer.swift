@@ -288,6 +288,10 @@ final class KotlinStructTransformer: KotlinTransformer {
             guard let classDeclaration else {
                 return .skip
             }
+            guard classDeclaration.declarationType != .enumDeclaration else {
+                binaryOperator.messages.append(.kotlinEnumSelfAssignment(binaryOperator, source: translator.syntaxTree.source))
+                return .skip
+            }
 
             let storedVariables = makeSelfAssignable(classDeclaration)
             var copyStatements: [KotlinStatement] = []

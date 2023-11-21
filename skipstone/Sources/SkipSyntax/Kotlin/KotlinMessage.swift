@@ -106,6 +106,10 @@ extension Message {
         return Message(kind: .error, message: "Skip does not support automatic Comparable conformance for enums that translate into Kotlin sealed classes. Consider writing your own < operator function", sourceDerived: sourceDerived, source: source)
     }
 
+    static func kotlinEnumSelfAssignment(_ sourceDervied: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Kotlin enums do not support reassignment", sourceDerived: sourceDervied, source: source)
+    }
+
     static func kotlinEnvironmentDeclaredType(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Kotlin cannot infer the type of this @Environment variable. Consider adding a type declaration", sourceDerived: sourceDerived, source: source)
     }

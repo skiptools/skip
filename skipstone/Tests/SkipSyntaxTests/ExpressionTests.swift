@@ -254,6 +254,18 @@ final class ExpressionTests: XCTestCase {
         """)
     }
 
+    func testSelfAssignEnumFunction() async throws {
+        try await checkProducesMessage(swift: """
+        enum E {
+            case on, off
+
+            mutating func reset() {
+                self = .off
+            }
+        }
+        """)
+    }
+
     func testOperatorAsParameter() async throws {
         try await check(supportingSwift: """
         func perform(on: Int, operation: (Int, Int) -> Int) -> Int {
@@ -556,6 +568,24 @@ final class ExpressionTests: XCTestCase {
         """, kotlin: """
         internal fun f() {
             fatalError()
+        }
+        """)
+    }
+
+    func testMultipleVariables() async throws {
+        try await check(swift: """
+        {
+            var a, b, c: Int
+            var x: Int, y, z: Double
+        }
+        """, kotlin: """
+        {
+            var a: Int
+            var b: Int
+            var c: Int
+            var x: Int
+            var y: Double
+            var z: Double
         }
         """)
     }
