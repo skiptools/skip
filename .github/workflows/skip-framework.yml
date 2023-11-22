@@ -9,7 +9,7 @@ on:
 jobs:
   skip-framework:
     runs-on: macos-13
-    timeout-minutes: 60
+    timeout-minutes: 45
     env:     
       DEVELOPER_DIR: /Applications/Xcode_15.0.app/Contents/Developer
     steps:
