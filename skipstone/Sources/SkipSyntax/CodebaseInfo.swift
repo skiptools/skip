@@ -22,6 +22,7 @@ public class CodebaseInfo {
 
     /// Map between Swift modules and the equivalent Skip modules.
     static let moduleNameMap: [String: String] = [
+        "AVKit": "SkipAV",
         "Combine": "SkipModel",
         "CoreFoundation": "SkipFoundation",
         "CoreGraphics": "SkipLib",

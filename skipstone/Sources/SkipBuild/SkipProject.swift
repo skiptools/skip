@@ -411,7 +411,7 @@ class FrameworkProjectLayout {
         ## Testing
 
         The module can be tested using the standard `swift test` command
-        or by running the test target for the macOS desintation in Xcode,
+        or by running the test target for the macOS destination in Xcode,
         which will run the Swift tests as well as the transpiled
         Kotlin JUnit tests in the Robolectric Android simulation environment.
 
@@ -695,7 +695,7 @@ class AppProjectLayout : FrameworkProjectLayout {
             public var body: some View {
                 ContentView()
                     .task {
-                        logger.log("Welcome to Skip on \\(androidSDK != nil ? "Android" : "iOS")!")
+                        logger.log("Welcome to Skip on \\(androidSDK != nil ? "Android" : "Darwin")!")
                         logger.warning("Skip app logs are viewable in the Xcode console for iOS; Android logs can be viewed in Studio or using adb logcat")
                     }
             }
@@ -1442,6 +1442,7 @@ extension FrameworkProjectLayout {
 
         pluginManagement {
             repositories {
+                maven("https://maven.skip.tools")
                 gradlePluginPortal()
                 mavenCentral()
                 google()
@@ -1450,6 +1451,7 @@ extension FrameworkProjectLayout {
 
         dependencyResolutionManagement {
             repositories {
+                maven("https://maven.skip.tools")
                 mavenCentral()
                 google()
             }
