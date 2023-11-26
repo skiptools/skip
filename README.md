@@ -2,7 +2,7 @@
 
 Skip is a technology for creating dual-platform mobile apps in Swift. [Read this introduction](https://skip.tools/docs/) to learn more about Skip. 
 
-This repository hosts the Skip development toolchain, a.k.a. SkipStone. It also hosts the Skip forums for general [discussions](https://source.skip.tools/skip/discussions) as well as specific [issues and bug reports](https://source.skip.tools/skip/issues).
+This repository hosts the Skip development toolchain, a.k.a. SkipStone. It also hosts the Skip forums for general [discussions](http://community.skip.tools) as well as specific [issues and bug reports](https://source.skip.tools/skip/issues).
 
 ## Getting Started
 
@@ -211,7 +211,7 @@ OPTIONS:
 
 Skip's architecture relies on recent advances in the plugin system used by Xcode 15 and Swift Package Manager 5.9. When unexpected issues arise, often the best first step is to clean your Xcode build (`Product` → `Clean Build Folder`) and reset packages (`File` → `Packages` → `Reset Package Caches`). Restarting Xcode is sometimes warranted, and trashing the local `DerivedData/` folder might even be needed. 
 
-Specific known error conditions are listed below. Search the [documentation](https://skip.tools/docs), [issues](https://source.skip.tools/skip/issues), and [discussions](https://source.skip.tools/skip/discussions) for more information and to report problems.
+Specific known error conditions are listed below. Search the [documentation](https://skip.tools/docs), [issues](https://source.skip.tools/skip/issues), and [discussions](http://community.skip.tools) for more information and to report problems.
 
 - Xcode sometimes reports error messages like the following:
 
