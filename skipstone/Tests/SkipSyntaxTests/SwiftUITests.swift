@@ -178,6 +178,46 @@ final class SwiftUITests: XCTestCase {
         """)
     }
 
+    func testNestedView() async throws {
+        try await check(supportingSwift: baseSupportingSwift, swift: """
+        import SwiftUI
+        struct V: View {
+            var body: some View {
+                MyText()
+            }
+
+            private struct MyText: View {
+                var body: some View {
+                    Text("Hello")
+                }
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
+        import skip.foundation.*
+        import skip.model.*
+
+        import skip.ui.*
+        internal class V: View {
+            override fun body(): View {
+                return ComposeView { composectx: ComposeContext -> MyText().Compose(composectx) }
+            }
+
+            private class MyText: View {
+                override fun body(): View {
+                    return ComposeView { composectx: ComposeContext -> Text("Hello").Compose(composectx) }
+                }
+            }
+        }
+        """)
+    }
+
     func testTailCall() async throws {
         let supportingSwift = baseSupportingSwift + """
         struct V: View {
@@ -975,7 +1015,6 @@ final class SwiftUITests: XCTestCase {
         """)
     }
 
-    //~~~ also test self.item
     func testMutableStructPathBinding() async throws {
         try await check(supportingSwift: baseSupportingSwift + """
         struct Item {
