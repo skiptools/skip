@@ -88,6 +88,8 @@ extension ToolOptionsCommand {
         await checkVersion(title: "Java version", cmd: ["java", "-version"], min: Version("17.0.0"), pattern: "version \"([0-9._]+)\"") // we don't necessarily need java in the path (which it doesn't seem to be by default with Homebrew)
         await checkVersion(title: "Android Debug Bridge version", cmd: ["adb", "version"], min: Version("1.0.40"), pattern: "version ([0-9.]+)")
 
+        // TODO: check for stale Intel Homebrew installations of tools (java, etc.) on ARM
+
         await checkAndroidStudioVersion(with: out)
     }
 
