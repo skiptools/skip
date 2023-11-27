@@ -1581,6 +1581,9 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             modifiers.visibility = newValue
         }
     }
+    var isExternal: Bool {
+        extras?.isExternal == true
+    }
 
     static func translate(statement: FunctionDeclaration, translator: KotlinTranslator) -> KotlinFunctionDeclaration {
         let kstatement = KotlinFunctionDeclaration(statement: statement)
@@ -1814,7 +1817,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 hasExplicitReturnType = appendFunctionDeclaration(to: output, indentation: indentation)
             }
         }
-        if let body {
+        if !isExternal, let body {
             if isEqualImplementation {
                 appendEqualsBody(body, to: output, indentation: indentation)
             } else if isLessThanImplementation {
@@ -1838,6 +1841,9 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         let generics = functionGenerics.filterWhereEqual()
         let isInline = attributes.contains(.inlineAlways) && !isOpen
         if type != .constructorDeclaration {
+            if isExternal {
+                output.append("external ")
+            }
             if isInline {
                 output.append("inline ")
             }

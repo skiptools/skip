@@ -13,6 +13,8 @@ struct StatementExtras {
         case declaration(String)
         /// Mute warnings and errors for this syntax.
         case nowarn
+        /// Marker for a function that should be declared `external` and have its body removed
+        case external
         /// Encountered an invalid directive.
         case invalid(String)
         /// Marker for a file whose purpose is to provide Swift symbols for separate Kotlin code. Symbols files are not transpiled, and warnings are suppressed.
@@ -42,6 +44,7 @@ struct StatementExtras {
         let replacePrefix = "SKIP REPLACE:"
         let declarationPrefix = "SKIP DECLARE:"
         let noWarnPrefix = "SKIP NOWARN"
+        let externalPrefix = "SKIP EXTERN"
         let symbolFilePrefix = "SKIP SYMBOLFILE"
         func endDirective() {
             guard let currentDirective = directive else {
@@ -149,6 +152,9 @@ struct StatementExtras {
                 } else if trimmedLine.hasPrefix(noWarnPrefix) {
                     directives.append(.nowarn)
                     isSingleLineDirective = isSingleLineDirective || !isMultilineCommentDirective
+                } else if trimmedLine.hasPrefix(externalPrefix) {
+                    directives.append(.external)
+                    isSingleLineDirective = isSingleLineDirective || !isMultilineCommentDirective
                 } else if trimmedLine.hasPrefix(symbolFilePrefix) {
                     directives.append(.symbolFile)
                     isSingleLineDirective = isSingleLineDirective || !isMultilineCommentDirective
@@ -229,6 +235,16 @@ struct StatementExtras {
     var suppressMessages: Bool {
         for directive in directives {
             if case .nowarn = directive {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Whether this block should be marked as a Kotlin `external` function and have its body removed.
+    var isExternal: Bool {
+        for directive in directives {
+            if case .external = directive {
                 return true
             }
         }
