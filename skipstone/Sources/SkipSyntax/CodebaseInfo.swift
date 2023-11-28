@@ -20,21 +20,24 @@ public class CodebaseInfo {
         }
     }
 
-    /// Map between Swift modules and the equivalent Skip modules.
-    static let moduleNameMap: [String: String] = [
-        "AVKit": "SkipAV",
-        "Combine": "SkipModel",
-        "CoreFoundation": "SkipFoundation",
-        "CoreGraphics": "SkipLib",
-        "CryptoKit": "SkipFoundation",
-        "Dispatch": "SkipFoundation",
-        "Foundation": "SkipFoundation",
-        "JavaScriptCore": "SkipScript",
-        "Observation": "SkipModel",
-        "OSLog": "SkipFoundation",
-        "Swift": "SkipLib",
-        "SwiftUI": "SkipUI",
-        "XCTest": "SkipUnit",
+    /// Map between a Swift module and the equivalent Skip module(s).
+    ///
+    /// When a Swift module transitively imports other modules - e.g.`SwiftUI` imports `Foundation` - put the corresponding Skip module first
+    /// and any transitive modules after it - e.g. `[SkipUI, SkipFoundation]`.
+    static let moduleNameMap: [String: [String]] = [
+        "AVKit": ["SkipAV"],
+        "Combine": ["SkipModel"],
+        "CoreFoundation": ["SkipFoundation"],
+        "CoreGraphics": ["SkipLib"],
+        "CryptoKit": ["SkipFoundation"],
+        "Dispatch": ["SkipFoundation"],
+        "Foundation": ["SkipFoundation"],
+        "JavaScriptCore": ["SkipScript"],
+        "Observation": ["SkipModel"],
+        "OSLog": ["SkipFoundation"],
+        "Swift": ["SkipLib"],
+        "SwiftUI": ["SkipUI", "SkipFoundation", "SkipModel"],
+        "XCTest": ["SkipUnit"],
     ]
 
     /// Messages for the user created during information gathering.
@@ -104,7 +107,7 @@ public class CodebaseInfo {
     
     /// Create a context that can access the given imported modules.
     func context(importedModuleNames: [String] = [], sourceFile: Source.FilePath? = nil) -> Context {
-        let mappedModuleNames = importedModuleNames.map { Self.moduleNameMap[$0] ?? $0 }
+        let mappedModuleNames = importedModuleNames.flatMap { Self.moduleNameMap[$0] ?? [$0] }
         return Context(global: self, importedModuleNames: Set(mappedModuleNames), sourceFile: sourceFile)
     }
 
@@ -129,7 +132,7 @@ public class CodebaseInfo {
     private func match(candidates: [CodebaseInfoItem], path: [String], moduleName: String?, qualifiedMatch: Bool) -> [CodebaseInfoItem] {
         var matches = candidates
         if let moduleName {
-            let mappedModuleName = Self.moduleNameMap[moduleName] ?? moduleName
+            let mappedModuleName = Self.moduleNameMap[moduleName]?.first ?? moduleName
             matches = matches.filter { $0.moduleName == mappedModuleName }
         }
         if !path.isEmpty {

@@ -16,7 +16,7 @@ public class KotlinTranslator {
     /// - Returns: The dot-separated package name.
     public static func packageName(forModule moduleName: String, withDefaultPackageSuffix: String? = "module", trimTests: Bool = true) -> String {
         // Map from e.g. Foundation to SkipFoundation
-        let moduleName = CodebaseInfo.moduleNameMap[moduleName] ?? moduleName
+        let moduleName = CodebaseInfo.moduleNameMap[moduleName]?.first ?? moduleName
 
         // Turn into package name
         var lastLower = false

@@ -47,7 +47,7 @@ struct TypeResolutionContext {
             if info is CodebaseInfo.TypeInfo || info is CodebaseInfo.TypealiasInfo, info.declarationType != .extensionDeclaration {
                 let signature = info.signature.withGenerics(type.generics)
                 // Detect whether the lookup used the base name as a module name
-                if info.moduleName == (CodebaseInfo.moduleNameMap[baseName] ?? baseName) && signature.name != qualifiedTypeName {
+                if info.moduleName == (CodebaseInfo.moduleNameMap[baseName]?.first ?? baseName) && signature.name != qualifiedTypeName {
                     return signature.withModuleName(baseName)
                 } else {
                     return signature

@@ -8,13 +8,21 @@ final class KotlinImportsTransformer: KotlinTransformer {
 
         // Translate imports and remove redundancies
         var importPaths: Set<[String]> = []
+        var additionalImportDeclarations: [KotlinImportDeclaration] = []
         var lastImportDeclaration: KotlinImportDeclaration? = nil
         for importDeclaration in syntaxTree.root.statements.compactMap({ $0 as? KotlinImportDeclaration }) {
-            importDeclaration.modulePath = translateImport(modulePath: importDeclaration.modulePath)
-            if importPaths.insert(importDeclaration.modulePath).inserted {
-                lastImportDeclaration = importDeclaration
-            } else {
-                syntaxTree.root.remove(statement: importDeclaration)
+            let modulePaths = translateImport(modulePath: importDeclaration.modulePath)
+            for i in 0..<modulePaths.count {
+                if importPaths.insert(modulePaths[i]).inserted {
+                    if i == 0 {
+                        importDeclaration.modulePath = modulePaths[i]
+                        lastImportDeclaration = importDeclaration
+                    } else {
+                        additionalImportDeclarations.append(KotlinImportDeclaration(modulePath: modulePaths[i]))
+                    }
+                } else if i == 0 {
+                    syntaxTree.root.remove(statement: importDeclaration)
+                }
             }
         }
 
@@ -28,21 +36,21 @@ final class KotlinImportsTransformer: KotlinTransformer {
             }
             return .recurse(nil)
         }
-        var additionalImportDeclarations: [KotlinImportDeclaration] = []
-        for modulePath in additionalModulePaths {
-            let modulePath = translateImport(modulePath: modulePath)
-            if importPaths.insert(modulePath).inserted {
-                additionalImportDeclarations.append(KotlinImportDeclaration(modulePath: modulePath))
+        for additionalModulePath in additionalModulePaths {
+            let modulePaths = translateImport(modulePath: additionalModulePath)
+            for modulePath in modulePaths {
+                if importPaths.insert(modulePath).inserted {
+                    additionalImportDeclarations.append(KotlinImportDeclaration(modulePath: modulePath))
+                }
             }
         }
         syntaxTree.root.insert(statements: additionalImportDeclarations, after: lastImportDeclaration)
     }
 
-    private func translateImport(modulePath: [String]) -> [String] {
-        var modulePath = modulePath
-        if modulePath.count == 1, let skipModuleName = CodebaseInfo.moduleNameMap[modulePath[0]] {
-            modulePath[0] = skipModuleName
+    private func translateImport(modulePath: [String]) -> [[String]] {
+        if modulePath.count == 1, let skipModuleNames = CodebaseInfo.moduleNameMap[modulePath[0]] {
+            return skipModuleNames.map { [$0] }
         }
-        return modulePath
+        return [modulePath]
     }
 }

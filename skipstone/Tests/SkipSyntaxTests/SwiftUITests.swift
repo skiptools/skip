@@ -63,10 +63,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         internal class V: View {
             override fun body(): View {
                 return ComposeView { composectx: ComposeContext -> ComposeResult.ok }
@@ -91,10 +91,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         internal class V: MyView {
             override fun body(): View {
                 return ComposeView { composectx: ComposeContext -> ComposeResult.ok }
@@ -138,10 +138,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         internal interface P {
             fun v(): View
             fun f(): View
@@ -200,10 +200,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         internal class V: View {
             override fun body(): View {
                 return ComposeView { composectx: ComposeContext -> MyText().Compose(composectx) }
@@ -242,10 +242,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         internal fun f() {
             VStack {
                 ComposeView { composectx: ComposeContext ->
@@ -273,10 +273,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         internal class MyV: View {
             override fun body(): View {
                 return ComposeView { composectx: ComposeContext ->
@@ -310,10 +310,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         internal class MyV: View {
             override fun body(): View {
                 return ComposeView { composectx: ComposeContext ->
@@ -372,10 +372,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         internal class MyV: View {
             override fun body(): View {
                 return ComposeView l@{ composectx: ComposeContext ->
@@ -434,10 +434,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         internal fun f() {
             VStack {
                 ComposeView { composectx: ComposeContext ->
@@ -473,10 +473,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         internal fun f() {
             VStack {
                 ComposeView { composectx: ComposeContext ->
@@ -533,10 +533,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         @Stable
         internal open class O: Observable {
         }
@@ -621,10 +621,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         internal class S: MutableStruct {
             internal var x: Int
                 set(newValue) {
@@ -758,10 +758,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         internal class V: View {
             internal var envvalue: Int = Int(0)
             override fun body(): View {
@@ -800,10 +800,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         internal class V: View {
             internal lateinit var envvalue: EnvValue
             override fun body(): View {
@@ -835,10 +835,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         internal class V: View {
             internal lateinit var envvalue: EnvValue
             override fun body(): View {
@@ -874,10 +874,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         internal class V: View {
             internal lateinit var envvalue: V.EnvValue
             override fun body(): View {
@@ -917,10 +917,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         internal class V: View {
             internal var envvalue: EnvValue? = null
             override fun body(): View {
@@ -956,10 +956,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         internal class V: View {
             internal var count: Int
                 get() = _count.wrappedValue
@@ -997,10 +997,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         class V: View {
             var text: String
                 get() = _text.wrappedValue
@@ -1049,10 +1049,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         internal class V: View {
             internal var text: String
                 get() = _text.wrappedValue
@@ -1111,10 +1111,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         internal class V: View {
             internal var item: Item
                 get() = _item.wrappedValue.sref({ this.item = it })
@@ -1174,10 +1174,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
 
         @Stable
         internal open class O: Observable {
@@ -1229,10 +1229,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         internal class V: View {
             internal var o: O
                 get() = _o.wrappedValue
@@ -1272,10 +1272,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         internal class V: View {
             internal var o: O
                 get() = _o.wrappedValue
@@ -1318,11 +1318,11 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
         import skip.lib.Array
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         internal class V: View {
             internal val os: Array<O>
             override fun body(): View {
@@ -1365,10 +1365,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         internal class V: View, MutableStruct {
             internal var envvalue: Int = Int(0)
             internal var count: Int
@@ -1453,10 +1453,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         internal class V: View, MutableStruct {
             internal var envvalue: Int = Int(0)
             internal var count: Int
@@ -1542,10 +1542,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         internal class HStack<Content>: View where Content: View {
             internal val content: Content
 
@@ -1581,10 +1581,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         internal class MyV: View {
             override fun body(): View {
                 return ComposeView { composectx: ComposeContext -> Text("Hello").Compose(composectx) }
@@ -1613,10 +1613,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         internal class MyV: View {
             override fun body(): View {
                 return ComposeView { composectx: ComposeContext -> Text("Hello").Compose(composectx) }
@@ -1664,10 +1664,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         internal class MyV: View {
             override fun body(): View {
                 return ComposeView { composectx: ComposeContext ->
@@ -1711,10 +1711,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         internal class MyV: View {
             override fun body(): View {
                 return ComposeView { composectx: ComposeContext -> Color.red.Compose(composectx) }
@@ -1752,10 +1752,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         internal class EnvironmentValues {
 
             internal val intValue: Int
@@ -1792,10 +1792,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         class MyKey: EnvironmentKey<String> {
 
             companion object: EnvironmentKeyCompanion<String> {
@@ -1833,10 +1833,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         internal class MyV: View {
             override fun body(): View {
                 return ComposeView { composectx: ComposeContext ->
@@ -1869,10 +1869,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         internal class V: View {
             internal var appStorageProp: String
                 get() = _appStorageProp.wrappedValue
@@ -1931,10 +1931,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         internal class V: View {
             internal var doublePref: Double
                 get() = _doublePref.wrappedValue
@@ -2007,10 +2007,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         internal class V: View {
             override fun body(): View {
                 return ComposeView { composectx: ComposeContext ->
@@ -2039,10 +2039,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         internal class V: View {
             override fun body(): View {
                 return ComposeView { composectx: ComposeContext ->

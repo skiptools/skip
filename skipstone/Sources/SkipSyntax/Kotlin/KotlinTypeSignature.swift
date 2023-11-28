@@ -4,6 +4,7 @@ extension TypeSignature {
     static let kotlinSkipLibImports: Set<String> = [
         "Array",
         "Collection",
+        "MutableCollection",
         "Sequence",
         "Set"
     ]

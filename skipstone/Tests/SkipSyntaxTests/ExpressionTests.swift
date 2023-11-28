@@ -495,10 +495,10 @@ final class ExpressionTests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.model.*
 
         import skip.foundation.*
         import skip.ui.*
+        import skip.model.*
 
         internal class V: View {
         }

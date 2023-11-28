@@ -646,7 +646,5 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         syntaxTree.dependencies.imports.insert("androidx.compose.runtime.setValue")
         syntaxTree.dependencies.imports.insert("androidx.compose.runtime.saveable.rememberSaveable")
         syntaxTree.dependencies.imports.insert("androidx.compose.runtime.saveable.Saver")
-        syntaxTree.dependencies.imports.insert("skip.foundation.*")
-        syntaxTree.dependencies.imports.insert("skip.model.*")
     }
 }
