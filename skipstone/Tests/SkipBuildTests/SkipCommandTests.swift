@@ -603,7 +603,7 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v16), .macOS(.v13), .tvOS(.v16), .watchOS(.v9), .macCatalyst(.v16)],
             products: [
-                .library(name: "TOP_MODULEApp", targets: ["TOP_MODULE"]),
+                .library(name: "TOP_MODULEApp", type: .dynamic, targets: ["TOP_MODULE"]),
                 .library(name: "MIDDLE_MODULE", targets: ["MIDDLE_MODULE"]),
                 .library(name: "BOTTOM_MODULE", targets: ["BOTTOM_MODULE"]),
             ],
