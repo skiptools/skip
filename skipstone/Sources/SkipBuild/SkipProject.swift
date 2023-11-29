@@ -1424,12 +1424,13 @@ extension FrameworkProjectLayout {
             <application
                 android:label="${PRODUCT_NAME}"
                 android:name=".AndroidAppMain"
-                android:configChanges="orientation|screenSize|screenLayout"
+                android:supportsRtl="true"
                 android:allowBackup="true"
                 \(androidIconName != nil ? "android:icon=\"@\(androidIconName!)\"" : "")>
                 <activity
                     android:name=".MainActivity"
                     android:exported="true"
+                    android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|mnc|colorMode|density|fontScale|fontWeightAdjustment|keyboard|layoutDirection|locale|mcc|navigation|smallestScreenSize|touchscreen|uiMode"
                     android:theme="@style/Theme.AppCompat.DayNight.NoActionBar"
                     android:windowSoftInputMode="adjustResize">
                     <intent-filter>
