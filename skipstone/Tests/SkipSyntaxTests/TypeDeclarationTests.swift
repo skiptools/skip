@@ -722,13 +722,6 @@ final class TypeDeclarationTests: XCTestCase {
         """)
     }
 
-    func testActor() async throws {
-        try await checkProducesMessage(swift: """
-        actor A {
-        }
-        """)
-    }
-
     func testOptionSet() async throws {
         try await check(supportingSwift: """
         protocol RawRepresentable {

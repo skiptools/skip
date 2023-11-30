@@ -891,6 +891,16 @@ class ExtensionDeclaration: TypeDeclaration {
         statement.messages = inheritsMessages + genericsMessages
         return [statement]
     }
+
+    override var nonExtensionDeclarationType: StatementType? {
+        return _nonExtensionDeclarationType
+    }
+    private(set) var _nonExtensionDeclarationType: StatementType?
+
+    override func resolveAttributes(in syntaxTree: SyntaxTree, context: TypeResolutionContext) {
+        super.resolveAttributes(in: syntaxTree, context: context)
+        _nonExtensionDeclarationType = context.declarationType(forNamed: extends)
+    }
 }
 
 /// `func f() { ... }`
@@ -899,24 +909,24 @@ class FunctionDeclaration: Statement {
     let isOptionalInit: Bool
     private(set) var returnType: TypeSignature
     private(set) var parameters: [Parameter<Expression>]
-    let isAsync: Bool
+    private(set) var asyncBehavior: AsyncBehavior
     let isThrows: Bool
     let attributes: Attributes
     private(set) var modifiers: Modifiers
     private(set) var generics: Generics
     let body: CodeBlock?
     var functionType: TypeSignature {
-        let apiFlags = APIFlags(isAsync: isAsync, isThrows: isThrows)
+        let apiFlags = APIFlags(isAsync: asyncBehavior != .sync, isThrows: isThrows)
         let function: TypeSignature = .function(parameters.map(\.signature), returnType, apiFlags, nil)
         return attributes.apply(toFunction: function)
     }
 
-    init(type: StatementType, name: String, isOptionalInit: Bool = false, returnType: TypeSignature = .void, parameters: [Parameter<Expression>] = [], isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), body: CodeBlock? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(type: StatementType, name: String, isOptionalInit: Bool = false, returnType: TypeSignature = .void, parameters: [Parameter<Expression>] = [], asyncBehavior: AsyncBehavior = .sync, isThrows: Bool = false, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), body: CodeBlock? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.name = name
         self.isOptionalInit = isOptionalInit
         self.returnType = returnType.or(.void)
         self.parameters = parameters
-        self.isAsync = isAsync
+        self.asyncBehavior = asyncBehavior
         self.isThrows = isThrows
         self.attributes = attributes
         self.modifiers = modifiers
@@ -950,7 +960,7 @@ class FunctionDeclaration: Statement {
         if let bodySyntax = functionDecl.body {
             body = CodeBlock(statements: StatementDecoder.decode(syntaxListContainer: bodySyntax, in: syntaxTree))
         }
-        let statement = FunctionDeclaration(type: .functionDeclaration, name: name, returnType: returnType, parameters: parameters, isAsync: isAsync, isThrows: isThrows, attributes: attributes, modifiers: modifiers, generics: generics, body: body, syntax: functionDecl, sourceFile: syntaxTree.source.file, sourceRange: functionDecl.range(in: syntaxTree.source), extras: extras)
+        let statement = FunctionDeclaration(type: .functionDeclaration, name: name, returnType: returnType, parameters: parameters, asyncBehavior: isAsync ? .async : .sync, isThrows: isThrows, attributes: attributes, modifiers: modifiers, generics: generics, body: body, syntax: functionDecl, sourceFile: syntaxTree.source.file, sourceRange: functionDecl.range(in: syntaxTree.source), extras: extras)
         statement.messages = signatureMessges + genericsMessages
         return statement
     }
@@ -968,7 +978,7 @@ class FunctionDeclaration: Statement {
         if let bodySyntax = initializerDecl.body {
             body = CodeBlock(statements: StatementDecoder.decode(syntaxListContainer: bodySyntax, in: syntaxTree))
         }
-        let statement = FunctionDeclaration(type: .initDeclaration, name: "init", isOptionalInit: isOptionalInit, returnType: .void, parameters: parameters, isAsync: isAsync, isThrows: isThrows, attributes: attributes, modifiers: modifiers, generics: generics, body: body, syntax: initializerDecl, sourceFile: syntaxTree.source.file, sourceRange: initializerDecl.range(in: syntaxTree.source), extras: extras)
+        let statement = FunctionDeclaration(type: .initDeclaration, name: "init", isOptionalInit: isOptionalInit, returnType: .void, parameters: parameters, asyncBehavior: isAsync ? .async : .sync, isThrows: isThrows, attributes: attributes, modifiers: modifiers, generics: generics, body: body, syntax: initializerDecl, sourceFile: syntaxTree.source.file, sourceRange: initializerDecl.range(in: syntaxTree.source), extras: extras)
         statement.messages = signatureMessages + genericsMessages
         return statement
     }
@@ -986,7 +996,7 @@ class FunctionDeclaration: Statement {
     }
 
     override func resolveAttributes(in syntaxTree: SyntaxTree, context: TypeResolutionContext) {
-        if type == .initDeclaration, let owningTypeDeclaration {
+        if type == .initDeclaration, let owningTypeDeclaration = parent as? TypeDeclaration {
             returnType = owningTypeDeclaration.signature.asOptional(isOptionalInit)
         } else {
             returnType = returnType.resolved(in: self, context: context)
@@ -1001,6 +1011,9 @@ class FunctionDeclaration: Statement {
             }
         }
         generics = generics.resolved(in: self, context: context)
+        if asyncBehavior == .sync, type != .initDeclaration, !modifiers.isNonisolated && !modifiers.isStatic, (parent as? TypeDeclaration)?.nonExtensionDeclarationType == .actorDeclaration {
+            asyncBehavior = .actor
+        }
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
@@ -1032,7 +1045,7 @@ class FunctionDeclaration: Statement {
         if !parameters.isEmpty {
             attrs.append(PrettyPrintTree(root: "parameters", children: parameters.map { $0.prettyPrintTree }))
         }
-        if isAsync {
+        if asyncBehavior != .sync {
             attrs.append("async")
         }
         if isThrows {
@@ -1078,7 +1091,7 @@ class ImportDeclaration: Statement {
 class SubscriptDeclaration: Statement {
     private(set) var elementType: TypeSignature
     private(set) var parameters: [Parameter<Expression>]
-    let isAsync: Bool
+    private(set) var asyncBehavior: AsyncBehavior
     let isThrows: Bool
     let attributes: Attributes
     private(set) var modifiers: Modifiers
@@ -1086,7 +1099,7 @@ class SubscriptDeclaration: Statement {
     let getter: Accessor<CodeBlock>?
     let setter: Accessor<CodeBlock>?
     var getterType: TypeSignature {
-        let apiFlags = APIFlags(isAsync: isAsync, isThrows: isThrows)
+        let apiFlags = APIFlags(isAsync: asyncBehavior != .sync, isThrows: isThrows)
         let function: TypeSignature = .function(parameters.map(\.signature), elementType, apiFlags, nil)
         return attributes.apply(toFunction: function)
     }
@@ -1094,10 +1107,10 @@ class SubscriptDeclaration: Statement {
         return .function(parameters.map(\.signature), .void, APIFlags(isMainActor: attributes.contains(.mainActor)), nil)
     }
 
-    init(elementType: TypeSignature, parameters: [Parameter<Expression>], isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), getter: Accessor<CodeBlock>? = nil, setter: Accessor<CodeBlock>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(elementType: TypeSignature, parameters: [Parameter<Expression>], asyncBehavior: AsyncBehavior = .sync, isThrows: Bool = false, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), getter: Accessor<CodeBlock>? = nil, setter: Accessor<CodeBlock>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.elementType = elementType
         self.parameters = parameters
-        self.isAsync = isAsync
+        self.asyncBehavior = asyncBehavior
         self.isThrows = isThrows
         self.attributes = attributes
         self.modifiers = modifiers
@@ -1127,7 +1140,7 @@ class SubscriptDeclaration: Statement {
                 accessors.getter = Accessor(body: CodeBlock(statements: statements))
             }
         }
-        let statement = SubscriptDeclaration(elementType: elementType, parameters: parameters, isAsync: accessors.isAsync, isThrows: accessors.isThrows, attributes: attributes, modifiers: modifiers, generics: generics, getter: accessors.getter, setter: accessors.setter, sourceFile: syntaxTree.source.file, sourceRange: subscriptDecl.range(in: syntaxTree.source), extras: extras)
+        let statement = SubscriptDeclaration(elementType: elementType, parameters: parameters, asyncBehavior: accessors.isAsync ? .async : .sync, isThrows: accessors.isThrows, attributes: attributes, modifiers: modifiers, generics: generics, getter: accessors.getter, setter: accessors.setter, sourceFile: syntaxTree.source.file, sourceRange: subscriptDecl.range(in: syntaxTree.source), extras: extras)
         statement.messages = accessors.messages + parametersMessages + genericsMessages
         return [statement]
     }
@@ -1144,6 +1157,9 @@ class SubscriptDeclaration: Statement {
             }
         }
         generics = generics.resolved(in: self, context: context)
+        if asyncBehavior == .sync, !modifiers.isNonisolated && !modifiers.isStatic, (parent as? TypeDeclaration)?.nonExtensionDeclarationType == .actorDeclaration {
+            asyncBehavior = .actor
+        }
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
@@ -1175,7 +1191,7 @@ class SubscriptDeclaration: Statement {
         if elementType != .none {
             attrs.append(PrettyPrintTree(root: elementType.description))
         }
-        if isAsync {
+        if asyncBehavior != .sync {
             attrs.append("async")
         }
         if isThrows {
@@ -1365,6 +1381,10 @@ class TypeDeclaration: Statement {
         return statement
     }
 
+    var nonExtensionDeclarationType: StatementType? {
+        return type
+    }
+
     override func qualifyTypeDeclaration() {
         if _signature == nil {
             _signature = qualifyDeclaredType(signature)
@@ -1422,7 +1442,7 @@ class VariableDeclaration: Statement {
     private(set) var declaredType: TypeSignature
     private(set) var constrainedDeclaredType: TypeSignature
     let isLet: Bool // True for async let local OR async get property
-    let isAsync: Bool
+    private(set) var asyncBehavior: AsyncBehavior
     let isThrows: Bool
     var attributes: Attributes
     private(set) var modifiers: Modifiers
@@ -1435,18 +1455,18 @@ class VariableDeclaration: Statement {
         return declaredType.or(value?.inferredType ?? .none).tupleTypes(count: names.count)
     }
     var apiFlags: APIFlags {
-        return APIFlags(isAsync: isAsync, isThrows: isThrows, isMainActor: attributes.contains(.mainActor), isViewBuilder: attributes.contains(.viewBuilder), isWriteable: !isLet && (getter == nil || setter != nil))
+        return APIFlags(isAsync: asyncBehavior != .sync, isThrows: isThrows, isMainActor: attributes.contains(.mainActor), isViewBuilder: attributes.contains(.viewBuilder), isWriteable: !isLet && (getter == nil || setter != nil))
     }
     var isMutating: Bool {
         return !isLet && (getter == nil || setter != nil) && !attributes.isNonMutating
     }
 
-    init(names: [String?], declaredType: TypeSignature = .none, isLet: Bool = false, isAsync: Bool = false, isThrows: Bool = false, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), value: Expression?, getter: Accessor<CodeBlock>? = nil, setter: Accessor<CodeBlock>? = nil, willSet: Accessor<CodeBlock>? = nil, didSet: Accessor<CodeBlock>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(names: [String?], declaredType: TypeSignature = .none, isLet: Bool = false, asyncBehavior: AsyncBehavior = .sync, isThrows: Bool = false, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), value: Expression?, getter: Accessor<CodeBlock>? = nil, setter: Accessor<CodeBlock>? = nil, willSet: Accessor<CodeBlock>? = nil, didSet: Accessor<CodeBlock>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.names = names
         self.declaredType = declaredType
         self.constrainedDeclaredType = declaredType
         self.isLet = isLet
-        self.isAsync = isAsync
+        self.asyncBehavior = asyncBehavior
         self.isThrows = isThrows
         self.attributes = attributes
         self.modifiers = modifiers
@@ -1473,13 +1493,13 @@ class VariableDeclaration: Statement {
         let lastTypeSyntax = variableDecl.bindings.last?.typeAnnotation?.type
         for (index, syntax) in variableDecl.bindings.enumerated() {
             let bindingExtras = index == 0 ? extras : nil
-            let statement = try decode(syntax: syntax, lastTypeSyntax: lastTypeSyntax, isLet: isLet, isAsync: isAsync, attributes: attributes, modifiers: modifiers, extras: bindingExtras, in: syntaxTree)
+            let statement = try decode(syntax: syntax, lastTypeSyntax: lastTypeSyntax, isLet: isLet, asyncBehavior: isAsync ? .async : .sync, attributes: attributes, modifiers: modifiers, extras: bindingExtras, in: syntaxTree)
             statements.append(statement)
         }
         return statements
     }
 
-    private static func decode(syntax: PatternBindingSyntax, lastTypeSyntax: TypeSyntax?, isLet: Bool, isAsync: Bool, attributes: Attributes, modifiers: Modifiers, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> Statement {
+    private static func decode(syntax: PatternBindingSyntax, lastTypeSyntax: TypeSyntax?, isLet: Bool, asyncBehavior: AsyncBehavior, attributes: Attributes, modifiers: Modifiers, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> Statement {
         var declaredType: TypeSignature = .none
         if let typeSyntax = syntax.typeAnnotation?.type ?? lastTypeSyntax {
             declaredType = TypeSignature.for(syntax: typeSyntax, in: syntaxTree)
@@ -1507,7 +1527,8 @@ class VariableDeclaration: Statement {
         guard let names = syntax.pattern.identifierPatterns(in: syntaxTree)?.map(\.name) else {
             throw Message.unsupportedSyntax(syntax.pattern, source: syntaxTree.source)
         }
-        let declaration = VariableDeclaration(names: names, declaredType: declaredType, isLet: isLet, isAsync: isAsync || accessors.isAsync, isThrows: accessors.isThrows, attributes: attributes, modifiers: modifiers, value: value, getter: accessors.getter, setter: accessors.setter, willSet: accessors.willSet, didSet: accessors.didSet, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
+        let combinedAsyncBehavior = asyncBehavior != .sync ? asyncBehavior : accessors.isAsync ? .async : .sync
+        let declaration = VariableDeclaration(names: names, declaredType: declaredType, isLet: isLet, asyncBehavior: combinedAsyncBehavior, isThrows: accessors.isThrows, attributes: attributes, modifiers: modifiers, value: value, getter: accessors.getter, setter: accessors.setter, willSet: accessors.willSet, didSet: accessors.didSet, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
         declaration.messages = accessors.messages
         return declaration
     }
@@ -1522,6 +1543,9 @@ class VariableDeclaration: Statement {
             } else {
                 modifiers.visibility = .internal
             }
+        }
+        if asyncBehavior == .sync, !modifiers.isNonisolated && !modifiers.isStatic, !isLet, (parent as? TypeDeclaration)?.nonExtensionDeclarationType == .actorDeclaration {
+            asyncBehavior = .actor
         }
     }
 
@@ -1578,7 +1602,7 @@ class VariableDeclaration: Statement {
         if declaredType != .none {
             attrs.append(PrettyPrintTree(root: declaredType.description))
         }
-        if isAsync {
+        if asyncBehavior != .sync {
             attrs.append("async")
         }
         if isThrows {

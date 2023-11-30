@@ -1022,6 +1022,164 @@ final class ConcurrencyTests: XCTestCase {
         """)
     }
 
+    func testActorDeclaration() async throws {
+        try await checkProducesMessage(swift: """
+        actor A {
+            var x = 1
+        }
+        """)
+
+        try await checkProducesMessage(swift: """
+        actor A {
+            var x: Int {
+                get {
+                    return 1
+                }
+                set {
+                }
+            }
+        }
+        """)
+
+        try await check(swift: """
+        actor A {
+            let c = 100
+            private var x: Int
+
+            init(x: Int) {
+                self.x = x
+            }
+
+            var y: Int {
+                return x
+            }
+
+            func f() {
+                g()
+                print(y)
+            }
+
+            func g() {
+                x += 1
+            }
+
+            static var staticx = 1
+
+            static func staticf() {
+            }
+
+            nonisolated func syncf() {
+                print("nonisolated")
+            }
+        }
+        """, kotlin: """
+        internal class A: Actor {
+            override val isolatedContext = Actor.isolatedContext()
+            internal val c = 100
+            private var x: Int
+
+            internal constructor(x: Int) {
+                this.x = x
+            }
+
+            internal suspend fun y(): Int = Actor.run(this) l@{
+                return@l x
+            }
+
+            internal suspend fun f(): Unit = Actor.run(this) {
+                g()
+                print(y())
+            }
+
+            internal suspend fun g(): Unit = Actor.run(this) {
+                x += 1
+            }
+
+            internal fun syncf(): Unit = print("nonisolated")
+
+            companion object {
+
+                internal var staticx = 1
+
+                internal fun staticf() = Unit
+            }
+        }
+        """)
+    }
+
+    func testActorExtension() async throws {
+        try await check(swift: """
+        actor A {
+            func f() {
+            }
+        }
+
+        extension A {
+            var x: Int {
+                return 1
+            }
+
+            func g() {
+                f()
+            }
+
+            nonisolated func h() {
+            }
+        }
+        """, kotlin: """
+        internal class A: Actor {
+            override val isolatedContext = Actor.isolatedContext()
+            internal suspend fun f(): Unit = Unit
+
+            internal suspend fun x(): Int = Actor.run(this) l@{
+                return@l 1
+            }
+
+            internal suspend fun g(): Unit = Actor.run(this) {
+                f()
+            }
+
+            internal fun h() = Unit
+        }
+        """)
+    }
+
+    func testActorAccess() async throws {
+        try await check(supportingSwift: """
+        actor A {
+            private var _x: Int
+
+            init(x: Int) {
+                _x = x
+            }
+
+            var x: Int {
+                return _x
+            }
+
+            func f() {
+            }
+
+            nonisolated func g() {
+            }
+        }
+        """, swift: """
+        func test() async {
+            let a = A(x: 100)
+            print(a.x)
+            await a.f()
+            a.g()
+        }
+        """, kotlin: """
+        internal suspend fun test(): Unit = Async.run {
+            val a = A(x = 100)
+            print(a.x())
+            a.f()
+            a.g()
+        }
+        """)
+    }
+
     // Running this and observing the output verifies that Swift hops to the main thread when required by @MainActor, but does
     // not stay there for chained calls. Commented out to avoid warnings about using Thread.isMainThread within async code.
 //    func testMainActorBehavior() async throws {

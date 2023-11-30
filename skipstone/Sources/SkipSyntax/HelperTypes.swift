@@ -18,6 +18,13 @@ struct Accessors {
     var messages: [Message] = []
 }
 
+/// A variable or function's async behavior.
+enum AsyncBehavior {
+    case sync
+    case async
+    case actor
+}
+
 /// Type of closure capture.
 enum CaptureType {
     case none

@@ -130,7 +130,7 @@ public class KotlinTranslator {
             case .whileLoop:
                 return [KotlinWhileLoop.translate(statement: statement as! WhileLoop, translator: self)]
             case .actorDeclaration:
-                return [KotlinMessageStatement(message: .kotlinActors(statement, source: syntaxTree.source), statement: statement)]
+                return KotlinClassDeclaration.translate(statement: statement as! TypeDeclaration, translator: self)
             case .classDeclaration:
                 return KotlinClassDeclaration.translate(statement: statement as! TypeDeclaration, translator: self)
             case .deinitDeclaration:

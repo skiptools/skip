@@ -13,11 +13,11 @@ struct StatementExtras {
         case declaration(String)
         /// Mute warnings and errors for this syntax.
         case nowarn
-        /// Marker for a function that should be declared `external` and have its body removed
+        /// Marker for a function that is implemented elsewhere, e.g. in a C library.
         case external
         /// Encountered an invalid directive.
         case invalid(String)
-        /// Marker for a file whose purpose is to provide Swift symbols for separate Kotlin code. Symbols files are not transpiled, and warnings are suppressed.
+        /// Marker for a file whose purpose is to provide Swift symbols. Symbols files are not transpiled, and warnings are suppressed.
         case symbolFile
         /// Marker for a statement in a `#if SKIP` block.
         case skipBlock
@@ -241,7 +241,7 @@ struct StatementExtras {
         return false
     }
 
-    /// Whether this block should be marked as a Kotlin `external` function and have its body removed.
+    /// Whether this block should be marked as being implemented by an external library.
     var isExternal: Bool {
         for directive in directives {
             if case .external = directive {

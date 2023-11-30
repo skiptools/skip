@@ -987,6 +987,9 @@ class KotlinClassDeclaration: KotlinStatement {
         }
 
         kstatement.inherits.forEach { $0.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
+        if kstatement.declarationType == .actorDeclaration && !kstatement.inherits.contains(where: { $0.isNamed("Actor", moduleName: "Swift") }) {
+            kstatement.inherits.append(.named("Actor", []))
+        }
 
         let kextensionMembers = KotlinExtensionDeclaration.translateExtensionMembers(extensionMembers, of: kstatement.signature, visibility: kstatement.modifiers.visibility, generics: kstatement.generics, translator: translator)
         kextensionMembers.first?.ensureLeadingNewlines(1)
@@ -1151,6 +1154,9 @@ class KotlinClassDeclaration: KotlinStatement {
         }
 
         let memberIndentation = indentation.inc()
+        if declarationType == .actorDeclaration {
+            output.append(memberIndentation).append("override val isolatedContext = Actor.isolatedContext()\n")
+        }
         enumCases.forEach { output.append($0, indentation: memberIndentation) }
         nonstaticMembers.forEach { output.append($0, indentation: memberIndentation) }
 
@@ -1519,6 +1525,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var modifiers = Modifiers()
     var attributes = Attributes()
     var apiFlags: APIFlags = []
+    var isActorIsolated = false
     var generics = Generics()
     var convertedGenerics: Generics? = nil
     var body: KotlinCodeBlock?
@@ -1594,6 +1601,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         kstatement.parameters = statement.parameters.map { $0.resolvingSelf(in: statement).translate(translator: translator) }
         kstatement.attributes = kstatement.processAttributes(statement.attributes, from: statement, translator: translator)
         kstatement.apiFlags = statement.functionType.apiFlags
+        kstatement.isActorIsolated = statement.asyncBehavior == .actor
 
         if !translateMemberInfo(declaration: kstatement, from: statement, modifiers: statement.modifiers, translator: translator) {
             if statement.parent?.owningFunctionDeclaration != nil {
@@ -1602,7 +1610,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 kstatement.role = .global
             }
         }
-        translateBody(declaration: kstatement, from: statement, body: statement.body, returnType: statement.returnType, isAsync: statement.isAsync, translator: translator)
+        translateBody(declaration: kstatement, from: statement, body: statement.body, returnType: statement.returnType, asyncBehavior: statement.asyncBehavior, translator: translator)
 
         // Warnings and fixups
         if let firstCharacter = kstatement.name.first, firstCharacter != "_" && firstCharacter != "$" && firstCharacter != "`" && !firstCharacter.isLetter && !firstCharacter.isNumber && !kstatement.isEqualImplementation && !kstatement.isLessThanImplementation {
@@ -1624,8 +1632,8 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         getter.attributes = getter.processAttributes(statement.attributes, from: statement, translator: translator)
         getter.apiFlags = statement.getterType.apiFlags
         translateMemberInfo(declaration: getter, from: statement, modifiers: statement.modifiers, translator: translator)
-        translateBody(declaration: getter, from: statement, body: statement.getter?.body, returnType: statement.elementType, isAsync: statement.isAsync, translator: translator)
-        if statement.isAsync {
+        translateBody(declaration: getter, from: statement, body: statement.getter?.body, returnType: statement.elementType, asyncBehavior: statement.asyncBehavior, translator: translator)
+        if statement.asyncBehavior != .sync {
             getter.messages.append(.kotlinAsyncSubscript(getter, source: translator.syntaxTree.source))
         }
 
@@ -1643,7 +1651,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         setter.attributes = getter.attributes
         setter.apiFlags = statement.setterType.apiFlags
         translateMemberInfo(declaration: setter, from: statement, modifiers: statement.modifiers, translator: translator)
-        translateBody(declaration: setter, from: statement, body: statementSetter.body, returnType: .void, isAsync: false, translator: translator)
+        translateBody(declaration: setter, from: statement, body: statementSetter.body, returnType: .void, asyncBehavior: .sync, translator: translator)
         return [getter, setter]
     }
 
@@ -1652,15 +1660,15 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             return false
         }
 
-        // Use codebaseInfo rather than .type directly so that extension API is also handled correctly
-        let owningDeclarationType = translator.codebaseInfo?.declarationType(forNamed: owningTypeDeclaration.signature) ?? owningTypeDeclaration.type
+        // Make sure extension API is also handled correctly
+        let owningDeclarationType = owningTypeDeclaration.nonExtensionDeclarationType ?? owningTypeDeclaration.type
         let owningDeclarationPrimaryTypeInfo = translator.codebaseInfo?.primaryTypeInfo(forNamed: owningTypeDeclaration.signature)
         let owningSignature = owningDeclarationPrimaryTypeInfo?.signature ?? owningTypeDeclaration.signature
 
         if statement.type == .initDeclaration {
             kstatement.isOpen = false
             kstatement.modifiers.isOverride = false // Kotlin does not override constructors
-            if (statement as? FunctionDeclaration)?.isAsync == true {
+            if (statement as? FunctionDeclaration)?.asyncBehavior == .async {
                 kstatement.messages.append(.kotlinAsyncConstructor(statement, source: translator.syntaxTree.source))
             }
         } else if statement.type == .deinitDeclaration {
@@ -1722,7 +1730,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         return true
     }
 
-    private static func translateBody(declaration kstatement: KotlinFunctionDeclaration, from statement: Statement, body: CodeBlock?, returnType: TypeSignature, isAsync: Bool, translator: KotlinTranslator) {
+    private static func translateBody(declaration kstatement: KotlinFunctionDeclaration, from statement: Statement, body: CodeBlock?, returnType: TypeSignature, asyncBehavior: AsyncBehavior, translator: KotlinTranslator) {
         kstatement.returnType.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source)
         kstatement.parameters.forEach { $0.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
         guard let body else {
@@ -1745,7 +1753,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 // have symbols. It also makes functions symmetrical with the behavior of arrays and of mutable properties
                 body.updateWithExpectedReturn(.sref(nil))
             }
-            if isAsync && body.updateWithExpectedReturn(.labelIfPresent(KotlinClosure.returnLabel)) {
+            if asyncBehavior != .sync && body.updateWithExpectedReturn(.labelIfPresent(KotlinClosure.returnLabel)) {
                 kstatement.hasAsyncExplicitReturn = true
             }
         }
@@ -1946,6 +1954,8 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if apiFlags.contains(.async) {
             if apiFlags.contains(.mainActor) {
                 output.append(" = MainActor.run ")
+            } else if isActorIsolated {
+                output.append(" = Actor.run(this) ")
             } else {
                 output.append(" = Async.run ")
             }
@@ -2336,15 +2346,16 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var declaredType: TypeSignature = .none
     var isLet = false
     var role: Role = .local
-    var isAsyncLet: Bool {
-        return isLet && apiFlags.contains(.async)
-    }
     var isOpen = false
     var annotations: [String] = []
     var getterAnnotations: [String] = []
     var modifiers = Modifiers()
     var attributes = Attributes()
     var apiFlags: APIFlags = []
+    var isAsyncLet: Bool {
+        return isLet && apiFlags.contains(.async)
+    }
+    var isActorIsolated = false
     var value: KotlinExpression?
     var getter: Accessor<KotlinCodeBlock>?
     var setter: Accessor<KotlinCodeBlock>?
@@ -2403,8 +2414,8 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         let owningTypeDeclaration = statement.parent as? TypeDeclaration
         var owningDeclarationType: StatementType? = nil
         if let owningTypeDeclaration {
-            // Use codebaseInfo rather than .type directly so that extension API is also handled correctly
-            owningDeclarationType = translator.codebaseInfo?.declarationType(forNamed: owningTypeDeclaration.signature) ?? owningTypeDeclaration.type
+            // Make sure extension API is also handled correctly
+            owningDeclarationType = owningTypeDeclaration.nonExtensionDeclarationType ?? owningTypeDeclaration.type
             let owningSignature = translator.codebaseInfo?.primaryTypeInfo(forNamed: owningTypeDeclaration.signature)?.signature ?? owningTypeDeclaration.signature
 
             kstatement.role = .property
@@ -2458,6 +2469,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
 
         kstatement.attributes = kstatement.processAttributes(statement.attributes, from: statement, translator: translator)
         kstatement.apiFlags = statement.apiFlags
+        kstatement.isActorIsolated = statement.asyncBehavior == .actor
         if kstatement.declaredType != .none {
             kstatement.mayBeSharedMutableStruct = statement.constrainedDeclaredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
         } else if let kvalue = kstatement.value {
@@ -2485,10 +2497,26 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if kstatement.apiFlags.contains(.async) {
             if kstatement.isAsyncLet {
                 if let value = kstatement.value {
-                    KotlinAwait.setIsAsynchronous(value, source: translator.syntaxTree.source)
+                    KotlinAwait.setIsAsync(value, source: translator.syntaxTree.source)
                 }
-            } else if kstatement.getter?.body?.updateWithExpectedReturn(.labelIfPresent(KotlinClosure.returnLabel)) == true {
-                kstatement.hasAsyncExplicitReturn = true
+            } else {
+                if kstatement.isActorIsolated {
+                    // Allow synchronous access to private actor mutable variables, and disallow non-private ones. This still
+                    // leaves us with potential bugs if a non-isolated actor function accesses its private state, but we have to
+                    // allow this because we don't yet support mutable isolated variables
+                    if kstatement.apiFlags.contains(.writeable) {
+                        if kstatement.modifiers.visibility == .private {
+                            kstatement.isActorIsolated = false
+                            kstatement.apiFlags.remove(.async)
+                        } else {
+                            kstatement.messages.append(.kotlinActorMutableProperty(kstatement, source: translator.syntaxTree.source))
+                        }
+                    }
+                }
+                // Check the async flag again, because we may have just cleared it above
+                if kstatement.apiFlags.contains(.async) && kstatement.getter?.body?.updateWithExpectedReturn(.labelIfPresent(KotlinClosure.returnLabel)) == true {
+                    kstatement.hasAsyncExplicitReturn = true
+                }
             }
         }
 
@@ -2634,6 +2662,8 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     private func appendAsFunctionDefinition(_ body: KotlinCodeBlock, to output: OutputGenerator, indentation: Indentation) {
         if apiFlags.contains(.mainActor) {
             output.append(" = MainActor.run ")
+        } else if isActorIsolated {
+            output.append(" = Actor.run(this) ")
         } else if apiFlags.contains(.async) {
             output.append(" = Async.run ")
         } else {

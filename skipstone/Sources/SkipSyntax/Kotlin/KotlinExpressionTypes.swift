@@ -115,7 +115,7 @@ class KotlinAwait: KotlinExpression {
 
     convenience init(target: KotlinExpression, source: Source) {
         self.init(target: target)
-        Self.setIsAsynchronous(target, source: source)
+        Self.setIsAsync(target, source: source)
     }
 
     private init(target: KotlinExpression) {
@@ -132,7 +132,7 @@ class KotlinAwait: KotlinExpression {
     }
 
     override func logicalNegated() -> KotlinExpression {
-        // Use private constructor that does not call setIsAsynchronous again on target
+        // Use private constructor that does not call setIsAsync again on target
         return KotlinAwait(target: target.logicalNegated())
     }
 
@@ -144,8 +144,8 @@ class KotlinAwait: KotlinExpression {
         return [target]
     }
 
-    /// Adjust the given Kotlin syntax for an asynchronous call.
-    static func setIsAsynchronous(_ node: KotlinSyntaxNode, source: Source) {
+    /// Adjust the given Kotlin syntax for an async call.
+    static func setIsAsync(_ node: KotlinSyntaxNode, source: Source) {
         node.visit { node in
             if var mainActorTargeting = node as? (KotlinSyntaxNode & KotlinMainActorTargeting) {
                 mainActorTargeting.isInAwait = true
@@ -1225,8 +1225,9 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
                     if let generics, !generics.isEmpty {
                         output.append("<\(generics.map(\.kotlin).joined(separator: ", "))>")
                     }
-                    if let apiMatch, apiMatch.declarationType == .variableDeclaration, apiMatch.apiFlags.contains(.viewBuilder) || apiMatch.apiFlags.contains(.async) {
-                        // View builder and async properties are converted to Kotlin functions
+                    if let apiMatch, apiMatch.declarationType == .variableDeclaration, apiMatch.apiFlags.contains(.viewBuilder) || (apiMatch.apiFlags.contains(.async) && !apiMatch.apiFlags.contains(.writeable)) {
+                        // View builder and async properties are converted to Kotlin functions. Any writeable async API must
+                        // be a private actor variable, which we do not treat as async
                         output.append("()")
                     }
                     if let valueSuffix {
@@ -2034,8 +2035,9 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
         } else if castTargetType != .none, let apiMatch, apiMatch.declarationType != .enumCaseDeclaration && !apiMatch.signature.generics.isEmpty {
             output.append("<\(Array(repeating: "*", count: apiMatch.signature.generics.count).joined(separator: ", "))>")
         }
-        if let apiMatch, apiMatch.declarationType == .variableDeclaration, apiMatch.apiFlags.contains(.viewBuilder) || apiMatch.apiFlags.contains(.async) {
-            // View builder and async properties are converted to Kotlin functions
+        if let apiMatch, apiMatch.declarationType == .variableDeclaration, apiMatch.apiFlags.contains(.viewBuilder) || (apiMatch.apiFlags.contains(.async) && !apiMatch.apiFlags.contains(.writeable)) {
+            // View builder and async properties are converted to Kotlin functions. Any writeable async API must
+            // be a private actor variable, which we do not treat as async
             output.append("()")
         }
         if mainActorOutputMode == .isolated {

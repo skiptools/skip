@@ -130,7 +130,7 @@ class SyntaxNode: SourceDerived, PrettyPrintable {
                 switch statement.type {
                 case .functionDeclaration, .initDeclaration, .subscriptDeclaration, .variableDeclaration:
                     return statement
-                case .classDeclaration, .enumDeclaration, .extensionDeclaration, .protocolDeclaration, .structDeclaration:
+                case .actorDeclaration, .classDeclaration, .enumDeclaration, .extensionDeclaration, .protocolDeclaration, .structDeclaration:
                     return nil
                 default:
                     break

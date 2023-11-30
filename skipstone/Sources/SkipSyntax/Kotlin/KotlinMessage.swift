@@ -6,9 +6,9 @@ extension Message {
 
     // List of specific untranslatable errors. This will be helpful in maintaining documentation
 
-    // Idea: create our own actors for Kotlin
-    static func kotlinActors(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "Kotlin supports async functions, but it does not have actors", sourceDerived: sourceDerived, source: source)
+    // Idea: translate variable assignments to set calls
+    static func kotlinActorMutableProperty(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Non-private mutable actor properties are not supported. Consider making this private and using non-private functions to access it", sourceDerived: sourceDerived, source: source)
     }
 
     static func kotlinAsyncAwaitTypeInference(_ sourceDerived: SourceDerived, source: Source) -> Message {

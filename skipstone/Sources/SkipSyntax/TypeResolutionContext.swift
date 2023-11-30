@@ -12,6 +12,11 @@ struct TypeResolutionContext {
         return codebaseInfo?.resolveTypealias(for: type) ?? type
     }
 
+    /// Reutrn the declaration type for the given named type, if known.
+    func declarationType(forNamed type: TypeSignature) -> StatementType? {
+        return codebaseInfo?.declarationType(forNamed: type)
+    }
+
     private func resolveModuleQualifiedType(_ type: TypeSignature, moduleName: String?, in baseOrModule: TypeSignature = .none) -> TypeSignature {
         if let moduleName {
             if baseOrModule != .none {
