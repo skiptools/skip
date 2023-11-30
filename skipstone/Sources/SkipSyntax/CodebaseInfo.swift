@@ -830,8 +830,10 @@ public class CodebaseInfo {
                         return nil
                     }
                 } else {
-                    // If there is no label, then either this parameter has to have no label, be a variadic continuation, or be a trailing closure
-                    if (isVariadicContinuation || parameter.label == nil || isSubscript), let score = argument.value.compatibilityScore(target: parameter.type, codebaseInfo: self) {
+                    // If there is no label, then either this parameter has to have no label, be a variadic continuation, or be a trailing closure.
+                    // We don't give the extra point for a nil label on a function parameter to avoid advantaging trailing closures on nil-labeled
+                    // params other trailing closures
+                    if (isVariadicContinuation || (parameter.label == nil && !parameter.type.isFunction) || isSubscript), let score = argument.value.compatibilityScore(target: parameter.type, codebaseInfo: self) {
                         return (startIndex + index, 1.0 + score)
                     } else if parameter.type.isFunction, let score = argument.value.compatibilityScore(target: parameter.type, codebaseInfo: self) {
                         if argumentIndex == arguments.count - 1 && startIndex + index < parameters.count - 1 && parameter.hasDefaultValue && parameters[(startIndex + index + 1)...].contains(where: { !$0.hasDefaultValue }) {
