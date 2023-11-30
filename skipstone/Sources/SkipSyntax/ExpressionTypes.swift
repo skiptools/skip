@@ -565,8 +565,16 @@ class Closure: Expression {
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
         captureList.forEach { $0.1.value.inferTypes(context: context, expecting: .none) }
-        let parameterSignatures = parameters.map { parameter in
-            TypeSignature.Parameter(label: parameter.externalLabel, type: parameter.declaredType, isInOut: parameter.isInOut, isVariadic: parameter.isVariadic, hasDefaultValue: parameter.defaultValue != nil )
+        let parameterSignatures: [TypeSignature.Parameter]
+        if parameters.isEmpty {
+            // If there are no explicit parameters, look for parameters used in the body
+            parameterSignatures = (0..<implicitParameterCount()).map { _ in
+                TypeSignature.Parameter(label: nil, type: .none)
+            }
+        } else {
+            parameterSignatures = parameters.map { parameter in
+                TypeSignature.Parameter(label: parameter.externalLabel, type: parameter.declaredType, isInOut: parameter.isInOut, isVariadic: parameter.isVariadic, hasDefaultValue: parameter.defaultValue != nil)
+            }
         }
         functionType = attributes.apply(toFunction: .function(parameterSignatures, returnType, apiFlags, nil)).or(expecting)
         if case .function(let expectingParameters, _, _, _) = expecting, expectingParameters.count == 1, case .tuple(let tupleLabels, _) = expectingParameters[0].type, tupleLabels.count == functionType.parameters.count {
@@ -579,6 +587,23 @@ class Closure: Expression {
         // Use any type information we can glean from return statements in the body
         functionType = .function(functionType.parameters, functionType.returnType.or(body.returnType, replaceAny: true), functionType.apiFlags, functionType.additionalAttributes)
         return context
+    }
+
+    private func implicitParameterCount() -> Int {
+        var highestParameter = -1
+        body.visit { node in
+            if node is Closure {
+                return .skip
+            } else if let identifier = node as? Identifier {
+                if let index = identifier.name.implicitClosureParameterIndex {
+                    highestParameter = max(highestParameter, index)
+                }
+                return .skip
+            } else {
+                return .recurse(nil)
+            }
+        }
+        return highestParameter + 1
     }
 
     var functionType: TypeSignature = .function([], .none, [], nil)

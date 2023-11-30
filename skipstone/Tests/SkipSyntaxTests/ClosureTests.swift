@@ -495,4 +495,45 @@ final class ClosureTests: XCTestCase {
         .trailing()
         """)
     }
+
+    func testInferTypeBasedOnParameterCount() async throws {
+        try await check(supportingSwift: """
+        struct S {
+            func f(c: () -> Void) {
+            }
+            func f(c: (Int) -> Void) {
+            }
+            func f(c: (Int, Int) -> Void) {
+            }
+        }
+        """, swift: """
+        func invoke() {
+            let s = S()
+            s.f {
+                print("none")
+            }
+            s.f {
+                print($0)
+            }
+            s.f { _ in
+                print("one")
+            }
+            s.f {
+                print($0)
+                print($1)
+            }
+        }
+        """, kotlin: """
+        internal fun invoke() {
+            val s = S()
+            s.f { print("none") }
+            s.f { it -> print(it) }
+            s.f { _ -> print("one") }
+            s.f { it, it_1 ->
+                print(it)
+                print(it_1)
+            }
+        }
+        """)
+    }
 }

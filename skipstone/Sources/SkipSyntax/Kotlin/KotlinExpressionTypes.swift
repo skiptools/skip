@@ -531,10 +531,10 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
     var returnType: TypeSignature = .none
     var parameters: [Parameter<Void>] = []
     var isDestructuredParameters = false
+    var implicitParameterCount = 0
     var attributes = Attributes()
     var apiFlags: APIFlags? = []
     var inferredReturnType: TypeSignature = .none
-    var implicitParameterLabels: [String] = []
     var isAnonymousFunction = false
     var body: KotlinCodeBlock
     var hasReturnLabel = false
@@ -557,7 +557,6 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
         // closures cannot declare a return type. Kotlin does not support anonymous suspend functions, though
         let kbody = KotlinCodeBlock.translate(statement: expression.body, translator: translator)
         let isAnonymousFunction = expression.returnType != .none && !expression.isDestructuredParameters && !expression.apiFlags.contains(.async) && !expression.apiFlags.contains(.mainActor)
-        var implicitParameterLabels: [String] = []
         var hasReturnLabel = false
         if isAnonymousFunction {
             if expression.returnType != .void {
@@ -569,18 +568,21 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
             if kbody.updateWithExpectedReturn(.labelIfPresent(returnLabel)) {
                 hasReturnLabel = true
             }
-            if expression.parameters.isEmpty {
-                implicitParameterLabels = handleImplicitParameters(in: kbody, inferredType: expression.inferredType)
-            }
         }
-        // Inferred type parameters include explicit parameter info already, so use them for parameter info
+        // Inferred type parameters include all parameter info already, so use them for our parameter info
         let inferredParameters = expression.inferredType.parameters
+        var implicitParameterCount = 0
         for (index, parameter) in inferredParameters.enumerated() {
             if let label = parameter.label, KotlinIdentifier.isSwiftUIBinding(name: label) {
                 kbody.updateWithSwiftUIBindingParameter(name: String(label.dropFirst()), source: translator.syntaxTree.source)
-            } else if parameter.isInOut {
-                let name = index < implicitParameterLabels.count ? "$\(index)" : parameter.label ?? "$\(index)"
-                kbody.updateWithInOutParameter(name: name, source: translator.syntaxTree.source)
+            } else {
+                if parameter.label == nil && expression.parameters.isEmpty {
+                    implicitParameterCount += 1
+                }
+                if parameter.isInOut {
+                    let name = parameter.label ?? "$\(index)"
+                    kbody.updateWithInOutParameter(name: name, source: translator.syntaxTree.source)
+                }
             }
         }
         handleSelfAssignments(in: kbody, source: translator.syntaxTree.source)
@@ -598,40 +600,14 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
             return parameter
         }
         kexpression.isDestructuredParameters = expression.isDestructuredParameters
+        kexpression.implicitParameterCount = implicitParameterCount
         kexpression.attributes = expression.attributes
         // Combine inferred flags because most closures aren't declared with explicit info
         kexpression.apiFlags = expression.apiFlags.union(expression.inferredType.apiFlags)
         kexpression.isAnonymousFunction = isAnonymousFunction
         kexpression.inferredReturnType = expression.returnType != .none ? expression.returnType.resolvingSelf(in: expression) : expression.inferredType.returnType.resolvingSelf(in: expression)
-        kexpression.implicitParameterLabels = implicitParameterLabels
         kexpression.hasReturnLabel = hasReturnLabel
         return kexpression
-    }
-
-    private static func handleImplicitParameters(in body: KotlinCodeBlock, inferredType: TypeSignature) -> [String] {
-        // Find the highest $n identifier used in the closure
-        var highestParameter = -1
-        body.visit { node in
-            if node is KotlinClosure {
-                return .skip
-            } else if let identifier = node as? KotlinIdentifier {
-                if let index = identifier.name.implicitClosureParameterIndex {
-                    highestParameter = max(highestParameter, index)
-                }
-                return .skip
-            } else {
-                return .recurse(nil)
-            }
-        }
-
-        // The closure might have more parameters than were used
-        highestParameter = max(highestParameter, inferredType.parameters.count - 1)
-
-        // $0 can use the special 'it' built-in, so no need to return it
-        guard highestParameter >= 0 else {
-            return []
-        }
-        return (0...highestParameter).map { KotlinIdentifier.translateName("$\($0)") }
     }
 
     private static func handleSelfAssignments(in codeBlock: KotlinCodeBlock, source: Source) {
@@ -715,7 +691,7 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
         }
         output.append("{")
         let isSingleStatement = !useMultilineFormatting
-        if parameters.isEmpty && implicitParameterLabels.isEmpty {
+        if parameters.isEmpty && implicitParameterCount == 0 {
             if isMainActor {
                 output.append(" MainActor.run \(returnLabel){")
             } else if isAsync {
@@ -739,8 +715,8 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
                     output.append(", ")
                 }
             }
-            if !implicitParameterLabels.isEmpty {
-                output.append(" ").append(implicitParameterLabels.joined(separator: ", "))
+            if implicitParameterCount > 0 {
+                output.append(" ").append((0..<implicitParameterCount).map({ KotlinIdentifier.translateName("$\($0)") }).joined(separator: ", "))
             }
             if isDestructuredParameters {
                 output.append(")")

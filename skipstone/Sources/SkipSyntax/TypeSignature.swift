@@ -1223,10 +1223,10 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             if strippedTarget.isNumeric {
                 return 1.5
             }
-        case .function:
+        case .function(let parameters, _, _, _):
             // TODO: Match params and return type
-            if case .function = strippedTarget {
-                return 1.0
+            if case .function(let parameters2, _, _, _) = strippedTarget {
+                return parameters.count == parameters2.count ? 1.5 : 1.0
             }
         case .member, .named:
             // TODO: Match on generics
