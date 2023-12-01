@@ -13,13 +13,7 @@ jobs:
     env:     
       DEVELOPER_DIR: /Applications/Xcode_15.0.app/Contents/Developer
     steps:
-      - run: brew update
-
       - run: brew install skiptools/skip/skip tree ${{ inputs.brew-install }}
-
-      - run: brew install openjdk@21
-
-      - run: brew upgrade gradle
 
       - run: java -version
 
