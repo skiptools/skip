@@ -17,6 +17,10 @@ jobs:
 
       - run: brew install skiptools/skip/skip tree ${{ inputs.brew-install }}
 
+      - run: brew install openjdk@21
+
+      - run: brew upgrade gradle
+
       - run: java -version
 
       - run: skip doctor

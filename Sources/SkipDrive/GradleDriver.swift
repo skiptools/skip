@@ -628,8 +628,8 @@ extension ProcessInfo {
         let JAVA_HOME = "JAVA_HOME"
         if (env[JAVA_HOME] ?? "").isEmpty {
             #if os(macOS)
-            // default to openjdk@17 if JAVA_HOME is unset
-            env[JAVA_HOME] = "\(Self.homebrewRoot)/opt/openjdk@17"
+            // default if JAVA_HOME is unset: /opt/homebrew/opt/java -> ../Cellar/openjdk/21.0.1
+            env[JAVA_HOME] = "\(Self.homebrewRoot)/opt/java"
             #endif
         }
 
