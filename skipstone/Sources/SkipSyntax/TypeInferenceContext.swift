@@ -293,25 +293,18 @@ struct TypeInferenceContext {
     func function(_ name: String?, in type: TypeSignature?, arguments: [LabeledValue<Expression>], expectedReturn: TypeSignature, messagesNode: SyntaxNode?) -> (TypeSignature, APIMatch)? {
         let argumentValues = arguments.map { LabeledValue(label: $0.label, value: argumentValue(for: $0.value)) }
         let matches = function(name, in: type, arguments: argumentValues, messagesNode: messagesNode)
-        guard !matches.isEmpty else {
-            return nil
-        }
-
-        let match: (TypeSignature, APIMatch)
         if matches.count > 1 {
             if let unqualifiedArgumentMatch = findUnqualifiedArgumentMatch(in: matches, arguments: arguments) {
-                match = unqualifiedArgumentMatch
+                return unqualifiedArgumentMatch
             } else {
                 if let messagesNode, !messagesSuppressed {
                     messagesNode.messages.append(.ambiguousFunctionCall(messagesNode, source: source))
                 }
-                match = matches.first { $0.0.returnType == expectedReturn } ?? matches[0]
+                return matches.first { $0.0.returnType == expectedReturn } ?? matches[0]
             }
         } else {
-            match = matches[0]
+            return matches.first
         }
-        assignLiteralExpressibleTypes(in: match.1.signature.parameters, to: arguments)
-        return match
     }
 
     // Exposed for testing
@@ -436,6 +429,37 @@ struct TypeInferenceContext {
         }
     }
 
+    /// When a call match is found, set any Expressible types on the literal expressions that will need to build them.
+    func assignLiteralExpressibleTypes(in match: APIMatch, to expressions: [Expression]) {
+        let parameters = match.signature.parameters
+        guard parameters.count == expressions.count else {
+            return
+        }
+
+        for i in 0..<expressions.count {
+            let expression = expressions[i]
+            let parameterType = parameters[i].type
+            // TODO: Handle other Expressible types
+            switch expression.type {
+            case .stringLiteral:
+                if parameterType.isNamedType, let stringLiteral = expression as? StringLiteral, let interpolationType = interpolationType(for: parameterType) {
+                    stringLiteral.expressibleByStringInterpolationType = (parameterType, interpolationType)
+                }
+            default:
+                break
+            }
+        }
+    }
+
+    private func interpolationType(for expressible: TypeSignature) -> TypeSignature? {
+        // Look for the ExpressibleByStringInterpolation protocol's init(stringInterpolation:) constructor requirement to figure out
+        // the correct interpolation type to instantiate
+        guard let match = codebaseInfo?.matchFunction(name: nil, inConstrained: expressible, arguments: [LabeledValue(label: "stringInterpolation", value: ArgumentValue(type: .none))]) else {
+            return nil
+        }
+        return match.first?.signature.parameters.first?.type
+    }
+
     /// Determine the element type of the given type, correctly handling custom sequences.
     func elementType(of type: TypeSignature) -> TypeSignature {
         let builtinType = type.elementType
@@ -554,26 +578,6 @@ struct TypeInferenceContext {
             return ArgumentValue(type: inferredType, isLiteral: true, isInterpolated: (expression as! StringLiteral).segments.count > 1)
         default:
             return ArgumentValue(type: inferredType)
-        }
-    }
-
-    private func assignLiteralExpressibleTypes(in parameters: [TypeSignature.Parameter], to arguments: [LabeledValue<Expression>]) {
-        guard parameters.count == arguments.count else {
-            return
-        }
-
-        for i in 0..<arguments.count {
-            let expression = arguments[i].value
-            let parameterType = parameters[i].type
-            // TODO: Handle other Expressible types
-            switch expression.type {
-            case .stringLiteral:
-                if parameterType.isNamedType {
-                    (expression as! StringLiteral).expressibleByStringInterpolationType = parameterType
-                }
-            default:
-                break
-            }
         }
     }
 

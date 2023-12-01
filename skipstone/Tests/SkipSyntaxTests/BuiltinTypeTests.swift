@@ -462,6 +462,10 @@ final class BuiltinTypeTests: XCTestCase {
         protocol ExpressibleByStringInterpolation {
         }
         struct LocalizedKey: ExpressibleByStringInterpolation {
+            init(stringInterpolation: Interpolation) {
+            }
+            struct Interpolation {
+            }
         }
         class Text {
             init(_ string: String) {
@@ -489,35 +493,35 @@ final class BuiltinTypeTests: XCTestCase {
         """, kotlin: """
         Text("Hello!")
         Text({
-            val str = LocalizedKey()
+            val str = LocalizedKey.Interpolation(literalCapacity = 0, interpolationCount = 0)
             str.appendLiteral("Hello ")
             str.appendInterpolation(name)
             str.appendLiteral("!")
-            str
+            LocalizedKey(stringInterpolation = str)
         }())
         NSLocalizedString("Hello!")
         NSLocalizedString({
-            val str = LocalizedKey()
+            val str = LocalizedKey.Interpolation(literalCapacity = 0, interpolationCount = 0)
             str.appendLiteral("Hello ")
             str.appendInterpolation(name)
             str.appendLiteral("!")
-            str
+            LocalizedKey(stringInterpolation = str)
         }())
         localize(key = "Hello!")
         localize(key = "Hello!", comment = "Comment")
         localize(key = {
-            val str = LocalizedKey()
+            val str = LocalizedKey.Interpolation(literalCapacity = 0, interpolationCount = 0)
             str.appendLiteral("Hello ")
             str.appendInterpolation(name)
             str.appendLiteral("!")
-            str
+            LocalizedKey(stringInterpolation = str)
         }())
         localize(key = {
-            val str = LocalizedKey()
+            val str = LocalizedKey.Interpolation(literalCapacity = 0, interpolationCount = 0)
             str.appendLiteral("Hello ")
             str.appendInterpolation(name)
             str.appendLiteral("!")
-            str
+            LocalizedKey(stringInterpolation = str)
         }(), comment = "Comment")
         """)
     }

@@ -829,6 +829,8 @@ class FunctionCall: Expression, APICallExpression, MemberAccessExpression {
                     match = refinedMatch
                 }
             }
+            context.assignLiteralExpressibleTypes(in: match.1, to: arguments.map(\.value))
+
             isInit = match.1.declarationType == .initDeclaration
             apiMatch = match.1
             returnType = match.0.returnType.or(expecting)
@@ -1681,7 +1683,7 @@ class PrefixOperator: Expression {
 class StringLiteral: Expression {
     let segments: [StringLiteralSegment<Expression>]
     let isMultiline: Bool
-    var expressibleByStringInterpolationType: TypeSignature = .none
+    var expressibleByStringInterpolationType: (TypeSignature, TypeSignature)?
 
     init(segments: [StringLiteralSegment<Expression>], isMultiline: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.segments = segments
