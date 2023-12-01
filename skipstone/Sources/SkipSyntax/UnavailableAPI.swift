@@ -18,7 +18,7 @@ public class UnavailableAPI {
     }
 
     /// Check if this is a function that is known to be unavailable.
-    func knownUnavailableFunction(_ name: String, in type: TypeSignature?, arguments: [LabeledValue<TypeSignature>]) -> APIMatch? {
+    func knownUnavailableFunction(_ name: String, in type: TypeSignature?, arguments: [LabeledValue<ArgumentValue>]) -> APIMatch? {
         return nil
     }
 }

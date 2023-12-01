@@ -456,4 +456,69 @@ final class BuiltinTypeTests: XCTestCase {
         }
         """)
     }
+
+    func testExpressibleByStringInterpolationMatch() async throws {
+        try await check(supportingSwift: """
+        protocol ExpressibleByStringInterpolation {
+        }
+        struct LocalizedKey: ExpressibleByStringInterpolation {
+        }
+        class Text {
+            init(_ string: String) {
+            }
+            init(_ string: LocalizedKey) {
+            }
+        }
+        func NSLocalizedString(_ string: String) {
+        }
+        func NSLocalizedString(_ string: LocalizedKey) {
+        }
+        func localize(key: String, comment: String? = nil) {
+        }
+        func localize(key: LocalizedKey, comment: String? = nil) {
+        }
+        """, swift: """
+        Text("Hello!")
+        Text("Hello \\(name)!")
+        NSLocalizedString("Hello!")
+        NSLocalizedString("Hello \\(name)!")
+        localize(key: "Hello!")
+        localize(key: "Hello!", comment: "Comment")
+        localize(key: "Hello \\(name)!")
+        localize(key: "Hello \\(name)!", comment: "Comment")
+        """, kotlin: """
+        Text("Hello!")
+        Text({
+            val str = LocalizedKey()
+            str.appendLiteral("Hello ")
+            str.appendInterpolation(name)
+            str.appendLiteral("!")
+            str
+        }())
+        NSLocalizedString("Hello!")
+        NSLocalizedString({
+            val str = LocalizedKey()
+            str.appendLiteral("Hello ")
+            str.appendInterpolation(name)
+            str.appendLiteral("!")
+            str
+        }())
+        localize(key = "Hello!")
+        localize(key = "Hello!", comment = "Comment")
+        localize(key = {
+            val str = LocalizedKey()
+            str.appendLiteral("Hello ")
+            str.appendInterpolation(name)
+            str.appendLiteral("!")
+            str
+        }())
+        localize(key = {
+            val str = LocalizedKey()
+            str.appendLiteral("Hello ")
+            str.appendInterpolation(name)
+            str.appendLiteral("!")
+            str
+        }(), comment = "Comment")
+        """)
+    }
 }

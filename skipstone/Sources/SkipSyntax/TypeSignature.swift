@@ -1124,9 +1124,29 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         }
     }
 
+    /// Whether this is any named type.
+    var isNamedType: Bool {
+        switch self {
+        case .member:
+            return true
+        case .module(_, let type):
+            return type.isNamedType
+        case .named:
+            return true
+        case .optional(let type):
+            return type.isNamedType
+        case .typealiased(_, let type):
+            return type.isNamedType
+        case .unwrappedOptional(let type):
+            return type.isNamedType
+        default:
+            return false
+        }
+    }
+
     /// Whether this is a named type with the given name, optionally matching a module and generics.
     func isNamed(_ name: String, moduleName: String? = nil, generics: [TypeSignature]? = nil) -> Bool {
-        switch asOptional(false) {
+        switch self {
         case .module(let module2, let type):
             guard type.isNamed(name, generics: generics) else {
                 return false
@@ -1156,14 +1176,14 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     /// nil = Not compatible
     ///
     /// Compound types with multiple elements return an average of their elements' scores.
-    func compatibilityScore(target: TypeSignature, codebaseInfo: CodebaseInfo.Context) -> Double? {
+    func compatibilityScore(target: TypeSignature, codebaseInfo: CodebaseInfo.Context, isLiteral: Bool = false, isInterpolated: Bool = false) -> Double? {
         let moduleName = self.moduleName
         let type = asTypealiased(nil).withModuleName(nil)
         let targetIsOptional = target.isOptional
         let targetModuleName = target.moduleName
         let maybeSameModule = moduleName == nil || targetModuleName == nil || moduleName == targetModuleName
         let strippedTarget = target.asTypealiased(nil).withoutOptionality().withModuleName(nil)
-        if type == target && maybeSameModule {
+        if type == target && maybeSameModule && !isInterpolated {
             return 2.0
         }
 
@@ -1270,6 +1290,13 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                 return (inheritanceScore + elementScore) / 2.0
             }
         case .string:
+            if isInterpolated, target.compatibilityScore(target: .named("ExpressibleByStringInterpolation", []), codebaseInfo: codebaseInfo) != nil {
+                return 2.0
+            }
+            if strippedTarget == .string {
+                // Favor using ExpressibleByStringInterpolation for interpolated strings
+                return isInterpolated ? 1.95 : 2.0
+            }
             if strippedTarget.isStringy {
                 return 1.0
             }

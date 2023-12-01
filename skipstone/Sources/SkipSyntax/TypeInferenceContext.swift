@@ -285,27 +285,37 @@ struct TypeInferenceContext {
 
     /// Return the signatures of the functions matching the given arguments.
     ///
-    /// The match on the argument types will attempt to allow for unknown types. The returned signatures may be different than the returned `APIMatch.signatures` due to optional chaining.
+    /// The match on the argument types will attempt to allow for unknown types. The returned signature may be different than the returned `APIMatch.signature` due to optional chaining.
     ///
     /// - Parameters:
     ///   - name: The function name, or `nil` if none, as in constructor calls.
     ///   - type: The function's owning type if this is a member function, or nil if not.
     func function(_ name: String?, in type: TypeSignature?, arguments: [LabeledValue<Expression>], expectedReturn: TypeSignature, messagesNode: SyntaxNode?) -> (TypeSignature, APIMatch)? {
-        let argumentTypes = arguments.map { LabeledValue(label: $0.label, value: $0.value.inferredType) }
-        let matches = function(name, in: type, arguments: argumentTypes, messagesNode: messagesNode)
-        if matches.count > 1 {
-            if let match = findUnqualifiedArgumentMatch(in: matches, arguments: arguments) {
-                return match
-            }
-            if let messagesNode, !messagesSuppressed {
-                messagesNode.messages.append(.ambiguousFunctionCall(messagesNode, source: source))
-            }
+        let argumentValues = arguments.map { LabeledValue(label: $0.label, value: argumentValue(for: $0.value)) }
+        let matches = function(name, in: type, arguments: argumentValues, messagesNode: messagesNode)
+        guard !matches.isEmpty else {
+            return nil
         }
-        return matches.first { $0.0.returnType == expectedReturn } ?? matches.first
+
+        let match: (TypeSignature, APIMatch)
+        if matches.count > 1 {
+            if let unqualifiedArgumentMatch = findUnqualifiedArgumentMatch(in: matches, arguments: arguments) {
+                match = unqualifiedArgumentMatch
+            } else {
+                if let messagesNode, !messagesSuppressed {
+                    messagesNode.messages.append(.ambiguousFunctionCall(messagesNode, source: source))
+                }
+                match = matches.first { $0.0.returnType == expectedReturn } ?? matches[0]
+            }
+        } else {
+            match = matches[0]
+        }
+        assignLiteralExpressibleTypes(in: match.1.signature.parameters, to: arguments)
+        return match
     }
 
     // Exposed for testing
-    func function(_ name: String?, in type: TypeSignature?, arguments: [LabeledValue<TypeSignature>], messagesNode: SyntaxNode?) -> [(TypeSignature, APIMatch)] {
+    func function(_ name: String?, in type: TypeSignature?, arguments: [LabeledValue<ArgumentValue>], messagesNode: SyntaxNode?) -> [(TypeSignature, APIMatch)] {
         if let type, type.isOptional {
             return function(name, inNonOptional: type.asOptional(false), arguments: arguments, messagesNode: messagesNode).map { match in
                 let signature = resolveSignature(match: match)
@@ -316,8 +326,12 @@ struct TypeInferenceContext {
         }
     }
 
-    private func function(_ name: String?, inNonOptional type: TypeSignature?, arguments: [LabeledValue<TypeSignature>], messagesNode: SyntaxNode?) -> [APIMatch] {
-        let constrainedArguments = arguments.map { LabeledValue(label: $0.label, value: $0.value.constrainedTypeWithGenerics(generics)) }
+    private func function(_ name: String?, inNonOptional type: TypeSignature?, arguments: [LabeledValue<ArgumentValue>], messagesNode: SyntaxNode?) -> [APIMatch] {
+        let constrainedArguments = arguments.map { argument in
+            var value = argument.value
+            value.type = value.type.constrainedTypeWithGenerics(generics)
+            return LabeledValue(label: argument.label, value: value)
+        }
         if let type {
             if let codebaseInfo {
                 let matches = codebaseInfo.matchFunction(name: name, inConstrained: type.constrainedTypeWithGenerics(generics), arguments: constrainedArguments)
@@ -379,8 +393,8 @@ struct TypeInferenceContext {
     /// - Parameters:
     ///   - type: The subscript's owning type.
     func `subscript`(in type: TypeSignature, arguments: [LabeledValue<Expression>], expectedReturn: TypeSignature, messagesNode: SyntaxNode?) -> (TypeSignature, APIMatch)? {
-        let argumentTypes = arguments.map { LabeledValue(label: $0.label, value: $0.value.inferredType) }
-        let matches = self.subscript(in: type, arguments: argumentTypes, messagesNode: messagesNode)
+        let argumentValues = arguments.map { LabeledValue(label: $0.label, value: argumentValue(for: $0.value)) }
+        let matches = self.subscript(in: type, arguments: argumentValues, messagesNode: messagesNode)
         if matches.count > 1 {
             if let match = findUnqualifiedArgumentMatch(in: matches, arguments: arguments) {
                 return match
@@ -393,7 +407,7 @@ struct TypeInferenceContext {
     }
 
     // Exposed for testing
-    func `subscript`(in type: TypeSignature, arguments: [LabeledValue<TypeSignature>], messagesNode: SyntaxNode?) -> [(TypeSignature, APIMatch)] {
+    func `subscript`(in type: TypeSignature, arguments: [LabeledValue<ArgumentValue>], messagesNode: SyntaxNode?) -> [(TypeSignature, APIMatch)] {
         if type.isOptional {
             return self.subscript(inNonOptional: type.asOptional(false), arguments: arguments, messagesNode: messagesNode).map { match in
                 let signature = resolveSignature(match: match)
@@ -404,9 +418,13 @@ struct TypeInferenceContext {
         }
     }
 
-    private func `subscript`(inNonOptional type: TypeSignature, arguments: [LabeledValue<TypeSignature>], messagesNode: SyntaxNode?) -> [APIMatch] {
+    private func `subscript`(inNonOptional type: TypeSignature, arguments: [LabeledValue<ArgumentValue>], messagesNode: SyntaxNode?) -> [APIMatch] {
         if let codebaseInfo {
-            let constrainedArguments = arguments.map { LabeledValue(label: $0.label, value: $0.value.constrainedTypeWithGenerics(generics)) }
+            let constrainedArguments = arguments.map { argument in
+                var value = argument.value
+                value.type = value.type.constrainedTypeWithGenerics(generics)
+                return LabeledValue(label: argument.label, value: value)
+            }
             let matches = codebaseInfo.matchSubscript(inConstrained: type.constrainedTypeWithGenerics(generics), arguments: constrainedArguments)
             addUnavailableMessages(to: messagesNode, for: matches.map(\.availability))
             return matches
@@ -526,6 +544,37 @@ struct TypeInferenceContext {
             }
         }
         return nil
+    }
+
+    private func argumentValue(for expression: Expression) -> ArgumentValue {
+        let inferredType = expression.inferredType
+        // TODO: Handle other Expressible types
+        switch expression.type {
+        case .stringLiteral:
+            return ArgumentValue(type: inferredType, isLiteral: true, isInterpolated: (expression as! StringLiteral).segments.count > 1)
+        default:
+            return ArgumentValue(type: inferredType)
+        }
+    }
+
+    private func assignLiteralExpressibleTypes(in parameters: [TypeSignature.Parameter], to arguments: [LabeledValue<Expression>]) {
+        guard parameters.count == arguments.count else {
+            return
+        }
+
+        for i in 0..<arguments.count {
+            let expression = arguments[i].value
+            let parameterType = parameters[i].type
+            // TODO: Handle other Expressible types
+            switch expression.type {
+            case .stringLiteral:
+                if parameterType.isNamedType {
+                    (expression as! StringLiteral).expressibleByStringInterpolationType = parameterType
+                }
+            default:
+                break
+            }
+        }
     }
 
     private func resolveSignature(match: APIMatch) -> TypeSignature {

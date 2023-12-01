@@ -1,3 +1,27 @@
+/// A variable we declare to mirror a Swift binding pattern.
+struct KotlinBindingVariable {
+    var names: [String?]
+    var value: KotlinExpression
+    var isLet: Bool
+
+    /// - Note: Appends without leading indentation or trailing newline.
+    func append(to output: OutputGenerator, indentation: Indentation) {
+        output.append(isLet ? "val " : "var ")
+        if names.count > 1 {
+            output.append("(")
+        }
+        output.append(names.map { $0 ?? "_" }.joined(separator: ", "))
+        if names.count > 1 {
+            output.append(")")
+        }
+        output.append(" = ").append(value, indentation: indentation)
+    }
+}
+
+enum KotlinDirectiveAttribute: String {
+    case nocopy
+}
+
 /// The type of return statement expected from a code block.
 enum KotlinExpectedReturn {
     /// No return is expected.
@@ -16,23 +40,27 @@ enum KotlinExpectedReturn {
     case throwIfNull
 }
 
-/// A variable we declare to mirror a Swift binding pattern.
-struct KotlinBindingVariable {
-    var names: [String?]
-    var value: KotlinExpression
-    var isLet: Bool
+/// Metadata about the placement of a Kotlin extension.
+struct KotlinExtensionPlacement {
+    var canMove = true
+    var visibilityAllowsMove = true
+    var isInModule: Bool?
+}
 
-    /// - Note: Appends without leading indentation or trailing newline.
-    func append(to output: OutputGenerator, indentation: Indentation) {
-        output.append(isLet ? "val " : "var ")
-        if names.count > 1 {
-            output.append("(")
+extension KotlinStatement {
+    /// Return supported attributes and add warnings for unsupported attributes.
+    func processAttributes(_ attributes: Attributes, from statement: Statement, translator: KotlinTranslator) -> Attributes {
+        // Keep Kotlin attributes that devs may use within SKIP blocks
+        guard !statement.isInSkipBlock else {
+            return attributes
         }
-        output.append(names.map { $0 ?? "_" }.joined(separator: ", "))
-        if names.count > 1 {
-            output.append(")")
+        let supported: [Attribute] = attributes.attributes.filter { $0.kind != .unknown }
+        if supported.count == attributes.attributes.count {
+            return attributes
+        } else {
+            messages.append(.kotlinAttributeUnsupported(self, source: translator.syntaxTree.source))
+            return Attributes(attributes: supported)
         }
-        output.append(" = ").append(value, indentation: indentation)
     }
 }
 
@@ -115,39 +143,6 @@ struct KotlinVariableStorage {
     }
 }
 
-extension ExtensionDeclaration {
-    /// Whether this extension's members can be moved into the extended type definition.
-    var canMoveIntoExtendedType: Bool {
-        return extends.generics.isEmpty && !generics.entries.contains { $0.whereEqual != nil || !$0.inherits.isEmpty }
-    }
-
-    /// Whether this extension's visibility allows it to be moved into its extended type definition.
-    ///
-    /// We do not move extensions marked `private` or `fileprivate` as a way for the user to veto movement.
-    var visibilityAllowsMoveIntoExtendedType: Bool {
-        return modifiers.visibility != .private && modifiers.visibility != .fileprivate
-    }
-
-    /// Whether this extension is in the same file as its extended type.
-    var isInSameFileAsExtendedType: Bool {
-        var root = parent
-        while let next = root?.parent {
-            root = next
-        }
-        guard let codeBlock = root as? CodeBlock else {
-            return false
-        }
-        return codeBlock.statements.containsDeclaration(of: extends)
-    }
-}
-
-/// Metadata about the placement of a Kotlin extension.
-struct KotlinExtensionPlacement {
-    var canMove = true
-    var visibilityAllowsMove = true
-    var isInModule: Bool?
-}
-
 extension Accessor where B: CodeBlock {
     /// Translate to an equivalent Kotlin accessor.
     func translate(translator: KotlinTranslator, expectedReturn: KotlinExpectedReturn) -> Accessor<KotlinCodeBlock> {
@@ -158,107 +153,6 @@ extension Accessor where B: CodeBlock {
         }
         return Accessor<KotlinCodeBlock>(parameterName: parameterName)
     }
-}
-
-extension Operator {
-    /// Kotlin version of this operator's symbol.
-    var kotlinSymbol: String {
-        switch symbol {
-        case "??":
-            return "?:"
-        case "as!":
-            return "as"
-        case "..<":
-            return "until"
-        case "...":
-            return ".."
-        case "|":
-            return "or"
-        case "&":
-            return "and"
-        case "^":
-            return "xor"
-        case "<<":
-            return "shl"
-        case ">>":
-            return "shr"
-        default:
-            // Note that we construct operators with non-Swift symbols like 'in'
-            return symbol
-        }
-    }
-}
-
-extension Modifiers {
-    /// Kotlin modifier string for a member.
-    func kotlinMemberString(isGlobal: Bool, isOpen: Bool, suffix: String) -> String {
-        var string: String
-        switch visibility {
-        case .default, .internal:
-            string = "internal"
-        case .open, .public:
-            string = ""
-        case .private:
-            string = "private"
-        case .fileprivate:
-            string = isGlobal ? "private" : "internal"
-        }
-        if isOverride {
-            string = string.isEmpty ? "override" : "\(string) override"
-        } else if isOpen && !isStatic {
-            string = string.isEmpty ? "open" : "\(string) open"
-        }
-        return string.isEmpty || suffix.isEmpty ? string : "\(string)\(suffix)"
-    }
-
-    /// Kotlin modifier for a setter.
-    func kotlinSetVisibilityString(isGlobal: Bool, suffix: String) -> String {
-        guard setVisibility != .default && setVisibility != visibility else {
-            return ""
-        }
-        var string: String
-        switch setVisibility {
-        case .default, .internal:
-            string = "internal"
-        case .open, .public:
-            string = "public"
-        case .private:
-            string = "private"
-        case .fileprivate:
-            string = isGlobal ? "private" : "internal"
-        }
-        return string.isEmpty || suffix.isEmpty ? string : "\(string)\(suffix)"
-    }
-}
-
-extension Parameter where V: Expression {
-    /// Translate to an equivalent Kotlin parameter.
-    func translate(translator: KotlinTranslator) -> Parameter<KotlinExpression> {
-        var kdefaultValue: KotlinExpression? = nil
-        if let defaultValue {
-            kdefaultValue = translator.translateExpression(defaultValue)
-        }
-        return Parameter<KotlinExpression>(externalLabel: externalLabel, internalLabel: internalLabel, declaredType: declaredType, isInOut: isInOut, isVariadic: isVariadic, attributes: attributes, defaultValue: kdefaultValue)
-    }
-}
-
-extension Parameter {
-    /// - Seealso: ``KotlinSyntaxNode/insertDependencies(into:)``
-    func insertDependencies(into dependencies: inout KotlinDependencies) {
-        declaredType.insertDependencies(into: &dependencies)
-    }
-
-    /// Add messages about unsupported aspects of this parameter.
-    func appendKotlinMessages(to node: KotlinSyntaxNode, source: Source) {
-        declaredType.appendKotlinMessages(to: node, source: source)
-        if attributes.contains(.unknown) {
-            node.messages.append(.kotlinAttributeOnParameterUnsupported(node, source: source))
-        }
-    }
-}
-
-enum KotlinDirectiveAttribute: String {
-    case nocopy
 }
 
 extension Attributes {
@@ -302,20 +196,29 @@ extension Attribute {
     }
 }
 
-extension KotlinStatement {
-    /// Return supported attributes and add warnings for unsupported attributes.
-    func processAttributes(_ attributes: Attributes, from statement: Statement, translator: KotlinTranslator) -> Attributes {
-        // Keep Kotlin attributes that devs may use within SKIP blocks
-        guard !statement.isInSkipBlock else {
-            return attributes
+extension ExtensionDeclaration {
+    /// Whether this extension's members can be moved into the extended type definition.
+    var canMoveIntoExtendedType: Bool {
+        return extends.generics.isEmpty && !generics.entries.contains { $0.whereEqual != nil || !$0.inherits.isEmpty }
+    }
+
+    /// Whether this extension's visibility allows it to be moved into its extended type definition.
+    ///
+    /// We do not move extensions marked `private` or `fileprivate` as a way for the user to veto movement.
+    var visibilityAllowsMoveIntoExtendedType: Bool {
+        return modifiers.visibility != .private && modifiers.visibility != .fileprivate
+    }
+
+    /// Whether this extension is in the same file as its extended type.
+    var isInSameFileAsExtendedType: Bool {
+        var root = parent
+        while let next = root?.parent {
+            root = next
         }
-        let supported: [Attribute] = attributes.attributes.filter { $0.kind != .unknown }
-        if supported.count == attributes.attributes.count {
-            return attributes
-        } else {
-            messages.append(.kotlinAttributeUnsupported(self, source: translator.syntaxTree.source))
-            return Attributes(attributes: supported)
+        guard let codeBlock = root as? CodeBlock else {
+            return false
         }
+        return codeBlock.statements.containsDeclaration(of: extends)
     }
 }
 
@@ -363,6 +266,112 @@ extension Generics {
     }
 }
 
+extension Modifiers {
+    /// Kotlin modifier string for a member.
+    func kotlinMemberString(isGlobal: Bool, isOpen: Bool, suffix: String) -> String {
+        var string: String
+        switch visibility {
+        case .default, .internal:
+            string = "internal"
+        case .open, .public:
+            string = ""
+        case .private:
+            string = "private"
+        case .fileprivate:
+            string = isGlobal ? "private" : "internal"
+        }
+        if isOverride {
+            string = string.isEmpty ? "override" : "\(string) override"
+        } else if isOpen && !isStatic {
+            string = string.isEmpty ? "open" : "\(string) open"
+        }
+        return string.isEmpty || suffix.isEmpty ? string : "\(string)\(suffix)"
+    }
+
+    /// Kotlin modifier for a setter.
+    func kotlinSetVisibilityString(isGlobal: Bool, suffix: String) -> String {
+        guard setVisibility != .default && setVisibility != visibility else {
+            return ""
+        }
+        var string: String
+        switch setVisibility {
+        case .default, .internal:
+            string = "internal"
+        case .open, .public:
+            string = "public"
+        case .private:
+            string = "private"
+        case .fileprivate:
+            string = isGlobal ? "private" : "internal"
+        }
+        return string.isEmpty || suffix.isEmpty ? string : "\(string)\(suffix)"
+    }
+}
+
+extension Operator {
+    /// Kotlin version of this operator's symbol.
+    var kotlinSymbol: String {
+        switch symbol {
+        case "??":
+            return "?:"
+        case "as!":
+            return "as"
+        case "..<":
+            return "until"
+        case "...":
+            return ".."
+        case "|":
+            return "or"
+        case "&":
+            return "and"
+        case "^":
+            return "xor"
+        case "<<":
+            return "shl"
+        case ">>":
+            return "shr"
+        default:
+            // Note that we construct operators with non-Swift symbols like 'in'
+            return symbol
+        }
+    }
+}
+
+extension Parameter where V: Expression {
+    /// Translate to an equivalent Kotlin parameter.
+    func translate(translator: KotlinTranslator) -> Parameter<KotlinExpression> {
+        var kdefaultValue: KotlinExpression? = nil
+        if let defaultValue {
+            kdefaultValue = translator.translateExpression(defaultValue)
+        }
+        return Parameter<KotlinExpression>(externalLabel: externalLabel, internalLabel: internalLabel, declaredType: declaredType, isInOut: isInOut, isVariadic: isVariadic, attributes: attributes, defaultValue: kdefaultValue)
+    }
+}
+
+extension Parameter {
+    /// - Seealso: ``KotlinSyntaxNode/insertDependencies(into:)``
+    func insertDependencies(into dependencies: inout KotlinDependencies) {
+        declaredType.insertDependencies(into: &dependencies)
+    }
+
+    /// Add messages about unsupported aspects of this parameter.
+    func appendKotlinMessages(to node: KotlinSyntaxNode, source: Source) {
+        declaredType.appendKotlinMessages(to: node, source: source)
+        if attributes.contains(.unknown) {
+            node.messages.append(.kotlinAttributeOnParameterUnsupported(node, source: source))
+        }
+    }
+}
+
+extension Source.FilePath {
+    /// Synthetic source that will be translated to a file appropriate for package-level support code.
+    var kotlinPackageSupport: Source.FilePath {
+        var filePath = self
+        filePath.name = "PackageSupport.swift"
+        return filePath
+    }
+}
+
 extension Array where Element == KotlinExpression {
     /// Append this expression array as combined logical conditions, e.g. for an `if`.
     func appendAsLogicalConditions(to output: OutputGenerator, op: Operator = .with(symbol: "&&"), indentation: Indentation) {
@@ -398,14 +407,5 @@ extension Array where Element == KotlinExpression {
             return self[0]
         }
         return KotlinBinaryOperator(op: .with(symbol: "&&"), lhs: Array(self[0..<(count - 1)]).asLogicalExpression(), rhs: self[count - 1])
-    }
-}
-
-extension Source.FilePath {
-    /// Synthetic source that will be translated to a file appropriate for package-level support code.
-    var kotlinPackageSupport: Source.FilePath {
-        var filePath = self
-        filePath.name = "PackageSupport.swift"
-        return filePath
     }
 }

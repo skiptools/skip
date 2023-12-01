@@ -2387,6 +2387,7 @@ class KotlinStringLiteral: KotlinExpression {
     var segments: [StringLiteralSegment<KotlinExpression>] = []
     var isMultiline = false
     var isCharacter = false
+    var expressibleByStringInterpolationType: TypeSignature = .none
 
     static func translate(expression: StringLiteral, translator: KotlinTranslator) -> KotlinStringLiteral {
         let kexpression = KotlinStringLiteral(expression: expression)
@@ -2404,6 +2405,7 @@ class KotlinStringLiteral: KotlinExpression {
         kexpression.segments = segments
         kexpression.isMultiline = expression.isMultiline
         kexpression.isCharacter = expression.inferredType == .character
+        kexpression.expressibleByStringInterpolationType = expression.expressibleByStringInterpolationType
         return kexpression
     }
 
@@ -2475,6 +2477,14 @@ class KotlinStringLiteral: KotlinExpression {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
+        if expressibleByStringInterpolationType != .none {
+            appendExpressibleByStringInterpolation(to: output, indentation: indentation)
+        } else {
+            appendInlineInterpolation(to: output, indentation: indentation)
+        }
+    }
+
+    private func appendInlineInterpolation(to output: OutputGenerator, indentation: Indentation) {
         let delimiter = isCharacter ? "'" : isMultiline ? "\"\"\"" : "\""
         output.append(delimiter)
         for segment in segments {
@@ -2489,6 +2499,22 @@ class KotlinStringLiteral: KotlinExpression {
             }
         }
         output.append(delimiter)
+    }
+
+    private func appendExpressibleByStringInterpolation(to output: OutputGenerator, indentation: Indentation) {
+        output.append("{\n")
+        let bodyIndentation = indentation.inc()
+        output.append(bodyIndentation).append("val str = ").append(expressibleByStringInterpolationType.kotlin).append("()\n")
+        for segment in segments {
+            switch segment {
+            case .string(let string):
+                output.append(bodyIndentation).append("str.appendLiteral(\"").append(string).append("\")\n")
+            case .expression(let expression):
+                output.append(bodyIndentation).append("str.appendInterpolation(").append(expression, indentation: bodyIndentation).append(")\n")
+            }
+        }
+        output.append(bodyIndentation).append("str\n")
+        output.append(indentation).append("}()")
     }
 }
 

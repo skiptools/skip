@@ -147,12 +147,11 @@ class ArrayLiteral: Expression {
             elementType = expecting.elementType
             elements.forEach { $0.inferTypes(context: context, expecting: elementType) }
         } else {
-            switch expecting.asTypealiased(nil).withoutOptionality() {
-            case .named, .member, .module:
+            if expecting.isNamedType {
                 // An array literal that maps to a named type is likely an option set
                 elementType = expecting
                 elements.forEach { $0.inferTypes(context: context, expecting: expecting) }
-            default:
+            } else {
                 for element in elements {
                     element.inferTypes(context: context, expecting: elementType)
                     elementType = elementType.or(element.inferredType)
@@ -1682,6 +1681,7 @@ class PrefixOperator: Expression {
 class StringLiteral: Expression {
     let segments: [StringLiteralSegment<Expression>]
     let isMultiline: Bool
+    var expressibleByStringInterpolationType: TypeSignature = .none
 
     init(segments: [StringLiteralSegment<Expression>], isMultiline: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.segments = segments

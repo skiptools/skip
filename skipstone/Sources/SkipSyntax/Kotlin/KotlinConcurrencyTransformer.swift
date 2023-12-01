@@ -163,7 +163,7 @@ extension CodebaseInfo.Context {
         if declaration.apiFlags.contains(.mainActor) {
             return true
         }
-        let arguments = declaration.parameters.map { LabeledValue(label: $0.externalLabel, value: $0.declaredType) }
+        let arguments = declaration.parameters.map { LabeledValue(label: $0.externalLabel, value: ArgumentValue(type: $0.declaredType)) }
         let matches: [APIMatch]
         if let owningType = owningType(of: declaration) {
             matches = matchFunction(name: declaration.name, inConstrained: owningType, arguments: arguments)

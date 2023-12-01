@@ -99,8 +99,8 @@ final class CodebaseInfoTests: XCTestCase {
 
     func testSubscript() async throws {
         let context = try await setUpContext(swift: "")
-        XCTAssertEqual([.function([.init(type: .int)], .int, [], nil)], context.matchSubscript(inConstrained: .array(.int), arguments: [LabeledValue<TypeSignature>(label: nil, value: .int)]).map(\.signature))
-        XCTAssertEqual([.function([.init(type: .string)], .optional(.int), [], nil)], context.matchSubscript(inConstrained: .dictionary(.string, .int), arguments: [LabeledValue<TypeSignature>(label: nil, value: .string)]).map(\.signature))
+        XCTAssertEqual([.function([.init(type: .int)], .int, [], nil)], context.matchSubscript(inConstrained: .array(.int), arguments: [LabeledValue(label: nil, value: ArgumentValue(type: .int))]).map(\.signature))
+        XCTAssertEqual([.function([.init(type: .string)], .optional(.int), [], nil)], context.matchSubscript(inConstrained: .dictionary(.string, .int), arguments: [LabeledValue(label: nil, value: ArgumentValue(type: .string))]).map(\.signature))
     }
 
     func testFunction() async throws {
@@ -118,8 +118,8 @@ final class CodebaseInfoTests: XCTestCase {
 
         XCTAssertEqual([.function([], .void, [], nil)], context.matchFunction(name: "voidF", inConstrained: .named("TestClass", []), arguments: []).map(\.signature))
 
-        XCTAssertEqual([.function([.init(type: .int), .init(label: "p2", type: .string, hasDefaultValue: true)], .int, [], nil)], context.matchFunction(name: "baseF", inConstrained: .named("TestClass", []), arguments: [LabeledValue<TypeSignature>(label: nil, value: .none), LabeledValue<TypeSignature>(label: "p2", value: .none)]).map(\.signature))
-        XCTAssertEqual([.function([.init(type: .int)], .int, [], nil)], context.matchFunction(name: "baseF", inConstrained: .named("TestClass", []), arguments: [LabeledValue<TypeSignature>(label: nil, value: .none)]).map(\.signature))
+        XCTAssertEqual([.function([.init(type: .int), .init(label: "p2", type: .string, hasDefaultValue: true)], .int, [], nil)], context.matchFunction(name: "baseF", inConstrained: .named("TestClass", []), arguments: [LabeledValue(label: nil, value: ArgumentValue(type: .none)), LabeledValue(label: "p2", value: ArgumentValue(type: .none))]).map(\.signature))
+        XCTAssertEqual([.function([.init(type: .int)], .int, [], nil)], context.matchFunction(name: "baseF", inConstrained: .named("TestClass", []), arguments: [LabeledValue(label: nil, value: ArgumentValue(type: .none))]).map(\.signature))
     }
 
     func testTrailingClosures() async throws {
@@ -142,17 +142,17 @@ final class CodebaseInfoTests: XCTestCase {
         }
         """)
 
-        XCTAssertEqual([.function([.init(label: "p1", type: .int), .init(label: "tc1", type: .function([.init(type: .string)], .int, [], nil))], .string, [], nil)], context.matchFunction(name: "trailingClosureF1", inConstrained: .named("TestClass", []), arguments: [LabeledValue<TypeSignature>(label: "p1", value: .none), LabeledValue<TypeSignature>(label: "tc1", value: .none)]).map(\.signature))
+        XCTAssertEqual([.function([.init(label: "p1", type: .int), .init(label: "tc1", type: .function([.init(type: .string)], .int, [], nil))], .string, [], nil)], context.matchFunction(name: "trailingClosureF1", inConstrained: .named("TestClass", []), arguments: [LabeledValue(label: "p1", value: ArgumentValue(type: .none)), LabeledValue(label: "tc1", value: ArgumentValue(type: .none))]).map(\.signature))
 
         let f2Type: TypeSignature = .function([.init(label: "p1", type: .string, hasDefaultValue: true), .init(label: "tc1", type: .function([.init(type: .string), .init(type: .string)], .int, [], nil), hasDefaultValue: true), .init(label: "tc2", type: .function([], .void, [], nil), hasDefaultValue: true)], .void, [], nil)
-        XCTAssertEqual([f2Type], context.matchFunction(name: "trailingClosureF2", inConstrained: .named("TestClass", []), arguments: [LabeledValue<TypeSignature>(label: "p1", value: .none), LabeledValue<TypeSignature>(label: "tc1", value: .none), LabeledValue<TypeSignature>(label: "tc2", value: .none)]).map(\.signature))
-        XCTAssertEqual([f2Type], context.matchFunction(name: "trailingClosureF2", inConstrained: .named("TestClass", []), arguments: [LabeledValue<TypeSignature>(label: "p1", value: .none), LabeledValue<TypeSignature>(label: nil, value: .none), LabeledValue<TypeSignature>(label: "tc2", value: .none)]).map(\.signature))
+        XCTAssertEqual([f2Type], context.matchFunction(name: "trailingClosureF2", inConstrained: .named("TestClass", []), arguments: [LabeledValue(label: "p1", value: ArgumentValue(type: .none)), LabeledValue(label: "tc1", value: ArgumentValue(type: .none)), LabeledValue(label: "tc2", value: ArgumentValue(type: .none))]).map(\.signature))
+        XCTAssertEqual([f2Type], context.matchFunction(name: "trailingClosureF2", inConstrained: .named("TestClass", []), arguments: [LabeledValue(label: "p1", value: ArgumentValue(type: .none)), LabeledValue(label: nil, value: ArgumentValue(type: .none)), LabeledValue(label: "tc2", value: ArgumentValue(type: .none))]).map(\.signature))
         XCTAssertEqual([.function([], .void, [], nil)], context.matchFunction(name: "trailingClosureF2", inConstrained: .named("TestClass", []), arguments: []).map(\.signature))
 
         let f3Type: TypeSignature = .function([.init(type: .optional(.dictionary(.int, .string)), hasDefaultValue: true), .init(label: "tc1", type: .function([], .array(.int), [], nil))], .function([.init(type: .named("TestEnum", []))], .int, [], nil), [], nil)
-        XCTAssertEqual([f3Type], context.matchFunction(name: "trailingClosureF3", inConstrained: .named("TestClass", []), arguments: [LabeledValue<TypeSignature>(label: nil, value: .none), LabeledValue<TypeSignature>(label: "tc1", value: .none)]).map(\.signature))
-        XCTAssertEqual([f3Type], context.matchFunction(name: "trailingClosureF3", inConstrained: .named("TestClass", []), arguments: [LabeledValue<TypeSignature>(label: nil, value: .none), LabeledValue<TypeSignature>(label: nil, value: .none)]).map(\.signature))
-        XCTAssertEqual([.function([.init(label: "tc1", type: .function([], .array(.int), [], nil))], .function([.init(type: .named("TestEnum", []))], .int, [], nil), [], nil)], context.matchFunction(name: "trailingClosureF3", inConstrained: .named("TestClass", []), arguments: [LabeledValue<TypeSignature>(label: nil, value: .function([], .none, [], nil))]).map(\.signature))
+        XCTAssertEqual([f3Type], context.matchFunction(name: "trailingClosureF3", inConstrained: .named("TestClass", []), arguments: [LabeledValue(label: nil, value: ArgumentValue(type: .none)), LabeledValue(label: "tc1", value: ArgumentValue(type: .none))]).map(\.signature))
+        XCTAssertEqual([f3Type], context.matchFunction(name: "trailingClosureF3", inConstrained: .named("TestClass", []), arguments: [LabeledValue(label: nil, value: ArgumentValue(type: .none)), LabeledValue(label: nil, value: ArgumentValue(type: .none))]).map(\.signature))
+        XCTAssertEqual([.function([.init(label: "tc1", type: .function([], .array(.int), [], nil))], .function([.init(type: .named("TestEnum", []))], .int, [], nil), [], nil)], context.matchFunction(name: "trailingClosureF3", inConstrained: .named("TestClass", []), arguments: [LabeledValue(label: nil, value: ArgumentValue(type: .function([], .none, [], nil)))]).map(\.signature))
     }
 
     func testFunctionOverload() async throws {
@@ -171,11 +171,11 @@ final class CodebaseInfoTests: XCTestCase {
         }
         """)
 
-        XCTAssertEqual([.function([.init(label: "p", type: .int32)], .int32, [], nil)], context.matchFunction(name: "f", arguments: [.init(label: "p", value: .int)]).map(\.signature))
-        XCTAssertEqual([.function([.init(label: "p", type: .float)], .float, [], nil)], context.matchFunction(name: "f", arguments: [.init(label: "p", value: .double)]).map(\.signature))
-        XCTAssertEqual([.function([.init(label: "p", type: .string)], .string, [], nil)], context.matchFunction(name: "f", arguments: [.init(label: "p", value: .string)]).map(\.signature))
-        XCTAssertEqual([.function([.init(label: "p", type: .any)], .any, [], nil)], context.matchFunction(name: "f", arguments: [.init(label: "p", value: .array(.int))]).map(\.signature))
-        XCTAssertEqual(4, context.matchFunction(name: "f", arguments: [.init(label: "p", value: .none)]).count)
+        XCTAssertEqual([.function([.init(label: "p", type: .int32)], .int32, [], nil)], context.matchFunction(name: "f", arguments: [.init(label: "p", value: ArgumentValue(type: .int))]).map(\.signature))
+        XCTAssertEqual([.function([.init(label: "p", type: .float)], .float, [], nil)], context.matchFunction(name: "f", arguments: [.init(label: "p", value: ArgumentValue(type: .double))]).map(\.signature))
+        XCTAssertEqual([.function([.init(label: "p", type: .string)], .string, [], nil)], context.matchFunction(name: "f", arguments: [.init(label: "p", value: ArgumentValue(type: .string))]).map(\.signature))
+        XCTAssertEqual([.function([.init(label: "p", type: .any)], .any, [], nil)], context.matchFunction(name: "f", arguments: [.init(label: "p", value: ArgumentValue(type: .array(.int)))]).map(\.signature))
+        XCTAssertEqual(4, context.matchFunction(name: "f", arguments: [.init(label: "p", value: ArgumentValue(type: .none))]).count)
     }
 
     func testInheritanceFunctionOverload() async throws {
@@ -194,10 +194,10 @@ final class CodebaseInfoTests: XCTestCase {
         }
         """)
 
-        XCTAssertEqual([.function([.init(label: "p", type: .named("P", []))], .void, [], nil)], context.matchFunction(name: "f", arguments: [.init(label: "p", value: .named("P", []))]).map(\.signature))
-        XCTAssertEqual([.function([.init(label: "p", type: .named("P", []))], .void, [], nil)], context.matchFunction(name: "f", arguments: [.init(label: "p", value: .named("A", []))]).map(\.signature))
-        XCTAssertEqual([.function([.init(label: "p", type: .named("B", []))], .void, [], nil)], context.matchFunction(name: "f", arguments: [.init(label: "p", value: .named("B", []))]).map(\.signature))
-        XCTAssertEqual([.function([.init(label: "p", type: .any)], .void, [], nil)], context.matchFunction(name: "f", arguments: [.init(label: "p", value: .named("D", []))]).map(\.signature))
+        XCTAssertEqual([.function([.init(label: "p", type: .named("P", []))], .void, [], nil)], context.matchFunction(name: "f", arguments: [.init(label: "p", value: ArgumentValue(type: .named("P", [])))]).map(\.signature))
+        XCTAssertEqual([.function([.init(label: "p", type: .named("P", []))], .void, [], nil)], context.matchFunction(name: "f", arguments: [.init(label: "p", value: ArgumentValue(type: .named("A", [])))]).map(\.signature))
+        XCTAssertEqual([.function([.init(label: "p", type: .named("B", []))], .void, [], nil)], context.matchFunction(name: "f", arguments: [.init(label: "p", value: ArgumentValue(type: .named("B", [])))]).map(\.signature))
+        XCTAssertEqual([.function([.init(label: "p", type: .any)], .void, [], nil)], context.matchFunction(name: "f", arguments: [.init(label: "p", value: ArgumentValue(type: .named("D", [])))]).map(\.signature))
     }
 
     func testConstructor() async throws {
@@ -215,8 +215,8 @@ final class CodebaseInfoTests: XCTestCase {
         }
         """)
 
-        XCTAssertEqual([.function([.init(label: "v", type: .int, hasDefaultValue: true)], .named("TestStruct", []), [], nil)], context.matchFunction(name: "TestStruct", arguments: [LabeledValue<TypeSignature>(label: "v", value: .none)]).map(\.signature))
-        XCTAssertEqual([.function([.init(label: "v", type: .int, hasDefaultValue: true), .init(label: "o", type: .optional(.int), hasDefaultValue: true)], .named("TestStruct", []), [], nil)], context.matchFunction(name: "TestStruct", arguments: [LabeledValue<TypeSignature>(label: "v", value: .none), LabeledValue<TypeSignature>(label: "o", value: .none)]).map(\.signature))
+        XCTAssertEqual([.function([.init(label: "v", type: .int, hasDefaultValue: true)], .named("TestStruct", []), [], nil)], context.matchFunction(name: "TestStruct", arguments: [LabeledValue(label: "v", value: ArgumentValue(type: .none))]).map(\.signature))
+        XCTAssertEqual([.function([.init(label: "v", type: .int, hasDefaultValue: true), .init(label: "o", type: .optional(.int), hasDefaultValue: true)], .named("TestStruct", []), [], nil)], context.matchFunction(name: "TestStruct", arguments: [LabeledValue(label: "v", value: ArgumentValue(type: .none)), LabeledValue(label: "o", value: ArgumentValue(type: .none))]).map(\.signature))
     }
 
     func testEnums() async throws {
@@ -242,8 +242,8 @@ final class CodebaseInfoTests: XCTestCase {
         XCTAssertEqual([.init(type: .int)], context.associatedValueSignatures(of: "case2", inConstrained: .metaType(enumAssociatedValueSignature)))
         XCTAssertEqual([.init(label: "d", type: .double), .init(label: "s", type: .string)], context.associatedValueSignatures(of: "case3", inConstrained: .metaType(enumAssociatedValueSignature)))
 
-        XCTAssertEqual([.function([.init(type: .int)], enumAssociatedValueSignature, [], nil)], context.matchFunction(name: "case2", inConstrained: .metaType(enumAssociatedValueSignature), arguments: [LabeledValue<TypeSignature>(value: .int)]).map(\.signature))
-        XCTAssertEqual([.function([.init(label: "d", type: .double), .init(label: "s", type: .string)], enumAssociatedValueSignature, [], nil)], context.matchFunction(name: "case3", inConstrained: .metaType(enumAssociatedValueSignature), arguments: [LabeledValue<TypeSignature>(label: "d", value: .double), LabeledValue<TypeSignature>(label: "s", value: .string)]).map(\.signature))
+        XCTAssertEqual([.function([.init(type: .int)], enumAssociatedValueSignature, [], nil)], context.matchFunction(name: "case2", inConstrained: .metaType(enumAssociatedValueSignature), arguments: [LabeledValue(value: ArgumentValue(type: .int))]).map(\.signature))
+        XCTAssertEqual([.function([.init(label: "d", type: .double), .init(label: "s", type: .string)], enumAssociatedValueSignature, [], nil)], context.matchFunction(name: "case3", inConstrained: .metaType(enumAssociatedValueSignature), arguments: [LabeledValue(label: "d", value: ArgumentValue(type: .double)), LabeledValue(label: "s", value: ArgumentValue(type: .string))]).map(\.signature))
     }
 
     func testTuples() async throws {

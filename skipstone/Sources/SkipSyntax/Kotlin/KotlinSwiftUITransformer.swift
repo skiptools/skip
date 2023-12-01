@@ -57,13 +57,8 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         guard let codebaseInfo else {
             return false
         }
-        switch type {
-        case .named, .member:
-            return codebaseInfo.global.protocolSignatures(forNamed: type)
+        return type.isNamedType && codebaseInfo.global.protocolSignatures(forNamed: type)
                 .contains { $0.isNamed(named, moduleName: "SwiftUI") }
-        default:
-            return false
-        }
     }
 
     private func translateVisit(_ node: KotlinSyntaxNode, translator: KotlinTranslator) -> VisitResult<KotlinSyntaxNode> {

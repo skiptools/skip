@@ -76,7 +76,7 @@ extension CodebaseInfo.Context {
         assert(global.kotlin != nil)
         let constrainedSignature = declaration.functionType.constrainedTypeWithGenerics(generics)
         let parameters = constrainedSignature.parameters
-        let arguments = parameters.map { LabeledValue(label: $0.label, value: $0.type) }
+        let arguments = parameters.map { LabeledValue(label: $0.label, value: ArgumentValue(type: $0.type)) }
         let matches = matchFunction(name: declaration.name, inConstrained: type.constrainedTypeWithGenerics(generics), arguments: arguments, excludeConstrainedExtensions: true)
         return !matches.isEmpty
     }

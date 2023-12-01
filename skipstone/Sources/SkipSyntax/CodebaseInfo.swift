@@ -399,7 +399,7 @@ public class CodebaseInfo {
         }
 
         /// Return API information for the possible functions being called with the given arguments.
-        func matchFunction(name: String, moduleName: String? = nil, arguments: [LabeledValue<TypeSignature>]) -> [APIMatch] {
+        func matchFunction(name: String, moduleName: String? = nil, arguments: [LabeledValue<ArgumentValue>]) -> [APIMatch] {
             let candidates = Self.dedupe(functionCandidates(name: name, moduleName: moduleName, arguments: arguments)).sorted { $0.score > $1.score }
             guard let topCandidate = candidates.first else {
                 return []
@@ -412,7 +412,7 @@ public class CodebaseInfo {
         /// This function also works for the creation of an enum case with associated values.
         ///
         /// - Note: Assumes that the constrained `type` has been resolved.
-        func matchFunction(name: String?, inConstrained type: TypeSignature, arguments: [LabeledValue<TypeSignature>], excludeConstrainedExtensions: Bool = false) -> [APIMatch] {
+        func matchFunction(name: String?, inConstrained type: TypeSignature, arguments: [LabeledValue<ArgumentValue>], excludeConstrainedExtensions: Bool = false) -> [APIMatch] {
             let type = type.asOptional(false)
             if case .tuple(let labels, let types) = type.asTypealiased(nil) {
                 for (index, label) in labels.enumerated() {
@@ -447,17 +447,17 @@ public class CodebaseInfo {
         }
 
         /// If the given function signature can be called with the given arguments, return the call signature.
-        func callableSignature(of functionSignature: TypeSignature, generics: Generics? = nil, arguments: [LabeledValue<TypeSignature>]) -> TypeSignature? {
+        func callableSignature(of functionSignature: TypeSignature, generics: Generics? = nil, arguments: [LabeledValue<ArgumentValue>]) -> TypeSignature? {
             return matchFunction(signature: functionSignature, generics: generics, declarationType: .functionDeclaration, availability: .available, arguments: arguments, level: 0)?.match.signature
         }
         
         /// Return the signatures of the possible subscripts being called with the given arguments.
         ///
         /// - Note: Assumes that the constrained `type` has been resolved.
-        func matchSubscript(inConstrained type: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> [APIMatch] {
+        func matchSubscript(inConstrained type: TypeSignature, arguments: [LabeledValue<ArgumentValue>]) -> [APIMatch] {
             var type = type.asTypealiased(nil).asOptional(false)
             if case .array(let elementType) = type, arguments.count == 1 {
-                if case .range = arguments[0].value {
+                if case .range = arguments[0].value.type {
                     // Slice - fall through to symbols
                 } else {
                     let signature: TypeSignature = .function([TypeSignature.Parameter(type: .int)], elementType.mappingSelf(to: type), [], nil)
@@ -536,7 +536,7 @@ public class CodebaseInfo {
         }
 
         /// - Note: Returns unsorted, un-deduped results.
-        private func functionCandidates(name: String, moduleName: String?, constrainedGenerics: [TypeSignature] = [], arguments: [LabeledValue<TypeSignature>], includeTypes: Bool = true) -> [FunctionCandidate] {
+        private func functionCandidates(name: String, moduleName: String?, constrainedGenerics: [TypeSignature] = [], arguments: [LabeledValue<ArgumentValue>], includeTypes: Bool = true) -> [FunctionCandidate] {
             let lookup = global.lookup(name: name, moduleName: moduleName, qualifiedMatch: true)
             let items = ranked(lookup)
             let funcs = items.filter { $0.declarationType == .functionDeclaration }
@@ -559,7 +559,7 @@ public class CodebaseInfo {
         }
 
         /// - Note: Returns unsorted, un-deduped results.
-        private func functionCandidates(name: String?, in type: TypeSignature, constrainedGenerics: [TypeSignature], arguments: [LabeledValue<TypeSignature>], excludeConstrainedExtensions: Bool) -> [FunctionCandidate] {
+        private func functionCandidates(name: String?, in type: TypeSignature, constrainedGenerics: [TypeSignature], arguments: [LabeledValue<ArgumentValue>], excludeConstrainedExtensions: Bool) -> [FunctionCandidate] {
             let isStatic = type.isMetaType
             let type = type.asMetaType(false)
 
@@ -590,7 +590,7 @@ public class CodebaseInfo {
         }
 
         /// - Note: Returns unsorted, un-deduped results.
-        private func functionCandidates(name: String, in typeInfo: TypeInfo, constrainedGenerics: [TypeSignature], arguments: [LabeledValue<TypeSignature>], isStatic: Bool, level: Int = 0) -> [FunctionCandidate] {
+        private func functionCandidates(name: String, in typeInfo: TypeInfo, constrainedGenerics: [TypeSignature], arguments: [LabeledValue<ArgumentValue>], isStatic: Bool, level: Int = 0) -> [FunctionCandidate] {
             guard typeInfo.isApplicable(toConstrainedGenerics: constrainedGenerics, codebaseInfo: self) else {
                 return []
             }
@@ -622,7 +622,7 @@ public class CodebaseInfo {
         }
 
         /// - Note: Returns unsorted, un-deduped results.
-        private func subscriptCandidates(in typeInfo: TypeInfo, constrainedGenerics: [TypeSignature], arguments: [LabeledValue<TypeSignature>], isStatic: Bool, level: Int = 0) -> [FunctionCandidate] {
+        private func subscriptCandidates(in typeInfo: TypeInfo, constrainedGenerics: [TypeSignature], arguments: [LabeledValue<ArgumentValue>], isStatic: Bool, level: Int = 0) -> [FunctionCandidate] {
             guard typeInfo.isApplicable(toConstrainedGenerics: constrainedGenerics, codebaseInfo: self) else {
                 return []
             }
@@ -646,7 +646,7 @@ public class CodebaseInfo {
         }
 
         /// - Note: Returns unsorted, un-deduped results.
-        private func initCandidates(for typeInfos: [TypeInfo], in contextTypeInfo: TypeInfo? = nil, constrainedGenerics: [TypeSignature] = [], arguments: [LabeledValue<TypeSignature>]) -> [FunctionCandidate] {
+        private func initCandidates(for typeInfos: [TypeInfo], in contextTypeInfo: TypeInfo? = nil, constrainedGenerics: [TypeSignature] = [], arguments: [LabeledValue<ArgumentValue>]) -> [FunctionCandidate] {
             guard let primaryTypeInfo = typeInfos.first(where: { $0.declarationType != .extensionDeclaration }) else {
                 return []
             }
@@ -676,14 +676,14 @@ public class CodebaseInfo {
             return initSignatures
         }
 
-        private func syntheticInitCandidate(for type: TypeSignature, arguments: [LabeledValue<TypeSignature>], apiFlags: APIFlags = [], availability: Availability = .available) -> FunctionCandidate {
-            let initParameters = arguments.map { TypeSignature.Parameter(label: $0.label, type: $0.value) }
+        private func syntheticInitCandidate(for type: TypeSignature, arguments: [LabeledValue<ArgumentValue>], apiFlags: APIFlags = [], availability: Availability = .available) -> FunctionCandidate {
+            let initParameters = arguments.map { TypeSignature.Parameter(label: $0.label, type: $0.value.type) }
             let match = APIMatch(signature: .function(initParameters, type, apiFlags, nil), apiFlags: apiFlags, declarationType: .initDeclaration, isMember: true, availability: availability)
             return FunctionCandidate(match: match, score: 0.0, level: 0)
         }
 
         /// - Note: Returns unsorted results.
-        private func typeNameFunctionCandidates(for type: TypeSignature, moduleName: String? = nil, constrainedGenerics: [TypeSignature], arguments: [LabeledValue<TypeSignature>], excludeConstrainedExtensions: Bool) -> [FunctionCandidate] {
+        private func typeNameFunctionCandidates(for type: TypeSignature, moduleName: String? = nil, constrainedGenerics: [TypeSignature], arguments: [LabeledValue<ArgumentValue>], excludeConstrainedExtensions: Bool) -> [FunctionCandidate] {
             switch type.withoutOptionality() {
             case .member(let baseType, let type):
                 return functionCandidates(name: type.name, in: baseType.asMetaType(true), constrainedGenerics: constrainedGenerics, arguments: arguments, excludeConstrainedExtensions: excludeConstrainedExtensions)
@@ -693,8 +693,8 @@ public class CodebaseInfo {
                 return typeNameFunctionCandidates(for: alias.from, constrainedGenerics: constrainedGenerics, arguments: arguments, excludeConstrainedExtensions: excludeConstrainedExtensions)
             default:
                 // Is this a cast?
-                if type.isNumeric && arguments.count == 1 && arguments[0].label == nil && arguments[0].value.isNumeric {
-                    return [FunctionCandidate(match: APIMatch(signature: .function([.init(type: arguments[0].value)], type, [], nil), apiFlags: [], declarationType: .initDeclaration, isMember: true, availability: .available), score: 1.0, level: 0)]
+                if type.isNumeric && arguments.count == 1 && arguments[0].label == nil && arguments[0].value.type.isNumeric {
+                    return [FunctionCandidate(match: APIMatch(signature: .function([.init(type: arguments[0].value.type)], type, [], nil), apiFlags: [], declarationType: .initDeclaration, isMember: true, availability: .available), score: 1.0, level: 0)]
                 }
                 return functionCandidates(name: type.name, moduleName: moduleName, constrainedGenerics: constrainedGenerics, arguments: arguments, includeTypes: false)
             }
@@ -713,19 +713,19 @@ public class CodebaseInfo {
             return parameters.map { $0.mappingTypes(from: typeInfo.signature.generics, to: constrainedGenerics) }
         }
 
-        private func matchTuple(_ signature: TypeSignature, arguments: [LabeledValue<TypeSignature>]) -> TypeSignature {
+        private func matchTuple(_ signature: TypeSignature, arguments: [LabeledValue<ArgumentValue>]) -> TypeSignature {
             guard case .function(let parameterTypes, _, _, _) = signature, parameterTypes.count == arguments.count else {
                 return .none
             }
             return signature
         }
         
-        private func matchFunction(_ item: CodebaseInfoItem, in typeInfo: TypeInfo? = nil, constrainedGenerics: [TypeSignature] = [], arguments: [LabeledValue<TypeSignature>], level: Int) -> FunctionCandidate? {
+        private func matchFunction(_ item: CodebaseInfoItem, in typeInfo: TypeInfo? = nil, constrainedGenerics: [TypeSignature] = [], arguments: [LabeledValue<ArgumentValue>], level: Int) -> FunctionCandidate? {
             let generics = (item as? FunctionInfo)?.generics
             return matchFunction(signature: item.signature, generics: generics, declarationType: item.declarationType, availability: item.availability, in: typeInfo, constrainedGenerics: constrainedGenerics, arguments: arguments, level: level)
         }
 
-        private func matchFunction(signature: TypeSignature, generics: Generics? = nil, declarationType: StatementType, availability: Availability, in typeInfo: TypeInfo? = nil, constrainedGenerics: [TypeSignature] = [], arguments: [LabeledValue<TypeSignature>], level: Int) -> FunctionCandidate? {
+        private func matchFunction(signature: TypeSignature, generics: Generics? = nil, declarationType: StatementType, availability: Availability, in typeInfo: TypeInfo? = nil, constrainedGenerics: [TypeSignature] = [], arguments: [LabeledValue<ArgumentValue>], level: Int) -> FunctionCandidate? {
             guard case .function(let parameters, let returnType, let apiFlags, let attributes) = signature else {
                 return nil
             }
@@ -763,10 +763,10 @@ public class CodebaseInfo {
                 // If the parameter type was constrained (i.e. is generic), the argument value will likely be more specific
                 let argument = arguments[argumentIndex]
                 let parameterType: TypeSignature
-                if parameters[matchingIndex].type != constrainedParameters[matchingIndex].type && argument.value != .any {
-                    parameterType = argument.value.or(constrainedParameters[matchingIndex].type)
+                if parameters[matchingIndex].type != constrainedParameters[matchingIndex].type && argument.value.type != .any {
+                    parameterType = argument.value.type.or(constrainedParameters[matchingIndex].type)
                 } else {
-                    parameterType = constrainedParameters[matchingIndex].type.or(argument.value)
+                    parameterType = constrainedParameters[matchingIndex].type.or(argument.value.type)
                 }
                 var matchingParameter = parameters[matchingIndex]
                 matchingOriginalParameters.append(matchingParameter)
@@ -814,7 +814,7 @@ public class CodebaseInfo {
             return FunctionCandidate(match: match, score: totalScore, level: level)
         }
 
-        private func matchArgument(at argumentIndex: Int, in arguments: [LabeledValue<TypeSignature>], isVariadicContinuation: Bool = false, to parameters: [TypeSignature.Parameter], isSubscript: Bool = false, startIndex: Int) -> (index: Int, score: Double)? {
+        private func matchArgument(at argumentIndex: Int, in arguments: [LabeledValue<ArgumentValue>], isVariadicContinuation: Bool = false, to parameters: [TypeSignature.Parameter], isSubscript: Bool = false, startIndex: Int) -> (index: Int, score: Double)? {
             // Note: in the algorith below we give an extra point for matching a label (or absence of one), as opposed to
             // being a trailing closure that omits the label
             let argument = arguments[argumentIndex]
@@ -824,7 +824,7 @@ public class CodebaseInfo {
                         return nil
                     }
                     // If there is a label, then it either has to match or we have to be able to skip this parameter
-                    if label == parameter.label, let score = argument.value.compatibilityScore(target: parameter.type, codebaseInfo: self) {
+                    if label == parameter.label, let score = argument.value.type.compatibilityScore(target: parameter.type, codebaseInfo: self, isLiteral: argument.value.isLiteral, isInterpolated: argument.value.isInterpolated) {
                         return (startIndex + index, 1.0 + score)
                     } else if !parameter.hasDefaultValue {
                         return nil
@@ -833,9 +833,9 @@ public class CodebaseInfo {
                     // If there is no label, then either this parameter has to have no label, be a variadic continuation, or be a trailing closure.
                     // We don't give the extra point for a nil label on a function parameter to avoid advantaging trailing closures on nil-labeled
                     // params other trailing closures
-                    if (isVariadicContinuation || (parameter.label == nil && !parameter.type.isFunction) || isSubscript), let score = argument.value.compatibilityScore(target: parameter.type, codebaseInfo: self) {
+                    if (isVariadicContinuation || (parameter.label == nil && !parameter.type.isFunction) || isSubscript), let score = argument.value.type.compatibilityScore(target: parameter.type, codebaseInfo: self, isLiteral: argument.value.isLiteral, isInterpolated: argument.value.isInterpolated) {
                         return (startIndex + index, 1.0 + score)
-                    } else if parameter.type.isFunction, let score = argument.value.compatibilityScore(target: parameter.type, codebaseInfo: self) {
+                    } else if parameter.type.isFunction, let score = argument.value.type.compatibilityScore(target: parameter.type, codebaseInfo: self, isLiteral: argument.value.isLiteral, isInterpolated: argument.value.isInterpolated) {
                         if argumentIndex == arguments.count - 1 && startIndex + index < parameters.count - 1 && parameter.hasDefaultValue && parameters[(startIndex + index + 1)...].contains(where: { !$0.hasDefaultValue }) {
                             // If this trailing closure is the last supplied argument, save it for the next required parameter
                             // even if it matches this defaulted parameter. Handles the case of a defaulted closure parameter

@@ -18,354 +18,66 @@ struct Accessors {
     var messages: [Message] = []
 }
 
+/// Match when querying identifiers, functions, and other API.
+struct APIMatch {
+    var signature: TypeSignature
+    var apiFlags: APIFlags = []
+    /// May be `nil` for bultins like tuple members.
+    var declarationType: StatementType?
+    var isMember = false
+    var availability: Availability = .available
+}
+
+/// Flags that affect API calls.
+///
+/// - Note: `Codable` for use in `CodebaseInfo`.
+struct APIFlags: OptionSet, Hashable, Codable {
+    let rawValue: Int
+
+    static let async = APIFlags(rawValue: 1 << 0)
+    static let autoclosure = APIFlags(rawValue: 1 << 1)
+    static let mainActor = APIFlags(rawValue: 1 << 2)
+    static let `throws` = APIFlags(rawValue: 1 << 3)
+    static let viewBuilder = APIFlags(rawValue: 1 << 4)
+    static let writeable = APIFlags(rawValue: 1 << 5)
+
+    init(rawValue: Int) {
+        self.rawValue = rawValue
+    }
+
+    init(isAsync: Bool = false, isThrows: Bool = false, isMainActor: Bool = false, isViewBuilder: Bool = false, isWriteable: Bool = false) {
+        var apiFlags: APIFlags = []
+        if isAsync {
+            apiFlags.insert(.async)
+        }
+        if isThrows {
+            apiFlags.insert(.throws)
+        }
+        if isMainActor {
+            apiFlags.insert(.mainActor)
+        }
+        if isViewBuilder {
+            apiFlags.insert(.viewBuilder)
+        }
+        if isWriteable {
+            apiFlags.insert(.writeable)
+        }
+        self = apiFlags
+    }
+}
+
+/// Function argument value information.
+struct ArgumentValue {
+    var type: TypeSignature
+    var isLiteral = false
+    var isInterpolated = false
+}
+
 /// A variable or function's async behavior.
 enum AsyncBehavior {
     case sync
     case async
     case actor
-}
-
-/// Type of closure capture.
-enum CaptureType {
-    case none
-    case unowned
-    case weak
-}
-
-/// A labeled value, as used in function call parameters.
-struct LabeledValue<V> {
-    var label: String?
-    var value: V
-}
-
-/// Operator information.
-struct Operator: Equatable {
-    let symbol: String
-    let associativity: Associativity
-    let precedence: Precedence
-
-    /// Left associativity means `(a + b + c) == ((a + b) + c)`.
-    enum Associativity: Equatable {
-        case none
-        case left
-        case right
-    }
-
-    /// Return an operator for the given symbol.
-    static func with(symbol: String) -> Operator {
-        if let op = allBySymbol[symbol] {
-            return op
-        }
-        return Operator(symbol: symbol, associativity: .left, precedence: .unknown)
-    }
-
-    var isUnknown: Bool {
-        return precedence == .unknown
-    }
-
-    enum Precedence: Int {
-        case assignment = 0
-        case ternary
-        case unknown
-        case or
-        case and
-        case comparison
-        case nilCoalescing
-        case cast
-        case range
-        case addition
-        case multiplication
-        case shift
-    }
-
-    /// This information was obtained from https://developer.apple.com/documentation/swift/swift_standard_library/operator_declarations
-    private static let all: [Operator] = [
-        Operator(symbol: "=", associativity: .right, precedence: .assignment),
-        Operator(symbol: "*=", associativity: .right, precedence: .assignment),
-        Operator(symbol: "/=", associativity: .right, precedence: .assignment),
-        Operator(symbol: "%=", associativity: .right, precedence: .assignment),
-        Operator(symbol: "+=", associativity: .right, precedence: .assignment),
-        Operator(symbol: "-=", associativity: .right, precedence: .assignment),
-        Operator(symbol: "<<=", associativity: .right, precedence: .assignment),
-        Operator(symbol: ">>=", associativity: .right, precedence: .assignment),
-        Operator(symbol: "&=", associativity: .right, precedence: .assignment),
-        Operator(symbol: "|=", associativity: .right, precedence: .assignment),
-        Operator(symbol: "^=", associativity: .right, precedence: .assignment),
-
-        Operator(symbol: "?:", associativity: .right, precedence: .ternary),
-
-        Operator(symbol: "||", associativity: .left, precedence: .or),
-
-        Operator(symbol: "&&", associativity: .left, precedence: .and),
-
-        Operator(symbol: "<", associativity: .none, precedence: .comparison),
-        Operator(symbol: "<=", associativity: .none, precedence: .comparison),
-        Operator(symbol: ">", associativity: .none, precedence: .comparison),
-        Operator(symbol: ">=", associativity: .none, precedence: .comparison),
-        Operator(symbol: "==", associativity: .none, precedence: .comparison),
-        Operator(symbol: "!=", associativity: .none, precedence: .comparison),
-        Operator(symbol: "===", associativity: .none, precedence: .comparison),
-        Operator(symbol: "!==", associativity: .none, precedence: .comparison),
-        Operator(symbol: "~=", associativity: .none, precedence: .comparison),
-        Operator(symbol: ".==", associativity: .none, precedence: .comparison),
-        Operator(symbol: ".!=", associativity: .none, precedence: .comparison),
-        Operator(symbol: ".<", associativity: .none, precedence: .comparison),
-        Operator(symbol: ".<=", associativity: .none, precedence: .comparison),
-        Operator(symbol: ".>", associativity: .none, precedence: .comparison),
-        Operator(symbol: ".>=", associativity: .none, precedence: .comparison),
-
-        Operator(symbol: "??", associativity: .right, precedence: .nilCoalescing),
-
-        Operator(symbol: "is", associativity: .left, precedence: .cast),
-        Operator(symbol: "as", associativity: .left, precedence: .cast),
-        Operator(symbol: "as?", associativity: .left, precedence: .cast),
-        Operator(symbol: "as!", associativity: .left, precedence: .cast),
-
-        Operator(symbol: "..<", associativity: .none, precedence: .range),
-        Operator(symbol: "...", associativity: .none, precedence: .range),
-
-        Operator(symbol: "+", associativity: .left, precedence: .addition),
-        Operator(symbol: "-", associativity: .left, precedence: .addition),
-        Operator(symbol: "&+", associativity: .left, precedence: .addition),
-        Operator(symbol: "&-", associativity: .left, precedence: .addition),
-        Operator(symbol: "|", associativity: .left, precedence: .addition),
-        Operator(symbol: "^", associativity: .left, precedence: .addition),
-
-        Operator(symbol: "*", associativity: .left, precedence: .multiplication),
-        Operator(symbol: "/", associativity: .left, precedence: .multiplication),
-        Operator(symbol: "%", associativity: .left, precedence: .multiplication),
-        Operator(symbol: "&*", associativity: .left, precedence: .multiplication),
-        Operator(symbol: "&", associativity: .left, precedence: .multiplication),
-
-        Operator(symbol: "<<", associativity: .none, precedence: .shift),
-        Operator(symbol: ">>", associativity: .none, precedence: .shift),
-    ]
-
-    private static let allBySymbol: [String: Operator] = {
-        return all.reduce(into: [String: Operator]()) { result, op in
-            result[op.symbol] = op
-        }
-    }()
-}
-
-/// A function parameter.
-struct Parameter<V>: Hashable {
-    var externalLabel: String?
-    var internalLabel: String {
-        return _internalLabel ?? externalLabel ?? "_"
-    }
-    internal var _internalLabel: String?
-    var declaredType: TypeSignature
-    var isInOut: Bool
-    var isVariadic: Bool
-    var attributes: Attributes
-    var defaultValue: V?
-    var signature: TypeSignature.Parameter {
-        return TypeSignature.Parameter(label: externalLabel, type: declaredType, isInOut: isInOut, isVariadic: isVariadic, hasDefaultValue: defaultValue != nil)
-    }
-
-    init(externalLabel: String?, internalLabel: String? = nil, declaredType: TypeSignature = .none, isInOut: Bool = false, isVariadic: Bool = false, attributes: Attributes = Attributes(), defaultValue: V? = nil) {
-        self.externalLabel = externalLabel == "" || externalLabel == "_" ? nil : externalLabel
-        _internalLabel = internalLabel
-        self.declaredType = attributes.apply(toFunction: declaredType)
-        self.isInOut = isInOut
-        self.isVariadic = isVariadic
-        self.attributes = attributes
-        self.defaultValue = defaultValue
-    }
-
-    var prettyPrintTree: PrettyPrintTree {
-        var children: [PrettyPrintTree] = []
-        if let internalLabel = _internalLabel {
-            children.append(PrettyPrintTree(root: internalLabel))
-        }
-        if declaredType != .none {
-            var typeDescription = declaredType.description
-            if isVariadic {
-                typeDescription += "..."
-            }
-            children.append(PrettyPrintTree(root: typeDescription))
-        }
-        if let defaultValue = defaultValue as? PrettyPrintable {
-            children.append(defaultValue.prettyPrintTree)
-        }
-        return PrettyPrintTree(root: externalLabel ?? "_", children: children)
-    }
-
-    func resolvedType(in node: SyntaxNode? = nil, context: TypeResolutionContext) -> Parameter<V> {
-        var parameter = self
-        parameter.declaredType = declaredType.resolved(in: node, context: context)
-        return parameter
-    }
-
-    func resolvingSelf(in node: SyntaxNode? = nil) -> Parameter<V> {
-        var parameter = self
-        parameter.declaredType = declaredType.resolvingSelf(in: node)
-        return parameter
-    }
-
-    static func ==(lhs: Parameter<V>, rhs: Parameter<V>) -> Bool {
-        return lhs.externalLabel == rhs.externalLabel && lhs.declaredType == rhs.declaredType && lhs.isInOut == rhs.isInOut && lhs.isVariadic == rhs.isVariadic && lhs.attributes == rhs.attributes
-    }
-
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(externalLabel)
-        hasher.combine(declaredType)
-        hasher.combine(isInOut)
-        hasher.combine(isVariadic)
-    }
-}
-
-/// An identifier found in pattern syntax.
-struct IdentifierPattern {
-    var name: String?
-    var isVar = false
-}
-
-/// A segment in a string literal.
-enum StringLiteralSegment<E> {
-    case string(String)
-    case expression(E)
-}
-
-/// Member and type modifiers.
-///
-/// - Note: `Codable` for use in `CodebaseInfo`.
-struct Modifiers: PrettyPrintable, Codable {
-    /// Visibility modifier.
-    ///
-    /// - Note: `Codable` for use in `CodebaseInfo`.
-    enum Visibility: Equatable, Comparable, Codable {
-        case `private`
-        case `fileprivate`
-        case `default`
-        case `internal`
-        case `public`
-        case `open`
-    }
-
-    var visibility: Visibility
-    var setVisibility: Visibility
-    var isStatic: Bool
-    var isMutating: Bool
-    var isFinal: Bool
-    var isOverride: Bool
-    var isLazy: Bool
-    var isNonisolated: Bool
-    
-    private enum CodingKeys: String, CodingKey {
-        case visibility = "v", setVisibility = "sv", isStatic = "s", isMutating = "m", isFinal = "f", isOverride = "o", isLazy = "l", isNonisolated = "n"
-    }
-
-    init(visibility: Visibility = .default, setVisibility: Visibility = .default, isStatic: Bool = false, isMutating: Bool = false, isFinal: Bool = false, isOverride: Bool = false, isLazy: Bool = false, isNonisolated: Bool = false) {
-        self.visibility = visibility
-        self.setVisibility = setVisibility
-        self.isStatic = isStatic
-        self.isMutating = isMutating
-        self.isFinal = isFinal
-        self.isOverride = isOverride
-        self.isLazy = isLazy
-        self.isNonisolated = isNonisolated
-    }
-
-    /// Decode the modifier information in the given syntax.
-    static func `for`(syntax: DeclModifierListSyntax?) -> Modifiers {
-        guard let syntax else {
-            return Modifiers()
-        }
-        var visibility: Visibility = .default
-        var setVisibility: Visibility = .default
-        var isStatic = false
-        var isMutating = false
-        var isFinal = false
-        var isOverride = false
-        var isLazy = false
-        var isNonisolated = false
-        for modifier in syntax {
-            switch modifier.name.text {
-            case "open":
-                if modifier.detail?.detail.text == "set" {
-                    setVisibility = .open
-                } else {
-                    visibility = .open
-                }
-            case "public":
-                if modifier.detail?.detail.text == "set" {
-                    setVisibility = .public
-                } else {
-                    visibility = .public
-                }
-            case "internal":
-                if modifier.detail?.detail.text == "set" {
-                    setVisibility = .internal
-                } else {
-                    visibility = .internal
-                }
-            case "fileprivate":
-                if modifier.detail?.detail.text == "set" {
-                    setVisibility = .fileprivate
-                } else {
-                    visibility = .fileprivate
-                }
-            case "private":
-                if modifier.detail?.detail.text == "set" {
-                    setVisibility = .private
-                } else {
-                    visibility = .private
-                }
-            case "static":
-                isStatic = true
-            case "class":
-                isStatic = true
-            case "mutating":
-                isMutating = true
-            case "final":
-                isFinal = true
-            case "override":
-                isOverride = true
-            case "lazy":
-                isLazy = true
-            case "nonisolated":
-                isNonisolated = true
-            default:
-                break
-            }
-        }
-        return Modifiers(visibility: visibility, setVisibility: setVisibility, isStatic: isStatic, isMutating: isMutating, isFinal: isFinal, isOverride: isOverride, isLazy: isLazy, isNonisolated: isNonisolated)
-    }
-
-    var isEmpty: Bool {
-        return visibility == .default && setVisibility == .default && !isStatic && !isFinal && !isOverride && !isLazy && !isNonisolated
-    }
-
-    var prettyPrintTree: PrettyPrintTree {
-        var children: [PrettyPrintTree] = []
-        if visibility != .default {
-            children.append(PrettyPrintTree(root: String(describing: visibility)))
-        }
-        if setVisibility != .default {
-            children.append(PrettyPrintTree(root: "\(visibility) set"))
-        }
-        if isStatic {
-            children.append(PrettyPrintTree(root: "static"))
-        }
-        if isMutating {
-            children.append(PrettyPrintTree(root: "mutating"))
-        }
-        if isFinal {
-            children.append(PrettyPrintTree(root: "final"))
-        }
-        if isOverride {
-            children.append(PrettyPrintTree(root: "override"))
-        }
-        if isLazy {
-            children.append(PrettyPrintTree(root: "lazy"))
-        }
-        if isNonisolated {
-            children.append(PrettyPrintTree(root: "nonisolated"))
-        }
-        return PrettyPrintTree(root: "modifiers", children: children)
-    }
 }
 
 /// @Attributes on a declaration.
@@ -680,6 +392,13 @@ enum Availability: Codable {
     }
 }
 
+/// Type of closure capture.
+enum CaptureType {
+    case none
+    case unowned
+    case weak
+}
+
 /// Generic information for a type or API.
 ///
 /// - Note: `Codable` for use in `CodebaseInfo`.
@@ -925,52 +644,340 @@ struct Generic: Equatable, Codable {
     }
 }
 
-/// Match when querying identifiers, functions, and other API.
-struct APIMatch {
-    var signature: TypeSignature
-    var apiFlags: APIFlags = []
-    /// May be `nil` for bultins like tuple members.
-    var declarationType: StatementType?
-    var isMember = false
-    var availability: Availability = .available
+/// An identifier found in pattern syntax.
+struct IdentifierPattern {
+    var name: String?
+    var isVar = false
 }
 
-/// Flags that affect API calls.
+/// A labeled value, as used in function call parameters.
+struct LabeledValue<V> {
+    var label: String?
+    var value: V
+}
+
+/// Member and type modifiers.
 ///
 /// - Note: `Codable` for use in `CodebaseInfo`.
-struct APIFlags: OptionSet, Hashable, Codable {
-    let rawValue: Int
-
-    static let async = APIFlags(rawValue: 1 << 0)
-    static let autoclosure = APIFlags(rawValue: 1 << 1)
-    static let mainActor = APIFlags(rawValue: 1 << 2)
-    static let `throws` = APIFlags(rawValue: 1 << 3)
-    static let viewBuilder = APIFlags(rawValue: 1 << 4)
-    static let writeable = APIFlags(rawValue: 1 << 5)
-
-    init(rawValue: Int) {
-        self.rawValue = rawValue
+struct Modifiers: PrettyPrintable, Codable {
+    /// Visibility modifier.
+    ///
+    /// - Note: `Codable` for use in `CodebaseInfo`.
+    enum Visibility: Equatable, Comparable, Codable {
+        case `private`
+        case `fileprivate`
+        case `default`
+        case `internal`
+        case `public`
+        case `open`
     }
 
-    init(isAsync: Bool = false, isThrows: Bool = false, isMainActor: Bool = false, isViewBuilder: Bool = false, isWriteable: Bool = false) {
-        var apiFlags: APIFlags = []
-        if isAsync {
-            apiFlags.insert(.async)
-        }
-        if isThrows {
-            apiFlags.insert(.throws)
-        }
-        if isMainActor {
-            apiFlags.insert(.mainActor)
-        }
-        if isViewBuilder {
-            apiFlags.insert(.viewBuilder)
-        }
-        if isWriteable {
-            apiFlags.insert(.writeable)
-        }
-        self = apiFlags
+    var visibility: Visibility
+    var setVisibility: Visibility
+    var isStatic: Bool
+    var isMutating: Bool
+    var isFinal: Bool
+    var isOverride: Bool
+    var isLazy: Bool
+    var isNonisolated: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case visibility = "v", setVisibility = "sv", isStatic = "s", isMutating = "m", isFinal = "f", isOverride = "o", isLazy = "l", isNonisolated = "n"
     }
+
+    init(visibility: Visibility = .default, setVisibility: Visibility = .default, isStatic: Bool = false, isMutating: Bool = false, isFinal: Bool = false, isOverride: Bool = false, isLazy: Bool = false, isNonisolated: Bool = false) {
+        self.visibility = visibility
+        self.setVisibility = setVisibility
+        self.isStatic = isStatic
+        self.isMutating = isMutating
+        self.isFinal = isFinal
+        self.isOverride = isOverride
+        self.isLazy = isLazy
+        self.isNonisolated = isNonisolated
+    }
+
+    /// Decode the modifier information in the given syntax.
+    static func `for`(syntax: DeclModifierListSyntax?) -> Modifiers {
+        guard let syntax else {
+            return Modifiers()
+        }
+        var visibility: Visibility = .default
+        var setVisibility: Visibility = .default
+        var isStatic = false
+        var isMutating = false
+        var isFinal = false
+        var isOverride = false
+        var isLazy = false
+        var isNonisolated = false
+        for modifier in syntax {
+            switch modifier.name.text {
+            case "open":
+                if modifier.detail?.detail.text == "set" {
+                    setVisibility = .open
+                } else {
+                    visibility = .open
+                }
+            case "public":
+                if modifier.detail?.detail.text == "set" {
+                    setVisibility = .public
+                } else {
+                    visibility = .public
+                }
+            case "internal":
+                if modifier.detail?.detail.text == "set" {
+                    setVisibility = .internal
+                } else {
+                    visibility = .internal
+                }
+            case "fileprivate":
+                if modifier.detail?.detail.text == "set" {
+                    setVisibility = .fileprivate
+                } else {
+                    visibility = .fileprivate
+                }
+            case "private":
+                if modifier.detail?.detail.text == "set" {
+                    setVisibility = .private
+                } else {
+                    visibility = .private
+                }
+            case "static":
+                isStatic = true
+            case "class":
+                isStatic = true
+            case "mutating":
+                isMutating = true
+            case "final":
+                isFinal = true
+            case "override":
+                isOverride = true
+            case "lazy":
+                isLazy = true
+            case "nonisolated":
+                isNonisolated = true
+            default:
+                break
+            }
+        }
+        return Modifiers(visibility: visibility, setVisibility: setVisibility, isStatic: isStatic, isMutating: isMutating, isFinal: isFinal, isOverride: isOverride, isLazy: isLazy, isNonisolated: isNonisolated)
+    }
+
+    var isEmpty: Bool {
+        return visibility == .default && setVisibility == .default && !isStatic && !isFinal && !isOverride && !isLazy && !isNonisolated
+    }
+
+    var prettyPrintTree: PrettyPrintTree {
+        var children: [PrettyPrintTree] = []
+        if visibility != .default {
+            children.append(PrettyPrintTree(root: String(describing: visibility)))
+        }
+        if setVisibility != .default {
+            children.append(PrettyPrintTree(root: "\(visibility) set"))
+        }
+        if isStatic {
+            children.append(PrettyPrintTree(root: "static"))
+        }
+        if isMutating {
+            children.append(PrettyPrintTree(root: "mutating"))
+        }
+        if isFinal {
+            children.append(PrettyPrintTree(root: "final"))
+        }
+        if isOverride {
+            children.append(PrettyPrintTree(root: "override"))
+        }
+        if isLazy {
+            children.append(PrettyPrintTree(root: "lazy"))
+        }
+        if isNonisolated {
+            children.append(PrettyPrintTree(root: "nonisolated"))
+        }
+        return PrettyPrintTree(root: "modifiers", children: children)
+    }
+}
+
+/// Operator information.
+struct Operator: Equatable {
+    let symbol: String
+    let associativity: Associativity
+    let precedence: Precedence
+
+    /// Left associativity means `(a + b + c) == ((a + b) + c)`.
+    enum Associativity: Equatable {
+        case none
+        case left
+        case right
+    }
+
+    /// Return an operator for the given symbol.
+    static func with(symbol: String) -> Operator {
+        if let op = allBySymbol[symbol] {
+            return op
+        }
+        return Operator(symbol: symbol, associativity: .left, precedence: .unknown)
+    }
+
+    var isUnknown: Bool {
+        return precedence == .unknown
+    }
+
+    enum Precedence: Int {
+        case assignment = 0
+        case ternary
+        case unknown
+        case or
+        case and
+        case comparison
+        case nilCoalescing
+        case cast
+        case range
+        case addition
+        case multiplication
+        case shift
+    }
+
+    /// This information was obtained from https://developer.apple.com/documentation/swift/swift_standard_library/operator_declarations
+    private static let all: [Operator] = [
+        Operator(symbol: "=", associativity: .right, precedence: .assignment),
+        Operator(symbol: "*=", associativity: .right, precedence: .assignment),
+        Operator(symbol: "/=", associativity: .right, precedence: .assignment),
+        Operator(symbol: "%=", associativity: .right, precedence: .assignment),
+        Operator(symbol: "+=", associativity: .right, precedence: .assignment),
+        Operator(symbol: "-=", associativity: .right, precedence: .assignment),
+        Operator(symbol: "<<=", associativity: .right, precedence: .assignment),
+        Operator(symbol: ">>=", associativity: .right, precedence: .assignment),
+        Operator(symbol: "&=", associativity: .right, precedence: .assignment),
+        Operator(symbol: "|=", associativity: .right, precedence: .assignment),
+        Operator(symbol: "^=", associativity: .right, precedence: .assignment),
+
+        Operator(symbol: "?:", associativity: .right, precedence: .ternary),
+
+        Operator(symbol: "||", associativity: .left, precedence: .or),
+
+        Operator(symbol: "&&", associativity: .left, precedence: .and),
+
+        Operator(symbol: "<", associativity: .none, precedence: .comparison),
+        Operator(symbol: "<=", associativity: .none, precedence: .comparison),
+        Operator(symbol: ">", associativity: .none, precedence: .comparison),
+        Operator(symbol: ">=", associativity: .none, precedence: .comparison),
+        Operator(symbol: "==", associativity: .none, precedence: .comparison),
+        Operator(symbol: "!=", associativity: .none, precedence: .comparison),
+        Operator(symbol: "===", associativity: .none, precedence: .comparison),
+        Operator(symbol: "!==", associativity: .none, precedence: .comparison),
+        Operator(symbol: "~=", associativity: .none, precedence: .comparison),
+        Operator(symbol: ".==", associativity: .none, precedence: .comparison),
+        Operator(symbol: ".!=", associativity: .none, precedence: .comparison),
+        Operator(symbol: ".<", associativity: .none, precedence: .comparison),
+        Operator(symbol: ".<=", associativity: .none, precedence: .comparison),
+        Operator(symbol: ".>", associativity: .none, precedence: .comparison),
+        Operator(symbol: ".>=", associativity: .none, precedence: .comparison),
+
+        Operator(symbol: "??", associativity: .right, precedence: .nilCoalescing),
+
+        Operator(symbol: "is", associativity: .left, precedence: .cast),
+        Operator(symbol: "as", associativity: .left, precedence: .cast),
+        Operator(symbol: "as?", associativity: .left, precedence: .cast),
+        Operator(symbol: "as!", associativity: .left, precedence: .cast),
+
+        Operator(symbol: "..<", associativity: .none, precedence: .range),
+        Operator(symbol: "...", associativity: .none, precedence: .range),
+
+        Operator(symbol: "+", associativity: .left, precedence: .addition),
+        Operator(symbol: "-", associativity: .left, precedence: .addition),
+        Operator(symbol: "&+", associativity: .left, precedence: .addition),
+        Operator(symbol: "&-", associativity: .left, precedence: .addition),
+        Operator(symbol: "|", associativity: .left, precedence: .addition),
+        Operator(symbol: "^", associativity: .left, precedence: .addition),
+
+        Operator(symbol: "*", associativity: .left, precedence: .multiplication),
+        Operator(symbol: "/", associativity: .left, precedence: .multiplication),
+        Operator(symbol: "%", associativity: .left, precedence: .multiplication),
+        Operator(symbol: "&*", associativity: .left, precedence: .multiplication),
+        Operator(symbol: "&", associativity: .left, precedence: .multiplication),
+
+        Operator(symbol: "<<", associativity: .none, precedence: .shift),
+        Operator(symbol: ">>", associativity: .none, precedence: .shift),
+    ]
+
+    private static let allBySymbol: [String: Operator] = {
+        return all.reduce(into: [String: Operator]()) { result, op in
+            result[op.symbol] = op
+        }
+    }()
+}
+
+/// A function parameter.
+struct Parameter<V>: Hashable {
+    var externalLabel: String?
+    var internalLabel: String {
+        return _internalLabel ?? externalLabel ?? "_"
+    }
+    internal var _internalLabel: String?
+    var declaredType: TypeSignature
+    var isInOut: Bool
+    var isVariadic: Bool
+    var attributes: Attributes
+    var defaultValue: V?
+    var signature: TypeSignature.Parameter {
+        return TypeSignature.Parameter(label: externalLabel, type: declaredType, isInOut: isInOut, isVariadic: isVariadic, hasDefaultValue: defaultValue != nil)
+    }
+
+    init(externalLabel: String?, internalLabel: String? = nil, declaredType: TypeSignature = .none, isInOut: Bool = false, isVariadic: Bool = false, attributes: Attributes = Attributes(), defaultValue: V? = nil) {
+        self.externalLabel = externalLabel == "" || externalLabel == "_" ? nil : externalLabel
+        _internalLabel = internalLabel
+        self.declaredType = attributes.apply(toFunction: declaredType)
+        self.isInOut = isInOut
+        self.isVariadic = isVariadic
+        self.attributes = attributes
+        self.defaultValue = defaultValue
+    }
+
+    var prettyPrintTree: PrettyPrintTree {
+        var children: [PrettyPrintTree] = []
+        if let internalLabel = _internalLabel {
+            children.append(PrettyPrintTree(root: internalLabel))
+        }
+        if declaredType != .none {
+            var typeDescription = declaredType.description
+            if isVariadic {
+                typeDescription += "..."
+            }
+            children.append(PrettyPrintTree(root: typeDescription))
+        }
+        if let defaultValue = defaultValue as? PrettyPrintable {
+            children.append(defaultValue.prettyPrintTree)
+        }
+        return PrettyPrintTree(root: externalLabel ?? "_", children: children)
+    }
+
+    func resolvedType(in node: SyntaxNode? = nil, context: TypeResolutionContext) -> Parameter<V> {
+        var parameter = self
+        parameter.declaredType = declaredType.resolved(in: node, context: context)
+        return parameter
+    }
+
+    func resolvingSelf(in node: SyntaxNode? = nil) -> Parameter<V> {
+        var parameter = self
+        parameter.declaredType = declaredType.resolvingSelf(in: node)
+        return parameter
+    }
+
+    static func ==(lhs: Parameter<V>, rhs: Parameter<V>) -> Bool {
+        return lhs.externalLabel == rhs.externalLabel && lhs.declaredType == rhs.declaredType && lhs.isInOut == rhs.isInOut && lhs.isVariadic == rhs.isVariadic && lhs.attributes == rhs.attributes
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(externalLabel)
+        hasher.combine(declaredType)
+        hasher.combine(isInOut)
+        hasher.combine(isVariadic)
+    }
+}
+
+/// A segment in a string literal.
+enum StringLiteralSegment<E> {
+    case string(String)
+    case expression(E)
 }
 
 /// The result of visiting a syntax node.
