@@ -13,4 +13,7 @@ jobs:
     steps:
       - run: brew install skiptools/skip/skip
       - run: skip checkup --double-check
+      - run: brew install openjdk@21
+      - run: brew upgrade gradle
+      - run: skip checkup --double-check
 
