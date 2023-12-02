@@ -11,6 +11,8 @@ jobs:
     env:     
       DEVELOPER_DIR: /Applications/Xcode_15.0.app/Contents/Developer
     steps:
+      # needed or else failure with brew upgrade gradle
+      - run: brew uninstall php composer
       - run: brew install skiptools/skip/skip
       - run: skip checkup --double-check
       - run: brew install openjdk@21
@@ -18,8 +20,6 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: '21'
-      # needed or else failure with brew upgrade gradle
-      - run: brew remove php
       - run: brew upgrade gradle
       - run: skip checkup --double-check
 
