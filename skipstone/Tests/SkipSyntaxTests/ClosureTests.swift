@@ -434,24 +434,66 @@ final class ClosureTests: XCTestCase {
 
     func testSwiftUIBinding() async throws {
         try await check(swift: """
-        List($items, id: \\.i) { $item in
-            Text(item.s)
+        struct V {
+            @State var items: [Item]
+            var body: some View {
+                List($items, id: \\.i) { $item in
+                    Text(item.s)
+                }
+            }
         }
         """, kotlin: """
-        List(Binding({ _items.wrappedValue }, { it -> _items.wrappedValue = it }), id = { it.i }) { item -> Text(item.wrappedValue.s) }
+        import skip.lib.Array
+
+        internal class V {
+            internal var items: Array<Item>
+                get() = field.sref({ this.items = it })
+                set(newValue) {
+                    field = newValue.sref()
+                }
+            internal val body: View
+                get() {
+                    return List(Binding({ _items.wrappedValue }, { it -> _items.wrappedValue = it }), id = { it.i }) { item -> Text(item.wrappedValue.s) }
+                }
+
+            constructor(items: Array<Item>) {
+                this._items = skip.ui.State(items.sref())
+            }
+        }
         """)
 
         try await check(swift: """
-        List($items, id: \\.i) { $item in
-            Toggle(item.$value)
-            Toggle($item.value)
-            CustomView($item)
+        struct V {
+            @State var items: [Item]
+            var body: some View {
+                List($items, id: \\.i) { $item in
+                    print(item.value)
+                    Toggle($item.value)
+                    CustomView($item)
+                }
+            }
         }
         """, kotlin: """
-        List(Binding({ _items.wrappedValue }, { it -> _items.wrappedValue = it }), id = { it.i }) { item ->
-            Toggle(Binding({ item.wrappedValue._value.wrappedValue }, { it -> item.wrappedValue._value.wrappedValue = it }))
-            Toggle(Binding.fromBinding(item, { it.value }, { it, newvalue -> it.value = newvalue }))
-            CustomView(item)
+        import skip.lib.Array
+
+        internal class V {
+            internal var items: Array<Item>
+                get() = field.sref({ this.items = it })
+                set(newValue) {
+                    field = newValue.sref()
+                }
+            internal val body: View
+                get() {
+                    return List(Binding({ _items.wrappedValue }, { it -> _items.wrappedValue = it }), id = { it.i }) { item ->
+                        print(item.wrappedValue.value)
+                        Toggle(Binding.fromBinding(item, { it.value }, { it, newvalue -> it.value = newvalue }))
+                        CustomView(item)
+                    }
+                }
+
+            constructor(items: Array<Item>) {
+                this._items = skip.ui.State(items.sref())
+            }
         }
         """)
     }

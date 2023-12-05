@@ -573,7 +573,7 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
         let inferredParameters = expression.inferredType.parameters
         var implicitParameterCount = 0
         for (index, parameter) in inferredParameters.enumerated() {
-            if let label = parameter.label, KotlinIdentifier.isSwiftUIBinding(name: label) {
+            if let label = parameter.label, KotlinIdentifier.isProjectedValue(name: label) {
                 kbody.updateWithSwiftUIBindingParameter(name: String(label.dropFirst()), source: translator.syntaxTree.source)
             } else {
                 if parameter.label == nil && expression.parameters.isEmpty {
@@ -593,7 +593,7 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
         kexpression.returnType.appendKotlinMessages(to: kexpression, source: translator.syntaxTree.source)
         kexpression.parameters = expression.parameters.map {
             var parameter = $0.resolvingSelf(in: expression)
-            if let externalLabel = parameter.externalLabel, KotlinIdentifier.isSwiftUIBinding(name: externalLabel) {
+            if let externalLabel = parameter.externalLabel, KotlinIdentifier.isProjectedValue(name: externalLabel) {
                 parameter.externalLabel = String(externalLabel.dropFirst())
             }
             parameter.appendKotlinMessages(to: kexpression, source: translator.syntaxTree.source)
@@ -1098,17 +1098,18 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
     }
 
     var isSwiftUIBinding: Bool {
-        return Self.isSwiftUIBinding(name: name)
+        return isSwiftUIBindingParameter || (Self.isProjectedValue(name: name) && apiFlags?.contains(.swiftUIBindable) == true)
     }
 
-    static func isSwiftUIBinding(name: String) -> Bool {
+    /// Whether the given identifier name represents the projected value of a property wrapper.
+    static func isProjectedValue(name: String) -> Bool {
         name.hasPrefix("$") && Int(name.dropFirst()) == nil
     }
 
     func appendSwiftUIBindingPath(to output: OutputGenerator, indentation: Indentation, appendPath: @escaping (OutputGenerator, Indentation, KotlinBindableBase) -> Void) {
         if isSwiftUIBindingParameter {
             output.append("Binding.fromBinding(")
-            appendIdentifier(to: output, indentation: indentation, isSwiftUIState: false)
+            appendIdentifier(to: output, indentation: indentation, projectedValue: false)
             output.append(", { ")
             appendPath(output, indentation) { output, _ in output.append("it") }
             output.append(" }, { it, newvalue -> ")
@@ -1117,7 +1118,7 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
         } else {
             appendBinding(to: output, indentation: indentation) { output, indentation in
                 appendPath(output, indentation) { output, indentation in
-                    appendIdentifier(to: output, indentation: indentation, isSwiftUIState: true)
+                    appendIdentifier(to: output, indentation: indentation, projectedValue: true)
                 }
             }
         }
@@ -1140,18 +1141,20 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
     override func append(to output: OutputGenerator, indentation: Indentation) {
         if isSwiftUIBinding && !isSwiftUIBindingParameter {
             appendBinding(to: output, indentation: indentation) { output, indentation in
-                appendIdentifier(to: output, indentation: indentation, isSwiftUIState: true)
+                appendIdentifier(to: output, indentation: indentation, projectedValue: true)
             }
         } else {
-            appendIdentifier(to: output, indentation: indentation, isSwiftUIState: false)
+            appendIdentifier(to: output, indentation: indentation, projectedValue: !isSwiftUIBindingParameter)
         }
     }
 
-    private func appendIdentifier(to output: OutputGenerator, indentation: Indentation, isSwiftUIState: Bool) {
+    private func appendIdentifier(to output: OutputGenerator, indentation: Indentation, projectedValue: Bool) {
         var name = name
-        if isSwiftUIBinding {
-            if isSwiftUIState {
+        if Self.isProjectedValue(name: name) {
+            if projectedValue && isSwiftUIBinding {
                 name = "_\(name.dropFirst()).wrappedValue"
+            } else if projectedValue {
+                name = "_\(name.dropFirst()).projectedValue"
             } else {
                 name = String(name.dropFirst())
             }
@@ -1854,25 +1857,25 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
     }
 
     var isSwiftUIBinding: Bool {
-        return member.hasPrefix("$") || (base as? KotlinSwiftUIBindable)?.isSwiftUIBinding == true
+        return (base as? KotlinSwiftUIBindable)?.isSwiftUIBinding == true || (KotlinIdentifier.isProjectedValue(name: member) && apiFlags?.contains(.swiftUIBindable) == true)
     }
 
     func appendSwiftUIBindingPath(to output: OutputGenerator, indentation: Indentation, appendPath: @escaping (OutputGenerator, Indentation, KotlinBindableBase) -> Void) {
-        if member.hasPrefix("$") {
+        if let baseBinding = base as? KotlinSwiftUIBindable, baseBinding.isSwiftUIBinding {
+            // Tack this member access onto our base's existing binding
+            baseBinding.appendSwiftUIBindingPath(to: output, indentation: indentation) { output, indentation, appendTo in
+                appendPath(output, indentation) { output, indentation in
+                    self.appendMemberAccess(to: output, indentation: indentation, projectedValue: false, appendBase: appendTo)
+                }
+            }
+        } else {
             appendBinding(to: output, indentation: indentation) { output, indentation in
                 appendPath(output, indentation) { output, indentation in
-                    appendMemberAccess(to: output, indentation: indentation, isSwiftUIState: true) { output, indentation in
+                    appendMemberAccess(to: output, indentation: indentation, projectedValue: true) { output, indentation in
                         if let base {
                             output.append(base, indentation: indentation)
                         }
                     }
-                }
-            }
-        } else {
-            // Tack this member access onto our base's existing binding
-            (base as? KotlinSwiftUIBindable)?.appendSwiftUIBindingPath(to: output, indentation: indentation) { output, indentation, appendTo in
-                appendPath(output, indentation) { output, indentation in
-                    self.appendMemberAccess(to: output, indentation: indentation, isSwiftUIState: false, appendBase: appendTo)
                 }
             }
         }
@@ -1910,21 +1913,23 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
-        if member.hasPrefix("$") {
-            appendBinding(to: output, indentation: indentation) { output, indentation in
-                appendMemberAccess(to: output, indentation: indentation, isSwiftUIState: true) { output, indentation in
-                    if let base {
-                        output.append(base, indentation: indentation)
+        if isSwiftUIBinding {
+            if let bindable = base as? KotlinSwiftUIBindable, bindable.isSwiftUIBinding {
+                // Add our member to the base binding path
+                bindable.appendSwiftUIBindingPath(to: output, indentation: indentation) { output, indentation, appendTo in
+                    self.appendMemberAccess(to: output, indentation: indentation, projectedValue: false, appendBase: appendTo)
+                }
+            } else {
+                appendBinding(to: output, indentation: indentation) { output, indentation in
+                    appendMemberAccess(to: output, indentation: indentation, projectedValue: true) { output, indentation in
+                        if let base {
+                            output.append(base, indentation: indentation)
+                        }
                     }
                 }
             }
-        } else if let bindable = base as? KotlinSwiftUIBindable, bindable.isSwiftUIBinding {
-            // Add our member to the base binding path
-            bindable.appendSwiftUIBindingPath(to: output, indentation: indentation) { output, indentation, appendTo in
-                self.appendMemberAccess(to: output, indentation: indentation, isSwiftUIState: false, appendBase: appendTo)
-            }
         } else {
-            appendMemberAccess(to: output, indentation: indentation, isSwiftUIState: false) { output, indentation in
+            appendMemberAccess(to: output, indentation: indentation, projectedValue: true) { output, indentation in
                 if let base {
                     output.append(base, indentation: indentation)
                 }
@@ -1932,11 +1937,13 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
         }
     }
 
-    private func appendMemberAccess(to output: OutputGenerator, indentation: Indentation, isSwiftUIState: Bool, appendBase: (OutputGenerator, Indentation) -> Void) {
+    private func appendMemberAccess(to output: OutputGenerator, indentation: Indentation, projectedValue: Bool, appendBase: (OutputGenerator, Indentation) -> Void) {
         var member = member
-        if member.hasPrefix("$") {
-            if isSwiftUIState {
+        if KotlinIdentifier.isProjectedValue(name: member) {
+            if projectedValue && isSwiftUIBinding {
                 member = "_\(member.dropFirst()).wrappedValue"
+            } else if projectedValue {
+                member = "_\(member.dropFirst()).projectedValue"
             } else {
                 member = String(member.dropFirst())
             }

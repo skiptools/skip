@@ -36,6 +36,7 @@ final class ObservationTests: XCTestCase {
 
         import skip.model.*
 
+        @Stable
         internal open class C: Observable {
             internal val a = 1
             internal open val b: Int
@@ -92,6 +93,7 @@ final class ObservationTests: XCTestCase {
         import androidx.compose.runtime.mutableStateOf
         import androidx.compose.runtime.setValue
 
+        @Stable
         internal class S: MutableStruct, Observable {
             internal var a: Int
                 get() = astate
@@ -124,6 +126,7 @@ final class ObservationTests: XCTestCase {
         import androidx.compose.runtime.mutableStateOf
         import androidx.compose.runtime.setValue
 
+        @Stable
         internal open class C: Observable {
             internal open var a: Int
                 get() {
@@ -152,6 +155,7 @@ final class ObservationTests: XCTestCase {
         import androidx.compose.runtime.mutableStateOf
         import androidx.compose.runtime.setValue
 
+        @Stable
         internal class S: MutableStruct, Observable {
             internal var a: Int
                 get() {
@@ -199,6 +203,7 @@ final class ObservationTests: XCTestCase {
         import androidx.compose.runtime.setValue
         import skip.lib.Array
 
+        @Stable
         internal open class C: Observable {
             internal open var a: Array<A>
                 get() = astate.sref({ this.a = it })
@@ -224,6 +229,7 @@ final class ObservationTests: XCTestCase {
         import androidx.compose.runtime.setValue
         import skip.lib.Array
 
+        @Stable
         internal class S: MutableStruct, Observable {
             internal var a: Array<A>
                 get() = astate!!.sref({ this.a = it })
@@ -265,22 +271,33 @@ final class ObservationTests: XCTestCase {
 
         import skip.model.*
 
+        @Stable
         internal open class C1: ObservableObject {
+            override val objectWillChange = ObservableObjectPublisher()
             internal open var a = 1
             internal open var b: Int
                 get() = bstate
                 set(newValue) {
-                    bstate = newValue
+                    val storagevalue = newValue
+                    objectWillChange.send()
+                    _b.projectedValue.send(storagevalue)
+                    bstate = storagevalue
                 }
             internal var bstate: Int by mutableStateOf(1)
+            internal val _b = Published<Int>(bstate)
         }
+        @Stable
         internal open class C2: C1() {
             internal open var c: Int
                 get() = cstate
                 set(newValue) {
-                    cstate = newValue
+                    val storagevalue = newValue
+                    objectWillChange.send()
+                    _c.projectedValue.send(storagevalue)
+                    cstate = storagevalue
                 }
             internal var cstate: Int by mutableStateOf(1)
+            internal val _c = Published<Int>(cstate)
         }
         """)
     }
@@ -304,21 +321,156 @@ final class ObservationTests: XCTestCase {
         import androidx.compose.runtime.mutableStateOf
         import androidx.compose.runtime.setValue
 
+        @Stable
         internal open class C: ObservableObject {
+            override val objectWillChange = ObservableObjectPublisher()
             internal open var a: S
                 get() = astate!!.sref({ this.a = it })
                 set(newValue) {
-                    astate = newValue.sref()
+                    val storagevalue = newValue.sref()
+                    objectWillChange.send()
+                    _a.projectedValue.send(storagevalue)
+                    astate = storagevalue
                 }
             internal var astate: S? by mutableStateOf(null)
+            internal val _a = Published<S>()
             internal open var b: S?
                 get() = bstate.sref({ this.b = it })
                 set(newValue) {
-                    bstate = newValue.sref()
+                    val storagevalue = newValue.sref()
+                    objectWillChange.send()
+                    _b.projectedValue.send(storagevalue)
+                    bstate = storagevalue
                 }
             internal var bstate: S? by mutableStateOf(null)
+            internal val _b = Published<S?>(bstate)
             internal constructor(a: S) {
                 this.a = a
+            }
+        }
+        """)
+    }
+
+    func testPublishedWithWillSet() async throws {
+        try await check(swift: """
+        class C: ObservableObject {
+            @Published var i = 0 {
+                willSet {
+                    print("Setting to \\(newValue)")
+                }
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.Stable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.setValue
+
+        @Stable
+        internal open class C: ObservableObject {
+            override val objectWillChange = ObservableObjectPublisher()
+            internal open var i: Int
+                get() = istate
+                set(newValue) {
+                    print("Setting to ${newValue}")
+                    val storagevalue = newValue
+                    objectWillChange.send()
+                    _i.projectedValue.send(storagevalue)
+                    istate = storagevalue
+                }
+            internal var istate: Int by mutableStateOf(0)
+            internal val _i = Published<Int>(istate)
+        }
+        """)
+    }
+
+    func testCustomObjectWillChange() async throws {
+        try await check(supportingSwift: """
+        class ObservableObjectPublisher {
+        }
+        """, swift: """
+        import Combine
+        class C: ObservableObject {
+            let objectWillChange = ObservableObjectPublisher()
+            @Published var i = 0
+            func f() {
+                objectWillChange.send()
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.Stable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.setValue
+
+        import skip.model.*
+        @Stable
+        internal open class C: ObservableObject {
+            override val objectWillChange = ObservableObjectPublisher()
+            internal open var i: Int
+                get() = istate
+                set(newValue) {
+                    val storagevalue = newValue
+                    objectWillChange.send()
+                    _i.projectedValue.send(storagevalue)
+                    istate = storagevalue
+                }
+            internal var istate: Int by mutableStateOf(0)
+            internal val _i = Published<Int>(istate)
+            internal open fun f(): Unit = objectWillChange.send()
+        }
+        """)
+    }
+
+    func testPropertyPublisher() async throws {
+        try await check(swift: """
+        class O: ObservableObject {
+            @Published var i = 0
+        }
+        class C {
+            let o: O
+            var value = 0
+            let token1: AnyCancellable
+            let token2: AnyCancellable
+
+            init(o: O) {
+                self.o = o
+                token1 = o.$i.sink { i in
+                    print("i = \\(i)")
+                }
+                token2 = o.$i.assign(to: \\.value, on: self)
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.Stable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.setValue
+
+        @Stable
+        internal open class O: ObservableObject {
+            override val objectWillChange = ObservableObjectPublisher()
+            internal open var i: Int
+                get() = istate
+                set(newValue) {
+                    val storagevalue = newValue
+                    objectWillChange.send()
+                    _i.projectedValue.send(storagevalue)
+                    istate = storagevalue
+                }
+            internal var istate: Int by mutableStateOf(0)
+            internal val _i = Published<Int>(istate)
+        }
+        internal open class C {
+            internal val o: O
+            internal open var value = 0
+            internal val token1: AnyCancellable
+            internal val token2: AnyCancellable
+
+            internal constructor(o: O) {
+                this.o = o
+                token1 = o._i.projectedValue.sink { i -> print("i = ${i}") }
+                token2 = o._i.projectedValue.assign(to = { it, it_1 -> it.value = it_1 }, on = this)
             }
         }
         """)

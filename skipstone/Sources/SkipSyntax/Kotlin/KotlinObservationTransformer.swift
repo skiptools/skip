@@ -9,10 +9,12 @@ final class KotlinObservationTransformer: KotlinTransformer {
                     addKotlinObservationDependencies(to: syntaxTree)
                     updateObservableClass(statement: classDeclaration, source: translator.syntaxTree.source)
                 } else if classDeclaration.type == .classDeclaration {
-                    if (handleObservableObject(statement: classDeclaration, source: translator.syntaxTree.source)) {
+                    if (handleObservableObject(statement: classDeclaration, translator: translator)) {
                         addKotlinObservationDependencies(to: syntaxTree)
                     }
                 }
+            } else if let functionCall = node as? KotlinFunctionCall {
+                updateAssignTo(expression: functionCall)
             }
             return .recurse(nil)
         }
@@ -75,23 +77,49 @@ final class KotlinObservationTransformer: KotlinTransformer {
         }
     }
 
-    private func handleObservableObject(statement: KotlinClassDeclaration, source: Source) -> Bool {
-        var isObservableObject = false
-        if let observableObjectIndex = statement.inherits.firstIndex(where: { $0.isNamed("ObservableObject", moduleName: "Combine") || $0.isNamed("ObservableObject", moduleName: "SwiftUI") }) {
+    private func handleObservableObject(statement: KotlinClassDeclaration, translator: KotlinTranslator) -> Bool {
+        var isObservableObjectBaseType = false
+        if let observableObjectIndex = statement.inherits.firstIndex(where: \.isObservableObject) {
             // Remove any package specification
             statement.inherits[observableObjectIndex] = .named("ObservableObject", [])
-            isObservableObject = true
+            isObservableObjectBaseType = true
+        } else if let codebaseInfo = translator.codebaseInfo {
+            let inheritanceChain = codebaseInfo.global.inheritanceChainSignatures(forNamed: statement.signature)
+            isObservableObjectBaseType = !inheritanceChain.isEmpty && lastObservableObjectType(in: inheritanceChain, codebaseInfo: codebaseInfo) == inheritanceChain.first
         }
+        var hasPublishedProperties = false
+        var hasObjectWillChangePublisher = false
         for member in statement.members {
-            if let variableDeclaration = member as? KotlinVariableDeclaration, variableDeclaration.attributes.contains(.published) {
-                makeObservable(statement: variableDeclaration, in: statement, isPublished: true, source: source)
-                isObservableObject = true
+            if let variableDeclaration = member as? KotlinVariableDeclaration {
+                if variableDeclaration.attributes.contains(.published) {
+                    makeObservable(statement: variableDeclaration, in: statement, isPublished: true, source: translator.syntaxTree.source)
+                    hasPublishedProperties = true
+                } else if variableDeclaration.propertyName == "objectWillChange" {
+                    variableDeclaration.modifiers.visibility = .public
+                    variableDeclaration.modifiers.isOverride = true
+                    hasObjectWillChangePublisher = true
+                }
             }
         }
+
+        let isObservableObject = isObservableObjectBaseType || hasPublishedProperties
         if isObservableObject {
             statement.annotations.append("@Stable")
         }
+        if isObservableObjectBaseType && !hasObjectWillChangePublisher {
+            let objectWillChangeDeclaration = KotlinRawStatement(sourceCode: "override val objectWillChange = ObservableObjectPublisher()")
+            statement.insert(statements: [objectWillChangeDeclaration], after: nil)
+        }
         return isObservableObject
+    }
+
+    private func lastObservableObjectType(in types: [TypeSignature], codebaseInfo: CodebaseInfo.Context) -> TypeSignature? {
+        for type in types.reversed() {
+            if codebaseInfo.global.protocolSignatures(forNamed: type).contains(where: \.isObservableObject) {
+                return type
+            }
+        }
+        return nil
     }
 
     private func makeObservable(statement: KotlinVariableDeclaration, in classDeclaration: KotlinClassDeclaration, isPublished: Bool = false, source: Source) {
@@ -106,8 +134,9 @@ final class KotlinObservationTransformer: KotlinTransformer {
         let storageDefaultValue = statement.propertyType.kotlinDefaultValue
         let isUnwrappedOptional = (statement.value == nil || statement.modifiers.isLazy) && storageDefaultValue == nil
         let storageType = isUnwrappedOptional ? propertyType.asOptional(true) : propertyType
-        statement.storage = KotlinVariableStorage(access: storageName, isUnwrappedOptional: isUnwrappedOptional) { variable, output, indentation in
-            output.append(indentation).append(variable.modifiers.kotlinMemberString(isGlobal: false, isOpen: false, suffix: " "))
+        let modifierString = statement.modifiers.kotlinMemberString(isGlobal: false, isOpen: false, suffix: " ")
+        var storage = KotlinVariableStorage(access: storageName, isUnwrappedOptional: isUnwrappedOptional) { variable, output, indentation in
+            output.append(indentation).append(modifierString)
             output.append("var \(storageName)")
             if storageType != .none {
                 output.append(": \(storageType.kotlin)")
@@ -122,6 +151,37 @@ final class KotlinObservationTransformer: KotlinTransformer {
             }
             output.append(")\n")
         }
+        if isPublished {
+            // Publish will change prior to setting storage
+            let defaultStorageSet = storage.appendSet
+            storage.appendSet = { variable, value, output, indentation in
+                output.append(indentation).append("val storagevalue = ")
+                value()
+                output.append("\n")
+                output.append(indentation).append("objectWillChange.send()\n")
+                output.append(indentation).append("_").append(variable.propertyName).append(".projectedValue.send(storagevalue)\n")
+                defaultStorageSet(variable, { output.append("storagevalue") }, output, indentation)
+            }
+
+            // Add publisher "property wrapper"
+            let publishedInitalValue = isUnwrappedOptional ? "" : storageName
+            let publishedDeclaration = KotlinRawStatement(sourceCode: "\(modifierString)val _\(statement.propertyName) = Published<\(propertyType.kotlin)>(\(publishedInitalValue))")
+            classDeclaration.insert(statements: [publishedDeclaration], after: statement)
+        }
+        statement.storage = storage
+    }
+
+    private func updateAssignTo(expression: KotlinFunctionCall) {
+        // Support Publisher.assign(to: \.property, on: object)
+        guard expression.arguments.count == 2, expression.arguments[0].label == "to", expression.arguments[1].label == "on" else {
+            return
+        }
+        guard let function = expression.function as? KotlinMemberAccess, function.member == "assign" else {
+            return
+        }
+        if let keyPath = expression.arguments[0].value as? KotlinKeyPathLiteral {
+            keyPath.isWrite = true
+        }
     }
 
     private func addKotlinObservationDependencies(to syntaxTree: KotlinSyntaxTree) {
@@ -129,5 +189,11 @@ final class KotlinObservationTransformer: KotlinTransformer {
         syntaxTree.dependencies.imports.insert("androidx.compose.runtime.mutableStateOf")
         syntaxTree.dependencies.imports.insert("androidx.compose.runtime.setValue")
         syntaxTree.dependencies.imports.insert("androidx.compose.runtime.Stable")
+    }
+}
+
+extension TypeSignature {
+    fileprivate var isObservableObject: Bool {
+        return isNamed("ObservableObject", moduleName: "Combine") || isNamed("ObservableObject", moduleName: "SwiftUI")
     }
 }

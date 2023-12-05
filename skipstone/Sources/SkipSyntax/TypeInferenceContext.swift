@@ -3,7 +3,7 @@ struct TypeInferenceContext {
     private let codebaseInfo: CodebaseInfo.Context?
     private let unavailableAPI: UnavailableAPI?
     private var path: [PathEntry] = []
-    private var localIdentifierTypes: [String: TypeSignature] = [:]
+    private var localIdentifierTypes: [String: (type: TypeSignature, apiFlags: APIFlags)] = [:]
     private struct PathEntry {
         var typeSignature: TypeSignature?
         var superSignature: TypeSignature?
@@ -108,18 +108,18 @@ struct TypeInferenceContext {
     }
 
     /// Return a context that includes the given identifier.
-    func addingIdentifier(_ name: String, type: TypeSignature) -> TypeInferenceContext {
+    func addingIdentifier(_ name: String, type: TypeSignature, apiFlags: APIFlags = []) -> TypeInferenceContext {
         var context = self
-        context.localIdentifierTypes[name] = type
+        context.localIdentifierTypes[name] = (type, apiFlags)
         return context
     }
 
     /// Return a context that includes the given identifiers.
-    func addingIdentifiers(_ names: [String?], types: [TypeSignature]) -> TypeInferenceContext {
+    func addingIdentifiers(_ names: [String?], types: [TypeSignature], apiFlags: APIFlags = []) -> TypeInferenceContext {
         var context = self
         for nameAndType in zip(names, types) {
             if let name = nameAndType.0 {
-                context.localIdentifierTypes[name] = nameAndType.1
+                context.localIdentifierTypes[name] = (nameAndType.1, apiFlags)
             }
         }
         return context
@@ -128,7 +128,9 @@ struct TypeInferenceContext {
     /// Return a context that includes the given identifiers.
     func addingIdentifiers(_ identifiers: [String: TypeSignature]) -> TypeInferenceContext {
         var context = self
-        context.localIdentifierTypes.merge(identifiers) { _, new in new }
+        for (name, type) in identifiers {
+            context.localIdentifierTypes[name] = (type, [])
+        }
         return context
     }
 
@@ -155,12 +157,12 @@ struct TypeInferenceContext {
         }
 
         // Check local identifiers and bindings
-        if let identifierType = localIdentifierTypes[name] {
+        if let (identifierType, apiFlags) = localIdentifierTypes[name] {
             var signature = identifierType.constrainedTypeWithGenerics(generics)
             if isBinding {
                 signature = signature.asBinding()
             }
-            return (signature, APIMatch(signature: signature))
+            return (signature, APIMatch(signature: signature, apiFlags: apiFlags))
         }
         if name == "self" || name == "Self" || name == "super" {
             guard let pathEntry = path.last(where: { $0.typeSignature != nil }), let typeSignature = pathEntry.typeSignature else {
@@ -342,7 +344,7 @@ struct TypeInferenceContext {
         }
 
         // Not a known member function. Check functions that can be invoked without a target type
-        if let localFunction = localIdentifierTypes[name], case .function = localFunction {
+        if let (localFunction, _) = localIdentifierTypes[name], case .function = localFunction {
             if let codebaseInfo {
                 if let callSignature = codebaseInfo.callableSignature(of: localFunction, generics: generics, arguments: constrainedArguments) {
                     return [APIMatch(signature: callSignature, apiFlags: localFunction.apiFlags, declarationType: .functionDeclaration)]

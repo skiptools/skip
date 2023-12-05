@@ -1455,7 +1455,7 @@ class VariableDeclaration: Statement {
         return declaredType.or(value?.inferredType ?? .none).tupleTypes(count: names.count)
     }
     var apiFlags: APIFlags {
-        return APIFlags(isAsync: asyncBehavior != .sync, isThrows: isThrows, isMainActor: attributes.contains(.mainActor), isViewBuilder: attributes.contains(.viewBuilder), isWriteable: !isLet && (getter == nil || setter != nil))
+        return APIFlags(isAsync: asyncBehavior != .sync, isThrows: isThrows, isMainActor: attributes.contains(.mainActor), isSwiftUIBindable: attributes.contains(.bindable) || attributes.contains(.observedObject) || attributes.contains(.state) || attributes.contains(.stateObject), isViewBuilder: attributes.contains(.viewBuilder), isWriteable: !isLet && (getter == nil || setter != nil))
     }
     var isMutating: Bool {
         return !isLet && (getter == nil || setter != nil) && !attributes.isNonMutating
@@ -1573,7 +1573,7 @@ class VariableDeclaration: Statement {
             return context
         } else {
             // Local variable in code block
-            return context.addingIdentifiers(names, types: variableTypes)
+            return context.addingIdentifiers(names, types: variableTypes, apiFlags: apiFlags)
         }
     }
 

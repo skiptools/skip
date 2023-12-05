@@ -1081,6 +1081,7 @@ class KotlinClassDeclaration: KotlinStatement {
             output.append(indentation).append(declaration)
         } else {
             attributes.append(to: output, indentation: indentation)
+            annotations.appendLines(to: output, indentation: indentation)
             output.append(indentation)
             switch modifiers.visibility {
             case .default, .internal:

@@ -537,6 +537,7 @@ final class SwiftUITests: XCTestCase {
         import skip.model.*
 
         import skip.ui.*
+        @Stable
         internal open class O: Observable {
         }
         internal class V: View {
@@ -1113,6 +1114,7 @@ final class SwiftUITests: XCTestCase {
 
         import skip.ui.*
 
+        @Stable
         internal open class O: Observable {
             internal open var string: String
                 get() = stringstate

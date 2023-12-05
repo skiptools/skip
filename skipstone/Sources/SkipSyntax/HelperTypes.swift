@@ -40,12 +40,13 @@ struct APIFlags: OptionSet, Hashable, Codable {
     static let `throws` = APIFlags(rawValue: 1 << 3)
     static let viewBuilder = APIFlags(rawValue: 1 << 4)
     static let writeable = APIFlags(rawValue: 1 << 5)
+    static let swiftUIBindable = APIFlags(rawValue: 1 << 6)
 
     init(rawValue: Int) {
         self.rawValue = rawValue
     }
 
-    init(isAsync: Bool = false, isThrows: Bool = false, isMainActor: Bool = false, isViewBuilder: Bool = false, isWriteable: Bool = false) {
+    init(isAsync: Bool = false, isThrows: Bool = false, isMainActor: Bool = false, isSwiftUIBindable: Bool = false, isViewBuilder: Bool = false, isWriteable: Bool = false) {
         var apiFlags: APIFlags = []
         if isAsync {
             apiFlags.insert(.async)
@@ -55,6 +56,9 @@ struct APIFlags: OptionSet, Hashable, Codable {
         }
         if isMainActor {
             apiFlags.insert(.mainActor)
+        }
+        if isSwiftUIBindable {
+            apiFlags.insert(.swiftUIBindable)
         }
         if isViewBuilder {
             apiFlags.insert(.viewBuilder)
