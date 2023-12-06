@@ -1032,11 +1032,24 @@ extension Array where Element == String {
 }
 
 extension String {
+    /// Remove backtick escaping.
+    var removingBacktickEscaping: String {
+        guard hasPrefix("`") && hasSuffix("`") else {
+            return self
+        }
+        return String(dropFirst().dropLast())
+    }
+
     /// If this is an implicit closure parameter - `$0`, `$1`, etc - return its index.
     var implicitClosureParameterIndex: Int? {
         if hasPrefix("$"), count > 1, let index = Int(String(self[index(after: startIndex)...])) {
             return index
         }
         return nil
+    }
+
+    /// Whether this identifier represents the projected value of a property wrapper.
+    var isProjectedValue: Bool {
+        return hasPrefix("$") && Int(dropFirst()) == nil
     }
 }

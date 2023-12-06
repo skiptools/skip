@@ -809,7 +809,7 @@ class EnumCaseDeclaration: Statement {
         attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: enumCaseDecl.modifiers)
         return enumCaseDecl.elements.enumerated().map { (index, element) in
-            let name = element.name.text
+            let name = element.name.text.removingBacktickEscaping
             let (associatedValues, messages) = element.parameterClause?.parameters(in: syntaxTree) ?? ([], [])
             let rawValue = element.rawValue.map { ExpressionDecoder.decode(syntax: $0.value, in: syntaxTree) }
             let statement = EnumCaseDeclaration(name: name, associatedValues: associatedValues, rawValue: rawValue, attributes: attributes, modifiers: modifiers, syntax: element, sourceFile: syntaxTree.source.file, sourceRange: element.range(in: syntaxTree.source), extras: index == 0 ? extras : nil)
@@ -948,7 +948,7 @@ class FunctionDeclaration: Statement {
     }
 
     private static func decodeFunctionDeclaration(_ functionDecl: FunctionDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> FunctionDeclaration {
-        let name = functionDecl.name.text
+        let name = functionDecl.name.text.removingBacktickEscaping
         let (returnType, parameters, signatureMessges) = functionDecl.signature.typeSignatures(in: syntaxTree)
         let isAsync = functionDecl.signature.effectSpecifiers?.asyncSpecifier != nil
         let isThrows = functionDecl.signature.effectSpecifiers?.throwsSpecifier != nil
@@ -1232,7 +1232,7 @@ class TypealiasDeclaration: Statement {
         guard syntax.kind == .typealiasDecl, let typealiasDecl = syntax.as(TypeAliasDeclSyntax.self) else {
             return nil
         }
-        let name = typealiasDecl.name.text
+        let name = typealiasDecl.name.text.removingBacktickEscaping
         var attributes = Attributes.for(syntax: typealiasDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: typealiasDecl.modifiers)
@@ -1315,7 +1315,7 @@ class TypeDeclaration: Statement {
     }
 
     private static func decodeClassDeclaration(_ classDecl: ClassDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration {
-        let name = classDecl.name.text
+        let name = classDecl.name.text.removingBacktickEscaping
         let (inherits, inheritsMessages) = classDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
         var attributes = Attributes.for(syntax: classDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras)
@@ -1328,7 +1328,7 @@ class TypeDeclaration: Statement {
     }
 
     private static func decodeStructDeclaration(_ structDecl: StructDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration {
-        let name = structDecl.name.text
+        let name = structDecl.name.text.removingBacktickEscaping
         let (inherits, inheritsMessages) = structDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
         var attributes = Attributes.for(syntax: structDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras)
@@ -1341,7 +1341,7 @@ class TypeDeclaration: Statement {
     }
 
     private static func decodeProtocolDeclaration(_ protocolDecl: ProtocolDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration {
-        let name = protocolDecl.name.text
+        let name = protocolDecl.name.text.removingBacktickEscaping
         let (inherits, inheritsMessages) = protocolDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
         var attributes = Attributes.for(syntax: protocolDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras)
@@ -1356,7 +1356,7 @@ class TypeDeclaration: Statement {
     }
 
     private static func decodeEnumDeclaration(_ enumDecl: EnumDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration {
-        let name = enumDecl.name.text
+        let name = enumDecl.name.text.removingBacktickEscaping
         let (inherits, inheritsMessages) = enumDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
         var attributes = Attributes.for(syntax: enumDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras)
@@ -1369,7 +1369,7 @@ class TypeDeclaration: Statement {
     }
 
     private static func decodeActorDeclaration(_ actorDecl: ActorDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration {
-        let name = actorDecl.name.text
+        let name = actorDecl.name.text.removingBacktickEscaping
         let (inherits, inheritsMessages) = actorDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
         var attributes = Attributes.for(syntax: actorDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras)
@@ -1524,7 +1524,7 @@ class VariableDeclaration: Statement {
             attributes.attributes += accessorsAttributes.attributes
         }
 
-        guard let names = syntax.pattern.identifierPatterns(in: syntaxTree)?.map(\.name) else {
+        guard let names = syntax.pattern.identifierPatterns(in: syntaxTree)?.map(\.name?.removingBacktickEscaping) else {
             throw Message.unsupportedSyntax(syntax.pattern, source: syntaxTree.source)
         }
         let combinedAsyncBehavior = asyncBehavior != .sync ? asyncBehavior : accessors.isAsync ? .async : .sync

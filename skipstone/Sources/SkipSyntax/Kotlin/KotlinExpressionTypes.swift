@@ -573,7 +573,7 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
         let inferredParameters = expression.inferredType.parameters
         var implicitParameterCount = 0
         for (index, parameter) in inferredParameters.enumerated() {
-            if let label = parameter.label, KotlinIdentifier.isProjectedValue(name: label) {
+            if let label = parameter.label, label.isProjectedValue {
                 kbody.updateWithSwiftUIBindingParameter(name: String(label.dropFirst()), source: translator.syntaxTree.source)
             } else {
                 if parameter.label == nil && expression.parameters.isEmpty {
@@ -593,7 +593,7 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
         kexpression.returnType.appendKotlinMessages(to: kexpression, source: translator.syntaxTree.source)
         kexpression.parameters = expression.parameters.map {
             var parameter = $0.resolvingSelf(in: expression)
-            if let externalLabel = parameter.externalLabel, KotlinIdentifier.isProjectedValue(name: externalLabel) {
+            if let externalLabel = parameter.externalLabel, externalLabel.isProjectedValue {
                 parameter.externalLabel = String(externalLabel.dropFirst())
             }
             parameter.appendKotlinMessages(to: kexpression, source: translator.syntaxTree.source)
@@ -1098,12 +1098,7 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
     }
 
     var isSwiftUIBinding: Bool {
-        return isSwiftUIBindingParameter || (Self.isProjectedValue(name: name) && apiFlags?.contains(.swiftUIBindable) == true)
-    }
-
-    /// Whether the given identifier name represents the projected value of a property wrapper.
-    static func isProjectedValue(name: String) -> Bool {
-        name.hasPrefix("$") && Int(name.dropFirst()) == nil
+        return isSwiftUIBindingParameter || (name.isProjectedValue && apiFlags?.contains(.swiftUIBindable) == true)
     }
 
     func appendSwiftUIBindingPath(to output: OutputGenerator, indentation: Indentation, appendPath: @escaping (OutputGenerator, Indentation, KotlinBindableBase) -> Void) {
@@ -1150,7 +1145,7 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
 
     private func appendIdentifier(to output: OutputGenerator, indentation: Indentation, projectedValue: Bool) {
         var name = name
-        if Self.isProjectedValue(name: name) {
+        if name.isProjectedValue {
             if projectedValue && isSwiftUIBinding {
                 name = "_\(name.dropFirst()).wrappedValue"
             } else if projectedValue {
@@ -1857,7 +1852,7 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
     }
 
     var isSwiftUIBinding: Bool {
-        return (base as? KotlinSwiftUIBindable)?.isSwiftUIBinding == true || (KotlinIdentifier.isProjectedValue(name: member) && apiFlags?.contains(.swiftUIBindable) == true)
+        return (base as? KotlinSwiftUIBindable)?.isSwiftUIBinding == true || (member.isProjectedValue && apiFlags?.contains(.swiftUIBindable) == true)
     }
 
     func appendSwiftUIBindingPath(to output: OutputGenerator, indentation: Indentation, appendPath: @escaping (OutputGenerator, Indentation, KotlinBindableBase) -> Void) {
@@ -1939,7 +1934,7 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
 
     private func appendMemberAccess(to output: OutputGenerator, indentation: Indentation, projectedValue: Bool, appendBase: (OutputGenerator, Indentation) -> Void) {
         var member = member
-        if KotlinIdentifier.isProjectedValue(name: member) {
+        if member.isProjectedValue {
             if projectedValue && isSwiftUIBinding {
                 member = "_\(member.dropFirst()).wrappedValue"
             } else if projectedValue {

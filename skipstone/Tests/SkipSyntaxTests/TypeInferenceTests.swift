@@ -725,6 +725,33 @@ final class TypeInferenceTests: XCTestCase {
         """)
     }
 
+    func testEscapedProperty() async throws {
+        try await check(supportingSwift: """
+        struct Notification {
+            struct Name {
+                init(_ value: String) {
+                }
+            }
+        }
+        extension Notification.Name {
+            static let test: Notification.Name {
+                return Notification.Name("test")
+            }
+        }
+        class NotificationCenter {
+            static let `default` = NotificationCenter()
+            func post(name: Notification.Name) {
+            }
+        }
+        """, swift: """
+        func f() {
+            NotificationCenter.default.post(name: .test)
+        }
+        """, kotlin: """
+        internal fun f(): Unit = NotificationCenter.default.post(name = Notification.Name.test)
+        """)
+    }
+
     func testCastCausingModuleNameFalsePositive() async throws {
         // The fact that the 'callingClass.kotlin' member access type is known due to the cast even though the
         // base type of the expression is unknown was causing us to think that callingClass was a module name.

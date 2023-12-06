@@ -14,10 +14,7 @@ private class EscapeKeywordsVisitor {
     ]
 
     func fixKeyword(name: String) -> String {
-        var name = name
-        if name.hasPrefix("`") && name .hasSuffix("`") {
-            name = name.dropFirst().dropLast().description
-        }
+        var name = name.removingBacktickEscaping
         // check against already suffixed keywords, e.g. turn: `null` into `null_`, but also turn `null_` into `null__`
         let unsuffixedName = String(name.reversed().drop(while: { $0 == "_" }).reversed())
         if Self.hardKeywords.contains(unsuffixedName) {
