@@ -8,9 +8,6 @@
       location = "group:../skip">
    </FileRef>
    <FileRef
-      location = "group:../skip-unit">
-   </FileRef>
-   <FileRef
       location = "group:../skip-lib">
    </FileRef>
    <FileRef
@@ -21,6 +18,9 @@
    </FileRef>
    <FileRef
       location = "group:../skip-ui">
+   </FileRef>
+   <FileRef
+      location = "group:../skip-sql">
    </FileRef>
    <FileRef
       location = "group:../skipapp-showcase/Darwin/Showcase.xcodeproj">

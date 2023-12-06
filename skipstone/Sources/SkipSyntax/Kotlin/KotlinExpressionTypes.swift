@@ -2815,7 +2815,7 @@ class KotlinWhen: KotlinExpression {
     var cases: [KotlinCase]
     var caseTargetVariable: KotlinTargetVariable?
     var hasNonNilMatches = false
-    var hasBreakLabel = false
+    var hasBreakLoop = false
     var requiresNestingClosure = false
 
     static func translate(expression: Switch, translator: KotlinTranslator) -> KotlinWhen {
@@ -2853,20 +2853,29 @@ class KotlinWhen: KotlinExpression {
         if let caseTargetVariable {
             kon = caseTargetVariable.identifier
         }
-        // Kotlin doesn't support break in when cases, so wrap the when in a closure and return to its label
-        var hasBreakLabel = false
-        for kcase in kcases {
-            if kcase.body.updateWithExpectedReturn(.labelIfBreak(breakLabel)) {
-                hasBreakLabel = true
-            }
-        }
+        // Kotlin doesn't support break in when cases, so wrap the when in a loop
+        let hasBreakLoop = kcases.contains { hasBreak(code: $0.body) }
 
         let kexpression = KotlinWhen(expression: expression, on: kon, cases: kcases)
         kexpression.caseTargetVariable = caseTargetVariable
         kexpression.hasNonNilMatches = hasNonNilMatches
-        kexpression.hasBreakLabel = hasBreakLabel
+        kexpression.hasBreakLoop = hasBreakLoop
         kexpression.messages += messages
         return kexpression
+    }
+
+    private static func hasBreak(code: KotlinCodeBlock) -> Bool {
+        // Look for any break statements, skipping loops and switches that may have their own
+        var hasBreak = false
+        code.visit { node in
+            if hasBreak || node is KotlinWhen || node is KotlinForLoop || node is KotlinWhileLoop {
+                return .skip
+            } else if node is KotlinBreak {
+                hasBreak = true
+            }
+            return .recurse(nil)
+        }
+        return hasBreak
     }
 
     init(on: KotlinExpression, cases: [KotlinCase], sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
@@ -2902,9 +2911,9 @@ class KotlinWhen: KotlinExpression {
             output.append("\n").append(indentation)
         }
         var whenIndentation = indentation
-        if hasBreakLabel {
+        if hasBreakLoop {
             whenIndentation = whenIndentation.inc()
-            output.append("linvoke ").append(Self.breakLabel).append("@{\n")
+            output.append("for (unusedi in 0..0) {\n")
             output.append(whenIndentation)
         }
         output.append("when")
@@ -2915,7 +2924,7 @@ class KotlinWhen: KotlinExpression {
         let caseIndentation = whenIndentation.inc()
         cases.forEach { append($0, to: output, indentation: caseIndentation) }
         output.append(whenIndentation).append("}")
-        if hasBreakLabel {
+        if hasBreakLoop {
             output.append("\n").append(indentation).append("}")
         }
 

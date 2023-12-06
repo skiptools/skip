@@ -32,7 +32,6 @@ enum KotlinStatementType {
 
 class KotlinBreak: KotlinStatement, KotlinSingleStatementAppendable {
     var label: String?
-    var asReturn = false
 
     init(statement: Break) {
         self.label = statement.label
@@ -54,11 +53,7 @@ class KotlinBreak: KotlinStatement, KotlinSingleStatementAppendable {
     }
 
     func appendAsSingleStatement(to output: OutputGenerator, indentation: Indentation, mode: KotlinSingleStatementAppendMode) {
-        if asReturn {
-            output.append("return")
-        } else {
-            output.append("break")
-        }
+        output.append("break")
         if let label {
             output.append("@\(label)")
         }
@@ -124,7 +119,6 @@ class KotlinCodeBlock: KotlinStatement, KotlinSingleStatementAppendable {
     @discardableResult func updateWithExpectedReturn(_ expectedReturn: KotlinExpectedReturn) -> Bool {
         var label: String?
         var assignToSelf = false
-        var convertBreak = false
         var sref = false
         var throwIfNull = false
         var returnRequired = false
@@ -139,9 +133,6 @@ class KotlinCodeBlock: KotlinStatement, KotlinSingleStatementAppendable {
             assignToSelf = true
         case .labelIfPresent(let l):
             label = l
-        case .labelIfBreak(let l):
-            label = l
-            convertBreak = true
         case .sref(let update):
             onUpdate = update
             sref = true
@@ -169,43 +160,26 @@ class KotlinCodeBlock: KotlinStatement, KotlinSingleStatementAppendable {
                         return .skip
                     }
                 case .return:
-                    if !convertBreak {
-                        let returnStatement = statement as! KotlinReturn
-                        didFindReturn = true
-                        if let label {
-                            returnStatement.label = label
-                        }
-                        if throwIfNull, let returnExpression = returnStatement.expression, returnExpression is KotlinNullLiteral {
-                            let throwStatement = KotlinRawStatement(sourceCode: "throw NullReturnException()", sourceFile: statement.sourceFile, sourceRange: statement.sourceRange)
-                            if let parent = statement.parent as? KotlinStatement {
-                                parent.insert(statements: [throwStatement], after: statement)
-                                parent.remove(statement: statement)
-                            } else {
-                                statement.messages.append(.internalError(statement))
-                            }
-                        } else if sref {
-                            returnStatement.expression = returnStatement.expression?.sref(onUpdate: onUpdate)
-                        }
-                        return .skip
+                    let returnStatement = statement as! KotlinReturn
+                    didFindReturn = true
+                    if let label {
+                        returnStatement.label = label
                     }
-                case .break:
-                    if convertBreak, let label {
-                        let breakStatement = statement as! KotlinBreak
-                        if breakStatement.label == nil {
-                            breakStatement.label = label
-                            breakStatement.asReturn = true
-                            didFindReturn = true
-                            return .skip
+                    if throwIfNull, let returnExpression = returnStatement.expression, returnExpression is KotlinNullLiteral {
+                        let throwStatement = KotlinRawStatement(sourceCode: "throw NullReturnException()", sourceFile: statement.sourceFile, sourceRange: statement.sourceRange)
+                        if let parent = statement.parent as? KotlinStatement {
+                            parent.insert(statements: [throwStatement], after: statement)
+                            parent.remove(statement: statement)
+                        } else {
+                            statement.messages.append(.internalError(statement))
                         }
+                    } else if sref {
+                        returnStatement.expression = returnStatement.expression?.sref(onUpdate: onUpdate)
                     }
+                    return .skip
                 case .functionDeclaration:
                     // Skip embedded functions that may have their own returns
                     return .skip
-                case .forLoop, .whileLoop:
-                    // Skip loops that may have their own breaks
-                    if convertBreak {
-                        return .skip
-                    }
                 default:
                     break
                 }
