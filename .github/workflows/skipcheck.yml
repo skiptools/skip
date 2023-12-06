@@ -20,7 +20,7 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: '21'
-      - run: brew upgrade gradle
+      - run: brew upgrade gradle || (brew link --overwrite python@3.11 && brew upgrade gradle)
       #- run: skip checkup --double-check --verbose
       - run: skip checkup --verbose
 
