@@ -511,6 +511,9 @@ struct KotlinCasePattern {
             } else {
                 value = translator.translateExpression(expression.value)
             }
+        case .nilLiteral:
+            op = .with(symbol: "==")
+            value = translator.translateExpression(expression.value)
         default:
             value = translator.translateExpression(expression.value)
         }
