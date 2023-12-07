@@ -676,6 +676,71 @@ final class SwiftUITests: XCTestCase {
         """)
     }
 
+    func testIfLetStateVariable() async throws {
+        try await check(supportingSwift: baseSupportingSwift, swift: """
+        import SwiftUI
+        struct V: View {
+            @State var x: String?
+
+            var body: some View {
+                if let x {
+                    Text(x)
+                } else {
+                    Text("no")
+                }
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
+        import skip.foundation.*
+        import skip.model.*
+
+        import skip.ui.*
+        internal class V: View {
+            internal var x: String?
+                get() = _x.wrappedValue
+                set(newValue) {
+                    _x.wrappedValue = newValue
+                }
+            internal var _x: skip.ui.State<String?> = skip.ui.State(null)
+
+            override fun body(): View {
+                return ComposeView { composectx: ComposeContext ->
+                    linvoke l@{
+                        val matchtarget_0 = x
+                        if (matchtarget_0 != null) {
+                            val x = matchtarget_0
+                            return@l Text(x).Compose(composectx)
+                        } else {
+                            return@l Text("no").Compose(composectx)
+                        }
+                    }
+                }
+            }
+
+            @Composable
+            @Suppress("UNCHECKED_CAST")
+            override fun ComposeContent(composectx: ComposeContext) {
+                val initialx = _x.wrappedValue
+                var composex by rememberSaveable(stateSaver = composectx.stateSaver as Saver<String?, Any>) { mutableStateOf(initialx) }
+                _x.sync(composex, { composex = it })
+
+                body().Compose(composectx)
+            }
+
+            constructor(x: String? = null) {
+                this._x = skip.ui.State(x)
+            }
+        }
+        """)
+    }
+
     func testKeyedEnvironmentVariable() async throws {
         try await check(supportingSwift: baseSupportingSwift, swift: """
         import SwiftUI

@@ -208,7 +208,9 @@ class KotlinCodeBlock: KotlinStatement, KotlinSingleStatementAppendable {
         }
         let returnStatement = KotlinReturn(expression: expression)
         returnStatement.extras = expressionStatement.extras
+        expression.parent = returnStatement
         statements = [returnStatement]
+        returnStatement.parent = self
         return true
     }
 
