@@ -517,6 +517,16 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             if node is KotlinFunctionDeclaration || node is KotlinClosure {
                 // These do not inherit our view builder context and will get processed by the top-level visitation code
                 return .skip
+            } else if let kif = node as? KotlinIf {
+                if kif.nestingClosureFunction != nil {
+                    kif.nestingClosureFunction = "linvokeComposable"
+                }
+                return .recurse(nil)
+            } else if let kwhen = node as? KotlinWhen {
+                if kwhen.nestingClosureFunction != nil {
+                    kwhen.nestingClosureFunction = "linvokeComposable"
+                }
+                return .recurse(nil)
             } else if let apiCall = node as? APICallExpression, let expressionStatement = node.parent as? KotlinExpressionStatement, !isInAssignmentExpression(expressionStatement, in: codeBlock) {
                 // Add our compose tail call to expressions that evaluate to Views and are used as statements
                 if let apiMatch = apiCall.apiMatch {

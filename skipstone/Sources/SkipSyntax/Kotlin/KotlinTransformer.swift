@@ -54,13 +54,15 @@ public let builtinKotlinTransformerTypes: [KotlinTransformer.Type] = [
     // May add constructors and modify existing constructors. May suppress property setting side effects in functions.
     // May change optional init call sites
     KotlinConstructorAndSideEffectSupressionTransformer.self,
-    KotlinConcurrencyTransformer.self,
     // May change the names of stored properties, but adds computed wrapper properties with the previous names
     KotlinObservationTransformer.self,
     KotlinIfWhenTransformer.self,
     KotlinDeferTransformer.self,
     KotlinDisambiguateFunctionsTransformer.self,
     KotlinTupleLabelTransformer.self,
+    // Requires knowledge of enclosing closures added by KotlinIfWhenTransformer
+    KotlinConcurrencyTransformer.self,
+    // Requires knowledge of enclosing closures added by KotlinIfWhenTransformer
     KotlinSwiftUITransformer.self,
     KotlinImportsTransformer.self,
     KotlinUnitTestTransformer.self,

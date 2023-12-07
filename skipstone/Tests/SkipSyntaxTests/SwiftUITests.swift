@@ -712,7 +712,7 @@ final class SwiftUITests: XCTestCase {
 
             override fun body(): View {
                 return ComposeView { composectx: ComposeContext ->
-                    linvoke l@{
+                    linvokeComposable l@{
                         val matchtarget_0 = x
                         if (matchtarget_0 != null) {
                             val x = matchtarget_0

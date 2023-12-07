@@ -5,24 +5,37 @@ final class KotlinConcurrencyTransformer: KotlinTransformer {
         var taskClosureIdentifiers: Set<ObjectIdentifier> = []
         syntaxTree.root.visit { node in
             if let functionDeclaration = node as? KotlinFunctionDeclaration {
-                // Async implementations change for main actor
-                if functionDeclaration.apiFlags.contains(.async) && codebaseInfo?.isMainActor(declaration: functionDeclaration) == true {
-                    functionDeclaration.apiFlags.insert(.mainActor)
+                if functionDeclaration.apiFlags.contains(.async) {
+                    if let body = functionDeclaration.body {
+                        updateNestingClosures(in: body)
+                    }
+                    // Async implementations change for main actor
+                    if codebaseInfo?.isMainActor(declaration: functionDeclaration) == true {
+                        functionDeclaration.apiFlags.insert(.mainActor)
+                    }
                 }
             } else if let variableDeclaration = node as? KotlinVariableDeclaration {
-                // Async implementations change for main actor
                 if variableDeclaration.apiFlags.contains(.async) {
                     if variableDeclaration.isAsyncLet {
                         if let codeBlock = variableDeclaration.parent as? KotlinCodeBlock {
                             codeBlock.updateWithAsyncLet(declaration: variableDeclaration, source: translator.syntaxTree.source)
                         }
-                    } else if codebaseInfo?.isMainActor(declaration: variableDeclaration) == true {
-                        variableDeclaration.apiFlags.insert(.mainActor)
+                    } else {
+                        if let body = variableDeclaration.getter?.body {
+                            updateNestingClosures(in: body)
+                        }
+                        // Async implementations change for main actor
+                        if codebaseInfo?.isMainActor(declaration: variableDeclaration) == true {
+                            variableDeclaration.apiFlags.insert(.mainActor)
+                        }
                     }
                 }
             } else if let closure = node as? KotlinClosure {
                 if !taskClosureIdentifiers.contains(ObjectIdentifier(closure)) {
                     updateClosure(closure, codebaseInfo: codebaseInfo)
+                }
+                if closure.isTaskClosure || closure.apiFlags?.contains(.async) == true {
+                    updateNestingClosures(in: closure.body)
                 }
             } else if let functionCall = node as? KotlinFunctionCall {
                 if let taskClosure = updateTaskClosure(in: functionCall, codebaseInfo: codebaseInfo, source: translator.syntaxTree.source) {
@@ -104,6 +117,26 @@ final class KotlinConcurrencyTransformer: KotlinTransformer {
         // Async closures inherit actor isolation when they're created. See if this one should be isolated
         if isInMainActorContext(node: closure, codebaseInfo: codebaseInfo) {
             closure.apiFlags?.insert(.mainActor)
+        }
+    }
+
+    private func updateNestingClosures(in codeBlock: KotlinCodeBlock) {
+        codeBlock.visit { node in
+            if node is KotlinFunctionDeclaration || node is KotlinClosure {
+                return .skip
+            } else if let kif = node as? KotlinIf {
+                if kif.nestingClosureFunction != nil {
+                    kif.nestingClosureFunction = "linvokeSuspend"
+                }
+                return .recurse(nil)
+            } else if let kwhen = node as? KotlinWhen {
+                if kwhen.nestingClosureFunction != nil {
+                    kwhen.nestingClosureFunction = "linvokeSuspend"
+                }
+                return .recurse(nil)
+            } else {
+                return .recurse(nil)
+            }
         }
     }
 

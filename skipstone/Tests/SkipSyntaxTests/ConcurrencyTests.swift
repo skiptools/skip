@@ -1180,6 +1180,30 @@ final class ConcurrencyTests: XCTestCase {
         """)
     }
 
+    func testSuspendingNestingClosure() async throws {
+        try await check(swift: """
+        func f() async -> Int? {
+            return if let x = await f() {
+                x + 1
+            } else {
+                0
+            }
+        }
+        """, kotlin: """
+        internal suspend fun f(): Int? = Async.run l@{
+            return@l linvokeSuspend l@{
+                val matchtarget_0 = f()
+                if (matchtarget_0 != null) {
+                    val x = matchtarget_0
+                    return@l x + 1
+                } else {
+                    return@l 0
+                }
+            }
+        }
+        """)
+    }
+
     // Running this and observing the output verifies that Swift hops to the main thread when required by @MainActor, but does
     // not stay there for chained calls. Commented out to avoid warnings about using Thread.isMainThread within async code.
 //    func testMainActorBehavior() async throws {

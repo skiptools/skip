@@ -19,7 +19,7 @@ private class ValueExpressionVisitor {
         if let kif = node as? KotlinIf {
             let type = valueExpressionType(for: kif)
             if type == .expression {
-                kif.requiresNestingClosure = true
+                kif.nestingClosureFunction = "linvoke"
             }
             if type != .none {
                 // Make return values explicit unless we're just nesting another if/when, in which case we'll end up making its return
@@ -38,7 +38,7 @@ private class ValueExpressionVisitor {
         } else if let kwhen = node as? KotlinWhen {
             let type = valueExpressionType(for: kwhen)
             if type == .expression {
-                kwhen.requiresNestingClosure = true
+                kwhen.nestingClosureFunction = "linvoke"
             }
             if type != .none {
                 for kcase in kwhen.cases {

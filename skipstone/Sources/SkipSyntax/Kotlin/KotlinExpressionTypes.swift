@@ -1225,7 +1225,7 @@ class KotlinIf: KotlinExpression {
     var isGuard = false
     var body: KotlinCodeBlock
     var elseBody: KotlinCodeBlock?
-    var requiresNestingClosure = false
+    var nestingClosureFunction: String?
 
     struct ConditionSet {
         var optionalBindingVariable: KotlinBindingVariable?
@@ -1398,9 +1398,9 @@ class KotlinIf: KotlinExpression {
 
     private func appendIf(to output: OutputGenerator, indentation: Indentation) {
         var indentation = indentation
-        if requiresNestingClosure {
+        if let nestingClosureFunction {
             indentation = indentation.inc()
-            output.append("linvoke \(KotlinClosure.returnLabel)@{\n").append(indentation)
+            output.append("\(nestingClosureFunction) \(KotlinClosure.returnLabel)@{\n").append(indentation)
         }
 
         // Nested conditions and their opening braces
@@ -1426,7 +1426,7 @@ class KotlinIf: KotlinExpression {
             }
         }
 
-        if (requiresNestingClosure) {
+        if nestingClosureFunction != nil {
             output.append("\n").append(indentation.dec()).append("}")
         }
     }
@@ -2816,7 +2816,7 @@ class KotlinWhen: KotlinExpression {
     var caseTargetVariable: KotlinTargetVariable?
     var hasNonNilMatches = false
     var hasBreakLoop = false
-    var requiresNestingClosure = false
+    var nestingClosureFunction: String?
 
     static func translate(expression: Switch, translator: KotlinTranslator) -> KotlinWhen {
         var kon = translator.translateExpression(expression.on)
@@ -2901,9 +2901,9 @@ class KotlinWhen: KotlinExpression {
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
         var indentation = indentation
-        if requiresNestingClosure {
+        if let nestingClosureFunction {
             indentation = indentation.inc()
-            output.append("linvoke \(KotlinClosure.returnLabel)@{\n").append(indentation)
+            output.append("\(nestingClosureFunction) \(KotlinClosure.returnLabel)@{\n").append(indentation)
         }
 
         if let caseTargetVariable {
@@ -2928,7 +2928,7 @@ class KotlinWhen: KotlinExpression {
             output.append("\n").append(indentation).append("}")
         }
 
-        if (requiresNestingClosure) {
+        if nestingClosureFunction != nil {
             output.append("\n").append(indentation.dec()).append("}")
         }
     }
