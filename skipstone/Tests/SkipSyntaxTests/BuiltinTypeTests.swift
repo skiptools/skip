@@ -311,12 +311,14 @@ final class BuiltinTypeTests: XCTestCase {
         try await check(swift: """
         {
             let a = [Int]()
+            let a = [[(String, String)]]()
         }
         """, kotlin: """
         import skip.lib.Array
 
         {
             val a = Array<Int>()
+            val a = Array<Array<Tuple2<String, String>>>()
         }
         """)
 
@@ -365,10 +367,14 @@ final class BuiltinTypeTests: XCTestCase {
         try await check(swift: """
         {
             let d = [Int: String]()
+            let d = [[Int]: (String, String)]()
         }
         """, kotlin: """
+        import skip.lib.Array
+        
         {
             val d = Dictionary<Int, String>()
+            val d = Dictionary<Array<Int>, Tuple2<String, String>>()
         }
         """)
 

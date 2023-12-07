@@ -163,6 +163,11 @@ enum KotlinCastTargetType {
     case none, target, typeErasedTarget
 }
 
+/// An expression that can be used as a type literal.
+protocol KotlinUsableAsTypeLiteral {
+    var isUsedAsTypeLiteral: Bool { get set }
+}
+
 class KotlinRawExpression: KotlinExpression {
     let sourceCode: String
 

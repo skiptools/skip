@@ -32,7 +32,7 @@ enum KotlinExpressionType {
     case raw
 }
 
-class KotlinArrayLiteral: KotlinExpression {
+class KotlinArrayLiteral: KotlinExpression, KotlinUsableAsTypeLiteral {
     var elements: [KotlinExpression] = []
     var inferredType: TypeSignature = .none
     var isOptionSet = false
@@ -57,6 +57,16 @@ class KotlinArrayLiteral: KotlinExpression {
         super.init(type: .arrayLiteral, expression: expression)
     }
 
+    var isUsedAsTypeLiteral = false {
+        didSet {
+            for element in elements {
+                if var usableAsTypeLiteral = element as? KotlinUsableAsTypeLiteral {
+                    usableAsTypeLiteral.isUsedAsTypeLiteral = isUsedAsTypeLiteral
+                }
+            }
+        }
+    }
+
     override func mayBeSharedMutableStructExpression(orType: Bool) -> Bool {
         // Array literals are not shared, but if we're using this expression to determine the type, then it can be
         return orType
@@ -77,6 +87,24 @@ class KotlinArrayLiteral: KotlinExpression {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
+        if isUsedAsTypeLiteral {
+            appendAsTypeLiteral(to: output, indentation: indentation)
+        } else {
+            appendAsValue(to: output, indentation: indentation)
+        }
+    }
+
+    private func appendAsTypeLiteral(to output: OutputGenerator, indentation: Indentation) {
+        output.append("Array<")
+        if let element = elements.first {
+            output.append(element, indentation: indentation)
+        } else {
+            output.append("*")
+        }
+        output.append(">")
+    }
+
+    private func appendAsValue(to output: OutputGenerator, indentation: Indentation) {
         if isOptionSet {
             output.append("\(inferredType.elementType.kotlin).of(")
         } else if case .set = inferredType {
@@ -756,7 +784,7 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
     }
 }
 
-class KotlinDictionaryLiteral: KotlinExpression {
+class KotlinDictionaryLiteral: KotlinExpression, KotlinUsableAsTypeLiteral {
     var entries: [(key: KotlinExpression, value: KotlinExpression)] = []
     var useMultilineFormatting = false
 
@@ -775,6 +803,19 @@ class KotlinDictionaryLiteral: KotlinExpression {
         super.init(type: .dictionaryLiteral, expression: expression)
     }
 
+    var isUsedAsTypeLiteral = false {
+        didSet {
+            for entry in entries {
+                if var usableAsTypeLiteral = entry.key as? KotlinUsableAsTypeLiteral {
+                    usableAsTypeLiteral.isUsedAsTypeLiteral = isUsedAsTypeLiteral
+                }
+                if var usableAsTypeLiteral = entry.value as? KotlinUsableAsTypeLiteral {
+                    usableAsTypeLiteral.isUsedAsTypeLiteral = isUsedAsTypeLiteral
+                }
+            }
+        }
+    }
+
     override func mayBeSharedMutableStructExpression(orType: Bool) -> Bool {
         // Dictionary literals are not shared, but if we're using this expression to determine the type, then it can be
         return orType
@@ -785,6 +826,24 @@ class KotlinDictionaryLiteral: KotlinExpression {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
+        if isUsedAsTypeLiteral {
+            appendAsTypeLiteral(to: output, indentation: indentation)
+        } else {
+            appendAsValue(to: output, indentation: indentation)
+        }
+    }
+
+    private func appendAsTypeLiteral(to output: OutputGenerator, indentation: Indentation) {
+        output.append("Dictionary<")
+        if let entry = entries.first {
+            output.append(entry.key, indentation: indentation).append(", ").append(entry.value, indentation: indentation)
+        } else {
+            output.append("*, *")
+        }
+        output.append(">")
+    }
+
+    private func appendAsValue(to output: OutputGenerator, indentation: Indentation) {
         output.append("dictionaryOf(")
         let entryIndentation = useMultilineFormatting ? indentation.inc() : indentation
         for (index, entry) in entries.enumerated() {
@@ -848,6 +907,11 @@ class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting, APICallExp
         }
 
         let kfunction = translator.translateExpression(expression.function)
+        // E.g. [Int](), [String: Int]()
+        if var usableAsTypeLiteral = kfunction as? KotlinUsableAsTypeLiteral {
+            usableAsTypeLiteral.isUsedAsTypeLiteral = true
+        }
+
         let kexpression = KotlinFunctionCall(expression: expression, function: kfunction)
         kexpression.arguments = karguments
         kexpression.hasTrailingClosures = expression.trailingClosureCount > 0
@@ -960,29 +1024,20 @@ class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting, APICallExp
             output.append("linvoke")
             trailingClosure = closure
         } else {
-            if let arrayLiteral = function as? KotlinArrayLiteral, arrayLiteral.elements.count == 1 {
-                // [Int]() syntax
-                output.append("Array<").append(arrayLiteral.elements[0], indentation: indentation).append(">")
-            } else if let dictionaryLiteral = function as? KotlinDictionaryLiteral, dictionaryLiteral.entries.count == 1 {
-                // [Int: String]() syntax
-                output.append("Dictionary<").append(dictionaryLiteral.entries[0].key, indentation: indentation).append(", ")
-                output.append(dictionaryLiteral.entries[0].value, indentation: indentation).append(">")
-            } else {
-                output.append(function, indentation: indentation)
-                if (function as? KotlinMemberAccess)?.incrementsIndentation == true {
-                    argumentIndentation = argumentIndentation.inc()
-                }
-                // Kotlin does not support <closure>?(args); use <closure>?.invoke(args)
-                if function.optionalChain == .explicit {
-                    output.append(".invoke")
-                } else if function.optionalChain == .implicit, let declarationType = (function as? APICallExpression)?.apiMatch?.declarationType, declarationType != .functionDeclaration {
-                    output.append("?.invoke")
-                }
-                if let identifier = function as? KotlinIdentifier {
-                    isReduceFunction = identifier.name == "reduce"
-                } else if let memberAccess = function as? KotlinMemberAccess {
-                    isReduceFunction = memberAccess.member == "reduce"
-                }
+            output.append(function, indentation: indentation)
+            if (function as? KotlinMemberAccess)?.incrementsIndentation == true {
+                argumentIndentation = argumentIndentation.inc()
+            }
+            // Kotlin does not support <closure>?(args); use <closure>?.invoke(args)
+            if function.optionalChain == .explicit {
+                output.append(".invoke")
+            } else if function.optionalChain == .implicit, let declarationType = (function as? APICallExpression)?.apiMatch?.declarationType, declarationType != .functionDeclaration {
+                output.append("?.invoke")
+            }
+            if let identifier = function as? KotlinIdentifier {
+                isReduceFunction = identifier.name == "reduce"
+            } else if let memberAccess = function as? KotlinMemberAccess {
+                isReduceFunction = memberAccess.member == "reduce"
             }
             let useTrailingClosure = hasTrailingClosures && arguments.last?.value.type == .closure && arguments.last?.label == nil && (arguments.last?.value as? KotlinClosure)?.isAnonymousFunction == false
             if useTrailingClosure {
@@ -2715,7 +2770,7 @@ class KotlinTry: KotlinExpression {
     }
 }
 
-class KotlinTupleLiteral: KotlinExpression {
+class KotlinTupleLiteral: KotlinExpression, KotlinUsableAsTypeLiteral {
     var values: [KotlinExpression]
 
     /// Maximum support tuple elements.
@@ -2745,6 +2800,16 @@ class KotlinTupleLiteral: KotlinExpression {
         super.init(type: .tupleLiteral, expression: expression)
     }
 
+    var isUsedAsTypeLiteral = false {
+        didSet {
+            for value in values {
+                if var usableAsTypeLiteral = value as? KotlinUsableAsTypeLiteral {
+                    usableAsTypeLiteral.isUsedAsTypeLiteral = isUsedAsTypeLiteral
+                }
+            }
+        }
+    }
+
     override func sref(onUpdate: (() -> String)? = nil) -> KotlinExpression {
         let srefValues = values.map { $0.sref() }
         return KotlinTupleLiteral(values: srefValues, sourceFile: sourceFile, sourceRange: sourceRange)
@@ -2759,14 +2824,14 @@ class KotlinTupleLiteral: KotlinExpression {
             output.append("Unit")
         } else {
             output.append("Tuple\(values.count)")
-            output.append("(")
+            output.append(isUsedAsTypeLiteral ? "<" : "(")
             for (index, value) in values.enumerated() {
                 output.append(value, indentation: indentation)
                 if index != values.count - 1 {
                     output.append(", ")
                 }
             }
-            output.append(")")
+            output.append(isUsedAsTypeLiteral ? ">" : ")")
         }
     }
 }

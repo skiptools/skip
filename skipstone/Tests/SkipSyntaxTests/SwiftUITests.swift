@@ -698,10 +698,10 @@ final class SwiftUITests: XCTestCase {
         import androidx.compose.runtime.saveable.Saver
         import androidx.compose.runtime.saveable.rememberSaveable
         import androidx.compose.runtime.setValue
-        import skip.foundation.*
-        import skip.model.*
 
         import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
         internal class V: View {
             internal var x: String?
                 get() = _x.wrappedValue
