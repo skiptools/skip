@@ -539,6 +539,8 @@ final class SwiftUITests: XCTestCase {
         import skip.model.*
         @Stable
         internal open class O: Observable {
+
+            override fun trackstate() = Unit
         }
         internal class V: View {
             internal var s: Int
@@ -569,7 +571,7 @@ final class SwiftUITests: XCTestCase {
             }
 
             @Composable
-            @Suppress(\"UNCHECKED_CAST\")
+            @Suppress("UNCHECKED_CAST")
             override fun ComposeContent(composectx: ComposeContext) {
                 val initials = _s.wrappedValue
                 var composes by rememberSaveable(stateSaver = composectx.stateSaver as Saver<Int, Any>) { mutableStateOf(initials) }
@@ -577,6 +579,7 @@ final class SwiftUITests: XCTestCase {
 
                 val initialo = _o.wrappedValue
                 var composeo by rememberSaveable(stateSaver = composectx.stateSaver as Saver<O, Any>) { mutableStateOf(initialo) }
+                (composeo as? skip.model.ComposeStateTracking)?.trackstate()
                 _o.sync(composeo, { composeo = it })
 
                 body().Compose(composectx)
@@ -664,6 +667,7 @@ final class SwiftUITests: XCTestCase {
             override fun ComposeContent(composectx: ComposeContext) {
                 val initials = _s.wrappedValue
                 var composes by rememberSaveable(stateSaver = composectx.stateSaver as Saver<S, Any>) { mutableStateOf(initials) }
+                (composes as? skip.model.ComposeStateTracking)?.trackstate()
                 _s.sync(composes, { composes = it })
 
                 body().Compose(composectx)
@@ -1139,6 +1143,7 @@ final class SwiftUITests: XCTestCase {
             override fun ComposeContent(composectx: ComposeContext) {
                 val initialitem = _item.wrappedValue
                 var composeitem by rememberSaveable(stateSaver = composectx.stateSaver as Saver<Item, Any>) { mutableStateOf(initialitem) }
+                (composeitem as? skip.model.ComposeStateTracking)?.trackstate()
                 _item.sync(composeitem, { composeitem = it })
 
                 body().Compose(composectx)
@@ -1182,11 +1187,13 @@ final class SwiftUITests: XCTestCase {
         @Stable
         internal open class O: Observable {
             internal open var string: String
-                get() = stringstate
+                get() = _string.wrappedValue
                 set(newValue) {
-                    stringstate = newValue
+                    _string.wrappedValue = newValue
                 }
-            internal var stringstate: String by mutableStateOf("")
+            internal var _string: skip.model.Observed<String> = skip.model.Observed("")
+
+            override fun trackstate(): Unit = _string.track()
         }
 
         internal class V: View {
@@ -1198,6 +1205,13 @@ final class SwiftUITests: XCTestCase {
             internal var _o: skip.ui.Bindable<O>
             override fun body(): View {
                 return ComposeView { composectx: ComposeContext -> TextField(Binding({ _o.wrappedValue.string }, { it -> _o.wrappedValue.string = it })).Compose(composectx) }
+            }
+
+            @Composable
+            override fun ComposeContent(composectx: ComposeContext) {
+                (_o.wrappedValue as? skip.model.ComposeStateTracking)?.trackstate()
+
+                body().Compose(composectx)
             }
 
             constructor(o: O) {
@@ -1244,6 +1258,13 @@ final class SwiftUITests: XCTestCase {
                 return ComposeView { composectx: ComposeContext -> TextField(Binding({ this._o.wrappedValue.s.string }, { it -> this._o.wrappedValue.s.string = it })).Compose(composectx) }
             }
 
+            @Composable
+            override fun ComposeContent(composectx: ComposeContext) {
+                (_o.wrappedValue as? skip.model.ComposeStateTracking)?.trackstate()
+
+                body().Compose(composectx)
+            }
+
             constructor(o: O) {
                 this._o = skip.ui.Bindable(o)
             }
@@ -1285,6 +1306,13 @@ final class SwiftUITests: XCTestCase {
             internal var _o: skip.ui.Bindable<O>
             override fun body(): View {
                 return ComposeView { composectx: ComposeContext -> TextField(Binding({ _o.wrappedValue.strings[0] }, { it -> _o.wrappedValue.strings[0] = it })).Compose(composectx) }
+            }
+
+            @Composable
+            override fun ComposeContent(composectx: ComposeContext) {
+                (_o.wrappedValue as? skip.model.ComposeStateTracking)?.trackstate()
+
+                body().Compose(composectx)
             }
 
             constructor(o: O) {
@@ -1399,13 +1427,15 @@ final class SwiftUITests: XCTestCase {
             override fun body(): View {
                 return ComposeView { composectx: ComposeContext -> Text("Hello").Compose(composectx) }
             }
-        
+
             @Composable
             @Suppress("UNCHECKED_CAST")
             override fun ComposeContent(composectx: ComposeContext) {
                 val initialcount = _count.wrappedValue
                 var composecount by rememberSaveable(stateSaver = composectx.stateSaver as Saver<Int, Any>) { mutableStateOf(initialcount) }
                 _count.sync(composecount, { composecount = it })
+
+                (_o.wrappedValue as? skip.model.ComposeStateTracking)?.trackstate()
 
                 envvalue = EnvironmentValues.shared.envvalue
 
@@ -1499,6 +1529,8 @@ final class SwiftUITests: XCTestCase {
                 val initialcount = _count.wrappedValue
                 var composecount by rememberSaveable(stateSaver = composectx.stateSaver as Saver<Int, Any>) { mutableStateOf(initialcount) }
                 _count.sync(composecount, { composecount = it })
+
+                (_o.wrappedValue as? skip.model.ComposeStateTracking)?.trackstate()
 
                 envvalue = EnvironmentValues.shared.envvalue
 

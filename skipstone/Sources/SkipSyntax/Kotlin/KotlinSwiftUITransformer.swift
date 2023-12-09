@@ -250,8 +250,8 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         let bindingVariables = variableDeclarations.filter { $0.attributes.contains(.binding) }
         let bindableVariables = variableDeclarations.filter { $0.attributes.contains(.bindable) || $0.attributes.contains(.observedObject) }
         let appStorageVariables = variableDeclarations.filter { $0.attributes.contains(.appStorage) }
-        if !stateVariables.isEmpty || !environmentVariables.isEmpty || !appStorageVariables.isEmpty {
-            let composeFunction = synthesizeComposeFunction(view: view, stateVariables: stateVariables, environmentVariables: environmentVariables, appStorageVariables: appStorageVariables, translator: translator)
+        if !stateVariables.isEmpty || !bindableVariables.isEmpty || !environmentVariables.isEmpty || !appStorageVariables.isEmpty {
+            let composeFunction = synthesizeComposeFunction(view: view, stateVariables: stateVariables, bindableVariables: bindableVariables, environmentVariables: environmentVariables, appStorageVariables: appStorageVariables, translator: translator)
             view.insert(statements: [composeFunction], after: body)
             
             for stateVariable in stateVariables {
@@ -270,7 +270,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
     }
 
     /// Create an override of the SkipUI `Compose` function on views to handle state synchronization, etc.
-    private func synthesizeComposeFunction(view: KotlinClassDeclaration, stateVariables: [KotlinVariableDeclaration], environmentVariables: [KotlinVariableDeclaration], appStorageVariables: [KotlinVariableDeclaration], translator: KotlinTranslator) -> KotlinStatement {
+    private func synthesizeComposeFunction(view: KotlinClassDeclaration, stateVariables: [KotlinVariableDeclaration], bindableVariables: [KotlinVariableDeclaration], environmentVariables: [KotlinVariableDeclaration], appStorageVariables: [KotlinVariableDeclaration], translator: KotlinTranslator) -> KotlinStatement {
         let composeFunction = KotlinFunctionDeclaration(name: "ComposeContent")
         composeFunction.modifiers.visibility = .public
         composeFunction.modifiers.isOverride = true
@@ -284,6 +284,13 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         var composeBodyStatements: [KotlinStatement] = []
         for stateVariable in stateVariables {
             let statements = synthesizeStateSync(variable: stateVariable)
+            if !composeBodyStatements.isEmpty {
+                statements[0].extras = .singleNewline
+            }
+            composeBodyStatements += statements
+        }
+        for bindableVariable in bindableVariables {
+            let statements = synthesizeBindableSync(variable: bindableVariable)
             if !composeBodyStatements.isEmpty {
                 statements[0].extras = .singleNewline
             }
@@ -322,7 +329,18 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         let initialValue = KotlinRawStatement(sourceCode: "val initial\(variable.propertyName) = _\(variable.propertyName).wrappedValue")
         let composeValue = KotlinRawStatement(sourceCode: "var compose\(variable.propertyName) by rememberSaveable(stateSaver = composectx.stateSaver as Saver<\(variable.propertyType.kotlin), Any>) { mutableStateOf(initial\(variable.propertyName)) }")
         let syncValue = KotlinRawStatement(sourceCode: "_\(variable.propertyName).sync(compose\(variable.propertyName), { compose\(variable.propertyName) = it })")
-        return [initialValue, composeValue, syncValue]
+        if variable.propertyType.isNamedType {
+            let trackState = KotlinRawStatement(sourceCode: "(compose\(variable.propertyName) as? skip.model.ComposeStateTracking)?.trackstate()")
+            return [initialValue, composeValue, trackState, syncValue]
+        } else {
+            return [initialValue, composeValue, syncValue]
+        }
+    }
+
+    /// Create code to remember and sync a bindable variable.
+    private func synthesizeBindableSync(variable: KotlinVariableDeclaration) -> [KotlinStatement] {
+        let trackState = KotlinRawStatement(sourceCode: "(_\(variable.propertyName).wrappedValue as? skip.model.ComposeStateTracking)?.trackstate()")
+        return [trackState]
     }
 
     /// Create code to remember and sync a state variable.

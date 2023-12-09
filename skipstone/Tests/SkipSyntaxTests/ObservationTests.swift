@@ -24,15 +24,12 @@ final class ObservationTests: XCTestCase {
                 }
             }
             @ObservationIgnored var f = 1
-            lazy var g = 1
 
             static var s = 1
         }
         """, kotlin: """
         import androidx.compose.runtime.Stable
-        import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
-        import androidx.compose.runtime.setValue
 
         import skip.model.*
 
@@ -46,143 +43,29 @@ final class ObservationTests: XCTestCase {
                 set(newValue) {
                 }
             internal open var d: Int
-                get() = dstate
+                get() = _d.wrappedValue
                 set(newValue) {
-                    dstate = newValue
+                    _d.wrappedValue = newValue
                 }
-            internal var dstate: Int by mutableStateOf(1)
+            internal var _d: skip.model.Observed<Int> = skip.model.Observed(1)
             internal open var e: Int
-                get() = estate
+                get() = _e.wrappedValue
                 set(newValue) {
-                    estate = newValue
+                    _e.wrappedValue = newValue
                     print("didSet: ${e}")
                 }
-            internal var estate: Int by mutableStateOf(1)
+            internal var _e: skip.model.Observed<Int> = skip.model.Observed(1)
             internal open var f = 1
-            internal open var g: Int
-                get() {
-                    if (!ginitialized) {
-                        gstate = 1
-                        ginitialized = true
-                    }
-                    return gstate
-                }
-                set(newValue) {
-                    gstate = newValue
-                    ginitialized = true
-                }
-            internal var gstate: Int by mutableStateOf(Int(0))
-            private var ginitialized = false
+
+            override fun trackstate() {
+                _d.track()
+                _e.track()
+            }
 
             companion object {
 
                 internal var s = 1
             }
-        }
-        """)
-    }
-
-    func testMutableStructObservable() async throws {
-        try await check(swift: """
-        @Observable struct S {
-            var a = 1
-        }
-        """, kotlin: """
-        import androidx.compose.runtime.Stable
-        import androidx.compose.runtime.getValue
-        import androidx.compose.runtime.mutableStateOf
-        import androidx.compose.runtime.setValue
-
-        @Stable
-        internal class S: MutableStruct, Observable {
-            internal var a: Int
-                get() = astate
-                set(newValue) {
-                    willmutate()
-                    astate = newValue
-                    didmutate()
-                }
-            internal var astate: Int by mutableStateOf(Int(0))
-
-            constructor(a: Int = 1) {
-                this.a = a
-            }
-
-            override var supdate: ((Any) -> Unit)? = null
-            override var smutatingcount = 0
-            override fun scopy(): MutableStruct = S(a)
-        }
-        """)
-    }
-
-    func testObservedLazyProperty() async throws {
-        try await check(swift: """
-        @Observable class C {
-            lazy var a: Int = { 1 }()
-        }
-        """, kotlin: """
-        import androidx.compose.runtime.Stable
-        import androidx.compose.runtime.getValue
-        import androidx.compose.runtime.mutableStateOf
-        import androidx.compose.runtime.setValue
-
-        @Stable
-        internal open class C: Observable {
-            internal open var a: Int
-                get() {
-                    if (!ainitialized) {
-                        astate = { 1 }()
-                        ainitialized = true
-                    }
-                    return astate
-                }
-                set(newValue) {
-                    astate = newValue
-                    ainitialized = true
-                }
-            internal var astate: Int by mutableStateOf(Int(0))
-            private var ainitialized = false
-        }
-        """)
-
-        try await check(swift: """
-        @Observable struct S {
-            lazy var a: Int = { 1 }()
-        }
-        """, kotlin: """
-        import androidx.compose.runtime.Stable
-        import androidx.compose.runtime.getValue
-        import androidx.compose.runtime.mutableStateOf
-        import androidx.compose.runtime.setValue
-
-        @Stable
-        internal class S: MutableStruct, Observable {
-            internal var a: Int
-                get() {
-                    val isinitialized = ainitialized
-                    if (!isinitialized) willmutate()
-                    try {
-                        if (!ainitialized) {
-                            astate = { 1 }()
-                            ainitialized = true
-                        }
-                        return astate
-                    } finally {
-                        if (!isinitialized) didmutate()
-                    }
-                }
-                set(newValue) {
-                    willmutate()
-                    astate = newValue
-                    ainitialized = true
-                    didmutate()
-                }
-            internal var astate: Int by mutableStateOf(Int(0))
-            private var ainitialized = false
-
-            override var supdate: ((Any) -> Unit)? = null
-            override var smutatingcount = 0
-            override fun scopy(): MutableStruct = S()
         }
         """)
     }
@@ -198,56 +81,19 @@ final class ObservationTests: XCTestCase {
         }
         """, kotlin: """
         import androidx.compose.runtime.Stable
-        import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
-        import androidx.compose.runtime.setValue
         import skip.lib.Array
 
         @Stable
         internal open class C: Observable {
             internal open var a: Array<A>
-                get() = astate.sref({ this.a = it })
+                get() = _a.wrappedValue.sref({ this.a = it })
                 set(newValue) {
-                    astate = newValue.sref()
+                    _a.wrappedValue = newValue.sref()
                 }
-            internal var astate: Array<A> by mutableStateOf(arrayOf())
-        }
-        """)
+            internal var _a: skip.model.Observed<Array<A>> = skip.model.Observed(arrayOf())
 
-        try await check(supportingSwift: """
-        struct A {
-            var x = 1
-        }
-        """, swift: """
-        @Observable struct S {
-            var a: [A] = []
-        }
-        """, kotlin: """
-        import androidx.compose.runtime.Stable
-        import androidx.compose.runtime.getValue
-        import androidx.compose.runtime.mutableStateOf
-        import androidx.compose.runtime.setValue
-        import skip.lib.Array
-
-        @Stable
-        internal class S: MutableStruct, Observable {
-            internal var a: Array<A>
-                get() = astate!!.sref({ this.a = it })
-                set(newValue) {
-                    @Suppress("NAME_SHADOWING") val newValue = newValue.sref()
-                    willmutate()
-                    astate = newValue
-                    didmutate()
-                }
-            internal var astate: Array<A>? by mutableStateOf(null)
-
-            constructor(a: Array<A> = arrayOf()) {
-                this.a = a
-            }
-
-            override var supdate: ((Any) -> Unit)? = null
-            override var smutatingcount = 0
-            override fun scopy(): MutableStruct = S(a)
+            override fun trackstate(): Unit = _a.track()
         }
         """)
     }
@@ -265,9 +111,7 @@ final class ObservationTests: XCTestCase {
         }
         """, kotlin: """
         import androidx.compose.runtime.Stable
-        import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
-        import androidx.compose.runtime.setValue
 
         import skip.model.*
 
@@ -276,28 +120,29 @@ final class ObservationTests: XCTestCase {
             override val objectWillChange = ObservableObjectPublisher()
             internal open var a = 1
             internal open var b: Int
-                get() = bstate
+                get() = _b.wrappedValue
                 set(newValue) {
-                    val storagevalue = newValue
                     objectWillChange.send()
-                    _b.projectedValue.send(storagevalue)
-                    bstate = storagevalue
+                    _b.wrappedValue = newValue
                 }
-            internal var bstate: Int by mutableStateOf(1)
-            internal val _b = Published<Int>(bstate)
+            internal var _b: skip.model.Published<Int> = skip.model.Published(1)
+
+            override fun trackstate(): Unit = _b.track()
         }
         @Stable
         internal open class C2: C1() {
             internal open var c: Int
-                get() = cstate
+                get() = _c.wrappedValue
                 set(newValue) {
-                    val storagevalue = newValue
                     objectWillChange.send()
-                    _c.projectedValue.send(storagevalue)
-                    cstate = storagevalue
+                    _c.wrappedValue = newValue
                 }
-            internal var cstate: Int by mutableStateOf(1)
-            internal val _c = Published<Int>(cstate)
+            internal var _c: skip.model.Published<Int> = skip.model.Published(1)
+
+            override fun trackstate() {
+                super.trackstate()
+                _c.track()
+            }
         }
         """)
     }
@@ -317,35 +162,32 @@ final class ObservationTests: XCTestCase {
         }
         """, kotlin: """
         import androidx.compose.runtime.Stable
-        import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
-        import androidx.compose.runtime.setValue
 
         @Stable
         internal open class C: ObservableObject {
             override val objectWillChange = ObservableObjectPublisher()
             internal open var a: S
-                get() = astate!!.sref({ this.a = it })
+                get() = _a.wrappedValue.sref({ this.a = it })
                 set(newValue) {
-                    val storagevalue = newValue.sref()
                     objectWillChange.send()
-                    _a.projectedValue.send(storagevalue)
-                    astate = storagevalue
+                    _a.wrappedValue = newValue.sref()
                 }
-            internal var astate: S? by mutableStateOf(null)
-            internal val _a = Published<S>()
+            internal var _a: skip.model.Published<S>
             internal open var b: S?
-                get() = bstate.sref({ this.b = it })
+                get() = _b.wrappedValue.sref({ this.b = it })
                 set(newValue) {
-                    val storagevalue = newValue.sref()
                     objectWillChange.send()
-                    _b.projectedValue.send(storagevalue)
-                    bstate = storagevalue
+                    _b.wrappedValue = newValue.sref()
                 }
-            internal var bstate: S? by mutableStateOf(null)
-            internal val _b = Published<S?>(bstate)
+            internal var _b: skip.model.Published<S?> = skip.model.Published(null)
             internal constructor(a: S) {
-                this.a = a
+                this._a = skip.model.Published(a)
+            }
+
+            override fun trackstate() {
+                _a.track()
+                _b.track()
             }
         }
         """)
@@ -362,24 +204,21 @@ final class ObservationTests: XCTestCase {
         }
         """, kotlin: """
         import androidx.compose.runtime.Stable
-        import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
-        import androidx.compose.runtime.setValue
 
         @Stable
         internal open class C: ObservableObject {
             override val objectWillChange = ObservableObjectPublisher()
             internal open var i: Int
-                get() = istate
+                get() = _i.wrappedValue
                 set(newValue) {
                     print("Setting to ${newValue}")
-                    val storagevalue = newValue
                     objectWillChange.send()
-                    _i.projectedValue.send(storagevalue)
-                    istate = storagevalue
+                    _i.wrappedValue = newValue
                 }
-            internal var istate: Int by mutableStateOf(0)
-            internal val _i = Published<Int>(istate)
+            internal var _i: skip.model.Published<Int> = skip.model.Published(0)
+
+            override fun trackstate(): Unit = _i.track()
         }
         """)
     }
@@ -399,25 +238,22 @@ final class ObservationTests: XCTestCase {
         }
         """, kotlin: """
         import androidx.compose.runtime.Stable
-        import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
-        import androidx.compose.runtime.setValue
 
         import skip.model.*
         @Stable
         internal open class C: ObservableObject {
             override val objectWillChange = ObservableObjectPublisher()
             internal open var i: Int
-                get() = istate
+                get() = _i.wrappedValue
                 set(newValue) {
-                    val storagevalue = newValue
                     objectWillChange.send()
-                    _i.projectedValue.send(storagevalue)
-                    istate = storagevalue
+                    _i.wrappedValue = newValue
                 }
-            internal var istate: Int by mutableStateOf(0)
-            internal val _i = Published<Int>(istate)
+            internal var _i: skip.model.Published<Int> = skip.model.Published(0)
             internal open fun f(): Unit = objectWillChange.send()
+
+            override fun trackstate(): Unit = _i.track()
         }
         """)
     }
@@ -443,23 +279,20 @@ final class ObservationTests: XCTestCase {
         }
         """, kotlin: """
         import androidx.compose.runtime.Stable
-        import androidx.compose.runtime.getValue
         import androidx.compose.runtime.mutableStateOf
-        import androidx.compose.runtime.setValue
 
         @Stable
         internal open class O: ObservableObject {
             override val objectWillChange = ObservableObjectPublisher()
             internal open var i: Int
-                get() = istate
+                get() = _i.wrappedValue
                 set(newValue) {
-                    val storagevalue = newValue
                     objectWillChange.send()
-                    _i.projectedValue.send(storagevalue)
-                    istate = storagevalue
+                    _i.wrappedValue = newValue
                 }
-            internal var istate: Int by mutableStateOf(0)
-            internal val _i = Published<Int>(istate)
+            internal var _i: skip.model.Published<Int> = skip.model.Published(0)
+
+            override fun trackstate(): Unit = _i.track()
         }
         internal open class C {
             internal val o: O
