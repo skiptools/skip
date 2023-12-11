@@ -577,7 +577,14 @@ struct TypeInferenceContext {
         // TODO: Handle other Expressible types
         switch expression.type {
         case .stringLiteral:
-            return ArgumentValue(type: inferredType, isLiteral: true, isInterpolated: (expression as! StringLiteral).segments.count > 1)
+            let isInterpolated = (expression as! StringLiteral).segments.contains(where: {
+                if case .expression = $0 {
+                    return true
+                } else {
+                    return false
+                }
+            })
+            return ArgumentValue(type: inferredType, isLiteral: true, isInterpolated: isInterpolated)
         default:
             return ArgumentValue(type: inferredType)
         }
