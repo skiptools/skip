@@ -691,12 +691,12 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                 .appending(components: packageName.split(separator: ".").map(\.description))
                 .appending(component: "Resources")
 
-            var resourcesIndex: [String] = []
+            var resourcesIndex: [RelativePath] = []
 
             for resourceFile in resourceURLs.map(\.path).sorted() {
                 guard let resourceSourceURL = moduleNamePaths.compactMap({ (_, folder) in
                     resourceFile.hasPrefix(folder) ? URL(fileURLWithPath: resourceFile.dropFirst(folder.count).trimmingCharacters(in: CharacterSet(charactersIn: "/")).description, relativeTo: URL(fileURLWithPath: folder, isDirectory: true)) : nil }).first else {
-                    // skip over resources that are no contained within the Resources/ folder (such as files in the Skip/ folder, which contain metadata that should not be copied)
+                    // skip over resources that are not contained within the Resources/ folder (such as files in the Skip/ folder, which contain metadata that should not be copied)
                     msg(.trace, "no module root parent for \(resourceFile)")
                     continue
                 }
@@ -705,20 +705,55 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
                 // all resources get put into a single "Resources/" folder in the jar, so drop the first item and replace it with "Resources/"
                 let components = try RelativePath(validating: resourceSourceURL.relativePath).components.dropFirst(1)
-                let resPath = components.joined(separator: "/")
-                let resourceSourcePath = try RelativePath(validating: resPath)
-                resourcesIndex.append(resPath)
+                let resourceSourcePath = try RelativePath(validating: components.joined(separator: "/"))
 
-                let destinationPath = destinationBasePath.appending(resourceSourcePath)
+                if sourcePath.extension == "xcstrings" {
+                    // process the .xcstrings in the same way that Xcode does: parse the JSON and use the localizations keys to synthesize a LANG.lproj/TABLENAME.strings file
+                    let xcstrings = try JSONDecoder().decode(LocalizableStringsDictionary.self, from: Data(contentsOf: resourceSourceURL))
+                    let locales = Set(xcstrings.strings.values.compactMap(\.localizations?.keys).joined())
+                    for localeId in locales {
+                        var locdict: [String: String] = [:]
+                        for key in xcstrings.strings.keys.sorted() {
+                            if let value = xcstrings.strings[key]?.localizations?[localeId]?.stringUnit?.value {
+                                locdict[key] = value
+                            }
+                        }
 
-                // only create links for files that exist
-                if fs.isFile(sourcePath) {
-                    info("\(destinationPath.relative(to: moduleBasePath).pathString) linking to \(sourcePath.pathString)", sourceFile: sourcePath.sourceFile)
-                    try fs.createDirectory(destinationPath.parentDirectory, recursive: true)
-                    if fs.isSymlink(destinationPath) {
-                        try fs.removeFileTree(destinationPath) // clear any pre-existing symlink
+                        if !locdict.isEmpty {
+                            let lproj = try RelativePath(validating: localeId + ".lproj" + "/" + sourcePath.basenameWithoutExt + ".strings") // e.g., fr.lproj/Localizable.strings
+                            let destinationPath = destinationBasePath.appending(lproj)
+
+                            func escape(_ string: String) throws -> String? {
+                                // escape quotes and newlines; we just use a JSON string fragment for this
+                                try String(data: JSONSerialization.data(withJSONObject: string, options: .fragmentsAllowed), encoding: .utf8)
+                            }
+
+                            var stringsContent = ""
+                            for (key, value) in locdict.sorted(by: { $0.key < $1.key }) {
+                                if let keyString = try escape(key), let valueString = try escape(value) {
+                                    stringsContent += keyString + " = " + valueString + ";\n"
+                                }
+                            }
+                            try fs.createDirectory(destinationPath.parentDirectory, recursive: true)
+                            info("create \(lproj.pathString) from \(sourcePath.pathString)", sourceFile: destinationPath.sourceFile)
+                            try writeChanges(tag: lproj.pathString, to: destinationPath, contents: stringsContent.utf8Data, readOnly: false)
+                            resourcesIndex.append(lproj)
+                        }
                     }
-                    try addLink(at: destinationPath, pointingAt: sourcePath, relative: false)
+                } else { // non-processed resources are just linked directly from the package
+                    resourcesIndex.append(resourceSourcePath)
+
+                    let destinationPath = destinationBasePath.appending(resourceSourcePath)
+
+                    // only create links for files that exist
+                    if fs.isFile(sourcePath) {
+                        info("\(destinationPath.relative(to: moduleBasePath).pathString) linking to \(sourcePath.pathString)", sourceFile: sourcePath.sourceFile)
+                        try fs.createDirectory(destinationPath.parentDirectory, recursive: true)
+                        if fs.isSymlink(destinationPath) {
+                            try fs.removeFileTree(destinationPath) // clear any pre-existing symlink
+                        }
+                        try addLink(at: destinationPath, pointingAt: sourcePath, relative: false)
+                    }
                 }
             }
 
@@ -726,7 +761,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
             if !resourcesIndex.isEmpty {
                 // write out the resources index file that acts as the directory for Java/Android resources
-                try fs.writeChanges(path: addOutputFile(indexPath), bytes: ByteString(encodingAsUTF8: resourcesIndex.sorted().joined(separator: "\n")))
+                try fs.writeChanges(path: addOutputFile(indexPath), bytes: ByteString(encodingAsUTF8: resourcesIndex.map(\.pathString).sorted().joined(separator: "\n")))
                 info("indexed \(resourcesIndex.count) resources at \(indexPath.pathString)", sourceFile: indexPath.sourceFile)
             } else {
                 // remove the resources file if it should be empty
@@ -906,4 +941,27 @@ func parseXCConfig(contents: String) -> [(key: String, value: String)] {
         }
     }
     return keyValues
+}
+
+
+/// The contents of a `Localizable.xcstrings` file, which is used for maually generating `Localizable.strings` files.
+struct LocalizableStringsDictionary : Decodable {
+    let version: String
+    let sourceLanguage: String
+    let strings: [String: StringsEntry]
+
+    struct StringsEntry : Decodable {
+        let extractionState: String? // e.g., "stale"
+        let comment: String?
+        let localizations: [String: TranslationSet]?
+    }
+
+    struct TranslationSet : Decodable {
+        let stringUnit: StringUnit?
+    }
+
+    struct StringUnit: Decodable {
+        let state: String? // e.g., "translated"
+        let value: String?
+    }
 }
