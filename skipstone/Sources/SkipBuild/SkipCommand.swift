@@ -734,7 +734,8 @@ extension ProcessInfo {
     }()
 
     /// The default `JAVA_HOME`
-    public static let defaultJavaHome: String = homebrewRoot + "/opt/java"
+    //public static let defaultJavaHome: String = homebrewRoot + "/opt/java"
+    public static let defaultJavaHome: String = homebrewRoot + "/opt/openjdk@17" // force JDK17 until JDK21 works
 
     /// True when the current architecture is ARM
     public static let isARM = {
