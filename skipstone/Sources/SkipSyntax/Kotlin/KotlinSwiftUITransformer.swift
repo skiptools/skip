@@ -50,6 +50,17 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         return classDeclaration
     }
 
+    /// If the given function is the `body` of a `ViewModifier`, return the parent view modifier.
+    static func viewModifierForBody(_ functionDeclaration: KotlinFunctionDeclaration, codebaseInfo: CodebaseInfo.Context?) -> KotlinClassDeclaration? {
+        guard functionDeclaration.role == .member, functionDeclaration.name == "body", functionDeclaration.parameters.count == 1, functionDeclaration.parameters[0].externalLabel == "content", !functionDeclaration.isStatic, let classDeclaration = functionDeclaration.parent as? KotlinClassDeclaration else {
+            return nil
+        }
+        guard isSwiftUIType(named: "ViewModifier", type: classDeclaration.signature, codebaseInfo: codebaseInfo) else {
+            return nil
+        }
+        return classDeclaration
+    }
+
     private static func isSwiftUIType(named: String, declaration: KotlinClassDeclaration? = nil, type: TypeSignature, codebaseInfo: CodebaseInfo.Context?) -> Bool {
         if let declaration, declaration.inherits.contains(where: { $0.isNamed(named, moduleName: "SwiftUI", generics: []) }) {
             return true
@@ -129,7 +140,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
 
     private func translateConstructorDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, translator: KotlinTranslator) {
         // Only need to consider Views
-        guard let classDeclaration = functionDeclaration.parent as? KotlinClassDeclaration, Self.isSwiftUIType(named: "View", declaration: classDeclaration, type: classDeclaration.signature, codebaseInfo: translator.codebaseInfo) else {
+        guard let classDeclaration = functionDeclaration.parent as? KotlinClassDeclaration, Self.isSwiftUIType(named: "View", declaration: classDeclaration, type: classDeclaration.signature, codebaseInfo: translator.codebaseInfo) || Self.isSwiftUIType(named: "ViewModifier", type: classDeclaration.signature, codebaseInfo: translator.codebaseInfo) else {
             return
         }
 
@@ -151,8 +162,8 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
     }
 
     /// If the given expression is a reference to a property wrapper type, return the underlying property name.
-    private func propertyWrapper(for expression: KotlinExpression, in view: KotlinClassDeclaration?) -> (name: String, propertyWrapperTypeName: String)? {
-        guard let view else {
+    private func propertyWrapper(for expression: KotlinExpression, in classDeclaration: KotlinClassDeclaration?) -> (name: String, propertyWrapperTypeName: String)? {
+        guard let classDeclaration else {
             return nil
         }
         var variableName: String? = nil
@@ -164,7 +175,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         guard let variableName else {
             return nil
         }
-        for member in view.members {
+        for member in classDeclaration.members {
             if let variable = member as? KotlinVariableDeclaration, variable.propertyName == variableName {
                 if variable.attributes.contains(.state) || variable.attributes.contains(.stateObject) {
                     return ("_" + variableName, "skip.ui.State")
@@ -179,7 +190,11 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
     }
 
     private func translateFunctionDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, translator: KotlinTranslator) {
-        guard functionDeclaration.apiFlags.contains(.viewBuilder) else {
+        if let viewModifierDeclaration = Self.viewModifierForBody(functionDeclaration, codebaseInfo: translator.codebaseInfo) {
+            functionDeclaration.apiFlags.insert(.viewBuilder)
+            // We perform our ViewModifier transformations when we find the body
+            transform(classDeclaration: viewModifierDeclaration, isModifier: true, body: functionDeclaration, translator: translator)
+        } else if !functionDeclaration.apiFlags.contains(.viewBuilder) {
             return
         }
         if let body = functionDeclaration.body {
@@ -224,8 +239,9 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
     private func translateVariableDeclaration(_ statement: KotlinVariableDeclaration, translator: KotlinTranslator) {
         var viewBuilder: KotlinCodeBlock? = nil
         if let viewDeclaration = Self.viewForBody(statement, codebaseInfo: translator.codebaseInfo) {
+            statement.apiFlags.insert(.viewBuilder)
             // We perform our View transformations when we find the body
-            transform(view: viewDeclaration, body: statement, translator: translator)
+            transform(classDeclaration: viewDeclaration, body: statement, translator: translator)
             viewBuilder = statement.getter?.body
         } else if statement.apiFlags.contains(.viewBuilder) {
             viewBuilder = statement.getter?.body
@@ -240,43 +256,44 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         }
     }
 
-    /// Perform `View` transformations.
-    private func transform(view: KotlinClassDeclaration, body: KotlinVariableDeclaration, translator: KotlinTranslator) {
-        body.apiFlags.insert(.viewBuilder)
-        
-        let variableDeclarations = view.members.compactMap { $0 as? KotlinVariableDeclaration }
+    /// Perform `View` and `ViewModifier` transformations.
+    private func transform(classDeclaration: KotlinClassDeclaration, isModifier: Bool = false, body: KotlinStatement, translator: KotlinTranslator) {
+        let variableDeclarations = classDeclaration.members.compactMap { $0 as? KotlinVariableDeclaration }
         let stateVariables = variableDeclarations.filter { $0.attributes.contains(.state) || $0.attributes.contains(.stateObject) }
         let environmentVariables = variableDeclarations.filter { $0.attributes.contains(.environment) || $0.attributes.contains(.environmentObject) }
         let bindingVariables = variableDeclarations.filter { $0.attributes.contains(.binding) }
         let bindableVariables = variableDeclarations.filter { $0.attributes.contains(.bindable) || $0.attributes.contains(.observedObject) }
         let appStorageVariables = variableDeclarations.filter { $0.attributes.contains(.appStorage) }
         if !stateVariables.isEmpty || !bindableVariables.isEmpty || !environmentVariables.isEmpty || !appStorageVariables.isEmpty {
-            let composeFunction = synthesizeComposeFunction(view: view, stateVariables: stateVariables, bindableVariables: bindableVariables, environmentVariables: environmentVariables, appStorageVariables: appStorageVariables, translator: translator)
-            view.insert(statements: [composeFunction], after: body)
-            
+            let composeFunction = synthesizeComposeFunction(isModifier: isModifier, stateVariables: stateVariables, bindableVariables: bindableVariables, environmentVariables: environmentVariables, appStorageVariables: appStorageVariables, translator: translator)
+            classDeclaration.insert(statements: [composeFunction], after: body)
+
             for stateVariable in stateVariables {
-                synthesizeStateBacking(variable: stateVariable, in: view, propertyWrapperTypeName: "skip.ui.State")
+                synthesizeStateBacking(variable: stateVariable, propertyWrapperTypeName: "skip.ui.State")
             }
         }
         for bindingVariable in bindingVariables {
-            synthesizeBindingBacking(variable: bindingVariable, in: view, source: translator.syntaxTree.source)
+            synthesizeBindingBacking(variable: bindingVariable, source: translator.syntaxTree.source)
         }
         for bindableVariable in bindableVariables {
-            synthesizeStateBacking(variable: bindableVariable, in: view, propertyWrapperTypeName: "skip.ui.Bindable")
+            synthesizeStateBacking(variable: bindableVariable, propertyWrapperTypeName: "skip.ui.Bindable")
         }
         for appStorageVariable in appStorageVariables {
-            synthesizeAppStorageBacking(variable: appStorageVariable, in: view, source: translator.syntaxTree.source)
+            synthesizeAppStorageBacking(variable: appStorageVariable, source: translator.syntaxTree.source)
         }
     }
 
-    /// Create an override of the SkipUI `Compose` function on views to handle state synchronization, etc.
-    private func synthesizeComposeFunction(view: KotlinClassDeclaration, stateVariables: [KotlinVariableDeclaration], bindableVariables: [KotlinVariableDeclaration], environmentVariables: [KotlinVariableDeclaration], appStorageVariables: [KotlinVariableDeclaration], translator: KotlinTranslator) -> KotlinStatement {
-        let composeFunction = KotlinFunctionDeclaration(name: "ComposeContent")
+    /// Create an override of the SkipUI `Compose` function on views and modifiers to handle state synchronization, etc.
+    private func synthesizeComposeFunction(isModifier: Bool, stateVariables: [KotlinVariableDeclaration], bindableVariables: [KotlinVariableDeclaration], environmentVariables: [KotlinVariableDeclaration], appStorageVariables: [KotlinVariableDeclaration], translator: KotlinTranslator) -> KotlinStatement {
+        let composeFunction = KotlinFunctionDeclaration(name: isModifier ? "Compose" : "ComposeContent")
         composeFunction.modifiers.visibility = .public
         composeFunction.modifiers.isOverride = true
         composeFunction.annotations.append("@Composable")
         if !stateVariables.isEmpty {
             composeFunction.annotations.append("@Suppress(\"UNCHECKED_CAST\")")
+        }
+        if isModifier {
+            composeFunction.parameters.append(Parameter(externalLabel: "content", declaredType: .named("View", [])))
         }
         composeFunction.parameters.append(Parameter(externalLabel: "composectx", declaredType: .named("ComposeContext", [])))
         composeFunction.extras = .singleNewline
@@ -313,7 +330,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             composeBodyStatements += statements
         }
 
-        let statement = KotlinRawStatement(sourceCode: "body().Compose(composectx)")
+        let statement = KotlinRawStatement(sourceCode: "body(\(isModifier ? "content" : "")).Compose(composectx)")
         statement.extras = .singleNewline
         composeBodyStatements.append(statement)
 
@@ -428,7 +445,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
     }
 
     /// Create the additional property synthesized for `@State` and similar variables.
-    private func synthesizeStateBacking(variable: KotlinVariableDeclaration, in view: KotlinClassDeclaration, propertyWrapperTypeName: String) {
+    private func synthesizeStateBacking(variable: KotlinVariableDeclaration, propertyWrapperTypeName: String) {
         // Tell the @State variable to get and set its value using _variable of type State
         let storageName = "_\(variable.propertyName)"
         var storage = KotlinVariableStorage()
@@ -462,7 +479,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
     }
 
     /// Create the extra property synthesized for `@Binding` variables.
-    private func synthesizeBindingBacking(variable: KotlinVariableDeclaration, in view: KotlinClassDeclaration, source: Source) {
+    private func synthesizeBindingBacking(variable: KotlinVariableDeclaration, source: Source) {
         let propertyType = variable.declaredType == .none ? variable.propertyType : variable.declaredType
         if propertyType == .none {
             variable.messages.append(.kotlinVariableNeedsTypeDeclaration(variable, source: source))
@@ -492,7 +509,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
     }
 
     /// Create the additional property synthesized for `@AppStorage` variables.
-    private func synthesizeAppStorageBacking(variable: KotlinVariableDeclaration, in view: KotlinClassDeclaration, source: Source) {
+    private func synthesizeAppStorageBacking(variable: KotlinVariableDeclaration, source: Source) {
         // Tell the @AppStorage variable to get and set its value using _variable of type AppStorage
         let storageName = "_\(variable.propertyName)"
         var storage = KotlinVariableStorage()

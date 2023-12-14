@@ -922,7 +922,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .named(let name, let generics):
             let generics = generics.map { $0.resolved(in: node, context: context) }
             if let node {
-                let qualified = node.qualifyReferencedNamedType(name: name, generics: generics)
+                let qualified = node.qualifyReferencedNamedType(name: name, generics: generics, context: context)
                 // If we get back a typealiased type, the target type might again need qualification
                 if case .typealiased = qualified {
                     return qualified.resolved(in: node, moduleName: moduleName, context: context)

@@ -13,6 +13,11 @@ final class SwiftUITests: XCTestCase {
         }
     }
 
+    protocol ViewModifier {
+        typealias Content = View
+        func body(content: View) -> View
+    }
+
     struct VStack: View {
         init(@ViewBuilder content: () -> any View) {
         }
@@ -2083,6 +2088,59 @@ final class SwiftUITests: XCTestCase {
                     }
                     .task { MainActor.run { print("task") } }.Compose(composectx)
                 }
+            }
+        }
+        """)
+    }
+
+    func testCustomViewModifier() async throws {
+        try await check(supportingSwift: baseSupportingSwift, swift: """
+        import SwiftUI
+        struct CustomModifier: ViewModifier {
+            @State var isPresented = false
+            func body(content: Content) -> some View {
+                content
+                    .mod()
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
+
+        import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
+        internal class CustomModifier: ViewModifier {
+            internal var isPresented: Boolean
+                get() = _isPresented.wrappedValue
+                set(newValue) {
+                    _isPresented.wrappedValue = newValue
+                }
+            internal var _isPresented: skip.ui.State<Boolean>
+            override fun body(content: View): View {
+                return ComposeView { composectx: ComposeContext ->
+                    content
+                        .mod().Compose(composectx)
+                }
+            }
+
+            @Composable
+            @Suppress("UNCHECKED_CAST")
+            override fun Compose(content: View, composectx: ComposeContext) {
+                val initialisPresented = _isPresented.wrappedValue
+                var composeisPresented by rememberSaveable(stateSaver = composectx.stateSaver as Saver<Boolean, Any>) { mutableStateOf(initialisPresented) }
+                _isPresented.sync(composeisPresented, { composeisPresented = it })
+
+                body(content).Compose(composectx)
+            }
+
+            constructor(isPresented: Boolean = false) {
+                this._isPresented = skip.ui.State(isPresented)
             }
         }
         """)

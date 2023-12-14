@@ -161,7 +161,7 @@ class SyntaxNode: SourceDerived, PrettyPrintable {
     /// Traverse up the syntax tree to fully qualify a type.
     ///
     /// - Returns: A qualified type or a typealiased type signature whose type must then be resolved.
-    final func qualifyReferencedNamedType(name: String, generics: [TypeSignature]) -> TypeSignature {
+    final func qualifyReferencedNamedType(name: String, generics: [TypeSignature], context: TypeResolutionContext) -> TypeSignature {
         // Look for a qualified name whose last token is the given type name
         let suffix = ".\(name)"
         var current: SyntaxNode? = self
@@ -179,7 +179,12 @@ class SyntaxNode: SourceDerived, PrettyPrintable {
             // Move up to the next owning type and repeat
             current = owningType.parent
         }
-        return .named(name, generics)
+        let type: TypeSignature = .named(name, generics)
+        if let owningType = owningTypeDeclaration {
+            return context.qualifyInherited(type: type, in: owningType.signature)
+        } else {
+            return type
+        }
     }
 
     /// Traverse up the syntax tree to fully qualify a type name declared by a class, struct, etc.

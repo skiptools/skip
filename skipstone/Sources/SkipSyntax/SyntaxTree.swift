@@ -15,7 +15,6 @@ public class SyntaxTree: PrettyPrintable {
         self.syntax = Parser.parse(source: source.content)
         self.root.statements = StatementDecoder.decode(syntaxListContainer: syntax, in: self)
 
-        // Resolve nodes breadth first so that a child can use information from its parent's siblings
         let importedModuleNames = root.statements.importedModulePaths.compactMap(\.moduleName)
         let codebaseContext = codebaseInfo?.context(importedModuleNames: importedModuleNames, sourceFile: source.file)
         let typeResolutionContext = TypeResolutionContext(codebaseInfo: codebaseContext)

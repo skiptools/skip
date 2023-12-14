@@ -170,7 +170,7 @@ final class KotlinConcurrencyTransformer: KotlinTransformer {
                 break
             }
             if let functionDeclaration = contextNode as? KotlinFunctionDeclaration {
-                return functionDeclaration.apiFlags.contains(.mainActor)
+                return functionDeclaration.apiFlags.contains(.mainActor) || KotlinSwiftUITransformer.viewModifierForBody(functionDeclaration, codebaseInfo: codebaseInfo) != nil
             } else if let variableDeclaration = contextNode as? KotlinVariableDeclaration {
                 return variableDeclaration.apiFlags.contains(.mainActor) || KotlinSwiftUITransformer.viewForBody(variableDeclaration, codebaseInfo: codebaseInfo) != nil
             } else if let closure = contextNode as? KotlinClosure, closure.apiFlags?.contains(.async) == true {

@@ -6,6 +6,31 @@ struct TypeResolutionContext {
         self.codebaseInfo = codebaseInfo
     }
 
+    /// Look for nested types matching the given name that are accessible to the given base type.
+    func qualifyInherited(type: TypeSignature, in base: TypeSignature) -> TypeSignature {
+        guard case .named = type, let codebaseInfo else {
+            return type
+        }
+        for base in codebaseInfo.global.inheritanceChainSignatures(forNamed: base) {
+            if let qualified = qualifyNamed(type: type, in: base, codebaseInfo: codebaseInfo) {
+                return qualified
+            }
+        }
+        for proto in codebaseInfo.global.protocolSignatures(forNamed: base) {
+            if let qualified = qualifyNamed(type: type, in: proto, codebaseInfo: codebaseInfo) {
+                return qualified
+            }
+        }
+        return type
+    }
+
+    private func qualifyNamed(type: TypeSignature, in base: TypeSignature, codebaseInfo: CodebaseInfo.Context) -> TypeSignature? {
+        guard let typeInfo = codebaseInfo.primaryTypeInfo(forNamed: .named(base.name + "." + type.name, [])) else {
+            return nil
+        }
+        return typeInfo.signature.withGenerics(type.generics)
+    }
+
     /// If the given type represents a typealias and/or module-qualified type, resolve it to the proper `.typealiased` and/or `.module` form.
     func resolve(_ type: TypeSignature, moduleName: String? = nil, in baseOrModule: TypeSignature = .none) -> TypeSignature {
         let type = resolveModuleQualifiedType(type, moduleName: moduleName, in: baseOrModule)
