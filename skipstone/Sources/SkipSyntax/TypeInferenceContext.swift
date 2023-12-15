@@ -493,18 +493,22 @@ struct TypeInferenceContext {
 
         switch type1 {
         case .array(let elementType1):
-            if case .array(let elementType2) = type2 {
-                return .array(operationResult(elementType1, elementType2))
-            }
-            if case .set(let elementType2) = type2 {
-                return .set(operationResult(elementType1, elementType2))
+            if let elementType1 {
+                if case .array(let elementType2) = type2, let elementType2 {
+                    return .array(operationResult(elementType1, elementType2))
+                }
+                if case .set(let elementType2) = type2, let elementType2 {
+                    return .set(operationResult(elementType1, elementType2))
+                }
             }
             return type1
         case .character:
             return type2.isStringy ? .string : type1
         case .dictionary(let keyType1, let valueType1):
-            if case .dictionary(let keyType2, let valueType2) = type2 {
-                return .dictionary(operationResult(keyType1, keyType2), operationResult(valueType1, valueType2))
+            if let keyType1, let valueType1 {
+                if case .dictionary(let keyType2, let valueType2) = type2, let keyType2, let valueType2 {
+                    return .dictionary(operationResult(keyType1, keyType2), operationResult(valueType1, valueType2))
+                }
             }
             return type1
         case .double:
@@ -522,11 +526,13 @@ struct TypeInferenceContext {
         case .int64:
             return type2.isFloatingPoint ? type2 : type1
         case .set(let elementType1):
-            if case .array(let elementType2) = type2 {
-                return .array(operationResult(elementType1, elementType2))
-            }
-            if case .set(let elementType2) = type2 {
-                return .set(operationResult(elementType1, elementType2))
+            if let elementType1 {
+                if case .array(let elementType2) = type2, let elementType2 {
+                    return .array(operationResult(elementType1, elementType2))
+                }
+                if case .set(let elementType2) = type2, let elementType2 {
+                    return .set(operationResult(elementType1, elementType2))
+                }
             }
             return type1
         case .string:

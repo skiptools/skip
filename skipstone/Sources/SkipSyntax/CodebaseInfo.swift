@@ -459,14 +459,14 @@ public class CodebaseInfo {
         /// - Note: Assumes that the constrained `type` has been resolved.
         func matchSubscript(inConstrained type: TypeSignature, arguments: [LabeledValue<ArgumentValue>]) -> [APIMatch] {
             var type = type.asTypealiased(nil).asOptional(false)
-            if case .array(let elementType) = type, arguments.count == 1 {
+            if case .array(let elementType) = type, let elementType, arguments.count == 1 {
                 if case .range = arguments[0].value.type {
                     // Slice - fall through to symbols
                 } else {
                     let signature: TypeSignature = .function([TypeSignature.Parameter(type: .int)], elementType.mappingSelf(to: type), [], nil)
                     return [APIMatch(signature: signature, isMember: true)]
                 }
-            } else if case .dictionary(let keyType, let valueType) = type, arguments.count == 1 {
+            } else if case .dictionary(let keyType, let valueType) = type, let keyType, let valueType, arguments.count == 1 {
                 let signature: TypeSignature = .function([TypeSignature.Parameter(type: keyType)], valueType.mappingSelf(to: type).asOptional(true), [], nil)
                 return [APIMatch(signature: signature, isMember: true)]
             }

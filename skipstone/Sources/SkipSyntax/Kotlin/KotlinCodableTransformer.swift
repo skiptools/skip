@@ -208,19 +208,31 @@ final class KotlinCodableTransformer: KotlinTransformer {
         let typeArguments: String
         switch decodeType {
         case .array(let elementType):
-            if case .array(let nestedElementType) = elementType {
-                typeArguments = "Array::class, elementType = Array::class, nestedElementType = \(nestedElementType.withGenerics([]).kotlin)::class"
+            if let elementType {
+                if case .array(let nestedElementType) = elementType, let nestedElementType {
+                    typeArguments = "Array::class, elementType = Array::class, nestedElementType = \(nestedElementType.withGenerics([]).kotlin)::class"
+                } else {
+                    typeArguments = "Array::class, elementType = \(elementType.withGenerics([]).kotlin)::class"
+                }
             } else {
-                typeArguments = "Array::class, elementType = \(elementType.withGenerics([]).kotlin)::class"
+                typeArguments = "Array::class"
             }
         case .dictionary(let keyType, let valueType):
-            if case .array(let nestedElementType) = valueType {
-                typeArguments = "Dictionary::class, keyType = \(keyType.withGenerics([]).kotlin)::class, valueType = Array::class, nestedElementType = \(nestedElementType.withGenerics([]).kotlin)::class"
+            if let keyType, let valueType {
+                if case .array(let nestedElementType) = valueType, let nestedElementType {
+                    typeArguments = "Dictionary::class, keyType = \(keyType.withGenerics([]).kotlin)::class, valueType = Array::class, nestedElementType = \(nestedElementType.withGenerics([]).kotlin)::class"
+                } else {
+                    typeArguments = "Dictionary::class, keyType = \(keyType.withGenerics([]).kotlin)::class, valueType = \(valueType.withGenerics([]).kotlin)::class"
+                }
             } else {
-                typeArguments = "Dictionary::class, keyType = \(keyType.withGenerics([]).kotlin)::class, valueType = \(valueType.withGenerics([]).kotlin)::class"
+                typeArguments = "Dictionary::class"
             }
         case .set(let elementType):
-            typeArguments = "Set::class, elementType = \(elementType.withGenerics([]).kotlin)::class"
+            if let elementType {
+                typeArguments = "Set::class, elementType = \(elementType.withGenerics([]).kotlin)::class"
+            } else {
+                typeArguments = "Set::class"
+            }
         default:
             typeArguments = "\(decodeType.withGenerics([]).kotlin)::class"
         }

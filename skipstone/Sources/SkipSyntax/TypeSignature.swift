@@ -10,11 +10,11 @@ import SwiftSyntax
 indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     case any
     case anyObject
-    case array(TypeSignature)
+    case array(TypeSignature?) // Nil means the generic type has been erased
     case bool
     case character
     case composition([TypeSignature]) // (A & B & C)
-    case dictionary(TypeSignature, TypeSignature)
+    case dictionary(TypeSignature?, TypeSignature?) // Nil means the generic type has been erased
     case double
     case float
     case function([Parameter], TypeSignature, APIFlags, Attributes?)
@@ -29,8 +29,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     case named(String, [TypeSignature]) // A<B, C>
     case none
     case optional(TypeSignature)
-    case range(TypeSignature)
-    case set(TypeSignature)
+    case range(TypeSignature?) // Nil means the generic type has been erased
+    case set(TypeSignature?) // Nil means the generic type has been erased
     case string
     case tuple([String?], [TypeSignature]) // (a: A, b: B)
     case typealiased(Typealias, TypeSignature) // typealias (A = B), Type
@@ -319,9 +319,13 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     var elementType: TypeSignature {
         switch self {
         case .array(let elementType):
-            return elementType
+            return elementType ?? .none
         case .dictionary(let keyType, let valueType):
-            return .tuple(["key", "value"], [keyType, valueType])
+            if let keyType, let valueType {
+                return .tuple(["key", "value"], [keyType, valueType])
+            } else {
+                return .none
+            }
         case .member(_, let type):
             return type.elementType
         case .module(_, let type):
@@ -329,9 +333,9 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .optional(let type):
             return type.elementType
         case .range(let elementType):
-            return elementType
+            return elementType ?? .none
         case .set(let elementType):
-            return elementType
+            return elementType ?? .none
         case .string:
             return .character
         case .typealiased(_, let type):
@@ -529,9 +533,17 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     var generics: [TypeSignature] {
         switch self {
         case .array(let element):
-            return element == .none ? [] : [element]
+            if let element {
+                return [element]
+            } else {
+                return []
+            }
         case .dictionary(let key, let value):
-            return key == .none && value == .none ? [] : [key, value]
+            if let key, let value {
+                return [key, value]
+            } else {
+                return []
+            }
         case .member(_, let type):
             return type.generics
         case .metaType(let type):
@@ -543,9 +555,17 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .optional(let type):
             return type.generics
         case .range(let element):
-            return element == .none ? [] : [element]
+            if let element {
+                return [element]
+            } else {
+                return []
+            }
         case .set(let element):
-            return element == .none ? [] : [element]
+            if let element {
+                return [element]
+            } else {
+                return []
+            }
         case .typealiased(_, let type):
             return type.generics
         case .unwrappedOptional(let type):
@@ -560,13 +580,13 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         switch self {
         case .array:
             if generics.isEmpty {
-                return .array(.none)
+                return .array(nil)
             } else if generics.count == 1 {
                 return .array(generics[0])
             }
         case .dictionary:
             if generics.isEmpty {
-                return .dictionary(.none, .none)
+                return .dictionary(nil, nil)
             } else if generics.count == 2 {
                 return .dictionary(generics[0], generics[1])
             }
@@ -586,13 +606,13 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return .optional(type.withGenerics(generics))
         case .range:
             if generics.isEmpty {
-                return .set(.none)
+                return .range(nil)
             } else if generics.count == 1 {
                 return .range(generics[0])
             }
         case .set:
             if generics.isEmpty {
-                return .set(.none)
+                return .set(nil)
             } else if generics.count == 1 {
                 return .set(generics[0])
             }
@@ -623,11 +643,11 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         }
         switch self {
         case .array(let element):
-            return .array(element.constrainedTypeWithGenerics(generics))
+            return .array(element?.constrainedTypeWithGenerics(generics))
         case .composition(let types):
             return .composition(types.map { $0.constrainedTypeWithGenerics(generics) })
         case .dictionary(let key, let value):
-            return .dictionary(key.constrainedTypeWithGenerics(generics), value.constrainedTypeWithGenerics(generics))
+            return .dictionary(key?.constrainedTypeWithGenerics(generics), value?.constrainedTypeWithGenerics(generics))
         case .function(let parameters, let returnType, let apiFlags, let attributes):
             return .function(parameters.map { $0.constrainedTypeWithGenerics(generics) }, returnType.constrainedTypeWithGenerics(generics), apiFlags, attributes)
         case .member(let base, let type):
@@ -641,9 +661,9 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .optional(let type):
             return .optional(type.constrainedTypeWithGenerics(generics))
         case .range(let element):
-            return .range(element.constrainedTypeWithGenerics(generics))
+            return .range(element?.constrainedTypeWithGenerics(generics))
         case .set(let element):
-            return .set(element.constrainedTypeWithGenerics(generics))
+            return .set(element?.constrainedTypeWithGenerics(generics))
         case .tuple(let labels, let types):
             return .tuple(labels, types.map { $0.constrainedTypeWithGenerics(generics) })
         case .typealiased(let alias, let type):
@@ -679,14 +699,16 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         }
         switch self {
         case .array(let element):
-            if case .array(let element2) = to {
-                element.addGenericMappings(to: element2, into: &generics)
-            } else if case .set(let element2) = to {
-                element.addGenericMappings(to: element2, into: &generics)
-            } else if case .range(let element2) = to {
-                element.addGenericMappings(to: element2, into: &generics)
-            } else if case .named(_, let genericTypes) = to, genericTypes.count == 1 {
-                element.addGenericMappings(to: genericTypes[0], into: &generics)
+            if let element {
+                if case .array(let element2) = to, let element2 {
+                    element.addGenericMappings(to: element2, into: &generics)
+                } else if case .set(let element2) = to, let element2 {
+                    element.addGenericMappings(to: element2, into: &generics)
+                } else if case .range(let element2) = to, let element2 {
+                    element.addGenericMappings(to: element2, into: &generics)
+                } else if case .named(_, let genericTypes) = to, genericTypes.count == 1 {
+                    element.addGenericMappings(to: genericTypes[0], into: &generics)
+                }
             }
         case .composition(let types):
             if case .composition(let types2) = to, types.count == types2.count {
@@ -694,8 +716,12 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             }
         case .dictionary(let key, let value):
             if case .dictionary(let key2, let value2) = to {
-                key.addGenericMappings(to: key2, into: &generics)
-                value.addGenericMappings(to: value2, into: &generics)
+                if let key, let key2 {
+                    key.addGenericMappings(to: key2, into: &generics)
+                }
+                if let value, let value2 {
+                    value.addGenericMappings(to: value2, into: &generics)
+                }
             }
         case .function(let parameters, let returnType, _, _):
             if case .function(let parameters2, let returnType2, _, _) = to, parameters.count == parameters2.count {
@@ -729,11 +755,11 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             if case .named(_, let genericTypes2) = target, genericTypes.count == genericTypes2.count {
                 zip(genericTypes, genericTypes2).forEach { $0.0.addGenericMappings(to: $0.1, into: &generics) }
             } else if genericTypes.count == 1 {
-                if case .array(let element) = target {
+                if case .array(let element) = target, let element {
                     genericTypes[0].addGenericMappings(to: element, into: &generics)
-                } else if case .set(let element) = target {
+                } else if case .set(let element) = target, let element {
                     genericTypes[0].addGenericMappings(to: element, into: &generics)
-                } else if case .range(let element) = target {
+                } else if case .range(let element) = target, let element {
                     genericTypes[0].addGenericMappings(to: element, into: &generics)
                 }
             }
@@ -744,20 +770,24 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                 type.addGenericMappings(to: to, into: &generics)
             }
         case .range(let element):
-            if case .range(let element2) = to {
-                element.addGenericMappings(to: element2, into: &generics)
-            } else if case .array(let element2) = to {
-                element.addGenericMappings(to: element2, into: &generics)
-            } else if case .set(let element2) = to {
-                element.addGenericMappings(to: element2, into: &generics)
-            } else if case .named(_, let genericTypes) = to, genericTypes.count == 1 {
-                element.addGenericMappings(to: genericTypes[0], into: &generics)
+            if let element {
+                if case .range(let element2) = to, let element2 {
+                    element.addGenericMappings(to: element2, into: &generics)
+                } else if case .array(let element2) = to, let element2 {
+                    element.addGenericMappings(to: element2, into: &generics)
+                } else if case .set(let element2) = to, let element2 {
+                    element.addGenericMappings(to: element2, into: &generics)
+                } else if case .named(_, let genericTypes) = to, genericTypes.count == 1 {
+                    element.addGenericMappings(to: genericTypes[0], into: &generics)
+                }
             }
         case .set(let element):
-            if case .set(let element2) = to {
-                element.addGenericMappings(to: element2, into: &generics)
-            } else if case .array(let element2) = to {
-                element.addGenericMappings(to: element2, into: &generics)
+            if let element {
+                if case .set(let element2) = to, let element2 {
+                    element.addGenericMappings(to: element2, into: &generics)
+                } else if case .array(let element2) = to, let element2 {
+                    element.addGenericMappings(to: element2, into: &generics)
+                }
             }
         case .tuple(_, let types):
             if case .tuple(_, let types2) = to, types.count == types2.count {
@@ -787,12 +817,12 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         }
         switch self {
         case .array(let element):
-            element.visit(visitor)
+            element?.visit(visitor)
         case .composition(let types):
             types.forEach { $0.visit(visitor) }
         case .dictionary(let key, let value):
-            key.visit(visitor)
-            value.visit(visitor)
+            key?.visit(visitor)
+            value?.visit(visitor)
         case .function(let parameters, let returnType, _, _):
             parameters.forEach { $0.type.visit(visitor) }
             returnType.visit(visitor)
@@ -808,9 +838,9 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .optional(let type):
             type.visit(visitor)
         case .range(let element):
-            element.visit(visitor)
+            element?.visit(visitor)
         case .set(let element):
-            element.visit(visitor)
+            element?.visit(visitor)
         case .typealiased(_, let type):
             type.visit(visitor)
         case .tuple(_, let types):
@@ -859,11 +889,11 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         }
         switch self {
         case .array(let element):
-            return .array(element.mappingTypes(with: map))
+            return .array(element?.mappingTypes(with: map))
         case .composition(let types):
             return .composition(types.map { $0.mappingTypes(with: map) })
         case .dictionary(let key, let value):
-            return .dictionary(key.mappingTypes(with: map), value.mappingTypes(with: map))
+            return .dictionary(key?.mappingTypes(with: map), value?.mappingTypes(with: map))
         case .function(let parameters, let returnType, let apiFlags, let attributes):
             return .function(parameters.map { $0.mappingTypes(with: map) }, returnType.mappingTypes(with: map), apiFlags, attributes)
         case .member(let base, let type):
@@ -879,9 +909,9 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .optional(let type):
             return type.mappingTypes(with: map).asOptional(true)
         case .range(let element):
-            return .range(element.mappingTypes(with: map))
+            return .range(element?.mappingTypes(with: map))
         case .set(let element):
-            return .set(element.mappingTypes(with: map))
+            return .set(element?.mappingTypes(with: map))
         case .tuple(let labels, let types):
             return .tuple(labels, types.map { $0.mappingTypes(with: map) })
         case .typealiased(let alias, let type):
@@ -894,15 +924,15 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         }
     }
 
-    /// Qualify local type names with any enclosing types, resolve typealiases and module-qualified types.
+    /// Qualify local type names with any enclosing types, resolve typealiases and module-qualified types, add missing generics.
     func resolved(in node: SyntaxNode? = nil, moduleName: String? = nil, context: TypeResolutionContext) -> TypeSignature {
         switch self {
         case .array(let elementType):
-            return .array(elementType.resolved(in: node, context: context))
+            return .array(elementType?.resolved(in: node, context: context))
         case .composition(let types):
             return .composition(types.map { $0.resolved(in: node, context: context) })
         case .dictionary(let keyType, let valueType):
-            return .dictionary(keyType.resolved(in: node, context: context), valueType.resolved(in: node, context: context))
+            return .dictionary(keyType?.resolved(in: node, context: context), valueType?.resolved(in: node, context: context))
         case .function(let parameters, let returnType, let apiFlags, let attributes):
             let resolvedParameters = parameters.map { Parameter(label: $0.label, type: $0.type.resolved(in: node, context: context), isInOut: $0.isInOut, isVariadic: $0.isVariadic, isVariadicContinuation: $0.isVariadicContinuation, hasDefaultValue: $0.hasDefaultValue) }
             return .function(resolvedParameters, returnType.resolved(in: node, context: context), apiFlags, attributes)
@@ -922,10 +952,12 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .named(let name, let generics):
             let generics = generics.map { $0.resolved(in: node, context: context) }
             if let node {
-                let qualified = node.qualifyReferencedNamedType(name: name, generics: generics, context: context)
+                let (qualified, isGenericParameter) = node.qualifyReferencedNamedType(name: name, generics: generics, context: context)
                 // If we get back a typealiased type, the target type might again need qualification
                 if case .typealiased = qualified {
                     return qualified.resolved(in: node, moduleName: moduleName, context: context)
+                } else if isGenericParameter {
+                    return qualified
                 } else {
                     return qualified.resolved(moduleName: moduleName, context: context)
                 }
@@ -935,9 +967,9 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .optional(let type):
             return type.resolved(in: node, moduleName: moduleName, context: context).asOptional(true)
         case .range(let elementType):
-            return .range(elementType.resolved(in: node, context: context))
+            return .range(elementType?.resolved(in: node, context: context))
         case .set(let elementType):
-            return .set(elementType.resolved(in: node, context: context))
+            return .set(elementType?.resolved(in: node, context: context))
         case .tuple(let labels, let types):
             return .tuple(labels, types.map { $0.resolved(in: node, context: context) })
         case .typealiased(let alias, let type):
@@ -977,14 +1009,14 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                 return typeSignature
             }
         case .array(let elementType):
-            if case .array(let elementType2) = strippedTypeSignature {
+            if let elementType, case .array(let elementType2) = strippedTypeSignature, let elementType2 {
                 let resolvedElementType = elementType.or(elementType2, replaceAny: replaceAny)
                 return .array(resolvedElementType)
             }
         case .dictionary(let keyType, let valueType):
             if case .dictionary(let keyType2, let valueType2) = strippedTypeSignature {
-                let resolvedKeyType = keyType.or(keyType2, replaceAny: replaceAny)
-                let resolvedValueType = valueType.or(valueType2, replaceAny: replaceAny)
+                let resolvedKeyType = keyType2 == nil ? keyType : keyType?.or(keyType2!, replaceAny: replaceAny)
+                let resolvedValueType = valueType2 == nil ? valueType : valueType?.or(valueType2!, replaceAny: replaceAny)
                 return .dictionary(resolvedKeyType, resolvedValueType)
             }
         case .function(let parameters, let returnType, let apiFlags, let attributes):
@@ -1021,12 +1053,12 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return type.or(typeSignature).asOptional(true)
         case .range(let elementType):
             if case .range(let elementType2) = strippedTypeSignature {
-                let resolvedElementType = elementType.or(elementType2, replaceAny: replaceAny)
+                let resolvedElementType = elementType2 == nil ? elementType : elementType?.or(elementType2!, replaceAny: replaceAny)
                 return .range(resolvedElementType)
             }
         case .set(let elementType):
             if case .set(let elementType2) = strippedTypeSignature {
-                let resolvedElementType = elementType.or(elementType2, replaceAny: replaceAny)
+                let resolvedElementType = elementType2 == nil ? elementType : elementType?.or(elementType2!, replaceAny: replaceAny)
                 return .set(resolvedElementType)
             }
         case .tuple(let labels, let types):
@@ -1190,26 +1222,26 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         switch type {
         case .array(let element):
             if case .array(let targetElement) = strippedTarget {
-                guard let elementScore = element.compatibilityScore(target: targetElement, codebaseInfo: codebaseInfo) else {
+                guard let elementScore = (element ?? .none).compatibilityScore(target: targetElement ?? .none, codebaseInfo: codebaseInfo) else {
                     return nil
                 }
                 return (2.0 + elementScore) / 2.0
             }
             if case .set(let targetElement) = strippedTarget {
-                guard let elementScore = element.compatibilityScore(target: targetElement, codebaseInfo: codebaseInfo) else {
+                guard let elementScore = (element ?? .none).compatibilityScore(target: targetElement ?? .none, codebaseInfo: codebaseInfo) else {
                     return nil
                 }
                 return (2.0 + elementScore) / 2.0
             }
             // Array literal being passed as OptionSet
             if codebaseInfo.global.protocolSignatures(forNamed: target).contains(where: { $0.isNamed("OptionSet", moduleName: "Swift") }) {
-                guard let elementScore = element.compatibilityScore(target: target, codebaseInfo: codebaseInfo) else {
+                guard let elementScore = (element ?? .none).compatibilityScore(target: target, codebaseInfo: codebaseInfo) else {
                     return nil
                 }
                 return (2.0 + elementScore) / 2.0
             }
             if case .named(_, let generics) = strippedTarget, generics.count == 1, let inheritanceScore = inheritanceCompatibilityScore(target: target, codebaseInfo: codebaseInfo) {
-                guard let elementScore = element.compatibilityScore(target: generics[0], codebaseInfo: codebaseInfo) else {
+                guard let elementScore = (element ?? .none).compatibilityScore(target: generics[0], codebaseInfo: codebaseInfo) else {
                     return nil
                 }
                 return (inheritanceScore + elementScore) / 2.0
@@ -1220,7 +1252,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             }
         case .dictionary(let keyType, let valueType):
             if case .dictionary(let keyType2, let valueType2) = strippedTarget {
-                guard let keyScore = keyType.compatibilityScore(target: keyType2, codebaseInfo: codebaseInfo), let valueScore = valueType.compatibilityScore(target: valueType2, codebaseInfo: codebaseInfo) else {
+                guard let keyScore = (keyType ?? .none).compatibilityScore(target: keyType2 ?? .none, codebaseInfo: codebaseInfo), let valueScore = (valueType ?? .none).compatibilityScore(target: valueType2 ?? .none, codebaseInfo: codebaseInfo) else {
                     return nil
                 }
                 return (2.0 + keyScore + 2.0 + valueScore) / 4.0
@@ -1271,20 +1303,20 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return type.compatibilityScore(target: target, codebaseInfo: codebaseInfo)
         case .range(let element):
             if case .range(let targetElement) = strippedTarget {
-                guard let elementScore = element.compatibilityScore(target: targetElement, codebaseInfo: codebaseInfo) else {
+                guard let elementScore = (element ?? .none).compatibilityScore(target: targetElement ?? .none, codebaseInfo: codebaseInfo) else {
                     return nil
                 }
                 return (2.0 + elementScore) / 2.0
             }
         case .set(let element):
             if case .set(let targetElement) = strippedTarget {
-                guard let elementScore = element.compatibilityScore(target: targetElement, codebaseInfo: codebaseInfo) else {
+                guard let elementScore = (element ?? .none).compatibilityScore(target: targetElement ?? .none, codebaseInfo: codebaseInfo) else {
                     return nil
                 }
                 return (2.0 + elementScore) / 2.0
             }
             if case .named(_, let generics) = strippedTarget, generics.count == 1, let inheritanceScore = inheritanceCompatibilityScore(target: target, codebaseInfo: codebaseInfo) {
-                guard let elementScore = element.compatibilityScore(target: generics[0], codebaseInfo: codebaseInfo) else {
+                guard let elementScore = (element ?? .none).compatibilityScore(target: generics[0], codebaseInfo: codebaseInfo) else {
                     return nil
                 }
                 return (inheritanceScore + elementScore) / 2.0
@@ -1545,13 +1577,13 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case "Any.Type", "Swift.Any.Type":
             return .metaType(.any)
         case "Array", "Swift.Array":
-            return genericTypes.isEmpty ? .array(.none) : genericTypes.count == 1 ? .array(genericTypes[0]) : allowNamed ? swiftNamed(name, genericTypes) : .none
+            return genericTypes.isEmpty ? .array(nil) : genericTypes.count == 1 ? .array(genericTypes[0]) : allowNamed ? swiftNamed(name, genericTypes) : .none
         case "Bool", "Swift.Bool":
             return genericTypes.isEmpty ? .bool : allowNamed ? swiftNamed(name, genericTypes) : .none
         case "Character", "Swift.Character":
             return genericTypes.isEmpty ? .character : allowNamed ? swiftNamed(name, genericTypes) : .none
         case "Dictionary", "Swift.Dictionary":
-            return genericTypes.isEmpty ? .dictionary(.none, .none) : genericTypes.count == 2 ? .dictionary(genericTypes[0], genericTypes[1]) : allowNamed ? swiftNamed(name, genericTypes) : .none
+            return genericTypes.isEmpty ? .dictionary(nil, nil) : genericTypes.count == 2 ? .dictionary(genericTypes[0], genericTypes[1]) : allowNamed ? swiftNamed(name, genericTypes) : .none
         case "Double", "Swift.Double":
             return genericTypes.isEmpty ? .double : allowNamed ? swiftNamed(name, genericTypes) : .none
         case "Float", "Swift.Float":
@@ -1567,9 +1599,9 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case "Int64", "Swift.Int64":
             return genericTypes.isEmpty ? .int64 : allowNamed ? swiftNamed(name, genericTypes) : .none
         case "Range", "Swift.Range":
-            return genericTypes.isEmpty ? .range(.none) : genericTypes.count == 1 ? .range(genericTypes[0]) : allowNamed ? swiftNamed(name, genericTypes) : .none
+            return genericTypes.isEmpty ? .range(nil) : genericTypes.count == 1 ? .range(genericTypes[0]) : allowNamed ? swiftNamed(name, genericTypes) : .none
         case "Set", "Swift.Set":
-            return genericTypes.isEmpty ? .set(.none) : genericTypes.count == 1 ? .set(genericTypes[0]) : allowNamed ? swiftNamed(name, genericTypes) : .none
+            return genericTypes.isEmpty ? .set(nil) : genericTypes.count == 1 ? .set(genericTypes[0]) : allowNamed ? swiftNamed(name, genericTypes) : .none
         case "String", "Swift.String":
             return genericTypes.isEmpty ? .string : allowNamed ? swiftNamed(name, genericTypes) : .none
         case "UInt", "Swift.UInt":
@@ -1625,7 +1657,11 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .anyObject:
             return "AnyObject"
         case .array(let elementType):
-            return "[\(elementType[keyPath: keyPath])]"
+            if let elementType {
+                return "[\(elementType[keyPath: keyPath])]"
+            } else {
+                return "Array"
+            }
         case .bool:
             return "Bool"
         case .character:
@@ -1633,7 +1669,11 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .composition(let types):
             return "(\(types.map { $0[keyPath: keyPath] }.joined(separator: " & ")))"
         case .dictionary(let keyType, let valueType):
-            return "[\(keyType[keyPath: keyPath]): \(valueType[keyPath: keyPath])]"
+            if let keyType, let valueType {
+                return "[\(keyType[keyPath: keyPath]): \(valueType[keyPath: keyPath])]"
+            } else {
+                return "Dictionary"
+            }
         case .double:
             return "Double"
         case .float:
@@ -1676,7 +1716,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             }
             return "\(name)<\(generics.map { $0[keyPath: keyPath] }.joined(separator: ", "))>"
         case .none:
-            return "<none>"
+            return "?"
         case .optional(let type):
             switch type {
             case .function:
@@ -1685,9 +1725,17 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                 return "\(type[keyPath: keyPath])?"
             }
         case .range(let type):
-            return "Range<\(type[keyPath: keyPath])>"
+            if let type {
+                return "Range<\(type[keyPath: keyPath])>"
+            } else {
+                return "Range"
+            }
         case .set(let type):
-            return "Set<\(type[keyPath: keyPath])>"
+            if let type {
+                return "Set<\(type[keyPath: keyPath])>"
+            } else {
+                return "Set"
+            }
         case .string:
             return "String"
         case .tuple(let labels, let types):

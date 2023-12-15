@@ -43,7 +43,7 @@ class KotlinArrayLiteral: KotlinExpression, KotlinUsableAsTypeLiteral {
         kexpression.elements = expression.elements.map { translator.translateExpression($0) }
         kexpression.useMultilineFormatting = expression.useMultilineFormatting
         kexpression.inferredType = expression.inferredType.resolvingSelf(in: expression)
-        if case .array(let element) = expression.inferredType {
+        if case .array(let element) = expression.inferredType, let element {
             kexpression.isOptionSet = translator.codebaseInfo?.global.protocolSignatures(forNamed: element).contains(where: \.isOptionSet) == true
         }
         return kexpression
@@ -270,7 +270,7 @@ class KotlinBinaryOperator: KotlinExpression, KotlinSingleStatementVetoing {
         guard let castGenerics = castTarget.generics else {
             return
         }
-        guard !castGenerics.allSatisfy({ $0.asOptional(false) == .any || $0.asOptional(false) == .named("AnyHashable", []) }) else {
+        guard !castGenerics.allSatisfy({ $0 == .none || $0.asOptional(false) == .any || $0.asOptional(false) == .named("AnyHashable", []) }) else {
             return
         }
         if op.symbol == "is" {
@@ -1236,10 +1236,10 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
             if castTargetType != .none {
                 if let specifiedGenerics = generics, !specifiedGenerics.isEmpty {
                     if castTargetType == .typeErasedTarget {
-                        generics = specifiedGenerics.map { _ in TypeSignature.named("*", []) }
+                        generics = specifiedGenerics.map { _ in TypeSignature.none }
                     }
                 } else if let apiMatch, !apiMatch.signature.generics.isEmpty {
-                    generics = Array(repeating: TypeSignature.named("*", []), count: apiMatch.signature.generics.count)
+                    generics = Array(repeating: TypeSignature.none, count: apiMatch.signature.generics.count)
                 }
             }
             if isTypealiasFor != .none {
@@ -2065,7 +2065,7 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
         }
         if var generics, !generics.isEmpty {
             if castTargetType == .typeErasedTarget {
-                generics = generics.map { _ in TypeSignature.named("*", []) }
+                generics = generics.map { _ in TypeSignature.none }
             }
             output.append("<\(generics.map(\.kotlin).joined(separator: ", "))>")
         } else if castTargetType != .none, let apiMatch, apiMatch.declarationType != .enumCaseDeclaration && !apiMatch.signature.generics.isEmpty {
@@ -2593,7 +2593,7 @@ class KotlinSubscript: KotlinExpression, KotlinMainActorTargeting, KotlinSwiftUI
             return LabeledValue(label: $0.label, value: kargumentExpression)
         }
         kexpression.apiMatch = expression.apiMatch
-        if expression.arguments.count == 1, case .range(let elementType) =  expression.arguments[0].value.inferredType, elementType.isNumeric {
+        if expression.arguments.count == 1, case .range(let elementType) = expression.arguments[0].value.inferredType, elementType?.isNumeric == true {
             // Special case: we don't support mutating slices
             kexpression.mayBeSharedMutableStruct = false
         } else {
@@ -2864,10 +2864,10 @@ class KotlinTypeLiteral: KotlinExpression, KotlinCastTarget {
         var literal = self.literal
         if !literal.generics.isEmpty {
             if castTargetType == .typeErasedTarget {
-                literal = literal.withGenerics(literal.generics.map { _ in TypeSignature.named("*", []) })
+                literal = literal.withGenerics(literal.generics.map { _ in TypeSignature.none })
             }
         } else if castTargetType != .none, let signature = signature, !signature.generics.isEmpty {
-            literal = literal.withGenerics(Array(repeating: TypeSignature.named("*", []), count: signature.generics.count))
+            literal = literal.withGenerics(Array(repeating: TypeSignature.none, count: signature.generics.count))
         }
         output.append(literal.kotlin)
     }

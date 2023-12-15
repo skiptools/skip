@@ -29,10 +29,11 @@ extension TypeSignature {
         case .anyObject:
             return "Any"
         case .array(let elementType):
-            if elementType == .none {
+            if let elementType {
+                return "Array<\(elementType.kotlin)>"
+            } else {
                 return "Array"
             }
-            return "Array<\(elementType.kotlin)>"
         case .bool:
             return "Boolean"
         case .character:
@@ -40,10 +41,11 @@ extension TypeSignature {
         case .composition:
             return "Any"
         case .dictionary(let keyType, let valueType):
-            if keyType == .none && valueType == .none {
+            if let keyType, let valueType {
+                return "Dictionary<\(keyType.kotlin), \(valueType.kotlin)>"
+            } else {
                 return "Dictionary"
             }
-            return "Dictionary<\(keyType.or(.any).kotlin), \(valueType.or(.any).kotlin)>"
         case .double:
             return "Double"
         case .float:
@@ -72,12 +74,12 @@ extension TypeSignature {
         case .module(let module, let type):
             return "\(KotlinTranslator.packageName(forModule: module)).\(type.kotlin)"
         case .named(let name, let generics):
-            guard !generics.isEmpty && generics.contains(where: { $0 != .none }) else {
+            guard !generics.isEmpty else {
                 return name
             }
             return "\(name)<\(generics.map { $0.kotlin }.joined(separator: ", "))>"
         case .none:
-            return description
+            return "*" // For when output as part of generic parameters
         case .optional(let type):
             switch type {
             case .function:
@@ -95,10 +97,11 @@ extension TypeSignature {
                 return "IntRange"
             }
         case .set(let elementType):
-            if elementType == .none {
+            if let elementType {
+                return "Set<\(elementType.kotlin)>"
+            } else {
                 return "Set"
             }
-            return "Set<\(elementType.kotlin)>"
         case .string:
             return "String"
         case .tuple(_, let types):

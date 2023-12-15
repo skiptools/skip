@@ -1017,4 +1017,76 @@ final class TypeInferenceTests: XCTestCase {
         }
         """)
     }
+
+    func testAnyProtocolWithoutSpecifiedGenerics() async throws {
+        try await check(supportingSwift: """
+        protocol P {
+            associatedtype Data
+            var data: Data { get }
+            func doSomething()
+        }
+        """, swift: """
+        struct S: P {
+            let data: Int
+            func doSomething() {
+                print(data)
+            }
+        }
+        func f(p: any P) {
+            p.doSomething()
+        }
+        func f<D>(s: S<D>) {
+            s.doSomething()
+        }
+        func f<P>(p: P) {
+            print(p)
+        }
+        """, kotlin: """
+        internal class S: P<Int> {
+            override val data: Int
+            override fun doSomething(): Unit = print(data)
+
+            constructor(data: Int) {
+                this.data = data
+            }
+        }
+        internal fun f(p: P<*>): Unit = p.doSomething()
+        internal fun <D> f(s: S<D>): Unit = s.doSomething()
+        internal fun <P> f(p: P): Unit = print(p)
+        """)
+
+        try await check(supportingSwift: """
+        protocol Base {
+            associatedtype Data
+            var data: Data { get }
+        }
+        protocol P: Base {
+            func doSomething()
+        }
+        """, swift: """
+        struct S: P {
+            let data: Int
+            func doSomething() {
+                print(data)
+            }
+        }
+        func f(p: any P) {
+            p.doSomething()
+        }
+        func f<D>(s: S<D>) {
+            s.doSomething()
+        }
+        """, kotlin: """
+        internal class S: P<Int> {
+            override val data: Int
+            override fun doSomething(): Unit = print(data)
+
+            constructor(data: Int) {
+                this.data = data
+            }
+        }
+        internal fun f(p: P<*>): Unit = p.doSomething()
+        internal fun <D> f(s: S<D>): Unit = s.doSomething()
+        """)
+    }
 }

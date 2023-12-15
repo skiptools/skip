@@ -1683,12 +1683,12 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             if kstatement.isStatic {
                 kstatement.convertToGenericFunction(owningTypeDeclaration, generics: owningSignature.generics, translator: translator)
             }
-            // Kotlin does not allow a generic type to refer to itself without constraints
-            let withoutGenerics: TypeSignature = .named(owningTypeDeclaration.name, [])
-            kstatement.returnType = kstatement.returnType.mappingTypes(from: [withoutGenerics], to: [owningSignature])
+            // Within a type C<T>, convert any references to C<none> into C<T>
+            let withUnknownGenerics: TypeSignature = .named(owningTypeDeclaration.name, owningTypeDeclaration.generics.entries.map { _ in TypeSignature.none })
+            kstatement.returnType = kstatement.returnType.mappingTypes(from: [withUnknownGenerics], to: [owningSignature])
             kstatement.parameters = kstatement.parameters.map {
                 var parameter = $0
-                parameter.declaredType = parameter.declaredType.mappingTypes(from: [withoutGenerics], to: [owningSignature])
+                parameter.declaredType = parameter.declaredType.mappingTypes(from: [withUnknownGenerics], to: [owningSignature])
                 return parameter
             }
         }
@@ -1966,7 +1966,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     private func appendEqualsBody(_ body: KotlinCodeBlock, to output: OutputGenerator, indentation: Indentation) {
         output.append(" {\n")
         let bodyIndentation = indentation.inc()
-        let anyGenerics = parameters[1].declaredType.generics.map { _ in TypeSignature.named("*", []) }
+        let anyGenerics = parameters[1].declaredType.generics.map { _ in TypeSignature.none }
         output.append(bodyIndentation).append("if (other !is \(parameters[1].declaredType.withGenerics(anyGenerics).kotlin)) {\n")
         output.append(bodyIndentation.inc()).append("return false\n")
         output.append(bodyIndentation).append("}\n")
@@ -2432,9 +2432,9 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 } else if kstatement.isStatic && owningTypeDeclaration.type == .extensionDeclaration && !owningTypeDeclaration.generics.isEmpty {
                     kstatement.messages.append(.kotlinGenericExtensionStaticMember(kstatement, source: translator.syntaxTree.source))
                 }
-                // Kotlin does not allow a generic type to refer to itself without constraints
-                let withoutGenerics: TypeSignature = .named(owningTypeDeclaration.name, [])
-                kstatement.declaredType = kstatement.declaredType.mappingTypes(from: [withoutGenerics], to: [owningSignature])
+                // Within a type C<T>, convert any references to C<none> into C<T>
+                let withUnknownGenerics: TypeSignature = .named(owningTypeDeclaration.name, owningTypeDeclaration.generics.entries.map { _ in TypeSignature.none })
+                kstatement.declaredType = kstatement.declaredType.mappingTypes(from: [withUnknownGenerics], to: [owningSignature])
             }
         } else if statement.isGlobal {
             kstatement.role = .global

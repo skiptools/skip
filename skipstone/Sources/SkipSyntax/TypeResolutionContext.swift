@@ -1,4 +1,4 @@
-/// Resolve typealiases and module-qualified types.
+/// Resolve missing type information such as typealiases, module-qualified type names, and missing generic parameters.
 struct TypeResolutionContext {
     private let codebaseInfo: CodebaseInfo.Context?
 
@@ -24,22 +24,37 @@ struct TypeResolutionContext {
         return type
     }
 
-    private func qualifyNamed(type: TypeSignature, in base: TypeSignature, codebaseInfo: CodebaseInfo.Context) -> TypeSignature? {
-        guard let typeInfo = codebaseInfo.primaryTypeInfo(forNamed: .named(base.name + "." + type.name, [])) else {
-            return nil
-        }
-        return typeInfo.signature.withGenerics(type.generics)
-    }
-
+    /// Fill in missing type metadata.
+    ///
     /// If the given type represents a typealias and/or module-qualified type, resolve it to the proper `.typealiased` and/or `.module` form.
+    /// If the type has generic parameters that aren't represented, add them as `.none` placeholders.
     func resolve(_ type: TypeSignature, moduleName: String? = nil, in baseOrModule: TypeSignature = .none) -> TypeSignature {
         let type = resolveModuleQualifiedType(type, moduleName: moduleName, in: baseOrModule)
-        return codebaseInfo?.resolveTypealias(for: type) ?? type
+        guard let codebaseInfo else {
+            return type
+        }
+        let unaliased = codebaseInfo.resolveTypealias(for: type)
+        return unaliased.mappingTypes { type in
+            guard type.isNamedType && type.generics.isEmpty else {
+                return nil
+            }
+            guard let primaryInfo = codebaseInfo.primaryTypeInfo(forNamed: type), !primaryInfo.generics.isEmpty else {
+                return nil
+            }
+            return type.withGenerics(primaryInfo.generics.entries.map { _ in TypeSignature.none })
+        }
     }
 
     /// Reutrn the declaration type for the given named type, if known.
     func declarationType(forNamed type: TypeSignature) -> StatementType? {
         return codebaseInfo?.declarationType(forNamed: type)
+    }
+
+    private func qualifyNamed(type: TypeSignature, in base: TypeSignature, codebaseInfo: CodebaseInfo.Context) -> TypeSignature? {
+        guard let typeInfo = codebaseInfo.primaryTypeInfo(forNamed: .named(base.name + "." + type.name, [])) else {
+            return nil
+        }
+        return typeInfo.signature.withGenerics(type.generics)
     }
 
     private func resolveModuleQualifiedType(_ type: TypeSignature, moduleName: String?, in baseOrModule: TypeSignature = .none) -> TypeSignature {

@@ -670,7 +670,7 @@ class DictionaryLiteral: Expression {
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
-        if case .dictionary(let ktype, let vtype) = expecting, ktype != .none, vtype != .none {
+        if case .dictionary(let ktype, let vtype) = expecting, let ktype, ktype != .none, let vtype, vtype != .none {
             keyType = ktype
             valueType = vtype
             entries.forEach {
@@ -751,7 +751,7 @@ class FunctionCall: Expression, APICallExpression, MemberAccessExpression {
             // Must be a constructor call, e.g. [String]()
             function.inferTypes(context: context, expecting: expecting)
             if case .array(let element) = function.inferredType {
-                returnType = .array(element.asMetaType(false))
+                returnType = .array(element?.asMetaType(false))
             } else {
                 returnType = function.inferredType.or(expecting)
             }
@@ -761,7 +761,7 @@ class FunctionCall: Expression, APICallExpression, MemberAccessExpression {
             // Must be a constructor call, e.g. [String: Int]()
             function.inferTypes(context: context, expecting: expecting)
             if case .dictionary(let keyType, let valueType) = function.inferredType {
-                returnType = .dictionary(keyType.asMetaType(false), valueType.asMetaType(false))
+                returnType = .dictionary(keyType?.asMetaType(false), valueType?.asMetaType(false))
             } else {
                 returnType = function.inferredType.or(expecting)
             }

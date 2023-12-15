@@ -20,7 +20,7 @@ class SyntaxNode: SourceDerived, PrettyPrintable {
     func qualifyTypeDeclaration() {
     }
 
-    /// Resolve contextual information about this node's attributes after the parent node is set.
+    /// Resolve contextual information about this node's attributes and types after the parent node is set.
     func resolveAttributes(in syntaxTree: SyntaxTree, context: TypeResolutionContext) {
     }
 
@@ -47,7 +47,7 @@ class SyntaxNode: SourceDerived, PrettyPrintable {
 
     /// Perform type inference.
     ///
-    /// This is called after `resolve`.
+    /// This is called after `resolveAttributes`.
     @discardableResult func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
         children.forEach { $0.inferTypes(context: context, expecting: .none) }
         return context
@@ -161,7 +161,14 @@ class SyntaxNode: SourceDerived, PrettyPrintable {
     /// Traverse up the syntax tree to fully qualify a type.
     ///
     /// - Returns: A qualified type or a typealiased type signature whose type must then be resolved.
-    final func qualifyReferencedNamedType(name: String, generics: [TypeSignature], context: TypeResolutionContext) -> TypeSignature {
+    final func qualifyReferencedNamedType(name: String, generics: [TypeSignature], context: TypeResolutionContext) -> (qualified: TypeSignature, isGenericParameter: Bool) {
+        // Is this type a generic of the enclosing function?
+        if generics.isEmpty, let owningFunction = owningFunctionDeclaration as? FunctionDeclaration {
+            if let generic = owningFunction.generics.entries.first(where: { $0.name == name }) {
+                return (generic.namedType, true)
+            }
+        }
+
         // Look for a qualified name whose last token is the given type name
         let suffix = ".\(name)"
         var current: SyntaxNode? = self
@@ -172,18 +179,20 @@ class SyntaxNode: SourceDerived, PrettyPrintable {
             }
             // Look for any direct child of that type with a matching qualified name
             if let referencedType = owningType.members.first(where: { ($0 as? TypeDeclaration)?.signature.name.hasSuffix(suffix) == true }) {
-                return (referencedType as! TypeDeclaration).signature.withGenerics(generics)
+                return ((referencedType as! TypeDeclaration).signature.withGenerics(generics), false)
             } else if let referencedTypealias = owningType.members.first(where: { ($0 as? TypealiasDeclaration)?.name == name }) {
-                return (referencedTypealias as! TypealiasDeclaration).signature.withGenerics(generics)
+                return ((referencedTypealias as! TypealiasDeclaration).signature.withGenerics(generics), false)
+            } else if generics.isEmpty, let generic = owningType.generics.entries.first(where: { $0.name == name }) {
+                return (generic.namedType, true)
             }
             // Move up to the next owning type and repeat
             current = owningType.parent
         }
         let type: TypeSignature = .named(name, generics)
         if let owningType = owningTypeDeclaration {
-            return context.qualifyInherited(type: type, in: owningType.signature)
+            return (context.qualifyInherited(type: type, in: owningType.signature), false)
         } else {
-            return type
+            return (type, false)
         }
     }
 
