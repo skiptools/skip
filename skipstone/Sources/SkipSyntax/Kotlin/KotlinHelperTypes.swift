@@ -363,9 +363,11 @@ extension Parameter {
 
 extension Source.FilePath {
     /// Synthetic source that will be translated to a file appropriate for package-level support code.
-    var kotlinPackageSupport: Source.FilePath {
+    /// 
+    /// - Parameter tests: whether this is for a test package, in which case the generated file will be "PackageSupportTest.swift" in order to not clash with the primary module's "PackageSupport.swift" (which turns into a `PackageSupportKt` class).
+    func kotlinPackageSupport(tests: Bool) -> Source.FilePath {
         var filePath = self
-        filePath.name = "PackageSupport.swift"
+        filePath.name = "PackageSupport\(tests ? "Test" : "").swift"
         return filePath
     }
 }

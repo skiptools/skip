@@ -58,8 +58,12 @@ public struct Transpiler {
                 try await handler(transpilation)
             }
         }
+
+        // Suffix the generated file with "Tests" to avoid clashes with the primary modules `PackageSupportKt` class (https://github.com/skiptools/skip/issues/66)
+        let isTestModule = codebaseInfo.moduleName?.hasSuffix("Tests") == true
+
         // Finally create an additional source file for any package-level code
-        if let packageSupportTranspilation = KotlinTranslator.transpilePackageSupport(sourceFile: sourceFiles[0].kotlinPackageSupport, codebaseInfo: codebaseInfo, transformers: transformers) {
+        if let packageSupportTranspilation = KotlinTranslator.transpilePackageSupport(sourceFile: sourceFiles[0].kotlinPackageSupport(tests: isTestModule), codebaseInfo: codebaseInfo, transformers: transformers) {
             try await handler(packageSupportTranspilation)
         }
     }
