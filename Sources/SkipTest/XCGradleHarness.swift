@@ -106,6 +106,11 @@ extension XCGradleHarness where Self : XCTestCase {
                     args += ["--tests", testFilter]
                 }
 
+                // specify additional arguments in the GRADLE_ARGUMENT variable, such as `-P android.testInstrumentationRunnerArguments.package=skip.ui.SkipUITests`
+                if let gradleArgument = env["GRADLE_ARGUMENT"] {
+                    args += [gradleArgument]
+                }
+
                 let (output, parseResults) = try await driver.launchGradleProcess(in: dir, module: baseModuleName, actions: actions, arguments: args, environment: env, maxMemory: maxMemory, exitHandler: { result in
                     // do not fail on non-zero exit code because we want to be able to parse the test results first
                     testProcessResult = result
