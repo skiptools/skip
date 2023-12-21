@@ -142,7 +142,7 @@ extension XCTestCase {
                 } else {
                     XCTAssertEqual(kotlinCode, content.trimmingCharacters(in: .whitespacesAndNewlines), messagesString, file: file, line: line)
                 }
-            } else if transpilation.input.file == srcFiles.first?.kotlinPackageSupport {
+            } else if transpilation.input.file == srcFiles.first?.kotlinPackageSupport(tests: false) {
                 if let packageSupportKotlin {
                     let content = fixup(code: trimmedContent(transpilation: transpilation))
                     let kotlinCode = packageSupportKotlin.trimmingCharacters(in: .whitespacesAndNewlines)
