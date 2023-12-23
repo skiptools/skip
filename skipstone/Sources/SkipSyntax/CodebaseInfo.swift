@@ -107,8 +107,12 @@ public class CodebaseInfo {
     
     /// Create a context that can access the given imported modules.
     func context(importedModuleNames: [String] = [], sourceFile: Source.FilePath? = nil) -> Context {
+        return context(importedModuleNames: importedModuleNames, sourceFile: sourceFile, cache: ContextCache())
+    }
+
+    private func context(importedModuleNames: [String], sourceFile: Source.FilePath?, cache: ContextCache) -> Context {
         let mappedModuleNames = importedModuleNames.flatMap { Self.moduleNameMap[$0] ?? [$0] }
-        return Context(global: self, importedModuleNames: Set(mappedModuleNames), sourceFile: sourceFile)
+        return Context(global: self, importedModuleNames: Set(mappedModuleNames), sourceFile: sourceFile, cache: cache)
     }
 
     /// The items for the given name.
@@ -228,12 +232,13 @@ public class CodebaseInfo {
         let global: CodebaseInfo
         let importedModuleNames: Set<String>
         let sourceFile: Source.FilePath?
-        private let cache = ContextCache()
+        private let cache: ContextCache
 
-        fileprivate init(global: CodebaseInfo, importedModuleNames: Set<String>, sourceFile: Source.FilePath?) {
+        fileprivate init(global: CodebaseInfo, importedModuleNames: Set<String>, sourceFile: Source.FilePath?, cache: ContextCache) {
             self.global = global
             self.sourceFile = sourceFile
             self.importedModuleNames = importedModuleNames
+            self.cache = cache
         }
         
         /// Score, sort, and filter the given items.
@@ -261,14 +266,24 @@ public class CodebaseInfo {
         /// Return the type info for the given type's primary declaration, omitting extensions.
         func primaryTypeInfo(forNamed type: TypeSignature) -> TypeInfo? {
             // Profiling indicated that ranking typeInfos to get the primary type info can be expensive, so cache
-            if let primaryTypeInfo = cache.primaryTypeInfos[type] {
+            if let primaryTypeInfo = cache.primaryTypeInfos?[type] {
                 return primaryTypeInfo
             }
             let primaryTypeInfo = typeInfos(forNamed: type).first { $0.declarationType != .extensionDeclaration }
             if let primaryTypeInfo {
-                cache.primaryTypeInfos[type] = primaryTypeInfo
+                cache.primaryTypeInfos?[type] = primaryTypeInfo
             }
             return primaryTypeInfo
+        }
+
+        /// Return the members of the given type that are visible in this context.
+        func visibleMembers(of typeInfo: TypeInfo) -> [CodebaseInfoItem] {
+            if let cached = cache.visibleMembers?[typeInfo] {
+                return cached
+            }
+            let visibleMembers = typeInfo.members.filter { rankScore(of: $0) > 0 }
+            cache.visibleMembers?[typeInfo] = visibleMembers
+            return visibleMembers
         }
 
         /// Whether the given type is a class, struct, etc, optionally limiting results to this module.
@@ -299,7 +314,11 @@ public class CodebaseInfo {
             guard recursionDepth < 10 else {
                 return type
             }
-            return type.mappingTypes {
+            let key = ContextTypealiasKey(type: type, moduleName: moduleName)
+            if let cached = cache.typealiases?[key] {
+                return cached
+            }
+            let ret = type.mappingTypes {
                 switch $0 {
                 case .named, .member:
                     if let info = ranked(global.lookup(name: $0.name, moduleName: moduleName, qualifiedMatch: true)).first(where: { $0.declarationType == .typealiasDeclaration }) as? TypealiasInfo {
@@ -324,6 +343,8 @@ public class CodebaseInfo {
                 }
                 return nil
             }
+            cache.typealiases?[key] = ret
+            return ret
         }
 
         /// Cross platform library code may create typealiases to unknown types. Return any typealias for the given unknown type.
@@ -338,6 +359,11 @@ public class CodebaseInfo {
 
         /// Return API information for the given identifier.
         func matchIdentifier(name: String, moduleName: String? = nil) -> APIMatch? {
+            let key = ContextMatchKey(name: name, moduleName: moduleName)
+            if let cached = cache.matches?[key] {
+                return cached.first
+            }
+
             let lookup = global.lookup(name: name, moduleName: moduleName, qualifiedMatch: true)
             let topRanked = ranked(lookup).first { candidate in
                 switch candidate.declarationType {
@@ -349,7 +375,9 @@ public class CodebaseInfo {
             }
             guard let topRanked else {
                 let type = moduleName == nil || moduleName == "Swift" ? TypeSignature.for(name: name, genericTypes: [], allowNamed: false).asMetaType(true) : .none
-                return type == .none ? nil : APIMatch(signature: type)
+                let apiMatch = type == .none ? nil : APIMatch(signature: type)
+                cache.matches?[key] = apiMatch == nil ? [] : [apiMatch!]
+                return apiMatch
             }
             var matchSignature = topRanked.signature
             if let generics = (topRanked as? TypeInfo)?.generics ?? (topRanked as? TypealiasInfo)?.generics {
@@ -357,6 +385,7 @@ public class CodebaseInfo {
             }
             var match = topRanked.apiMatch
             match.signature = matchSignature.asMetaType(topRanked.declarationType != .variableDeclaration && topRanked.declarationType != .enumCaseDeclaration && topRanked.declarationType != .functionDeclaration)
+            cache.matches?[key] = [match]
             return match
         }
         
@@ -378,36 +407,56 @@ public class CodebaseInfo {
             let isStatic = type.isMetaType
             type = type.asMetaType(false)
 
+            let key = ContextMatchKey(name: name, inConstrained: type, excludeConstrainedGenerics: excludeConstrainedExtensions)
+            if let cached = cache.matches?[key] {
+                return cached.first
+            }
+
             let typeInfos = typeInfos(forNamed: type)
             let primaryTypeInfo = typeInfos.first { $0.declarationType != .extensionDeclaration }
-            for typeInfo in typeInfos {
-                if excludeConstrainedExtensions && typeInfo.declarationType == .extensionDeclaration && typeInfo.generics != primaryTypeInfo?.generics {
-                    // We intentionally leave out cases where primaryTypeInfo is unknown so that extensions to unknown types are excluded
-                    continue
-                }
-                if var match = matchIdentifier(name: name, in: typeInfo, constrainedGenerics: type.generics, isStatic: isStatic) {
-                    match.signature = match.signature.mappingSelf(to: type)
-                    return match
+            // We intentionally exclude extensions to unknown named types
+            if primaryTypeInfo != nil || !type.isNamedType {
+                for typeInfo in typeInfos {
+                    if excludeConstrainedExtensions && typeInfo.declarationType == .extensionDeclaration && typeInfo.generics != primaryTypeInfo?.generics {
+                        continue
+                    }
+                    if var match = matchIdentifier(name: name, in: typeInfo, constrainedGenerics: type.generics, isStatic: isStatic) {
+                        match.signature = match.signature.mappingSelf(to: type)
+                        cache.matches?[key] = [match]
+                        return match
+                    }
                 }
             }
+
+            let ret: APIMatch?
             if let match = matchIdentifier(name: type.name + "." + name) {
                 // Is this a nested type name?
-                return match
+                ret = match
             } else if case .named(let moduleName, []) = type {
                 // Is it a module name?
-                return matchIdentifier(name: name, moduleName: moduleName)
+                ret = matchIdentifier(name: name, moduleName: moduleName)
             } else {
-                return nil
+                ret = nil
             }
+            cache.matches?[key] = ret == nil ? [] : [ret!]
+            return ret
         }
 
         /// Return API information for the possible functions being called with the given arguments.
         func matchFunction(name: String, moduleName: String? = nil, arguments: [LabeledValue<ArgumentValue>]) -> [APIMatch] {
-            let candidates = Self.dedupe(functionCandidates(name: name, moduleName: moduleName, arguments: arguments)).sorted { $0.score > $1.score }
-            guard let topCandidate = candidates.first else {
-                return []
+            let key = ContextMatchKey(name: name, moduleName: moduleName, arguments: arguments)
+            if let cached = cache.matches?[key] {
+                return cached
             }
-            return candidates.filter { $0.score >= topCandidate.score }.map(\.match)
+            let candidates = Self.dedupe(functionCandidates(name: name, moduleName: moduleName, arguments: arguments)).sorted { $0.score > $1.score }
+            let ret: [APIMatch]
+            if let topCandidate = candidates.first {
+                ret = candidates.filter { $0.score >= topCandidate.score }.map(\.match)
+            } else {
+                ret = []
+            }
+            cache.matches?[key] = ret
+            return ret
         }
 
         /// Return the signatures of the possible member functions being called with the given arguments.
@@ -432,21 +481,30 @@ public class CodebaseInfo {
                 return matchFunction(name: name, moduleName: module, arguments: arguments)
             }
 
+            let key = ContextMatchKey(name: name ?? "init", inConstrained: type, arguments: arguments, excludeConstrainedGenerics: excludeConstrainedExtensions)
+            if let cached = cache.matches?[key] {
+                return cached
+            }
+
             let candidates = Self.dedupe(functionCandidates(name: name, in: type, constrainedGenerics: type.generics, arguments: arguments, excludeConstrainedExtensions: excludeConstrainedExtensions))
             let sortedCandidates = candidates.sorted { $0.score > $1.score || ($0.score == $1.score && $0.level < $1.level) }
-            guard let topCandidate = sortedCandidates.first else {
+            let ret: [APIMatch]
+            if let topCandidate = sortedCandidates.first {
+                ret = sortedCandidates.filter { $0.score >= topCandidate.score && $0.level <= topCandidate.level }.map {
+                    var match = $0.match
+                    match.signature = match.signature.mappingSelf(to: type)
+                    return match
+                }
+            } else {
                 if let name, case .named(let moduleName, []) = type {
                     // Is type a module name?
-                    return matchFunction(name: name, moduleName: moduleName, arguments: arguments)
+                    ret = matchFunction(name: name, moduleName: moduleName, arguments: arguments)
                 } else {
-                    return []
+                    ret = []
                 }
             }
-            return sortedCandidates.filter { $0.score >= topCandidate.score && $0.level <= topCandidate.level }.map {
-                var match = $0.match
-                match.signature = match.signature.mappingSelf(to: type)
-                return match
-            }
+            cache.matches?[key] = ret
+            return ret
         }
 
         /// If the given function signature can be called with the given arguments, return the call signature.
@@ -509,7 +567,7 @@ public class CodebaseInfo {
 
         private func matchIdentifier(name: String, in typeInfo: TypeInfo, constrainedGenerics: [TypeSignature], isStatic: Bool, functionMatch: Bool) -> APIMatch? {
             // We allow .init to be used both as a static or instance member
-            if let memberInfo = typeInfo.visibleMembers(context: self).first(where: { $0.name == name
+            if let memberInfo = visibleMembers(of: typeInfo).first(where: { $0.name == name
                 && ($0.declarationType == .initDeclaration || $0.isStatic == isStatic)
                 && functionMatch == ($0.declarationType == .functionDeclaration) }) {
                 let availability = memberInfo.availability.least(typeInfo.availability)
@@ -597,7 +655,7 @@ public class CodebaseInfo {
             guard typeInfo.isApplicable(toConstrainedGenerics: constrainedGenerics, codebaseInfo: self) else {
                 return []
             }
-            var candidates = typeInfo.visibleMembers(context: self).flatMap { (member) -> [FunctionCandidate] in
+            var candidates = visibleMembers(of: typeInfo).flatMap { (member) -> [FunctionCandidate] in
                 // We allow .init to be used both as a static or instance member
                 guard member.name == name && (member.declarationType == .initDeclaration || member.isStatic == isStatic) else {
                     return []
@@ -629,7 +687,7 @@ public class CodebaseInfo {
             guard typeInfo.isApplicable(toConstrainedGenerics: constrainedGenerics, codebaseInfo: self) else {
                 return []
             }
-            var candidates = typeInfo.visibleMembers(context: self).compactMap { (member) -> FunctionCandidate? in
+            var candidates = visibleMembers(of: typeInfo).compactMap { (member) -> FunctionCandidate? in
                 guard member.declarationType == .subscriptDeclaration && member.isStatic == isStatic else {
                     return nil
                 }
@@ -665,7 +723,7 @@ public class CodebaseInfo {
                 typeInfoConstrainedGenerics = typeInfoGenerics.entries.map { $0.constrainedType(fallback: .any) }
             }
             var initSignatures = typeInfos.flatMap { typeInfo in
-                let initInfos = typeInfo.visibleMembers(context: self).filter { $0.declarationType == .initDeclaration }
+                let initInfos = visibleMembers(of: typeInfo).filter { $0.declarationType == .initDeclaration }
                 return initInfos.compactMap { (initInfo: CodebaseInfoItem) -> FunctionCandidate? in
                     return matchFunction(initInfo, in: typeInfo, constrainedGenerics: typeInfoConstrainedGenerics, arguments: arguments, level: 0)
                 }
@@ -707,7 +765,7 @@ public class CodebaseInfo {
             guard typeInfo.isApplicable(toConstrainedGenerics: constrainedGenerics, codebaseInfo: self) else {
                 return nil
             }
-            guard let memberInfo = typeInfo.visibleMembers(context: self).first(where: { $0.name == member && $0.declarationType == .enumCaseDeclaration }) else {
+            guard let memberInfo = visibleMembers(of: typeInfo).first(where: { $0.name == member && $0.declarationType == .enumCaseDeclaration }) else {
                 return nil
             }
             guard case .function(let parameters, _, _, _) = memberInfo.signature else {
@@ -871,8 +929,39 @@ public class CodebaseInfo {
     }
 
     /// Reference-type cache so that we can mutate it within a `Context` struct.
-    private class ContextCache {
-        var primaryTypeInfos: [TypeSignature: TypeInfo] = [:]
+    fileprivate class ContextCache {
+        var primaryTypeInfos: [TypeSignature: TypeInfo]?
+        var typealiases: [ContextTypealiasKey: TypeSignature]?
+        var visibleMembers: [TypeInfo: [CodebaseInfoItem]]?
+        var matches: [ContextMatchKey: [APIMatch]]?
+
+        init(primaryTypeInfos: [TypeSignature: TypeInfo]? = [:], typealiases: [ContextTypealiasKey: TypeSignature]? = [:], visibleMembers: [TypeInfo: [CodebaseInfoItem]]? = [:], matches: [ContextMatchKey: [APIMatch]]? = [:]) {
+            self.primaryTypeInfos = primaryTypeInfos
+            self.typealiases = typealiases
+            self.visibleMembers = visibleMembers
+            self.matches = matches
+        }
+    }
+
+    fileprivate struct ContextMatchKey: Hashable {
+        let name: String
+        let moduleName: String?
+        let inConstrained: TypeSignature?
+        let arguments: [LabeledValue<ArgumentValue>]?
+        let excludeConstrainedExtensions: Bool
+
+        init(name: String, moduleName: String? = nil, inConstrained: TypeSignature? = nil, arguments: [LabeledValue<ArgumentValue>]? = nil, excludeConstrainedGenerics: Bool = false) {
+            self.name = name
+            self.moduleName = moduleName
+            self.inConstrained = inConstrained
+            self.arguments = arguments
+            self.excludeConstrainedExtensions = excludeConstrainedGenerics
+        }
+    }
+
+    fileprivate struct ContextTypealiasKey: Hashable {
+        let type: TypeSignature
+        let moduleName: String?
     }
 
     private func candidateTypeNames(for type: TypeSignature) -> [(String, String?)] {
@@ -1086,7 +1175,8 @@ public class CodebaseInfo {
                 if let existingContext = typeInferenceContexts[sourceFile] {
                     context = existingContext
                 } else {
-                    let codebaseInfoContext = self.context(importedModuleNames: syntaxTree.root.statements.importedModulePaths.compactMap(\.moduleName), sourceFile: syntaxTree.source.file)
+                    // Create a context without match + member caches so lookups can see the changes we make as we infer variable types
+                    let codebaseInfoContext = self.context(importedModuleNames: syntaxTree.root.statements.importedModulePaths.compactMap(\.moduleName), sourceFile: syntaxTree.source.file, cache: ContextCache(visibleMembers: nil, matches: nil))
                     context = TypeInferenceContext(codebaseInfo: codebaseInfoContext, unavailableAPI: nil, source: syntaxTree.source)
                     typeInferenceContexts[sourceFile] = context
                 }
@@ -1325,7 +1415,7 @@ public class CodebaseInfo {
     /// Information about a declared type.
     ///
     /// - Note: Unlike the other `CodebaseInfoItem` datastructures, types are modeled as `class` instances so that we can mutate them in place.
-    class TypeInfo: CodebaseInfoItem, Codable {
+    class TypeInfo: CodebaseInfoItem, Hashable, Codable {
         let name: String
         let declarationType: StatementType
         var signature: TypeSignature
@@ -1371,10 +1461,6 @@ public class CodebaseInfo {
             members += functions
             members += subscripts
             return members
-        }
-
-        func visibleMembers(context: CodebaseInfo.Context) -> [CodebaseInfoItem] {
-            return members.filter { context.rankScore(of: $0) > 0 }
         }
 
         /// Return whether this extension info applies when we have the given generics values.
@@ -1626,6 +1712,14 @@ public class CodebaseInfo {
                     break
                 }
             }
+        }
+
+        static func ==(lhs: TypeInfo, rhs: TypeInfo) -> Bool {
+            return lhs === rhs
+        }
+
+        func hash(into hasher: inout Hasher) {
+            hasher.combine(ObjectIdentifier(self))
         }
     }
 
@@ -2014,8 +2108,13 @@ extension CodebaseInfoItem {
             // Always favor types over other items, even overwhelming locality. This solves the issue of type-named functions that
             // act as factories compete with constructors - e.g. a call to func A(...) and a call to an A(...) constructor. We're smart
             // enough to find type-named functions when looking for constructors
-            if self is CodebaseInfo.TypeInfo || self is CodebaseInfo.TypealiasInfo {
+            //
+            // Note: Don't use "self is TypeInfo" here because it was prominent in profiles. Use declarationType instead
+            switch declarationType {
+            case .actorDeclaration, .classDeclaration, .enumDeclaration, .extensionDeclaration, .protocolDeclaration, .structDeclaration, .typealiasDeclaration:
                 score += 3
+            default:
+                break
             }
         }
         return score

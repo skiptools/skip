@@ -39,7 +39,7 @@ extension CodebaseInfo.Context {
             guard typeInfo.declarationType != .protocolDeclaration else {
                 return []
             }
-            return typeInfo.visibleMembers(context: self).filter { $0.declarationType == .initDeclaration }
+            return visibleMembers(of: typeInfo).filter { $0.declarationType == .initDeclaration }
         }
         return inits.compactMap { (initInfo) -> [Parameter<Expression>]? in
             guard let functionInfo = initInfo as? CodebaseInfo.FunctionInfo else {

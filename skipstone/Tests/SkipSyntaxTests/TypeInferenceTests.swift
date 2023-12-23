@@ -1089,4 +1089,22 @@ final class TypeInferenceTests: XCTestCase {
         internal fun <D> f(s: S<D>): Unit = s.doSomething()
         """)
     }
+
+    func testExtensionOfUnknownTypeReference() async throws {
+        try await check(supportingSwift: """
+        extension Modifier {
+            static func ext() -> Int {
+                return 0
+            }
+        }
+        """, swift: """
+        func f() {
+            let m = Modifier.ext()
+        }
+        """, kotlin: """
+        internal fun f() {
+            val m = Modifier.ext()
+        }
+        """)
+    }
 }

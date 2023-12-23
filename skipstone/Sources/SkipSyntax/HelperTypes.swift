@@ -71,7 +71,7 @@ struct APIFlags: OptionSet, Hashable, Codable {
 }
 
 /// Function argument value information.
-struct ArgumentValue {
+struct ArgumentValue: Hashable {
     var type: TypeSignature
     var isLiteral = false
     var isInterpolated = false
@@ -658,6 +658,9 @@ struct IdentifierPattern {
 struct LabeledValue<V> {
     var label: String?
     var value: V
+}
+
+extension LabeledValue: Equatable, Hashable where V: Equatable, V: Hashable {
 }
 
 /// Member and type modifiers.

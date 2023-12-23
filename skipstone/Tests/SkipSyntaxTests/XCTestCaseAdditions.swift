@@ -185,28 +185,31 @@ extension XCTestCase {
     /// Checks that the given Swift generates a message when transpiled.
     public func checkProducesMessage(preflight: Bool = false, swift: String) async throws {
         let tmpFile = try tmpFile(named: "Source.swift", contents: swift)
-        let messages = try await transpile(preflight: preflight, file: tmpFile)
+        let messages = try await transpile(preflight: preflight, files: [tmpFile])
         XCTAssertTrue(!messages.isEmpty)
         messages.forEach { print("Received expected message: \($0)") }
     }
 
     /// Transpiles the code without performing checks, e.g. for performance profiling.
-    @discardableResult public func transpile(preflight: Bool = false, file: URL) async throws -> [Message] {
-        let srcFile = Source.FilePath(path: file.absoluteURL.path)
+    @discardableResult public func transpile(preflight: Bool = false, files: [URL], dependentModules: [CodebaseInfo.ModuleExport] = []) async throws -> [Message] {
+        let srcFiles = files.map { Source.FilePath(path: $0.absoluteURL.path) }
+        let transformers = builtinKotlinTransformers()
         var messages: [Message] = []
         if preflight {
-            let source = try Source(file: srcFile)
-            let syntaxTree = SyntaxTree(source: source, unavailableAPI: KotlinUnavailableAPI())
-            let transformers = builtinKotlinTransformers()
-            transformers.forEach { $0.gather(from: syntaxTree) }
-            transformers.forEach { $0.prepareForUse(codebaseInfo: nil) }
-            let translator = KotlinTranslator(syntaxTree: syntaxTree)
-            let kotlinTree = translator.translateSyntaxTree()
-            transformers.forEach { $0.apply(to: kotlinTree, translator: translator) }
-            messages += kotlinTree.messages + transformers.flatMap { $0.messages(for: srcFile) }
+            for srcFile in srcFiles {
+                let source = try Source(file: srcFile)
+                let syntaxTree = SyntaxTree(source: source, unavailableAPI: KotlinUnavailableAPI())
+                transformers.forEach { $0.gather(from: syntaxTree) }
+                transformers.forEach { $0.prepareForUse(codebaseInfo: nil) }
+                let translator = KotlinTranslator(syntaxTree: syntaxTree)
+                let kotlinTree = translator.translateSyntaxTree()
+                transformers.forEach { $0.apply(to: kotlinTree, translator: translator) }
+                messages += kotlinTree.messages + transformers.flatMap { $0.messages(for: srcFile) }
+            }
         } else {
             let codebaseInfo = CodebaseInfo()
-            let tp = Transpiler(sourceFiles: [srcFile], codebaseInfo: codebaseInfo, transformers: builtinKotlinTransformers())
+            codebaseInfo.dependentModules = dependentModules
+            let tp = Transpiler(sourceFiles: srcFiles, codebaseInfo: codebaseInfo, transformers: transformers)
             try await tp.transpile { transpilation in
                 messages += transpilation.messages
             }
