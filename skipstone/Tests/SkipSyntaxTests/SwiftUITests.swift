@@ -1161,6 +1161,49 @@ final class SwiftUITests: XCTestCase {
         """)
     }
 
+    func testBindingToBinding() async throws {
+        try await check(supportingSwift: baseSupportingSwift + """
+        struct S {
+            var text = ""
+        }
+        """, swift: """
+        import SwiftUI
+        struct V: View {
+            @Binding var s: S
+            var body: some View {
+                TextField("", text: $s.text)
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
+
+        import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
+        internal class V: View {
+            internal var s: S
+                get() = _s.wrappedValue.sref({ this.s = it })
+                set(newValue) {
+                    _s.wrappedValue = newValue.sref()
+                }
+            internal var _s: Binding<S>
+            override fun body(): View {
+                return ComposeView { composectx: ComposeContext -> TextField("", text = Binding({ _s.wrappedValue.text }, { it -> _s.wrappedValue.text = it })).Compose(composectx) }
+            }
+
+            constructor(s: Binding<S>) {
+                this._s = s
+            }
+        }
+        """)
+    }
+
     func testBindable() async throws {
         try await check(supportingSwift: baseSupportingSwift, swift: """
         import SwiftUI
