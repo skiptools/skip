@@ -36,8 +36,6 @@ jobs:
     env:     
       DEVELOPER_DIR: /Applications/Xcode_15.0.app/Contents/Developer
     steps:
-      - run: brew update
-
       - run: brew install skiptools/skip/skip
 
       - uses: actions/checkout@v4
@@ -75,8 +73,14 @@ jobs:
         # "null cannot be cast to non-null type kotlin.String"
         run: test ! -d Tests || skip test || skip test -v
 
-      - name: Build ipa
+      - name: Build iOS ipa
         run: |
+          if [ -f "Darwin/fastlane/Fastfile" ]; then
+            cd Darwin/
+            #fastlane ios assemble
+            cd -
+          fi
+
           mkdir -p ${RELDIR}
           APPARTIFACT="${SKIP_MODULE}"
           #export NOSKIP=1
@@ -96,18 +100,20 @@ jobs:
             cp -av "${ARCHIVE_PATH}/Products/${APPARTIFACT}-${CONFIGURATION}.ipa" ${RELDIR}/
           done
 
-      - name: Build apk
+      - name: Build Android apk
         run: |
-          #skip gradle -p Android assemble
-          for CONFIGURATION in "Release" "Debug"; do
-            xcodebuild -project Darwin/${SKIP_MODULE}.xcodeproj -derivedDataPath .build/Darwin/DerivedData -skipPackagePluginValidation -configuration "${CONFIGURATION}" -destination "platform=macosx" -scheme "${SKIP_MODULE}" build SKIP_ACTION=assemble
-          done
+          if [ -f "Android/fastlane/Fastfile" ]; then
+            cd Android/
+            #fastlane android assemble
+            cd -
+          fi
 
+          skip gradle -p Android assemble
           cp -av .build/Android/app/outputs/apk/*/*.apk ${RELDIR}/
           ls -la ${RELDIR}/
           shasum -a 256 ${RELDIR}/*.apk
 
-      - name: Assemble Swift Source
+      - name: Archive Swift Source
         run: |
           # create the source zip file with predictable timestamps for reproducibility
           find . -exec touch -d "${COMMIT_DATE:0:19}" {} \;
@@ -124,7 +130,7 @@ jobs:
           #skip app create --template-file "${TEMPLATE_FILE}" --build --test $(mktemp -d)
 
 
-      - name: Assemble Kotlin Source
+      - name: Archive Kotlin Source
         run: |
           cd .build/Darwin/DerivedData/SourcePackages/plugins/*.output/${SKIP_MODULE}*/skipstone/
           rm -rf .gradle .build */.build
