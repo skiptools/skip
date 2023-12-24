@@ -132,7 +132,8 @@ jobs:
 
       - name: Archive Kotlin Source
         run: |
-          cd .build/Darwin/DerivedData/SourcePackages/plugins/*.output/${SKIP_MODULE}*/skipstone/
+          #cd .build/Darwin/DerivedData/SourcePackages/plugins/*.output/${SKIP_MODULE}*/skipstone/
+          cd .build/plugins/outputs/*/${SKIP_MODULE}/skipstone/
           rm -rf .gradle .build */.build
           # create the zip file with predictable timestamps for reproducibility
           find . -exec touch -d "${COMMIT_DATE:0:19}" {} \;
