@@ -122,6 +122,7 @@ class KotlinCodeBlock: KotlinStatement, KotlinSingleStatementAppendable {
         var sref = false
         var throwIfNull = false
         var returnRequired = false
+        var returnValue: KotlinExpression? = nil
         var onUpdate: (() -> String)? = nil
         switch expectedReturn {
         case .no:
@@ -139,6 +140,10 @@ class KotlinCodeBlock: KotlinStatement, KotlinSingleStatementAppendable {
             returnRequired = true
         case .throwIfNull:
             throwIfNull = true
+        case .value(let value, let asReturn, let valueLabel):
+            returnValue = value
+            returnRequired = asReturn
+            label = valueLabel
         }
 
         var didFindReturn = false
@@ -176,6 +181,11 @@ class KotlinCodeBlock: KotlinStatement, KotlinSingleStatementAppendable {
                     } else if sref {
                         returnStatement.expression = returnStatement.expression?.sref(onUpdate: onUpdate)
                     }
+                    if let returnValue, returnStatement.expression == nil {
+                        let expression: KotlinExpression = returnValue.parent == nil ? returnValue : KotlinSharedExpressionPointer(shared: returnValue)
+                        returnStatement.expression = expression
+                        expression.parent = returnStatement
+                    }
                     return .skip
                 case .functionDeclaration:
                     // Skip embedded functions that may have their own returns
@@ -191,11 +201,30 @@ class KotlinCodeBlock: KotlinStatement, KotlinSingleStatementAppendable {
                 return .recurse(nil)
             }
         }
+
+        // If we must return a certain value, add a return statement at the end if needed
+        if let returnValue {
+            if statements.last?.type != .return {
+                let expression: KotlinExpression = returnValue.parent == nil ? returnValue : KotlinSharedExpressionPointer(shared: returnValue)
+                let statement: KotlinStatement
+                if returnRequired {
+                    let returnStatement = KotlinReturn(expression: expression)
+                    returnStatement.label = label
+                    statement = returnStatement
+                } else {
+                    statement = KotlinExpressionStatement(expression: expression)
+                }
+                expression.parent = statement
+                statements.append(statement)
+                statement.parent = self
+            }
+            return didFindReturn
+        }
+
+        // Otherwise if this was an implicit return, replace it with an explicit one if a return is required
         if didFindReturn {
             return true
         }
-
-        // If this was an implicit return, replace it with an explicit one if a return is required
         guard returnRequired, statements.count == 1, statements[0].type == .expression, let expressionStatement = statements[0] as? KotlinExpressionStatement, var expression = expressionStatement.expression else {
             return false
         }
@@ -642,8 +671,8 @@ class KotlinReturn: KotlinExpressionStatement {
         return kstatement
     }
 
-    init(expression: KotlinExpression) {
-        super.init(type: .return, sourceFile: expression.sourceFile, sourceRange: expression.sourceRange)
+    override init(expression: KotlinExpression?) {
+        super.init(type: .return, sourceFile: expression?.sourceFile, sourceRange: expression?.sourceRange)
         self.expression = expression
     }
 

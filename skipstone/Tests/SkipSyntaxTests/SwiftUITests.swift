@@ -1734,6 +1734,18 @@ final class SwiftUITests: XCTestCase {
                     }
                     return .ok
                 }
+                ComposeView { _ in
+                    androidx.compose.Text("y")
+                }
+                ComposeView(content: { _ in androidx.compose.Text("y") })
+                ComposeView { context in
+                    if true { return }
+                    if false {
+                        androidx.compose.Text("y")
+                    } else {
+                        androidx.compose.Text("y")
+                    }
+                }
             }
         }
         """, kotlin: """
@@ -1754,6 +1766,25 @@ final class SwiftUITests: XCTestCase {
                     Text("x").Compose(composectx)
                     ComposeView l@{ it ->
                         androidx.compose.Column(modifier = it.modifier) { androidx.compose.Text("y") }
+                        return@l ComposeResult.ok
+                    }.Compose(composectx)
+                    ComposeView { _ ->
+                        androidx.compose.Text("y")
+                        ComposeResult.ok
+                    }.Compose(composectx)
+                    ComposeView(content = { _ ->
+                        androidx.compose.Text("y")
+                        ComposeResult.ok
+                    }).Compose(composectx)
+                    ComposeView l@{ context ->
+                        if (true) {
+                            return@l ComposeResult.ok
+                        }
+                        if (false) {
+                            androidx.compose.Text("y")
+                        } else {
+                            androidx.compose.Text("y")
+                        }
                         return@l ComposeResult.ok
                     }.Compose(composectx)
                     ComposeResult.ok

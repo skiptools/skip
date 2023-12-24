@@ -23,7 +23,8 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             }
         }
         if needsTranslation {
-            syntaxTree.root.visit { translateVisit($0, translator: translator) }
+            let visitor = TranslateVisitor(translator: translator)
+            syntaxTree.root.visit(perform: visitor.visit)
         }
     }
 
@@ -61,46 +62,65 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         return classDeclaration
     }
 
-    private static func isSwiftUIType(named: String, declaration: KotlinClassDeclaration? = nil, type: TypeSignature, codebaseInfo: CodebaseInfo.Context?) -> Bool {
-        if let declaration, declaration.inherits.contains(where: { $0.isNamed(named, moduleName: "SwiftUI", generics: []) }) {
-            return true
-        }
-        guard let codebaseInfo else {
-            return false
-        }
-        return type.isNamedType && codebaseInfo.global.protocolSignatures(forNamed: type)
-                .contains { $0.isNamed(named, moduleName: "SwiftUI") }
+    private func addKotlinComposeDependencies(to syntaxTree: KotlinSyntaxTree) {
+        syntaxTree.dependencies.imports.insert("androidx.compose.runtime.Composable")
+        syntaxTree.dependencies.imports.insert("androidx.compose.runtime.getValue")
+        syntaxTree.dependencies.imports.insert("androidx.compose.runtime.mutableStateOf")
+        syntaxTree.dependencies.imports.insert("androidx.compose.runtime.remember")
+        syntaxTree.dependencies.imports.insert("androidx.compose.runtime.setValue")
+        syntaxTree.dependencies.imports.insert("androidx.compose.runtime.saveable.rememberSaveable")
+        syntaxTree.dependencies.imports.insert("androidx.compose.runtime.saveable.Saver")
+    }
+}
+
+private func isSwiftUIType(named: String, declaration: KotlinClassDeclaration? = nil, type: TypeSignature, codebaseInfo: CodebaseInfo.Context?) -> Bool {
+    if let declaration, declaration.inherits.contains(where: { $0.isNamed(named, moduleName: "SwiftUI", generics: []) }) {
+        return true
+    }
+    guard let codebaseInfo else {
+        return false
+    }
+    return type.isNamedType && codebaseInfo.global.protocolSignatures(forNamed: type)
+            .contains { $0.isNamed(named, moduleName: "SwiftUI") }
+}
+
+private class TranslateVisitor {
+    private let translator: KotlinTranslator
+    private var composeViewIdentifiers: Set<ObjectIdentifier> = []
+
+    init(translator: KotlinTranslator) {
+        self.translator = translator
     }
 
-    private func translateVisit(_ node: KotlinSyntaxNode, translator: KotlinTranslator) -> VisitResult<KotlinSyntaxNode> {
+    func visit(_ node: KotlinSyntaxNode) -> VisitResult<KotlinSyntaxNode> {
         if let classDeclaration = node as? KotlinClassDeclaration {
-            if omitPreviewProvider(classDeclaration, codebaseInfo: translator.codebaseInfo) {
+            if omitPreviewProvider(classDeclaration) {
                 return .skip
             } else {
-                translateClassDeclaration(classDeclaration, translator: translator)
+                translateClassDeclaration(classDeclaration)
             }
         } else if let functionDeclaration = node as? KotlinFunctionDeclaration {
             if functionDeclaration.type == .constructorDeclaration {
-                translateConstructorDeclaration(functionDeclaration, translator: translator)
+                translateConstructorDeclaration(functionDeclaration)
             } else {
-                translateFunctionDeclaration(functionDeclaration, translator: translator)
+                translateFunctionDeclaration(functionDeclaration)
             }
         } else if let variableDeclaration = node as? KotlinVariableDeclaration {
-            translateVariableDeclaration(variableDeclaration, translator: translator)
+            translateVariableDeclaration(variableDeclaration)
         } else if let closure = node as? KotlinClosure {
-            translateClosure(closure, translator: translator)
+            translateClosure(closure)
         } else if let functionCall = node as? KotlinFunctionCall {
-            translateFunctionCallParameters(functionCall, translator: translator)
+            translateFunctionCall(functionCall)
         }
         return .recurse(nil)
     }
 
-    private func omitPreviewProvider(_ classDeclaration: KotlinClassDeclaration, codebaseInfo: CodebaseInfo.Context?) -> Bool {
+    private func omitPreviewProvider(_ classDeclaration: KotlinClassDeclaration) -> Bool {
         // The most common thing in a SwiftUI file will be Views, so do a quick exclusion
-        guard !Self.isSwiftUIType(named: "View", declaration: classDeclaration, type: classDeclaration.signature, codebaseInfo: codebaseInfo) else {
+        guard !isSwiftUIType(named: "View", declaration: classDeclaration, type: classDeclaration.signature, codebaseInfo: translator.codebaseInfo) else {
             return false
         }
-        guard Self.isSwiftUIType(named: "PreviewProvider", declaration: classDeclaration, type: classDeclaration.signature, codebaseInfo: codebaseInfo) else {
+        guard isSwiftUIType(named: "PreviewProvider", declaration: classDeclaration, type: classDeclaration.signature, codebaseInfo: translator.codebaseInfo) else {
             return false
         }
         guard let parentStatement = classDeclaration.parent as? KotlinStatement else {
@@ -110,7 +130,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         return true
     }
 
-    private func translateClassDeclaration(_ classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) {
+    private func translateClassDeclaration(_ classDeclaration: KotlinClassDeclaration) {
         var environmentKeyIndex: Int? = nil
         for i in 0..<classDeclaration.inherits.count {
             if classDeclaration.inherits[i].isNamed("EnvironmentKey", moduleName: "SwiftUI") {
@@ -138,9 +158,9 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         classDeclaration.companionInherits.append(.named("EnvironmentKeyCompanion", [defaultValueDeclaration.propertyType]))
     }
 
-    private func translateConstructorDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, translator: KotlinTranslator) {
+    private func translateConstructorDeclaration(_ functionDeclaration: KotlinFunctionDeclaration) {
         // Only need to consider Views
-        guard let classDeclaration = functionDeclaration.parent as? KotlinClassDeclaration, Self.isSwiftUIType(named: "View", declaration: classDeclaration, type: classDeclaration.signature, codebaseInfo: translator.codebaseInfo) || Self.isSwiftUIType(named: "ViewModifier", type: classDeclaration.signature, codebaseInfo: translator.codebaseInfo) else {
+        guard let classDeclaration = functionDeclaration.parent as? KotlinClassDeclaration, isSwiftUIType(named: "View", declaration: classDeclaration, type: classDeclaration.signature, codebaseInfo: translator.codebaseInfo) || isSwiftUIType(named: "ViewModifier", type: classDeclaration.signature, codebaseInfo: translator.codebaseInfo) else {
             return
         }
 
@@ -189,33 +209,51 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         return nil
     }
 
-    private func translateFunctionDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, translator: KotlinTranslator) {
-        if let viewModifierDeclaration = Self.viewModifierForBody(functionDeclaration, codebaseInfo: translator.codebaseInfo) {
+    private func translateFunctionDeclaration(_ functionDeclaration: KotlinFunctionDeclaration) {
+        if let viewModifierDeclaration = KotlinSwiftUITransformer.viewModifierForBody(functionDeclaration, codebaseInfo: translator.codebaseInfo) {
             functionDeclaration.apiFlags.insert(.viewBuilder)
             // We perform our ViewModifier transformations when we find the body
-            transform(classDeclaration: viewModifierDeclaration, isModifier: true, body: functionDeclaration, translator: translator)
+            transform(classDeclaration: viewModifierDeclaration, isModifier: true, body: functionDeclaration)
         } else if !functionDeclaration.apiFlags.contains(.viewBuilder) {
             return
         }
         if let body = functionDeclaration.body {
-            functionDeclaration.body = translateViewBuilder(codeBlock: body, translator: translator)
+            functionDeclaration.body = translateViewBuilder(codeBlock: body)
             functionDeclaration.body?.parent = functionDeclaration
         }
     }
     
-    private func translateClosure(_ closure: KotlinClosure, translator: KotlinTranslator) {
+    private func translateClosure(_ closure: KotlinClosure) {
         guard closure.apiFlags?.contains(.viewBuilder) == true else {
             return
         }
-        closure.body = translateViewBuilder(codeBlock: closure.body, fromClosure: closure, translator: translator)
+        closure.body = translateViewBuilder(codeBlock: closure.body, fromClosure: closure)
         closure.body.parent = closure
     }
     
-    private func translateFunctionCallParameters(_ functionCall: KotlinFunctionCall, translator: KotlinTranslator) {
+    private func translateFunctionCall(_ functionCall: KotlinFunctionCall) {
+        // Make sure ComposeView { ... } calls return a ComposeResult from their closures
+        let isComposeViewCall: Bool
+        if let memberAccess = functionCall.function as? KotlinMemberAccess, memberAccess.member == "ComposeView", (memberAccess.base as? KotlinIdentifier)?.name == "SwiftUI" {
+            isComposeViewCall = true
+        } else if (functionCall.function as? KotlinIdentifier)?.name == "ComposeView" {
+            isComposeViewCall = true
+        } else {
+            isComposeViewCall = false
+        }
+        if isComposeViewCall, functionCall.arguments.count == 1, let composeClosure = functionCall.arguments[0].value as? KotlinClosure {
+            // We use an anonymous function when the return type is specified, so should already be returning a ComposeResult
+            if !composeClosure.isAnonymousFunction, !composeViewIdentifiers.contains(ObjectIdentifier(functionCall)) {
+                let returnValue = KotlinRawExpression(sourceCode: "ComposeResult.ok")
+                composeClosure.body.updateWithExpectedReturn(.value(returnValue, asReturn: composeClosure.hasReturnLabel, label: KotlinClosure.returnLabel))
+            }
+            return
+        }
+
         // Translate .environment(\.keyPath, value) calls. The key path will have been transpiled
         // to a closure that reads the named property, but we want to set it in EnvironmentValues
         if (functionCall.function as? KotlinMemberAccess)?.member == "environment" || (functionCall.function as? KotlinIdentifier)?.name == "environment", functionCall.arguments.count == 2, let keyPath = functionCall.arguments[0].value as? KotlinKeyPathLiteral {
-            updateEnvironmentFunctionCallParameters(for: keyPath, in: functionCall, codebaseInfo: translator.codebaseInfo)
+            updateEnvironmentFunctionCallParameters(for: keyPath, in: functionCall)
             return
         }
 
@@ -231,17 +269,17 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             guard closure.apiFlags?.contains(.viewBuilder) != true else {
                 continue
             }
-            closure.body = translateViewBuilder(codeBlock: closure.body, fromClosure: closure, translator: translator)
+            closure.body = translateViewBuilder(codeBlock: closure.body, fromClosure: closure)
             closure.body.parent = closure
         }
     }
     
-    private func translateVariableDeclaration(_ statement: KotlinVariableDeclaration, translator: KotlinTranslator) {
+    private func translateVariableDeclaration(_ statement: KotlinVariableDeclaration) {
         var viewBuilder: KotlinCodeBlock? = nil
-        if let viewDeclaration = Self.viewForBody(statement, codebaseInfo: translator.codebaseInfo) {
+        if let viewDeclaration = KotlinSwiftUITransformer.viewForBody(statement, codebaseInfo: translator.codebaseInfo) {
             statement.apiFlags.insert(.viewBuilder)
             // We perform our View transformations when we find the body
-            transform(classDeclaration: viewDeclaration, body: statement, translator: translator)
+            transform(classDeclaration: viewDeclaration, body: statement)
             viewBuilder = statement.getter?.body
         } else if statement.apiFlags.contains(.viewBuilder) {
             viewBuilder = statement.getter?.body
@@ -251,13 +289,13 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             translateEnvironmentValue(statement)
         }
         if let viewBuilder {
-            statement.getter?.body = translateViewBuilder(codeBlock: viewBuilder, translator: translator)
+            statement.getter?.body = translateViewBuilder(codeBlock: viewBuilder)
             statement.getter?.body?.parent = statement
         }
     }
 
     /// Perform `View` and `ViewModifier` transformations.
-    private func transform(classDeclaration: KotlinClassDeclaration, isModifier: Bool = false, body: KotlinStatement, translator: KotlinTranslator) {
+    private func transform(classDeclaration: KotlinClassDeclaration, isModifier: Bool = false, body: KotlinStatement) {
         let variableDeclarations = classDeclaration.members.compactMap { $0 as? KotlinVariableDeclaration }
         let stateVariables = variableDeclarations.filter { $0.attributes.contains(.state) || $0.attributes.contains(.stateObject) }
         let environmentVariables = variableDeclarations.filter { $0.attributes.contains(.environment) || $0.attributes.contains(.environmentObject) }
@@ -265,7 +303,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         let bindableVariables = variableDeclarations.filter { $0.attributes.contains(.bindable) || $0.attributes.contains(.observedObject) }
         let appStorageVariables = variableDeclarations.filter { $0.attributes.contains(.appStorage) }
         if !stateVariables.isEmpty || !bindableVariables.isEmpty || !environmentVariables.isEmpty || !appStorageVariables.isEmpty {
-            let composeFunction = synthesizeComposeFunction(isModifier: isModifier, stateVariables: stateVariables, bindableVariables: bindableVariables, environmentVariables: environmentVariables, appStorageVariables: appStorageVariables, translator: translator)
+            let composeFunction = synthesizeComposeFunction(isModifier: isModifier, stateVariables: stateVariables, bindableVariables: bindableVariables, environmentVariables: environmentVariables, appStorageVariables: appStorageVariables)
             classDeclaration.insert(statements: [composeFunction], after: body)
 
             for stateVariable in stateVariables {
@@ -273,18 +311,18 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             }
         }
         for bindingVariable in bindingVariables {
-            synthesizeBindingBacking(variable: bindingVariable, source: translator.syntaxTree.source)
+            synthesizeBindingBacking(variable: bindingVariable)
         }
         for bindableVariable in bindableVariables {
             synthesizeStateBacking(variable: bindableVariable, propertyWrapperTypeName: "skip.ui.Bindable")
         }
         for appStorageVariable in appStorageVariables {
-            synthesizeAppStorageBacking(variable: appStorageVariable, source: translator.syntaxTree.source)
+            synthesizeAppStorageBacking(variable: appStorageVariable)
         }
     }
 
     /// Create an override of the SkipUI `Compose` function on views and modifiers to handle state synchronization, etc.
-    private func synthesizeComposeFunction(isModifier: Bool, stateVariables: [KotlinVariableDeclaration], bindableVariables: [KotlinVariableDeclaration], environmentVariables: [KotlinVariableDeclaration], appStorageVariables: [KotlinVariableDeclaration], translator: KotlinTranslator) -> KotlinStatement {
+    private func synthesizeComposeFunction(isModifier: Bool, stateVariables: [KotlinVariableDeclaration], bindableVariables: [KotlinVariableDeclaration], environmentVariables: [KotlinVariableDeclaration], appStorageVariables: [KotlinVariableDeclaration]) -> KotlinStatement {
         let composeFunction = KotlinFunctionDeclaration(name: isModifier ? "Compose" : "ComposeContent")
         composeFunction.modifiers.visibility = .public
         composeFunction.modifiers.isOverride = true
@@ -314,7 +352,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             composeBodyStatements += statements
         }
         for i in 0..<environmentVariables.count {
-            guard let statement = synthesizeEnvironmentSync(variable: environmentVariables[i], translator: translator) else {
+            guard let statement = synthesizeEnvironmentSync(variable: environmentVariables[i]) else {
                 continue
             }
             if i == 0 && !composeBodyStatements.isEmpty {
@@ -369,11 +407,11 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
     }
 
     /// Create code to initialize an environment variable.
-    private func synthesizeEnvironmentSync(variable: KotlinVariableDeclaration, translator: KotlinTranslator) -> KotlinStatement? {
+    private func synthesizeEnvironmentSync(variable: KotlinVariableDeclaration) -> KotlinStatement? {
         let entry: (key: String, type: TypeSignature?, isObject: Bool)
         if let environment = (variable.attributes.of(kind: .environment) + variable.attributes.of(kind: .environmentObject)).first {
             let rawKey = environment.tokens.first ?? ""
-            if let environmentEntry = environmentEntry(for: variable, key: rawKey, codebaseInfo: translator.codebaseInfo) {
+            if let environmentEntry = environmentEntry(for: variable, key: rawKey) {
                 entry = environmentEntry
             } else {
                 variable.messages.append(.kotlinEnvironmentKeyType(variable, source: translator.syntaxTree.source))
@@ -423,7 +461,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
     }
 
     /// Given a Swift `@Environment` property wrapper key, return the Kotlin key and the expected value type.
-    private func environmentEntry(for variableDeclaration: KotlinVariableDeclaration, key: String, codebaseInfo: CodebaseInfo.Context?) -> (key: String, type: TypeSignature?, isObject: Bool)? {
+    private func environmentEntry(for variableDeclaration: KotlinVariableDeclaration, key: String) -> (key: String, type: TypeSignature?, isObject: Bool)? {
         if key.isEmpty {
             let type = variableDeclaration.declaredType
             return type == .none ? nil : (type.kotlin + "::class", type, true)
@@ -439,7 +477,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             } else {
                 return nil
             }
-            let type = codebaseInfo?.matchIdentifier(name: propertyName, inConstrained: .named("EnvironmentValues", []))?.signature
+            let type = translator.codebaseInfo?.matchIdentifier(name: propertyName, inConstrained: .named("EnvironmentValues", []))?.signature
             return (propertyName, type, false)
         }
     }
@@ -479,10 +517,10 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
     }
 
     /// Create the extra property synthesized for `@Binding` variables.
-    private func synthesizeBindingBacking(variable: KotlinVariableDeclaration, source: Source) {
+    private func synthesizeBindingBacking(variable: KotlinVariableDeclaration) {
         let propertyType = variable.declaredType == .none ? variable.propertyType : variable.declaredType
         if propertyType == .none {
-            variable.messages.append(.kotlinVariableNeedsTypeDeclaration(variable, source: source))
+            variable.messages.append(.kotlinVariableNeedsTypeDeclaration(variable, source: translator.syntaxTree.source))
         }
 
         // Tell the @Binding variable to get and set its value using _variable of type Binding
@@ -509,7 +547,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
     }
 
     /// Create the additional property synthesized for `@AppStorage` variables.
-    private func synthesizeAppStorageBacking(variable: KotlinVariableDeclaration, source: Source) {
+    private func synthesizeAppStorageBacking(variable: KotlinVariableDeclaration) {
         // Tell the @AppStorage variable to get and set its value using _variable of type AppStorage
         let storageName = "_\(variable.propertyName)"
         var storage = KotlinVariableStorage()
@@ -534,11 +572,11 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
                 output.append(" = skip.ui.AppStorage(")
                 value.append(to: output, indentation: indentation)
                 output.append(", ")
-                output.append(Self.appStorageAdditionalInitParameters(for: variable))
+                output.append(KotlinSwiftUITransformer.appStorageAdditionalInitParameters(for: variable))
                 output.append(")")
             } else if variable.propertyType.isOptional {
                 output.append(" = skip.ui.AppStorage(null, ")
-                output.append(Self.appStorageAdditionalInitParameters(for: variable))
+                output.append(KotlinSwiftUITransformer.appStorageAdditionalInitParameters(for: variable))
                 output.append(")")
             }
             output.append("\n")
@@ -546,7 +584,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         variable.storage = storage
     }
 
-    private func translateViewBuilder(codeBlock: KotlinCodeBlock, fromClosure closure: KotlinClosure? = nil, translator: KotlinTranslator) -> KotlinCodeBlock {
+    private func translateViewBuilder(codeBlock: KotlinCodeBlock, fromClosure closure: KotlinClosure? = nil) -> KotlinCodeBlock {
         // Add tail calls to compose the views that SwiftUI would build into a TupleView
         codeBlock.visit { node in
             if node is KotlinFunctionDeclaration || node is KotlinClosure {
@@ -565,7 +603,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             } else if let apiCall = node as? APICallExpression, let expressionStatement = node.parent as? KotlinExpressionStatement, !isInAssignmentExpression(expressionStatement, in: codeBlock) {
                 // Add our compose tail call to expressions that evaluate to Views and are used as statements
                 if let apiMatch = apiCall.apiMatch {
-                    if Self.isSwiftUIType(named: "View", type: apiMatch.signature, codebaseInfo: translator.codebaseInfo) || Self.isSwiftUIType(named: "View", type: apiMatch.signature.returnType, codebaseInfo: translator.codebaseInfo) {
+                    if isSwiftUIType(named: "View", type: apiMatch.signature, codebaseInfo: translator.codebaseInfo) || isSwiftUIType(named: "View", type: apiMatch.signature.returnType, codebaseInfo: translator.codebaseInfo) {
                         addComposeTailCall(to: node as! KotlinExpression, statement: expressionStatement)
                     }
                 } else {
@@ -596,8 +634,11 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         composingClosure.hasReturnLabel = needsReturnLabel
         let composingArgument = LabeledValue<KotlinExpression>(value: composingClosure)
         let composingFunction = KotlinIdentifier(name: "ComposeView")
+        
         let composingFunctionCall = KotlinFunctionCall(function: composingFunction, arguments: [composingArgument])
         composingFunctionCall.hasTrailingClosures = true
+        // Track the ComposeView calls we add so that we don't process them when adding returns to ComposeView calls
+        composeViewIdentifiers.insert(ObjectIdentifier(composingFunctionCall))
 
         let returnStatement: KotlinStatement = closure == nil ? KotlinReturn(expression: composingFunctionCall) : KotlinExpressionStatement(expression: composingFunctionCall)
         let composingCodeBlock = KotlinCodeBlock(statements: [returnStatement])
@@ -651,7 +692,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         (statement.parent as? KotlinStatement)?.insert(statements: [setFunction], after: statement)
     }
 
-    private func updateEnvironmentFunctionCallParameters(for keyPath: KotlinKeyPathLiteral, in functionCall: KotlinFunctionCall, codebaseInfo: CodebaseInfo.Context?) {
+    private func updateEnvironmentFunctionCallParameters(for keyPath: KotlinKeyPathLiteral, in functionCall: KotlinFunctionCall) {
         guard keyPath.components.count == 1, case .property(let property) = keyPath.components[0] else {
             return
         }
@@ -664,22 +705,12 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         closure.parent = functionCall
         functionCall.arguments[0] = LabeledValue(label: functionCall.arguments[0].label, value: closure)
 
-        guard let memberAccess = functionCall.arguments[1].value as? KotlinMemberAccess, memberAccess.baseType == .none || memberAccess.baseType == .any, let codebaseInfo else {
+        guard let memberAccess = functionCall.arguments[1].value as? KotlinMemberAccess, memberAccess.baseType == .none || memberAccess.baseType == .any, let codebaseInfo = translator.codebaseInfo else {
             return
         }
         // Attempt to fill in the base type using the EnvironmentValues property being accessed
         if let match = codebaseInfo.matchIdentifier(name: property, inConstrained: .named("EnvironmentValues", [])) {
             memberAccess.baseType = match.signature
         }
-    }
-
-    private func addKotlinComposeDependencies(to syntaxTree: KotlinSyntaxTree) {
-        syntaxTree.dependencies.imports.insert("androidx.compose.runtime.Composable")
-        syntaxTree.dependencies.imports.insert("androidx.compose.runtime.getValue")
-        syntaxTree.dependencies.imports.insert("androidx.compose.runtime.mutableStateOf")
-        syntaxTree.dependencies.imports.insert("androidx.compose.runtime.remember")
-        syntaxTree.dependencies.imports.insert("androidx.compose.runtime.setValue")
-        syntaxTree.dependencies.imports.insert("androidx.compose.runtime.saveable.rememberSaveable")
-        syntaxTree.dependencies.imports.insert("androidx.compose.runtime.saveable.Saver")
     }
 }

@@ -36,6 +36,8 @@ enum KotlinExpectedReturn {
     case sref((() -> String)?)
     /// Convert any null return to our Kotlin `NullReturnException`.
     case throwIfNull
+    /// Return the given value if there isn't already an explicit value being returned.
+    case value(KotlinExpression, asReturn: Bool, label: String?)
 }
 
 /// Metadata about the placement of a Kotlin extension.
