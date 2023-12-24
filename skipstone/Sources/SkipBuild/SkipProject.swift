@@ -1852,7 +1852,7 @@ extension FrameworkProjectLayout {
     }
     static func defaultProguardContents() -> String {
         """
-        -keep class skip.** { *; }
+        #-keep class skip.** { *; }
         """
     }
 
@@ -1867,11 +1867,11 @@ extension FrameworkProjectLayout {
     }
 
     /// the Gradle version string to generate
-    static let gradleVersion = "8.4"
+    static let gradleVersion = "8.5"
 
     static func defaultGradleWrapperProperties() -> String {
         """
-        distributionUrl=https\\://services.gradle.org/distributions/gradle-\(gradleVersion)-all.zip
+        distributionUrl=https\\://services.gradle.org/distributions/gradle-\(gradleVersion)-bin.zip
 
         """
     }
