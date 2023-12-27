@@ -14,6 +14,9 @@ let skipcodeExtension = ".skipcode.json"
 struct TranspileCommand: TranspilePhase, StreamingCommand {
     static var configuration = CommandConfiguration(commandName: "transpile", abstract: "Transpile Swift to Kotlin", shouldDisplay: false)
 
+    /// The `ENABLE_PREVIEW` parameter specifies whether we are building for previews
+    static let enablePreviews = ProcessInfo.processInfo.environment["ENABLE_PREVIEWS"] == "YES"
+
     @OptionGroup(title: "Check Options")
     var inputOptions: TranspilerInputOptions
 
@@ -52,6 +55,11 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         #else
         let v = skipVersion
         #endif
+
+        if Self.enablePreviews == true {
+            info("Skip \(v): transpile plugin not running for ENABLE_PREVIEWS=YES")
+            return
+        }
 
         if SkippyCommand.skippyOnly == true {
             info("Skip \(v): transpile plugin not running for CONFIGURATION=Skippy")
