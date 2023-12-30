@@ -205,8 +205,11 @@ import PackagePlugin
                 continue
             }
 
+            let isCmakeProject = FileManager.default.isReadableFile(atPath: depTarget.directory.appending("CMakeLists.txt").string)
+            let hasSkipConfig = FileManager.default.isReadableFile(atPath: depTarget.directory.appending("Skip", "skip.yml").string)
+
             // ignore non-Skip-enabled dependency modules, based on the existance of the SRC/MODULE/Skip/skip.yml file
-            if !FileManager.default.isReadableFile(atPath: depTarget.directory.appending("Skip", "skip.yml").string) {
+            if !hasSkipConfig && !isCmakeProject {
                 continue
             }
 
