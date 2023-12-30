@@ -208,6 +208,7 @@ class FrameworkProjectLayout {
 
                 let testSkipModuleFile = testDir.appending(path: "XCSkipTests.swift")
                 try """
+                import Foundation
                 \(sourceHeader)#if os(macOS) // Skip transpiled tests only run on macOS targets
                 import SkipTest
 
@@ -226,6 +227,16 @@ class FrameworkProjectLayout {
                     }
                 }
                 #endif
+
+                /// True when running in a transpiled Java runtime environment
+                let isJava = ProcessInfo.processInfo.environment["java.io.tmpdir"] != nil
+                /// True when running within an Android environment (either an emulator or device)
+                let isAndroid = isJava && ProcessInfo.processInfo.environment["ANDROID_ROOT"] != nil
+                /// True is the transpiled code is currently running in the local Robolectric test environment
+                let isRobolectric = isJava && !isAndroid
+                /// True if the system's `Int` type is 32-bit.
+                let is32BitInteger = Int64(Int.max) == Int64(Int32.max)
+
                 """.write(to: testSkipModuleFile, atomically: true, encoding: .utf8)
 
                 let skipYamlAppTests = """
