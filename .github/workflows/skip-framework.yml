@@ -20,6 +20,8 @@ jobs:
       - run: skip doctor
 
       - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
 
       - name: Verify Skip Framework
         run: skip verify
