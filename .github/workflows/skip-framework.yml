@@ -32,9 +32,10 @@ jobs:
       - name: Prepare Android emulator
         run: |
           PACKAGE=$(swift package dump-package | jq -r '.name')
-          MODULE=$(swift package dump-package | jq -r '.targets[0].name')
+          MODULE=$(swift package dump-package | jq -r '.targets[] | select(.type == "test") | .name' | head -n 1)
+
           cd .build/
-          ln -vs plugins/outputs/${PACKAGE}/${MODULE}Tests/skipstone android-tests
+          ln -vs plugins/outputs/${PACKAGE}/${MODULE}/skipstone android-tests
           cd android-tests/
           # ensure we can write to the foldr
           chmod -Rf +w .
