@@ -205,10 +205,13 @@ import PackagePlugin
                 continue
             }
 
-            let isCmakeProject = FileManager.default.isReadableFile(atPath: depTarget.directory.appending("CMakeLists.txt").string)
+            // perform special Skip CMAKE support by specifying SKIP_BUILD_CMAKE
+            let isCmakeProject = (depTarget as? ClangSourceModuleTarget)?.publicHeadersDirectory != nil && FileManager.default.isReadableFile(atPath: depTarget.directory.appending("CMakeLists.txt").string)
             let hasSkipConfig = FileManager.default.isReadableFile(atPath: depTarget.directory.appending("Skip", "skip.yml").string)
 
-            // ignore non-Skip-enabled dependency modules, based on the existance of the SRC/MODULE/Skip/skip.yml file
+            // ignore non-Skip-enabled dependency modules, based on the existance of the SRC/MODULE/Skip/skip.yml file,
+            // or if it is a zero-dependency C library.
+            // ideally, we would simply filter out dependencies that don't use the skip plugin, but there's no `plugins` property of PackagePlugin.Target
             if !hasSkipConfig && !isCmakeProject {
                 continue
             }

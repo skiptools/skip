@@ -51,9 +51,9 @@ extension Process {
                     var data: ArraySlice<UInt8> = outputBytes[outputBytes.startIndex...] // turn array into slice
                     while let nl = data.firstIndex(of: separatorCharacter.utf8.first!) {
                         let line = buffer + data[data.startIndex..<nl]
+                        buffer = []
                         continuation.yield(Data(line))
                         data = data[nl...].dropFirst() // continue processing the rest of the buffer
-                        buffer = []
                     }
                     buffer += data
                 }

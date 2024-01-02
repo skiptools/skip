@@ -369,7 +369,7 @@ extension GradleHarness {
         }
 
         guard let exitCode = exitCode, case .terminated(0) = exitCode else {
-            throw AppLaunchError(errorDescription: "Gradle run error: \(String(describing: exitCode))")
+            throw AppLaunchError(errorDescription: "The skip gradle command failed. See the Report navigator build log for details, and consult https://skip.tools/docs/faq for common solutions. Command: gradle \(arguments.joined(separator: " "))")
         }
     }
 
