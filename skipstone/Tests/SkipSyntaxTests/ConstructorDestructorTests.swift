@@ -738,7 +738,9 @@ final class ConstructorDestructorTests: XCTestCase {
                 }
             }
         }
-        internal fun f(): Int = (try { C(param = 0) } catch (_: NullReturnException) { null })?.i ?: -1
+        internal fun f(): Int {
+            return (try { C(param = 0) } catch (_: NullReturnException) { null })?.i ?: -1
+        }
         internal fun g(): C = C(param = 0)
         """)
     }

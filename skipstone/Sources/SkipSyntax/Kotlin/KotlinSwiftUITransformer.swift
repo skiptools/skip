@@ -381,32 +381,28 @@ private class TranslateVisitor {
 
     /// Create code to remember and sync a state variable.
     private func synthesizeStateSync(variable: KotlinVariableDeclaration) -> [KotlinStatement] {
-        let stateValue = KotlinRawStatement(sourceCode: "var state\(variable.propertyName) by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<\(variable.propertyType.kotlin)>, Any>) { mutableStateOf(_\(variable.propertyName)) }")
-        let updateStateValue = KotlinRawStatement(sourceCode: "_\(variable.propertyName) = state\(variable.propertyName)")
-        let initialValue = KotlinRawStatement(sourceCode: "val initial\(variable.propertyName) = _\(variable.propertyName).wrappedValue")
-        let composeValue = KotlinRawStatement(sourceCode: "var compose\(variable.propertyName) by rememberSaveable(stateSaver = composectx.stateSaver as Saver<\(variable.propertyType.kotlin), Any>) { mutableStateOf(initial\(variable.propertyName)) }")
-        let updateComposeValue = KotlinRawStatement(sourceCode: "compose\(variable.propertyName) = initial\(variable.propertyName)")
-        let syncValue = KotlinRawStatement(sourceCode: "_\(variable.propertyName).onUpdate = { compose\(variable.propertyName) = it }")
-        if variable.propertyType.isNamedType {
-            let trackState = KotlinRawStatement(sourceCode: "(compose\(variable.propertyName) as? skip.model.ComposeStateTracking)?.trackstate()")
-            return [stateValue, updateStateValue, initialValue, composeValue, updateComposeValue, trackState, syncValue]
-        } else {
-            return [stateValue, updateStateValue, initialValue, composeValue, updateComposeValue, syncValue]
-        }
+        // We save and restore the State object rather than its wrappedValue so that bindings can mutate the value even if this
+        // view has disappeared from the Compose tree (e.g. is on the back stack). The State object uses a Compose MutableState
+        // internally so that all reads and writes are tracked by Compose, including those from bindings
+        let stateValue = KotlinRawStatement(sourceCode: "val remembered\(variable.propertyName) by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<\(variable.propertyType.kotlin)>, Any>) { mutableStateOf(_\(variable.propertyName)) }")
+        let updateStateValue = KotlinRawStatement(sourceCode: "_\(variable.propertyName) = remembered\(variable.propertyName)")
+        let trackState = KotlinRawStatement(sourceCode: "_\(variable.propertyName).trackstate()") // See ComposeStateTracking
+        return [stateValue, updateStateValue, trackState]
     }
 
     /// Create code to remember and sync a bindable variable.
     private func synthesizeBindableSync(variable: KotlinVariableDeclaration) -> [KotlinStatement] {
-        let trackState = KotlinRawStatement(sourceCode: "(_\(variable.propertyName).wrappedValue as? skip.model.ComposeStateTracking)?.trackstate()")
+        let trackState = KotlinRawStatement(sourceCode: "_\(variable.propertyName).trackstate()")
         return [trackState]
     }
 
-    /// Create code to remember and sync a state variable.
+    /// Create code to remember and sync an app storage variable.
     private func synthesizeAppStorageSync(variable: KotlinVariableDeclaration) -> [KotlinStatement] {
-        let initialValue = KotlinRawStatement(sourceCode: "val initial\(variable.propertyName) = _\(variable.propertyName).wrappedValue")
-        let composeValue = KotlinRawStatement(sourceCode: "var compose\(variable.propertyName) by remember { mutableStateOf(initial\(variable.propertyName)) }")
-        let syncValue = KotlinRawStatement(sourceCode: "_\(variable.propertyName).sync(compose\(variable.propertyName), { compose\(variable.propertyName) = it })")
-        return [initialValue, composeValue, syncValue]
+        // See explanation in the similar code for @State sync
+        let stateValue = KotlinRawStatement(sourceCode: "val remembered\(variable.propertyName) by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.AppStorage<\(variable.propertyType.kotlin)>, Any>) { mutableStateOf(_\(variable.propertyName)) }")
+        let updateStateValue = KotlinRawStatement(sourceCode: "_\(variable.propertyName) = remembered\(variable.propertyName)")
+        let trackState = KotlinRawStatement(sourceCode: "_\(variable.propertyName).trackstate()") // See ComposeStateTracking
+        return [stateValue, updateStateValue, trackState]
     }
 
     /// Create code to initialize an environment variable.

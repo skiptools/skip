@@ -578,14 +578,13 @@ final class SwiftUITests: XCTestCase {
             @Composable
             @Suppress("UNCHECKED_CAST")
             override fun ComposeContent(composectx: ComposeContext) {
-                val initials = _s.wrappedValue
-                var composes by rememberSaveable(stateSaver = composectx.stateSaver as Saver<Int, Any>) { mutableStateOf(initials) }
-                _s.sync(composes, { composes = it })
+                val remembereds by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<Int>, Any>) { mutableStateOf(_s) }
+                _s = remembereds
+                _s.trackstate()
 
-                val initialo = _o.wrappedValue
-                var composeo by rememberSaveable(stateSaver = composectx.stateSaver as Saver<O, Any>) { mutableStateOf(initialo) }
-                (composeo as? skip.model.ComposeStateTracking)?.trackstate()
-                _o.sync(composeo, { composeo = it })
+                val rememberedo by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<O>, Any>) { mutableStateOf(_o) }
+                _o = rememberedo
+                _o.trackstate()
 
                 body().Compose(composectx)
             }
@@ -668,12 +667,11 @@ final class SwiftUITests: XCTestCase {
             }
 
             @Composable
-            @Suppress(\"UNCHECKED_CAST\")
+            @Suppress("UNCHECKED_CAST")
             override fun ComposeContent(composectx: ComposeContext) {
-                val initials = _s.wrappedValue
-                var composes by rememberSaveable(stateSaver = composectx.stateSaver as Saver<S, Any>) { mutableStateOf(initials) }
-                (composes as? skip.model.ComposeStateTracking)?.trackstate()
-                _s.sync(composes, { composes = it })
+                val remembereds by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<S>, Any>) { mutableStateOf(_s) }
+                _s = remembereds
+                _s.trackstate()
 
                 body().Compose(composectx)
             }
@@ -736,9 +734,9 @@ final class SwiftUITests: XCTestCase {
             @Composable
             @Suppress("UNCHECKED_CAST")
             override fun ComposeContent(composectx: ComposeContext) {
-                val initialx = _x.wrappedValue
-                var composex by rememberSaveable(stateSaver = composectx.stateSaver as Saver<String?, Any>) { mutableStateOf(initialx) }
-                _x.sync(composex, { composex = it })
+                val rememberedx by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<String?>, Any>) { mutableStateOf(_x) }
+                _x = rememberedx
+                _x.trackstate()
 
                 body().Compose(composectx)
             }
@@ -933,7 +931,9 @@ final class SwiftUITests: XCTestCase {
         internal class V: View {
             internal var envvalue: EnvValue? = null
             override fun body(): View {
-                return ComposeView { composectx: ComposeContext -> Text("Value: ${envvalue?.x ?: 1}").Compose(composectx) }
+                return ComposeView { composectx: ComposeContext ->
+                    Text("Value: ${envvalue?.x ?: 1}").Compose(composectx)
+                }
             }
 
             @Composable
@@ -1024,9 +1024,9 @@ final class SwiftUITests: XCTestCase {
             @Composable
             @Suppress("UNCHECKED_CAST")
             override fun ComposeContent(composectx: ComposeContext) {
-                val initialtext = _text.wrappedValue
-                var composetext by rememberSaveable(stateSaver = composectx.stateSaver as Saver<String, Any>) { mutableStateOf(initialtext) }
-                _text.sync(composetext, { composetext = it })
+                val rememberedtext by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<String>, Any>) { mutableStateOf(_text) }
+                _text = rememberedtext
+                _text.trackstate()
 
                 body().Compose(composectx)
             }
@@ -1074,11 +1074,11 @@ final class SwiftUITests: XCTestCase {
             }
 
             @Composable
-            @Suppress(\"UNCHECKED_CAST\")
+            @Suppress("UNCHECKED_CAST")
             override fun ComposeContent(composectx: ComposeContext) {
-                val initialtext = _text.wrappedValue
-                var composetext by rememberSaveable(stateSaver = composectx.stateSaver as Saver<String, Any>) { mutableStateOf(initialtext) }
-                _text.sync(composetext, { composetext = it })
+                val rememberedtext by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<String>, Any>) { mutableStateOf(_text) }
+                _text = rememberedtext
+                _text.trackstate()
 
                 body().Compose(composectx)
             }
@@ -1146,10 +1146,9 @@ final class SwiftUITests: XCTestCase {
             @Composable
             @Suppress("UNCHECKED_CAST")
             override fun ComposeContent(composectx: ComposeContext) {
-                val initialitem = _item.wrappedValue
-                var composeitem by rememberSaveable(stateSaver = composectx.stateSaver as Saver<Item, Any>) { mutableStateOf(initialitem) }
-                (composeitem as? skip.model.ComposeStateTracking)?.trackstate()
-                _item.sync(composeitem, { composeitem = it })
+                val remembereditem by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<Item>, Any>) { mutableStateOf(_item) }
+                _item = remembereditem
+                _item.trackstate()
 
                 body().Compose(composectx)
             }
@@ -1257,7 +1256,7 @@ final class SwiftUITests: XCTestCase {
 
             @Composable
             override fun ComposeContent(composectx: ComposeContext) {
-                (_o.wrappedValue as? skip.model.ComposeStateTracking)?.trackstate()
+                _o.trackstate()
 
                 body().Compose(composectx)
             }
@@ -1308,7 +1307,7 @@ final class SwiftUITests: XCTestCase {
 
             @Composable
             override fun ComposeContent(composectx: ComposeContext) {
-                (_o.wrappedValue as? skip.model.ComposeStateTracking)?.trackstate()
+                _o.trackstate()
 
                 body().Compose(composectx)
             }
@@ -1358,7 +1357,7 @@ final class SwiftUITests: XCTestCase {
 
             @Composable
             override fun ComposeContent(composectx: ComposeContext) {
-                (_o.wrappedValue as? skip.model.ComposeStateTracking)?.trackstate()
+                _o.trackstate()
 
                 body().Compose(composectx)
             }
@@ -1479,11 +1478,11 @@ final class SwiftUITests: XCTestCase {
             @Composable
             @Suppress("UNCHECKED_CAST")
             override fun ComposeContent(composectx: ComposeContext) {
-                val initialcount = _count.wrappedValue
-                var composecount by rememberSaveable(stateSaver = composectx.stateSaver as Saver<Int, Any>) { mutableStateOf(initialcount) }
-                _count.sync(composecount, { composecount = it })
+                val rememberedcount by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<Int>, Any>) { mutableStateOf(_count) }
+                _count = rememberedcount
+                _count.trackstate()
 
-                (_o.wrappedValue as? skip.model.ComposeStateTracking)?.trackstate()
+                _o.trackstate()
 
                 envvalue = EnvironmentValues.shared.envvalue
 
@@ -1574,11 +1573,11 @@ final class SwiftUITests: XCTestCase {
             @Composable
             @Suppress("UNCHECKED_CAST")
             override fun ComposeContent(composectx: ComposeContext) {
-                val initialcount = _count.wrappedValue
-                var composecount by rememberSaveable(stateSaver = composectx.stateSaver as Saver<Int, Any>) { mutableStateOf(initialcount) }
-                _count.sync(composecount, { composecount = it })
+                val rememberedcount by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<Int>, Any>) { mutableStateOf(_count) }
+                _count = rememberedcount
+                _count.trackstate()
 
-                (_o.wrappedValue as? skip.model.ComposeStateTracking)?.trackstate()
+                _o.trackstate()
 
                 envvalue = EnvironmentValues.shared.envvalue
 
@@ -2005,9 +2004,9 @@ final class SwiftUITests: XCTestCase {
 
             @Composable
             override fun ComposeContent(composectx: ComposeContext) {
-                val initialappStorageProp = _appStorageProp.wrappedValue
-                var composeappStorageProp by remember { mutableStateOf(initialappStorageProp) }
-                _appStorageProp.sync(composeappStorageProp, { composeappStorageProp = it })
+                val rememberedappStorageProp by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.AppStorage<String>, Any>) { mutableStateOf(_appStorageProp) }
+                _appStorageProp = rememberedappStorageProp
+                _appStorageProp.trackstate()
 
                 body().Compose(composectx)
             }
@@ -2068,9 +2067,9 @@ final class SwiftUITests: XCTestCase {
 
             @Composable
             override fun ComposeContent(composectx: ComposeContext) {
-                val initialdoublePref = _doublePref.wrappedValue
-                var composedoublePref by remember { mutableStateOf(initialdoublePref) }
-                _doublePref.sync(composedoublePref, { composedoublePref = it })
+                val remembereddoublePref by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.AppStorage<Double>, Any>) { mutableStateOf(_doublePref) }
+                _doublePref = remembereddoublePref
+                _doublePref.trackstate()
 
                 body().Compose(composectx)
             }
@@ -2206,9 +2205,9 @@ final class SwiftUITests: XCTestCase {
             @Composable
             @Suppress("UNCHECKED_CAST")
             override fun Compose(content: View, composectx: ComposeContext) {
-                val initialisPresented = _isPresented.wrappedValue
-                var composeisPresented by rememberSaveable(stateSaver = composectx.stateSaver as Saver<Boolean, Any>) { mutableStateOf(initialisPresented) }
-                _isPresented.sync(composeisPresented, { composeisPresented = it })
+                val rememberedisPresented by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<Boolean>, Any>) { mutableStateOf(_isPresented) }
+                _isPresented = rememberedisPresented
+                _isPresented.trackstate()
 
                 body(content).Compose(composectx)
             }

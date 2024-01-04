@@ -393,7 +393,9 @@ final class ExpressionTests: XCTestCase {
             return Foo().bar!.baz.str
         }
         """, kotlin: """
-        internal fun f(): String? = Foo().bar?.baz?.str
+        internal fun f(): String? {
+            return Foo().bar?.baz?.str
+        }
         internal fun g(): String = Foo().bar!!.baz.str
         """)
 
@@ -408,9 +410,15 @@ final class ExpressionTests: XCTestCase {
             return Foo().bar?.bazs![0].str
         }
         """, kotlin: """
-        internal fun f(): String? = Foo().bar?.bazs?.get(0)?.str
-        internal fun g(): String? = Foo().bar?.baz?.strs?.get(0)
-        internal fun h(): String? = Foo().bar?.bazs!![0].str
+        internal fun f(): String? {
+            return Foo().bar?.bazs?.get(0)?.str
+        }
+        internal fun g(): String? {
+            return Foo().bar?.baz?.strs?.get(0)
+        }
+        internal fun h(): String? {
+            return Foo().bar?.bazs!![0].str
+        }
         """)
 
         try await check(supportingSwift: supportingSwift, swift: """
@@ -421,7 +429,9 @@ final class ExpressionTests: XCTestCase {
             return Foo().barf()!.bazf().str
         }
         """, kotlin: """
-        internal fun f(): String? = Foo().barf()?.bazf()?.str
+        internal fun f(): String? {
+            return Foo().barf()?.bazf()?.str
+        }
         internal fun g(): String = Foo().barf()!!.bazf().str
         """)
     }

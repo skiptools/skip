@@ -1935,7 +1935,8 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
     }
 
     func isSingleStatementAppendable(mode: KotlinSingleStatementAppendMode) -> Bool {
-        return !useMultilineFormatting
+        // Do not use single statement formatting with optional chaining because it can result in Unit vs. Unit? return type mismatches
+        return !useMultilineFormatting && (base == nil || base?.optionalChain == KotlinOptionalChain.none)
     }
 
     var generics: [TypeSignature]?
