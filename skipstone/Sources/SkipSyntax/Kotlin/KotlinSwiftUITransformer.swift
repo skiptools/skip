@@ -381,14 +381,17 @@ private class TranslateVisitor {
 
     /// Create code to remember and sync a state variable.
     private func synthesizeStateSync(variable: KotlinVariableDeclaration) -> [KotlinStatement] {
+        let stateValue = KotlinRawStatement(sourceCode: "var state\(variable.propertyName) by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<\(variable.propertyType.kotlin)>, Any>) { mutableStateOf(_\(variable.propertyName)) }")
+        let updateStateValue = KotlinRawStatement(sourceCode: "_\(variable.propertyName) = state\(variable.propertyName)")
         let initialValue = KotlinRawStatement(sourceCode: "val initial\(variable.propertyName) = _\(variable.propertyName).wrappedValue")
         let composeValue = KotlinRawStatement(sourceCode: "var compose\(variable.propertyName) by rememberSaveable(stateSaver = composectx.stateSaver as Saver<\(variable.propertyType.kotlin), Any>) { mutableStateOf(initial\(variable.propertyName)) }")
-        let syncValue = KotlinRawStatement(sourceCode: "_\(variable.propertyName).sync(compose\(variable.propertyName), { compose\(variable.propertyName) = it })")
+        let updateComposeValue = KotlinRawStatement(sourceCode: "compose\(variable.propertyName) = initial\(variable.propertyName)")
+        let syncValue = KotlinRawStatement(sourceCode: "_\(variable.propertyName).onUpdate = { compose\(variable.propertyName) = it }")
         if variable.propertyType.isNamedType {
             let trackState = KotlinRawStatement(sourceCode: "(compose\(variable.propertyName) as? skip.model.ComposeStateTracking)?.trackstate()")
-            return [initialValue, composeValue, trackState, syncValue]
+            return [stateValue, updateStateValue, initialValue, composeValue, updateComposeValue, trackState, syncValue]
         } else {
-            return [initialValue, composeValue, syncValue]
+            return [stateValue, updateStateValue, initialValue, composeValue, updateComposeValue, syncValue]
         }
     }
 
