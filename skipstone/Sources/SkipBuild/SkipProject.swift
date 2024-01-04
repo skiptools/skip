@@ -1067,7 +1067,7 @@ class AppProjectLayout : FrameworkProjectLayout {
 
     /* Begin PBXBuildFile section */
             49231BAC2AC5BCEF00F98ADF /* \(primaryModuleAppTarget) in Frameworks */ = {isa = PBXBuildFile; productRef = 49231BAB2AC5BCEF00F98ADF /* \(primaryModuleAppTarget) */; };
-            49231BAD2AC5BCEF00F98ADF /* \(primaryModuleAppTarget) in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 49231BAB2AC5BCEF00F98ADF /* \(primaryModuleAppTarget) */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+            49231BAD2AC5BCEF00F98ADF /* \(primaryModuleAppTarget)App in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 49231BAB2AC5BCEF00F98ADF /* \(primaryModuleAppTarget) */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
             499CD43B2AC5B799001AE8D8 /* \(appMainSwiftFileName) in Sources */ = {isa = PBXBuildFile; fileRef = 49F90C2B2A52156200F06D93 /* \(appMainSwiftFileName) */; };
             499CD4402AC5B799001AE8D8 /* \(Assets_xcassets_name) in Resources */ = {isa = PBXBuildFile; fileRef = 49F90C2F2A52156300F06D93 /* \(Assets_xcassets_name) */; };
     /* End PBXBuildFile section */
@@ -1088,7 +1088,7 @@ class AppProjectLayout : FrameworkProjectLayout {
 
     /* Begin PBXFileReference section */
             493609562A6B7EAE00C401E2 /* \(appModuleName) */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = \(appModuleName); path = \(relativeSwiftPackageRoot); sourceTree = "<group>"; };
-            496EB72F2A6AE4DE00C1253A /* \(skipEnvFileName) */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = \(skipEnvBaseName); path = \(skipEnvFileName); sourceTree = "<group>"; };
+            496EB72F2A6AE4DE00C1253A /* \(skipEnvBaseName) */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = \(skipEnvBaseName); path = \(skipEnvFileName); sourceTree = "<group>"; };
             496EB72F2A6AE4DE00C1253B /* \(xcconfigFileName) */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = \(xcconfigFileName); sourceTree = "<group>"; };
             496EB72F2A6AE4DE00C1253C /* README.md */ = {isa = PBXFileReference; name = README.md; path = ../README.md; sourceTree = "<group>"; };
             4990AB3B2A91AFC5005777FD /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = Platforms/MacOSX.platform/Developer/Library/Frameworks/XCTest.framework; sourceTree = DEVELOPER_DIR; };
@@ -1104,7 +1104,7 @@ class AppProjectLayout : FrameworkProjectLayout {
                 isa = PBXFrameworksBuildPhase;
                 buildActionMask = 2147483647;
                 files = (
-                    49231BAC2AC5BCEF00F98ADF /* \(appModuleName) in Frameworks */,
+                    49231BAC2AC5BCEF00F98ADF /* \(appModuleName)App in Frameworks */,
                 );
                 runOnlyForDeploymentPostprocessing = 0;
             };
