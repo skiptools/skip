@@ -36,7 +36,8 @@ extension XCGradleHarness where Self : XCTestCase {
             // there is no "connectedReleaseAndroidTest" target for some reason, so release tests against an Android emulator/simulator do not work
             let testAction = device == nil ? "testRelease" : "connectedAndroidTest"
             #endif
-            try await invokeGradle(actions: [testAction], deviceID: device)
+            let info = !["NO", "no", "false", "0"].contains(ProcessInfo.processInfo.environment["SKIP_GRADLE_VERBOSE"] ?? "NO")
+            try await invokeGradle(actions: [testAction], info: info, deviceID: device)
         } catch {
             XCTFail("\((error as? LocalizedError)?.localizedDescription ?? error.localizedDescription)", file: file, line: line)
         }
@@ -53,7 +54,7 @@ extension XCGradleHarness where Self : XCTestCase {
     ///   - moduleSuffix: the expected module name for automatic test determination
     ///   - sourcePath: the full path to the test case call site, which is used to determine the package root
     @available(macOS 13, macCatalyst 16, iOS 16, tvOS 16, watchOS 8, *)
-    func invokeGradle(actions: [String], arguments: [String] = [], pluginFolderName: String = "skipstone", outputPrefix: String? = "GRADLE>", deviceID: String? = nil, testFilter: String? = nil, moduleName: String? = nil, maxMemory: UInt64? = ProcessInfo.processInfo.physicalMemory, fromSourceFileRelativeToPackageRoot sourcePath: StaticString? = #file) async throws {
+    func invokeGradle(actions: [String], arguments: [String] = [], info: Bool = false, pluginFolderName: String = "skipstone", outputPrefix: String? = "GRADLE>", deviceID: String? = nil, testFilter: String? = nil, moduleName: String? = nil, maxMemory: UInt64? = ProcessInfo.processInfo.physicalMemory, fromSourceFileRelativeToPackageRoot sourcePath: StaticString? = #file) async throws {
 
         // the filters should be passed through to the --tests argument, but they don't seem to work for Android unit tests, neighter for Robolectric nor connected tests
         precondition(testFilter == nil, "test filtering does not yet work")
@@ -111,7 +112,7 @@ extension XCGradleHarness where Self : XCTestCase {
                     args += [gradleArgument]
                 }
 
-                let (output, parseResults) = try await driver.launchGradleProcess(in: dir, module: baseModuleName, actions: actions, arguments: args, environment: env, maxMemory: maxMemory, exitHandler: { result in
+                let (output, parseResults) = try await driver.launchGradleProcess(in: dir, module: baseModuleName, actions: actions, arguments: args, environment: env, info: info, maxMemory: maxMemory, exitHandler: { result in
                     // do not fail on non-zero exit code because we want to be able to parse the test results first
                     testProcessResult = result
                 })
@@ -307,19 +308,21 @@ extension XCGradleHarness where Self : XCTestCase {
             return
         }
 
-        if let linkDestination = try? FileManager.default.destinationOfSymbolicLink(atPath: issue.location.path) {
+        if var location = issue.location, 
+            let linkDestination = try? FileManager.default.destinationOfSymbolicLink(atPath: location.path) {
             // attempt the map the error back any originally linking source projects, since it is better the be editing the canonical Xcode version of the file as Xcode is able to provide details about it
-            issue.location.path = linkDestination
+            location.path = linkDestination
+            issue.location = location
         }
 
-        record(XCTIssue(type: .assertionFailure, compactDescription: issue.message, detailedDescription: issue.message, sourceCodeContext: XCTSourceCodeContext(location: issue.location.contextLocation), associatedError: nil, attachments: []))
+        record(XCTIssue(type: .assertionFailure, compactDescription: issue.message, detailedDescription: issue.message, sourceCodeContext: XCTSourceCodeContext(location: issue.location?.contextLocation), associatedError: nil, attachments: []))
 
         // if the error maps back to a Swift source file, then also report that location
-        if let swiftLocation = try? issue.location.findSourceMapLine() {
+        if let swiftLocation = try? issue.location?.findSourceMapLine() {
             record(XCTIssue(type: .assertionFailure, compactDescription: issue.message, detailedDescription: issue.message, sourceCodeContext: XCTSourceCodeContext(location: swiftLocation.contextLocation), associatedError: nil, attachments: []))
         }
     }
-    
+
     /// Parse the test suite results and output the summary to standard out
     /// - Returns: an array of failed test case names
     private func reportTestResults(_ testSuites: [GradleDriver.TestSuite], _ dir: URL, showStreams: Bool = true) -> [GradleDriver.TestCase] {

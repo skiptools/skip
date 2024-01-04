@@ -115,7 +115,7 @@ import PackagePlugin
         }
 
         func recursivePackageDependencies(for package: Package) -> [PackageDependency] {
-            package.dependencies + package.dependencies.flatMap({ recursivePackageDependencies(for: $0.package) })
+            return package.dependencies + package.dependencies.flatMap({ recursivePackageDependencies(for: $0.package) })
         }
 
         // create a lookup table from the (arbitrary but unique) product ID to the owning package
@@ -205,14 +205,15 @@ import PackagePlugin
                 continue
             }
 
-            // perform special Skip CMAKE support by specifying SKIP_BUILD_CMAKE
-            let isCmakeProject = (depTarget as? ClangSourceModuleTarget)?.publicHeadersDirectory != nil && FileManager.default.isReadableFile(atPath: depTarget.directory.appending("CMakeLists.txt").string)
             let hasSkipConfig = FileManager.default.isReadableFile(atPath: depTarget.directory.appending("Skip", "skip.yml").string)
+
+            // perform special Skip cmake support by specifying SKIP_BUILD_CMAKE
+            let isNDKTarget = (depTarget as? ClangSourceModuleTarget)?.preprocessorDefinitions.contains(where: { $0 == "SKIP_BUILD_NDK" }) == true
 
             // ignore non-Skip-enabled dependency modules, based on the existance of the SRC/MODULE/Skip/skip.yml file,
             // or if it is a zero-dependency C library.
             // ideally, we would simply filter out dependencies that don't use the skip plugin, but there's no `plugins` property of PackagePlugin.Target
-            if !hasSkipConfig && !isCmakeProject {
+            if !hasSkipConfig && !isNDKTarget {
                 continue
             }
 

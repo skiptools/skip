@@ -239,7 +239,7 @@ extension GradleHarness {
     public func scanGradleOutput(line1: String, line2: String) {
         if let kotlinIssue = parseGradleOutput(line1: line1, line2: line2) {
             // check for match Swift source lines
-            if let swiftIssue = try? kotlinIssue.location.findSourceMapLine() {
+            if let swiftIssue = try? kotlinIssue.location?.findSourceMapLine() {
                 print(GradleIssue(kind: kotlinIssue.kind, message: kotlinIssue.message, location: swiftIssue).xcodeMessageString)
             }
             print(kotlinIssue.xcodeMessageString)
@@ -262,6 +262,11 @@ extension GradleHarness {
     }
 
     private func parseGradleErrorOutput(line1: String, line2: String) -> GradleIssue? {
+        // general task failure
+        if line1 == "* What went wrong:" && line2.hasPrefix("Execution failed for task ") {
+            return GradleIssue(kind: .error, message: line2)
+        }
+
         guard let matchResult = gradleFailurePattern.firstMatch(in: line1, range: NSRange(line1.startIndex..., in: line1)) else {
             return nil
         }
@@ -406,7 +411,7 @@ extension NSRegularExpression {
 public struct GradleIssue {
     public var kind: Kind
     public var message: String
-    public var location: SourceLocation
+    public var location: SourceLocation? = nil
 
     public enum Kind : String, CaseIterable {
         case error = "e"
@@ -423,7 +428,12 @@ public struct GradleIssue {
     
     /// A message string that will show up in the Xcode Issue Navigator
     public var xcodeMessageString: String {
-        "\(location.path):\(location.position.line):\(location.position.column): \(kind.xcode): \(message)"
+        let msg = "\(kind.xcode): \(message)"
+        if let location = location {
+            return "\(location.path):\(location.position.line):\(location.position.column): " + msg
+        } else {
+            return msg
+        }
     }
 }
 
