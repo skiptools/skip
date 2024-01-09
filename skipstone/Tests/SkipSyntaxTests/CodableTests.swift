@@ -22,14 +22,6 @@ final class CodableTests: XCTestCase {
                 s("s");
             }
 
-            private fun CodingKeys(rawValue: String): CodingKeys? {
-                return when (rawValue) {
-                    "i" -> CodingKeys.i
-                    "s" -> CodingKeys.s
-                    else -> null
-                }
-            }
-
             override fun encode(to: Encoder) {
                 val container = to.container(keyedBy = CodingKeys::class)
                 container.encode(i, forKey = CodingKeys.i)
@@ -44,6 +36,14 @@ final class CodableTests: XCTestCase {
 
             companion object: DecodableCompanion<S> {
                 override fun init(from: Decoder): S = S(from = from)
+
+                private fun CodingKeys(rawValue: String): CodingKeys? {
+                    return when (rawValue) {
+                        "i" -> CodingKeys.i
+                        "s" -> CodingKeys.s
+                        else -> null
+                    }
+                }
             }
         }
         """)
@@ -84,14 +84,6 @@ final class CodableTests: XCTestCase {
                 s("s");
             }
 
-            private fun CodingKeys(rawValue: String): CodingKeys? {
-                return when (rawValue) {
-                    "i" -> CodingKeys.i
-                    "s" -> CodingKeys.s
-                    else -> null
-                }
-            }
-
             override fun encode(to: Encoder) {
                 val container = to.container(keyedBy = CodingKeys::class)
                 container.encode(i, forKey = CodingKeys.i)
@@ -106,6 +98,14 @@ final class CodableTests: XCTestCase {
 
             companion object: DecodableCompanion<S> {
                 override fun init(from: Decoder): S = S(from = from)
+
+                private fun CodingKeys(rawValue: String): CodingKeys? {
+                    return when (rawValue) {
+                        "i" -> CodingKeys.i
+                        "s" -> CodingKeys.s
+                        else -> null
+                    }
+                }
             }
         }
         """)
@@ -134,14 +134,6 @@ final class CodableTests: XCTestCase {
                 d("dbl");
             }
 
-            private fun CodingKeys(rawValue: String): S.CodingKeys? {
-                return when (rawValue) {
-                    "i" -> CodingKeys.i
-                    "dbl" -> CodingKeys.d
-                    else -> null
-                }
-            }
-
             constructor(i: Int, d: Double) {
                 this.i = i
                 this.d = d
@@ -161,6 +153,14 @@ final class CodableTests: XCTestCase {
 
             companion object: DecodableCompanion<S> {
                 override fun init(from: Decoder): S = S(from = from)
+
+                private fun CodingKeys(rawValue: String): S.CodingKeys? {
+                    return when (rawValue) {
+                        "i" -> CodingKeys.i
+                        "dbl" -> CodingKeys.d
+                        else -> null
+                    }
+                }
             }
         }
         """)
@@ -187,14 +187,6 @@ final class CodableTests: XCTestCase {
                 d(101);
             }
 
-            private fun CodingKeys(rawValue: Int): S.CodingKeys? {
-                return when (rawValue) {
-                    100 -> CodingKeys.i
-                    101 -> CodingKeys.d
-                    else -> null
-                }
-            }
-
             constructor(i: Int, d: Double) {
                 this.i = i
                 this.d = d
@@ -214,6 +206,14 @@ final class CodableTests: XCTestCase {
 
             companion object: DecodableCompanion<S> {
                 override fun init(from: Decoder): S = S(from = from)
+
+                private fun CodingKeys(rawValue: Int): S.CodingKeys? {
+                    return when (rawValue) {
+                        100 -> CodingKeys.i
+                        101 -> CodingKeys.d
+                        else -> null
+                    }
+                }
             }
         }
         """)
@@ -245,14 +245,6 @@ final class CodableTests: XCTestCase {
                 s("s");
             }
 
-            private fun CK(rawValue: String): S.CK? {
-                return when (rawValue) {
-                    "i" -> CK.i
-                    "s" -> CK.s
-                    else -> null
-                }
-            }
-
             override fun encode(to: Encoder) = Unit
 
             constructor(from: Decoder) {
@@ -260,6 +252,14 @@ final class CodableTests: XCTestCase {
 
             companion object: DecodableCompanion<S> {
                 override fun init(from: Decoder): S = S(from = from)
+
+                private fun CK(rawValue: String): S.CK? {
+                    return when (rawValue) {
+                        "i" -> CK.i
+                        "s" -> CK.s
+                        else -> null
+                    }
+                }
             }
         }
         """)
@@ -296,16 +296,6 @@ final class CodableTests: XCTestCase {
                 nd("nd");
             }
 
-            private fun CodingKeys(rawValue: String): CodingKeys? {
-                return when (rawValue) {
-                    "a" -> CodingKeys.a
-                    "d" -> CodingKeys.d
-                    "na" -> CodingKeys.na
-                    "nd" -> CodingKeys.nd
-                    else -> null
-                }
-            }
-
             override fun encode(to: Encoder) {
                 val container = to.container(keyedBy = CodingKeys::class)
                 container.encode(a, forKey = CodingKeys.a)
@@ -324,6 +314,16 @@ final class CodableTests: XCTestCase {
 
             companion object: DecodableCompanion<S> {
                 override fun init(from: Decoder): S = S(from = from)
+
+                private fun CodingKeys(rawValue: String): CodingKeys? {
+                    return when (rawValue) {
+                        "a" -> CodingKeys.a
+                        "d" -> CodingKeys.d
+                        "na" -> CodingKeys.na
+                        "nd" -> CodingKeys.nd
+                        else -> null
+                    }
+                }
             }
         }
         """)
@@ -350,18 +350,21 @@ final class CodableTests: XCTestCase {
                 s("s");
             }
 
-            private fun CodingKeys(rawValue: String): CodingKeys? {
-                return when (rawValue) {
-                    "i" -> CodingKeys.i
-                    "s" -> CodingKeys.s
-                    else -> null
-                }
-            }
-
             override fun encode(to: Encoder) {
                 val container = to.container(keyedBy = CodingKeys::class)
                 container.encode(i, forKey = CodingKeys.i)
                 container.encode(s, forKey = CodingKeys.s)
+            }
+
+            companion object {
+
+                private fun CodingKeys(rawValue: String): CodingKeys? {
+                    return when (rawValue) {
+                        "i" -> CodingKeys.i
+                        "s" -> CodingKeys.s
+                        else -> null
+                    }
+                }
             }
         }
         """)
@@ -390,14 +393,6 @@ final class CodableTests: XCTestCase {
                 s("s");
             }
 
-            private fun CK(rawValue: String): S.CK? {
-                return when (rawValue) {
-                    "i" -> CK.i
-                    "s" -> CK.s
-                    else -> null
-                }
-            }
-
             override fun encode(to: Encoder) = Unit
 
             constructor(i: Int, s: String) {
@@ -410,14 +405,6 @@ final class CodableTests: XCTestCase {
                 s("s");
             }
 
-            private fun CodingKeys(rawValue: String): CodingKeys? {
-                return when (rawValue) {
-                    "i" -> CodingKeys.i
-                    "s" -> CodingKeys.s
-                    else -> null
-                }
-            }
-
             constructor(from: Decoder) {
                 val container = from.container(keyedBy = CodingKeys::class)
                 this.i = container.decode(Int::class, forKey = CodingKeys.i)
@@ -426,6 +413,22 @@ final class CodableTests: XCTestCase {
 
             companion object: DecodableCompanion<S> {
                 override fun init(from: Decoder): S = S(from = from)
+
+                private fun CK(rawValue: String): S.CK? {
+                    return when (rawValue) {
+                        "i" -> CK.i
+                        "s" -> CK.s
+                        else -> null
+                    }
+                }
+
+                private fun CodingKeys(rawValue: String): CodingKeys? {
+                    return when (rawValue) {
+                        "i" -> CodingKeys.i
+                        "s" -> CodingKeys.s
+                        else -> null
+                    }
+                }
             }
         }
         """)
@@ -452,14 +455,6 @@ final class CodableTests: XCTestCase {
                 s("s");
             }
 
-            private fun CodingKeys(rawValue: String): CodingKeys? {
-                return when (rawValue) {
-                    "i" -> CodingKeys.i
-                    "s" -> CodingKeys.s
-                    else -> null
-                }
-            }
-
             constructor(from: Decoder) {
                 val container = from.container(keyedBy = CodingKeys::class)
                 this.i = container.decode(Int::class, forKey = CodingKeys.i)
@@ -468,6 +463,14 @@ final class CodableTests: XCTestCase {
 
             companion object: DecodableCompanion<S> {
                 override fun init(from: Decoder): S = S(from = from)
+
+                private fun CodingKeys(rawValue: String): CodingKeys? {
+                    return when (rawValue) {
+                        "i" -> CodingKeys.i
+                        "s" -> CodingKeys.s
+                        else -> null
+                    }
+                }
             }
         }
         """)
@@ -496,14 +499,6 @@ final class CodableTests: XCTestCase {
                 s("s");
             }
 
-            private fun CodingKeys(rawValue: String): S.CodingKeys? {
-                return when (rawValue) {
-                    "i" -> CodingKeys.i
-                    "s" -> CodingKeys.s
-                    else -> null
-                }
-            }
-
             constructor(from: Decoder) {
             }
 
@@ -515,6 +510,14 @@ final class CodableTests: XCTestCase {
 
             companion object: DecodableCompanion<S> {
                 override fun init(from: Decoder): S = S(from = from)
+
+                private fun CodingKeys(rawValue: String): S.CodingKeys? {
+                    return when (rawValue) {
+                        "i" -> CodingKeys.i
+                        "s" -> CodingKeys.s
+                        else -> null
+                    }
+                }
             }
         }
         """)
@@ -564,16 +567,6 @@ final class CodableTests: XCTestCase {
                 nd("nd");
             }
 
-            private fun CK(rawValue: String): S.CK? {
-                return when (rawValue) {
-                    "a" -> CK.a
-                    "d" -> CK.d
-                    "na" -> CK.na
-                    "nd" -> CK.nd
-                    else -> null
-                }
-            }
-
             override fun encode(to: Encoder) {
                 val encoder = to
                 val container = encoder.container(keyedBy = CK::class)
@@ -594,6 +587,16 @@ final class CodableTests: XCTestCase {
 
             companion object: DecodableCompanion<S> {
                 override fun init(from: Decoder): S = S(from = from)
+
+                private fun CK(rawValue: String): S.CK? {
+                    return when (rawValue) {
+                        "a" -> CK.a
+                        "d" -> CK.d
+                        "na" -> CK.na
+                        "nd" -> CK.nd
+                        else -> null
+                    }
+                }
             }
         }
         """)
@@ -620,14 +623,6 @@ final class CodableTests: XCTestCase {
                 s("s");
             }
 
-            private fun CodingKeys(rawValue: String): CodingKeys? {
-                return when (rawValue) {
-                    "i" -> CodingKeys.i
-                    "s" -> CodingKeys.s
-                    else -> null
-                }
-            }
-
             override fun encode(to: Encoder) {
                 val container = to.container(keyedBy = CodingKeys::class)
                 container.encodeIfPresent(i, forKey = CodingKeys.i)
@@ -642,6 +637,14 @@ final class CodableTests: XCTestCase {
 
             companion object: DecodableCompanion<S> {
                 override fun init(from: Decoder): S = S(from = from)
+
+                private fun CodingKeys(rawValue: String): CodingKeys? {
+                    return when (rawValue) {
+                        "i" -> CodingKeys.i
+                        "s" -> CodingKeys.s
+                        else -> null
+                    }
+                }
             }
         }
         """)
@@ -655,7 +658,7 @@ final class CodableTests: XCTestCase {
         }
         """, kotlin: """
         import skip.lib.Array
-        
+
         internal class S: Codable {
             internal val i: Int
             internal var a = arrayOf("foo")
@@ -667,14 +670,6 @@ final class CodableTests: XCTestCase {
             private enum class CodingKeys(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 i("i"),
                 a("a");
-            }
-
-            private fun CodingKeys(rawValue: String): CodingKeys? {
-                return when (rawValue) {
-                    "i" -> CodingKeys.i
-                    "a" -> CodingKeys.a
-                    else -> null
-                }
             }
 
             override fun encode(to: Encoder) {
@@ -691,6 +686,14 @@ final class CodableTests: XCTestCase {
 
             companion object: DecodableCompanion<S> {
                 override fun init(from: Decoder): S = S(from = from)
+
+                private fun CodingKeys(rawValue: String): CodingKeys? {
+                    return when (rawValue) {
+                        "i" -> CodingKeys.i
+                        "a" -> CodingKeys.a
+                        else -> null
+                    }
+                }
             }
         }
         """)
@@ -713,13 +716,6 @@ final class CodableTests: XCTestCase {
                 s("s");
             }
 
-            private fun CodingKeys(rawValue: String): CodingKeys? {
-                return when (rawValue) {
-                    "s" -> CodingKeys.s
-                    else -> null
-                }
-            }
-
             override fun encode(to: Encoder) {
                 val container = to.container(keyedBy = CodingKeys::class)
                 container.encode(s, forKey = CodingKeys.s)
@@ -732,6 +728,13 @@ final class CodableTests: XCTestCase {
 
             companion object: DecodableCompanion<Sub> {
                 override fun init(from: Decoder): Sub = Sub(from = from)
+
+                private fun CodingKeys(rawValue: String): CodingKeys? {
+                    return when (rawValue) {
+                        "s" -> CodingKeys.s
+                        else -> null
+                    }
+                }
             }
         }
         """)
@@ -903,14 +906,6 @@ final class CodableTests: XCTestCase {
                 package_("package");
             }
 
-            private fun CodingKeys(rawValue: String): CodingKeys? {
-                return when (rawValue) {
-                    "name" -> CodingKeys.namecodingkey
-                    "package" -> CodingKeys.package_
-                    else -> null
-                }
-            }
-
             override fun encode(to: Encoder) {
                 val container = to.container(keyedBy = CodingKeys::class)
                 container.encode(name, forKey = CodingKeys.namecodingkey)
@@ -925,6 +920,14 @@ final class CodableTests: XCTestCase {
 
             companion object: DecodableCompanion<S> {
                 override fun init(from: Decoder): S = S(from = from)
+
+                private fun CodingKeys(rawValue: String): CodingKeys? {
+                    return when (rawValue) {
+                        "name" -> CodingKeys.namecodingkey
+                        "package" -> CodingKeys.package_
+                        else -> null
+                    }
+                }
             }
         }
         """)

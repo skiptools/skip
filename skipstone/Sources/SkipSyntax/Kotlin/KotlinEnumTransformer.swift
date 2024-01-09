@@ -40,7 +40,13 @@ final class KotlinEnumTransformer: KotlinTransformer {
         factory.body?.updateWithExpectedReturn(.assignToSelf)
 
         classDeclaration.remove(statement: constructor)
-        (classDeclaration.parent as? KotlinStatement)?.insert(statements: [factory], after: classDeclaration)
+        if let parentClassDeclaration = classDeclaration.parent as? KotlinClassDeclaration {
+            factory.modifiers.isStatic = true
+            parentClassDeclaration.members.append(factory)
+            factory.parent = parentClassDeclaration
+        } else if let parentStatement = classDeclaration.parent as? KotlinStatement {
+            parentStatement.insert(statements: [factory], after: classDeclaration)
+        }
     }
 
     private func synthesizeCaseIterable(for classDeclaration: KotlinClassDeclaration, in syntaxTree: KotlinSyntaxTree, codebaseInfo: CodebaseInfo.Context) {

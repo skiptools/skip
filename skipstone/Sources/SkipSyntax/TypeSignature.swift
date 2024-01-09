@@ -1873,19 +1873,11 @@ extension TypeSignature {
     }
 
     var isOptionSet: Bool {
-        // May have generics
-        if case .named("OptionSet", _) = self {
-            return true
-        }
-        return false
+        return isNamed("OptionSet", moduleName: "Swift")
     }
 
     var isRawRepresentable: Bool {
-        // May have generics
-        if case .named("RawRepresentable", _) = self {
-            return true
-        }
-        return false
+        return isNamed("RawRepresentable", moduleName: "Swift")
     }
 
     /// Return this type as a binding.

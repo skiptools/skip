@@ -29,15 +29,22 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
     }
 
     /// Return a string of the init parameters needed to construct an `AppStorage` after the `wrappedValue`.
-    static func appStorageAdditionalInitParameters(for variableDeclaration: KotlinVariableDeclaration) -> String {
+    static func appStorageAdditionalInitParameters(for variableDeclaration: KotlinVariableDeclaration, codebaseInfo: CodebaseInfo.Context?) -> String {
         // Parse annotation tokens to transfer into the constructor args: `@AppStorage("prefsKey", store: UserDefaults.standard)`
         let tokens = variableDeclaration.attributes.of(kind: .appStorage).first?.tokens ?? []
         let keyName = tokens.first ?? "storageKey"
+        var ret: String
         if tokens.count == 2, let storeName = tokens.last {
-            return "\(keyName), store = \(storeName)"
+            ret = "\(keyName), store = \(storeName)"
         } else {
-            return keyName
+            ret = keyName
         }
+        let propertyType = variableDeclaration.propertyType
+        let rawValueType = codebaseInfo == nil ? .none : propertyType.rawValueType(codebaseInfo: codebaseInfo!)
+        if rawValueType != .none {
+            ret += ", serializer = { it.rawValue }, deserializer = { if (it is \(rawValueType.kotlin)) \(propertyType.kotlin)(rawValue = it) else null }"
+        }
+        return ret
     }
 
     /// If the given variable is the `body` of a `View`, return the parent view.
@@ -547,6 +554,10 @@ private class TranslateVisitor {
 
     /// Create the additional property synthesized for `@AppStorage` variables.
     private func synthesizeAppStorageBacking(variable: KotlinVariableDeclaration) {
+        if variable.propertyType.isOptional {
+            variable.messages.append(.kotlinSwiftUIAppStorageOptional(variable, source: translator.syntaxTree.source))
+        }
+
         // Tell the @AppStorage variable to get and set its value using _variable of type AppStorage
         let storageName = "_\(variable.propertyName)"
         var storage = KotlinVariableStorage()
@@ -564,6 +575,7 @@ private class TranslateVisitor {
             value()
             output.append("\n")
         }
+        let codebaseInfo = translator.codebaseInfo
         storage.appendStorage = { variable, output, indentation in
             let storageType = variable.propertyType.asPropertyWrapper("skip.ui.AppStorage").kotlin
             output.append(indentation).append(variable.modifiers.kotlinMemberString(isGlobal: false, isOpen: false, suffix: " ")).append("var ").append(storageName).append(": ").append(storageType)
@@ -571,11 +583,11 @@ private class TranslateVisitor {
                 output.append(" = skip.ui.AppStorage(")
                 value.append(to: output, indentation: indentation)
                 output.append(", ")
-                output.append(KotlinSwiftUITransformer.appStorageAdditionalInitParameters(for: variable))
+                output.append(KotlinSwiftUITransformer.appStorageAdditionalInitParameters(for: variable, codebaseInfo: codebaseInfo))
                 output.append(")")
             } else if variable.propertyType.isOptional {
                 output.append(" = skip.ui.AppStorage(null, ")
-                output.append(KotlinSwiftUITransformer.appStorageAdditionalInitParameters(for: variable))
+                output.append(KotlinSwiftUITransformer.appStorageAdditionalInitParameters(for: variable, codebaseInfo: codebaseInfo))
                 output.append(")")
             }
             output.append("\n")

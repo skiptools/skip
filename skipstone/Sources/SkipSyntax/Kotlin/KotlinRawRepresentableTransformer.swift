@@ -63,6 +63,12 @@ final class KotlinRawRepresentableTransformer: KotlinTransformer {
         let ret = KotlinReturn(expression: when)
         factory.body = KotlinCodeBlock(statements: [ret])
 
-        (classDeclaration.parent as? KotlinStatement)?.insert(statements: [factory], after: classDeclaration)
+        if let parentClassDeclaration = classDeclaration.parent as? KotlinClassDeclaration {
+            factory.modifiers.isStatic = true
+            parentClassDeclaration.members.append(factory)
+            factory.parent = parentClassDeclaration
+        } else if let parentStatement = classDeclaration.parent as? KotlinStatement {
+            parentStatement.insert(statements: [factory], after: classDeclaration)
+        }
     }
 }

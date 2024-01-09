@@ -169,7 +169,7 @@ final class KotlinCodableTransformer: KotlinTransformer {
         decode.parameters = [Parameter<KotlinExpression>(externalLabel: "from", declaredType: .named("Decoder", []))]
 
         var statements: [KotlinStatement] = []
-        if let codingKeys {
+        if let codingKeys { // Must be a non-RawRepresentable, non-enum type
             if !codingKeys.isEmpty {
                 statements.append(KotlinRawStatement(sourceCode: "val container = from.container(keyedBy = CodingKeys::class)"))
             }
@@ -178,7 +178,7 @@ final class KotlinCodableTransformer: KotlinTransformer {
 
             classDeclaration.members.append(decode)
             decode.parent = classDeclaration
-        } else if rawValueType != .none {
+        } else if rawValueType != .none { // RawRepresentable type
             statements.append(KotlinRawStatement(sourceCode: "val container = from.singleValueContainer()"))
             statements.append(KotlinRawStatement(sourceCode: "val rawValue = container.decode(\(rawValueType.kotlin)::class)"))
             // Raw value constructor may or may not be optional - check for explicit optional constructor or generated enum constructor
@@ -191,7 +191,13 @@ final class KotlinCodableTransformer: KotlinTransformer {
             }
             decode.body = KotlinCodeBlock(statements: statements)
 
-            (classDeclaration.parent as? KotlinStatement)?.insert(statements: [decode], after: classDeclaration)
+            if let parentClassDeclaration = classDeclaration.parent as? KotlinClassDeclaration {
+                decode.modifiers.isStatic = true
+                parentClassDeclaration.members.append(decode)
+                decode.parent = parentClassDeclaration
+            } else if let parentStatement = classDeclaration.parent as? KotlinStatement {
+                parentStatement.insert(statements: [decode], after: classDeclaration)
+            }
         } else {
             classDeclaration.messages.append(.kotlinCodableDecodeRawValueEnumsOnly(classDeclaration, source: source))
             return

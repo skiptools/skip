@@ -192,7 +192,7 @@ final class KotlinStructTransformer: KotlinTransformer {
                 if variableDeclaration.mayBeSharedMutableStruct {
                     value += ".sref()"
                 }
-                let appStorageParameters = KotlinSwiftUITransformer.appStorageAdditionalInitParameters(for: variableDeclaration)
+                let appStorageParameters = KotlinSwiftUITransformer.appStorageAdditionalInitParameters(for: variableDeclaration, codebaseInfo: translator.codebaseInfo)
                 assignment = "this._\(variableDeclaration.propertyName) = skip.ui.AppStorage(wrappedValue = \(value), \(appStorageParameters))"
             } else if variableDeclaration.attributes.contains(.binding) {
                 assignment = "this._\(variableDeclaration.propertyName) = \(variableDeclaration.propertyName)"

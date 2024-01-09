@@ -2081,6 +2081,76 @@ final class SwiftUITests: XCTestCase {
         """)
     }
 
+    func testAppStorageWithRawRepresentable() async throws {
+        try await check(supportingSwift: baseSupportingSwift + """
+        enum E: String {
+            case a, b
+        }
+        struct S: RawRepresentable {
+            let rawValue: Int
+            init(rawValue: Int) {
+                self.rawValue = rawValue
+            }
+        }
+        """, swift: """
+        import SwiftUI
+        struct V: View {
+            @AppStorage("enumKey") var enumProp: E = .a
+            @AppStorage("structKey") var structProp = S(rawValue: 1)
+            var body: some View {
+                Text("Hello")
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
+
+        import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
+        internal class V: View {
+            internal var enumProp: E
+                get() = _enumProp.wrappedValue
+                set(newValue) {
+                    _enumProp.wrappedValue = newValue
+                }
+            internal var _enumProp: skip.ui.AppStorage<E>
+            internal var structProp: S
+                get() = _structProp.wrappedValue
+                set(newValue) {
+                    _structProp.wrappedValue = newValue
+                }
+            internal var _structProp: skip.ui.AppStorage<S>
+            override fun body(): View {
+                return ComposeView { composectx: ComposeContext -> Text("Hello").Compose(composectx) }
+            }
+
+            @Composable
+            override fun ComposeContent(composectx: ComposeContext) {
+                val rememberedenumProp by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.AppStorage<E>, Any>) { mutableStateOf(_enumProp) }
+                _enumProp = rememberedenumProp
+                _enumProp.trackstate()
+
+                val rememberedstructProp by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.AppStorage<S>, Any>) { mutableStateOf(_structProp) }
+                _structProp = rememberedstructProp
+                _structProp.trackstate()
+
+                body().Compose(composectx)
+            }
+
+            constructor(enumProp: E = E.a, structProp: S = S(rawValue = 1)) {
+                this._enumProp = skip.ui.AppStorage(wrappedValue = enumProp, "enumKey", serializer = { it.rawValue }, deserializer = { if (it is String) E(rawValue = it) else null })
+                this._structProp = skip.ui.AppStorage(wrappedValue = structProp, "structKey", serializer = { it.rawValue }, deserializer = { if (it is Int) S(rawValue = it) else null })
+            }
+        }
+        """)
+    }
+
     func testMainActorViewBody() async throws {
         let supportingSwift = """
         struct Task<Success, Failure> where Failure: Error {

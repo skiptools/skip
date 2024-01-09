@@ -1010,7 +1010,7 @@ final class TypeInferenceTests: XCTestCase {
         """, kotlin: """
         internal interface P {
 
-            @Deprecated("This API is not yet available in Skip. Consider filing an issue against the owning library at https://github.com/skiptools, or see the library README for information on adding support", level = DeprecationLevel.ERROR)
+            @Deprecated("This API is not yet available in Skip. Consider placing it within a #if !SKIP block. You can file an issue against the owning library at https://github.com/skiptools, or see the library README for information on adding support", level = DeprecationLevel.ERROR)
             fun f(x: Int = 0, block: () -> Unit) = Unit
             fun f(a: Int = 0) = Unit
             fun g(): Unit = f()

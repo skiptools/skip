@@ -30,3 +30,16 @@ extension KotlinClassDeclaration {
         return (rawValueConstructor, rawValueVariable)
     }
 }
+
+extension TypeSignature {
+    /// Lookup the raw value type of this `RawRepresentable` type.
+    func rawValueType(codebaseInfo: CodebaseInfo.Context) -> TypeSignature {
+        guard isNamedType else {
+            return .none
+        }
+        guard let rawValue = codebaseInfo.matchIdentifier(name: "rawValue", inConstrained: self), rawValue.declarationType == .variableDeclaration else {
+            return .none
+        }
+        return rawValue.signature
+    }
+}

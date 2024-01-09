@@ -288,6 +288,10 @@ extension Message {
     // Idea: convert string mutation to re-assigning the string value
     static let kotlinStringMutation = "Detected possible string mutation. This may cause errors when converting to Kotlin, which does not have mutable strings"
 
+    static func kotlinSwiftUIAppStorageOptional(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .warning, message: "Skip does not support nil @AppStorage values. Consider making this property non-optional", sourceDerived: sourceDerived, source: source)
+    }
+
     static func kotlinSwiftUINavigationDestination(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .warning, message: ".navigationDestination modifiers must be the outer-most modifiers on the root view directly within a NavigationStack, e.g. NavigationStack { RootView().navigationDestination(...) }", sourceDerived: sourceDerived, source: source)
     }
