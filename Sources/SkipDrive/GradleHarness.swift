@@ -363,18 +363,33 @@ extension GradleHarness {
             exitCode = result.exitStatus
         })
 
-        var previousLine: String? = nil
+        var lines: [String] = []
         for try await line in output {
             if let outputPrefix = outputPrefix {
                 print(outputPrefix, line)
             }
             // check for errors and report them to the IDE with a 1-line buffer
-            scanGradleOutput(line1: previousLine ?? line, line2: line)
-            previousLine = line
+            scanGradleOutput(line1: lines.last ?? line, line2: line)
+            lines.append(line)
         }
 
         guard let exitCode = exitCode, case .terminated(0) = exitCode else {
-            throw AppLaunchError(errorDescription: "The skip gradle command failed. See the Report navigator build log for details, and consult https://skip.tools/docs/faq for common solutions. Command: gradle \(arguments.joined(separator: " "))")
+            // output the gradle build to a temporary location to make the file reference clickable
+            let logPath = (ProcessInfo.processInfo.environment["TEMP_DIR"] ?? URL.temporaryDirectory.path) + "/skip-gradle.log.txt"
+            var logPrefix: String = ""
+            do {
+                let logContents = lines.joined(separator: "\n")
+                // TODO: add debugging tips and pointers to the documentation
+                let endContents = """
+                """
+                try (logContents + endContents).write(toFile: logPath, atomically: false, encoding: .utf8)
+                // if we were able to write to the log file, add the xcode-compatible prefix for the error location
+                // https://developer.apple.com/documentation/xcode/running-custom-scripts-during-a-build#Log-errors-and-warnings-from-your-script
+                logPrefix = "\(logPath):\(lines.count):0: "
+            } catch {
+                // shouldn't fail
+            }
+            throw AppLaunchError(errorDescription: "\(logPrefix)error: The gradle command failed. Review the log for details and consult https://skip.tools/docs/faq for common solutions. Command: gradle \(arguments.joined(separator: " "))")
         }
     }
 
