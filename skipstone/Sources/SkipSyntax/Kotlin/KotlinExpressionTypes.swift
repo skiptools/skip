@@ -1107,6 +1107,7 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
     var isLocalOrSelfIdentifier = false
     var isOperatorIdentifier = false
     var valueSuffix: String? // Suffix to append to extract value, e.g. '.value()'
+    var isCalledAsFunction = false
     var isFunctionReference = false
     var isModuleNameFor: TypeSignature = .none
     var isTypealiasFor: TypeSignature = .none
@@ -1120,6 +1121,7 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
         kexpression.mayBeSharedMutableStruct = !kexpression.isOperatorIdentifier && expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
         kexpression.isLocalOrSelfIdentifier = expression.isLocalOrSelfIdentifier
         kexpression.isModuleNameFor = expression.isModuleNameFor.resolvingSelf(in: expression)
+        kexpression.isCalledAsFunction = expression.isCalledAsFunction
         if expression.inferredType.isFunction {
             kexpression.isFunctionReference = !expression.isLocalOrSelfIdentifier && !expression.isCalledAsFunction && translator.codebaseInfo?.isFunctionName(expression.name, in: expression.owningTypeDeclaration?.signature) == true
         } else if expression.inferredType.isMetaType && expression.apiMatch?.declarationType == .typealiasDeclaration {
@@ -1246,6 +1248,8 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
                 var type = isTypealiasFor
                 if let generics, !generics.isEmpty {
                     type = type.withGenerics(generics)
+                } else if isCalledAsFunction {
+                    type = type.withGenerics([])
                 }
                 output.append(type.kotlin)
             } else {

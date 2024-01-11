@@ -79,6 +79,35 @@ final class TypealiasTests: XCTestCase {
         """)
     }
 
+    func testTypealiasConstructorWithGenerics() async throws {
+        try await check(supportingSwift: """
+        struct S<T> {
+        }
+        """, swift: """
+        typealias SA<T> = S<T>
+        func f() {
+            let s = SA()
+        }
+        """, kotlin: """
+        internal typealias SA<T> = S<T>
+        internal fun f() {
+            val s = S()
+        }
+        """)
+
+        try await check(supportingSwift: """
+        typealias AA = Array<Int>
+        """, swift: """
+        func f() {
+            let a = AA()
+        }
+        """, kotlin: """
+        internal fun f() {
+            val a = Array<Int>()
+        }
+        """)
+    }
+
     func testProtocolGenericsResolutionUsingUnknownTypealiasMember() async throws {
         // Figure out generic type of P based on S.v
         try await check(swift: """
