@@ -29,7 +29,8 @@ final class KotlinModuleBundleTransformer: KotlinTransformer {
         
         let declarations = [
             "internal val skip.foundation.Bundle.Companion.module: skip.foundation.Bundle",
-            "    get() = skip.foundation.Bundle(_ModuleBundleLocator::class)",
+            "    get() = _moduleBundle",
+            "private val _moduleBundle : skip.foundation.Bundle by lazy { skip.foundation.Bundle(_ModuleBundleLocator::class) }",
             "internal class _ModuleBundleLocator {}"
         ]
         let statements = declarations.map { KotlinRawStatement(sourceCode: $0) }

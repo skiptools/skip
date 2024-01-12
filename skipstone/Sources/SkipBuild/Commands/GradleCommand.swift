@@ -44,8 +44,8 @@ struct GradleCommand: SkipCommand {
             try await self.gradleExec(in: projectRoot(forModule: module, packageName: package, projectFolder: project), moduleName: module, packageName: package, arguments: gradleArguments)
             #endif
         } catch {
-            // output error message in an xcode-friendly way
-            print("error: \(error.localizedDescription)")
+            // output error message
+            print("\(error.localizedDescription)")
             throw error
         }
     }
