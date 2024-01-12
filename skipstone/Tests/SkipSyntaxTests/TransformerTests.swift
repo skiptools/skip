@@ -81,7 +81,8 @@ final class TransformerTests: XCTestCase {
         }
         """, packageSupportKotlin: """
         internal val skip.foundation.Bundle.Companion.module: skip.foundation.Bundle
-            get() = skip.foundation.Bundle(_ModuleBundleLocator::class)
+            get() = _moduleBundle
+        private val _moduleBundle : skip.foundation.Bundle by lazy { skip.foundation.Bundle(_ModuleBundleLocator::class) }
         internal class _ModuleBundleLocator {}
         """)
 
@@ -97,7 +98,8 @@ final class TransformerTests: XCTestCase {
         }
         """, packageSupportKotlin: """
         internal val skip.foundation.Bundle.Companion.module: skip.foundation.Bundle
-            get() = skip.foundation.Bundle(_ModuleBundleLocator::class)
+            get() = _moduleBundle
+        private val _moduleBundle : skip.foundation.Bundle by lazy { skip.foundation.Bundle(_ModuleBundleLocator::class) }
         internal class _ModuleBundleLocator {}
         """)
 
