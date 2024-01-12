@@ -30,7 +30,7 @@ jobs:
         run: |
           SKIP_ZERO=1 xcodebuild build -sdk iphonesimulator -destination "platform=iOS Simulator,name=iPhone 14" -skipPackagePluginValidation -configuration debug -scheme $(basename $PWD)
 
-      - name: Test iOS & Android (local)
+      - name: Test macOS & Android (local)
         run: skip test --verbose
 
       - name: Prepare Android emulator
