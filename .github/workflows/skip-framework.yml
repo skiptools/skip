@@ -26,8 +26,12 @@ jobs:
       - name: Verify Skip Framework
         run: skip verify
 
-      - name: Local Skip Tests
-        run: skip test || skip test --verbose
+      - name: Test iOS (connected)
+        run: |
+          SKIP_ZERO=1 xcodebuild build -sdk iphonesimulator -destination "platform=iOS Simulator,name=iPhone 14" -skipPackagePluginValidation -configuration debug -scheme $(basename $PWD)
+
+      - name: Test iOS & Android (local)
+        run: skip test --verbose
 
       - name: Prepare Android emulator
         run: |
@@ -67,7 +71,8 @@ jobs:
           disable-animations: false
           script: echo "Generated AVD snapshot for caching"
 
-      - name: Run connected Android emulator tests
+
+      - name: Test Android (connected)
         uses: reactivecircus/android-emulator-runner@v2
         with:
           working-directory: .build/android-tests
@@ -79,12 +84,6 @@ jobs:
           #profile: Galaxy Nexus
           avd-name: Pixel_3a_API_30
           script: adb logcat *:S TestRunner:V & ./gradlew connectedCheck --stacktrace
-
-      - name: Connected iOS Simulator Build
-        run: |
-          SKIP_ZERO=1 xcodebuild build -sdk iphonesimulator -destination "platform=iOS Simulator,name=iPhone 14" -skipPackagePluginValidation -configuration debug -scheme $(basename $PWD) && xcodebuild test -sdk iphonesimulator -destination "platform=iOS Simulator,name=iPhone 14" -skipPackagePluginValidation -configuration debug -scheme $(basename $PWD)
-
-          tree ~/Library/Developer/Xcode/DerivedData/*/Build/Products/ || true
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
