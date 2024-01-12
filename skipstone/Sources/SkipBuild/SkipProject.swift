@@ -208,8 +208,8 @@ class FrameworkProjectLayout {
 
                 let testSkipModuleFile = testDir.appending(path: "XCSkipTests.swift")
                 try """
-                import Foundation
-                \(sourceHeader)#if os(macOS) // Skip transpiled tests only run on macOS targets
+                \(sourceHeader)import Foundation
+                #if os(macOS) // Skip transpiled tests only run on macOS targets
                 import SkipTest
 
                 /// This test case will run the transpiled tests for the Skip module.
