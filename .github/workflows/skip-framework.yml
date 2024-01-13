@@ -28,7 +28,10 @@ jobs:
 
       - name: Test iOS (connected)
         run: |
-          SKIP_ZERO=1 xcodebuild test -sdk iphonesimulator -destination "platform=iOS Simulator,name=iPhone 14" -skipPackagePluginValidation -configuration debug -scheme $(basename $PWD)
+          # run the tests against the first listed scheme, which for a
+          # single-module package will just be "project-name",
+          # and for a multi-module package will be "project-name-Package"
+          SKIP_ZERO=1 xcodebuild test -sdk iphonesimulator -destination "platform=iOS Simulator,name=iPhone 15" -skipPackagePluginValidation -configuration debug -scheme $(xcodebuild -list -json | jq -r '.workspace.schemes[0]')
 
       - name: Test macOS & Robolectric (local)
         run: skip test --verbose
