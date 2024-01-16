@@ -114,6 +114,23 @@ final class MemberDeclarationTests: XCTestCase {
         internal fun C.Companion.staticFunc(): Int = 20
         """)
 
+        try await check(swift: """
+        extension C {
+            static var staticVar: Int?
+            static let staticConst = 10
+        }
+        """, kotlin: """
+        internal var C.Companion.staticVar: Int?
+            get() = CCompanionstaticVarstorage
+            set(newValue) {
+                CCompanionstaticVarstorage = newValue
+            }
+        private var CCompanionstaticVarstorage: Int? = null
+        internal val C.Companion.staticConst: Int
+            get() = CCompanionstaticConststorage
+        private val CCompanionstaticConststorage = 10
+        """)
+
         try await checkProducesMessage(swift: """
         class C<T> {
         }

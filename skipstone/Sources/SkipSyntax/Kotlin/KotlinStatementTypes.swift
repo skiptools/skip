@@ -2901,8 +2901,17 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             return nil
         }
 
-        guard !modifiers.isLazy else {
-            let name = "\(propertyName)storage"
+        var storagePrefix = ""
+        if let extends {
+            storagePrefix = extends.0.name
+            if modifiers.isStatic {
+                storagePrefix += "Companion"
+            }
+        }
+        let name = "\(storagePrefix)\(propertyName)storage"
+
+        // Lazy?
+        if modifiers.isLazy {
             return KotlinVariableStorage(access: name) { variable, output, indentation in
                 if variable.propertyType.kotlinIsNative(primitive: true) {
                     output.append(indentation).append("private var \(name) = \(variable.propertyType.kotlinDefaultValue ?? "")\n")
@@ -2912,25 +2921,39 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             }
         }
 
-        guard declaredType.isUnwrappedOptional else {
-            return nil
-        }
-        // We only need a separate storage var if we need custom get or set logic
-        guard (mayBeSharedMutableStruct && apiFlags.contains(.writeable)) || mutationFunctionNames != nil || getter?.body != nil || setter?.body != nil || willSet?.body != nil || didSet?.body != nil else {
-            return nil
+        // Unwrapped optional with custom get and set logic?
+        if declaredType.isUnwrappedOptional, (mayBeSharedMutableStruct && apiFlags.contains(.writeable)) || mutationFunctionNames != nil || getter?.body != nil || setter?.body != nil || willSet?.body != nil || didSet?.body != nil {
+            if !apiFlags.contains(.writeable), let getterBody = getter?.body {
+                return KotlinVariableStorage(access: name, isUnwrappedOptional: !propertyType.isOptional) { variable, output, indentation in
+                    output.append(indentation).append("private val \(name): \(variable.propertyType.asOptional(true).kotlin)\n")
+                    variable.appendGetterBody(getterBody, to: output, indentation: indentation.inc())
+                }
+            } else {
+                return KotlinVariableStorage(access: name) { variable, output, indentation in
+                    output.append(indentation).append("private lateinit var \(name): \(variable.propertyType.kotlin)\n")
+                }
+            }
         }
 
-        let name = "\(propertyName)storage"
-        if !apiFlags.contains(.writeable), let getterBody = getter?.body {
-            return KotlinVariableStorage(access: name, isUnwrappedOptional: !propertyType.isOptional) { variable, output, indentation in
-                output.append(indentation).append("private val \(name): \(variable.propertyType.asOptional(true).kotlin)\n")
-                variable.appendGetterBody(getterBody, to: output, indentation: indentation.inc())
-            }
-        } else {
-            return KotlinVariableStorage(access: name) { variable, output, indentation in
-                output.append(indentation).append("private lateinit var \(name): \(variable.propertyType.kotlin)\n")
+        // Stored static extension property that can't be moved into owning type?
+        if extends != nil, modifiers.isStatic, getter?.body == nil || (apiFlags.contains(.writeable) && setter?.body == nil) {
+            return KotlinVariableStorage(access: name, isUnwrappedOptional: propertyType.isUnwrappedOptional) { variable, output, indentation in
+                output.append(indentation).append("private ")
+                output.append(variable.apiFlags.contains(.writeable) ? "var " : "val ")
+                output.append(name)
+                if variable.declaredType != .none {
+                    output.append(": ").append(variable.declaredType.kotlin)
+                }
+                if let value = variable.value {
+                    output.append(" = ").append(value, indentation: indentation)
+                } else if variable.declaredType.isOptional {
+                    output.append(" = null")
+                }
+                output.append("\n")
             }
         }
+
+        return nil
     }
 
     private var didSetUsesOldValue: Bool {
