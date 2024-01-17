@@ -268,6 +268,7 @@ extension Message {
         return Message(kind: .error, message: "Skip only supports OptionSets that are structs. Change this type to a struct", sourceDerived: sourceDerived, source: source)
     }
 
+    //~~~
     // Idea: create Companion protocol too with init functions, conform implementations to it, and cast to it at call sites
     static func kotlinProtocolConstructor(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Kotlin does not support constructors in protocols", sourceDerived: sourceDerived, source: source)
@@ -277,6 +278,7 @@ extension Message {
         return Message(kind: .warning, message: "Kotlin does not support protocol members with lower visibility than their declaring protocol. Skip will elevate the visibility of this member, which may cause problems if it exposes internal types", sourceDerived: sourceDerived, source: source)
     }
 
+    //~~~
     // Idea: create Companion protocol too, conform implementations to it, and cast to it at call sites
     static func kotlinProtocolStaticMember(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Kotlin does not support static requirements in protocols", sourceDerived: sourceDerived, source: source)

@@ -1722,16 +1722,8 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             }
         }
 
-        if owningTypeDeclaration.type == .protocolDeclaration {
-            if statement.type == .initDeclaration {
-                kstatement.messages.append(.kotlinProtocolConstructor(statement, source: translator.syntaxTree.source))
-            } else if modifiers.isStatic {
-                kstatement.messages.append(.kotlinProtocolStaticMember(statement, source: translator.syntaxTree.source))
-            }
-        } else if owningTypeDeclaration.type == .extensionDeclaration {
-            if modifiers.isStatic && owningDeclarationType == .protocolDeclaration {
-                kstatement.messages.append(.kotlinProtocolExtensionStaticMember(protocolName: owningTypeDeclaration.name, memberName: kstatement.name, sourceDerived: statement, source: translator.syntaxTree.source))
-            }
+        if owningTypeDeclaration.type == .extensionDeclaration, modifiers.isStatic && owningDeclarationType == .protocolDeclaration {
+            kstatement.messages.append(.kotlinProtocolExtensionStaticMember(protocolName: owningTypeDeclaration.name, memberName: kstatement.name, sourceDerived: statement, source: translator.syntaxTree.source))
         }
         return true
     }
@@ -2543,12 +2535,8 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if kstatement.declaredType == .none && kstatement.propertyType == .none && kstatement.initializeStorage() != nil {
             kstatement.messages.append(.kotlinVariableNeedsTypeDeclaration(kstatement, source: translator.syntaxTree.source))
         }
-        if statement.modifiers.isStatic && owningDeclarationType == .protocolDeclaration {
-            if let owningTypeDeclaration, owningTypeDeclaration.type == .extensionDeclaration {
-                kstatement.messages.append(.kotlinProtocolExtensionStaticMember(protocolName: owningTypeDeclaration.name, memberName: statement.propertyName, sourceDerived: statement, source: translator.syntaxTree.source))
-            } else {
-                kstatement.messages.append(.kotlinProtocolStaticMember(statement, source: translator.syntaxTree.source))
-            }
+        if let owningTypeDeclaration, owningTypeDeclaration.type == .extensionDeclaration, statement.modifiers.isStatic && owningDeclarationType == .protocolDeclaration {
+            kstatement.messages.append(.kotlinProtocolExtensionStaticMember(protocolName: owningTypeDeclaration.name, memberName: statement.propertyName, sourceDerived: statement, source: translator.syntaxTree.source))
         }
         return kstatement
     }
