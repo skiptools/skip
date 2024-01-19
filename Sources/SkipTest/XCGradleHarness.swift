@@ -38,6 +38,7 @@ extension XCGradleHarness where Self : XCTestCase {
             #endif
             let info = !["NO", "no", "false", "0"].contains(ProcessInfo.processInfo.environment["SKIP_GRADLE_VERBOSE"] ?? "NO")
             try await invokeGradle(actions: [testAction], info: info, deviceID: device)
+            print("Completed gradle test run for \(device ?? "local")")
         } catch {
             XCTFail("\((error as? LocalizedError)?.localizedDescription ?? error.localizedDescription)", file: file, line: line)
         }
@@ -133,7 +134,9 @@ extension XCGradleHarness where Self : XCTestCase {
                 if isTestAction {
                     let testSuites = try parseResults()
                     // the absense of any test data probably indicates some sort of mis-configuration or else a build failure
-                    XCTAssertNotEqual(0, testSuites.count, "No tests were run")
+                    if testSuites.isEmpty {
+                        XCTFail("No tests were run; this may indicate an issue with running the tests on \(deviceID ?? "Robolectric"). See the test output and Report Navigator log for details.")
+                    }
                     failedTests = reportTestResults(testSuites, dir).map(\.fullName)
                 } else {
                     failedTests = []

@@ -42,6 +42,8 @@ extension Process {
     private static func streamSeparator(character separatorCharacter: UnicodeScalar = Character("\n").unicodeScalars.first!, command arguments: [String], environment: [String: String], workingDirectory: URL?, includeStdErr: Bool, onExit: @escaping (_ result: ProcessResult) throws -> ()) -> AsyncDataOutput {
         AsyncThrowingStream { continuation in
             var buffer: [UInt8] = []
+            // lock is needed because handleProcessOutput seems to sometimes be invoked from different threads (somehow) – possibly one for stdout and stdin?
+            let bufferLock = NSLock()
             func handleProcessOutput(err: Bool) -> (_ data: [UInt8]) -> Void {
                 { outputBytes in
                     if err && !includeStdErr {
@@ -50,12 +52,16 @@ extension Process {
                     }
                     var data: ArraySlice<UInt8> = outputBytes[outputBytes.startIndex...] // turn array into slice
                     while let nl = data.firstIndex(of: separatorCharacter.utf8.first!) {
-                        let line = buffer + data[data.startIndex..<nl]
-                        buffer = []
-                        continuation.yield(Data(line))
-                        data = data[nl...].dropFirst() // continue processing the rest of the buffer
+                        bufferLock.withLock {
+                            let line = buffer + data[data.startIndex..<nl]
+                            buffer = []
+                            continuation.yield(Data(line))
+                            data = data[nl...].dropFirst() // continue processing the rest of the buffer
+                        }
                     }
-                    buffer += data
+                    bufferLock.withLock {
+                        buffer += data
+                    }
                 }
             }
 
