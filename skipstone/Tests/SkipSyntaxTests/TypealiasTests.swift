@@ -196,17 +196,14 @@ final class TypealiasTests: XCTestCase {
 
     func testRecursivelyNamedUnknownTypealias() async throws {
         try await check(swift: """
-        public typealias MessageDigest = java.security.MessageDigest
-        public protocol NamedHashFunction {
+        typealias MessageDigest = java.security.MessageDigest
+        protocol NamedHashFunction {
             var digest: MessageDigest { get }
         }
         """, kotlin: """
-        typealias MessageDigest = java.security.MessageDigest
-        interface NamedHashFunction {
+        internal typealias MessageDigest = java.security.MessageDigest
+        internal interface NamedHashFunction {
             val digest: java.security.MessageDigest
-
-            companion object {
-            }
         }
         """)
     }

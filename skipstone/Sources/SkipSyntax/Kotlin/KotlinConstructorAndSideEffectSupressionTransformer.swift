@@ -165,7 +165,7 @@ final class KotlinConstructorAndSideEffectSupressionTransformer: KotlinTransform
     }
 
     private func superclass(of classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) -> TypeSignature? {
-        guard let inherits = classDeclaration.inherits.first, translator.codebaseInfo?.declarationType(forNamed: inherits) == .classDeclaration else {
+        guard let inherits = classDeclaration.inherits.first, translator.codebaseInfo?.declarationType(forNamed: inherits)?.type == .classDeclaration else {
             return nil
         }
         return inherits

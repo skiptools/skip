@@ -83,23 +83,22 @@ extension CodebaseInfo.Context {
 
     /// Whether this declaration is implementing a protocol property.
     func isImplementingKotlinInterfaceMember(declaration: Statement, in type: TypeSignature) -> Bool {
-        // Kotlin interfaces can have static extensions but not requirements, so static members are no overridable
-        if let variableDeclaration = declaration as? VariableDeclaration, !variableDeclaration.modifiers.isStatic {
+        if let variableDeclaration = declaration as? VariableDeclaration {
             guard !variableDeclaration.names.isEmpty, let name = variableDeclaration.names[0] else {
                 return false
             }
-            return isKotlinInterfaceMember(name: name, parameters: nil, in: type, includeDeclaringType: false)
-        } else if let functionDeclaration = declaration as? FunctionDeclaration, !functionDeclaration.modifiers.isStatic {
-            return isKotlinInterfaceMember(name: functionDeclaration.name, parameters: functionDeclaration.functionType.parameters, in: type, includeDeclaringType: false)
-        } else if let subscriptDeclaration = declaration as? SubscriptDeclaration, subscriptDeclaration.modifiers.isStatic {
-            return isKotlinInterfaceMember(name: "subscript", parameters: subscriptDeclaration.getterType.parameters, in: type, includeDeclaringType: false)
+            return isKotlinInterfaceMember(name: name, parameters: nil, isStatic: variableDeclaration.modifiers.isStatic, in: type, includeDeclaringType: false)
+        } else if let functionDeclaration = declaration as? FunctionDeclaration {
+            return isKotlinInterfaceMember(name: functionDeclaration.name, parameters: functionDeclaration.functionType.parameters, isStatic: functionDeclaration.modifiers.isStatic, in: type, includeDeclaringType: false)
+        } else if let subscriptDeclaration = declaration as? SubscriptDeclaration {
+            return isKotlinInterfaceMember(name: "subscript", parameters: subscriptDeclaration.getterType.parameters, isStatic: subscriptDeclaration.modifiers.isStatic, in: type, includeDeclaringType: false)
         } else {
             return false
         }
     }
 
     /// Whether the given member is declared by a protocol of the given type.
-    func isKotlinInterfaceMember(name: String, parameters: [TypeSignature.Parameter]?, in owningType: TypeSignature, includeDeclaringType: Bool = true) -> Bool {
+    func isKotlinInterfaceMember(name: String, parameters: [TypeSignature.Parameter]?, isStatic: Bool, in owningType: TypeSignature, includeDeclaringType: Bool = true) -> Bool {
         assert(global.kotlin != nil)
         let protocolSignatures = global.protocolSignatures(forNamed: owningType)
         let parameterLabels = parameters?.map(\.label) ?? []
@@ -112,15 +111,15 @@ extension CodebaseInfo.Context {
             for protocolInfo in typeInfos(forNamed: protocolSignature) {
                 if parameters != nil {
                     if name == "subscript" {
-                        if protocolInfo.subscripts.contains(where: { $0.signature.parameters.map(\.label) == parameterLabels && isCompatibleParameterTypes(candidates: parameterTypes, in: owningType, targets: $0.signature.parameters.map(\.type), in: protocolInfo.signature) }) {
+                        if protocolInfo.subscripts.contains(where: { $0.isStatic == isStatic && $0.signature.parameters.map(\.label) == parameterLabels && isCompatibleParameterTypes(candidates: parameterTypes, in: owningType, targets: $0.signature.parameters.map(\.type), in: protocolInfo.signature) }) {
                             return true
                         }
                     } else {
-                        if protocolInfo.functions.contains(where: { $0.name == name && $0.signature.parameters.map(\.label) == parameterLabels && isCompatibleParameterTypes(candidates: parameterTypes, in: owningType, targets: $0.signature.parameters.map(\.type), in: protocolInfo.signature) }) {
+                        if protocolInfo.functions.contains(where: { $0.isStatic == isStatic && $0.name == name && $0.signature.parameters.map(\.label) == parameterLabels && isCompatibleParameterTypes(candidates: parameterTypes, in: owningType, targets: $0.signature.parameters.map(\.type), in: protocolInfo.signature) }) {
                             return true
                         }
                     }
-                } else if protocolInfo.variables.contains(where: { $0.name == name }) {
+                } else if protocolInfo.variables.contains(where: { $0.isStatic == isStatic && $0.name == name }) {
                     return true
                 }
             }
@@ -190,6 +189,26 @@ extension CodebaseInfo.Context {
         }
         let items = ranked(global.lookup(name: name))
         return items.contains { $0.declarationType == .functionDeclaration && $0.declaringType?.name == owningType?.name }
+    }
+
+    /// If the given interface has a companion object interface, return it.
+    func companionInterface(of interface: TypeSignature) -> TypeSignature? {
+        let typeInfos = typeInfos(forNamed: interface)
+        guard let typeInfo = typeInfos.first(where: { $0.declarationType == .protocolDeclaration }) else {
+            return nil
+        }
+        // Use a companion interface for any protocol that has static or init members, or that inherits from
+        // a protocol with static or init members
+        let companionInterface: TypeSignature = .named(KotlinInterfaceDeclaration.companionInterfaceName(for: interface.name), interface.generics)
+        if typeInfos.contains(where: { $0.members.contains(where: { $0.declarationType == .initDeclaration || ($0.declarationType == .variableDeclaration && $0.isStatic) || ($0.declarationType == .functionDeclaration && $0.isStatic) }) }) {
+            return companionInterface
+        }
+        for inherit in typeInfo.inherits {
+            if self.companionInterface(of: inherit) != nil {
+                return companionInterface
+            }
+        }
+        return nil
     }
 }
 

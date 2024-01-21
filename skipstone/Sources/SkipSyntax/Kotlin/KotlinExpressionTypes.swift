@@ -1708,7 +1708,7 @@ struct KotlinMatchingCase {
 
 class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwiftUIBindable, KotlinCastTarget, KotlinSingleStatementVetoing, APICallExpression {
     var base: KotlinExpression?
-    var baseKClass: TypeSignature?
+    var baseKClass: (TypeSignature, StatementType)?
     var member: String
     var memberSourceRange: Source.Range?
     var apiMatch: APIMatch?
@@ -1805,7 +1805,7 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
     }
 
     /// Return the `KClass` instance the given expression evaluates to, if any.
-    private static func kclass(for expression: Expression, accessingMember: String, codebaseInfo: CodebaseInfo.Context?) -> TypeSignature? {
+    private static func kclass(for expression: Expression, accessingMember: String, codebaseInfo: CodebaseInfo.Context?) -> (TypeSignature, StatementType)? {
         // Must evaluate to X.Type
         guard expression.inferredType.isMetaType else {
             return nil
@@ -1841,7 +1841,9 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
         }
         // Now that we've ruled out a type literal, any other non-Identifier must be represented by a KClass
         guard let identifier = expression as? Identifier else {
-            return type.resolvingSelf(in: expression)
+            let resolvedType = type.resolvingSelf(in: expression)
+            let declarationType = codebaseInfo?.declarationType(forNamed: type)?.type ?? .classDeclaration
+            return (resolvedType, declarationType)
         }
         guard identifier.name != "Self" && identifier.name != "self" else {
             return nil
@@ -1862,7 +1864,12 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
         guard let codebaseInfo else {
             return nil
         }
-        return codebaseInfo.declarationType(forNamed: .named(identifier.name, [])) == nil ? type.resolvingSelf(in: expression) : nil
+        guard codebaseInfo.declarationType(forNamed: .named(identifier.name, [])) == nil else {
+            return nil
+        }
+        let resolvedType = type.resolvingSelf(in: expression)
+        let declarationType = codebaseInfo.declarationType(forNamed: type)?.type ?? .classDeclaration
+        return (resolvedType, declarationType)
     }
 
     init(base: KotlinExpression, member: String) {
@@ -2029,7 +2036,14 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
                 output.append("?")
             }
             if let baseKClass {
-                output.append(".companionObjectInstance as \(baseKClass).Companion)")
+                output.append(".companionObjectInstance as ")
+                if baseKClass.1 == .protocolDeclaration {
+                    let type = TypeSignature.named(KotlinInterfaceDeclaration.companionInterfaceName(for: baseKClass.0.name), baseKClass.0.generics)
+                    output.append(type.kotlin)
+                } else {
+                    output.append(baseKClass.0.withGenerics([]).kotlin).append(".Companion")
+                }
+                output.append(")")
                 if base.optionalChain == .implicit {
                     output.append("?")
                 }

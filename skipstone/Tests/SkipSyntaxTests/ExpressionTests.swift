@@ -71,6 +71,55 @@ final class ExpressionTests: XCTestCase {
         """)
     }
 
+    func testProtocolInit() async throws {
+        //~~~
+        //~~~ Also need to add inits for every matching constructor
+    }
+
+    func testStaticProtocolMember() async throws {
+        try await check(supportingSwift: """
+        func type<T>(of: T) -> T.Type {
+        }
+        """, swift: """
+        protocol P {
+            static var i: Int { get }
+            static func f()
+        }
+        protocol Q: P {
+        }
+        func g<T>(ptype: T.Type) where T: P {
+            let i = ptype.i
+            ptype.f()
+        }
+        func h<T>(p: T, q: any Q) where T: P {
+            let i = type(of: p).i
+            type(of: q).f()
+        }
+        """, kotlin: """
+        import kotlin.reflect.KClass
+        import kotlin.reflect.full.companionObjectInstance
+
+        internal interface P {
+        }
+        internal interface PCompanion {
+            val i: Int
+            fun f()
+        }
+        internal interface Q: P {
+        }
+        internal interface QCompanion: PCompanion {
+        }
+        internal fun <T> g(ptype: KClass<T>) where T: P {
+            val i = (ptype.companionObjectInstance as PCompanion).i
+            (ptype.companionObjectInstance as PCompanion).f()
+        }
+        internal fun <T> h(p: T, q: Q) where T: P {
+            val i = (type(of = p).companionObjectInstance as PCompanion).i
+            (type(of = q).companionObjectInstance as QCompanion).f()
+        }
+        """)
+    }
+
     func testStaticMemberUsingClassReference() async throws {
         try await check(swift: """
         class C {

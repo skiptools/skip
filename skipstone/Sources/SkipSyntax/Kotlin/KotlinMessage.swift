@@ -137,6 +137,10 @@ extension Message {
         return Message(kind: .error, message: "\(unmovableExplanation) Therefore it cannot add additional constructors", sourceDerived: sourceDerived, source: source)
     }
 
+    static func kotlinExtensionAddStaticProtocolMember(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "You cannot add static extension members to a protocol declared outside of this module, unless that protocol already has static members", sourceDerived: sourceDerived, source: source)
+    }
+
     static func kotlinExtensionAddProtocols(_ sourceDerived: SourceDerived, extensionPlacement: KotlinExtensionPlacement, source: Source) -> Message? {
         guard let unmovableExplanation = extensionUnmovableExplanation(placement: extensionPlacement) else {
             return nil
@@ -268,25 +272,8 @@ extension Message {
         return Message(kind: .error, message: "Skip only supports OptionSets that are structs. Change this type to a struct", sourceDerived: sourceDerived, source: source)
     }
 
-    //~~~
-    // Idea: create Companion protocol too with init functions, conform implementations to it, and cast to it at call sites
-    static func kotlinProtocolConstructor(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "Kotlin does not support constructors in protocols", sourceDerived: sourceDerived, source: source)
-    }
-
     static func kotlinProtocolMemberVisibility(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .warning, message: "Kotlin does not support protocol members with lower visibility than their declaring protocol. Skip will elevate the visibility of this member, which may cause problems if it exposes internal types", sourceDerived: sourceDerived, source: source)
-    }
-
-    //~~~
-    // Idea: create Companion protocol too, conform implementations to it, and cast to it at call sites
-    static func kotlinProtocolStaticMember(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "Kotlin does not support static requirements in protocols", sourceDerived: sourceDerived, source: source)
-    }
-
-    // Idea: have the transpiler change C.member to P.member so it appears that you can access through C
-    static func kotlinProtocolExtensionStaticMember(protocolName: String, memberName: String, sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .warning, message: "Your code must only access this static protocol member as \(protocolName).\(memberName). If some class C implements \(protocolName), C.\(memberName) is not valid in Kotlin", sourceDerived: sourceDerived, source: source)
     }
 
     // Idea: convert string mutation to re-assigning the string value

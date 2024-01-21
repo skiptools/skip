@@ -18,7 +18,7 @@ final class KotlinErrorToExceptionTransformer: KotlinTransformer {
         guard codebaseInfo.conformsToError(type: classDeclaration.signature) else {
             return
         }
-        if let firstInherits = classDeclaration.inherits.first, codebaseInfo.declarationType(forNamed: firstInherits) == .classDeclaration {
+        if let firstInherits = classDeclaration.inherits.first, codebaseInfo.declarationType(forNamed: firstInherits)?.type == .classDeclaration {
             classDeclaration.messages.append(.kotlinErrorCannotExtendClass(classDeclaration, source: source))
             return
         }

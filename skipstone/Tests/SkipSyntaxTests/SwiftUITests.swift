@@ -104,6 +104,9 @@ final class SwiftUITests: XCTestCase {
             override fun body(): View {
                 return ComposeView { composectx: ComposeContext -> ComposeResult.ok }
             }
+
+            companion object: MyViewCompanion {
+            }
         }
         """)
     }

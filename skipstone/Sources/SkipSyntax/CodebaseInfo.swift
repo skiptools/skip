@@ -287,21 +287,21 @@ public class CodebaseInfo {
         }
 
         /// Whether the given type is a class, struct, etc, optionally limiting results to this module.
-        func declarationType(forNamed type: TypeSignature, resolveTypealias: Bool = true, unknownTypealiasFallback: StatementType = .classDeclaration, mustBeInModule: Bool = false) -> StatementType? {
+        func declarationType(forNamed type: TypeSignature, resolveTypealias: Bool = true, unknownTypealiasFallback: StatementType = .classDeclaration) -> (type: StatementType, isInModule: Bool)? {
             if !resolveTypealias {
                 let members = ranked(global.lookup(name: type.name, qualifiedMatch: true))
-                return members.first { ($0 is TypeInfo || $0 is TypealiasInfo) && (!mustBeInModule || $0.moduleName == global.moduleName) }?.declarationType
+                guard let match = members.first(where: { ($0 is TypeInfo || $0 is TypealiasInfo) }) else {
+                    return nil
+                }
+                return (match.declarationType, match.moduleName == global.moduleName)
             }
             guard let typeInfo = primaryTypeInfo(forNamed: type) else {
                 guard let typealiasInfo = crossPlatformTypealias(forUnknownNamed: type) else {
                     return nil
                 }
-                return !mustBeInModule || typealiasInfo.moduleName == global.moduleName ? unknownTypealiasFallback : nil
+                return (unknownTypealiasFallback, typealiasInfo.moduleName == global.moduleName)
             }
-            if mustBeInModule && typeInfo.moduleName != global.moduleName {
-                return nil
-            }
-            return typeInfo.declarationType
+            return (typeInfo.declarationType, typeInfo.moduleName == global.moduleName)
         }
 
         /// Resolve typealiases in the given type.

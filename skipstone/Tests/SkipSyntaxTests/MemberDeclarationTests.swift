@@ -972,17 +972,27 @@ final class MemberDeclarationTests: XCTestCase {
         protocol P {
             var i: Int { get }
             func f()
+            static var si: Int { get }
+            static func sf()
         }
         """, swift: """
         class PImpl: P {
             var i = 0
             func f() {
             }
+            static var si = 0
+            static func sf() {
+            }
         }
         """, kotlin: """
         internal open class PImpl: P {
             override var i = 0
             override fun f() = Unit
+
+            companion object: PCompanion {
+                override var si = 0
+                override fun sf() = Unit
+            }
         }
         """)
 
@@ -1026,6 +1036,7 @@ final class MemberDeclarationTests: XCTestCase {
         protocol P {
             var i: Int { get }
             func f()
+            static func sf()
         }
         protocol Q: P {
         }
@@ -1036,11 +1047,17 @@ final class MemberDeclarationTests: XCTestCase {
 
             func f() {
             }
+
+            static func sf() {
+            }
         }
         """, kotlin: """
         internal interface P {
             val i: Int
             fun f()
+        }
+        internal interface PCompanion {
+            fun sf()
         }
         internal interface Q: P {
 
@@ -1049,11 +1066,15 @@ final class MemberDeclarationTests: XCTestCase {
 
             override fun f() = Unit
         }
+        internal interface QCompanion: PCompanion {
+
+            override fun sf() = Unit
+        }
         """)
     }
 
     func testProtocolExtensionStaticMembers() async throws {
-        try await check(expectMessages: true, swift: """
+        try await check(swift: """
         protocol P {
         }
         extension P {
@@ -1065,13 +1086,12 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal interface P {
+        }
+        internal interface PCompanion {
 
-            companion object {
-
-                val x: Int
-                    get() = 1
-                fun f() = Unit
-            }
+            val x: Int
+                get() = 1
+            fun f() = Unit
         }
         """)
     }
@@ -1413,19 +1433,31 @@ final class MemberDeclarationTests: XCTestCase {
         internal interface P1 {
             fun f(a: Int)
         }
+        internal interface P1Companion {
+        }
         internal interface P2 {
             fun f(a: Double)
+        }
+        internal interface P2Companion {
         }
         internal interface P3: P1, P2 {
             fun f(b: Int, @Suppress("UNUSED_PARAMETER") unusedp_0: Nothing? = null)
         }
+        internal interface P3Companion: P1Companion, P2Companion {
+        }
         internal open class A: P1 {
             override fun f(a: Int) = Unit
+
+            companion object: P1Companion {
+            }
         }
         internal open class B: P2, P3 {
             override fun f(a: Int) = Unit
             override fun f(a: Double) = Unit
             override fun f(b: Int, @Suppress("UNUSED_PARAMETER") unusedp_0: Nothing?) = Unit
+
+            companion object: P2Companion, P3Companion {
+            }
         }
         """)
 
@@ -1590,6 +1622,73 @@ final class MemberDeclarationTests: XCTestCase {
         struct S<T> {
             mutating func f() where T: I {
                 self = S()
+            }
+        }
+        """)
+    }
+
+    func testGenericProtocolStaticRequirements() async throws {
+        try await check(swift: """
+        protocol P {
+            associatedtype T
+            static func f(p: T)
+        }
+        class C: P {
+            static func f(p: Int) {
+            }
+        }
+        """, kotlin: """
+        internal interface P<T> {
+        }
+        internal interface PCompanion<T> {
+            fun f(p: T)
+        }
+        internal open class C: P<Int> {
+
+            companion object: PCompanion<Int> {
+                override fun f(p: Int) = Unit
+            }
+        }
+        """)
+
+        try await check(swift: """
+        protocol P {
+            associatedtype T
+            func f(p: T)
+            static func sf(p: Int)
+        }
+        class C<T>: P {
+            func f(p: T) {
+            }
+            static func sf(p: Int) {
+            }
+        }
+        """, kotlin: """
+        internal interface P<T> {
+            fun f(p: T)
+        }
+        internal interface PCompanion<T> {
+            fun sf(p: Int)
+        }
+        internal open class C<T>: P<T> {
+            override fun f(p: T) = Unit
+
+            companion object: PCompanion<Any> {
+                override fun sf(p: Int) = Unit
+            }
+        }
+        """)
+
+        try await checkProducesMessage(swift: """
+        protocol P {
+            associatedtype T
+            func f(p: T)
+            static func sf(p: T)
+        }
+        class C<T>: P {
+            func f(p: T) {
+            }
+            static func sf(p: T) {
             }
         }
         """)

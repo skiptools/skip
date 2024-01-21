@@ -13,7 +13,7 @@ final class KotlinEnumTransformer: KotlinTransformer {
             synthesizeCaseIterable(for: classDeclaration, in: syntaxTree, codebaseInfo: codebaseInfo)
         } else if let functionCall = node as? KotlinFunctionCall, functionCall.isOptionalInit {
             // We change enum constructors to factory functions
-            if codebaseInfo.declarationType(forNamed: functionCall.inferredType) == .enumDeclaration {
+            if codebaseInfo.declarationType(forNamed: functionCall.inferredType)?.type == .enumDeclaration {
                 functionCall.isOptionalInit = false
             }
         }

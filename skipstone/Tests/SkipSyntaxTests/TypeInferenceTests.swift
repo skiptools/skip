@@ -1084,6 +1084,9 @@ final class TypeInferenceTests: XCTestCase {
             constructor(data: Int) {
                 this.data = data
             }
+
+            companion object: PCompanion<Int> {
+            }
         }
         internal fun f(p: P<*>): Unit = p.doSomething()
         internal fun <D> f(s: S<D>): Unit = s.doSomething()

@@ -47,7 +47,7 @@ struct TypeResolutionContext {
 
     /// Reutrn the declaration type for the given named type, if known.
     func declarationType(forNamed type: TypeSignature) -> StatementType? {
-        return codebaseInfo?.declarationType(forNamed: type)
+        return codebaseInfo?.declarationType(forNamed: type)?.type
     }
 
     private func qualifyNamed(type: TypeSignature, in base: TypeSignature, codebaseInfo: CodebaseInfo.Context) -> TypeSignature? {
