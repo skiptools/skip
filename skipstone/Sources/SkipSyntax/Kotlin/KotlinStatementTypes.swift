@@ -924,6 +924,7 @@ class KotlinClassDeclaration: KotlinStatement {
     var name: String
     var signature: TypeSignature
     var inherits: [TypeSignature] = []
+    var companionClass: TypeSignature?
     var companionInherits: [TypeSignature] = []
     var superclassCall: String?
     var annotations: [String] = []
@@ -985,8 +986,11 @@ class KotlinClassDeclaration: KotlinStatement {
                 kmembers += kpartitionedMembers
                 kstatement.movedExtensionImportModulePaths += extImportModulePaths
             }
+
+            kstatement.companionClass = codebaseInfo.companionClass(of: statement.signature)
+            //~~~ need to check if the first one is a companion class
+            kstatement.companionInherits = kstatement.inherits.compactMap { codebaseInfo.companionInterface(of: $0)?.constrainedTypeWithGenerics(kstatement.generics) }
         }
-        kstatement.companionInherits = kstatement.inherits.compactMap { translator.codebaseInfo?.companionInterface(of: $0)?.constrainedTypeWithGenerics(kstatement.generics) }
         kstatement.members = kmembers
         if statement.type == .enumDeclaration {
             kstatement.processEnumCaseDeclarations(messagesSource: translator.syntaxTree.source)
@@ -2115,19 +2119,14 @@ class KotlinInterfaceDeclaration: KotlinStatement {
     var name: String
     var signature: TypeSignature
     var inherits: [TypeSignature] = []
+    var companionInterface: TypeSignature?
     var companionInherits: [TypeSignature] = []
     var attributes = Attributes()
     var annotations: [String] = []
     var modifiers = Modifiers()
     var generics = Generics()
     var members: [KotlinStatement] = []
-    var hasCompanion = false
     var movedExtensionImportModulePaths: [[String]] = []
-
-    /// The name of the Companion interface for an interface with the given name.
-    static func companionInterfaceName(for name: String) -> String {
-        return name + "Companion"
-    }
 
     static func translate(statement: TypeDeclaration, translator: KotlinTranslator) -> [KotlinStatement] {
         let kstatement = KotlinInterfaceDeclaration(statement: statement)
@@ -2140,6 +2139,7 @@ class KotlinInterfaceDeclaration: KotlinStatement {
             kstatement.inherits.forEach { $0.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
             return [kstatement]
         }
+        kstatement.companionInterface = codebaseInfo.companionInterface(of: statement.signature)
 
         if let typeInfo = codebaseInfo.primaryTypeInfo(forNamed: statement.signature) {
             // Type info contains full resolved generics
@@ -2174,9 +2174,7 @@ class KotlinInterfaceDeclaration: KotlinStatement {
 
         // Kotlin interfaces cannot extend Any
         kstatement.inherits = kstatement.inherits.filter { $0 != .any && $0 != .anyObject }
-        kstatement.companionInherits = kstatement.inherits.compactMap { translator.codebaseInfo?.companionInterface(of: $0) }
-        kstatement.hasCompanion = !kstatement.companionInherits.isEmpty || translator.codebaseInfo?.companionInterface(of: statement.signature) != nil
-
+        kstatement.companionInherits = kstatement.inherits.compactMap { codebaseInfo.companionInterface(of: $0) }
         kstatement.inherits.forEach { $0.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
 
         let kextensionMembers = KotlinExtensionDeclaration.translateExtensionMembers(extensionMembers, of: kstatement.signature, visibility: kstatement.modifiers.visibility, generics: kstatement.generics, declarationType: .protocolDeclaration, translator: translator)
@@ -2270,9 +2268,9 @@ class KotlinInterfaceDeclaration: KotlinStatement {
         output.append(indentation).append("}\n")
 
         // Always add a companion interface to public types in case another module extends it with static members
-        if hasCompanion {
+        if let companionInterface {
             output.append(indentation)
-            output.append(visibilityDeclaration).append("interface ").append(Self.companionInterfaceName(for: name))
+            output.append(visibilityDeclaration).append("interface ").append(companionInterface.name)
             generics.append(to: output, indentation: indentation)
             if !companionInherits.isEmpty {
                 output.append(": ").append(companionInherits.map(\.kotlin).joined(separator: ", "))

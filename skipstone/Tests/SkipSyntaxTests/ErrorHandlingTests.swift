@@ -551,8 +551,6 @@ final class ErrorHandlingTests: XCTestCase {
         """, kotlin: """
         internal interface MyError: Error {
         }
-        internal interface MyErrorCompanion {
-        }
         internal fun throwit(error: MyError) {
             throw error as Throwable
         }

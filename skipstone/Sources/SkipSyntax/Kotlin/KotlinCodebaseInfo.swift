@@ -191,19 +191,36 @@ extension CodebaseInfo.Context {
         return items.contains { $0.declarationType == .functionDeclaration && $0.declaringType?.name == owningType?.name }
     }
 
+    //~~~ Change to single function that returns KotlinCompanionType
+
+    /// If the given class has a companion object class, return it.
+    func companionClass(of cls: TypeSignature) -> TypeSignature? {
+        guard let primaryTypeInfo = primaryTypeInfo(forNamed: cls) else {
+            return nil
+        }
+        // Use a companion class for any non-final class so that subclasses can inherit their static members by
+        // subclassing the companion class in their own companion object
+        guard primaryTypeInfo.declarationType == .classDeclaration, !primaryTypeInfo.modifiers.isFinal else {
+            return nil
+        }
+        //~~~ need a companion class if it extends something with a companion class
+        guard primaryTypeInfo.modifiers.visibility == .public || primaryTypeInfo.modifiers.visibility == .open ||
+        return TypeSignature.named(cls.name + "CompanionClass", [])
+    }
+
     /// If the given interface has a companion object interface, return it.
     func companionInterface(of interface: TypeSignature) -> TypeSignature? {
         let typeInfos = typeInfos(forNamed: interface)
-        guard let typeInfo = typeInfos.first(where: { $0.declarationType == .protocolDeclaration }) else {
+        guard let primaryTypeInfo = typeInfos.first(where: { $0.declarationType == .protocolDeclaration }) else {
             return nil
         }
         // Use a companion interface for any protocol that has static or init members, or that inherits from
         // a protocol with static or init members
-        let companionInterface: TypeSignature = .named(KotlinInterfaceDeclaration.companionInterfaceName(for: interface.name), interface.generics)
+        let companionInterface: TypeSignature = .named(interface.name + "CompanionInterface", interface.generics)
         if typeInfos.contains(where: { $0.members.contains(where: { $0.declarationType == .initDeclaration || ($0.declarationType == .variableDeclaration && $0.isStatic) || ($0.declarationType == .functionDeclaration && $0.isStatic) }) }) {
             return companionInterface
         }
-        for inherit in typeInfo.inherits {
+        for inherit in primaryTypeInfo.inherits {
             if self.companionInterface(of: inherit) != nil {
                 return companionInterface
             }

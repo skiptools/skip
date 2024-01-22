@@ -930,26 +930,3 @@ final class TypeDeclarationTests: XCTestCase {
         """)
     }
 }
-
-
-//~~~
-protocol PP {
-    init(s: String)
-    init(i: Int?)
-    static func f()
-//    static var i: Int { get }
-}
-extension PP {
-    static var i: Int {
-        return 10
-    }
-    init(s: String) {
-        self.init(i: Int(s))
-    }
-}
-func ff<T: PP>(p: T) {
-    let i = T.i
-}
-func ff2(p: any PP) {
-    let i = type(of: p).i
-}

@@ -18,6 +18,12 @@ struct KotlinBindingVariable {
     }
 }
 
+enum KotlinCompanionType {
+    case object
+    case `class`(TypeSignature)
+    case interface(TypeSignature)
+}
+
 enum KotlinDirectiveAttribute: String {
     case nocopy
 }
